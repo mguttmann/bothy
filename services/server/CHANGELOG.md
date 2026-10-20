@@ -221,6 +221,26 @@ documented in this file. The format is based on
   counts `bothy.terminal.relay.unpaired`; an opening then ends `open_failed` once, by
   compare-and-swap, and a detached session stays detached. With `cluster.mode = single` nothing of
   this runs and no `NOTIFY` is sent.
+- Terminal revocation, limits, audit and metrics (M2-46): every kind of revocation ends the
+  affected terminal sessions in the transaction that causes it. The module `terminal` subscribes
+  to `authorize.AccessChanged` (a removed `host` target or a lost owner status under SR10),
+  `identity.DeviceRevoked` and `identity.SessionEnded` (exact reasons `device_revoked`,
+  `logout`, `user_disabled`, `session_revoked`). The relay ends a session itself at
+  `terminal.idle_timeout` plus `terminal.idle_grace` without device bytes, at
+  `terminal.max_session_duration` after `opened_at` (across reattaching) and at
+  `terminal.detach_grace` in `detached`; the new job `terminal.sweep` (queue `maintenance`, every
+  `terminal.sweep_interval` and once at the start) repeats these checks in the database for the
+  sessions of a failed node and ends sessions whose login session was revoked or expired.
+  `terminal.open` counts the open sessions of the person and of the host under a person lock and
+  refuses with `403 terminal_denied`, `reason` `session_limit` at `terminal.max_sessions_per_person`
+  or `terminal.max_sessions_per_host`, without consuming the step-up. `rl.terminal` applies at
+  `identify` of the device stream, `rl.host` on control and data connections after the proof check,
+  and a failed check of presented credentials consumes `rl.public_auth` of the client address
+  (`4008` with `retry_after=<seconds>`). New instruments `bothy.terminal.sessions.active`,
+  `bothy.terminal.sessions.closed` and `bothy.terminal.hosts.connected`. The configuration keys
+  `terminal.idle_grace`, `terminal.max_session_duration`, `terminal.max_sessions_per_person`,
+  `terminal.max_sessions_per_host` and `terminal.sweep_interval` are now read by the server.
+  `identity.Auth.EndedSessions` returns the revoked or expired ones of a list of login sessions.
 - Upload sessions, parts and completion (M3-03): `createUpload`, `uploadPart`, `getUpload`,
   `completeUpload`, `abortUpload` and `getFile` in mode `direct`. The tables `files`,
   `file_upload_sessions` and `file_upload_parts` (with `files.search_vector`) and the validated
@@ -1553,6 +1573,14 @@ documented in this file. The format is based on
 
 ### Changed
 
+- One end function for terminal sessions (M2-46): every end goes through `EndSessions` with the
+  end value `domain.End` (reason, detail, exit code, closer, source, unwritten counts) and the one
+  closing statement `EndTerminalSession`, which replaces `CloseSession`, `CloseSessionReported` and
+  `CloseTerminalSessionByPerson`. The pair rule of 24 10.3 (`close_detail` exactly with
+  `open_failed` and `host_policy_violation`) now holds for every writer, not only host reports; the
+  first committed end wins, and a later end of a closed session writes nothing. The token `jti` of
+  every grant is a UUIDv7 on the clock of the use cases, so `terminal.sweep` reads the time of the
+  last grant from it.
 - Start and memory of the server process (M1-72): the production request validator no longer
   compiles the response schemas of every operation (only the test build with `contract_validate`
   keeps them for G8); `make perf` had measured `perf.startup_ready_max` and `perf.idle_rss_max`

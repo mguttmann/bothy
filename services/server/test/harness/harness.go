@@ -137,6 +137,12 @@ type Options struct {
 	// OnListen, when set, receives the origin of the own public listener before the server starts
 	// (an edge in front of several nodes routes to it, M2-47).
 	OnListen func(listenURL string)
+	// JobModules receives the use cases of the jobs (wire.Deps.JobModules, M2-46): a test runs
+	// authz.expiry_sweep or terminal.sweep directly.
+	JobModules func(*wire.JobModules)
+	// TerminalSessionMetrics replaces the session instruments of the terminal
+	// (wire.Deps.TerminalSessionMetrics, M2-46).
+	TerminalSessionMetrics terminalapp.SessionMetrics
 }
 
 // Server is a running harness server.
@@ -300,7 +306,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 
 		FilesImageHooks: opts.FilesImageHooks,
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
-		TerminalModule: opts.TerminalModule,
+		TerminalModule: opts.TerminalModule, JobModules: opts.JobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

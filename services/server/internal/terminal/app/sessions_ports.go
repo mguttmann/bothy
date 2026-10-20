@@ -41,6 +41,9 @@ type Expectation struct {
 	// slot already holds changes nothing, so a signal that arrives after a side built the
 	// expectation from the row, or twice, never resets the slot.
 	Grant ids.ID
+	// Times are the times of the row the deadlines of the relay start from (M2-46 Design note 7):
+	// state, opened_at, the time of the grant, started_at, detached_at and last_input_at.
+	Times domain.SessionTimes
 }
 
 // Counts are the live counts of the pairing of a session: bytes of the transport messages from and

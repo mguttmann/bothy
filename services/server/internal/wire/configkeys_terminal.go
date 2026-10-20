@@ -15,7 +15,8 @@ import (
 // a retiring signing key of the purpose terminal stays usable (19 section 10); and since M2-40 the
 // windows of the fresh step-up and of the quick reattach (24 section 17), read by authz; and since
 // M2-41 the confirmation of the fingerprint and the bounds of a report of a host; and since M2-45
-// the idle and detach windows the host service applies.
+// the idle and detach windows the host service applies; and since M2-46 the server's own
+// limits of a session.
 func terminalConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -105,6 +106,34 @@ func terminalConfigKeys() []config.Key {
 		{
 			Name: "terminal.detach_grace", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s",
 			Doc:     "This long a detached session stays attachable; announced to the host service in hello.",
+			Chapter: chapter24,
+		},
+		// The server's own limits of a session (M2-46, 24 sections 6.2 and 6.3): the relay and the
+		// job terminal.sweep end sessions without the help of the host service, and terminal.open
+		// counts the open sessions of the person and of the host.
+		{
+			Name: "terminal.idle_grace", Kind: config.KindDuration, Default: "2m", Min: "1s",
+			Doc:     "Grace after terminal.idle_timeout after which the server itself ends an idle session.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.max_session_duration", Kind: config.KindDuration, Default: "12h", Min: "1s",
+			Doc:     "Longest duration of a session from its opening, also across reattaching.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.max_sessions_per_person", Kind: config.KindInt, Default: "5", Min: "1",
+			Doc:     "Open sessions of one person; terminal.open is refused with session_limit at this count.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.max_sessions_per_host", Kind: config.KindInt, Default: "10", Min: "1",
+			Doc:     "Open sessions on one host; terminal.open is refused with session_limit at this count.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.sweep_interval", Kind: config.KindDuration, Default: thirtySeconds, Min: "1s",
+			Doc:     "Interval of the job terminal.sweep.",
 			Chapter: chapter24,
 		},
 		{

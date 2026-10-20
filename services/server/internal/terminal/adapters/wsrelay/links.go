@@ -55,6 +55,17 @@ type Links struct {
 	// hub is the handler of the signals across nodes (M2-47): connection IDs, presence and
 	// probation; nil before NewHub, which a process without the relay never builds.
 	hub *Hub
+	// metrics records bothy.terminal.hosts.connected (M2-46); nil records nothing.
+	metrics app.SessionMetrics
+}
+
+// BindMetrics sets the instrument bothy.terminal.hosts.connected (M2-46): +1 when a link of this
+// process becomes usable for sessions, -1 when it stops being usable. internal/wire calls it once
+// before the public listener opens.
+func (l *Links) BindMetrics(m app.SessionMetrics) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.metrics = m
 }
 
 // bindHub sets the hub of the process (NewHub).
@@ -265,8 +276,19 @@ func (l *Links) SendReady(hostID ids.ID) {
 }
 
 // publish sends host.presence_changed {host_id, connected}: resource host, no scope, no actor,
-// no seq. A failure is logged with the type only; presence is at most once.
+// no seq, and moves bothy.terminal.hosts.connected (every call is a change of a link of this
+// process). A failure is logged with the type only; presence is at most once.
 func (l *Links) publish(hostID ids.ID, connected bool) {
+	l.mu.Lock()
+	m := l.metrics
+	l.mu.Unlock()
+	if m != nil {
+		delta := int64(-1)
+		if connected {
+			delta = 1
+		}
+		m.HostsConnected(context.Background(), delta)
+	}
 	if l.publisher == nil {
 		return
 	}

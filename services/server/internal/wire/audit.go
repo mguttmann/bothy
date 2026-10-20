@@ -33,6 +33,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 )
 
 // AuditConfig binds the audit.* and privacy.audit_ip_* keys of v into the configuration of the
@@ -85,8 +86,15 @@ type Audit struct {
 //
 // Errors: a registry that cannot be built, and the errors of auditapp.NewRecorder.
 func NewAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek auditapp.KEKSource, log *slog.Logger) (*Audit, error) {
+	return NewAuditWithClock(pool, unitCfg, cfg, kek, nil, log)
+}
+
+// NewAuditWithClock is NewAudit with the clock of the rights hook of the registry (nil means
+// clock.System(); NewModulesWithClock, M2-46).
+func NewAuditWithClock(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek auditapp.KEKSource, clk clock.Clock,
+	log *slog.Logger) (*Audit, error) {
 	log = orDiscard(log)
-	mods := NewModules(pool, log)
+	mods := NewModulesWithClock(pool, clk, log)
 	reg, err := NewTxnRegistry(mods)
 	if err != nil {
 		return nil, err
@@ -249,6 +257,10 @@ func (a *Audit) NotifySubscribers() *notifyapp.Subscribers { return a.modules.No
 // RunsAcceptor returns the in-transaction acceptance of runs of the registry of the unit of work;
 // the chat step binds it to the runs use cases (M2-05).
 func (a *Audit) RunsAcceptor() *runsapp.Acceptor { return a.modules.RunsAcceptor }
+
+// TerminalSubscribers returns the subscribers of terminal in the txn registry of the process
+// (M2-46): the terminal step binds the use cases.
+func (a *Audit) TerminalSubscribers() *terminalapp.Subscribers { return a.modules.TerminalSubscribers }
 
 // Recorder returns the recorder; it implements auditing.Recorder.
 func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }

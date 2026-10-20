@@ -32,6 +32,8 @@ type RelayUseCases interface {
 	RelaySessionState(ctx context.Context, id ids.ID) (string, bool, error)
 	RelayOpeningTimedOut(ctx context.Context, id ids.ID) error
 	RelayExpectation(ctx context.Context, id ids.ID) (app.Expectation, bool)
+	// RelayEnd ends a session at a limit of the relay with its unwritten counts (M2-46).
+	RelayEnd(ctx context.Context, id ids.ID, reason domain.CloseReason, p domain.Progress) error
 }
 
 // Compile-time check: the use cases of the module.
@@ -50,6 +52,14 @@ type RelayConfig struct {
 	// control connection, so a node without the pairing never detaches on it, and a pairing of a
 	// session waiting for local confirmation is announced with terminal.session_paired.
 	Multi bool
+	// Windows are the limits of a session the relay enforces without the host service (M2-46
+	// Design note 7): terminal.idle_timeout plus terminal.idle_grace without device bytes,
+	// terminal.max_session_duration from opened_at and terminal.detach_grace in detached; the
+	// progress of a held session is written at most once per terminal.idle_grace. A zero Idle
+	// switches the limits off (tests of M2-44 that build a relay without them).
+	Windows domain.Windows
+	// Metrics records bothy.terminal.sessions.active (M2-46); nil records nothing.
+	Metrics app.SessionMetrics
 }
 
 // The log messages and keys of the relay: length, time, side, close code and session ID only
@@ -89,6 +99,8 @@ type Relay struct {
 	closing bool
 	// idle is signalled when the last side ends (the stop step waits for it).
 	idle *gosync.Cond
+	// writes counts the progress writes in flight, each until its counts are back after a failure.
+	writes gosync.WaitGroup
 }
 
 // Compile-time check: the outgoing port of the use cases.
@@ -115,6 +127,13 @@ func NewRelay(cfg RelayConfig, uc RelayUseCases, links app.ControlLinks, timers 
 	}
 	if log == nil {
 		log = slog.Default()
+	}
+	if cfg.Metrics == nil {
+		cfg.Metrics = app.NoSessionMetrics{}
+	}
+	w := cfg.Windows
+	if w.Idle > 0 && (w.IdleGrace <= 0 || w.MaxDuration <= 0 || w.DetachGrace <= 0) {
+		return nil, errors.New("wsrelay: terminal.idle_grace, terminal.max_session_duration and terminal.detach_grace must be positive")
 	}
 	r := &Relay{cfg: cfg, uc: uc, links: links, timers: timers, clk: clk, log: log, slots: map[ids.ID]*slot{}, sides: map[*side]bool{}}
 	r.idle = gosync.NewCond(&r.mu)
@@ -145,6 +164,30 @@ type slot struct {
 	in, out           int64
 	lastInput         time.Time
 	seenDev, seenHost bool
+	// times are the times of the row of the last grant, kept current from the log tail; lastDev
+	// is the last binary message from the device seen by this node, never cleared (M2-46 Design
+	// note 7). limitStop and limitGen are the timer of the limits; persisted the last write of the
+	// progress; storedInput the last input time written; counted the state this slot counts in
+	// bothy.terminal.sessions.active ("" none).
+	times       domain.SessionTimes
+	lastDev     time.Time
+	limitStop   func() bool
+	limitGen    int
+	persisted   time.Time
+	storedInput time.Time
+	counted     string
+	// flushStop and flushGen are the flush timer of the progress (persist).
+	flushStop func() bool
+	flushGen  int
+	// held marks a slot that held a side on this node since its grant: only such a node runs the
+	// limits (Design note 7: "one set per session the process holds a side of"). With several
+	// nodes every node expects the session, but only the node of the pairing sees the device's
+	// bytes; a new grant clears the mark there, because the next pairing may live elsewhere.
+	held bool
+	// limitEnded marks a slot whose limit timer ended the session on this node: a later row of
+	// the log tail (the active row of a reattach before the closed row) must not start it again,
+	// because a second end would carry no counts. A new grant clears it.
+	limitEnded bool
 }
 
 // queue is one direction of a slot, bounded by terminal.relay_buffer_max_bytes.
@@ -222,11 +265,99 @@ func (r *Relay) Expect(e app.Expectation) {
 	}
 	s.host, s.device, s.started, s.confirm, s.wdi, s.grant = e.HostID, e.DeviceID, e.Started, e.LocalConfirm, e.WorkdirIndex, e.Grant
 	s.toDev, s.toHost, s.seenDev, s.seenHost, s.paired = queue{}, queue{}, false, false, false
-	s.pairedOnce, s.pairedElsewhere, s.overdue = false, false, false
+	s.pairedOnce, s.pairedElsewhere, s.overdue, s.limitEnded = false, false, false, false
+	if r.cfg.Multi {
+		s.held = false
+		s.stopLimit()
+	}
 	s.gen++
 	r.arm(s, max(e.Deadline.Sub(r.clk.Now()), 0))
+	if !e.Times.OpenedAt.IsZero() {
+		s.times = e.Times
+	}
+	r.armLimit(s)
 	r.mu.Unlock()
 	fx.run(ctx)
+}
+
+// armLimit (re)starts the timer of the limits of s at the earliest of its deadlines
+// (domain.RelayDeadline); r.mu is held. Without configured windows or without the times of a row
+// nothing runs.
+func (r *Relay) armLimit(s *slot) {
+	if r.cfg.Windows.Idle <= 0 || s.times.OpenedAt.IsZero() || !s.held || s.limitEnded {
+		return
+	}
+	if s.limitStop != nil {
+		s.limitStop()
+	}
+	s.limitGen++
+	id, gen := s.id, s.limitGen
+	at, _ := domain.RelayDeadline(s.times, s.lastDev, r.cfg.Windows)
+	s.limitStop = r.timers.AfterFunc(max(at.Sub(r.clk.Now()), 0), func() { r.limitDeadline(id, gen) })
+}
+
+// limitDeadline is the timer of the limits of the session id (M2-46 Design note 7): when the
+// earliest deadline is reached (the instant itself ends), the session ends through
+// RelayUseCases.RelayEnd with the reason and the counts of this node; when device input moved the
+// idle deadline meanwhile, the timer starts again for the new deadline. The connections close
+// after the commit through the log tail (4100 with the reason).
+func (r *Relay) limitDeadline(id ids.ID, gen int) {
+	r.mu.Lock()
+	s := r.slots[id]
+	if s == nil || s.limitGen != gen || !s.held {
+		r.mu.Unlock()
+		return
+	}
+	at, reason := domain.RelayDeadline(s.times, s.lastDev, r.cfg.Windows)
+	if !domain.Reached(at, r.clk.Now()) {
+		r.armLimit(s)
+		r.mu.Unlock()
+		return
+	}
+	c := s.take()
+	s.limitGen++
+	s.limitEnded = true
+	r.mu.Unlock()
+	ctx := context.Background()
+	r.call(ctx, r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput}))
+}
+
+// hold marks s as held by this node and starts its limits, once per grant; r.mu is held.
+func (r *Relay) hold(s *slot) {
+	if s.held {
+		return
+	}
+	s.held = true
+	r.armLimit(s)
+}
+
+// countState moves the state s counts in bothy.terminal.sessions.active to state ("" stops
+// counting it); r.mu is held.
+func (r *Relay) countState(s *slot, state string) {
+	if s.counted == state {
+		return
+	}
+	ctx := context.Background()
+	if s.counted != "" {
+		r.cfg.Metrics.SessionsActive(ctx, s.counted, -1)
+	}
+	if state != "" {
+		r.cfg.Metrics.SessionsActive(ctx, state, 1)
+	}
+	s.counted = state
+}
+
+// heldState is the state a slot counts once it holds a side: the state of its row, opening when
+// none is known yet.
+func (s *slot) heldState() string {
+	switch st := s.times.State; st {
+	case domain.SessionOpening, domain.SessionActive, domain.SessionDetached:
+		return st
+	}
+	if s.started {
+		return domain.SessionActive
+	}
+	return domain.SessionOpening
 }
 
 // arm starts the deadline of s after d; r.mu is held.
@@ -292,7 +423,7 @@ func (r *Relay) expire(s *slot, started bool, state string) effects {
 		// The pairing on another node met the opening deadline there; the host service bounds
 		// start and consent itself (ruling D-M2-47-3).
 		s.stopDeadline()
-		delete(r.slots, s.id)
+		r.forget(s)
 		return nil
 	}
 	return r.apply(s, domain.Decide(s.state(), domain.RelayEvent{Kind: domain.EvDeadline}))
@@ -350,7 +481,16 @@ func (r *Relay) apply(s *slot, acts []domain.RelayAction) effects {
 	}
 	if wasPaired && !s.paired && !dropped {
 		id, c := s.id, s.take()
-		fx = append([]func(context.Context){func(ctx context.Context) { r.call(ctx, r.uc.RelayCounters(ctx, id, c)) }}, fx...)
+		fx = append([]func(context.Context){func(ctx context.Context) {
+			if err := r.uc.RelayCounters(ctx, id, c); err != nil {
+				r.call(ctx, err)
+				r.giveBack(id, c)
+			}
+		}}, fx...)
+	}
+	if s.dev == nil && s.hst == nil && !dropped {
+		// A session without a connection on this node is not held here (M2-46 Design note 12 b).
+		r.countState(s, "")
 	}
 	return fx
 }
@@ -364,8 +504,20 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 	case domain.ActCloseHost:
 		r.closeSide(s, s.hst, a.Code, a.Reason)
 	case domain.ActActivate:
+		// The detach limit stops now on this node, the mirror of ActDetach; the committed row of
+		// the log tail replaces the local state (red team M2-46, B1).
+		if s.times.State == domain.SessionDetached {
+			s.times.State, s.times.DetachedAt = domain.SessionActive, time.Time{}
+			r.armLimit(s)
+		}
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayActivate(ctx, id)) }
 	case domain.ActDetach:
+		// The detach limit starts now on this node; the committed detached_at of the log tail
+		// replaces the instant (M2-46 Design note 7 b).
+		if s.times.State == domain.SessionActive {
+			s.times.State, s.times.DetachedAt = domain.SessionDetached, r.clk.Now()
+			r.armLimit(s)
+		}
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }
 	case domain.ActEndOpenFailed:
 		detail := a.Detail
@@ -388,9 +540,25 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 		return func(ctx context.Context) { r.uc.RelayUnpaired(ctx, side) }
 	case domain.ActDrop:
 		s.stopDeadline()
-		delete(r.slots, id)
+		r.forget(s)
 	}
 	return nil
+}
+
+// stopLimit stops the timer of the limits of s, if any; r.mu is held.
+func (s *slot) stopLimit() {
+	if s.limitStop != nil {
+		s.limitStop()
+	}
+	s.limitGen++
+}
+
+// forget removes the slot s: its timers stop and it no longer counts as held; r.mu is held.
+func (r *Relay) forget(s *slot) {
+	s.stopLimit()
+	s.stopFlush()
+	r.countState(s, "")
+	delete(r.slots, s.id)
 }
 
 // stopDeadline stops the running deadline of s, if any.
@@ -463,6 +631,10 @@ func (r *Relay) attachDevice(sessionID, deviceID ids.ID, ws *websocket.Conn) (*s
 	}
 	sd := r.newSide(domain.SideClient, sessionID, ws)
 	s.dev = sd
+	if s.counted == "" {
+		r.countState(s, s.heldState())
+	}
+	r.hold(s)
 	fx = append(fx, r.pairIfBoth(s)...)
 	r.armLone(s, sd)
 	r.mu.Unlock()
@@ -500,6 +672,10 @@ func (r *Relay) attachHost(sessionID, hostID ids.ID, ws *websocket.Conn) (*side,
 	}
 	sd := r.newSide(domain.SideHost, sessionID, ws)
 	s.hst = sd
+	if s.counted == "" {
+		r.countState(s, s.heldState())
+	}
+	r.hold(s)
 	fx = append(fx, r.pairIfBoth(s)...)
 	r.armLone(s, sd)
 	r.mu.Unlock()
@@ -649,12 +825,100 @@ func (r *Relay) forward(sd *side, msg []byte) {
 	q.msgs = append(q.msgs, msg)
 	q.bytes += len(msg)
 	r.wakeLocked(to)
+	fx := r.persist(s)
 	r.mu.Unlock()
+	fx.run(context.Background())
+}
+
+// persist is the one place that decides the progress write of s (M2-46 Design note 7 d,
+// D-M2-46-7 and D-M2-46-22): the counts since the last write are added once and last_input_at moves
+// forward, without an event and without a new version. It writes when terminal.idle_grace passed
+// since the last attempt (domain.PersistDue) and also at once when unwritten input is a full grace
+// newer than the last input sent, so an output-only write never holds input back. Otherwise, while
+// unwritten input waits, a flush timer writes it at the last attempt plus the grace, so input reaches
+// the store within one grace even when no further frame arrives. A failed write gives its counts
+// back and comes through here again, so it is retried at most once per grace. Together: the stored
+// last_input_at lags the true one by less than the grace while the store works, and the relay
+// writes at most twice per grace. r.mu is held.
+func (r *Relay) persist(s *slot) effects {
+	if r.cfg.Windows.Idle <= 0 || r.closing || (s.in == 0 && s.out == 0 && s.lastInput.IsZero()) {
+		return nil
+	}
+	now, grace := r.clk.Now(), r.cfg.Windows.IdleGrace
+	inputDue := !s.lastInput.IsZero() && s.lastInput.Sub(s.storedInput) >= grace
+	if !inputDue && !domain.PersistDue(s.persisted, now, grace) {
+		if !s.lastInput.IsZero() && s.flushStop == nil {
+			s.flushGen++
+			id, gen := s.id, s.flushGen
+			s.flushStop = r.timers.AfterFunc(s.persisted.Add(grace).Sub(now), func() { r.flush(id, gen) })
+		}
+		return nil
+	}
+	s.stopFlush()
+	s.persisted = now
+	id, c := s.id, s.take()
+	if !c.LastInput.IsZero() {
+		s.storedInput = c.LastInput
+	}
+	r.writes.Add(1)
+	return effects{func(ctx context.Context) {
+		go func() {
+			defer r.writes.Done()
+			if err := r.uc.RelayCounters(ctx, id, c); err != nil {
+				r.call(ctx, err)
+				r.giveBack(id, c)
+			}
+		}()
+	}}
+}
+
+// flush is the flush timer of the progress of the session id (persist).
+func (r *Relay) flush(id ids.ID, gen int) {
+	r.mu.Lock()
+	s := r.slots[id]
+	if s == nil || s.flushGen != gen {
+		r.mu.Unlock()
+		return
+	}
+	s.flushStop = nil
+	fx := r.persist(s)
+	r.mu.Unlock()
+	fx.run(context.Background())
+}
+
+// stopFlush stops the flush timer of s, if any; r.mu is held.
+func (s *slot) stopFlush() {
+	if s.flushStop != nil {
+		s.flushStop()
+		s.flushStop = nil
+	}
+	s.flushGen++
+}
+
+// giveBack adds counts of a failed write back to the slot of the session, if it still exists, and
+// lets persist schedule the retry.
+func (r *Relay) giveBack(id ids.ID, c app.Counts) {
+	r.mu.Lock()
+	s := r.slots[id]
+	var fx effects
+	if s != nil {
+		s.in += c.In
+		s.out += c.Out
+		if c.LastInput.After(s.lastInput) {
+			s.lastInput = c.LastInput
+		}
+		fx = r.persist(s)
+	}
+	r.mu.Unlock()
+	fx.run(context.Background())
 }
 
 // count adds a message of n bytes from kind to the counters of s; r.mu is held.
 func (r *Relay) count(s *slot, kind domain.Side, n int) {
 	if kind == domain.SideClient {
+		// Every binary message of the device moves the idle reference of this node, the handshake
+		// included (24 section 6.3: only device bytes count).
+		s.lastDev = r.clk.Now()
 		if !s.seenDev {
 			s.seenDev = true
 			return
@@ -831,6 +1095,41 @@ type sessionEnd struct {
 	State       string `json:"state"`
 	CloseReason string `json:"close_reason"`
 	CloseDetail string `json:"close_detail"`
+	// OpenedAt, StartedAt and DetachedAt keep the times of a held slot current (M2-46).
+	OpenedAt   string `json:"opened_at"`
+	StartedAt  string `json:"started_at"`
+	DetachedAt string `json:"detached_at"`
+}
+
+// observeTimes takes the state and the times of a committed terminal_session.changed into the slot
+// of the session on this node, moves its count in bothy.terminal.sessions.active and restarts the
+// timer of its limits (M2-46 Design note 7 b: detached_at starts terminal.detach_grace).
+func (r *Relay) observeTimes(id ids.ID, p sessionEnd) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.slots[id]
+	if s == nil {
+		return
+	}
+	s.times.State = p.State
+	if t, err := time.Parse(time.RFC3339Nano, p.OpenedAt); err == nil && s.times.OpenedAt.IsZero() {
+		// opened_at never changes; the row's value of the expectation keeps its full precision.
+		s.times.OpenedAt = t
+	}
+	s.times.StartedAt, s.times.DetachedAt = parseStamp(p.StartedAt), parseStamp(p.DetachedAt)
+	if s.counted != "" {
+		r.countState(s, s.heldState())
+	}
+	r.armLimit(s)
+}
+
+// parseStamp parses an RFC 3339 time of a payload; "" or an invalid value is the zero time.
+func parseStamp(v string) time.Time {
+	t, err := time.Parse(time.RFC3339Nano, v)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 // ObserveLogEvent is the third consumer of the log tail of an api process (Design note 11 of
@@ -848,6 +1147,7 @@ func (r *Relay) ObserveLogEvent(ctx context.Context, typ string, resourceID ids.
 		return
 	}
 	if p.State != domain.SessionClosed {
+		r.observeTimes(resourceID, p)
 		r.observeStarted(ctx, resourceID, p.State)
 		return
 	}
@@ -918,6 +1218,10 @@ func (r *Relay) Shutdown(ctx context.Context) error {
 		if s.stop != nil {
 			s.stop()
 		}
+		if s.limitStop != nil {
+			s.limitStop()
+		}
+		s.stopFlush()
 	}
 	for sd := range r.sides {
 		sd.close(int(domain.StreamServerRestart), "")

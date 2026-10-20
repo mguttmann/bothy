@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	syncjobs "github.com/OWNER/bothy/services/server/internal/sync/adapters/jobs"
+	terminaljobs "github.com/OWNER/bothy/services/server/internal/terminal/adapters/jobs"
 )
 
 // jobsKeys are the configuration keys of the job runtime (02 "Konfigurationswerte dieses
@@ -109,6 +110,24 @@ type JobModules struct {
 	FilesImages filesjobs.ImageRunner
 	// FilesImageTimeout is file.image.processing_timeout, the River timeout of files.thumbnail.
 	FilesImageTimeout time.Duration
+	// TerminalSweep is the use case of terminal.sweep (M2-46).
+	TerminalSweep terminaljobs.Sweeper
+	// TerminalSweepInterval is terminal.sweep_interval.
+	TerminalSweepInterval time.Duration
+}
+
+// TerminalSweepConfig binds terminal.sweep_interval, the period of terminal.sweep (M2-46).
+type TerminalSweepConfig struct {
+	Interval time.Duration `config:"terminal.sweep_interval"`
+}
+
+// TerminalSweepConfigFrom binds TerminalSweepConfig from v; the error names the key, never a value.
+func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
+	var c TerminalSweepConfig
+	if err := config.Bind(v, &c); err != nil {
+		return TerminalSweepConfig{}, err
+	}
+	return c, nil
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
@@ -117,8 +136,9 @@ type JobModules struct {
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
 // audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
 // on the queue files without a River job timeout (M3-04) and files.thumbnail on the queue files
-// with the timeout file.image.processing_timeout (M3-06); the error is the first rejected
-// registration.
+// with the timeout file.image.processing_timeout (M3-06), and terminal.sweep on the queue
+// maintenance, periodic with terminal.sweep_interval and once at the start (M2-46); the error is
+// the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -149,6 +169,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := filesjobs.RegisterThumbnail(reg, m.FilesImages, m.FilesImageTimeout); err != nil {
+		return nil, err
+	}
+	if err := terminaljobs.Register(reg, m.TerminalSweep, m.TerminalSweepInterval); err != nil {
 		return nil, err
 	}
 	return reg, nil

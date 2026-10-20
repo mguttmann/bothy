@@ -261,7 +261,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		// M2-05: the run instruments of 4.3.
 		"bothy.run.active", "bothy.run.duration", "bothy.run.finished", "bothy.run.start.latency",
 		"bothy.storage.volume.free", "bothy.storage.volume.size",
-		"bothy.telemetry.dropped", "bothy.terminal.relay.unpaired", "db.client.operation.duration", "http.server.request.duration",
+		"bothy.telemetry.dropped", "bothy.terminal.hosts.connected", "bothy.terminal.relay.unpaired", "bothy.terminal.sessions.active",
+		"bothy.terminal.sessions.closed", "db.client.operation.duration", "http.server.request.duration",
 		// M4-31: the app metrics of 4.6a and the discard counter of their endpoint.
 		"bothy.client.catchup.duration", "bothy.client.catchup.events", "bothy.client.cold_start.duration",
 		"bothy.client.frames", "bothy.client.frames.over_budget", "bothy.client.outbox.depth",

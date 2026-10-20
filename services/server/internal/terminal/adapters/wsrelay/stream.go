@@ -69,6 +69,9 @@ type StreamDeps struct {
 	Clock clock.Clock
 	// Log receives panics without content; nil means slog.Default().
 	Log *slog.Logger
+	// Limiter applies rl.terminal at identify and rl.public_auth to failed credentials (M2-46);
+	// nil means NoLimiter.
+	Limiter Limiter
 }
 
 // StreamHandler is the HTTP handler of GET /api/v1/terminal/sessions/{session_id}/stream (asyncapi
@@ -103,6 +106,9 @@ func NewStreamHandler(cfg StreamConfig, d StreamDeps) (*StreamHandler, error) {
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()
+	}
+	if d.Limiter == nil {
+		d.Limiter = NoLimiter{}
 	}
 	return &StreamHandler{cfg: cfg, d: d, origin: u}, nil
 }
@@ -208,7 +214,10 @@ func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID
 }
 
 // identify reads identify within terminal.open_timeout and decides it (the table of Design note
-// 8). It returns the principal, or the close code with its reason.
+// 8). It returns the principal, or the close code with its reason. Presented credentials reserve
+// one token of rl.public_auth of the client address first and keep it when the check fails (4004
+// or 4012); with the bucket empty the stream closes with 4008 before any check (M2-46 Design note
+// 10 c).
 func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids.ID) (actor.Actor, int, string) {
 	in, code, reason := h.readIdentify(ctx, ws, id)
 	if code != 0 {
@@ -218,6 +227,19 @@ func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids
 		// The console path (cookie session) is M6-18's; any other identify without a token fails.
 		return h.authFailed(ctx, id)
 	}
+	ok, retry, settle := h.d.Limiter.ReserveCredentials(clientIP(ctx))
+	if !ok {
+		return actor.Actor{}, int(domain.CodeRateLimited), retryText(retry)
+	}
+	a, code, reason := h.checkCredentials(ctx, in, id)
+	settle(code == int(domain.StreamAuthFailed) || code == int(domain.StreamRevoked))
+	return a, code, reason
+}
+
+// checkCredentials verifies the access token and its proof of identify, applies rl.terminal to
+// the human principal (after the credential check, before authorize; 05 section 3) and authorizes
+// terminal.stream.
+func (h *StreamHandler) checkCredentials(ctx context.Context, in rest.TerminalStreamIdentify, id ids.ID) (actor.Actor, int, string) {
 	ip, _ := reqmeta.ClientIP(ctx)
 	a, err := h.d.Authenticator.Authenticate(ctx, actor.Credentials{Method: http.MethodGet, HTU: h.htu(id),
 		Authorization: "DPoP " + *in.AccessToken, DPoP: *in.Dpop, DPoPProofs: []string{*in.Dpop}, ClientIP: ip})
@@ -229,6 +251,11 @@ func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids
 		return h.authFailed(ctx, id)
 	case a.Kind == actor.KindUser && a.DeviceID != ids.ID(in.DeviceId):
 		return h.authFailed(ctx, id)
+	}
+	if a.Kind == actor.KindUser {
+		if ok, retry := h.d.Limiter.AllowTerminal(a.ID); !ok {
+			return actor.Actor{}, int(domain.CodeRateLimited), retryText(retry)
+		}
 	}
 	// Agents, apps and personal tokens reach authorize too, whose gate answers them (TM-T17).
 	sc, reason, err := h.d.UseCases.StreamAccess(actor.WithActor(ctx, a), a, id)

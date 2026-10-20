@@ -11,28 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const closeSession = `-- name: CloseSession :execrows
-UPDATE terminal_sessions
-SET state = 'closed', closed_at = $1, close_reason = $2, detached_at = NULL, version = version + 1
-WHERE id = $3 AND state <> 'closed'
-`
-
-type CloseSessionParams struct {
-	ClosedAt    pgtype.Timestamptz
-	CloseReason pgtype.Text
-	ID          pgtype.UUID
-}
-
-// Closes a session as the server: closed_at, close_reason, no detail and no closer, detached_at
-// cleared (03 terminal_sessions_detached_check), version raised.
-func (q *Queries) CloseSession(ctx context.Context, arg CloseSessionParams) (int64, error) {
-	result, err := q.db.Exec(ctx, closeSession, arg.ClosedAt, arg.CloseReason, arg.ID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const lockOpenSessions = `-- name: LockOpenSessions :many
 
 SELECT id, host_id, user_id, host_session_user_id, opened_by_device_id, device_id, auth_session_id, profile, state, token_jti, key_generation, opened_at, started_at, detached_at, last_input_at, closed_at, closed_by, close_reason, close_detail, exit_code, bytes_in, bytes_out, version FROM terminal_sessions
@@ -48,7 +26,8 @@ type LockOpenSessionsParams struct {
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// Queries of the table terminal_sessions (M2-39: the end of sessions by the server).
+// Queries of the table terminal_sessions (M2-39): the open sessions of a host; the end itself is
+// EndTerminalSession of ending.sql (M2-46).
 // The sessions of a host that are not closed, of one person or of everyone (zero user), locked in
 // ascending id (03 section 6.3).
 func (q *Queries) LockOpenSessions(ctx context.Context, arg LockOpenSessionsParams) ([]TerminalSession, error) {

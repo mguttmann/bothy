@@ -103,15 +103,31 @@ func (s *memStore) update(id ids.ID, f func(*domain.Session)) error {
 	return nil
 }
 
-func (s *memStore) CloseSession(_ context.Context, id ids.ID, reason domain.CloseReason, at time.Time) error {
-	return s.update(id, func(x *domain.Session) { x.State, x.CloseReason, x.ClosedAt = domain.SessionClosed, reason, at })
-}
-
-func (s *memStore) CloseSessionReported(_ context.Context, id ids.ID, end domain.HostSessionEnd, at time.Time) error {
+func (s *memStore) EndSession(_ context.Context, id ids.ID, end domain.End, at time.Time) error {
 	return s.update(id, func(x *domain.Session) {
-		x.State, x.CloseReason, x.CloseDetail, x.ClosedAt = domain.SessionClosed, end.Reason, end.Detail, at
+		x.State, x.CloseReason, x.CloseDetail, x.ClosedBy, x.ClosedAt = domain.SessionClosed, end.Reason, end.Detail, end.ClosedBy, at
 	})
 }
+
+func (s *memStore) CountOpenSessions(_ context.Context, userID, hostID ids.ID) (int, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	person, host := 0, 0
+	for _, x := range s.sessions {
+		if x.State == domain.SessionClosed {
+			continue
+		}
+		if x.UserID == userID {
+			person++
+		}
+		if x.HostID == hostID {
+			host++
+		}
+	}
+	return person, host, nil
+}
+
+func (s *memStore) LockPersonForOpen(context.Context, ids.ID) error { return nil }
 
 func (s *memStore) AddCounters(context.Context, ids.ID, int64, int64, time.Time) error { return nil }
 

@@ -1,6 +1,6 @@
 # Modul `terminal`
 
-Status: Datensätze der Rechner (M2-39), Rechte des Terminals (M2-40), Kopplung (M2-41), control connection of the host services (M2-43), terminal sessions, session token and relay (M2-44), the terminal across several api nodes (M2-47). Revocation of every kind, idle and maximum duration, session limits and the remaining metrics come with M2-46. Normativ ist [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); bei Abweichung gilt das Kapitel.
+Status: Datensätze der Rechner (M2-39), Rechte des Terminals (M2-40), Kopplung (M2-41), control connection of the host services (M2-43), terminal sessions, session token and relay (M2-44), the terminal across several api nodes (M2-47), revocation of every kind, the server's own limits of a session, session limits, rate limits of the terminal channels and the session metrics (M2-46). Normativ ist [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
 
@@ -19,7 +19,7 @@ Rechner und Kopplung, Erklärung der LLM-Anmeldung (I6), Sitzungsbenutzer je Per
 
 - Eingehend: `Hosts` (M2-39; `SetLlmCredentials` seit M2-40) and `Sessions` (M2-44: `Open`, `Attach`, `List`, `Get`, `Close`, implemented by `app.Sessions`). The relay is no port for other modules; it lives in `adapters/wsrelay` (02 4.3).
 - Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: ab M2-46 kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (Sitzungen beenden).
+- Abonniert In-Tx-Ereignisse: kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (M2-46: they end sessions in the transaction of the revocation; `app.Subscribers`, see "Built in M2-46").
 - Implementiert Quellen-Ports und Querschnitts-Ports: `authz.HostSource` (Zustand, Inhaber, LLM-Erklärung, Server-Host des Rechners), gebunden in `internal/wire` für Authorizer, Rechte-Hook und Freigaben.
 
 ## Abhängigkeiten
@@ -36,6 +36,14 @@ Geprüft durch go-arch-lint (ADR 0008).
 `hosts`, `host_session_users`, `terminal_sessions`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+
+## Retention (M2-46)
+
+| Table | Retention class | Deleted by |
+|---|---|---|
+| `terminal_sessions` | `security` (`retention.security_after_end` after `closed_at`) | the job `retention.security` of M7-05 (DP-T05), not this module |
+
+`terminal_sessions` holds metadata only: times, state, close reason and detail, exit code, byte counts and IDs; never terminal content, commands, environment variables, paths or profile command lines. There is no content recording (OQ-04 default, D-M2-46-15). The retention of `hosts` and `host_session_users` follows their rows in [20-datenschutz.md](../../../../docs/spec/20-datenschutz.md).
 
 ## Aktionen (05-aktionen.md)
 
@@ -164,7 +172,8 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 - M2-47 (built, see "Built in M2-47"): the duplicate probe and the presence across nodes behind `app.ControlLinks`, the signals through `app.Signals` and `app.SignalHandler`.
 - M7-17: the rest of the operation of several nodes on the same `cluster.mode`; it may merge the listener `terminal_ephemeral` with its own `LISTEN ephemeral` connection, which the namespaced kinds (prefix `terminal.`) allow, and may add a signal kind for the re-sent `ready` (D-M2-47-17).
 - M2-44: Sitzungen und Relais; ergänzt `EndSessions` um `terminal_session.changed`, den Schließ-Code `4100` und `session.close` an den Host-Dienst.
-- M2-46: Entzug, Grenzen und Metriken (`bothy.terminal.sessions.closed`), Job `terminal.sweep`.
+- M2-46 (built, see "Built in M2-46"): revocation through the three subscriptions, the limits in the relay and in `terminal.sweep`, the session limits, the rate limits of the channels and the session metrics.
+- M2-48: runs TM-T06, TM-T10 and TM-T11 against the real host service in a container; M7-05: deletes `terminal_sessions` rows with `retention.security`.
 
 ## Hinweise für den Bau
 
@@ -304,3 +313,89 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   side), `app` (`LocalSignals`, staged signals), `adapters/wsrelay` (the handler), `internal/wire`
   (key and wiring), `test/terminal/multinode` (TM-T15 and the cross-node tests over two in-process
   nodes) and `test/edge` (the example edge with the real nginx image and the overlay).
+
+## Built in M2-46
+
+Every revocation and every limit ends terminal sessions without the help of the host service
+([24-terminal.md](../../../../docs/spec/24-terminal.md) sections 6.3, 8.3 and 10.3; the reasons
+are the rows `D-M2-46-<n>` of [DECISIONS.md](../../../../docs/DECISIONS.md)).
+
+- One end function: `app.Service.EndSessions` (inside the caller's unit of work) and `EndSession`
+  (its own unit, as the system) with the selector members `SessionID`, `DeviceID` and
+  `AuthSessionIDs` besides `HostID`, `UserID` and `ExceptUserID`. The end value is `domain.End`
+  (`Reason`, `Detail`, `ExitCode *int`, `ClosedBy`, `Source`, `Progress`) with `domain.EndSource`
+  `server`, `host` or `close_request`; `domain.ServerEnd` and `domain.HostEnd` build it, and
+  `End.Normalized` keeps an exit code only with `process_exited` from the host and a closer only
+  with `close_request`. `domain.ValidateEnd` applies the pair rule of 24 10.3 to every writer.
+  Every end goes through `finish`: the one closing statement `EndTerminalSession`
+  (`queries/ending.sql`, the only statement that sets `close_reason`; it replaces `CloseSession`,
+  `CloseSessionReported` and `CloseTerminalSessionByPerson`) with `WHERE state <> 'closed'`, the
+  audit entry `terminal.terminate` as the system with exactly `session_id`, `close_reason`,
+  `close_detail` (only when set), `bytes_in`, `bytes_out` and `duration_ms` (or `terminal.close`
+  for an end by a person), the personal event `terminal_session.changed`, and
+  `bothy.terminal.sessions.closed` after the commit. A session that is already closed is skipped:
+  the first committed end wins.
+- Close path: no connection is touched in a transaction. The log tail of every api process hands
+  the committed `terminal_session.changed` with `closed` to the relay, which closes the host data
+  connection it holds with `4100` and the device stream with the code of `domain.StreamCodeForEnd`
+  (`4100` for every revocation and limit; `4101` or `4104` for an `open_failed` with a token or
+  handshake detail, M2-44) and the `close_reason` as reason, and the process
+  holding the host's control connection sends `session.close`, after which the PTY helper ends the
+  whole process tree. A host service that was offline gets `session.close` at its next login
+  (`live_sessions`, M2-43).
+- Subscriptions (`app/subscribers.go`, `app/revocation.go`): `Subscribers` with
+  `OnAccessChanged` (removed host targets end that person's sessions on the host; a lost owner
+  status ends what `domain.SR10Lost` names; reasons from `domain.ReasonForLostHost`),
+  `OnDeviceRevoked` (sessions whose current `device_id` is the device,
+  `domain.ReasonForDeviceRevoke`) and `OnSessionEnded` (sessions of the ended login sessions,
+  `domain.ReasonForSessionEnd`). `internal/wire` builds them with the txn registry (golden file
+  `txn_registrations.golden`) and binds the use cases in the terminal step (`Subscribers.Bind`).
+  Unbound, a subscriber does nothing without open sessions and fails the unit when it finds a
+  session it would have to end, so a revocation never commits around an open session.
+- Job `terminal.sweep` (`adapters/jobs`, `app/sweep.go`): queue `maintenance`, every
+  `terminal.sweep_interval` and once at the start, roles `worker` and `all`, no actor. It reads the
+  sessions that are not closed with the state of their host (`SweepCandidates`), asks identity
+  which login sessions ended (`app.AuthSessions`, bound to `identity.Auth.EndedSessions`), and ends
+  each session in its own unit of work (host row, then session row) with the first match of
+  `domain.SweepVerdict`: host not `active`, login session ended, `opening` past the last grant
+  plus `terminal.open_timeout` (not on a host reporting `require_local_confirm`), `max_duration`,
+  `detach_expired`, `idle_timeout` with the stored `last_input_at`. The last grant is the UUIDv7
+  time of `token_jti`, which the use cases now generate on their clock.
+- Deadlines of the relay (`adapters/wsrelay/relay.go`, `domain/deadlines.go`): per held session one
+  timer on the existing scheduler port `app.Timers` at `domain.RelayDeadline` (idle from the
+  latest of the last device message this process saw, `last_input_at`, `started_at` and
+  `opened_at` plus `terminal.idle_timeout` plus `terminal.idle_grace`, in every open state;
+  `opened_at` plus `terminal.max_session_duration` across reattaching; `detached_at` plus
+  `terminal.detach_grace`). The instant itself ends (`domain.Reached`); the relay ends through
+  `RelayEnd` with its unwritten counts. Progress: the relay writes its counts since the last write
+  as additions at most once per `terminal.idle_grace` (`domain.PersistDue`) and when a pairing is
+  released, `last_input_at` only forward, without a new version and without an event; a failed
+  periodic write gives the counts back to the slot.
+- Session limits (`app/sessions_open.go`): the unit of work of `terminal.open` takes the person
+  lock (`LockPersonForOpen`, an advisory lock), consumes the step-up (the first row lock), locks
+  the host row and compares the counts of `CountOpenSessions` with those of the decision; when they
+  moved, the opening starts again with a new decision, at most `database.tx_retry_max` times, then
+  `503 unavailable`. The guard `terminal_session_limit` lives in `authz` (`403 terminal_denied`,
+  `reason` `session_limit`); a denial keeps the step-up. The recheck after the commit does not
+  repeat the limit.
+- Rate limits (`adapters/wsrelay/limits.go`, bound in `internal/wire` to `platform/ratelimit`):
+  `rl.terminal` of the person at `identify` of the device stream after the credential check,
+  `rl.host` of the host after the proof check on control and data connections, and one token of
+  `rl.public_auth` of the client address for each failed check of presented credentials; an empty
+  bucket closes with `4008` and `retry_after=<seconds>`. REST opening and attaching count against
+  `rl.terminal` in the REST chain.
+- Metrics (`app/metrics.go`, `adapters/otelmetrics`): `bothy.terminal.sessions.closed`
+  (`bothy.reason`, after the commit in the process that committed the end, api and worker),
+  `bothy.terminal.sessions.active` (`bothy.terminal.state`, the sessions the relay of this api
+  process holds with at least one connection) and `bothy.terminal.hosts.connected` (the control
+  connections of this process that are usable for sessions), next to M2-44's
+  `bothy.terminal.relay.unpaired`; closed attribute sets, no ID of a person, no host name, no span
+  per frame.
+- Configuration keys consumed first here (`internal/wire/configkeys_terminal.go`):
+  `terminal.idle_grace`, `terminal.max_session_duration`, `terminal.max_sessions_per_person`,
+  `terminal.max_sessions_per_host`, `terminal.sweep_interval`; besides `terminal.idle_timeout`,
+  `terminal.detach_grace`, `terminal.open_timeout` and `database.tx_retry_max`.
+- Tests: `domain` (`ending_test.go`, `deadlines_test.go`), `adapters/wsrelay`
+  (`relay_limits_internal_test.go`), `adapters/otelmetrics` (`TestTerminalMetrics_ClosedAttributes`)
+  and the integration tests of `test/terminal` over the full-server harness with the Fake-Hosts on a
+  fake clock with the deadline scheduler `fakehost.ClockTimers`.

@@ -39,14 +39,34 @@ const hostStateActive = "active"
 type TerminalLiveFacts struct {
 	HostConnected, ProfileKnown bool
 	SessionDeviceID             ids.ID
+	// OpenSessionsOfPerson and OpenSessionsOfHost are the sessions of the person and of the host
+	// that are not closed (terminal.open only, M2-46); MaxSessionsPerPerson and MaxSessionsPerHost
+	// are terminal.max_sessions_per_person and terminal.max_sessions_per_host, zero for not
+	// configured.
+	OpenSessionsOfPerson, OpenSessionsOfHost int
+	MaxSessionsPerPerson, MaxSessionsPerHost int
+}
+
+// TerminalSessionLimit reports whether f reaches a session limit of terminal.open (24 sections
+// 6.1 step 2 and 6.3, Design note 9 of M2-46): the open sessions of the person at least
+// terminal.max_sessions_per_person or those of the host at least terminal.max_sessions_per_host.
+// A zero limit is not configured and never reached.
+func TerminalSessionLimit(f TerminalLiveFacts) bool {
+	return (f.MaxSessionsPerPerson > 0 && f.OpenSessionsOfPerson >= f.MaxSessionsPerPerson) ||
+		(f.MaxSessionsPerHost > 0 && f.OpenSessionsOfHost >= f.MaxSessionsPerHost)
 }
 
 // TerminalLiveGuard applies the guards after SR12 (the extension point of TerminalGuard, 24
-// section 6.1 step 2) in this order: host_not_active when the host is not active or its control
-// connection has not reported (nil facts count as not connected: fail closed), then, for
-// terminal.open only, terminal_profile_unknown when the profile verdict is false. M2-46 inserts
-// terminal_session_limit before host_not_active. It returns the reason and false, or "" and true.
+// section 6.1 step 2) in this order: for terminal.open only, terminal_session_limit when
+// TerminalSessionLimit holds (M2-46; attaching creates no session and is never counted); then
+// host_not_active when the host is not active or its control connection has not reported (nil
+// facts count as not connected: fail closed; the application layer refuses missing facts of
+// terminal.open as an internal error before); then, for terminal.open only, terminal_profile_unknown when the
+// profile verdict is false. It returns the reason and false, or "" and true.
 func TerminalLiveGuard(action string, h HostFacts, f *TerminalLiveFacts) (Reason, bool) {
+	if action == ActionTerminalOpen && f != nil && TerminalSessionLimit(*f) {
+		return ReasonTerminalSessionLimit, false
+	}
 	if h.State != hostStateActive || f == nil || !f.HostConnected {
 		return ReasonHostNotActive, false
 	}
@@ -157,8 +177,8 @@ type TerminalGuardFacts struct {
 //  4. SR12: without a valid assignment to a session user the host reports, owners included,
 //     terminal_no_session_user.
 //
-// Extension point after SR12 (no stub here): M2-44 adds host_not_active and
-// terminal_profile_unknown, M2-46 terminal_session_limit, in the order of 24 section 6.1 step 2.
+// The guards after SR12 are TerminalLiveGuard: terminal_session_limit (M2-46), host_not_active and
+// terminal_profile_unknown (M2-44), in the order of 24 section 6.1 step 2.
 // It returns the reason and false, or "" and true.
 func TerminalGuard(f TerminalGuardFacts) (Reason, bool) {
 	h := f.Host
