@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
 
@@ -244,6 +245,10 @@ func (a *Audit) SyncSubscribers() *syncapp.Subscribers { return a.modules.SyncSu
 // NotifySubscribers returns the in-transaction subscribers of notify of the registry of the unit
 // of work; the chat step binds their appender and the chat paths (M3-18).
 func (a *Audit) NotifySubscribers() *notifyapp.Subscribers { return a.modules.NotifySubscribers }
+
+// RunsAcceptor returns the in-transaction acceptance of runs of the registry of the unit of work;
+// the chat step binds it to the runs use cases (M2-05).
+func (a *Audit) RunsAcceptor() *runsapp.Acceptor { return a.modules.RunsAcceptor }
 
 // Recorder returns the recorder; it implements auditing.Recorder.
 func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }

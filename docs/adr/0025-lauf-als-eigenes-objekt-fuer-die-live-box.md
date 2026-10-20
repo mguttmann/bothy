@@ -58,6 +58,12 @@ Sitzung und Marke macht.
   Dokument.
 - Lasttest: Anzahl dauerhafter Ereignisse je Lauf bleibt unabhängig von der Patch-Rate.
 - Test, dass Live-Box-Anker keine Revisionen erzeugen (03 `message_revisions`).
+- M2-05 names the tests of the state machine and the run object: `TestCanTransition_AllPairs`,
+  `TestReasonTable`, `TestNormalizeAdapterReason` and `TestTriggerStateMapping`
+  (`services/server/internal/runs/domain`); `TestTransition_EveryDisallowedPairRejected`,
+  `TestTransition_RaceOfTwoStartsOneWins`, `TestTransition_TriggerStatePerEndState`,
+  `TestTransition_UnknownAdapterReasonBecomesAdapterError`, `TestOpen_AtMostOneActivePerThread`
+  and `TestAcceptance_ThreadMessageOpensRun` (`services/server/test/integration/runs`).
 
 ## Pros and Cons of the Options
 

@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
 
@@ -44,6 +45,10 @@ type Modules struct {
 	// MessagingSubscribers are the in-transaction subscribers of messaging (ThreadMoved moves
 	// messages.channel_id, M1-62); required.
 	MessagingSubscribers *messagingapp.Subscribers
+	// RunsAcceptor is the in-transaction subscriber of runs (MessagePosted, the acceptance of a
+	// triggering message, M2-05); required. It writes nothing until the chat step binds it to the
+	// runs use cases (Acceptor.Bind, D-M2-05-19).
+	RunsAcceptor *runsapp.Acceptor
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
@@ -52,7 +57,7 @@ type Modules struct {
 func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
 	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
 		SyncSubscribers: newSyncSubscribers(pool), NotifySubscribers: newNotifySubscribers(pool),
-		MessagingSubscribers: newMessagingSubscribers(pool)}
+		MessagingSubscribers: newMessagingSubscribers(pool), RunsAcceptor: runsapp.NewAcceptor()}
 }
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
@@ -91,6 +96,10 @@ var errNoNotifySubscribers = errors.New("wire: the txn registry needs the subscr
 // would keep its messages at the old channel.
 var errNoMessagingSubscribers = errors.New("wire: the txn registry needs the subscribers of messaging (Modules.MessagingSubscribers)")
 
+// errNoRunsAcceptor reports Modules without the acceptance of runs: a triggering message would open
+// no run.
+var errNoRunsAcceptor = errors.New("wire: the txn registry needs the acceptance of runs (Modules.RunsAcceptor)")
+
 // errNoAuditHook reports Modules without the audit hook: every unit of work must chain its audit
 // entries, so a registry without it is refused.
 var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Modules.Audit)")
@@ -101,7 +110,9 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // spans, the rights hooks of phases 1 and 3.1, the sync hook of phase 3.2 and the audit hook of
 // phase 3.3, the subscription messaging.MessagePosted -> sync (drafts with clear_draft, M1-61),
 // chat.ThreadMoved -> messaging, then -> sync (the copies of channel_id, M1-62) and
-// chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18).
+// chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18) and, after the
+// existing subscribers, messaging.MessagePosted -> runs (the acceptance of a triggering message,
+// M2-05).
 // authorize.AccessChanged, published by authz, has no production subscriber in M1 (runs
 // subscribes in M2, 02 section 4.3).
 func registerTxn(reg *txn.Registry, m *Modules) error {
@@ -145,10 +156,22 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 	if m.NotifySubscribers == nil {
 		return errNoNotifySubscribers
 	}
+	return subscribeArchivesAndRuns(reg, m)
+}
+
+// subscribeArchivesAndRuns registers chat.ChannelArchived and chat.SpaceArchived -> notify, then
+// messaging.MessagePosted -> runs after the existing subscribers (M2-05).
+func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
 	}
-	return txn.Subscribe(reg, m.NotifySubscribers.OnSpaceArchived)
+	if err := txn.Subscribe(reg, m.NotifySubscribers.OnSpaceArchived); err != nil {
+		return err
+	}
+	if m.RunsAcceptor == nil {
+		return errNoRunsAcceptor
+	}
+	return txn.Subscribe(reg, m.RunsAcceptor.OnMessagePosted)
 }
 
 // UnitConfig binds the configuration of the unit of work (database.tx_retry_max and the three

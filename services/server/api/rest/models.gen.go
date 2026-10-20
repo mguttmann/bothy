@@ -16379,6 +16379,25 @@ type CreateTokenParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListActiveRunsParams defines parameters for ListActiveRuns.
+type ListActiveRunsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// AgentId Only runs of this agent.
+	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
+}
+
+// ListRunStepsParams defines parameters for ListRunSteps.
+type ListRunStepsParams struct {
+	// Cursor Cursor from the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Page size.
+	Limit *PageLimit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // RevokeSessionParams defines parameters for RevokeSession.
 type RevokeSessionParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16498,6 +16517,13 @@ type MarkThreadUnreadParams struct {
 type ReopenThreadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListThreadRunsParams defines parameters for ListThreadRuns.
+type ListThreadRunsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // SetThreadTagsParams defines parameters for SetThreadTags.

@@ -513,6 +513,15 @@ type ServerInterface interface {
 	// GetProblemType Documentation of a problem type
 	// (GET /problems/{code})
 	GetProblemType(w http.ResponseWriter, r *http.Request, code CodePath)
+	// ListActiveRuns Running now
+	// (GET /runs)
+	ListActiveRuns(w http.ResponseWriter, r *http.Request, params ListActiveRunsParams)
+	// GetRun Read the run document
+	// (GET /runs/{run_id})
+	GetRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// ListRunSteps List steps in order
+	// (GET /runs/{run_id}/steps)
+	ListRunSteps(w http.ResponseWriter, r *http.Request, runId RunIdPath, params ListRunStepsParams)
 	// RevokeSession End a session
 	// (POST /sessions/{session_id}/revoke)
 	RevokeSession(w http.ResponseWriter, r *http.Request, sessionId SessionIdPath, params RevokeSessionParams)
@@ -603,6 +612,9 @@ type ServerInterface interface {
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ReopenThreadParams)
+	// ListThreadRuns List runs of a thread
+	// (GET /threads/{thread_id}/runs)
+	ListThreadRuns(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ListThreadRunsParams)
 	// SetThreadTags Set forum tags of a thread
 	// (PUT /threads/{thread_id}/tags)
 	SetThreadTags(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params SetThreadTagsParams)
@@ -6906,6 +6918,146 @@ func (siw *ServerInterfaceWrapper) GetProblemType(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListActiveRuns operation middleware
+func (siw *ServerInterfaceWrapper) ListActiveRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListActiveRunsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "agent_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "agent_id", r.URL.Query(), &params.AgentId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "agent_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "agent_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListActiveRuns(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRun operation middleware
+func (siw *ServerInterfaceWrapper) GetRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRunSteps operation middleware
+func (siw *ServerInterfaceWrapper) ListRunSteps(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRunStepsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRunSteps(w, r, runId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RevokeSession operation middleware
 func (siw *ServerInterfaceWrapper) RevokeSession(w http.ResponseWriter, r *http.Request) {
 
@@ -8145,6 +8297,61 @@ func (siw *ServerInterfaceWrapper) ReopenThread(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReopenThread(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListThreadRuns operation middleware
+func (siw *ServerInterfaceWrapper) ListThreadRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListThreadRunsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListThreadRuns(w, r, threadId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9464,6 +9671,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/move", wrapper.MoveThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/runs", wrapper.ListThreadRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/pins", wrapper.ListPins)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/read-state", wrapper.PutReadState)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/read-state/mark-unread", wrapper.MarkThreadUnread)
@@ -9521,6 +9729,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/consumers/{consumer}/ack", wrapper.AckAgentEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels", wrapper.ListServedChannels)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/channels/{channel_id}/config", wrapper.GetServedChannelConfig)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs", wrapper.ListActiveRuns)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}/steps", wrapper.ListRunSteps)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/apps", wrapper.ListApps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps", wrapper.InstallApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/app-manifests/validate", wrapper.ValidateManifest)
@@ -10227,6 +10438,15 @@ type StrictServerInterface interface {
 	// GetProblemType Documentation of a problem type
 	// (GET /problems/{code})
 	GetProblemType(ctx context.Context, request GetProblemTypeRequestObject) (GetProblemTypeResponseObject, error)
+	// ListActiveRuns Running now
+	// (GET /runs)
+	ListActiveRuns(ctx context.Context, request ListActiveRunsRequestObject) (ListActiveRunsResponseObject, error)
+	// GetRun Read the run document
+	// (GET /runs/{run_id})
+	GetRun(ctx context.Context, request GetRunRequestObject) (GetRunResponseObject, error)
+	// ListRunSteps List steps in order
+	// (GET /runs/{run_id}/steps)
+	ListRunSteps(ctx context.Context, request ListRunStepsRequestObject) (ListRunStepsResponseObject, error)
 	// RevokeSession End a session
 	// (POST /sessions/{session_id}/revoke)
 	RevokeSession(ctx context.Context, request RevokeSessionRequestObject) (RevokeSessionResponseObject, error)
@@ -10317,6 +10537,9 @@ type StrictServerInterface interface {
 	// ReopenThread Reopen a thread
 	// (POST /threads/{thread_id}/reopen)
 	ReopenThread(ctx context.Context, request ReopenThreadRequestObject) (ReopenThreadResponseObject, error)
+	// ListThreadRuns List runs of a thread
+	// (GET /threads/{thread_id}/runs)
+	ListThreadRuns(ctx context.Context, request ListThreadRunsRequestObject) (ListThreadRunsResponseObject, error)
 	// SetThreadTags Set forum tags of a thread
 	// (PUT /threads/{thread_id}/tags)
 	SetThreadTags(ctx context.Context, request SetThreadTagsRequestObject) (SetThreadTagsResponseObject, error)
@@ -15320,6 +15543,85 @@ func (sh *strictHandler) GetProblemType(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// ListActiveRuns operation middleware
+func (sh *strictHandler) ListActiveRuns(w http.ResponseWriter, r *http.Request, params ListActiveRunsParams) {
+	var request ListActiveRunsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListActiveRuns(ctx, request.(ListActiveRunsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListActiveRuns")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListActiveRunsResponseObject); ok {
+		if err := validResponse.VisitListActiveRunsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRun operation middleware
+func (sh *strictHandler) GetRun(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request GetRunRequestObject
+
+	request.RunId = runId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRun(ctx, request.(GetRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRunResponseObject); ok {
+		if err := validResponse.VisitGetRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRunSteps operation middleware
+func (sh *strictHandler) ListRunSteps(w http.ResponseWriter, r *http.Request, runId RunIdPath, params ListRunStepsParams) {
+	var request ListRunStepsRequestObject
+
+	request.RunId = runId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRunSteps(ctx, request.(ListRunStepsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRunSteps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRunStepsResponseObject); ok {
+		if err := validResponse.VisitListRunStepsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RevokeSession operation middleware
 func (sh *strictHandler) RevokeSession(w http.ResponseWriter, r *http.Request, sessionId SessionIdPath, params RevokeSessionParams) {
 	var request RevokeSessionRequestObject
@@ -16207,6 +16509,33 @@ func (sh *strictHandler) ReopenThread(w http.ResponseWriter, r *http.Request, th
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReopenThreadResponseObject); ok {
 		if err := validResponse.VisitReopenThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListThreadRuns operation middleware
+func (sh *strictHandler) ListThreadRuns(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ListThreadRunsParams) {
+	var request ListThreadRunsRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListThreadRuns(ctx, request.(ListThreadRunsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListThreadRuns")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListThreadRunsResponseObject); ok {
+		if err := validResponse.VisitListThreadRunsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

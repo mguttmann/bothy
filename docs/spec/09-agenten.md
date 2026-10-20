@@ -157,6 +157,13 @@ Für eine neue Nachricht M eines Prinzipals P im Thread T des Kanals C gilt in d
    `trigger_state = received`. Bei Ablehnung: M bleibt gespeichert, `trigger_state = failed` mit
    Grund.
 
+Order of the check and the auto thread (D-M2-05-2): with `auto_thread` in the main thread the check
+of point 7 names the thread of M, not the new thread, so the mention rule of point 3 and the guard
+of `agent.invoke` judge the same thread. The thread of point 5 is created only after the `allow` of
+point 7, so a denial leaves no empty thread. A candidate that M does not mention is first checked
+in filter mode: a person without `trigger` gets no `trigger_state` and no audit entry (point 4,
+D-M2-05-13).
+
 Position of the voice rule (D-M2-04-2): the rejection `voice_unsupported` of section 13 is decided
 after step 4 and before step 5. A voice message without a transcription path
 (`voice.transcription_mode` is `off`, or `agent` and the candidate lacks the effective feature
@@ -595,7 +602,10 @@ stateDiagram-v2
 | `cancel_timeout` | `cancelled` | Server | Adapter meldete den Abbruch nicht in `agent.cancel_grace` |
 | `agent_disabled` | `cancelled` | Server | Agent gesperrt |
 | `billing_mode_personal_not_holder` | `failed` | Server | I2 bei Zustellung |
+| `channel_read_only` | `cancelled` | Server | Channel became read-only or archived (04 section 8.3) |
 | `billing_mode_mismatch` | `failed` | Adapter oder Server | I3 |
+| `tool_class_owner_only` | `failed` | Server | SR2 at delivery or at `run.token.renew` |
+| `tool_class_mismatch` | `failed` | Adapter or Server | actual tool class higher than the `tool_class` of the token (SR2) |
 | `invalid_invocation_token` | `failed` | Adapter | Marke ungültig |
 | `project_not_ready` | `failed` | Server | Projektbindung nicht bereit |
 | `agent_unavailable` | `failed` | Server | länger als `run.queued_max_age` in `queued` |
@@ -604,9 +614,11 @@ stateDiagram-v2
 | `runtime_error` | `failed` | Adapter | Laufzeit meldet einen Fehler; Details im letzten Schritt |
 | `adapter_error` | `failed` | Adapter | Fehler im Adapter selbst |
 | `runtime_not_authenticated` | `failed` | Adapter | Laufzeit hat keine gültige Anmeldung |
+| `user_disabled` | `cancelled` | Server | The triggering person was disabled (`user.disable`, 02 section 4.3) |
 
-Unbekannte Gründe eines Adapters speichert der Server als `adapter_error` mit dem Originalcode in
-den Details.
+The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
+unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the original code as the detail `original_reason` of a server
+step with `kind = status` and `name = adapter_reason`, cut to `run.step_detail_max_bytes`.
 
 ### 5.3 Lauf-Dokument (`run_document.v1`)
 
