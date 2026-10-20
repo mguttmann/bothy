@@ -9,6 +9,7 @@
 /// local database, the auth session and the sync engine, and [AccountWiper] removes them again.
 library;
 
+import 'dart:async';
 import 'dart:io' as io;
 import 'dart:io' show Directory, Platform;
 import 'dart:math';
@@ -25,6 +26,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../composer/draft_sync.dart';
+import '../files/file_cache.dart';
+import '../files/file_ports.dart';
+import '../files/upload_executor.dart';
 import '../platform/app_lifecycle.dart';
 import '../platform/browser_launcher.dart';
 import '../platform/device_key_signer.dart';
@@ -77,7 +81,9 @@ final class AppPorts {
     this._stepUpPrompt,
     AppMeasurements? measurements,
     CrashReports? crashReports,
+    FilePorts? files,
   }) : config = config ?? AppConfig.defaults(),
+       files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
        measurements = measurements ?? AppMeasurements(ClientMetrics()),
        crashReports =
@@ -159,6 +165,9 @@ final class AppPorts {
   /// The crash path; starts only when [BuildBranding.crashDsn] names a target (15 16).
   final CrashReports crashReports;
 
+  /// The file picker, clipboard, opener, microphone and media players (brief M4-22).
+  final FilePorts files;
+
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
   late final StepUpPrompt stepUpPrompt =
@@ -225,6 +234,8 @@ final class InstanceServices {
     required this.secrets,
     required this.ids,
     required this.draftEditing,
+    required this.fileCache,
+    required this.uploads,
     required this._stopWatching,
   });
 
@@ -285,6 +296,13 @@ final class InstanceServices {
       passkeys: ports.passkeys,
     );
     final draftEditing = DraftEditingRegistry();
+    // D-M4-22-5: the bytes of the file cache lie in the instance folder, which the wipe
+    // deletes; the rows lie in the encrypted database.
+    final fileCache = FileCache(
+      db: database,
+      root: Directory('${folder.path}${Platform.pathSeparator}files'),
+    );
+    final uploads = UploadProgress();
     late final SyncEngine engine;
     engine = SyncEngine.create(
       baseUrl: instance.address,
@@ -308,8 +326,10 @@ final class InstanceServices {
       allowPlainHttpForTests: ports.allowPlainHttpForTests,
       // 04 14: a draft being typed here is not overwritten by another device (M4-20).
       draftEditing: draftEditing,
+      // 04 8.3 item 3: the dispatcher hands the paths of removed targets to the cache.
+      eraser: fileCache,
       // The app's own writes: the personal sidebar and new forum posts (M4-19), the writes of
-      // the thread view (M4-20).
+      // the thread view (M4-20), the uploads and the attaching of their files (M4-22).
       registerExecutors: (executors, api) {
         SidebarOps.register(executors, api, database);
         // The executor runs only after the engine exists, so `engine` is set by then.
@@ -323,6 +343,8 @@ final class InstanceServices {
           api,
           AppOpsStore.of(() => engine, database),
         );
+        UploadOps.register(executors, api, uploads, baseUrl: instance.address);
+        AttachmentMessageOps.wrap(executors, uploads);
       },
     );
     final stopWatching = ports.measurements.watchEngine(
@@ -344,6 +366,19 @@ final class InstanceServices {
       keys: ports.deviceKeys,
       secrets: secrets,
     );
+    // 15 6.3: old and excess cache entries go once per start, with their bytes. A failure
+    // leaves the cache as it is until the next start.
+    unawaited(
+      fileCache
+          .clean(
+            CacheCleaner.fromConfig(
+              database,
+              ports.config,
+              now: ports.clock.now,
+            ),
+          )
+          .then<void>((_) {}, onError: (Object _) {}),
+    );
     return InstanceServices._(
       instance: instance,
       auth: auth,
@@ -353,6 +388,8 @@ final class InstanceServices {
       secrets: secrets,
       ids: ids,
       draftEditing: draftEditing,
+      fileCache: fileCache,
+      uploads: uploads,
       stopWatching: stopWatching,
     );
   }
@@ -380,6 +417,12 @@ final class InstanceServices {
 
   /// The drafts being edited on this device (the `DraftEditing` port of the engine, 04 14).
   final DraftEditingRegistry draftEditing;
+
+  /// The file cache of the instance (15 6.1, 6.3).
+  final FileCache fileCache;
+
+  /// The progress of the uploads of this run.
+  final UploadProgress uploads;
 
   /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
   ///

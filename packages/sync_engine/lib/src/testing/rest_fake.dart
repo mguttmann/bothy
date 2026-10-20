@@ -336,6 +336,7 @@ final class RestFake {
         response = _problem(
           fault.status,
           fault.code,
+          reason: fault.reason,
           retryAfter: fault.retryAfter,
         );
       } else {

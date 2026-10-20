@@ -15,11 +15,17 @@ sealed class RequestFault {
   final String? operationId;
 }
 
-/// Answer with [status] and a problem with [code] instead of handling the request (nothing
-/// is stored); [retryAfter] sets `Retry-After`.
+/// Answer with [status] and a problem with [code] (and [reason]) instead of handling the
+/// request (nothing is stored); [retryAfter] sets `Retry-After`.
 final class AnswerFault extends RequestFault {
   /// Creates the fault.
-  const AnswerFault(super.operationId, this.status, this.code, this.retryAfter);
+  const AnswerFault(
+    super.operationId,
+    this.status,
+    this.code,
+    this.retryAfter, {
+    this.reason,
+  });
 
   /// The HTTP status.
   final int status;
@@ -29,6 +35,9 @@ final class AnswerFault extends RequestFault {
 
   /// The `Retry-After` wait, if any.
   final Duration? retryAfter;
+
+  /// The `reason` member, if any (for example `part_conflict` of a `409 conflict`).
+  final String? reason;
 }
 
 /// Handle the request (the write is stored and its events are appended), then close the
@@ -104,15 +113,20 @@ final class FaultPlan {
   List<RequestFault> get pending => [for (final r in _rules) r.fault];
 
   /// Answers the next [times] requests of [operationId] with [status] and a problem with
-  /// [code] (`409`, `410`, `412`, `429`, `5xx`), with `Retry-After` when [retryAfter] is set.
+  /// [code] and [reason] (`409`, `410`, `412`, `429`, `5xx`), with `Retry-After` when
+  /// [retryAfter] is set.
   void onRequest(
     String operationId, {
     required int status,
     required String code,
+    String? reason,
     Duration? retryAfter,
     int times = 1,
   }) => _rules.add(
-    _Rule(AnswerFault(operationId, status, code, retryAfter), times),
+    _Rule(
+      AnswerFault(operationId, status, code, retryAfter, reason: reason),
+      times,
+    ),
   );
 
   /// Stores the next [times] writes of [operationId] and closes their connection before the

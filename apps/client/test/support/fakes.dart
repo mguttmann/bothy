@@ -11,6 +11,7 @@ import 'package:client/app/bootstrap.dart';
 import 'package:client/app/branding.dart';
 import 'package:client/app/deep_links.dart';
 import 'package:client/app/discovery.dart';
+import 'package:client/files/file_ports.dart';
 import 'package:client/platform/device_key_signer.dart';
 import 'package:client/platform/secure_store.dart';
 import 'package:domain/domain.dart';
@@ -175,6 +176,7 @@ AppPorts testPorts({
   StepUpPrompt? stepUpPrompt,
   BuildBranding branding = testBranding,
   Map<String, String> config = fastConfig,
+  FilePorts? files,
 }) => AppPorts(
   branding: branding,
   stepUpPrompt: stepUpPrompt,
@@ -199,4 +201,5 @@ AppPorts testPorts({
       (file, keys) =>
           openLocalStore(file: file, keys: keys, inBackground: false),
   allowPlainHttpForTests: true,
+  files: files,
 );
