@@ -375,11 +375,15 @@ func (a *Authorizer) loadRecheck(ctx context.Context, ref authz.CredentialRef, v
 	return e, nil
 }
 
-// checkRecheck refuses the marker of the check without a request (R-AZ-29) outside its one use in
+// checkRecheck passes every principal without the marker and refuses the marker of the check
+// without a request (R-AZ-29) outside its one use in
 // this build: only agent.invoke (command.invoke and interaction.create follow with M2-25), only a
 // person, and never with a session, device, token, installation, "view as" or acting for. Each
 // violation is a programming error of the server, never a decision (M2-08 design note 4).
 func checkRecheck(p authorize.Principal, act authorize.Action) error {
+	if !authorize.IsRecheckPrincipal(p) {
+		return nil
+	}
 	if act != authorize.ActionAgentInvoke {
 		return internal("the re-check principal is allowed only with agent.invoke")
 	}
@@ -465,11 +469,6 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	if req.IsHostSelf() || (p != nil && p.PrincipalKind() == domain.KindHost) {
 		return a.authorizeHost(ctx, p, spec, req, r, t)
 	}
-	if authorize.IsRecheckPrincipal(p) {
-		if err := checkRecheck(p, act); err != nil {
-			return authorize.Decision{}, err
-		}
-	}
 	if p == nil || p.PrincipalKind() == domain.KindAnonymous {
 		if isPublic(req) {
 			return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
@@ -483,8 +482,12 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	return a.decideFor(ctx, s, act, r, spec, req, preview, t)
 }
 
-// acting loads the acting principal at the current rights version (principalOf).
+// acting loads the acting principal at the current rights version (principalOf), after the
+// check of the re-check marker (checkRecheck).
 func (a *Authorizer) acting(ctx context.Context, p authorize.Principal, action string, t time.Time) (*actingPrincipal, domain.Decision, error) {
+	if err := checkRecheck(p, authorize.Action(action)); err != nil {
+		return nil, domain.Decision{}, err
+	}
 	v, err := a.version(ctx)
 	if err != nil {
 		return nil, domain.Decision{}, err
