@@ -366,7 +366,7 @@ func (p *ScanPass) finish(ctx context.Context, t SessionRecord, st passState, ou
 	if !transitioned {
 		// Another run decided the file, or it was deleted: keep the state, remove only what this
 		// run wrote and nobody may serve.
-		if st.written && !domain.Deliverable(current.File.UploadState, current.File.ScanStatus, current.File.Deleted) {
+		if st.written && !domain.IsDeliverable(current.File.UploadState, current.File.ScanStatus, current.File.Deleted) {
 			p.deleteKeys(ctx, t.FileID, t.File.ObjectKey)
 		}
 		return PassResult{Outcome: OutcomeNone}, nil

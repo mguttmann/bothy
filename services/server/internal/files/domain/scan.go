@@ -115,13 +115,13 @@ const (
 	ScanSkipped  = "skipped"
 )
 
-// Deliverable reports whether a file may be served (12 2): upload_state complete, scan_status
+// IsDeliverable reports whether a file may be served (12 2): upload_state complete, scan_status
 // clean or skipped, and not deleted. M3-05 answers every other state with 409.
 //
 // Example:
 //
-//	ok := domain.Deliverable("complete", "clean", false) // true
-func Deliverable(uploadState, scanStatus string, deleted bool) bool {
+//	ok := domain.IsDeliverable("complete", "clean", false) // true
+func IsDeliverable(uploadState, scanStatus string, deleted bool) bool {
 	return !deleted && uploadState == UploadComplete && (scanStatus == ScanClean || scanStatus == ScanSkipped)
 }
 
@@ -133,7 +133,7 @@ func Deliverable(uploadState, scanStatus string, deleted bool) bool {
 //
 //	done := domain.Final("complete", "infected", false) // true
 func Final(uploadState, scanStatus string, deleted bool) bool {
-	return Deliverable(uploadState, scanStatus, deleted) || uploadState == UploadFailed ||
+	return IsDeliverable(uploadState, scanStatus, deleted) || uploadState == UploadFailed ||
 		scanStatus == ScanInfected || scanStatus == ScanError
 }
 

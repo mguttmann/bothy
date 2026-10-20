@@ -85,6 +85,8 @@ type Deps struct {
 type Service struct {
 	cfg Config
 	d   Deps
+	// dl are downloads, tickets and transcripts (M3-05); nil until EnableDownloads.
+	dl *download
 }
 
 // Compile-time checks: the incoming ports.
