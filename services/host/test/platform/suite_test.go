@@ -181,6 +181,10 @@ func installed(t *testing.T, extra string, users ...string) {
 		t.Fatalf("install: %d\n%s", code, out)
 	}
 	t.Cleanup(func() { uninstall(t, users) })
+	// Folders a test created for session users before install made them (mkdirOwned) get
+	// their owner now; otherwise HD7 drops them as unresolvable and the test of a doctor
+	// finding sees a list without them.
+	applyPendingOwners(t)
 }
 
 // doctorEntries runs doctor and returns output and exit code.

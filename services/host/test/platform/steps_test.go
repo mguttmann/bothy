@@ -126,6 +126,11 @@ func applyPendingOwners(t *testing.T) {
 
 func mkdirOwned(t *testing.T, p, user string) {
 	t.Helper()
+	// The parents stay traversable (0755): a parent of mode 0700 owned by the administrator would
+	// hide the folder from the helper of its owner, and HD7 would drop it as unresolvable.
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil { //nolint:gosec // G301: every helper must traverse the parents
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(p, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -299,6 +304,7 @@ func startImpostor(t *testing.T, user string) func() {
 	case "linux":
 		pid := strings.TrimSpace(sh(t, "/usr/bin/systemctl", "show", "--property=MainPID", "--value", "bothy-host-helper-"+user+".service"))
 		_, _ = asUser(user, "/bin/kill", pid)
+		return stageLinuxImpostor(t, user)
 	case "darwin":
 		_, _ = try("/bin/launchctl", "kill", "SIGKILL", "system/bothy-host.helper."+user)
 	case "windows":
