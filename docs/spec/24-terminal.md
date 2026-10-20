@@ -1665,8 +1665,12 @@ the node knows it (phase rule):
   session ends (`terminal.detach_grace`) and is not unpaired.
 
 A node counts a session as started once it has seen `session.started` (only the node of the control
-connection does) or once the deadline of its expectation read a state other than `opening` from the
-database. The deadline of an expectation waits while an unpaired side is present, because that
+connection does), once its log tail delivered `terminal_session.changed` with `active` or
+`detached` (D-M2-47-22), or once the deadline of its expectation read a state other than `opening`
+from the database. A side that reaches a node before `terminal.session_open` did builds the
+expectation of the current grant from the row; an expectation carries its grant (the token `jti`),
+and the same grant again changes nothing, so the signal and the side may arrive in either order
+(D-M2-47-21). The deadline of an expectation waits while an unpaired side is present, because that
 side's own timer decides; an expectation without sides ends a session still in `opening` through the
 same compare-and-swap. On a host whose last `report` says `require_local_confirm = true` an
 expectation without sides that received `terminal.session_paired` only removes itself at its
@@ -1690,10 +1694,9 @@ check, `/readyz` unchanged; it stops with the log tail (02, section 15.3).
 What is lost while a node's `LISTEN ephemeral` connection is down: `NOTIFY` keeps no backlog, so the
 node misses every signal sent meanwhile. Its control connections of a host disabled, retired or
 re-paired elsewhere stay open until the reconciliation (the sessions of that host still end on every
-node through the log tail, which has its own `LISTEN` and poll); it registers no expectation for
-new sessions, so a host data connection of such a session gets `1000` there, and an opening whose
-`session.open` should go through its control connection is not sent and ends `open_failed` with
-`close_detail = open_timeout`; its presence view ages, so its entries expire after the window above
+node through the log tail, which has its own `LISTEN` and poll); an opening whose `session.open` should
+go through its control connection is not sent and ends `open_failed` with
+`close_detail = open_timeout` (its sides still build their expectation from the row); its presence view ages, so its entries expire after the window above
 and a newer control connection on another node is probed only after the reconnect and the next
 announcement; a missed `terminal.session_paired` lets a side-less expectation end an opening that
 waits for local confirmation on another node. Signals the node itself sends still reach the other

@@ -53,6 +53,9 @@ func (f *fakeRelayUC) RelaySessionState(context.Context, ids.ID) (string, bool, 
 	}
 	return f.state, true, nil
 }
+func (f *fakeRelayUC) RelayExpectation(context.Context, ids.ID) (app.Expectation, bool) {
+	return app.Expectation{}, false
+}
 func (f *fakeRelayUC) RelayOpeningTimedOut(context.Context, ids.ID) error {
 	f.add("open_failed:" + string(domain.DetailOpenTimeout))
 	return nil

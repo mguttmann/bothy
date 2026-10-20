@@ -115,7 +115,11 @@ func (e *testEdge) target(path, pick string) *url.URL {
 			node = hashNode(m[2])
 		}
 	}
-	return e.targets[node]
+	if t := e.targets[node]; t != nil {
+		return t
+	}
+	// One node (cluster.mode single): everything goes to A.
+	return e.targets[nodeA]
 }
 
 // hashNode is the rendezvous hash of the session ID over both nodes.
