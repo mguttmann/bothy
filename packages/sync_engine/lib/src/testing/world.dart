@@ -91,6 +91,12 @@ final class FakePerson {
   /// tests skip the approval, a simplification the README names.
   bool newDevicesPending;
 
+  /// The language of the profile (`users.locale`), or null while the person has chosen none.
+  String? locale;
+
+  /// The IANA time zone of the profile (`users.time_zone`), or null.
+  String? timeZone;
+
   /// The API `PrincipalRef`.
   JsonMap get ref => {
     'id': id,
@@ -147,6 +153,12 @@ final class FakeDevice {
   /// Why it was revoked.
   String? revokeReason;
 
+  /// The public JWK of the `step_up` key (08 6.1), or null for a device without one.
+  JsonMap? stepUpJwk;
+
+  /// The time of the last authenticated request of the device.
+  String? lastSeenAt;
+
   /// The verification code of a waiting device (08 5.2), derived from ID and key.
   String get verificationCode {
     final digest = sha256.convert(utf8.encode('$id|$jkt')).bytes;
@@ -171,6 +183,7 @@ final class FakeDevice {
     'approved_at': ?approvedAt,
     'revoked_at': ?revokedAt,
     'created_at': createdAt,
+    'last_seen_at': ?lastSeenAt,
   };
 }
 
@@ -220,14 +233,22 @@ final class FakeSession {
   /// Whether the session was revoked.
   bool revoked = false;
 
-  /// The API `Session`.
-  JsonMap toJson() => {
+  /// When the session last confirmed with its step-up key (08 6.2), or null.
+  DateTime? stepUpAt;
+
+  /// The time of the last authenticated request of the session.
+  String? lastSeenAt;
+
+  /// The API `Session`; [current] marks the session of the request.
+  JsonMap toJson({bool? current}) => {
     'id': id,
     'user_id': userId,
     'device_id': deviceId,
     'auth_method': authMethod,
     'created_at': createdAt,
     'expires_at': expiresAt,
+    'last_seen_at': ?lastSeenAt,
+    'current': ?current,
   };
 }
 
@@ -400,6 +421,10 @@ final class FakeWorld {
 
   /// Pairings by ID.
   final Map<String, FakePairing> pairings = {};
+
+  /// Open step-up challenges (08 6.2) by ID: the random value and the session that asked.
+  final Map<String, ({String challenge, String sessionId})> stepUpChallenges =
+      {};
 
   /// Spaces (API `Space`) by ID.
   final Map<String, JsonMap> spaces = {};

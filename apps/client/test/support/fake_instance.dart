@@ -6,6 +6,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:auth/auth.dart' show StepUpPrompt;
 import 'package:client/app/bootstrap.dart';
 import 'package:client/app/discovery.dart';
 import 'package:client/app/providers/ports.dart';
@@ -46,6 +47,7 @@ class FakeInstance {
   static Future<FakeInstance> start({
     Map<String, String> config = fastConfig,
     DiscoveryClient Function(DiscoveryClient real)? discovery,
+    StepUpPrompt? stepUpPrompt,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -53,6 +55,23 @@ class FakeInstance {
       ),
     );
     final seed = WorldSeed.standard(server.world);
+    return _on(server, seed, config, discovery, stepUpPrompt);
+  }
+
+  /// A second app of Alex on the same fake: its own data folder, keys and secrets (a second
+  /// simulated device, brief M4-25 Tests). The caller stops it with [stopSibling].
+  Future<FakeInstance> sibling({
+    Map<String, String> config = fastConfig,
+    StepUpPrompt? stepUpPrompt,
+  }) => _on(server, seed, config, null, stepUpPrompt);
+
+  static Future<FakeInstance> _on(
+    FakeServer server,
+    WorldSeed seed,
+    Map<String, String> config,
+    DiscoveryClient Function(DiscoveryClient real)? discovery,
+    StepUpPrompt? stepUpPrompt,
+  ) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
     final secure = MemorySecureBackend();
@@ -67,6 +86,7 @@ class FakeInstance {
       secureBackend: secure,
       deviceKeys: keys,
       discovery: discovery == null ? real : discovery(real),
+      stepUpPrompt: stepUpPrompt,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }
@@ -99,6 +119,12 @@ class FakeInstance {
       keys.scopes.isEmpty &&
       !secure.values.keys.any((k) => k.contains(server.world.instanceId));
 
+  /// Deletes the data folder of a [sibling]; the fake keeps running. The folder goes as in
+  /// [stop], once the sibling's database is closed.
+  Future<void> stopSibling({
+    Duration closeTimeout = const Duration(seconds: 10),
+  }) => _deleteRoot(closeTimeout);
+
   /// Stops the fake and deletes the data folder.
   ///
   /// When a test removes the app, the app closes its database without waiting, as it does
@@ -109,6 +135,10 @@ class FakeInstance {
     Duration closeTimeout = const Duration(seconds: 10),
   }) async {
     await server.stop();
+    await _deleteRoot(closeTimeout);
+  }
+
+  Future<void> _deleteRoot(Duration closeTimeout) async {
     final end = DateTime.now().add(closeTimeout);
     while (root.existsSync()) {
       try {

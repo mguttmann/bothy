@@ -301,4 +301,12 @@ void main() {
     await settle();
     expect(h.phase, ConnectionPhase.signedOut);
   });
+
+  test('dispose does not wait for a paused listener of the states', () async {
+    await h.goLive();
+    // A Riverpod provider that nobody watches pauses its stream (15 7.2 status line).
+    final sub = h.connection.states.listen((_) {})..pause();
+    await h.connection.dispose().timeout(const Duration(seconds: 5));
+    await sub.cancel();
+  });
 }

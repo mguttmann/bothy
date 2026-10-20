@@ -13,11 +13,12 @@ import 'dart:io' as io;
 import 'dart:io' show Directory, Platform;
 import 'dart:math';
 
+import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart' hide File, InstanceInfo;
 import 'package:auth/auth.dart';
 import 'package:device_key/device_key.dart' as dk;
 import 'package:domain/domain.dart' hide InstanceInfo;
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 import 'package:local_store/local_store.dart';
 import 'package:path_provider/path_provider.dart';
@@ -65,8 +66,10 @@ final class AppPorts {
     this.clock = const SystemClock(),
     this.openDatabase = _openEncrypted,
     this.allowPlainHttpForTests = false,
-    this.stepUpPrompt = const ConfirmingStepUpPrompt(),
-  }) : config = config ?? AppConfig.defaults();
+    GlobalKey<NavigatorState>? navigatorKey,
+    this._stepUpPrompt,
+  }) : config = config ?? AppConfig.defaults(),
+       navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>();
 
   /// The build branding.
   final BuildBranding branding;
@@ -127,24 +130,20 @@ final class AppPorts {
   /// release build can talk plain HTTP (D-M4-17-6).
   final bool allowPlainHttpForTests;
 
-  /// Explains a step-up before the system asks for the confirmation.
-  final StepUpPrompt stepUpPrompt;
+  /// The navigator of the app's router; dialogs that services open (the step-up) use it.
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  final StepUpPrompt? _stepUpPrompt;
+
+  /// Explains a step-up before the system asks for the confirmation: by default the
+  /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
+  late final StepUpPrompt stepUpPrompt =
+      _stepUpPrompt ?? StepUpDialogPrompt(() => navigatorKey.currentContext);
 
   static Future<LocalDatabase> _openEncrypted(
     io.File file,
     DatabaseKeySource keys,
   ) => openLocalStore(file: file, keys: keys);
-}
-
-/// The [StepUpPrompt] of the desktop shell: it continues at once, because the step-up key asks
-/// the system for the confirmation itself (08 6.1); the screens that start a step-up (M4-25)
-/// explain it before they call.
-final class ConfirmingStepUpPrompt implements StepUpPrompt {
-  /// Creates the prompt.
-  const ConfirmingStepUpPrompt();
-
-  @override
-  Future<bool> ask(String purposeText) async => true;
 }
 
 /// The ports of a real desktop build on macOS or Windows.
@@ -200,6 +199,7 @@ final class InstanceServices {
     required this.engine,
     required this.wiper,
     required this.secrets,
+    required this.ids,
   });
 
   /// Builds the services of [instance] (Design note 1): the device keys with the instance ID as
@@ -295,6 +295,7 @@ final class InstanceServices {
       engine: engine,
       wiper: wiper,
       secrets: secrets,
+      ids: ids,
     );
   }
 
@@ -315,6 +316,9 @@ final class InstanceServices {
 
   /// The secrets of the instance.
   final InstanceSecrets secrets;
+
+  /// The UUIDv7 source of the instance (idempotency keys of the REST actions).
+  final Uuid7Generator ids;
 
   /// Whether a refresh token of an earlier login is stored, so the app can start signed in.
   ///

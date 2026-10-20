@@ -18,7 +18,7 @@ import '../../test/support/fake_instance.dart';
 import '../../test/support/fakes.dart';
 import '../../test/support/other_device.dart';
 
-export '../../test/support/fake_instance.dart' show FakeInstance;
+export '../../test/support/fake_instance.dart' show FakeInstance, eventually;
 export '../../test/support/other_device.dart' show OtherDevice;
 
 /// The running test app and its fake.
@@ -118,6 +118,21 @@ class TestApp {
     return other;
   }
 
+  /// A second app of Alex on the same fake, headless (its own data, keys and engine; brief
+  /// M4-25 Tests). The caller calls [SecondApp.stop].
+  Future<SecondApp> secondApp() async {
+    final instance = await fake.sibling();
+    return SecondApp._(instance, appContainer(instance));
+  }
+
+  /// Opens the settings section [segment] from the shell.
+  Future<void> openSettings(String segment) async {
+    await tester.tap(find.byKey(const ValueKey('shell.settings')));
+    await waitFor(find.byKey(const ValueKey('screen.settings')));
+    await tester.tap(find.byKey(ValueKey('settings.nav.$segment')));
+    await tester.pumpAndSettle();
+  }
+
   /// The address the app remembers.
   Uri get address => fake.server.baseUri;
 
@@ -126,5 +141,35 @@ class TestApp {
     await tester.pumpWidget(const SizedBox());
     await fake.stop();
     tester.view.reset();
+  }
+}
+
+/// The second, headless app of Alex.
+class SecondApp {
+  SecondApp._(this.instance, this.container);
+
+  /// Its ports and data folder.
+  final FakeInstance instance;
+
+  /// Its providers.
+  final ProviderContainer container;
+
+  /// Its onboarding state.
+  OnboardingState get state => container.read(onboardingControllerProvider);
+
+  /// Connects and logs in with password and one-time code as Alex.
+  Future<void> signIn() async {
+    final control = await connected(container, instance);
+    await control.loginWithPassword(
+      WorldSeed.alexLogin,
+      WorldSeed.password,
+      WorldSeed.totp,
+    );
+  }
+
+  /// Releases the providers and deletes the data folder.
+  Future<void> stop() async {
+    container.dispose();
+    await instance.stopSibling();
   }
 }

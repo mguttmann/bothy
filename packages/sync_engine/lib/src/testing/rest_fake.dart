@@ -381,6 +381,9 @@ final class RestFake {
         !_pendingAllowed.contains(op.operationId)) {
       throw const FakeProblem(403, 'device_pending');
     }
+    final seen = world.stamp();
+    device.lastSeenAt = seen;
+    session.lastSeenAt = seen;
     return (session, jkt);
   }
 
@@ -433,7 +436,9 @@ final class RestFake {
     try {
       response = await handler(r);
     } on FakeProblem catch (p) {
-      if (p.status < 500) {
+      // A `401` is an answer of the authentication in front of the operation (06 7): the
+      // repeat after a step-up or refresh with the same key runs the operation again.
+      if (p.status < 500 && p.status != 401) {
         world.idempotency[slot] = StoredResponse(
           hash,
           p.status,
