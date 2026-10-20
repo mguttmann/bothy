@@ -51,6 +51,12 @@ type CheckResult struct {
 type PageInput struct {
 	After, Head int64
 	Limit       int
+	// AgentConsumer marks the page read of the agent consumer engine of the gateway (WebSocket and
+	// REST poll), which passes every invocation-bearing event through runs.Delivery before it is
+	// sent (M2-08). Only then is a personal event whose receive action takes the agent itself
+	// (agent.events.consume of agent.invocation) decided on its audience; every other caller, the
+	// generic catch-up listEvents included, never receives such an event.
+	AgentConsumer bool
 }
 
 // EnvelopeJSON is one event in its wire form: the JSON of Event.Envelope (ADR 0052), without
