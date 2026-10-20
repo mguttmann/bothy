@@ -56,7 +56,8 @@ for this public repository (ADR 0039):
    branch (`tools/hooks/build_push.py`) and runs only the fast gates: `denylist` with the
    private list, `gitleaks`, `commitlint`, `codegen-check` when a generator input changed and
    `lint`, both for the components the diff against `origin/main` touches. It needs no review
-   report (`tools/hooks/review_gate.py`).
+   report (`tools/hooks/review_gate.py`). A ticket branch on an integration head pushes its
+   base ref first ("Base ref" below).
 2. **Wait.** The push starts `.github/workflows/build-verify.yml`: every target of
    `make gates` and the platform jobs of `ci.yml` (postgres image on both architectures,
    apps on macOS, Windows and the Android emulators), split into parallel jobs, with the
@@ -70,14 +71,37 @@ for this public repository (ADR 0039):
 4. **Pull request.** When `build-verify-ok` is green, the ticket branch goes the usual way
    from step 4 of the flow above: independent review, push of the ticket branch (the
    pre-push hook runs the full `make check` there), pull request, `ci-ok`. Delete the build
-   branch afterwards (`git push origin --delete build/<ticket>`).
+   branch and its base ref afterwards
+   (`git push origin --delete build/<ticket> build-base/<ticket>`).
+
+**Base ref.** A ticket branch built on an integration head (for example a wave branch that
+is not on `main` yet) differs from the old merge base with `main` in thousands of files, so
+its plan runs every job. Push the integration head it was built on as
+`build-base/<ticket>` first, in a push of its own, then the build branch:
+
+```sh
+git push origin <integration-head>:refs/heads/build-base/<ticket>
+git push origin <ticket-branch>:build/<ticket>
+```
+
+The pre-push hook gives the base
+push the same fast gates as a build branch (`tools/hooks/build_push.py`), so its commits are
+scanned before they reach the remote. The plan of `build-verify.yml` then counts only the
+files between the merge base of the pushed commit with `build-base/<ticket>` and the pushed
+commit (`tools/ci/build_base.py`), and runs the jobs they need. The base must be the commit
+the ticket branch was built on, an ancestor of it, so the jobs cover exactly the changes of
+the ticket. Without the ref, or without common history with it, the plan measures from the
+merge base with `origin/main`, which on an integration base means every job, and without
+any base every job runs. Push the ref
+again (`--force` is fine, it is no shared branch) before the build branch when the ticket
+branch is rebased onto a newer integration head.
 
 What the build verification does not do: it uses no secret, so it scans with the generic
 deny rules only and runs no SonarQube analysis; both stay in `ci.yml` of the pull request.
 It is no required check, and its result never stands in for `ci-ok`. Caches are scoped to
 the branch that wrote them, so the first run of a new build branch starts cold. pre-commit
-reports one ref per push (the first one that is not a deletion), so push a build branch on
-its own, never together with another branch in one `git push`.
+reports only the first ref of a push that is not a deletion, so push a build branch in a
+command of its own, separate from every other branch, its `build-base/<ticket>` included.
 
 ## Protection of `main` (ruleset)
 

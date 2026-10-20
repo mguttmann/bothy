@@ -84,11 +84,13 @@ def test_tag_push_needs_no_report(repo: Path, monkeypatch: pytest.MonkeyPatch) -
     assert review_gate.main(["--repo", str(repo)]) == 0
 
 
+@pytest.mark.parametrize("ref", ["refs/heads/build/M2-44", "refs/heads/build-base/M2-44"])
 def test_build_branch_push_needs_no_report(
-    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], ref: str
 ) -> None:
-    # A build branch is verification only (build-verify.yml); the pull request push needs one.
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/build/M2-44")
+    # A build branch and its base ref are verification only (build-verify.yml); the pull request
+    # push needs one.
+    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", ref)
     assert review_gate.main(["--repo", str(repo)]) == 0
     assert "build branch" in capsys.readouterr().out
 

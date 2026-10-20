@@ -17,7 +17,8 @@ without a remote branch) runs the command given after `--` unchanged, today `mak
 
 pre-commit names one ref per push (`PRE_COMMIT_REMOTE_BRANCH`, the first ref that is not a
 deletion), so a single `git push` of a build branch together with another branch gets the
-fast gates only; push other branches in a push of their own.
+fast gates only; push other branches in a push of their own. A push of `build-base/<ticket>`
+(the base ref of a build branch) gets the same fast gates, so its commits are scanned too.
 
 Usage:
   build_push.py [--repo <dir>] -- <command>...
@@ -35,7 +36,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ci"))
 import components
 
-BUILD_PREFIX = "build/"
+# Branch prefixes of the build verification: the build branch and its base ref.
+BUILD_PREFIXES = ("build/", "build-base/")
 BASE_REF = "origin/main"
 # Files outside every gate component that a generator of `make codegen-check` reads; the inputs
 # inside components and the API contract select a component (tools/ci/components.py).
@@ -47,11 +49,15 @@ HOOK_VARIABLES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"
 
 
 def is_build_ref(ref: str) -> bool:
-    """Return whether `ref` (full or short branch name) is a branch `build/<name>`."""
+    """Return whether `ref` (full or short branch name) is `build/<name>` or `build-base/<name>`.
+
+    `build-base/<ticket>` is the base ref of a build branch (tools/ci/build_base.py), pushed on
+    its own right before it; it gets the same fast gates.
+    """
     name = ref.removeprefix("refs/heads/")
     if ref.startswith("refs/") and name == ref:
         return False
-    return name.startswith(BUILD_PREFIX) and len(name) > len(BUILD_PREFIX)
+    return any(name.startswith(p) and len(name) > len(p) for p in BUILD_PREFIXES)
 
 
 def _clean_env() -> dict[str, str]:

@@ -76,7 +76,11 @@ read `design/build/tokens.resolved.json`, which also selects `server`). Shared s
 runs the jobs of the components of its tag. Documentation (`docs/` outside `docs/api/`, `infra/`,
 the root Markdown files, `LICENSE`, `NOTICE`) needs no conditional job, except the files the map
 assigns to a component (for example `docs/spec/actions.yaml` to `server`). The plan reads the diff
-without rename detection, so a moved file counts for its old and its new path.
+without rename detection, so a moved file counts for its old and its new path. A build branch
+(`build-verify.yml`) measures from the merge base with `build-base/<ticket>` when the build team
+pushed that ref before it (the integration head the ticket branch was built on), else from the
+merge base with `main`; without either merge base it runs every job (`tools/ci/build_base.py`;
+push-discipline.md, "Build branches").
 
 A skip never hides a failure: `ci-ok` and `build-verify-ok` are the last job of their run, need
 every other job and run with `always()`, and `tools/ci/ci_ok.py needs` checks the results of their

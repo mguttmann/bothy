@@ -153,3 +153,19 @@ def test_build_verify_ok_sums_up_every_job() -> None:
     [run] = [s["run"] for s in ok["steps"] if "run" in s]
     # tools/ci/ci_ok.py needs: the plan and every needed job passed (tools/ci/tests/test_ci_ok.py).
     assert run.rstrip().endswith("tools/ci/ci_ok.py needs")
+
+
+def test_the_plan_measures_from_the_build_base() -> None:
+    """The plan step takes its base from tools/ci/build_base.py, with the pushed branch."""
+    plan = _jobs()["plan"]
+    [step] = [s for s in plan["steps"] if s.get("id") == "jobs"]
+    assert step["env"]["BRANCH"] == "${{ github.ref_name }}"
+    run = str(step["run"])
+    assert "tools/ci/build_base.py" in run
+    assert '--branch "$BRANCH"' in run
+    assert "git merge-base" not in run
+    assert 'ci-plan --base "$base" --head "$HEAD_SHA"' in run
+    assert "ci-plan --components all" in run
+    # Every branch and its history: the base ref is a remote branch of the checkout.
+    uses = [s for s in plan["steps"] if str(s.get("uses", "")).startswith("actions/checkout@")]
+    assert [s["with"]["fetch-depth"] for s in uses] == [0]
