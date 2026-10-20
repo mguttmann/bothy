@@ -9872,7 +9872,12 @@ paths:
         Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
         Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
         instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
-        for blocked or failed files; without read access always 404 (12, 9.3).
+        for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
+        gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
+        416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+        `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
+        CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
+        only (ADR 0048).
       x-authz-action: file.read
       x-rate-limit-class: rl.read
       security:
@@ -9881,9 +9886,12 @@ paths:
       - fileTicket: []
       parameters:
       - $ref: '#/components/parameters/FileIdPath'
+      - $ref: '#/components/parameters/FileTicketQuery'
+      - $ref: '#/components/parameters/Range'
+      - $ref: '#/components/parameters/If-Range'
       responses:
         '200':
-          description: OK.
+          description: The whole file (12, 9.3; ADR 0048).
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
@@ -9891,8 +9899,100 @@ paths:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
               $ref: '#/components/headers/RateLimit-Policy'
+            Content-Disposition:
+              $ref: '#/components/headers/Content-Disposition'
+            Content-Security-Policy:
+              $ref: '#/components/headers/File-Content-Security-Policy'
+            Cross-Origin-Resource-Policy:
+              $ref: '#/components/headers/Cross-Origin-Resource-Policy'
+            Cache-Control:
+              $ref: '#/components/headers/File-Cache-Control'
+            ETag:
+              $ref: '#/components/headers/File-ETag'
+            Repr-Digest:
+              $ref: '#/components/headers/Repr-Digest'
+            Accept-Ranges:
+              $ref: '#/components/headers/Accept-Ranges'
           content:
             application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            audio/mp4:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Exactly one byte range of the file (12, 9.3; ADR 0048).
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            Content-Disposition:
+              $ref: '#/components/headers/Content-Disposition'
+            Content-Security-Policy:
+              $ref: '#/components/headers/File-Content-Security-Policy'
+            Cross-Origin-Resource-Policy:
+              $ref: '#/components/headers/Cross-Origin-Resource-Policy'
+            Cache-Control:
+              $ref: '#/components/headers/File-Cache-Control'
+            ETag:
+              $ref: '#/components/headers/File-ETag'
+            Repr-Digest:
+              $ref: '#/components/headers/Repr-Digest'
+            Accept-Ranges:
+              $ref: '#/components/headers/Accept-Ranges'
+            Content-Range:
+              $ref: '#/components/headers/Content-Range'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            audio/mp4:
+              schema:
+                type: string
+                format: binary
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            video/mp4:
               schema:
                 type: string
                 format: binary
@@ -9905,7 +10005,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/FileConflict'
         '416':
           $ref: '#/components/responses/RangeNotSatisfiable'
         '429':
@@ -9918,7 +10018,11 @@ paths:
       operationId: downloadThumbnail
       summary: Download a thumbnail
       tags: [Files]
-      description: Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`.
+      description: |-
+        Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview
+        `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`; a variant
+        the file does not have gives 404. Thumbnails are always inline with their own type; range,
+        headers and caching as for `downloadFile` (12, 9.3).
       x-authz-action: file.read
       x-rate-limit-class: rl.read
       security:
@@ -9928,9 +10032,12 @@ paths:
       parameters:
       - $ref: '#/components/parameters/FileIdPath'
       - $ref: '#/components/parameters/VariantPath'
+      - $ref: '#/components/parameters/FileTicketQuery'
+      - $ref: '#/components/parameters/Range'
+      - $ref: '#/components/parameters/If-Range'
       responses:
         '200':
-          description: OK.
+          description: The whole thumbnail (12, 9.3; ADR 0048).
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
@@ -9938,8 +10045,60 @@ paths:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
               $ref: '#/components/headers/RateLimit-Policy'
+            Content-Disposition:
+              $ref: '#/components/headers/Content-Disposition'
+            Content-Security-Policy:
+              $ref: '#/components/headers/File-Content-Security-Policy'
+            Cross-Origin-Resource-Policy:
+              $ref: '#/components/headers/Cross-Origin-Resource-Policy'
+            Cache-Control:
+              $ref: '#/components/headers/File-Cache-Control'
+            ETag:
+              $ref: '#/components/headers/File-ETag'
+            Repr-Digest:
+              $ref: '#/components/headers/Repr-Digest'
+            Accept-Ranges:
+              $ref: '#/components/headers/Accept-Ranges'
           content:
-            image/*:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Exactly one byte range of the thumbnail (12, 9.3; ADR 0048).
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            Content-Disposition:
+              $ref: '#/components/headers/Content-Disposition'
+            Content-Security-Policy:
+              $ref: '#/components/headers/File-Content-Security-Policy'
+            Cross-Origin-Resource-Policy:
+              $ref: '#/components/headers/Cross-Origin-Resource-Policy'
+            Cache-Control:
+              $ref: '#/components/headers/File-Cache-Control'
+            ETag:
+              $ref: '#/components/headers/File-ETag'
+            Repr-Digest:
+              $ref: '#/components/headers/Repr-Digest'
+            Accept-Ranges:
+              $ref: '#/components/headers/Accept-Ranges'
+            Content-Range:
+              $ref: '#/components/headers/Content-Range'
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
               schema:
                 type: string
                 format: binary
@@ -9952,7 +10111,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/FileConflict'
+        '416':
+          $ref: '#/components/responses/RangeNotSatisfiable'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -9964,7 +10125,12 @@ paths:
       summary: Create a short-lived fetch ticket
       tags: [Files]
       description: |-
-        For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+        For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+        checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+        session of the caller: a principal without a session (agent, app, API token) gets 403
+        `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+        deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+        404. A repeated call mints a new ticket.
       x-authz-action: file.read
       x-rate-limit-class: rl.read
       x-idempotency-exempt: read_only
@@ -10008,7 +10174,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          $ref: '#/components/responses/Conflict'
+          $ref: '#/components/responses/FileConflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -10019,7 +10185,7 @@ paths:
       operationId: getTranscript
       summary: Read the transcript of a voice message
       tags: [Files]
-      description: 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3).
+      description: 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
       x-authz-action: file.read
       x-rate-limit-class: rl.read
       parameters:
@@ -19934,6 +20100,35 @@ components:
       schema:
         type: integer
         minimum: 1
+    FileTicketQuery:
+      name: ticket
+      in: query
+      required: false
+      description: |-
+        Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+        `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+        bearer secret: never logged.
+      schema:
+        type: string
+    Range:
+      name: Range
+      in: header
+      required: false
+      description: |-
+        One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+        `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+        a range that starts at or after the end gives 416 (12, 9.3).
+      schema:
+        type: string
+    If-Range:
+      name: If-Range
+      in: header
+      required: false
+      description: |-
+        Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+        included, gives the whole variant (200).
+      schema:
+        type: string
     VariantPath:
       name: variant
       in: path
@@ -20071,6 +20266,38 @@ components:
         type: integer
     ETag:
       description: Strong entity tag of the resource version, e.g. `"7"`.
+      schema:
+        type: string
+    File-ETag:
+      description: '`"<sha256 hex>"`, the lowercase hex SHA-256 of the whole delivered variant (12, 9.3); not a version.'
+      schema:
+        type: string
+    Repr-Digest:
+      description: '`sha-256=:<base64>:` of the whole delivered variant (RFC 9530); the client checks it after the download.'
+      schema:
+        type: string
+    Accept-Ranges:
+      description: Always `bytes`; exactly one range is supported.
+      schema:
+        type: string
+    Content-Range:
+      description: '`bytes <first>-<last>/<size>` with 206, `bytes */<size>` with 416 (RFC 9110).'
+      schema:
+        type: string
+    Content-Disposition:
+      description: '`inline` only for the inline list of 12 9.3, otherwise `attachment`; always `filename="<ASCII fallback>"` before `filename*=UTF-8''''<percent-encoded>` (RFC 6266, RFC 8187).'
+      schema:
+        type: string
+    File-Content-Security-Policy:
+      description: Always `default-src 'none'; sandbox`, so an upload never runs as a page of the instance (12, 9.3).
+      schema:
+        type: string
+    Cross-Origin-Resource-Policy:
+      description: Always `same-origin`.
+      schema:
+        type: string
+    File-Cache-Control:
+      description: '`private, max-age=<client.cache_max_age>, immutable` with normal authentication, `private, no-store` with a ticket (12, 9.3; ADR 0048).'
       schema:
         type: string
     Idempotent-Replay:
@@ -20241,6 +20468,28 @@ components:
       headers:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
+    FileConflict:
+      x-status: 409
+      description: 'Problem codes: `file_not_ready`, `file_blocked`.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            default:
+              summary: File not ready
+              value:
+                type: /api/v1/problems/file_not_ready
+                title: File not ready
+                status: 409
+                code: file_not_ready
+                correlation_id: 0192f4a0-7b1c-7577-8bf0-c4f4ee4f887e
+                instance: /api/v1/files/0192f4a0-7b1c-75c7-88f6-199cc394b56a/content
+      headers:
+        Correlation-Id:
+          $ref: '#/components/headers/Correlation-Id'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
     Gone:
       x-status: 410
       description: 'Problem codes: `resync_required`, `message_deleted`, `gone`.'
@@ -20344,6 +20593,8 @@ components:
       headers:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
+        Content-Range:
+          $ref: '#/components/headers/Content-Range'
     UnprocessableEntity:
       x-status: 422
       description: 'Problem codes: `idempotency_key_reuse`.'

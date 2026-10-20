@@ -251,6 +251,18 @@ type ServerInterface interface {
 	// GetFile Read file metadata
 	// (GET /files/{file_id})
 	GetFile(w http.ResponseWriter, r *http.Request, fileId FileIdPath)
+	// DownloadFile Download a file
+	// (GET /files/{file_id}/content)
+	DownloadFile(w http.ResponseWriter, r *http.Request, fileId FileIdPath, params DownloadFileParams)
+	// DownloadThumbnail Download a thumbnail
+	// (GET /files/{file_id}/thumbnails/{variant})
+	DownloadThumbnail(w http.ResponseWriter, r *http.Request, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params DownloadThumbnailParams)
+	// CreateFileTicket Create a short-lived fetch ticket
+	// (POST /files/{file_id}/tickets)
+	CreateFileTicket(w http.ResponseWriter, r *http.Request, fileId FileIdPath)
+	// GetTranscript Read the transcript of a voice message
+	// (GET /files/{file_id}/transcript)
+	GetTranscript(w http.ResponseWriter, r *http.Request, fileId FileIdPath)
 	// ListGrants List grants of a target or subject
 	// (GET /grants)
 	ListGrants(w http.ResponseWriter, r *http.Request, params ListGrantsParams)
@@ -3841,6 +3853,231 @@ func (siw *ServerInterfaceWrapper) GetFile(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetFile(w, r, fileId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadFile operation middleware
+func (siw *ServerInterfaceWrapper) DownloadFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DownloadFileParams
+
+	// ------------- Optional query parameter "ticket" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ticket", r.URL.Query(), &params.Ticket, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ticket"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ticket", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Range")]; found {
+		var Range Range
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Range", valueList[0], &Range, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Range", Err: err})
+			return
+		}
+
+		params.Range = &Range
+
+	}
+
+	// ------------- Optional header parameter "If-Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Range")]; found {
+		var IfRange IfRange
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Range", valueList[0], &IfRange, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Range", Err: err})
+			return
+		}
+
+		params.IfRange = &IfRange
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadFile(w, r, fileId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadThumbnail operation middleware
+func (siw *ServerInterfaceWrapper) DownloadThumbnail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "variant" -------------
+	var variant DownloadThumbnailParamsVariant
+
+	err = runtime.BindStyledParameterWithOptions("simple", "variant", r.PathValue("variant"), &variant, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "variant", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DownloadThumbnailParams
+
+	// ------------- Optional query parameter "ticket" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ticket", r.URL.Query(), &params.Ticket, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ticket"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ticket", Err: err})
+		}
+		return
+	}
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Range")]; found {
+		var Range Range
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Range", valueList[0], &Range, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Range", Err: err})
+			return
+		}
+
+		params.Range = &Range
+
+	}
+
+	// ------------- Optional header parameter "If-Range" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Range")]; found {
+		var IfRange IfRange
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Range", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Range", valueList[0], &IfRange, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Range", Err: err})
+			return
+		}
+
+		params.IfRange = &IfRange
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadThumbnail(w, r, fileId, variant, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFileTicket operation middleware
+func (siw *ServerInterfaceWrapper) CreateFileTicket(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFileTicket(w, r, fileId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTranscript operation middleware
+func (siw *ServerInterfaceWrapper) GetTranscript(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTranscript(w, r, fileId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8933,6 +9170,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/uploads/{file_id}", wrapper.AbortUpload)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/uploads/{file_id}", wrapper.GetUpload)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}", wrapper.GetFile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}/content", wrapper.DownloadFile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}/thumbnails/{variant}", wrapper.DownloadThumbnail)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/files/{file_id}/tickets", wrapper.CreateFileTicket)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}/transcript", wrapper.GetTranscript)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/sync/snapshot", wrapper.GetSnapshot)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/events", wrapper.ListEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/read-states", wrapper.ListMyReadStates)
@@ -9030,6 +9271,16 @@ type ErrorApplicationProblemPlusJSONResponse struct {
 	Headers ErrorResponseHeaders
 }
 
+type FileConflictResponseHeaders struct {
+	CorrelationId *CorrelationId
+	RetryAfter    *int
+}
+type FileConflictApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers FileConflictResponseHeaders
+}
+
 type ForbiddenResponseHeaders struct {
 	CorrelationId *CorrelationId
 }
@@ -9085,6 +9336,7 @@ type PreconditionRequiredApplicationProblemPlusJSONResponse struct {
 }
 
 type RangeNotSatisfiableResponseHeaders struct {
+	ContentRange  *string
 	CorrelationId *CorrelationId
 }
 type RangeNotSatisfiableApplicationProblemPlusJSONResponse struct {
@@ -9391,6 +9643,18 @@ type StrictServerInterface interface {
 	// GetFile Read file metadata
 	// (GET /files/{file_id})
 	GetFile(ctx context.Context, request GetFileRequestObject) (GetFileResponseObject, error)
+	// DownloadFile Download a file
+	// (GET /files/{file_id}/content)
+	DownloadFile(ctx context.Context, request DownloadFileRequestObject) (DownloadFileResponseObject, error)
+	// DownloadThumbnail Download a thumbnail
+	// (GET /files/{file_id}/thumbnails/{variant})
+	DownloadThumbnail(ctx context.Context, request DownloadThumbnailRequestObject) (DownloadThumbnailResponseObject, error)
+	// CreateFileTicket Create a short-lived fetch ticket
+	// (POST /files/{file_id}/tickets)
+	CreateFileTicket(ctx context.Context, request CreateFileTicketRequestObject) (CreateFileTicketResponseObject, error)
+	// GetTranscript Read the transcript of a voice message
+	// (GET /files/{file_id}/transcript)
+	GetTranscript(ctx context.Context, request GetTranscriptRequestObject) (GetTranscriptResponseObject, error)
 	// ListGrants List grants of a target or subject
 	// (GET /grants)
 	ListGrants(ctx context.Context, request ListGrantsRequestObject) (ListGrantsResponseObject, error)
@@ -12185,6 +12449,120 @@ func (sh *strictHandler) GetFile(w http.ResponseWriter, r *http.Request, fileId 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetFileResponseObject); ok {
 		if err := validResponse.VisitGetFileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadFile operation middleware
+func (sh *strictHandler) DownloadFile(w http.ResponseWriter, r *http.Request, fileId FileIdPath, params DownloadFileParams) {
+	var request DownloadFileRequestObject
+
+	request.FileId = fileId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadFile(ctx, request.(DownloadFileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadFile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadFileResponseObject); ok {
+		if err := validResponse.VisitDownloadFileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadThumbnail operation middleware
+func (sh *strictHandler) DownloadThumbnail(w http.ResponseWriter, r *http.Request, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params DownloadThumbnailParams) {
+	var request DownloadThumbnailRequestObject
+
+	request.FileId = fileId
+	request.Variant = variant
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadThumbnail(ctx, request.(DownloadThumbnailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadThumbnail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadThumbnailResponseObject); ok {
+		if err := validResponse.VisitDownloadThumbnailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateFileTicket operation middleware
+func (sh *strictHandler) CreateFileTicket(w http.ResponseWriter, r *http.Request, fileId FileIdPath) {
+	var request CreateFileTicketRequestObject
+
+	request.FileId = fileId
+
+	var body CreateFileTicketJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateFileTicket(ctx, request.(CreateFileTicketRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateFileTicket")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateFileTicketResponseObject); ok {
+		if err := validResponse.VisitCreateFileTicketResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetTranscript operation middleware
+func (sh *strictHandler) GetTranscript(w http.ResponseWriter, r *http.Request, fileId FileIdPath) {
+	var request GetTranscriptRequestObject
+
+	request.FileId = fileId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTranscript(ctx, request.(GetTranscriptRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTranscript")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTranscriptResponseObject); ok {
+		if err := validResponse.VisitGetTranscriptResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
