@@ -2,7 +2,7 @@
 
 /// A group: rename, delete, members with their expiry, add and remove members
 /// (docs/spec/07-permissions.md 2.1; 05 `group.update`, `group.delete`, `group.member.add`,
-/// `group.member.remove` with step-up).
+/// `group.member.remove` with step-up; 10 11: the guided switch when adding meets I1).
 library;
 
 import 'package:api_client/api_client.dart' show ApiProblem;
@@ -10,10 +10,14 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/guided_flow.dart';
 import '../common/admin_action.dart';
 import '../common/confirm_change.dart';
 import '../common/problem_banner.dart';
+import '../data/access_repository.dart' show I1Resolution, InvariantFinding;
 import '../data/admin_repository.dart';
+import '../data/self_repository.dart' show SelfActionFailed;
+import '../grants/grant_labels.dart' show AccessNames;
 import '../self/self_feedback.dart';
 import 'groups_list.dart' show GroupNameDialog;
 import 'member_editor.dart';
@@ -22,6 +26,11 @@ import 'member_editor.dart';
 /// [repository]; the step-up comes from the interceptor. A group whose members the identity
 /// provider manages (`oidc_claim`) shows them without "Add member" and "Remove" (08 3.4).
 /// [onBack] returns to the list; a deleted group returns there too.
+///
+/// When adding a member meets I1 (`409 i1_violation` with `conflicts`, 10 5.4), the detail
+/// offers the guided option of 10 11 ([GuidedSwitch]): after a reason it repeats the same call
+/// once with `resolve_i1`, so the server switches the agents and adds the member in one
+/// transaction (BR-07), and shows [GuidedResult].
 class GroupDetail extends StatefulWidget {
   /// Creates the detail.
   const GroupDetail({
@@ -62,6 +71,7 @@ class _GroupDetailState extends State<GroupDetail>
   List<AdminGroupMember>? _members;
   List<AdminPerson> _people = const [];
   ApiProblem? _problem;
+  _GuidedAdd? _guided;
 
   @override
   void initState() {
@@ -152,16 +162,66 @@ class _GroupDetailState extends State<GroupDetail>
       ],
     );
     if (request == null || !mounted) return;
+    setState(() => _guided = null);
     final name = request.person.displayName;
+    var conflicts = const <InvariantFinding>[];
     await _change('add', () async {
-      await widget.repository.addMember(
-        group.id,
-        request.person.id,
-        expiresAt: request.expiresAt,
-        purpose: l.stepUpPurposeAddMember(name, group.name),
-      );
+      try {
+        await widget.repository.addMember(
+          group.id,
+          request.person.id,
+          expiresAt: request.expiresAt,
+          purpose: l.stepUpPurposeAddMember(name, group.name),
+        );
+      } on SelfActionFailed catch (e) {
+        if (e.problem?.code == 'i1_violation') conflicts = e.conflicts;
+        rethrow;
+      }
       return SelfNotice(l.adminMemberAdded(name, group.name));
     });
+    if (guidedAgentIds(conflicts).isEmpty || !mounted) return;
+    final names = await AccessNames.load(widget.repository);
+    if (!mounted) return;
+    // The guided option explains the conflict itself (10 11 step 2) and replaces the plain
+    // rejection.
+    setState(() {
+      notice = null;
+      _guided = _GuidedAdd(group, request, conflicts, names);
+    });
+  }
+
+  /// The guided option for [g]: the reason, then the same `addMember` once more with
+  /// `resolve_i1` (05 rule 1.6); never a switch on its own.
+  Future<void> _takeGuided(_GuidedAdd g) async {
+    final l = AppLocalizations.of(context);
+    final ids = guidedAgentIds(g.conflicts);
+    final reason = await GuidedFlow.askReason(
+      context,
+      agents: guidedAgentNames(g.names, g.conflicts),
+    );
+    if (reason == null || !mounted) return;
+    setState(() => _guided = null);
+    final name = g.request.person.displayName;
+    final ok = await runChange('add', () async {
+      await widget.repository.addMember(
+        g.group.id,
+        g.request.person.id,
+        expiresAt: g.request.expiresAt,
+        purpose: l.stepUpPurposeAddMember(name, g.group.name),
+        resolveI1: I1Resolution(ids, reason: reason),
+      );
+      return SelfNotice(l.adminMemberAdded(name, g.group.name));
+    });
+    if (ok) widget.onChanged?.call();
+    if (!mounted) return;
+    await _load();
+    if (ok && mounted) {
+      await GuidedResult.show(
+        context,
+        repository: widget.repository,
+        agentIds: ids,
+      );
+    }
   }
 
   Future<void> _remove(AdminGroup group, AdminGroupMember member) async {
@@ -265,6 +325,14 @@ class _GroupDetailState extends State<GroupDetail>
           ),
           const SizedBox(height: DsSpace.s8),
           noticeBanner(),
+          if (_guided case final g?)
+            GuidedSwitch(
+              conflicts: g.conflicts,
+              person: g.request.person.displayName,
+              names: g.names,
+              grant: false,
+              onTake: busy ? null : () => _takeGuided(g),
+            ),
           Padding(
             padding: const EdgeInsets.only(top: DsSpace.s16),
             child: Row(
@@ -341,4 +409,14 @@ class _GroupDetailState extends State<GroupDetail>
       ],
     );
   }
+}
+
+/// An "Add member" the server rejected with I1, waiting for the guided option.
+final class _GuidedAdd {
+  const _GuidedAdd(this.group, this.request, this.conflicts, this.names);
+
+  final AdminGroup group;
+  final MemberRequest request;
+  final List<InvariantFinding> conflicts;
+  final AccessNames names;
 }

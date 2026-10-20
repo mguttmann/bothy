@@ -111,14 +111,15 @@ InvariantFinding i1Finding(
 );
 
 /// The `409 i1_violation` of [conflicts], as the repository throws it.
-SelfActionFailed i1Failure(List<InvariantFinding> conflicts) => SelfActionFailed(
-  const ApiProblem(
-    status: 409,
-    code: 'i1_violation',
-    hint: 'Switch the agent to organization first',
-  ),
-  conflicts: conflicts,
-);
+SelfActionFailed i1Failure(List<InvariantFinding> conflicts) =>
+    SelfActionFailed(
+      const ApiProblem(
+        status: 409,
+        code: 'i1_violation',
+        hint: 'Switch the agent to organization first',
+      ),
+      conflicts: conflicts,
+    );
 
 /// The agent calls of the fake; [change], [read] and [refused] are those of the repository.
 mixin FakeAgents {
@@ -228,7 +229,9 @@ mixin FakeAgents {
     for (final id in resolve.agentIds) {
       final a = agentRecordsById[id];
       if (a == null) {
-        throw const SelfActionFailed(ApiProblem(status: 404, code: 'not_found'));
+        throw const SelfActionFailed(
+          ApiProblem(status: 404, code: 'not_found'),
+        );
       }
       if (a.mode != AgentBillingMode.organization) {
         agentRecordsById[id] = switched(a, AgentBillingMode.organization);
@@ -239,7 +242,9 @@ mixin FakeAgents {
 
   AgentRecord _agent(String id) =>
       agentRecordsById[id] ??
-      (throw const SelfActionFailed(ApiProblem(status: 404, code: 'not_found')));
+      (throw const SelfActionFailed(
+        ApiProblem(status: 404, code: 'not_found'),
+      ));
 
   /// Every agent.
   Future<List<AgentRecord>> agentRecords() async {
@@ -381,7 +386,7 @@ mixin FakeAgents {
     tokensById.putIfAbsent(principalId, () => []).add(token);
     return AgentTokenCreated(
       token,
-      'bothy_agt_EXAMP${n}leSecretOnlyShownOnce0000000000000000_000000',
+      'bothy_agt_EXAMP${n}EXAMPLESecretShownOnce000000000000000_000000',
     );
   }
 

@@ -33,11 +33,28 @@
 /// [CreateHostDialog], [FingerprintConfirm], [LlmLoginChoice], [ServerHostChoice] and
 /// [SessionUserRows], the host target in the [GrantWizard] and the data source
 /// [HostsRepository] ([ApiHostsRepository]), which [AdminRepository] includes.
+///
+/// M4-28 adds screen A5 (01 5.2; 10 5.4, 8, 9, 11, 13): the [AgentsList] with the
+/// [AgentModeBadge], the [AgentPage] with the configured next to the reported mode and the
+/// server's warnings, [SwitchModeDialog], [HolderDialog], [SwitchAllDialog], the
+/// [I1Explanation], the agent's [AgentTokens] with [TokenSecretView], the guided flow
+/// ([GuidedSwitch], [GuidedFlow], [GuidedResult]) in the grant preview, the group members and
+/// the owners, and the data source [AgentsRepository] ([ApiAgentsRepository]), which
+/// [AdminRepository] includes.
 library;
 
 export 'src/access/source_chain.dart';
 export 'src/access/view_as_person.dart';
 export 'src/access/who_has_access.dart';
+export 'src/agents/agent_labels.dart';
+export 'src/agents/agent_page.dart';
+export 'src/agents/agent_tokens.dart';
+export 'src/agents/agents_list.dart';
+export 'src/agents/guided_flow.dart';
+export 'src/agents/holder_dialog.dart';
+export 'src/agents/i1_explanation.dart';
+export 'src/agents/switch_all_dialog.dart';
+export 'src/agents/switch_mode_dialog.dart';
 export 'src/audit/audit_entry_detail.dart';
 export 'src/audit/audit_export.dart';
 export 'src/audit/audit_filters.dart';
@@ -55,6 +72,7 @@ export 'src/data/hosts_repository.dart';
 export 'src/data/self_repository.dart';
 export 'src/devices/approve_device_dialog.dart';
 export 'src/devices/waiting_devices.dart';
+export 'src/grants/grant_labels.dart' show AccessNames;
 export 'src/grants/grant_wizard.dart';
 export 'src/grants/grants_list.dart';
 export 'src/grants/preview_panel.dart';
