@@ -154,9 +154,12 @@ func (t *Tracker) bound() (eventlog.EphemeralPublisher, Readiness) {
 	return t.publisher, t.readiness
 }
 
-// entry is the presence of one agent in this process. mu guards every field; loaded is false
+// entry is the presence of one agent in this process. mu guards every field except readiness
+// and readinessSet and is never held across a database call; beat runs the heartbeats of the
+// agent one after the other and guards readiness and readinessSet (D-M2-21-11). loaded is false
 // until the stored row has filled it.
 type entry struct {
+	beat   gosync.Mutex
 	mu     gosync.Mutex
 	id     ids.ID
 	handle string
@@ -183,6 +186,9 @@ type entry struct {
 
 	stop func() bool
 	gen  uint64
+	// changes counts the calls of Changed, so a heartbeat keeps configured values newer than its
+	// read.
+	changes uint64
 }
 
 // lookup returns the entry of id, creating it with handle and status from the directory.
@@ -357,7 +363,7 @@ func (t *Tracker) Statuses(ctx context.Context, agentIDs []ids.ID) ([]agents.Pre
 	found := make(map[ids.ID]agents.PresenceStatus, len(agentIDs))
 	var rest []ids.ID
 	for _, id := range agentIDs {
-		if st, ok := t.memory(ctx, id, now); ok {
+		if st, ok := t.memory(id, now); ok {
 			found[id] = st
 			continue
 		}
@@ -379,23 +385,15 @@ func (t *Tracker) Statuses(ctx context.Context, agentIDs []ids.ID) ([]agents.Pre
 	return out, nil
 }
 
-// memory returns the status of the loaded entry of id. Inside a unit of work it does not wait for
-// the entry lock and reports false while another goroutine holds it: a heartbeat holds the entry
-// lock while it waits for the agents row lock, and the unit may hold that row (a switch or the
-// guided flow of M2-21), so waiting here would make both wait until a lock timeout. The caller
-// then uses the stored row.
-func (t *Tracker) memory(ctx context.Context, id ids.ID, now time.Time) (agents.PresenceStatus, bool) {
+// memory returns the status of the loaded entry of id. The entry lock is never held across a
+// database call (D-M2-21-11), so this read inside a unit that holds the agents row does not wait
+// for a heartbeat.
+func (t *Tracker) memory(id ids.ID, now time.Time) (agents.PresenceStatus, bool) {
 	e := t.tracked(id)
 	if e == nil {
 		return agents.PresenceStatus{}, false
 	}
-	if txn.InUnit(ctx) {
-		if !e.mu.TryLock() {
-			return agents.PresenceStatus{}, false
-		}
-	} else {
-		e.mu.Lock()
-	}
+	e.mu.Lock()
 	defer e.mu.Unlock()
 	if !e.loaded {
 		return agents.PresenceStatus{}, false
@@ -415,9 +413,9 @@ func storedStatus(row domain.PresenceRow, now time.Time, alertAfter time.Duratio
 
 // recordStatus is the presence of the record rec for getAgent and listAgents: the entry from
 // memory when this process tracks the agent, otherwise the stored columns of rec.
-func (t *Tracker) recordStatus(ctx context.Context, rec domain.Agent) agents.PresenceStatus {
+func (t *Tracker) recordStatus(rec domain.Agent) agents.PresenceStatus {
 	now := t.d.Clock.Now()
-	if st, ok := t.memory(ctx, rec.ID, now); ok {
+	if st, ok := t.memory(rec.ID, now); ok {
 		return st
 	}
 	return recordPresence(rec, now, t.cfg.MismatchAlertAfter)
@@ -458,6 +456,7 @@ func (t *Tracker) Changed(ctx context.Context, list []ids.ID) error {
 	for _, row := range rows {
 		e := t.tracked(row.ID)
 		e.mu.Lock()
+		e.changes++
 		if e.loaded {
 			e.target = row.Target
 			if p, ok := principals[row.ID]; ok {

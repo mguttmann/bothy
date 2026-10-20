@@ -178,21 +178,21 @@ func (s *Service) view(ctx context.Context, rec domain.Agent) (agents.Agent, err
 	if err != nil {
 		return agents.Agent{}, err
 	}
-	return s.agentView(ctx, rec, p), nil
+	return s.agentView(rec, p), nil
 }
 
 // presence returns the presence of rec: from the tracker when one is bound (M2-20 ends the
 // placeholder of M1-63/3), otherwise from the stored columns.
-func (s *Service) presence(ctx context.Context, rec domain.Agent) agents.PresenceStatus {
+func (s *Service) presence(rec domain.Agent) agents.PresenceStatus {
 	if s.d.Presence != nil {
-		return s.d.Presence.recordStatus(ctx, rec)
+		return s.d.Presence.recordStatus(rec)
 	}
 	return recordPresence(rec, s.d.Clock.Now(), 0)
 }
 
 // agentView converts a record and its principal.
-func (s *Service) agentView(ctx context.Context, rec domain.Agent, p identity.PrincipalView) agents.Agent {
-	presence := s.presence(ctx, rec)
+func (s *Service) agentView(rec domain.Agent, p identity.PrincipalView) agents.Agent {
+	presence := s.presence(rec)
 	// The tracker learns a desired mode changed in another unit of work (the guided flow of
 	// M2-21) only with the next heartbeat, so the comparison takes the desired mode of this read
 	// (M2-21 design note 8, docs/DECISIONS.md D-M2-21-7).
@@ -406,7 +406,7 @@ func (s *Service) presenceChanged(ctx context.Context, out *agents.Agent) {
 		return
 	}
 	s.notifyPresence(ctx, []ids.ID{out.ID})
-	if st, ok := s.d.Presence.memory(ctx, out.ID, s.d.Clock.Now()); ok {
+	if st, ok := s.d.Presence.memory(out.ID, s.d.Clock.Now()); ok {
 		out.Presence = st
 	}
 }

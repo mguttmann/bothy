@@ -1533,10 +1533,11 @@ documented in this file. The format is based on
 
 ### Fixed
 
-- A heartbeat that stores a changed reported mode and a switch to `organization` (per agent, for
-  all agents or in the guided flow of M2-21) for the same agent no longer wait on each other until a
-  lock timeout: inside a unit of work the presence read of the tracker uses the stored row while a
-  heartbeat holds the entry lock (docs/DECISIONS.md D-M2-21-10).
+- A heartbeat that waits for the agents row or a channel row no longer blocks a request that holds
+  that row and reads or updates the presence tracker (a switch to `organization` per agent, for all
+  agents or in the guided flow of M2-21, `disableAgent` and `enableAgent` under `Idempotency-Key`):
+  both waited on each other until a lock timeout and answered `5xx`. The tracker entry lock is no
+  longer held across a database call (docs/DECISIONS.md D-M2-21-11).
 
 - `instance` registers the event type `instance.updated` it emits, so the start check and gate G9
   see it (M1-67).
