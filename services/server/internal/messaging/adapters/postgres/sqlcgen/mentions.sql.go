@@ -11,6 +11,63 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countUnreadMentions = `-- name: CountUnreadMentions :many
+SELECT m.thread_id, m.channel_id, count(*)::int AS mention_count
+FROM mentions mn
+JOIN messages m ON m.id = mn.message_id
+LEFT JOIN (SELECT unnest($1::uuid[]) AS thread_id, unnest($2::bigint[]) AS last_read_seq) AS r
+    ON r.thread_id = m.thread_id
+WHERE mn.principal_id = $3
+  AND m.channel_id = ANY ($4::uuid[])
+  AND m.deleted_at IS NULL
+  AND m.thread_seq > coalesce(r.last_read_seq, 0)
+GROUP BY m.thread_id, m.channel_id
+ORDER BY m.thread_id
+`
+
+type CountUnreadMentionsParams struct {
+	ReadThreadIds     []pgtype.UUID
+	ReadSeqs          []int64
+	PrincipalID       pgtype.UUID
+	VisibleChannelIds []pgtype.UUID
+}
+
+type CountUnreadMentionsRow struct {
+	ThreadID     pgtype.UUID
+	ChannelID    pgtype.UUID
+	MentionCount int32
+}
+
+// The unread mentions of a principal per thread (brief M1-60 note 4): messages above the read
+// sequence of their thread (0 for a thread outside the arrays), without tombstones, only in
+// visible channels. The read sequences come as two parallel arrays of equal length, zipped by
+// the two unnest calls of one select list. Threads with no unread
+// mention are absent.
+func (q *Queries) CountUnreadMentions(ctx context.Context, arg CountUnreadMentionsParams) ([]CountUnreadMentionsRow, error) {
+	rows, err := q.db.Query(ctx, countUnreadMentions,
+		arg.ReadThreadIds,
+		arg.ReadSeqs,
+		arg.PrincipalID,
+		arg.VisibleChannelIds,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountUnreadMentionsRow
+	for rows.Next() {
+		var i CountUnreadMentionsRow
+		if err := rows.Scan(&i.ThreadID, &i.ChannelID, &i.MentionCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertMentions = `-- name: InsertMentions :exec
 
 INSERT INTO mentions (message_id, principal_id, thread_id, created_at)
@@ -56,6 +113,88 @@ func (q *Queries) ListMentions(ctx context.Context, messageID pgtype.UUID) ([]pg
 			return nil, err
 		}
 		items = append(items, principal_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMyMentions = `-- name: ListMyMentions :many
+SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, mn.created_at AS mentioned_at
+FROM mentions mn
+JOIN messages m ON m.id = mn.message_id
+WHERE mn.principal_id = $1
+  AND m.channel_id = ANY ($2::uuid[])
+  AND m.deleted_at IS NULL
+  AND (NOT $3::boolean OR (mn.created_at, mn.message_id) < ($4::timestamptz, $5::uuid))
+ORDER BY mn.created_at DESC, mn.message_id DESC
+LIMIT $6
+`
+
+type ListMyMentionsParams struct {
+	PrincipalID       pgtype.UUID
+	VisibleChannelIds []pgtype.UUID
+	HasAfter          bool
+	AfterAt           pgtype.Timestamptz
+	AfterID           pgtype.UUID
+	RowLimit          int32
+}
+
+type ListMyMentionsRow struct {
+	Message     Message
+	MentionedAt pgtype.Timestamptz
+}
+
+// One page of the mentions of a principal in visible channels without tombstones, newest first
+// (brief M1-60 note 2): keyset (mn.created_at DESC, mn.message_id DESC) after the cursor, index
+// mentions_principal_created_idx. The caller asks for one row more than the page.
+func (q *Queries) ListMyMentions(ctx context.Context, arg ListMyMentionsParams) ([]ListMyMentionsRow, error) {
+	rows, err := q.db.Query(ctx, listMyMentions,
+		arg.PrincipalID,
+		arg.VisibleChannelIds,
+		arg.HasAfter,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMyMentionsRow
+	for rows.Next() {
+		var i ListMyMentionsRow
+		if err := rows.Scan(
+			&i.Message.ID,
+			&i.Message.ThreadID,
+			&i.Message.ChannelID,
+			&i.Message.ThreadSeq,
+			&i.Message.AuthorPrincipalID,
+			&i.Message.ClientMsgID,
+			&i.Message.ClientPayloadSha256,
+			&i.Message.Origin,
+			&i.Message.Kind,
+			&i.Message.SystemCode,
+			&i.Message.ContentMd,
+			&i.Message.ContentFormat,
+			&i.Message.ReplyToMessageID,
+			&i.Message.RunID,
+			&i.Message.TriggerState,
+			&i.Message.TriggerStateReason,
+			&i.Message.TriggerStateAt,
+			&i.Message.Silent,
+			&i.Message.ImportItemID,
+			&i.Message.Version,
+			&i.Message.EditedAt,
+			&i.Message.DeletedAt,
+			&i.Message.DeletedBy,
+			&i.Message.CreatedAt,
+			&i.MentionedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

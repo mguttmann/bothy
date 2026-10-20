@@ -120,6 +120,8 @@ var appPrivileges = map[string][]string{
 	// editing replaces the mentions of a message and deleting removes them.
 	"messages": {"SELECT", "INSERT", "UPDATE"},
 	"mentions": {"SELECT", "INSERT", "DELETE"},
+	// M1-60: templates are deleted softly (deleted_at); no DELETE.
+	"message_templates": {"SELECT", "INSERT", "UPDATE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},

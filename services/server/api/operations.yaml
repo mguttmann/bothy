@@ -32,6 +32,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - confirmHost
   - createAgent
   - createChannel
+  - createChannelTemplate
   - createEnrollmentCode
   - createExtensionSession
   - createForumTag
@@ -40,6 +41,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createHost
   - createIdentityProvider
   - createMessage
+  - createPersonalTemplate
   - createSpace
   - createStepUpChallenge
   - createThread
@@ -48,6 +50,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteForumTag
   - deleteGroup
   - deleteIdentityProvider
+  - deleteTemplate
   - disableAgent
   - disableUser
   - enableAgent
@@ -89,10 +92,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listIdentityProviders
   - listInstanceSettings
   - listMyDevices
+  - listMyMentions
   - listMySessions
+  - listMyTemplates
   - listOwners
   - listSpaceChannels
   - listSpaces
+  - listTemplates
   - listTokens
   - listUserDevices
   - listUserSessions
@@ -144,6 +150,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateIdentityProvider
   - updateMyProfile
   - updateSpace
+  - updateTemplate
   - updateUser
   - upgradeAppManifest
   - validateManifest
@@ -201,9 +208,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createAgentWebhookSubscription
     milestone: M2
     ticket: M2-26
-  - operation_id: createChannelTemplate
-    milestone: M1
-    ticket: M1-60
   - operation_id: createDm
     milestone: V3
     ticket: V3-01
@@ -224,9 +228,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createInteraction
     milestone: M2
     ticket: M2-15
-  - operation_id: createPersonalTemplate
-    milestone: M1
-    ticket: M1-60
   - operation_id: createPrice
     milestone: M2
     ticket: M2-22
@@ -277,9 +278,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteStatusComponent
     milestone: M7
     ticket: M7-09
-  - operation_id: deleteTemplate
-    milestone: M1
-    ticket: M1-60
   - operation_id: deleteThreadDraft
     milestone: M1
     ticket: M1-61
@@ -434,9 +432,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMyDrafts
     milestone: M1
     ticket: M1-61
-  - operation_id: listMyMentions
-    milestone: M1
-    ticket: M1-60
   - operation_id: listMyNotificationPreferences
     milestone: M3
     ticket: M3-18
@@ -449,9 +444,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMySettings
     milestone: M1
     ticket: M1-61
-  - operation_id: listMyTemplates
-    milestone: M1
-    ticket: M1-60
   - operation_id: listPins
     milestone: M1
     ticket: M1-59
@@ -467,9 +459,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listServedChannels
     milestone: M2
     ticket: M2-02
-  - operation_id: listTemplates
-    milestone: M1
-    ticket: M1-60
   - operation_id: listTerminalSessions
     milestone: M2
     ticket: M2-44
@@ -626,9 +615,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateStatusComponent
     milestone: M7
     ticket: M7-09
-  - operation_id: updateTemplate
-    milestone: M1
-    ticket: M1-60
   - operation_id: updateWebhookSubscription
     milestone: M2
     ticket: M2-26

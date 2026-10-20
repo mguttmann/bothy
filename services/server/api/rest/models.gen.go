@@ -15829,6 +15829,12 @@ type MoveForumTagParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreateChannelTemplateParams defines parameters for CreateChannelTemplate.
+type CreateChannelTemplateParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListChannelThreadsParams defines parameters for ListChannelThreads.
 type ListChannelThreadsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -16027,6 +16033,13 @@ type ApprovePairingParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListMyMentionsParams defines parameters for ListMyMentions.
+type ListMyMentionsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // UpdateMyProfileParams defines parameters for UpdateMyProfile.
 type UpdateMyProfileParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16038,6 +16051,12 @@ type ListMySessionsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreatePersonalTemplateParams defines parameters for CreatePersonalTemplate.
+type CreatePersonalTemplateParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // AddOwnerParams defines parameters for AddOwner.
@@ -16112,6 +16131,15 @@ type MoveSpaceParams struct {
 
 // SetSpaceOperatorParams defines parameters for SetSpaceOperator.
 type SetSpaceOperatorParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// UpdateTemplateParams defines parameters for UpdateTemplate.
+type UpdateTemplateParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
@@ -16299,6 +16327,9 @@ type UpdateForumTagJSONRequestBody = ForumTagUpdate
 // MoveForumTagJSONRequestBody defines body for MoveForumTag for application/json ContentType.
 type MoveForumTagJSONRequestBody = MovePosition
 
+// CreateChannelTemplateJSONRequestBody defines body for CreateChannelTemplate for application/json ContentType.
+type CreateChannelTemplateJSONRequestBody = TemplateCreate
+
 // CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
 type CreateThreadJSONRequestBody = ThreadCreate
 
@@ -16389,6 +16420,9 @@ type CreateExtensionSessionJSONRequestBody = ExtensionSessionCreate
 // PutMySidebarSpaceJSONRequestBody defines body for PutMySidebarSpace for application/json ContentType.
 type PutMySidebarSpaceJSONRequestBody = SidebarStatePut
 
+// CreatePersonalTemplateJSONRequestBody defines body for CreatePersonalTemplate for application/json ContentType.
+type CreatePersonalTemplateJSONRequestBody = TemplateCreate
+
 // AddOwnerJSONRequestBody defines body for AddOwner for application/json ContentType.
 type AddOwnerJSONRequestBody = OwnerAdd
 
@@ -16418,6 +16452,9 @@ type MoveSpaceJSONRequestBody = MovePosition
 
 // SetSpaceOperatorJSONRequestBody defines body for SetSpaceOperator for application/json ContentType.
 type SetSpaceOperatorJSONRequestBody = OperatorSet
+
+// UpdateTemplateJSONRequestBody defines body for UpdateTemplate for application/json ContentType.
+type UpdateTemplateJSONRequestBody = TemplateUpdate
 
 // CreateMessageJSONRequestBody defines body for CreateMessage for application/json ContentType.
 type CreateMessageJSONRequestBody = MessageCreate

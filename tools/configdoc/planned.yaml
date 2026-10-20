@@ -105,8 +105,6 @@ rules:
     milestone: M2
   - match: telemetry.dashboard_url  # M6-06
     milestone: M6
-  - match: "template."  # M1-60
-    milestone: M1
   - match: "terminal."  # M2-40 to M2-46
     milestone: M2
   - match: "voice."  # M3-09

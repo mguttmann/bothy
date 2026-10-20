@@ -209,6 +209,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		// M1-56: the mention limit of sending.
 		"message.max_mentions":               {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "03-data-model.md"},
 		"thread.title_max_chars":             {Kind: config.KindInt, Default: "200", Min: "1", Chapter: "03-data-model.md"},
+		"template.name_max_chars":            {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},
+		"template.max_per_scope":             {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},
 		"voice.max_duration":                 {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "12-files.md"},
 		"auth.local_password_enabled":        {Kind: config.KindBool, Default: "true", Chapter: "08-identity.md"},
 		"auth.login_flow_ttl":                {Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: "08-identity.md"},
