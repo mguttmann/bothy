@@ -52,18 +52,18 @@ jobs:
             echo "::error::repository variable SONAR_PROJECT_KEY is not set"
             exit 1
           fi
-      # The free plan caps the lines of code of a private project and refused the analysis of
-      # main; a public project has no such cap, and the repository is public anyway.
-      - name: make sonar-visibility
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: make sonar-visibility SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
       # First, because it does not depend on gate and profiles: a failing check below must not
       # keep the main branch from being named main.
       - name: make sonar-main-branch
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: make sonar-main-branch SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
+      # The free plan caps the lines of code of a private project and refused the analysis of
+      # main; a public project has no such cap, and the repository is public anyway.
+      - name: make sonar-visibility
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: make sonar-visibility SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
       - name: make sonar-config
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
