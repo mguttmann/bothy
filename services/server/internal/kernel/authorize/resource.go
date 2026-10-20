@@ -66,6 +66,11 @@ type Resource struct {
 	// widens access by leaving it out; nil only in filter and delivery mode, where the event scope
 	// is the path (ResourceFromEvent).
 	File *FileFacts
+	// IssueTicket marks file.read through createFileTicket (M3-05): the caller wants a download
+	// ticket, which binds to a login session (12 section 9.2), so authz refuses a principal without
+	// a session (API token, agent, app) with forbidden step_up_not_possible after the visibility
+	// check. Ignored for every other action.
+	IssueTicket bool
 	// Event marks the descriptor of a stored event (ResourceFromEvent) and carries its full
 	// scope. When the stored resource kind is not a resource of the receive action (pin.added
 	// names a message, thread.read takes a thread), authz decides on the object of the scope the
@@ -76,9 +81,10 @@ type Resource struct {
 // FileFacts describes a file for the visibility rule of kind file (docs/spec/05-aktionen.md
 // section 2.2, docs/DECISIONS.md D-M3-03-17): an attachment that is not attached yet is visible
 // only to its uploader (Resource.OwnerID) with read on its scope channel (Resource.ChannelID); an
-// attached one to every reader of the path of its message (Resource.ThreadID or ChannelID); the
-// purposes avatar, branding and gdpr_export are not visible until their tickets (M3-10, M7-06)
-// define their read rules.
+// attached one to every reader of the path of its message (Resource.ThreadID or ChannelID). For
+// file.read an avatar is visible to every authenticated principal and a branding file to everybody
+// (M3-05); a gdpr_export is never visible through file.read, and no other action sees a file of a
+// purpose other than attachment.
 //
 // Example:
 //
