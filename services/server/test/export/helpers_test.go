@@ -913,6 +913,28 @@ func (e *env) newThread(t *testing.T, c *harness.Client, channel, mainThread, pa
 	return p, out.Thread.ID, decodeMsg(t, out.FirstMessage)
 }
 
+// runAnchors returns the run anchors (kind = run, M2-05) of a thread in thread order.
+func (e *env) runAnchors(t *testing.T, thread string) []msg {
+	t.Helper()
+	rows, err := e.db.Query(t.Context(), `SELECT id::text, thread_seq, created_at FROM messages WHERE thread_id = $1 AND kind = 'run' ORDER BY thread_seq`, thread)
+	if err != nil {
+		t.Fatalf("run anchors of %s: %v", thread, err)
+	}
+	defer rows.Close()
+	var out []msg
+	for rows.Next() {
+		m := msg{Thread: thread}
+		if err := rows.Scan(&m.ID, &m.Seq, &m.Created); err != nil {
+			t.Fatalf("run anchor of %s: %v", thread, err)
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("run anchors of %s: %v", thread, err)
+	}
+	return out
+}
+
 // mainThread returns the main thread of a text channel (getChannel does not name it).
 func (e *env) mainThread(t *testing.T, channel string) string {
 	t.Helper()

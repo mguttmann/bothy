@@ -85,6 +85,10 @@ func TestExportChannel(t *testing.T) {
 	e.clk.Advance(2 * time.Second)
 	harness.MustDo(t, o, harness.Request{Method: http.MethodDelete, Path: "/messages/" + gone.ID}, http.StatusNoContent)
 	inRange := []msg{atFrom, long, gone, parent, first2, inWorld, special, second2, lastIn}
+	// The first answer of the new thread triggers the agent of the world, so the run of M2-05
+	// writes its silent anchor (kind = run) into the thread; it is a message of the channel in
+	// the range and the export streams it like any other (INT-W51/12).
+	inRange = append(inRange, e.runAnchors(t, thread2)...)
 	if got, want := sortedIDs(e.selection(t, allgemein, from, to)), sortedIDs(idsOfMsgs(inRange)); !slices.Equal(got, want) {
 		t.Fatalf("selection of the range %v, want the posted messages %v", got, want)
 	}
@@ -196,7 +200,8 @@ func TestExportChannel(t *testing.T) {
 			Items []map[string]any `json:"items"`
 		}
 		harness.MustDo(t, alex, harness.Request{Method: http.MethodGet, Path: "/threads/" + th + "/messages"}, http.StatusOK).JSON(t, &list)
-		if len(list.Items) != 1 || list.Items[0]["content_truncated"] != true {
+		// The run anchor of M2-05 follows the first message in the thread (INT-W51/12).
+		if len(list.Items) != 1+len(e.runAnchors(t, th)) || list.Items[0]["content_truncated"] != true {
 			t.Errorf("the list does not cut the long text: %v", list.Items)
 		}
 	})
@@ -381,6 +386,7 @@ func TestExportChannel(t *testing.T) {
 		for j := range extra {
 			batchesMsgs = append(batchesMsgs, e.post(t, o, th, mark(50+3*i+j, "batch more"), time.Time{}))
 		}
+		batchesMsgs = append(batchesMsgs, e.runAnchors(t, th)...) // INT-W51/12
 	}
 	all0, all1 := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
 

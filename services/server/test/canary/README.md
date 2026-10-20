@@ -50,6 +50,8 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   `scenario_terminal.go` drives the terminal sessions (M2-44): a host paired and confirmed by the
   owner and connected by a Fake-Host, a shell opened, listed, read, attached and closed; the session
   tokens of the grants are registered as secrets.
+  `scenario_images.go` drives avatar and logo (M3-10): Alex sets and deletes the avatar, the owner
+  uploads, reads and deletes the instance logo.
 
 ## Sinks
 
