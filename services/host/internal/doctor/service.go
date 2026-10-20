@@ -134,6 +134,8 @@ type run struct {
 	res       *Result
 	facts     facts
 	users     []string // configured session users that passed HD1's per-name rules and exist
+	// workdirCodes are the HD11 codes of the working directories per session user, by path.
+	workdirCodes map[string]map[string]string
 	subjects  []hostos.Subject
 	claudeBin string
 	search    []string
@@ -692,6 +694,7 @@ func (r *run) aggregate(answers []helperAnswer) {
 	}
 	r.hd9(listable)
 	r.hd7Workdirs(idOf, ids)
+	r.workdirPlaces()
 	r.facts.profiles = r.env.Config.Profiles
 	r.facts.sessionUsers = r.env.Config.SessionUsers
 }
@@ -711,6 +714,28 @@ func (r *run) takeHelper(user string, res HelperResult, listable map[string]bool
 	}
 	if res.PlaceCode != "" {
 		r.add(HD11, Entry{Status: Fail, Code: res.PlaceCode, SessionUser: user})
+	}
+	if r.workdirCodes == nil {
+		r.workdirCodes = map[string]map[string]string{}
+	}
+	codes := map[string]string{}
+	for i, w := range r.env.Config.Workdirs(user) {
+		if i < len(res.WorkdirCodes) && res.WorkdirCodes[i] != "" {
+			codes[w.Path] = res.WorkdirCodes[i]
+		}
+	}
+	r.workdirCodes[user] = codes
+}
+
+// workdirPlaces adds HD11 for the working directories HD7 keeps; a directory HD7 drops is no place
+// of the session user (M2-45, TM-T29 (c)).
+func (r *run) workdirPlaces() {
+	for _, u := range r.env.Config.SessionUsers {
+		for _, w := range r.res.Workdirs[u] {
+			if code := r.workdirCodes[u][w.Path]; code != "" {
+				r.add(HD11, Entry{Status: Fail, Code: code, SessionUser: u})
+			}
+		}
 	}
 }
 

@@ -64,6 +64,12 @@ func (r *Runner) RunFull(ctx context.Context) *Result {
 		}
 		st.running = true
 		req := res.requests[u]
+		// The entry scan covers only the working directories HD7 keeps: a folder of two session
+		// users holds entries of both and is no place of either (M2-45, TM-T29 (c)).
+		req.Workdirs = nil
+		for _, w := range res.Workdirs[u] {
+			req.Workdirs = append(req.Workdirs, w.Path)
+		}
 		// The scan reads its own copy of the environment: a later ready changes r.env
 		// (SetDeclaration) while the scan runs (M2-43).
 		env := r.env
