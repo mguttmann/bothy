@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -59,7 +60,7 @@ func (r *Runs) Start(ctx context.Context, kind status.BackupKind) (ids.ID, error
 
 // Finish implements status.BackupRuns: it moves the running row run.ID to succeeded or failed
 // with finished_at from the clock. A negative size records NULL, a nil manifest the empty object
-// of a failed run, an empty error NULL.
+// of a failed run, nil checks the empty object of every backup kind, an empty error NULL.
 //
 // It fails when no running row has the id: the run is unknown or was finished before.
 func (r *Runs) Finish(ctx context.Context, run status.FinishedRun) error {
@@ -67,9 +68,12 @@ func (r *Runs) Finish(ctx context.Context, run status.FinishedRun) error {
 	if run.Succeeded {
 		state = "succeeded"
 	}
-	manifest := run.Manifest
+	manifest, checks := run.Manifest, run.Checks
 	if manifest == nil {
 		manifest = []byte("{}")
+	}
+	if checks == nil {
+		checks = []byte("{}")
 	}
 	n, err := r.q.FinishBackupRun(ctx, sqlcgen.FinishBackupRunParams{
 		ID:         uuid(run.ID),
@@ -77,6 +81,7 @@ func (r *Runs) Finish(ctx context.Context, run status.FinishedRun) error {
 		FinishedAt: ts(r.clock.Now()),
 		SizeBytes:  pgtype.Int8{Int64: run.SizeBytes, Valid: run.SizeBytes >= 0},
 		Manifest:   manifest,
+		Checks:     checks,
 		Error:      pgtype.Text{String: run.Error, Valid: run.Error != ""},
 	})
 	if err != nil {
@@ -111,6 +116,23 @@ func (r *Runs) LastSuccess(ctx context.Context, kinds ...status.BackupKind) (tim
 		return time.Time{}, false, nil
 	}
 	return last.Time.UTC(), true, nil
+}
+
+// LatestSucceeded implements status.BackupRuns: the newest succeeded row of kinds by started_at
+// (ties by id) with its manifest.
+func (r *Runs) LatestSucceeded(ctx context.Context, kinds ...status.BackupKind) (status.BackupRun, bool, error) {
+	names := make([]string, len(kinds))
+	for i, k := range kinds {
+		names[i] = string(k)
+	}
+	row, err := r.q.LatestBackupRun(ctx, names)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return status.BackupRun{}, false, nil
+	}
+	if err != nil {
+		return status.BackupRun{}, false, fmt.Errorf("status: reading the latest successful backup: %w", err)
+	}
+	return status.BackupRun{ID: ids.ID(row.ID.Bytes), Kind: status.BackupKind(row.Kind), StartedAt: row.StartedAt.Time.UTC(), Manifest: row.Manifest}, true, nil
 }
 
 // uuid converts an id to its column value.
