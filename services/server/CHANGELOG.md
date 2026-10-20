@@ -15,9 +15,9 @@ documented in this file. The format is based on
   and `quiet_hours` and serves `listMyNotificationPreferences`, `putNotificationPreference`,
   `deleteNotificationPreference`, `listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`
   and `deleteQuietHoursRule`. Every change writes one `notification_pref.updated` or
-  `quiet_hours.updated` for the person; an archived target refuses a new level with `409`
-  `target_archived`; archiving a space or channel removes the levels below it in the same
-  transaction. `Facts.LevelFacts` and `Facts.QuietRules` gather the facts of the push path in one
+  `quiet_hours.updated` for the person; an archived target refuses a new level with
+  `409 conflict` and `reason` `target_archived`; archiving a space or channel removes the levels
+  below it in the same transaction. `Facts.LevelFacts` and `Facts.QuietRules` gather the facts of the push path in one
   query each. New configuration key `notify.user_default_level`. Agents and apps get
   `subject_kind_not_allowed` for `notification_pref.update` and `quiet_hours.update`.
 - Search vectors (M3-13): migration `00035` adds `messages.search_language`,
