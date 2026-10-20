@@ -331,75 +331,136 @@ Nutzlasten enthalten nie Kanal-Prompt, Skills oder Projektbindung (04 Abschnitt 
 nie Nachrichteninhalte über `sync.event_payload_max_bytes` hinaus. Den Inhalt holt der Adapter
 per REST (4.6).
 
-### 4.5 Aufruf-Marke
+### 4.5 Invocation token
 
-Die Aufruf-Marke ist ein JWT in JWS-Kompaktform ([ADR 0023](../adr/0023-signierte-aufruf-marke-und-pruefung-im-adapter.md)).
-Der Server erzeugt sie bei jeder Zustellung neu (R-SY-07) und signiert mit dem aktiven Schlüssel
-des Zwecks `invocation` (`server_signing_keys`).
+The invocation token is a JWT in JWS compact serialization ([ADR 0023](../adr/0023-signierte-aufruf-marke-und-pruefung-im-adapter.md)).
+The server creates it anew for every delivery (R-SY-07) and signs it with the active key
+of the purpose `invocation` (`server_signing_keys`).
 
-**Kopf.** `alg = "EdDSA"`, `kid` (Schlüssel-ID), `typ = "agent-invocation+jwt"`. Expliziter Typ
-nach RFC 8725 Abschnitt 3.11, damit kein anderes JWT des Servers (Zugriffstoken) als Marke
-durchgeht (https://www.rfc-editor.org/rfc/rfc8725.html, abgerufen 2026-10-10, [belegt]).
+**Header.** `alg = "EdDSA"`, `kid` (key ID), `typ = "agent-invocation+jwt"`. Explicit type
+per RFC 8725 section 3.11, so that no other JWT of the server (access token) passes as an
+invocation token (https://www.rfc-editor.org/rfc/rfc8725.html, retrieved 2026-10-10, [verified]).
 
-**Claims.** Die normative Liste steht in 05 Abschnitt 5; hier mit Herkunft:
+**Claims.** The normative list is in 05 section 5; here with their source:
 
-| Claim | Inhalt | Herkunft |
+| Claim | Content | Source |
 |---|---|---|
 | `iss` | `instance.instance_id` | 05 |
-| `aud` | Prinzipal-ID des Agenten | 05 |
-| `sub` | Prinzipal-ID des auslösenden Menschen | 05 |
-| `jti` | UUIDv7 dieser Marke; steht in `runs.invocation_jti` | 05 |
-| `iat`, `exp` | Ausstellung, Ablauf (`iat + agent.invocation_token_ttl`) | 05 |
-| `run_id` | Lauf; fehlt nur bei `trigger_kind = autocomplete` | 05 |
-| `message_id` oder `interaction_id` oder `command_id` | auslösendes Objekt | 05, `command_id` neu |
-| `thread_id`, `channel_id` | Ort | 05 |
-| `space_id` | Bereich des Kanals | neu |
-| `level` | wirksame Stufe von `sub` auf dem Kanal zur Zustellzeit | 05 |
-| `billing_mode` | Soll aus `agents.billing_mode` zur Zustellzeit | 05 |
-| `permission_version` | Rechte-Version zur Zustellzeit | 05 |
-| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete` | neu |
+| `aud` | Principal ID of the agent | 05 |
+| `sub` | Principal ID of the triggering person | 05 |
+| `jti` | UUIDv7 of this token; stored in `runs.invocation_jti` when its delivery or renewal replaces the token of the run there (04 section 15.3), never for `command.invoked` (R-AZ-25) | 05 |
+| `iat`, `exp` | Issued at, expiry (`iat + agent.invocation_token_ttl`) | 05 |
+| `run_id` | Run; missing for `trigger_kind = autocomplete` and for `command.invoked` when the owner of the control command has no active run in the thread at execution time (otherwise its run) | 05, R-AZ-25 |
+| `message_id` or `interaction_id` or `command_id` | triggering object | 05, `command_id` new |
+| `thread_id`, `channel_id` | Location; for `trigger_kind = autocomplete` the thread of the request, without one the main timeline of the text channel; in a forum channel without a thread no token | 05, R-AZ-26 |
+| `space_id` | Space of the channel | new |
+| `level` | effective level of `sub` on the channel at delivery time | 05 |
+| `billing_mode` | configured mode from `agents.billing_mode` at delivery time | 05 |
+| `tool_class` | configured tool class from `agents.tool_class` at delivery time (SR2, section 2.4) | 05 |
+| `dev_environment_id` | Dev environment of the run; only in the dev environment milestone | 05 |
+| `permission_version` | Permission version at delivery time | 05 |
+| `trigger_kind` | `message`, `followup`, `interaction`, `command`, `autocomplete` | new |
 
-**Prüfung im Adapter.** Der Adapter verarbeitet ein Ereignis mit Marke nur, wenn alle Punkte
-gelten. Sonst startet er nichts und meldet den Grund (`run.finish` mit `failed`, Grund
-`invalid_invocation_token` oder `billing_mode_mismatch`).
+**Check in the adapter.** The adapter processes an event with a token only if all items
+hold. If only item 5 fails because `exp` has passed, it fetches a fresh token (4.5.1).
+If the `kid` is missing even after reloading the JWKS (item 3), it does not accept the event and
+does not acknowledge it; after `agent.ack_timeout` it arrives again with a token of the current key
+(emergency rotation below). If another item fails, it starts nothing and reports the reason (`run.finish` with `failed`,
+reason `invalid_invocation_token`, `billing_mode_mismatch` or `tool_class_mismatch`).
 
-1. `alg` ist genau `EdDSA`; jeder andere Wert wird abgelehnt (RFC 8725 Abschnitt 3.1:
-   Algorithmen-Erlaubnisliste, ein Algorithmus je Schlüssel).
-2. `typ` ist genau `agent-invocation+jwt`.
-3. `kid` steht in der zwischengespeicherten JWKS des Servers. Fehlt er, lädt der Adapter die JWKS
-   einmal neu, höchstens einmal je `adapter.jwks_refresh_min_interval`.
-4. Signatur gültig; `iss` gleich der konfigurierten Instanz; `aud` gleich der eigenen Agenten-ID.
-5. `exp` liegt in der Zukunft, `iat` nicht in der Zukunft, je mit `adapter.invocation_token_leeway`.
-6. `run_id`, `thread_id` und das auslösende Objekt stimmen mit der Nutzlast des Ereignisses
-   überein.
-7. `jti` ist dem Adapter neu (Speicher bis `exp`); eine Wiederholung derselben Marke wird
-   ignoriert.
-8. `billing_mode` ist gleich dem Ist-Modus der Laufzeit für genau diesen Lauf (I3,
-   [10-backend-richtlinie.md](10-backend-richtlinie.md) Abschnitt 7).
-9. `sub` steht in der Erlaubnisliste des Adapters, wenn er eine führt (17.7). Ist die
-   `permission_version` der Marke größer als die der Liste, lädt er die Liste vorher neu.
+1. `alg` is exactly `EdDSA`; every other value is rejected (RFC 8725 section 3.1:
+   algorithm allow list, one algorithm per key).
+2. `typ` is exactly `agent-invocation+jwt`.
+3. `kid` is in the server's cached JWKS. If it is missing, the adapter reloads the JWKS
+   once, at most once per `adapter.jwks_refresh_min_interval`.
+4. Signature valid; `iss` equals the configured instance; `aud` equals the adapter's own agent ID.
+5. `exp` is in the future, `iat` not in the future, each with `adapter.invocation_token_leeway`.
+6. `run_id`, `thread_id` and the triggering object match the payload of the
+   event.
+7. `jti` is new to the adapter (stored until `exp`); a repetition of the same token is
+   ignored.
+8. `billing_mode` equals the reported mode of the runtime for exactly this run (I3,
+   [10-backend-policy.md](10-backend-richtlinie.md) section 7).
+9. `sub` is on the allow list of the adapter, if it keeps one (17.7). If the
+   `permission_version` of the token is greater than that of the list, it reloads the list first.
+10. The actually loaded tool class is not higher than `tool_class` (order `chat`
+    < `scoped` < `host`, [07-permissions.md](07-rechte.md) section 2.11). Otherwise
+    `tool_class_mismatch`.
 
-Der Server prüft beim Lauf-Start erneut: Signatur, Ablauf, `jti` gleich `runs.invocation_jti`
-und Ist-Modus gleich Soll (`run.start`, 05). Der Adapter kann also keine Marke wiederverwenden und
-keinen Lauf ohne gültige Marke starten.
+The server checks again at run start: signature, expiry, `jti` equal to `runs.invocation_jti`,
+reported mode equal to the configured mode and reported tool class (`tool_class_used`) not higher
+than `tool_class` of the token (`run.start`, 05). A token is **consumed** when its `jti` equals
+`runs.started_jti`. Repeating a start with the consumed token returns the
+result only as long as the run is `running` (response lost, R-SY-19); in `waiting_input`
+it is a token error (`superseded`), because `run.start` does not change `runs.invocation_jti`.
+The adapter can therefore neither reuse a token nor start a run without a valid token,
+not even a waiting run without the token of the answer.
 
-**Schlüssel und Rotation.** Die JWKS-Ausgabe (Aktion `instance.discovery.read`) enthält die
-Schlüssel des Zwecks `invocation` in den Zuständen `next`, `active` und `retiring`, mit
+A token error at start always yields `403 invocation_token_invalid` with `reason`
+([06-api.md](06-api.md)):
+
+| `reason` | Case | Adapter behavior |
+|---|---|---|
+| `expired` | `exp` passed, otherwise valid and current | fetch a fresh token (4.5.1), retry the start once |
+| `superseded` | valid, but no longer current: `jti` not equal to `runs.invocation_jti` (a newer delivery or renewal has replaced the token) or consumed (`jti` equal to `runs.started_jti`, run in `waiting_input`) | start nothing, do not finish the run; the start follows with the newer token from the inbox (4.3), for `waiting_input` with the token of the answer |
+| `invalid` | signature, `kid`, `typ`, `aud` or run wrong | start nothing; `run.finish` with `failed` and `invalid_invocation_token` |
+
+Another delivery of an already started run still gets `409 already_started`.
+
+#### 4.5.1 Fresh token for a waiting run
+
+If the way from acceptance to start takes longer than `agent.invocation_token_ttl`, the
+adapter fetches a fresh token with `POST /api/v1/runs/{id}/invocation-token` (action
+`run.token.renew`, agent-self). The body carries the expired token. The server
+
+1. checks signature, `kid`, `typ`, `aud` equal to the requesting agent and `run_id` equal to the
+   path, otherwise `reason: invalid`; it does not check the expiry here;
+2. requires the run in `queued` or `waiting_input`, otherwise `409 already_started`;
+3. requires `jti` equal to `runs.invocation_jti` or equal to `runs.renewed_from_jti` (retry
+   of a renewal whose response was lost) and `runs.started_jti` is NULL or not equal to
+   `jti` (not consumed; in SQL `started_jti IS DISTINCT FROM jti`, because `<>` is never
+   true with NULL), otherwise `403 invocation_token_invalid` with `reason: superseded`;
+4. checks everything that it checks before a delivery, with the current permissions: `agent.invoke` for
+   `sub` with the triggering object of the old token, I2, SR2 and SR3 (04 section 15.3
+   step 2). If that fails, it sets the run to `failed` with the reason as at delivery
+   and answers `403 agent_invocation_denied`;
+5. issues a new token with the same triggering object and location, but the current configured
+   values (`billing_mode`, `tool_class`), the current `permission_version` and a new `jti`, replaces
+   `runs.invocation_jti`, sets `runs.billing_mode_expected` and sets `runs.renewed_from_jti`
+   to the `jti` of the presented token if it was the current one (on a retry the value
+   stays), all in one transaction with a row lock on the run.
+
+Every delivery that replaces `runs.invocation_jti`, and every successful `run.start`, sets
+`runs.renewed_from_jti` to `NULL`. The adapter runs at most one renewal per run at a time
+and starts with the most recently received token.
+
+Reason: the old token only proves which trigger the server gave this agent for this run;
+the server makes the decision anew. A token that a delivery has replaced is not usable,
+because its `jti` is no longer current. A consumed token is not usable,
+because the run has already started with it; otherwise a renewed start token would resume a
+waiting run without an answer from a person. The token before the last renewal stays
+valid, because otherwise a lost response would leave the run hanging until `run.queued_max_age`: the
+retry would get `superseded`, and no delivery would bring a newer token. It still starts
+the run at most once, because every renewal replaces the previous renewed token and
+`run.start` is a compare-and-swap.
+
+**Keys and rotation.** The JWKS output (action `instance.discovery.read`) contains the
+keys of the purpose `invocation` in the states `next`, `active` and `retiring`, with
 `Cache-Control: max-age` = `agent.jwks_max_age`.
 
-1. Planmäßig nach `signing_key.invocation_rotation_interval`: Ein neuer Schlüssel geht nach `next`
-   und wird mindestens `agent.jwks_max_age` lang veröffentlicht, bevor er `active` wird. So kennt
-   jeder Adapter ihn vor der ersten Marke.
-2. Der alte Schlüssel geht nach `retiring` und bleibt veröffentlicht, bis
-   `agent.invocation_token_ttl` plus `auth.clock_leeway` vergangen sind; dann `retired`. Der
-   Server kennt die Toleranz des Adapters nicht; darum darf `adapter.invocation_token_leeway`
-   höchstens `auth.clock_leeway` des Servers sein.
-3. Notfall (Schlüssel kompromittiert): `signing_key.rotate` mit `mode = emergency` (Owner,
-   Step-up) setzt alle Schlüssel des Zwecks sofort auf `retired` und legt einen neuen `active` an;
-   ein vom Owner angestoßener planmäßiger Wechsel nutzt `mode = scheduled`.
-   Marken mit diesem `kid` scheitern beim Adapter; weil der Server Marken je Zustellung neu
-   ausstellt, kommt das Ereignis nach `agent.ack_timeout` mit einer Marke des neuen Schlüssels
-   wieder. Ein Notfallwechsel kostet höchstens eine Zustellverzögerung, keinen Lauf.
+1. Scheduled after `signing_key.invocation_rotation_interval`: a new key goes to `next`
+   and is published for at least `agent.jwks_max_age` before it becomes `active`. That way
+   every adapter knows it before the first token.
+2. The old key goes to `retiring` and stays published until
+   `agent.invocation_token_ttl` plus `auth.clock_leeway` have passed; then `retired`. The
+   server does not know the tolerance of the adapter; therefore `adapter.invocation_token_leeway`
+   must be at most the server's `auth.clock_leeway`.
+3. Emergency (key compromised): `signing_key.rotate` with `mode = emergency` (owner,
+   step-up) sets all keys of the purpose to `retired` immediately and creates a new `active` one;
+   a scheduled rotation triggered by the owner uses `mode = scheduled`.
+   Tokens with this `kid` fail at the adapter; because the server issues tokens anew per
+   delivery, the event arrives again after `agent.ack_timeout` with a token of the new key.
+   An emergency rotation costs at most one delivery delay, no run.
 
 ### 4.6 Kontext eines Laufs
 
