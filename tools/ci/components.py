@@ -57,7 +57,11 @@ API_PREFIX = "docs/api/"
 # the component, so that its codegen-check sees the drift.
 GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
     # services/server/api/generate.go: route table and action catalogue of the server.
-    "server": ("docs/spec/actions.yaml",),
+    "server": (
+        "docs/spec/actions.yaml",
+        # services/server/internal/kernel/designkeys: go generate and its tests read the tokens.
+        "design/build/tokens.resolved.json",
+    ),
     # Chapter 09 is the contract of the adapters under plugins/; its section 17.10 is bound to the
     # recording evidence of plugins/hermes-adapter by the offline fixture tests.
     "plugins": ("docs/spec/09-agents.md",),
@@ -73,6 +77,36 @@ GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
     "server": ("tools/observability/", "infra/observability/slo/"),
     "apps": ("tools/observability/", "infra/observability/slo/"),
 }
+# Self-contained tool folders under tools/ (and single files in them) with the gate components
+# whose gates or tests read them; the longest matching key decides. A tool without a component is
+# read only by repository-wide gates and the tools tests, which run on every change
+# (docs/quality/gates.md, "Jobs a change needs"). tools/arch-check and tools/observability are
+# component inputs above. Every other path under tools/ is a shared input: SHARED_TOOL_FOLDERS,
+# the root files of the tools project (pyproject.toml, uv.lock, conftest.py) and any new folder.
+TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
+    "tools/api-checks/": (),
+    # `make api-breaking` runs only for the component server.
+    "tools/api-checks/breaking.py": ("server",),
+    "tools/catalog/": (),
+    "tools/configdoc/": (),
+    "tools/denylist/": (),
+    # The token generator writes the committed Dart tokens and icons of packages/design_system,
+    # like design/, and design/build/tokens.resolved.json, which the server's designkeys
+    # generator and tests read.
+    "tools/design-tokens/": ("apps", "server"),
+    "tools/doccheck/": (),
+    "tools/docs/": (),
+    "tools/opscheck/": (),
+    "tools/scancode/": (),
+    "tools/sonarqube/": (),
+    # The test of services/server/internal/platform/pg/pgtest reads the image pin of this file.
+    "tools/sonarqube/compose.yaml": ("server",),
+    "tools/testing/": (),
+    "tools/README.md": (),
+}
+# Tool folders every gate and job depends on: the pinned binaries, the CI helpers with this map,
+# the hooks (commitlint and the pre-push plan) and the Node tools with their lock file.
+SHARED_TOOL_FOLDERS = ("bin", "ci", "hooks", "node")
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
 NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
@@ -164,6 +198,12 @@ class ReleaseError(Exception):
     """The tag does not describe a releasable component state."""
 
 
+def tool_components(path: str) -> tuple[str, ...] | None:
+    """Return the components of a tool path of TOOL_COMPONENTS, or None for any other path."""
+    keys = [k for k in TOOL_COMPONENTS if path == k or (k.endswith("/") and path.startswith(k))]
+    return TOOL_COMPONENTS[max(keys, key=len)] if keys else None
+
+
 def changed(files: list[str]) -> list[str]:
     """Return the gate components touched by the changed `files` (all for unknown paths)."""
     selected: set[str] = set()
@@ -173,8 +213,11 @@ def changed(files: list[str]) -> list[str]:
         owners += [
             c for c, prefixes in GATE_COMPONENT_INPUT_PREFIXES.items() if path.startswith(prefixes)
         ]
+        tool = tool_components(path)
         if owners:
             selected.update(owners)
+        elif tool is not None:
+            selected.update(tool)
         elif path.startswith(API_PREFIX):
             selected.update(GATE_COMPONENTS)
         elif path.startswith(NO_COMPONENT_PREFIXES) or NO_COMPONENT_ROOT_FILES.match(path):

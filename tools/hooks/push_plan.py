@@ -5,8 +5,8 @@ The pushed diff is every file that differs between the pushed commit and its mer
 `origin/main`, the same range a pull request shows. The component map of CI
 (`tools/ci/components.py changed`) turns it into `COMPONENTS`: the Go, Dart, SDK and plugin
 gates run for the touched components only, exactly as the `gates` job of CI selects them. A
-shared input (Makefile, tool locks and tools, the API contract, workflows, root files) maps to
-`all` there, and then this gate runs the full `make check`.
+shared input (Makefile, tool locks and shared tools, the API contract, workflows, root files)
+maps to `all` there, and then this gate runs the full `make check`.
 
 Two further switches narrow the repository-wide gates:
 
