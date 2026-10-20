@@ -122,6 +122,16 @@ Die Ausnahme schränkt Owner ein und erweitert nichts; L22 bleibt für I1 unver�
   `TestTMT15_TwoNodesWithHashRouting`, `TestTMT15_WithoutHashRouting` and
   `TestTMT15_WithoutHashRouting_Attach` in `services/server/test/terminal/multinode`, at the server
   level with the fake host of M2-44; M2-48 runs it again end to end with the real host service.
+* Since M2-48 the tests of 24 section 14 run as one data-driven conformance suite in
+  `services/server/test/terminal`: scenario files run end to end in every `make check` against the
+  server image built from the worktree, real host services `bothy-host` in Linux containers and a
+  Go test device that speaks Noise through `internal/noise` and `internal/frame` of the host
+  service. The platform suite `services/host/test/platform` runs in a Linux container in every
+  `make check` and, as a bundle of `make -C services/host platform-bundle`, on disposable macOS,
+  Windows 10 and Windows 11 test machines. TM-T16 runs in `make check` and again under load in
+  `make perf` (`TestChaosTMT16` in `services/server/test/chaos`). The catalogue
+  `services/server/test/terminal/catalogue.yaml` names every run, and `make docs` holds it equal to
+  24 section 14 and threat model section 6.7.
 * Red Team Terminal am Ende von M2, M4, M5, M6 (Bedrohungsmodell, Abschnitt 6.7).
 
 ## Pros and Cons of the Options

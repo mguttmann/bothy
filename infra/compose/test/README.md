@@ -131,3 +131,97 @@ the CI wiring of `portability.yml`. The probe's own output (`out/`) is not scann
 `docker compose ... down` and `rm -rf` commands that remove them. With the project name from the
 output, `docker compose --project-name bothy-smoke-<run ID> ... logs api` shows a service. Never
 print `out/setup.out` or `out/canaries.txt`: they hold the enrollment code and the tokens.
+
+## Terminal conformance suite (M2-48)
+
+The end-to-end packages of the terminal suite (`services/server/test/terminal/e2e/...`,
+[README](../../../services/server/test/terminal/README.md)) run one Compose stack per test package
+from the files of this directory. **Test only, never for an installation**; like everything here
+they are not in the release bundle.
+
+| File | Content |
+|---|---|
+| `compose.terminal.yaml` | overlay of the suite: `api` and `worker` read the server keys of the suite profile from `TERMSUITE_SERVER_ENV`; `api` listens on `:8080` inside its namespace, trusts `TERMSUITE_TRUSTED_PROXIES` as its proxies and publishes no port; the TLS front `tls-front`; the service `termhost` (profile `termhost`, so `up` never starts it) for the host containers; the internal network `termhosts` |
+| `compose.terminal-twonode.yaml` | overlay of the profile `twonode` (TM-T15), last after M2-47's `compose.multi-node.yaml`: `api-2` on the server image of the suite with the same rendered environment as `api`, and `edge` without a published port |
+| `host/Dockerfile` | the host image: Debian with systemd as process 1 and the marker file `/etc/termsuite-disposable` of the platform suite; no `bothy-host` inside |
+| `terminal/nginx.conf.tmpl` | configuration of the TLS front; the suite renders it with the timeouts of the profile (stream paths from `terminal.idle_timeout` and `terminal.idle_grace`, everything else from `terminal.host_heartbeat_interval` and `terminal.host_heartbeat_miss_limit`, as M2-47's edge computes them) |
+| `terminal/routing-single.conf`, `routing-hash.conf`, `routing-split.conf` | the routing modes of the front: `single` sends everything to `api`; `hash` to M2-47's example edge `edge`; `split` the device stream paths to `api`, the host data paths to `api-2` and the rest to `edge` (TM-T15 without hash routing) |
+
+### Stack
+
+The suite combines, in this order, `compose.yaml` unchanged, `test/compose.smoke.yaml` of M1-73,
+for the profile `twonode` `compose.multi-node.yaml`, then `test/compose.terminal.yaml` and for
+`twonode` last `test/compose.terminal-twonode.yaml`; every call passes `--project-directory
+infra/compose` and `--env-file infra/compose/test/smoke.env`, as `smoke.sh` does. The project
+name is `termsuite-<package>-<8 random hex>`. `COMPOSE_PROFILES=direct` keeps the services of the
+smoke test inactive, and `BOTHY_PUBLIC_URL` is the instance origin `https://chat.example.com:8443`.
+
+- **Server image built from the worktree.** Each e2e package builds `services/server/Dockerfile`
+  from the repository root with `docker buildx build --load` for the platform of the Docker host,
+  with the build arguments `VERSION` (from `services/server/VERSION`) and `REVISION` (`git
+  rev-parse HEAD`), and tags it `termsuite-server:<first 12 hex of the image ID>`; that tag is
+  `SMOKE_SERVER_IMAGE`. An unchanged tree is a cache hit of BuildKit, and parallel packages and
+  worktrees arrive at their own content-addressed tags, so no lock is needed. The suite never
+  pulls a server image.
+- **TLS front.** `tls-front` runs `nginxinc/nginx-unprivileged` at `BOTHY_NGINX_VERSION` of M2-47
+  as the uid and gid of the test process, read-only, without capabilities and with
+  `no-new-privileges`. It serves `chat.example.com:8443` with a certificate of a test CA that the
+  suite creates per stack, and is the only published port: `127.0.0.1` with a random host port
+  (`docker compose port tls-front 8443`). On `termhosts` it carries the alias `chat.example.com`.
+  The suite switches the routing mode by replacing `routing.conf` in `TERMSUITE_FRONT_DIR` and
+  reloading nginx in the container.
+- **Networks.** `termhosts` is `internal` and carries only `tls-front` and the host containers, so
+  a host service reaches nothing but the TLS front; the server services stay on the networks of
+  the installation. `TERMSUITE_TRUSTED_PROXIES` is the subnet of `<project>_default`, read after
+  `compose up --no-start` with `docker network inspect`, before `compose up --detach --wait`.
+- **Host image.** `termsuite-host:<first 12 hex of the SHA-256 of host/Dockerfile>`, built with
+  BuildKit when the tag is missing. Base `debian:trixie-slim` pinned by digest, APT sources on one
+  timestamp of `snapshot.debian.org` (recorded in the Dockerfile,
+  [toolchain.md](../../../docs/quality/toolchain.md)). It runs as root because systemd is process
+  1 and `bothy-host install` creates real users and units; `termhost` is `privileged` because
+  systemd needs a writable cgroup tree and the host service creates a cgroup per session. Only
+  this test service is privileged. Each host of a case is one container `compose run --detach
+  --name <project>-<case>-<host> termhost`; the suite copies `bothy-host` and the Fake-`claude`,
+  built from the worktree, into it, adds the test CA to the trust store and runs `bothy-host
+  install`, `pair` and `doctor` as an operator would.
+- **Removal.** At the end of each test binary: the host containers, then `compose down --volumes
+  --remove-orphans`; the suite then asserts that no container, volume or network with the project
+  label remains, and that no file under `infra/compose` changed while the stack ran.
+
+### Variables
+
+Every variable of the suite starts with `TERMSUITE_`; the suite sets them for each Compose call,
+after it removed every exported `BOTHY_*`, `COMPOSE_*`, `OTEL_*`, `SMOKE_*` and `TERMSUITE_*`
+variable of the calling shell. They are not inputs.
+
+| Variable | Read by | Meaning |
+|---|---|---|
+| `TERMSUITE_SERVER_ENV` | `compose.terminal.yaml` (`api`, `worker`), `compose.terminal-twonode.yaml` (`api-2`) | `env_file` with the server keys of the profile of `services/server/test/terminal/profiles.yaml` as `BOTHY_*` variables (mode 0600 in the temporary folder) |
+| `TERMSUITE_TRUSTED_PROXIES` | `api`, `api-2` | `BOTHY_SERVER__TRUSTED_PROXIES`: the subnet of the project's default network, where the TLS front connects from |
+| `TERMSUITE_FRONT_DIR` | `tls-front` | folder mounted read-only with the rendered `nginx.conf`, `routing.conf`, the certificate and the key of the front |
+| `TERMSUITE_UID`, `TERMSUITE_GID` | `tls-front` | uid and gid of the test process, so the front reads its key file of mode 0600 |
+| `TERMSUITE_HOST_IMAGE` | `termhost` | the tag of the host image |
+
+The smoke overlay's `SMOKE_SERVER_IMAGE`, `SMOKE_SECRETS_INPUT`, `SMOKE_RUN_ID`, `SMOKE_OUT`,
+`SMOKE_TMP` and `SMOKE_CANARY` are set by the suite as `smoke.sh` sets them.
+
+### Prerequisites
+
+Docker Engine and Compose at the minimum versions above, `docker buildx`, a Docker host on cgroup
+version 2 that starts privileged containers, and `kernel.yama.ptrace_scope` of at least `1` on the
+Docker host (below it the host service refuses to start with HD10 code `ptrace_scope_low`). The
+preflight of the suite checks each and fails with a message that names the fix; nothing is
+skipped, and the suite never changes a kernel setting.
+
+### Cached images
+
+The server and host images stay as local build cache under their content-addressed tags, one per
+tree and Dockerfile state. List and remove them with:
+
+```sh
+docker image ls 'termsuite-server'
+docker image ls 'termsuite-host'
+docker image rm termsuite-server:<tag> termsuite-host:<tag>
+```
+
+The next run of the suite builds a removed image again.

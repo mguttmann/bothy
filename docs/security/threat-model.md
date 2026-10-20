@@ -409,6 +409,17 @@ Jede Bedrohung im Register nennt Tests aus 07, 08 oder 19. Eine Bedrohung ohne T
 Spalte "Tests" einen leeren Eintrag und muss im nächsten Red-Team-Gate entweder einen Test bekommen
 oder ihr Restrisiko ausdrücklich begründen.
 
+Terminal (M2-48): the catalogue `services/server/test/terminal/catalogue.yaml` lists, for every
+TM-T ID of [24-terminal.md](../spec/24-terminal.md) section 14 and for every AZ-M, ID-T and SEC-T
+ID that section 6.7 names, where it runs (end-to-end scenario, platform test per operating system,
+chaos test of `make perf` or the unit test of the implementing ticket), which ticket implemented
+it and which T-TM threats it covers. The docs gate `tools/docs/terminal_catalogue.py`, run by
+`make docs`, keeps it so: every T-TM row of 6.7 names at least one test; every test ID named
+there has a catalogue entry that lists the threat; every Go test named there exists as a function
+under `services/`; every `PLAN` reference names a row of the plan; and every place the catalogue
+names exists. A new threat row, a renamed test or a deleted scenario file therefore fails
+`make docs` in the same change.
+
 ## 9. Pflegeregel
 
 Das Bedrohungsmodell wird aktualisiert:

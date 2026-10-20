@@ -257,7 +257,8 @@ the server carries codes and, by the rule for names, the names of session users 
 | `internal/profiles/` | offered profiles, start specifications and allow-list environments |
 | `internal/confirm/` | confirmation endpoint, peer rule and the agent with its dialogs |
 | `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
-| `test/platform/` | the platform suite (build tag `platform`) |
+| `test/platform/` | the platform suite (build tag `platform`) and its marker guard (`guard.go`, untagged) |
+| `test/noisedevice/` | the Noise sidecar of the Go test device of the terminal suite in `services/server/test/terminal` (M2-48): JSON lines on stdin and stdout, `internal/noise` and `internal/frame` unchanged |
 | `.go-arch-lint.yml` | architecture rules, maintained by hand, one component per package |
 
 ## Development
@@ -270,8 +271,29 @@ GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeServerFrame -fuzztime=60s ./
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzVerifySessionToken -fuzztime=60s ./internal/session
 make release-build VERSION=$(cat VERSION) OUT=<dir>   # unsigned binaries for five platforms
 make platform-test                                   # only on a disposable machine, see below
+make platform-bundle OUT=<dir> [GOOS=<os> GOARCH=<arch>]  # build a platform run, run nothing
 ```
 
 The platform suite needs administrator rights and creates and deletes users, services and ACLs.
 It runs only in the workflow `host-platform.yml` on throwaway GitHub-hosted runners
 (docs/DECISIONS.md D-M2-42-19), never on a workstation.
+
+Platform bundle (M2-48): `make -C services/host platform-bundle OUT=<dir> [GOOS=<os>
+GOARCH=<arch>]` builds, without running anything, every file a platform run needs: `bothy-host`
+with the platform-suite mark, the Fake-`claude` and its `node` build, the fakes of the suite
+(`suite-claude`, `bighome`), the test binary of
+`test/platform` and the test binaries of `internal/pty`, `internal/session`, `internal/profiles`
+and `internal/confirm`, `run.sh` (`run.ps1` on Windows) and `bundle.json` with the commit, the Go
+version and the SHA-256 of every file. Without `OUT` it is a usage error (exit `2`).
+`make platform-test` builds the bundle of the build host and runs it, so both paths execute the
+same files. The terminal suite runs the Linux bundle as root in a fresh host container in every
+`make check` (`services/server/test/terminal/e2e/hostplatform`); the same bundle, built for the
+platform, runs on disposable macOS, Windows 10 and Windows 11 test machines with `run.sh suite` or
+`run.ps1 suite` as administrator and writes the result file.
+
+Marker guard: the platform test binary refuses to run unless the marker file
+`/etc/termsuite-disposable` (Windows `%ProgramData%\termsuite-disposable`) exists; without it it
+prints `platform: not a disposable test machine (marker file missing)` and exits `2`
+(`test/platform/guard.go`, tested in every `make check`). The host image of the terminal suite
+carries the marker; on a disposable test machine the run's operator creates it before the run, on
+no other machine.

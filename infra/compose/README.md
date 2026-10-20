@@ -14,7 +14,7 @@ Anleitung: [docs/operations/install-compose.md](../../docs/operations/install-co
 | `secrets/` | nicht im Repository: vom Owner gelieferte Geheimnisse als Dateien (Katalog in [configuration.md](../../docs/operations/configuration.md) 5) |
 | `install.sh` | source of the setup wizard (POSIX `sh`, [16-betrieb.md](../../docs/spec/16-betrieb.md) 3.1); the release ships it rendered with version, checksum and download address next to the bundle (`make release-build`), not inside it; tests in [test/install/](test/install/README.md) (`make install-test`) |
 | `smoke.sh` | the Compose smoke test (`make portability`, M1-73); test only |
-| `test/` | the test overlay, its variables and the collector overlay `file` of the smoke test; test only, not in the release bundle ([test/README.md](test/README.md)) |
+| `test/` | the test overlay, its variables and the collector overlay `file` of the smoke test; the test overlays `test/compose.terminal.yaml` and `test/compose.terminal-twonode.yaml`, the host image `test/host/Dockerfile` and the TLS front `test/terminal/` of the terminal conformance suite (M2-48); test only, never for an installation, not in the release bundle ([test/README.md](test/README.md)) |
 
 Der Stack bindet außerdem `../otel` (Collector) und `../observability` (Prometheus, Alertmanager,
 Loki, Tempo, Grafana) nur lesend ein. The release bundle therefore contains both folders
