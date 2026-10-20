@@ -76,3 +76,28 @@ type AgentConfig interface {
 	// forbidden subject_kind_not_allowed.
 	GetServedChannelConfig(ctx context.Context, a actor.Actor, channelID ids.ID) (ServedChannelConfig, error)
 }
+
+// TriggerChannel are the facts of a channel the trigger decision of runs reads (09 section 3,
+// M2-05): the effective operator now (03 channels "Effective operator") and the trigger switches
+// of 09 section 3.3. It carries neither prompt nor skills.
+type TriggerChannel struct {
+	ChannelID, SpaceID ids.ID
+	// Kind is text, forum or dm.
+	Kind string
+	// EffectiveOperatorID is the operator after inheritance; zero for none.
+	EffectiveOperatorID ids.ID
+	// The switches of 09 section 3.3.
+	RequireMention, ThreadRequireMention, FreeResponse, AutoThread, AllowMentionedAgents bool
+}
+
+// TriggerFacts is the incoming port of the channel facts of the trigger decision (M2-05). It never
+// authorizes: runs reads it inside the unit of work of a message whose author message.create
+// allowed, and decides with agent.invoke. It reads inside the ambient transaction of ctx.
+type TriggerFacts interface {
+	// TriggerChannel returns the facts of the channel. Errors: not_found for an unknown channel.
+	//
+	// Example:
+	//
+	//	ch, err := facts.TriggerChannel(ctx, channelID)
+	TriggerChannel(ctx context.Context, channelID ids.ID) (TriggerChannel, error)
+}

@@ -167,6 +167,11 @@ var appPrivileges = map[string][]string{
 	// 03 backup_runs (M7-02): the console and the status page read the runs; only bothy_backup
 	// writes them (TestMigrationBackupRuns holds its rights).
 	"backup_runs": {"SELECT"},
+	// 03 runs and run_steps (M2-05): a run ends with an end state, never with a delete; steps
+	// are deleted when the server folds older finished steps into one (run.max_steps_persisted,
+	// M2-10).
+	"runs":      {"SELECT", "INSERT", "UPDATE"},
+	"run_steps": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

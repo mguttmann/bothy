@@ -49,7 +49,7 @@ const (
 // Kind is messages.kind (03 messages).
 type Kind string
 
-// The kinds; M1 writes only text and system (voice M3-09, card M2-15, run M2-05).
+// The kinds; text and system since M1, run since M2-05 (voice M3-09, card M2-15).
 const (
 	KindText   Kind = "text"
 	KindVoice  Kind = "voice"
@@ -88,6 +88,13 @@ type Message struct {
 	ReplyToID ids.ID
 	// Silent suppresses notifications.
 	Silent bool
+	// RunID is the run of a live box anchor (KindRun, M2-05); zero for every other message.
+	RunID ids.ID
+	// TriggerState is trigger_state of a message of a person (09 section 6), "" while NULL;
+	// TriggerStateReason is set for failed and cancelled; TriggerStateAt is zero while NULL. They
+	// are not content: a tombstone keeps them (03 messages).
+	TriggerState, TriggerStateReason string
+	TriggerStateAt                   time.Time
 	// Version is the row version, 1 at creation.
 	Version int64
 	// EditedAt, DeletedAt and DeletedBy are zero until M1-58 edits or deletes.
@@ -215,6 +222,38 @@ func SystemLine(code string, thread, channel, author ids.ID, seq int64) Message 
 		PayloadSHA256: RequestHash(HashInput{Context: "system:" + code, Kind: string(KindSystem)}),
 		Origin:        OriginSystem, Kind: KindSystem, SystemCode: code, ContentFormat: ContentFormat, Silent: true, Version: 1,
 	}
+}
+
+// RunAnchor returns the live box anchor of run by agent at seq in the thread (09 section 5.4,
+// M2-05): kind run, origin agent, empty content, silent (the anchor notifies nobody), a new server
+// client_msg_id and the hash of its own canonical form, whose context names the run.
+func RunAnchor(run, thread, channel, agent ids.ID, seq int64) Message {
+	return Message{
+		ID: ids.New(), ThreadID: thread, ChannelID: channel, ThreadSeq: seq, AuthorID: agent, ClientMsgID: ids.New(),
+		PayloadSHA256: RequestHash(HashInput{Context: "run-anchor:" + run.String(), Kind: string(KindRun)}),
+		Origin:        OriginAgent, Kind: KindRun, ContentFormat: ContentFormat, RunID: run, Silent: true, Version: 1,
+	}
+}
+
+// triggerStates are the values of schema TriggerState (09 section 6); true marks the states that
+// carry a reason (03 messages_trigger_reason_check).
+var triggerStates = map[string]bool{
+	"received": false, "queued": false, "working": false, "done": false, "failed": true, "cancelled": true,
+	"followup_delivered": false,
+}
+
+// CheckTriggerState accepts a value of schema TriggerState with a non-empty reason exactly for
+// failed and cancelled. The caller (runs) builds both, so a refusal is a programming error.
+// Errors: internal.
+func CheckTriggerState(state, reason string) error {
+	withReason, ok := triggerStates[state]
+	if !ok {
+		return errs.New(errs.CodeInternalError, "messaging: an unknown trigger state")
+	}
+	if withReason != (reason != "") {
+		return errs.New(errs.CodeInternalError, "messaging: a trigger state reason that does not fit the state")
+	}
+	return nil
 }
 
 // TruncateForEvent returns content cut to the longest prefix at a character boundary for which

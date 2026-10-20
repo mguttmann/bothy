@@ -17,6 +17,9 @@ import (
 type Store interface {
 	// Agent returns the record id; found is false for an unknown id.
 	Agent(ctx context.Context, id ids.ID) (a domain.Agent, found bool, err error)
+	// Agents returns the records of list without a lock, ascending by id; unknown ids and
+	// duplicates are left out, and an empty list reads nothing (the run facts of M2-05).
+	Agents(ctx context.Context, list []ids.ID) ([]domain.Agent, error)
 	// LockAgent returns the record id like Agent and locks its row until the end of the unit of
 	// work (03 section 6.3).
 	LockAgent(ctx context.Context, id ids.ID) (a domain.Agent, found bool, err error)

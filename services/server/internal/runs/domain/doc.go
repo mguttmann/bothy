@@ -11,7 +11,19 @@
 //   - Settle applies step 7: it turns the verdict of the agent.invoke (or run.followup.create)
 //     check into trigger_state and trigger_state_reason.
 //
-// The package imports only the standard library and kernel-core (kernel/ids, kernel/errs); it has
+// It also holds the rules of the run itself (09 section 5 and 6):
+//
+//   - State and CanTransition are the run state machine of 03 runs: the allowed transitions,
+//     the active states of the one-active-run-per-thread index and the end states.
+//   - ReasonTable is the reason table of 09 5.2 plus user_disabled, with the state and the setter
+//     of every code; ValidateServerReason checks a reason the server sets, NormalizeAdapterReason
+//     turns a reason an adapter reports into the stored one, and OriginalReasonDetail keeps a
+//     replaced adapter reason for the run steps.
+//   - TriggerOnOpen and TriggerOnTransition map the opening and every transition of a run to the
+//     trigger_state of its triggering message (09 6).
+//
+// The package imports only the standard library and kernel-core (kernel/ids, kernel/errs,
+// kernel/textcheck); it has
 // no I/O, no clock, no randomness, no context and never calls authorize (D-B7, ADR 0017). Every
 // permission fact is an input that the application layer gathers from authz, so the authz guard of
 // agent.invoke stays the only place that decides permissions and these functions only choose the

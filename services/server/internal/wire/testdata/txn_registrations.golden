@@ -8,3 +8,4 @@ subscribe chat.ThreadMoved -> messaging github.com/OWNER/bothy/services/server/i
 subscribe chat.ThreadMoved -> sync github.com/OWNER/bothy/services/server/internal/sync/app.(*Subscribers).OnThreadMoved-fm
 subscribe chat.ChannelArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnChannelArchived-fm
 subscribe chat.SpaceArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnSpaceArchived-fm
+subscribe messaging.MessagePosted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessagePosted-fm

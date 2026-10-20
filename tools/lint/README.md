@@ -24,7 +24,7 @@ Rules (comments and string literals never count):
 |---|---|
 | `missing-predicate` | a read (first keyword `SELECT` or `WITH`, no `INSERT`, `UPDATE` or `DELETE` at the top level; `FOR UPDATE` is a row lock of a read) names a content table after `FROM` or `JOIN` and has no predicate `(alias.)?(channel_id\|space_id) = ANY(<param>)`; `<param>` is `$n`, `@name`, `sqlc.arg(name)` or `sqlc.narg(name)` with an optional cast, never a subquery; on `spaces` and `channels` their key `id` counts as the column (`id = ANY(@visible)`) |
 | `stale-exception` | an exception names a query that no longer exists |
-| `unknown-category` | the category is not one of `authorize_resolution` (resolves a resource path for `authorize`), `after_authorize` (loads a single resource, or the rows of one resource, after `authorize` allowed it), `system_job` (job without principal), `log_tail` (the log tail reads every event; delivery checks `authorize` per receiver) |
+| `unknown-category` | the category is not one of `authorize_resolution` (resolves a resource path for `authorize`), `after_authorize` (loads a single resource, or the rows of one resource, after `authorize` allowed it), `system_job` (job without principal), `log_tail` (the log tail reads every event; delivery checks `authorize` per receiver), `thread_scope` (a list over a thread-scoped table without `channel_id`, such as `runs`: reads the active runs, resolves their threads through the `chat` port, keeps only threads whose channel is in `Scope.ChannelIDs` and authorizes each row) |
 | `duplicate-exception` | a query stands twice on the list |
 | `exception-reason` | the reason is empty |
 | `unknown-content-table` | a content table is no table heading of the data model chapter |
@@ -43,8 +43,9 @@ An exception says why the query cannot carry the predicate, never only that it d
 over several channels or spaces always can: pass the visible lists of `Authorizer.Scope` to the
 query, as `ListVisibleSpaces`, `ListVisibleChannels` and `ListSidebarStates` do. Single-resource
 reads, locks and the rows of one resource `authorize` allowed (`after_authorize`), the structure and
-invariant facts `authz` resolves (`authorize_resolution`), jobs and the log tail are the cases the
-list holds (docs/DECISIONS.md M1-70).
+invariant facts `authz` resolves (`authorize_resolution`), jobs, the log tail and the lists over
+thread-scoped tables without `channel_id` (`thread_scope`, docs/DECISIONS.md D-M2-05-9) are the
+cases the list holds (docs/DECISIONS.md M1-70).
 
 ### Limits
 

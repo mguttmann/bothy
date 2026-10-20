@@ -88,9 +88,9 @@ dürfen das Fehlerbudget von `bothy-sync/reconnect` nicht verbrauchen.
 | Name | Typ | Einheit | Attribute | Quelle | Prometheus |
 |---|---|---|---|---|---|
 | `bothy.run.active` | Gauge | `{run}` | `bothy.agent.handle`, `bothy.run.state` (`queued`, `running`, `waiting_input`) | worker: Abfrage je Intervall | `bothy_run_active` |
-| `bothy.run.start.latency` | Histogramm | `s` | `bothy.agent.handle`, `bothy.outcome` (`started`, `failed`, `cancelled`), `bothy.billing_mode` | api: `queued_at` bis Verlassen von `queued` | `bothy_run_start_latency_seconds` |
+| `bothy.run.start.latency` | Histogramm | `s` | `bothy.agent.handle`, `bothy.outcome` (`started`, `failed`, `cancelled`), `bothy.billing_mode` (`personal`, `organization`) | api: `queued_at` bis Verlassen von `queued` | `bothy_run_start_latency_seconds` |
 | `bothy.run.duration` | Histogramm | `s` | `bothy.agent.handle`, `bothy.run.state` (`completed`, `failed`, `cancelled`) | api: `started_at` bis Ende | `bothy_run_duration_seconds` |
-| `bothy.run.finished` | Zähler | `{run}` | `bothy.agent.handle`, `bothy.run.state`, `bothy.reason` (`state_reason` aus fester Liste, sonst `other`) | api | `bothy_run_finished_total` |
+| `bothy.run.finished` | Zähler | `{run}` | `bothy.agent.handle`, `bothy.run.state`, `bothy.reason` (`user_cancelled`, `access_revoked`, `cancel_timeout`, `agent_disabled`, `billing_mode_personal_not_holder`, `channel_read_only`, `billing_mode_mismatch`, `tool_class_owner_only`, `tool_class_mismatch`, `invalid_invocation_token`, `project_not_ready`, `agent_unavailable`, `interrupted`, `stale`, `runtime_error`, `adapter_error`, `runtime_not_authenticated`, `user_disabled`: the state_reason of 09 section 5.2, any other value records as other; absent for completed) | api | `bothy_run_finished_total` |
 | `bothy.run.steps` | Zähler | `{step}` | `bothy.agent.handle`, `bothy.step.kind` | api | `bothy_run_steps_total` |
 | `bothy.run.tokens` | Zähler | `{token}` | `bothy.agent.handle`, `bothy.token.type` (`input`, `output`, `cache_read`, `cache_write`), `gen_ai.provider.name`, `gen_ai.request.model` | api: aus `runs.metrics` am Laufende | `bothy_run_tokens_total` |
 | `bothy.run.cost` | Zähler | `{currency_unit}` | `bothy.agent.handle`, `bothy.billing_mode`, `bothy.currency`, `bothy.cost.estimate` (`true`, `false`) | api: aus `cost_entries` | `bothy_run_cost_total` |

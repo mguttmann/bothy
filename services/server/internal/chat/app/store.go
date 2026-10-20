@@ -172,6 +172,9 @@ type Store interface {
 	// ThreadCounters returns the counters of the threads in channels with last_message_seq above
 	// unread_floor_seq, ascending by thread (M1-63).
 	ThreadCounters(ctx context.Context, channels []ids.ID) ([]chat.ThreadCounter, error)
+	// LocateThreads returns the routing data of the known threads among threads with their channel
+	// and space in one statement, ascending by id; an unknown id is absent (M2-05, Threads.Locate).
+	LocateThreads(ctx context.Context, threads []ids.ID) ([]chat.ThreadInfo, error)
 	// ListThreads returns the threads of q in the order of its sort.
 	ListThreads(ctx context.Context, q ThreadQuery) ([]domain.Thread, error)
 	// ThreadTags returns the live tags of each of threads in the order of the tags; a thread

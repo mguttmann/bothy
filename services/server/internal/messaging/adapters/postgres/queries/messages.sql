@@ -8,13 +8,15 @@
 -- name: InsertMessage :one
 -- A new message; thread_seq comes from threads.last_message_seq under the row lock (03 section
 -- 6.2). A second (author_principal_id, client_msg_id) violates messages_author_client_msg_id_key.
--- search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
+-- search_language goes in as text and is cast here, so pgx needs no codec for regconfig. run_id is
+-- set exactly for the live box anchor of a run (kind run, M2-05); the deferred foreign key lets
+-- the anchor and its run be written in either order.
 INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256,
-                      origin, kind, system_code, content_md, content_format, reply_to_message_id, silent, version, created_at,
-                      search_language)
+                      origin, kind, system_code, content_md, content_format, reply_to_message_id, run_id, silent, version,
+                      created_at, search_language)
 VALUES (@id, @thread_id, @channel_id, @thread_seq, @author_principal_id, @client_msg_id, @client_payload_sha256,
-        @origin, @kind, @system_code, @content_md, @content_format, @reply_to_message_id, @silent, 1, @created_at,
-        sqlc.arg(search_language)::text::regconfig)
+        @origin, @kind, @system_code, @content_md, @content_format, @reply_to_message_id, sqlc.narg(run_id), @silent, 1,
+        @created_at, sqlc.arg(search_language)::text::regconfig)
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
     silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at;
@@ -53,6 +55,20 @@ RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg
 -- goes, deleted_at, deleted_by and the next version are set.
 UPDATE messages SET content_md = '', deleted_at = @deleted_at, deleted_by = @deleted_by, version = version + 1
 WHERE id = @id AND channel_id = ANY(@visible::uuid[]) AND deleted_at IS NULL
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at;
+
+-- name: SetTriggerState :one
+-- The trigger state of a message of a person (M2-05, 09 section 6): the three columns and the
+-- next version, only when state or reason differ from the stored ones (D-M2-05-17). No row means
+-- an unknown message, another origin or no change; the caller reads the message to tell them
+-- apart. The row lock of this UPDATE comes after the runs row of the caller (lock order of the
+-- README: runs before messages).
+UPDATE messages SET trigger_state = @trigger_state, trigger_state_reason = sqlc.narg(trigger_state_reason),
+    trigger_state_at = @trigger_state_at, version = version + 1
+WHERE id = @id AND origin = 'human'
+  AND (trigger_state IS DISTINCT FROM @trigger_state::text OR trigger_state_reason IS DISTINCT FROM sqlc.narg(trigger_state_reason)::text)
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
     silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at;

@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/terminal"
 )
@@ -44,11 +45,12 @@ const msgRegistrationCheckFailed = "registration check failed"
 // agent.updated (M1-51), chat space.created, space.updated, space.archived and sidebar.updated
 // (M1-52), messaging message.created (M1-56), terminal (M2-39) and sync read_state.updated,
 // draft.updated, draft.deleted and settings.updated (M1-61) and gateway the ops identify, resume,
-// heartbeat and reauth (M1-64), instance instance.updated (M1-67) and files file.updated (M3-03);
+// heartbeat and reauth (M1-64), instance instance.updated (M1-67), files file.updated (M3-03) and
+// runs run.state_changed (M2-05);
 // each module's ticket
 // appends its function here.
 var moduleRegistrations = []func(*authorize.Registry){instance.Register, identity.Register, authz.Register, agents.Register, chat.Register,
-	files.Register, messaging.Register, terminal.Register, sync.Register, gateway.Register}
+	files.Register, messaging.Register, terminal.Register, runs.Register, sync.Register, gateway.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
 // production list of the module ports.

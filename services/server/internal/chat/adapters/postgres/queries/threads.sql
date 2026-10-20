@@ -103,3 +103,16 @@ SELECT id, channel_id, last_message_seq, unread_floor_seq
 FROM threads
 WHERE channel_id = ANY(sqlc.arg(channel_ids)::uuid[]) AND last_message_seq > unread_floor_seq
 ORDER BY id;
+
+-- name: LocateThreads :many
+-- The routing data of a batch of threads (M2-05, chat.Threads.Locate: "Running now" resolves the
+-- threads of the active runs) in one statement, the fields of Threads.Info: the channel kind and
+-- space, and the archived flag of the channel or its space. A dm channel has no space, hence the
+-- LEFT JOIN. The caller filters by its Authorizer.Scope, so there is no channel predicate here.
+SELECT t.id, t.channel_id, c.space_id, c.kind AS channel_kind, t.kind, t.state, t.operator_agent_id, t.created_by, t.version,
+    (c.archived_at IS NOT NULL OR s.archived_at IS NOT NULL)::boolean AS channel_archived, t.last_message_seq, t.unread_floor_seq
+FROM threads t
+JOIN channels c ON c.id = t.channel_id
+LEFT JOIN spaces s ON s.id = c.space_id
+WHERE t.id = ANY(sqlc.arg(thread_ids)::uuid[])
+ORDER BY t.id;

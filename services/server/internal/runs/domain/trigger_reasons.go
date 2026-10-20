@@ -119,8 +119,10 @@ const (
 	TranscriptService TranscriptSource = "service"
 )
 
-// TriggerState is a value of messages.trigger_state that this package yields (09 6). It never
-// yields queued, working, done, cancelled or followup_delivered; later steps set those.
+// TriggerState is a value of messages.trigger_state (09 6). Settle yields only none, received and
+// failed; TriggerOnOpen and TriggerOnTransition (triggerstate.go) yield the values that follow a
+// run (received, working, done, failed, cancelled). Nothing in this package yields queued or
+// followup_delivered: the delivery and the follow-up path set those.
 type TriggerState string
 
 // The trigger states of a Settlement.
