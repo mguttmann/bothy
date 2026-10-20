@@ -57,8 +57,8 @@ func runtimeRegister(t *testing.T) specschema.Register {
 		GatewayOps struct {
 			Enabled []string `yaml:"enabled"`
 			Later   []struct {
-				Op     string `yaml:"op"`
-				Etappe string `yaml:"etappe"`
+				Op        string `yaml:"op"`
+				Milestone string `yaml:"milestone"`
 			} `yaml:"later"`
 		} `yaml:"gateway_ops"`
 	}
@@ -67,7 +67,7 @@ func runtimeRegister(t *testing.T) specschema.Register {
 	}
 	out.Enabled = doc.GatewayOps.Enabled
 	for _, l := range doc.GatewayOps.Later {
-		out.Later = append(out.Later, specschema.LaterOp{Op: l.Op, Milestone: l.Etappe})
+		out.Later = append(out.Later, specschema.LaterOp{Op: l.Op, Milestone: l.Milestone})
 	}
 	return out
 }
