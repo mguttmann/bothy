@@ -4,7 +4,7 @@
 Proves the host setup of the module on a real Linux host without any cloud cost (D-W-125,
 D-W-127, OQ-09):
 
-1. the product trial of `make release-trial COMPONENT=bothy` on this host: the pinned registry
+1. the product trial of `make release-trial` for the product on this host: the pinned registry
    on 127.0.0.1, the server images, then bundle and install.sh of the product, here also signed
    with the throwaway key of the trial (SBOMs, `.sigstore.json` per file, signed SHA256SUMS),
    served by a static HTTP server on 127.0.0.1;
@@ -234,7 +234,7 @@ def snapshot_script(stack: str = STACK) -> str:
             f"find {compose}/secrets -printf '%P %s %m %T@\\n' | sort",
             "dpkg-query -W -f '${Package} ${Version}\\n'"
             " docker-ce docker-compose-plugin containerd.io",
-            "id bothy",
+            f"id {SSH_USER}",
             "systemctl is-enabled bothy.service bothy-firewall.service",
             "nft list table inet bothy_edge",
             "docker volume ls --format '{{.Name}}' | sort",
@@ -563,7 +563,7 @@ def build_probe(workdir: Path) -> Path:
 def release(
     trial: release_trial.Trial, tools: chain.Tools, www: Path, port: int, pub: Path
 ) -> tuple[str, list[Path]]:
-    """Build bundle and install.sh like `make release-trial COMPONENT=bothy` into www/good,
+    """Build bundle and install.sh like the product trial of `make release-trial` into www/good,
     sign them with the trial key like `release.yml` (job product-signing) and verify them.
 
     Returns:
@@ -707,7 +707,7 @@ def step_smoke(ctx: Context) -> None:
     setup_out.touch(mode=0o600)
     # A new code of the owner: install.sh withheld the first one from the log (D-M7-15-4).
     issue = (
-        f"cd {STACK}/infra/compose && runuser -u bothy -- docker compose exec -T api"
+        f"cd {STACK}/infra/compose && runuser -u {SSH_USER} -- docker compose exec -T api"
         f" bothy setup issue-enrollment-code --user {OWNER}"
     )
     setup_out.write_text(vm.run(issue).stdout, encoding="utf-8")
@@ -770,6 +770,40 @@ def step_negative(ctx: Context, before: str) -> None:
     ctx.report.step("negative: nothing unpacked, the running stack unchanged")
 
 
+BOOT_ID = "cat /proc/sys/kernel/random/boot_id"
+
+
+def step_reboot(ctx: Context) -> None:
+    """After a reboot the units bring the host back: the firewall table loads without an
+    ordering cycle in the journal, and bothy.service starts the stack (discovery answers 200)."""
+    vm = ctx.need_vm()
+    first = vm.run(BOOT_ID).stdout.strip()
+    vm.run("systemctl reboot", check=False, timeout=30)
+    wait_for("the VM after the reboot", lambda: vm.run(BOOT_ID, timeout=30).stdout.strip()
+             not in ("", first), BOOT_TIMEOUT_S)  # fmt: skip
+    env_file = f"{STACK}/infra/compose/.env"
+    script = f"""set -u
+publish=$(sed -n 's/^BOTHY_HTTP_PUBLISH_PORT=//p' {env_file})
+url="http://127.0.0.1:${{publish:-8090}}/api/v1/instance/discovery"
+code=none
+for i in $(seq 1 90); do
+  code=$(curl -s -o /dev/null -w '%{{http_code}}' "$url" || true)
+  [ "$code" = 200 ] && break
+  sleep 5
+done
+echo "discovery=$code"
+echo "service=$(systemctl is-active bothy.service)"
+echo "firewall=$(systemctl is-active bothy-firewall.service)"
+nft list table inet bothy_edge >/dev/null 2>&1 && echo table=loaded
+echo "cycles=$(journalctl -b 0 --no-pager | grep -ci 'ordering cycle')"
+"""
+    out = vm.run(script, timeout=STEP_TIMEOUT_S).stdout
+    want = ("discovery=200", "service=active", "firewall=active", "table=loaded", "cycles=0")
+    if not all(w in out for w in want):
+        raise VMTestError(f"after the reboot: {out.strip()}")
+    ctx.report.step("reboot: firewall loaded without an ordering cycle, the stack is back")
+
+
 def run(args: argparse.Namespace) -> int:
     """The whole test; see the module documentation."""
     arch = guest_arch(args.platforms)
@@ -797,6 +831,7 @@ def run(args: argparse.Namespace) -> int:
             before = step_second_delivery(ctx, tofu)
             step_no_terminal(ctx)
             step_negative(ctx, before)
+            step_reboot(ctx)
             vm = ctx.need_vm()
             vm.run("poweroff", check=False, timeout=30)
     finally:

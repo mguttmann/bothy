@@ -68,12 +68,14 @@ The script, in this order:
 6. Verification before anything is unpacked: the signature of `SHA256SUMS`, the checksums of
    bundle and `install.sh` from it, their own signatures, then the registry of the bundle. A
    wrong checksum or signature stops the setup (exit code 1, step `verify`).
-7. The firewall table and the unit `bothy-firewall.service`.
+7. The firewall table and the unit `bothy-firewall.service`, which loads it at boot before the
+   network (`DefaultDependencies=no`, `Before=network-pre.target`, like `nftables.service`).
 8. `install.sh --bundle <bundle> --dir <stack_dir>` with the options, as the user `bothy`, in a
    new session without a controlling terminal (`setsid`, standard input closed; the SSH delivery
    runs under a pseudo terminal, and with a terminal `install.sh` would print the code to
    `/dev/tty`). The enrollment code of the first owner is replaced in the log by the command that
-   issues a new one (`bothy setup issue-enrollment-code --user <owner_handle>`), because cloud-init
+   issues a new one (`bothy setup issue-enrollment-code --user <owner_handle>` in the API service of the edge,
+   `api` or `api-tailscale`), because cloud-init
    and the SSH delivery keep the output in a log.
 9. The unit `bothy.service` (`docker compose up -d` at boot), enabled and started.
 

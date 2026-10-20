@@ -1,4 +1,4 @@
-# Host setup of a Linux host for Bothy (brief M7-15, ADR 0012, infra/tofu/README.md).
+# Host setup of a Linux host for the chat server (brief M7-15, ADR 0012, infra/tofu/README.md).
 #
 # One script, two delivery paths (docs/DECISIONS.md D-M7-15-1): the static script
 # files/bothy-setup.sh plus four rendered files (setup.env, install-options, firewall.nft and,
