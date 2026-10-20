@@ -14,6 +14,7 @@ import (
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -22,6 +23,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
+	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 )
 
 // Modules holds the module objects of a process role whose hooks and subscribers the txn
@@ -54,17 +57,40 @@ type Modules struct {
 	// AppsArchive is the in-transaction subscriber of apps (ChannelArchived revokes the incoming
 	// webhooks of the channel, M2-27); required.
 	AppsArchive *appsapp.ArchiveSubscriber
+	// TerminalSubscribers are the in-transaction subscribers of terminal (AccessChanged,
+	// DeviceRevoked and SessionEnded end terminal sessions, M2-46); required. The terminal step
+	// binds the use cases (Subscribers.Bind).
+	TerminalSubscribers *terminalapp.Subscribers
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
 // where no unit of work runs (the golden test). It opens no connection. The rights hook gets the
 // empty structure and agent policy sources until M1-54 and M1-51.
-func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
-	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
+func NewModules(pool *pg.Pool, log *slog.Logger) *Modules { return NewModulesWithClock(pool, nil, log) }
+
+// NewModulesWithClock is NewModules with the clock of the rights hook (nil means clock.System()):
+// the serve process passes wire.Deps.Clock, so a test on a fake clock folds due expiries on that
+// clock (M2-46).
+func NewModulesWithClock(pool *pg.Pool, clk clock.Clock, log *slog.Logger) *Modules {
+	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, clk, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
 		SyncSubscribers: newSyncSubscribers(pool), NotifySubscribers: newNotifySubscribers(pool),
 		MessagingSubscribers: newMessagingSubscribers(pool), RunsAcceptor: runsapp.NewAcceptor(),
-		AppsArchive: appsapp.NewArchiveSubscriber(appspg.NewRepository(pool))}
+		AppsArchive:         appsapp.NewArchiveSubscriber(appspg.NewRepository(pool)),
+		TerminalSubscribers: newTerminalSubscribers(pool)}
 }
+
+// newTerminalSubscribers returns the unbound subscribers of terminal over pool (nil: none read, the
+// golden test). It opens no connection.
+func newTerminalSubscribers(pool *pg.Pool) *terminalapp.Subscribers {
+	if pool == nil {
+		return terminalapp.NewSubscribers(nil)
+	}
+	return terminalapp.NewSubscribers(terminalpg.NewRepository(pool))
+}
+
+// errNoTerminalSubscribers reports Modules without the subscribers of terminal: a revocation would
+// leave terminal sessions open (24 section 8.3).
+var errNoTerminalSubscribers = errors.New("wire: the txn registry needs the subscribers of terminal (Modules.TerminalSubscribers)")
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
 // all) builds its registry here, so the golden file shows the one list of all roles. The error
@@ -116,11 +142,11 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // spans, the rights hooks of phases 1 and 3.1, the sync hook of phase 3.2 and the audit hook of
 // phase 3.3, the subscription messaging.MessagePosted -> sync (drafts with clear_draft, M1-61),
 // chat.ThreadMoved -> messaging, then -> sync (the copies of channel_id, M1-62) and
-// chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18) and, after the
-// existing subscribers, messaging.MessagePosted -> runs (the acceptance of a triggering message,
-// M2-05).
-// authorize.AccessChanged, published by authz, has no production subscriber in M1 (runs
-// subscribes in M2, 02 section 4.3).
+// chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18), after the existing
+// subscribers messaging.MessagePosted -> runs (the acceptance of a triggering message, M2-05) and
+// chat.ChannelArchived -> apps (the revocation of incoming webhooks, M2-27), and
+// kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (the end of
+// terminal sessions at every revocation, M2-46).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -159,6 +185,13 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.SyncSubscribers.OnThreadMoved); err != nil {
 		return err
 	}
+	return registerArchiveAndTerminal(reg, m)
+}
+
+// registerArchiveAndTerminal registers chat.ChannelArchived and chat.SpaceArchived -> notify
+// (M3-18), then kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal
+// (M2-46), in this order after the subscriptions of registerTxn.
+func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 	if m.NotifySubscribers == nil {
 		return errNoNotifySubscribers
 	}
@@ -184,7 +217,19 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if m.AppsArchive == nil {
 		return errNoAppsArchive
 	}
-	return txn.Subscribe(reg, m.AppsArchive.OnChannelArchived)
+	if err := txn.Subscribe(reg, m.AppsArchive.OnChannelArchived); err != nil {
+		return err
+	}
+	if m.TerminalSubscribers == nil {
+		return errNoTerminalSubscribers
+	}
+	if err := txn.Subscribe(reg, m.TerminalSubscribers.OnAccessChanged); err != nil {
+		return err
+	}
+	if err := txn.Subscribe(reg, m.TerminalSubscribers.OnDeviceRevoked); err != nil {
+		return err
+	}
+	return txn.Subscribe(reg, m.TerminalSubscribers.OnSessionEnded)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

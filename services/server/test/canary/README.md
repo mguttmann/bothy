@@ -24,6 +24,7 @@ forbids it. A new operation that the scenario does not call fails
 | `TestSEC_T10_DetectorFindsClearPrincipalIDInLog` | a clear principal ID in a log attribute is an identity finding |
 | `TestSEC_T10_CanaryAcrossAllOutputs` | the full scenario, zero findings; every class has values, every file of the secrets directory and the key store is registered, the IP canaries reached the audit IP path, the message delete left a redacted event, the permitted sinks saw their values |
 | `TestSEC_T10_ScenarioCoversEveryEnabledOperation` | every enabled operation called, every op of `wire.GatewayOpClasses` sent |
+| `TestSEC_T10_TerminalInputOutput` | the terminal step with Noise (M2-46): the canary input arrives in clear at the Fake-Host, the canary output at the device, the session token is the payload of message 1, the raw relay messages are a sink, and no terminal canary is in any sink |
 | `TestDP_T09_NoClearPrincipalOrDeviceIDsInTelemetry` | no principal or device ID in logs, traces or metrics, and `bothy.principal.pseudo_id` on request spans |
 | `TestSEC_T10_RateLimitedResponse` | a second server with default limits answers canary logins with `429` on `rl.public_auth`; zero findings |
 
@@ -52,6 +53,11 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   tokens of the grants are registered as secrets.
   `scenario_images.go` drives avatar and logo (M3-10): Alex sets and deletes the avatar, the owner
   uploads, reads and deletes the instance logo.
+  tokens of the grants are registered as secrets. Since M2-46 the host has a real X25519 key and a
+  second shell runs the handshake `Noise_NK_25519_ChaChaPoly_SHA256` between the device test client
+  and the Fake-Host (`test/terminal/fakehost`): `start`, a `data` frame with a canary input
+  (content of the session's scope, which no observer reads), a `resize`, the Fake-Host's `data`
+  frame with a canary output, and `close`. `Scenario.TerminalIO` keeps the positive controls.
 
 ## Sinks
 
@@ -65,6 +71,9 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
 6. Foreign events: the gateway frames, every `listEvents` page from cursor 0 and the snapshot of
    the observers Sam (reads Marketing and Support/Allgemein), Robin (reads Engineering/Projekt-A)
    and Alex (reads Support), and the `listEvents` pages of the operator Lotse.
+7. Relay (M2-46): every raw binary WebSocket message the device and the Fake-Host of the terminal
+   step sent and received, what passed the relay. No value of any class is allowed there: terminal
+   content is encrypted end to end, and message 1 carries the session token only encrypted.
 
 ## Allow matrix
 

@@ -258,6 +258,9 @@ func newClusterWith(t *testing.T, mode string, extra map[string]string) *cluster
 		"audit.deny_aggregate_window": "50ms", "cluster.mode": mode,
 		"terminal.host_heartbeat_interval": heartbeatInterval.String(), "terminal.host_heartbeat_miss_limit": fmt.Sprint(heartbeatMisses),
 		"terminal.host_duplicate_probe_timeout": probeTimeout.String(), "database.listen_reconnect_backoff_cap": "200ms",
+		// The tests open sessions in loops while they wait for presence; the session limits of
+		// M2-46 are not what they prove.
+		"terminal.max_sessions_per_person": "1000", "terminal.max_sessions_per_host": "1000",
 	} {
 		conf[k] = v
 	}

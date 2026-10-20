@@ -54,7 +54,7 @@ func TestPartitionMaintenanceJobRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reg, err := wire.NewJobRegistry(&wire.JobModules{Partitions: nil, PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, Partitions: nil, PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestIdempotencyCleanupJobRegistered(t *testing.T) {
 	if cfg.Cleanup.BatchSize != 50 {
 		t.Fatalf("batch size %d, want 50", cfg.Cleanup.BatchSize)
 	}
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,10 +4,12 @@
 // component testsupport): Host holds the keys of an active host, runs its control connection over
 // hosttest with a report and a heartbeat loop, and answers every session.open with one data
 // connection run by a script per session (Accept, Pair, Refuse, End, EndAfterHandshake, Ignore,
-// Stall); Device opens the
+// Stall, NoiseAccept); Device opens the
 // device stream with an access token and a DPoP proof of a harness client. Both exchange opaque
-// bytes: message 1 of the device is the compact session token (a test framing only), which the
-// relay cannot tell from Noise. Every text frame passes api/specschema.ValidateChannelFrame (G9).
+// bytes: with the older scripts message 1 of the device is the compact session token (a test
+// framing only), which the relay cannot tell from Noise; NoiseAccept and Device.Handshake run the
+// real Noise_NK_25519_ChaChaPoly_SHA256 of 24 section 5.2 and encrypt every frame (noise.go,
+// M2-46). Every text frame passes api/specschema.ValidateChannelFrame (G9).
 // Timers is the fake of terminal/app.Timers the tests fire. Neither fake replaces the Go test
 // device of M2-48 or the real host service (README.md).
 package fakehost
@@ -38,9 +40,10 @@ import (
 
 // The channels of asyncapi.yaml the fakes speak.
 const (
-	channelData   = "hostData"
-	channelStream = "terminalStream"
-	tokenTyp      = "terminal-session+jwt"
+	channelData    = "hostData"
+	channelStream  = "terminalStream"
+	channelControl = "hostControl"
+	tokenTyp       = "terminal-session+jwt"
 )
 
 // Timers is a fake of terminal/app.Timers: AfterFunc records the function, Fire runs every pending
@@ -128,6 +131,12 @@ const (
 	// session.ended with Reason and Detail on the control connection; it keeps the data connection
 	// open and forwards nothing, so the server closes both sides through its end path.
 	EndAfterHandshake
+	// NoiseAccept runs the real handshake Noise_NK_25519_ChaChaPoly_SHA256 of 24 section 5.2 as the
+	// responder with the key of UseNoise (M2-46 Design note 13): message 1 carries the token
+	// (verified like Accept, plus its claim cek against the initiator's ephemeral key), message 2
+	// answers, the frame start triggers session.started, every data frame is answered with Output
+	// (or echoed), and the frame close sends session.ended with client_closed (noise.go).
+	NoiseAccept
 )
 
 // Script is the behaviour for one session.
@@ -136,6 +145,8 @@ type Script struct {
 	Code   int
 	Detail string
 	Reason string
+	// Output is the PTY output NoiseAccept sends for every data frame of the device; nil echoes.
+	Output []byte
 }
 
 // Host is the fake host service of one active host.
@@ -162,6 +173,10 @@ type Host struct {
 	cancel  context.CancelFunc
 	// ended is closed when the reader of the control connection returned (M2-47).
 	ended chan struct{}
+	// noise is the static Noise key of NoiseAccept (UseNoise); plain the frames it decrypted per
+	// session.
+	noise *NoiseKey
+	plain map[ids.ID][][]byte
 }
 
 // NewKey returns a fresh login key and Noise key pair of a host: the Ed25519 login key and 32
@@ -187,7 +202,7 @@ func Connect(t testing.TB, baseURL string, id ids.ID, key hosttest.Key, report m
 		t.Fatal(err)
 	}
 	h := &Host{t: t, base: baseURL, ID: id, Key: key, contract: contract, scripts: map[ids.ID]Script{}, seenJTI: map[string]bool{},
-		data: map[ids.ID]*DataConn{}, ctx: ctx, cancel: cancel, ended: make(chan struct{})}
+		data: map[ids.ID]*DataConn{}, ctx: ctx, cancel: cancel, ended: make(chan struct{}), plain: map[ids.ID][][]byte{}}
 	h.cond = gosync.NewCond(&h.mu)
 	h.Control = hosttest.Dial(t, ctx, baseURL)
 	h.addJWKS(h.Control.Hello().Jwks)
@@ -454,7 +469,7 @@ func (h *Host) run(session ids.ID, s Script) {
 		}
 		_ = h.Send("session.ended", d)
 		return
-	case Accept, Refuse, Stall, Pair, EndAfterHandshake:
+	case Accept, Refuse, Stall, Pair, EndAfterHandshake, NoiseAccept:
 	}
 	dc, err := h.DialData(h.ctx, session)
 	if err != nil {
@@ -472,6 +487,8 @@ func (h *Host) run(session ids.ID, s Script) {
 		h.accept(dc, s.Kind == Accept)
 	case EndAfterHandshake:
 		h.endAfterHandshake(dc, s)
+	case NoiseAccept:
+		h.noiseAccept(dc, s)
 	case End, Ignore:
 	}
 }
@@ -595,6 +612,8 @@ type DataConn struct {
 	queue [][]byte
 	cerr  error
 	cond  *gosync.Cond
+	// wire records every binary message sent and received (Wire).
+	wire []WireMessage
 }
 
 // DialData opens the data connection of session: hello, identify with session_id; the frames
@@ -660,6 +679,7 @@ func (dc *DataConn) read() {
 		}
 		if typ == websocket.MessageBinary {
 			dc.queue = append(dc.queue, b)
+			dc.wire = append(dc.wire, WireMessage{Bytes: b})
 		}
 		dc.cond.Broadcast()
 		dc.mu.Unlock()
@@ -673,7 +693,7 @@ func (dc *DataConn) Recv(ctx context.Context) ([]byte, error) {
 
 // Send sends m as one binary message.
 func (dc *DataConn) Send(ctx context.Context, m []byte) error {
-	return dc.ws.Write(ctx, websocket.MessageBinary, m)
+	return sendBinary(ctx, dc.ws, &dc.mu, &dc.wire, m)
 }
 
 // SendText sends a text frame (a negative test).
@@ -758,6 +778,9 @@ type DeviceParams struct {
 	Raw             []byte
 	// BinaryFirst sends a binary frame instead of identify; Silent sends nothing.
 	BinaryFirst, Silent bool
+	// ClientIP, when set, is sent as X-Forwarded-For on the upgrade: the server trusts the loopback
+	// peer of the harness as its reverse proxy, so the stream comes from that address (M2-46).
+	ClientIP string
 }
 
 // Device is one device stream.
@@ -772,6 +795,8 @@ type Device struct {
 	cond    *gosync.Cond
 	// paused holds the reader before its next read (Pause, Resume): a slow device.
 	paused bool
+	// wire records every binary message sent and received (Wire).
+	wire []WireMessage
 }
 
 // Pause stops reading from the server before the next message, so the server's writes back up.
@@ -799,8 +824,14 @@ func DialDevice(t testing.TB, ctx context.Context, baseURL, publicURL string, se
 	}
 	url := "ws" + strings.TrimPrefix(baseURL, "http") + "/api/v1/terminal/sessions/" + session.String() + "/stream"
 	opts := &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled}
+	if dp.Origin != "" || dp.ClientIP != "" {
+		opts.HTTPHeader = http.Header{}
+	}
 	if dp.Origin != "" {
-		opts.HTTPHeader = http.Header{"Origin": []string{dp.Origin}}
+		opts.HTTPHeader.Set("Origin", dp.Origin)
+	}
+	if dp.ClientIP != "" {
+		opts.HTTPHeader.Set("X-Forwarded-For", dp.ClientIP)
 	}
 	ws, resp, err := websocket.Dial(ctx, url, opts) // nosemgrep: bothy-go-egress-only -- test client of the device stream; it dials only the server of the test
 	status := 0
@@ -902,6 +933,7 @@ func (dv *Device) read() {
 		}
 		if typ == websocket.MessageBinary {
 			dv.queue = append(dv.queue, b)
+			dv.wire = append(dv.wire, WireMessage{Bytes: b})
 		}
 		dv.cond.Broadcast()
 		dv.mu.Unlock()
@@ -910,7 +942,7 @@ func (dv *Device) read() {
 
 // Send sends m as one binary message.
 func (dv *Device) Send(ctx context.Context, m []byte) error {
-	return dv.ws.Write(ctx, websocket.MessageBinary, m)
+	return sendBinary(ctx, dv.ws, &dv.mu, &dv.wire, m)
 }
 
 // SendText sends a text frame (a negative test).
@@ -969,3 +1001,67 @@ func B64(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 
 // Equal reports whether a and b hold the same bytes.
 func Equal(a, b []byte) bool { return bytes.Equal(a, b) }
+
+// ControlAttempt opens one control connection at baseURL from clientIP (sent as X-Forwarded-For;
+// "" for the loopback peer, which the server trusts as its reverse proxy), answers hello with
+// identify of host id signed by key, or carrying proof instead when proof is not empty (a negative
+// test), and reads the answer (M2-46, the failed-credentials rule of rl.public_auth). It returns
+// the op of the first frame after identify ("ready" after a login) with code 0, or the close code
+// and reason of the server. The connection is closed before it returns; a login that succeeded
+// was a real control connection for that moment. Errors: the dial, hello, or ctx ending first.
+func ControlAttempt(ctx context.Context, baseURL string, id ids.ID, key hosttest.Key, proof, clientIP string) (
+	string, int, string, error,
+) {
+	contract, err := specschema.Default()
+	if err != nil {
+		return "", 0, "", err
+	}
+	opts := &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled}
+	if clientIP != "" {
+		opts.HTTPHeader = http.Header{"X-Forwarded-For": []string{clientIP}}
+	}
+	url := "ws" + strings.TrimPrefix(baseURL, "http") + hosttest.Path
+	ws, resp, err := websocket.Dial(ctx, url, opts) // nosemgrep: bothy-go-egress-only -- test client of the control connection; it dials only the server of the test
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	if err != nil {
+		return "", 0, "", err
+	}
+	defer func() { _ = ws.CloseNow() }()
+	ws.SetReadLimit(-1)
+	_, b, err := ws.Read(ctx)
+	if err != nil {
+		return "", 0, "", fmt.Errorf("fakehost: hello: %w", err)
+	}
+	if err := contract.ValidateChannelFrame(channelControl, true, b); err != nil {
+		return "", 0, "", fmt.Errorf("fakehost: server frame violates the contract (G9): %w", err)
+	}
+	var env struct {
+		D rest.HostChannelHello `json:"d"`
+	}
+	if err := json.Unmarshal(b, &env); err != nil {
+		return "", 0, "", err
+	}
+	if proof == "" {
+		proof = hosttest.Proof(key, id, env.D.Challenge, env.D.ServerTime)
+	}
+	frame, _ := json.Marshal(map[string]any{"op": "identify", "d": map[string]any{"protocol_version": 1, "host_id": id.String(),
+		"proof": proof, "host_version": "1.0.0", "live_sessions": []string{}}})
+	if err := ws.Write(ctx, websocket.MessageText, frame); err != nil {
+		return "", 0, "", err
+	}
+	_, b, err = ws.Read(ctx)
+	if err != nil {
+		var ce websocket.CloseError
+		if errors.As(err, &ce) {
+			return "", int(ce.Code), ce.Reason, nil
+		}
+		return "", 0, "", err
+	}
+	var next struct {
+		Op string `json:"op"`
+	}
+	_ = json.Unmarshal(b, &next)
+	return next.Op, 0, "", nil
+}

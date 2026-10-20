@@ -52,9 +52,11 @@ func (a *Authorizer) resolveTerminalSession(ctx context.Context, r authorize.Res
 	return a.resolveHost(ctx, r.HostID)
 }
 
-// terminalFacts fills the facts of the step-up "frisch", of the quick reattach and of the guards
-// SR10 to SR12 (Design notes 4 and 5 of M2-40). Errors: terminal.attach without Resource.Terminal
-// and a terminal action without its host are internal errors.
+// terminalFacts fills the facts of the step-up "frisch", of the quick reattach, of the guards
+// SR10 to SR12 (Design notes 4 and 5 of M2-40) and of the live guards with the session limits
+// (M2-46). Errors: terminal.open and terminal.attach without Resource.Terminal and a terminal
+// action without its host are internal errors; terminal.open needs it for the session counts, so
+// a caller that leaves them out cannot pass the limit.
 func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r authorize.Resource, in *domain.Input) error {
 	if spec.StepUpFresh {
 		in.Fresh = domain.FreshFacts{
@@ -62,6 +64,9 @@ func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r
 			StepUpMethod: s.p.StepUpMethodName(), ClientComponent: s.p.ClientComponentName(),
 		}
 		in.FreshMaxAge, in.ReattachWindow = a.cfg.TerminalStepUpMaxAge, a.cfg.QuickReattachWindow
+	}
+	if spec.ID == domain.ActionTerminalOpen && r.Terminal == nil {
+		return internal("terminal.open without its session counts")
 	}
 	if spec.ID == domain.ActionTerminalAttach {
 		if r.Terminal == nil {
@@ -76,7 +81,7 @@ func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r
 		}
 	}
 	if spec.ID == domain.ActionTerminalOpen || spec.ID == domain.ActionTerminalAttach || spec.ID == domain.ActionTerminalStream {
-		in.Live = liveFacts(r.Terminal)
+		in.Live = a.liveFacts(r.Terminal)
 	}
 	if spec.ID != domain.ActionTerminalOpen && spec.ID != domain.ActionTerminalAttach {
 		return nil
@@ -92,14 +97,19 @@ func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r
 	return nil
 }
 
-// liveFacts returns the live facts of a terminal descriptor (M2-44); nil without one, which the
-// guards treat as a host that is not connected and a device that is not the session's (fail
-// closed).
-func liveFacts(t *authorize.TerminalFacts) *domain.TerminalLiveFacts {
+// liveFacts returns the live facts of a terminal descriptor (M2-44) with the open session counts
+// and the session limits terminal.max_sessions_per_person and terminal.max_sessions_per_host
+// (M2-46); nil without one, which the guards treat as a host that is not connected and a device
+// that is not the session's (fail closed).
+func (a *Authorizer) liveFacts(t *authorize.TerminalFacts) *domain.TerminalLiveFacts {
 	if t == nil {
 		return nil
 	}
-	return &domain.TerminalLiveFacts{HostConnected: t.HostConnected, ProfileKnown: t.ProfileKnown, SessionDeviceID: t.SessionDeviceID}
+	return &domain.TerminalLiveFacts{
+		HostConnected: t.HostConnected, ProfileKnown: t.ProfileKnown, SessionDeviceID: t.SessionDeviceID,
+		OpenSessionsOfPerson: t.OpenSessionsOfPerson, OpenSessionsOfHost: t.OpenSessionsOfHost,
+		MaxSessionsPerPerson: a.cfg.MaxSessionsPerPerson, MaxSessionsPerHost: a.cfg.MaxSessionsPerHost,
+	}
 }
 
 // FreshCheck implements authz.FreshStepUpCheck with domain.FreshStepUp and

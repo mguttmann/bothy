@@ -136,6 +136,15 @@ func (r *Repository) ActiveSessionsOfUser(ctx context.Context, userID, before id
 	return out, nil
 }
 
+// EndedSessions implements app.SessionStore.
+func (r *Repository) EndedSessions(ctx context.Context, list []ids.ID, at time.Time) ([]ids.ID, error) {
+	rows, err := r.read(ctx).EndedAuthSessions(ctx, sqlcgen.EndedAuthSessionsParams{Ids: uuids(list), At: ts(at)})
+	if err != nil {
+		return nil, mapError(err, "reading the ended sessions")
+	}
+	return idsOf(rows), nil
+}
+
 // AuthState implements app.SessionStore.
 func (r *Repository) AuthState(ctx context.Context, id ids.ID) (app.AuthState, bool, error) {
 	row, err := r.read(ctx).GetAuthState(ctx, uuid(id))

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	stdsync "sync"
 	"time"
 
@@ -14,13 +15,16 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
+	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
+	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
 // The two upgrade routes of the terminal sessions (M2-44, asyncapi channels terminalStream and
@@ -65,11 +69,16 @@ func TerminalStreamRouteBindings() []authorize.RouteBinding {
 
 // TerminalStreamsConfig binds the keys of the relay and the device stream (M2-44).
 type TerminalStreamsConfig struct {
-	PublicURL      string        `config:"server.public_url"`
-	OpenTimeout    time.Duration `config:"terminal.open_timeout"`
-	BufferMaxBytes int           `config:"terminal.relay_buffer_max_bytes"`
-	MaxFrameBytes  int           `config:"sync.ws_max_frame_bytes"`
-	MaxJSONDepth   int           `config:"http.max_json_depth"`
+	PublicURL   string        `config:"server.public_url"`
+	OpenTimeout time.Duration `config:"terminal.open_timeout"`
+	// The limits the relay enforces without the host service (M2-46 Design note 7).
+	IdleTimeout        time.Duration `config:"terminal.idle_timeout"`
+	IdleGrace          time.Duration `config:"terminal.idle_grace"`
+	MaxSessionDuration time.Duration `config:"terminal.max_session_duration"`
+	DetachGrace        time.Duration `config:"terminal.detach_grace"`
+	BufferMaxBytes     int           `config:"terminal.relay_buffer_max_bytes"`
+	MaxFrameBytes      int           `config:"sync.ws_max_frame_bytes"`
+	MaxJSONDepth       int           `config:"http.max_json_depth"`
 }
 
 // TerminalStreamsConfigFrom binds TerminalStreamsConfig from v; the error names the key, never a
@@ -101,6 +110,9 @@ type TerminalStreamsDeps struct {
 	Log *slog.Logger
 	// Multi is cluster.mode multi (M2-47, wsrelay.RelayConfig.Multi).
 	Multi bool
+	// Limiter applies rl.terminal and rl.public_auth on the device stream (M2-46); nil allows
+	// everything (wsrelay.NoLimiter).
+	Limiter wsrelay.Limiter
 }
 
 // TerminalStreams are the relay of this process with its two handlers.
@@ -125,6 +137,9 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 		return nil, errors.New("wire: the terminal streams need the module, the control connection, the authenticator, the nonces and the signer")
 	}
 	m := d.Metrics
+	if m == nil && t.Metrics != nil {
+		m = t.Metrics
+	}
 	if m == nil {
 		om, err := otelmetrics.New(nil)
 		if err != nil {
@@ -132,8 +147,10 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 		}
 		m = om
 	}
-	relay, err := wsrelay.NewRelay(wsrelay.RelayConfig{BufferMaxBytes: cfg.BufferMaxBytes, OpenTimeout: cfg.OpenTimeout, Multi: d.Multi}, t.Service, hc.Links,
-		d.Timers, d.Clock, d.Log)
+	windows := domain.Windows{Idle: cfg.IdleTimeout, IdleGrace: cfg.IdleGrace, MaxDuration: cfg.MaxSessionDuration, DetachGrace: cfg.DetachGrace,
+		OpenTimeout: cfg.OpenTimeout}
+	relay, err := wsrelay.NewRelay(wsrelay.RelayConfig{BufferMaxBytes: cfg.BufferMaxBytes, OpenTimeout: cfg.OpenTimeout, Multi: d.Multi,
+		Windows: windows, Metrics: t.Service.Instruments()}, t.Service, hc.Links, d.Timers, d.Clock, d.Log)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +161,7 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 	stream, err := wsrelay.NewStreamHandler(wsrelay.StreamConfig{PublicURL: cfg.PublicURL, OpenTimeout: cfg.OpenTimeout,
 		MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth},
 		wsrelay.StreamDeps{UseCases: t.Service, Authenticator: d.Authenticator, Nonces: d.Nonces, Relay: relay, Schemas: schemas,
-			Timers: d.Timers, Clock: d.Clock, Log: d.Log})
+			Timers: d.Timers, Clock: d.Clock, Log: d.Log, Limiter: d.Limiter})
 	if err != nil {
 		return nil, err
 	}
@@ -183,3 +200,53 @@ func (s *TerminalStreams) Observer() LogObserver {
 // LogObserver is a consumer of the log tail of an api process after Authorizer.Observe and the
 // hub; it must not block.
 type LogObserver func(ctx context.Context, ev sync.Event)
+
+// terminalLimiter adapts the limiter of the process to the terminal channels (M2-46 Design note
+// 10): rl.terminal keyed by the human principal, rl.host keyed by the host after its proof, and the
+// reservation of rl.public_auth of the client address before presented credentials are checked.
+type terminalLimiter struct{ l *ratelimit.Limiter }
+
+// The classes of the terminal channels (05 section 3).
+const (
+	terminalClass   = ratelimit.Class(terminalStreamClass)
+	hostClass       = ratelimit.Class(hostConnectClass)
+	publicAuthClass = ratelimit.ClassPublicAuth
+)
+
+// AllowTerminal implements wsrelay.Limiter; an error of the limiter (an unknown class, which the
+// start check rules out) refuses.
+func (t terminalLimiter) AllowTerminal(id ids.ID) (bool, int) {
+	return t.allow(terminalClass, ratelimit.KeyForPrincipal(id))
+}
+
+// AllowHost implements wsrelay.Limiter.
+func (t terminalLimiter) AllowHost(id ids.ID) (bool, int) {
+	return t.allow(hostClass, ratelimit.KeyForHost(id))
+}
+
+// ReserveCredentials implements wsrelay.Limiter: like the failed-credentials rule of the REST
+// chain, one token is reserved and given back unless the check failed.
+func (t terminalLimiter) ReserveCredentials(ip netip.Addr) (bool, int, func(bool)) {
+	key := ratelimit.KeyForIP(ip)
+	ok, retry := t.allow(publicAuthClass, key)
+	if !ok {
+		return false, retry, func(bool) {}
+	}
+	return true, 0, func(failed bool) {
+		if !failed {
+			_ = t.l.Refund(publicAuthClass, key)
+		}
+	}
+}
+
+// allow takes one token of class and key; no limiter allows.
+func (t terminalLimiter) allow(class ratelimit.Class, key string) (bool, int) {
+	if t.l == nil {
+		return true, 0
+	}
+	d, err := t.l.Allow(class, key)
+	if err != nil {
+		return false, 1
+	}
+	return d.Allowed, d.RetryAfterSeconds
+}
