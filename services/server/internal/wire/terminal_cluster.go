@@ -103,7 +103,13 @@ func (s *server) startTerminalEphemeral(ctx context.Context) error {
 	if hub == nil || pool == nil {
 		return errors.New("wire: the terminal listener needs the hub of the relay and the pool")
 	}
+	gate := s.deps.TerminalListenerGate
 	l, err := terminalpg.NewEphemeralListener(func(ctx context.Context) (*pgx.Conn, error) {
+		if gate != nil {
+			if err := gate(ctx); err != nil {
+				return nil, err
+			}
+		}
 		return pool.DialDedicated(ctx, terminalpg.ApplicationName)
 	}, terminalpg.ListenerConfig{ReconnectBackoffCap: cfg.ReconnectBackoffCap}, hub, hub, s.runner.Fail, s.logger())
 	if err != nil {

@@ -272,21 +272,12 @@ func (r *Relay) deadline(id ids.ID, gen int) {
 // expire applies the deadline of s; started says whether the session started (here or on
 // another node), state is the state read; r.mu is held.
 func (r *Relay) expire(s *slot, started bool, state string) effects {
+	if started && !s.started {
+		// Started on another node (Design note 3 of M2-47).
+		return r.markStarted(s, state)
+	}
 	if s.lonePresent() {
 		s.overdue = true
-		return nil
-	}
-	if started && !s.started {
-		// Started on another node: the deadline is met; a pairing of this node that ended before
-		// session.started leaves the session detached, as session.started without a pairing
-		// does on one node.
-		s.started = true
-		s.gen++
-		s.stopDeadline()
-		if s.pairedOnce && !s.paired && state == domain.SessionActive {
-			id := s.id
-			return effects{func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }}
-		}
 		return nil
 	}
 	if !started && s.dev == nil && s.hst == nil && s.confirm && s.pairedElsewhere {
@@ -561,6 +552,11 @@ func (r *Relay) loneDeadline(sd *side) {
 		return
 	}
 	out := domain.LoneSideOutcome(sd.kind, s.phase())
+	if !out.Timer {
+		// The session started meanwhile: a host data connection waits for an attaching device.
+		r.mu.Unlock()
+		return
+	}
 	r.closeSide(s, sd, out.Code, "")
 	id := s.id
 	fx := effects{func(ctx context.Context) { r.uc.RelayUnpaired(ctx, out.Side) }}
@@ -819,7 +815,11 @@ func (r *Relay) ObserveLogEvent(ctx context.Context, typ string, resourceID ids.
 		return
 	}
 	var p sessionEnd
-	if err := json.Unmarshal(payload, &p); err != nil || p.State != domain.SessionClosed {
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return
+	}
+	if p.State != domain.SessionClosed {
+		r.observeStarted(ctx, resourceID, p.State)
 		return
 	}
 	host, err := ids.Parse(p.HostID)
@@ -835,6 +835,38 @@ func (r *Relay) ObserveLogEvent(ctx context.Context, typ string, resourceID ids.
 	r.mu.Unlock()
 	fx.run(ctx)
 	_ = r.links.CloseSession(ctx, host, resourceID, domain.CloseReason(p.CloseReason))
+}
+
+// observeStarted learns from the log tail that a session started on any node (M2-47): with several
+// nodes session.started arrives only on the node of the control connection, so the node of the
+// pairing marks its slot started here, meets its deadline and, when its pairing already ended,
+// detaches the session as the hook of session.started does on one node. With one node the hook
+// has done it already.
+func (r *Relay) observeStarted(ctx context.Context, id ids.ID, state string) {
+	if !r.cfg.Multi || (state != domain.SessionActive && state != domain.SessionDetached) {
+		return
+	}
+	r.mu.Lock()
+	var fx effects
+	if s := r.slots[id]; s != nil && !s.started {
+		fx = r.markStarted(s, state)
+	}
+	r.mu.Unlock()
+	fx.run(ctx)
+}
+
+// markStarted marks s started on another node's word: the deadline is met; a pairing of this node
+// that ended before session.started leaves the session detached, as session.started without a
+// pairing does on one node. r.mu is held.
+func (r *Relay) markStarted(s *slot, state string) effects {
+	s.started = true
+	s.gen++
+	s.stopDeadline()
+	if s.pairedOnce && !s.paired && state == domain.SessionActive {
+		id := s.id
+		return effects{func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }}
+	}
+	return nil
 }
 
 // Shutdown is the stop step of the relay (Design note 14 of M2-44, 02 section 15.3 step 3): no
