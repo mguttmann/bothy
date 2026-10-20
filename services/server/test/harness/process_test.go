@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func TestRSSParsing(t *testing.T) {
@@ -91,7 +92,7 @@ func TestGatewayConn(t *testing.T) {
 		MainThreadID string `json:"main_thread_id"`
 	}
 	resp.JSON(t, &ch)
-	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)
 	defer cancel()
 	g, err := s.Owner.Gateway(ctx)
 	if err != nil {
@@ -113,7 +114,7 @@ func TestGatewayConn(t *testing.T) {
 			break
 		}
 	}
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		sent, acked := g.Heartbeats()
 		if sent >= 2 && acked == sent {

@@ -74,7 +74,7 @@ func TestPerf_WSConnectionsPerNode(t *testing.T) {
 	}
 	time.Sleep(intervals*interval + interval/2)
 	alive, unacked, fewBeats := 0, 0, 0
-	deadline := time.Now().Add(ackGrace)
+	deadline := time.Now().Add(ackGrace) // nosemgrep: bothy-go-test-wall-clock-wait -- the ack grace is a latency bound under test
 	for _, g := range conns {
 		for {
 			sent, acked := g.Heartbeats()

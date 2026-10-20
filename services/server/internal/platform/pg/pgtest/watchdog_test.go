@@ -184,7 +184,7 @@ func TestWatchdogScriptRestartsOnUSR1(t *testing.T) {
 	bin := writeWatchdogStubs(t)
 	t.Parallel()
 	w := startWatchdog(t, bin, "t 1\n")
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := testkit.Deadline()
 	for w.starts() < 1 {
 		if time.Now().After(deadline) {
 			t.Fatal("the stub server did not start")
@@ -194,7 +194,7 @@ func TestWatchdogScriptRestartsOnUSR1(t *testing.T) {
 	if err := w.cmd.Process.Signal(syscall.SIGUSR1); err != nil {
 		t.Fatal(err)
 	}
-	deadline = time.Now().Add(15 * time.Second)
+	deadline = testkit.Deadline()
 	for w.starts() < 2 {
 		if time.Now().After(deadline) {
 			t.Fatalf("the server started %d times after SIGUSR1, want 2", w.starts())
