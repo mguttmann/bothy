@@ -500,14 +500,16 @@ def test_ce_error_shortens_the_message_and_names_a_task_that_went_through(
     state = State(cloud=True)
     state.ce_tasks["LONG"] = {"status": "FAILED", "errorMessage": "x" * 1000}
     state.ce_tasks["OK"] = {"status": "SUCCESS"}
+    state.ce_tasks["WAIT"] = {"status": "IN_PROGRESS"}
     monkeypatch.setenv("SONAR_TOKEN", TOKEN)
     with running(state) as url:
-        for task_id in ("LONG", "OK"):
+        for task_id in ("LONG", "OK", "WAIT"):
             report = _report_task(tmp_path, task_id)
             assert qs.main(["ce-error", "--url", url, "--report-task", str(report)]) == 0
     out = capsys.readouterr().out
     assert f"quality_sync: background task LONG FAILED: {'x' * qs._MAX_ERROR_CHARS}\n" in out
     assert "quality_sync: background task OK SUCCESS, not the cause" in out
+    assert "quality_sync: background task WAIT IN_PROGRESS: no message" in out
 
 
 def test_ce_error_fails_for_an_unknown_task(

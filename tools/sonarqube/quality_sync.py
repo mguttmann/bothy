@@ -560,9 +560,10 @@ def _ce_error(client: Client, report_task: Path) -> int:
         print(f"quality_sync: {exc}", file=sys.stderr)
         return 1
     status = task.get("status")
-    if status not in ("FAILED", "CANCELED"):
+    if status == "SUCCESS":
         # The task went through; the scanner failed for another reason (such as the gate),
-        # which its own output above names.
+        # which its own output above names. A task still PENDING or IN_PROGRESS is reported
+        # with its status below: the scanner gave up waiting for it.
         print(f"quality_sync: background task {task_id} {status}, not the cause")
         return 0
     reason = str(task.get("errorMessage", ""))[:_MAX_ERROR_CHARS]
