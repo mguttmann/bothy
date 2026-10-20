@@ -15,12 +15,16 @@ Decisions: ADR [0038](../adr/0038-local-gates-first-one-command-identical-to-ci.
    split across three jobs (`gates`, `denylist`, `sonar`). What is green locally is green
    in CI; the only intended exception is the path selection of the components (section 4).
 2. **Local first.** Errors are found before the push. The pre-push hook calls
-   `make check`. CI is the confirmation, not the place to debug.
+   `make check` for the parts the push touches, and the full `make check` when a shared input
+   changes ([push-discipline.md](../quality/push-discipline.md), "Affected-only pre-push").
+   CI is the confirmation, not the place to debug.
 3. **Fail closed.** If a tool, a list or a token is missing, the gate fails.
    A gate may skip with a `SKIP` line only when the checked
    component has no code yet. The Makefile makes this decision from the
    tracked files, not the developer. The only exception is the explicit switches
-   for contributions from forks and for runs that a dependency bot starts (R-QA-02).
+   for contributions from forks and for runs that a dependency bot starts (R-QA-02), and the
+   switches the pre-push hook sets for the parts a push does not touch (`AREAS`,
+   `LINT_FROM_REF`); CI never sets them.
 4. **Pinned tools.** Every tool has a fixed version with a checksum
    (`tools/uv.lock`, `tools/node/package-lock.json`, `tools/bin/tools.lock.json`,
    image digests, action SHAs). Updates come as a pull request from Renovate.

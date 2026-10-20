@@ -24,10 +24,11 @@ commit per feature, signed and linear.
    with `BOTHY_CODERABBIT=1`, see below). At the end of a milestone, the overall review
    over the whole milestone is added.
 5. **Push.** The pre-push hook first checks the report (`tools/hooks/review_gate.py`:
-   file present, last line `Urteil: JA`), then it runs `make check` (a push to a build
-   branch `build/**` runs only the fast gates, section "Build branches"). Red means:
-   fix, do not bypass. `git push --no-verify` is a process failure. Contributors from
-   forks set `REVIEW_SKIP=1`; then a maintainer checks before the merge.
+   file present, last line `Urteil: JA`), then it runs `make check` for the parts the push
+   touches (section "Affected-only pre-push"; a push to a build branch `build/**` runs only
+   the fast gates, section "Build branches"). Red means: fix, do not bypass.
+   `git push --no-verify` is a process failure. Contributors from forks set
+   `REVIEW_SKIP=1`; then a maintainer checks before the merge.
 6. **Pull request.** One pull request per finished feature. The title is a
    Conventional Commit header line, because on merge it becomes the header line of the commit on `main`;
    CI checks it (`PR_TITLE` in `make commitlint`). The body becomes the message of that
@@ -102,10 +103,29 @@ retrieved 2026-10-10]. The rule "Required reviewers" for teams does not exist in
 repositories; in single-person operation, the independent review before every
 push (step 4) replaces the second review.
 
+## Affected-only pre-push
+
+The pre-push hook (`tools/hooks/push_plan.py`) runs `make check` for the files the push
+changes against its merge base with `origin/main`, the range of the pull request. CI stays the
+authority: its jobs run as before, whatever the hook ran.
+
+| Pushed files | What runs |
+|---|---|
+| A shared input: `Makefile`, `.pre-commit-config.yaml`, anything under `tools/` except the inputs the component map assigns to a component (`tools/arch-check/`, `tools/observability/`; the gates are built from `tools/`, including the tool locks), `.github/`, `.semgrep/`, `quality/`, root files other than Markdown (`mkdocs.yml`, `sonar-project.properties`, `.gitleaks.toml`), any path the component map does not know | the full `make check` |
+| Files of a component (`services/`, `apps/` and `packages/`, `sdk/python/`, `sdk/typescript/`, `plugins/`) and the inputs of its generated code (`docs/spec/actions.yaml`, `docs/api/`, the root files of the Dart workspace) | the gates of these components (`COMPONENTS`, the same map as the CI job `gates`: `tools/ci/components.py`) |
+| Anything that is not source code of a component (Go, Dart, TypeScript, Kotlin, Swift or Python files under a component directory): docs, infrastructure, manifests, lock files, configuration, test data | in addition the gates of the Python tools (`AREAS=tools`: format, lint, types, tests, coverage of `tools/`), because their tests read many of these files; without them `make test` still runs the few tools tests that read component sources (`TOOLS_SOURCE_TESTS` in the Makefile) |
+| Every push | commitlint, gitleaks, denylist, semgrep, the docs gates, the supply-chain scans, the API and contract checks and the file hygiene hooks of `make lint` on the changed files (`LINT_FROM_REF`, `LINT_TO_REF`) |
+
+`PUSH_FULL=1 git push` runs the full `make check`; so do a tag push and a branch without a
+merge base with `origin/main`. `make check` without arguments stays the full check. The mapping is
+held by `tools/hooks/tests/test_push_plan.py`. A renamed file counts with its old and its new path.
+
 ## Failures after the push
 
 A red CI run after a green `make check` means: local and CI are not the same. That
-is a failure of the toolchain, not bad luck. Flow:
+is a failure of the toolchain, not bad luck. With the affected-only pre-push this includes a
+gate the hook left out: then the path belongs to a wider row of the table above (fix the map
+in `tools/hooks/push_plan.py` or `tools/ci/components.py` with a test). Flow:
 
 1. Determine the cause and note it in the pull request.
 2. Close the gap locally (gate, test, pin), in the same or in a separate pull request.

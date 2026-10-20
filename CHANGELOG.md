@@ -519,6 +519,11 @@ operated, and the order of the build.
 - `make test` gives each Go test binary the time limit `quality.test.go_timeout` instead of the
   default ten, because the module-wide coverage instrumentation slows the larger packages down
   (PL/2 in [DECISIONS.md](docs/DECISIONS.md)).
+- The pre-push hook runs `make check` for the parts the push touches: the gates of the touched
+  components (the component map of CI), the Python tools gates unless only component source
+  files changed, the file hygiene hooks on the changed files and every repository-wide gate; a
+  shared input (Makefile, `tools/`, `.github/`, root files) runs the full `make check`, and so
+  does `PUSH_FULL=1` (`tools/hooks/push_plan.py`, PL/10 in [DECISIONS.md](docs/DECISIONS.md)).
 - Golden tests of the design system compare with `DsGoldenFileComparator`
   (`package:design_system/testing.dart`): a pixel counts as different only when one color
   channel differs by more than `dsCiGoldenChannelTolerance`, so the anti-aliasing of another
