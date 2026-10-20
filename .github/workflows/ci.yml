@@ -146,7 +146,7 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      - name: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins
+      - name: make fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check commitlint runners-check labels-check release-pins
         env:
           COMPONENTS: ${{ needs.plan.outputs.components }}
           COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
@@ -154,7 +154,7 @@ jobs:
           # A dependency bot's own commits need no sign-off in its pull request (D-DEPS-3).
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           GH_TOKEN: ${{ github.token }}
-        run: make fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins COMPONENTS="$COMPONENTS"
+        run: make fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check commitlint runners-check labels-check release-pins COMPONENTS="$COMPONENTS"
 
   # Documentation, configuration reference, diagrams, API contract and client gates.
   gates-docs:
