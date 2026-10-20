@@ -64,9 +64,13 @@ func RenderFront(root, dir string, mode Mode, t FrontTimeouts) error {
 		return err
 	}
 	var b bytes.Buffer
+	// The stream paths outlast the end of an idle session by the server (idle_timeout plus
+	// idle_grace) by one detection window of the heartbeats, so the front never cuts a quiet
+	// stream before the server closes it with 4100 (TM-T11, ruling D-M2-48-3).
+	other := t.HeartbeatInterval * time.Duration(t.HeartbeatMissLimit)
 	if err := tmpl.Execute(&b, struct{ StreamSeconds, OtherSeconds int64 }{
-		StreamSeconds: int64((t.IdleTimeout + t.IdleGrace) / time.Second),
-		OtherSeconds:  int64(t.HeartbeatInterval*time.Duration(t.HeartbeatMissLimit)) / int64(time.Second),
+		StreamSeconds: int64((t.IdleTimeout + t.IdleGrace + other) / time.Second),
+		OtherSeconds:  int64(other / time.Second),
 	}); err != nil {
 		return err
 	}

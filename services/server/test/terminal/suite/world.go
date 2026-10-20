@@ -71,6 +71,8 @@ type sessInst struct {
 	streamPath string
 	expires    time.Time
 	conns      []*device.Conn
+	// connDevice names the device of each connection.
+	connDevice []string
 }
 
 // instance is the world of one case.

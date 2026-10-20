@@ -37,7 +37,9 @@ func Run(t *testing.T, env *Env, sc *Scenario) {
 	t.Run(sc.ID, func(t *testing.T) {
 		for _, c := range sc.Cases {
 			t.Run(c.Name, func(t *testing.T) {
-				t.Parallel()
+				if !sc.Sequential {
+					t.Parallel()
+				}
 				RunCase(t, env, sc, c)
 			})
 		}
@@ -51,6 +53,7 @@ func RunCase(t *testing.T, env *Env, sc *Scenario, c Case) {
 	w.recordBaselines()
 	for i, s := range c.Steps {
 		if msgs := w.step(i, s); len(msgs) > 0 {
+			w.diagnose()
 			t.Fatal(Failure(sc.ID, c.Name, i, msgs))
 		}
 	}
@@ -439,7 +442,7 @@ func (w *instance) deviceStep(s Step) []string {
 	if err != nil {
 		return []string{err.Error()}
 	}
-	if s.Do == "connect" && s.Device != ses.device {
+	if s.Do == "connect" && s.Device != ses.connDevice[len(ses.connDevice)-1] {
 		// another principal dials the stream of the session (TM-T17): a connection of its own
 		other, err := device.NewConn(w.env.Sidecar)
 		if err != nil {
@@ -449,6 +452,7 @@ func (w *instance) deviceStep(s Step) []string {
 		other.StreamPath, other.Token = conn.StreamPath, conn.Token
 		w.mu.Lock()
 		ses.conns = append(ses.conns, other)
+		ses.connDevice = append(ses.connDevice, s.Device)
 		w.mu.Unlock()
 		conn = other
 	}
@@ -556,6 +560,7 @@ func (w *instance) openOrAttach(c *harness.Client, s Step) []string {
 	ses.token, ses.streamPath, ses.expires = g.SessionToken, g.StreamPath, g.TokenExpiresAt
 	conn.Token, conn.StreamPath = g.SessionToken, g.StreamPath
 	ses.conns = append(ses.conns, conn)
+	ses.connDevice = append(ses.connDevice, s.Device)
 	return msgs
 }
 
@@ -643,8 +648,11 @@ func (w *instance) expectReplay(s Step, conn *device.Conn) []string {
 	if s.Expect.Replay == nil {
 		return nil
 	}
-	begin, end := conn.Replay()
-	return CompareReplay(*s.Expect.Replay, begin, end)
+	// replay_end can follow the last replayed output by a moment.
+	return w.poll(func() []string {
+		begin, end := conn.Replay()
+		return CompareReplay(*s.Expect.Replay, begin, end)
+	})
 }
 
 // wait passes the window of the configuration keys of s: the sum of their profile values, then
@@ -683,4 +691,26 @@ func problemCode(body []byte) string {
 		return ""
 	}
 	return strings.TrimSpace(p.Code + " " + p.Reason)
+}
+
+// diagnose writes the journal of the bothy-host units of every host container of the case,
+// filtered to codes, into the test output (Design note 3: on a failure, codes only).
+func (w *instance) diagnose() {
+	w.mu.Lock()
+	hosts := make(map[string]*stack.Host, len(w.hosts))
+	for name, h := range w.hosts {
+		if h.container != nil {
+			hosts[name] = h.container
+		}
+	}
+	w.mu.Unlock()
+	for name, h := range hosts {
+		j, err := h.Journal(context.WithoutCancel(w.ctx))
+		if err != nil {
+			continue
+		}
+		var b strings.Builder
+		stack.WriteCodes(&b, j)
+		w.t.Logf("journal of %s (codes only):\n%s", name, b.String())
+	}
 }

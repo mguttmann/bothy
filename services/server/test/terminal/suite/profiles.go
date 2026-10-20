@@ -175,6 +175,9 @@ func (ps *Profiles) Check(keys map[string]bool, overlayMode string) []string {
 		if name == "limits" && idle+idleGrace >= maxDur {
 			add("terminal.idle_timeout plus terminal.idle_grace (%s) must be below terminal.max_session_duration (%s)", idle+idleGrace, maxDur)
 		}
+		if name == "limits" && grace >= idle {
+			add("terminal.detach_grace (%s) must be below terminal.idle_timeout (%s): TM-T11 sees detach_expired before idle", grace, idle)
+		}
 		if name == "default" {
 			for k, v := range map[string]time.Duration{"terminal.idle_timeout": idle, "terminal.detach_grace": grace, "terminal.max_session_duration": maxDur} {
 				if v < defaultFloor {

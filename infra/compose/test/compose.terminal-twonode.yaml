@@ -42,3 +42,9 @@ services:
 
   edge:
     ports: !reset []
+
+  # Test service of the terminal overlay: nginx resolves the upstream edge at its start.
+  tls-front:
+    depends_on:
+      edge:
+        condition: service_started

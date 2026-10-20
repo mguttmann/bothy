@@ -366,13 +366,58 @@ func (s *Stack) Logs(ctx context.Context, svc ...string) ([]byte, error) {
 	return s.Compose(ctx, append([]string{"logs", "--no-color"}, svc...)...)
 }
 
-// FrontMode switches the routing of the TLS front to mode and reloads nginx in its container.
+// FrontMode switches the routing of the TLS front to mode, reloads nginx in its container and
+// waits until the workers of the old configuration no longer accept connections (nginx -s
+// reload only signals the master).
 func (s *Stack) FrontMode(ctx context.Context, mode Mode) error {
+	old, err := s.frontWorkers(ctx)
+	if err != nil {
+		return err
+	}
 	if err := SetFrontRouting(s.Root, s.frontDir, mode); err != nil {
 		return err
 	}
-	_, err := s.Exec(ctx, "tls-front", "nginx", "-c", "/etc/termsuite-front/nginx.conf", "-s", "reload")
-	return err
+	if _, err := s.Exec(ctx, "tls-front", "nginx", "-c", "/etc/termsuite-front/nginx.conf", "-s", "reload"); err != nil {
+		return err
+	}
+	for {
+		now, err := s.frontWorkers(ctx)
+		if err != nil {
+			return err
+		}
+		fresh := len(now) > 0
+		for pid := range now {
+			if old[pid] {
+				fresh = false
+			}
+		}
+		if fresh {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("stack: the TLS front did not load the routing %s: %w", mode, ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// frontWorkers returns the PIDs of the nginx workers of the TLS front that accept connections
+// (not "shutting down").
+func (s *Stack) frontWorkers(ctx context.Context) (map[string]bool, error) {
+	out, err := s.Exec(ctx, "tls-front", "ps", "-o", "pid,args")
+	if err != nil {
+		return nil, err
+	}
+	pids := map[string]bool{}
+	for _, l := range strings.Split(string(out), "\n") {
+		if strings.Contains(l, "worker process") && !strings.Contains(l, "shutting down") {
+			if f := strings.Fields(l); len(f) > 0 {
+				pids[f[0]] = true
+			}
+		}
+	}
+	return pids, nil
 }
 
 // RestartService restarts the Compose service svc (docker compose restart) and waits until it is
@@ -408,13 +453,17 @@ func (s *Stack) Diagnose(ctx context.Context, w io.Writer) {
 	if out, err := s.Compose(ctx, "ps", "--all", "--format", "{{.Service}} {{.State}} {{.Status}}"); err == nil {
 		_, _ = fmt.Fprintf(w, "stack %s:\n%s", s.Project, out)
 	}
-	for _, svc := range []string{"api", "worker"} {
+	svcs := []string{"api", "worker"}
+	if s.Profile == ProfileTwoNode {
+		svcs = append(svcs, "api-2")
+	}
+	for _, svc := range svcs {
 		out, err := s.Compose(ctx, "logs", "--no-color", "--tail", "60", svc)
 		if err != nil {
 			continue
 		}
 		_, _ = fmt.Fprintf(w, "last log lines of %s (codes only):\n", svc)
-		writeCodes(w, out)
+		WriteCodes(w, out)
 	}
 	s.mu.Lock()
 	hosts := slices.Collect(maps.Values(s.hosts))
@@ -425,16 +474,18 @@ func (s *Stack) Diagnose(ctx context.Context, w io.Writer) {
 			continue
 		}
 		_, _ = fmt.Fprintf(w, "last journal lines of %s (codes only):\n", h.Container)
-		writeCodes(w, r.stdout)
+		WriteCodes(w, r.stdout)
 	}
 }
 
 // codeFields are the fields of a JSON log line that Diagnose keeps: level, message and the
 // fields that carry codes, states and reasons, never a value of a request.
-var codeFields = []string{"level", "msg", "code", "check", "ok", "session_user", "reason", "close_code", "close_reason", "close_detail", "state", "error.type", "op"}
+var codeFields = []string{"level", "msg", "code", "check", "ok", "session_user", "reason", "close_code", "close_reason", "close_detail", "state", "error.type", "op",
+	"bothy.terminal.side", "bothy.close.code", "http.route", "http.response.status_code"}
 
-// writeCodes writes the code fields of every JSON line of logs to w; other lines are counted only.
-func writeCodes(w io.Writer, logs []byte) {
+// WriteCodes writes the code fields of every JSON line of logs to w (level, message, codes,
+// states, reasons, sides); other lines are counted only. It never writes a value of a request.
+func WriteCodes(w io.Writer, logs []byte) {
 	sc := bufio.NewScanner(bytes.NewReader(logs))
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
 	other := 0

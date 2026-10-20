@@ -14,9 +14,9 @@ import (
 )
 
 // TestFrontConfigRendering proves the TLS front of Design note 3: the three routing modes name
-// their upstreams, and the timeouts equal the profile's keys (stream paths terminal.idle_timeout
-// plus terminal.idle_grace, everything else terminal.host_heartbeat_interval times
-// terminal.host_heartbeat_miss_limit).
+// their upstreams, and the timeouts follow the profile's keys (everything else
+// terminal.host_heartbeat_interval times terminal.host_heartbeat_miss_limit, the stream paths
+// terminal.idle_timeout plus terminal.idle_grace plus that window).
 func TestFrontConfigRendering(t *testing.T) {
 	root, err := RepoRoot()
 	if err != nil {
@@ -31,7 +31,7 @@ func TestFrontConfigRendering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"listen 8443 ssl;", "proxy_read_timeout 660s;", "proxy_send_timeout 660s;", "proxy_read_timeout 60s;",
+	for _, want := range []string{"listen 8443 ssl;", "proxy_read_timeout 720s;", "proxy_send_timeout 720s;", "proxy_read_timeout 60s;",
 		"X-Forwarded-Proto https", "access_log off;", "client_max_body_size 0;", "proxy_buffering off;", "proxy_request_buffering off;",
 		"pid /tmp/nginx.pid;", "include /etc/termsuite-front/routing.conf;"} {
 		if !strings.Contains(string(conf), want) {
