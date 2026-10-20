@@ -10,19 +10,13 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
-	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-func (s *store) ShareSpace(ctx context.Context, id ids.ID) (domain.Space, bool, error) {
-	return s.Space(ctx, id)
-}
-
-func (s *store) ShareChannel(ctx context.Context, id ids.ID) (app.ChannelRow, bool, error) {
-	return s.Channel(ctx, id)
-}
+// ShareSpace and ShareChannel of the fake live in fakes_test.go with the fault hooks of the move
+// tests (M1-62).
 
 func (s *store) ChannelIDsOfSpace(_ context.Context, space ids.ID) ([]ids.ID, error) {
 	s.mu.Lock()

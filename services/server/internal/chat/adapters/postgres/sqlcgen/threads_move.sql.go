@@ -22,6 +22,7 @@ func (q *Queries) DeleteThreadTagsOfThread(ctx context.Context, threadID pgtype.
 }
 
 const moveThread = `-- name: MoveThread :one
+
 UPDATE threads
 SET channel_id = $1, moved_at = $2, version = version + 1
 WHERE id = $3
@@ -56,6 +57,14 @@ type MoveThreadRow struct {
 	Version         int64
 }
 
+// SPDX-License-Identifier: Apache-2.0
+// Queries of thread.move (chat module, M1-62; docs/spec/03-data-model.md threads, "I1 check" and
+// "Lock order"). The thread row is locked FOR UPDATE by LockThread of threads.sql first; then the
+// target channel and, when it inherits its operator, the target's space are held FOR SHARE
+// (ShareChannel of channels.sql and ShareSpace of spaces.sql, shared with notify), so
+// channel.operator.set and space.operator.set, which update these rows, are serialized with the
+// operator check of the move. The copies in messages, read_states and drafts are changed by the
+// subscribers of messaging and sync in the same transaction.
 // The move of the locked thread: the new channel, the time of the move and version + 1; the id
 // never changes (03 threads.id).
 func (q *Queries) MoveThread(ctx context.Context, arg MoveThreadParams) (MoveThreadRow, error) {
@@ -79,91 +88,6 @@ func (q *Queries) MoveThread(ctx context.Context, arg MoveThreadParams) (MoveThr
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.MovedAt,
-		&i.Version,
-	)
-	return i, err
-}
-
-const shareChannel = `-- name: ShareChannel :one
-
-SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
-FROM channels c
-LEFT JOIN spaces s ON s.id = c.space_id
-LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
-WHERE c.id = $1
-FOR SHARE OF c
-`
-
-type ShareChannelRow struct {
-	Channel         Channel
-	SpaceOperatorID pgtype.UUID
-	SpaceArchived   bool
-	MainThreadID    pgtype.UUID
-}
-
-// SPDX-License-Identifier: Apache-2.0
-// Queries of thread.move (chat module, M1-62; docs/spec/03-data-model.md threads, "I1 check" and
-// "Lock order"). The thread row is locked FOR UPDATE by LockThread of threads.sql first; then the
-// target channel and, when it inherits its operator, the target's space are held FOR SHARE, so
-// channel.operator.set and space.operator.set, which update these rows, are serialized with the
-// operator check of the move. The copies in messages, read_states and drafts are changed by the
-// subscribers of messaging and sync in the same transaction.
-// The target channel held FOR SHARE with the facts of its space and its main thread, the columns
-// of GetChannel.
-func (q *Queries) ShareChannel(ctx context.Context, id pgtype.UUID) (ShareChannelRow, error) {
-	row := q.db.QueryRow(ctx, shareChannel, id)
-	var i ShareChannelRow
-	err := row.Scan(
-		&i.Channel.ID,
-		&i.Channel.SpaceID,
-		&i.Channel.Kind,
-		&i.Channel.Name,
-		&i.Channel.Topic,
-		&i.Channel.SortKey,
-		&i.Channel.OperatorInherit,
-		&i.Channel.OperatorAgentID,
-		&i.Channel.RequireMention,
-		&i.Channel.ThreadRequireMention,
-		&i.Channel.FreeResponse,
-		&i.Channel.AutoThread,
-		&i.Channel.AllowMentionedAgents,
-		&i.Channel.HistoryBackfillLimit,
-		&i.Channel.Prompt,
-		&i.Channel.ForumDefaultSort,
-		&i.Channel.DefaultNotificationLevel,
-		&i.Channel.ReadOnly,
-		&i.Channel.CreatedBy,
-		&i.Channel.CreatedAt,
-		&i.Channel.ArchivedAt,
-		&i.Channel.Version,
-		&i.Channel.SettingsVersion,
-		&i.SpaceOperatorID,
-		&i.SpaceArchived,
-		&i.MainThreadID,
-	)
-	return i, err
-}
-
-const shareSpace = `-- name: ShareSpace :one
-SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version FROM spaces WHERE id = $1 FOR SHARE
-`
-
-// The space of an inheriting target channel held FOR SHARE; its default operator is read after
-// the lock.
-func (q *Queries) ShareSpace(ctx context.Context, id pgtype.UUID) (Space, error) {
-	row := q.db.QueryRow(ctx, shareSpace, id)
-	var i Space
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Icon,
-		&i.Color,
-		&i.SortKey,
-		&i.DefaultOperatorAgentID,
-		&i.CreatedBy,
-		&i.CreatedAt,
-		&i.ArchivedAt,
 		&i.Version,
 	)
 	return i, err

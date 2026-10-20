@@ -288,7 +288,7 @@ an agent or app), in the unit of work of the insert ([14-search.md](../../../../
   `{kind: thread, id, TargetChannelID}` (manage on source and target; an invisible or unknown
   target is the same `404` as an unknown thread); lock the thread `FOR UPDATE` (a concurrent move
   committed in between makes it authorize again on the new place); hold the target channel and,
-  when it inherits, its space `FOR SHARE` (`queries/threads_move.sql`) and compute the effective
+  when it inherits, its space `FOR SHARE` (`ShareChannel` and `ShareSpace`, shared with notify) and compute the effective
   operator after these locks, so `channel.operator.set` and `space.operator.set` are serialized
   with the check and I1 holds (03 "I1 check"); `domain.CanMove` (`domain/move.go`): main thread
   `409 conflict`, same channel `400` on `/target_channel_id` (`same_channel`), archived target

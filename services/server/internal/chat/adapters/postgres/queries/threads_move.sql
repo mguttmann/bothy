@@ -1,26 +1,11 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Queries of thread.move (chat module, M1-62; docs/spec/03-data-model.md threads, "I1 check" and
 -- "Lock order"). The thread row is locked FOR UPDATE by LockThread of threads.sql first; then the
--- target channel and, when it inherits its operator, the target's space are held FOR SHARE, so
+-- target channel and, when it inherits its operator, the target's space are held FOR SHARE
+-- (ShareChannel of channels.sql and ShareSpace of spaces.sql, shared with notify), so
 -- channel.operator.set and space.operator.set, which update these rows, are serialized with the
 -- operator check of the move. The copies in messages, read_states and drafts are changed by the
 -- subscribers of messaging and sync in the same transaction.
-
--- name: ShareChannel :one
--- The target channel held FOR SHARE with the facts of its space and its main thread, the columns
--- of GetChannel.
-SELECT sqlc.embed(c), s.default_operator_agent_id AS space_operator_id,
-       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
-FROM channels c
-LEFT JOIN spaces s ON s.id = c.space_id
-LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
-WHERE c.id = @id
-FOR SHARE OF c;
-
--- name: ShareSpace :one
--- The space of an inheriting target channel held FOR SHARE; its default operator is read after
--- the lock.
-SELECT * FROM spaces WHERE id = @id FOR SHARE;
 
 -- name: MoveThread :one
 -- The move of the locked thread: the new channel, the time of the move and version + 1; the id
