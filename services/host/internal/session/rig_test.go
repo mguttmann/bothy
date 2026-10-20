@@ -44,7 +44,8 @@ import (
 
 // helperMarker as the first argument makes the test binary the helper of the integration tests:
 // this binary run again as a subprocess of the same user (Design note 17) with the socket, the
-// temporary home and the file that counts the PTYs as the next arguments.
+// temporary home, the file that counts the PTYs and a delay of every PTY start as the next
+// arguments.
 const helperMarker = "bothy-session-test-helper"
 
 // envCanary is a value of the helper's environment that reaches the PTY through the allow list
@@ -52,24 +53,28 @@ const helperMarker = "bothy-session-test-helper"
 const envCanary = "ENV-CANARY-7f3a"
 
 func TestMain(m *testing.M) {
-	if len(os.Args) == 5 && os.Args[1] == helperMarker {
-		os.Exit(runHelper(os.Args[2], os.Args[3], os.Args[4]))
+	if len(os.Args) == 6 && os.Args[1] == helperMarker {
+		delay, _ := time.ParseDuration(os.Args[5])
+		os.Exit(runHelper(os.Args[2], os.Args[3], os.Args[4], delay))
 	}
 	os.Exit(m.Run())
 }
 
-// countingStarter appends one line per started PTY to a file, so a test counts the PTYs.
+// countingStarter appends one line "<session id> <pid>" per started PTY to a file, so a test
+// counts the PTYs and finds their leaders; delay slows every start (the window of a race).
 type countingStarter struct {
-	s    helper.Starter
-	file string
+	s     helper.Starter
+	file  string
+	delay time.Duration
 }
 
 func (c countingStarter) Start(spec pty.StartSpec) (pty.Process, error) {
+	time.Sleep(c.delay)
 	p, err := c.s.Start(spec)
 	if err == nil && c.file != "" {
 		f, ferr := os.OpenFile(c.file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 		if ferr == nil {
-			_, _ = fmt.Fprintln(f, spec.SessionID)
+			_, _ = fmt.Fprintln(f, spec.SessionID, p.PID())
 			_ = f.Close()
 		}
 	}
@@ -78,7 +83,7 @@ func (c countingStarter) Start(spec pty.StartSpec) (pty.Process, error) {
 
 // runHelper is the helper subprocess: the production helper.Serve with the session user being the
 // current user, /bin/sh as its login shell and a temporary home.
-func runHelper(sock, home, starts string) int {
+func runHelper(sock, home, starts string, delay time.Duration) int {
 	me, err := user.Current()
 	if err != nil {
 		return 1
@@ -108,7 +113,7 @@ func runHelper(sock, home, starts string) int {
 		cancel()
 	}()
 	err = helper.Serve(ctx, helper.Options{Listener: l, ServiceUID: me.Uid, Env: env,
-		Session: &helper.SessionEnv{Check: env, Profiles: penv, PTY: countingStarter{s: sup, file: starts}}})
+		Session: &helper.SessionEnv{Check: env, Profiles: penv, PTY: countingStarter{s: sup, file: starts, delay: delay}}})
 	if err != nil {
 		return 1
 	}
@@ -294,12 +299,17 @@ type rig struct {
 	peerBad atomic.Bool
 	clk     clock.Clock
 	sock    string
+	// startDelay slows every PTY start of the helper.
+	startDelay time.Duration
 	helper  *exec.Cmd
 }
 
 type rigOption func(*rig)
 
 func withConfirm(f *fakeConfirm) rigOption { return func(r *rig) { r.confirm = f } }
+func withStartDelay(d time.Duration) rigOption {
+	return func(r *rig) { r.startDelay = d }
+}
 func withClock(c clock.Clock) rigOption    { return func(r *rig) { r.clk = c } }
 func withValues(v sessiontest.Values) rigOption {
 	return func(r *rig) { r.values = v }
@@ -393,7 +403,7 @@ func (r *rig) startHelper() {
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	cmd := exec.CommandContext(context.WithoutCancel(r.ctx), exe, helperMarker, r.sock, r.home, r.starts) //nolint:gosec // the test binary itself
+	cmd := exec.CommandContext(context.WithoutCancel(r.ctx), exe, helperMarker, r.sock, r.home, r.starts, r.startDelay.String()) //nolint:gosec // the test binary itself
 	cmd.Env = []string{"PATH=/usr/bin:/bin"}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -434,9 +444,18 @@ func (r *rig) checkRun(req doctor.Request) {
 	}
 }
 
-func (r *rig) startCount() int {
+func (r *rig) startCount() int { return len(r.startedPIDs()) }
+
+// startedPIDs returns the leader PIDs of the PTYs the helper started.
+func (r *rig) startedPIDs() []int {
 	b, _ := os.ReadFile(r.starts)
-	return strings.Count(string(b), "\n")
+	var out []int
+	for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if f := strings.Fields(l); len(f) == 2 {
+			out = append(out, atoi(f[1]))
+		}
+	}
+	return out
 }
 
 // sessionOpen sends session.open for id.

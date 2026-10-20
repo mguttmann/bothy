@@ -663,3 +663,55 @@ func hasProfile(ps []doctor.Profile, name string) bool {
 	}
 	return false
 }
+
+// TestOpeningAtomicAgainstEnd: a session.close or the end of all sessions while the helper starts
+// the PTY leaves no PTY behind (review M1).
+func TestOpeningAtomicAgainstEnd(t *testing.T) {
+	for _, end := range []string{"close", "endall"} {
+		t.Run(end, func(t *testing.T) {
+			r := newRig(t, withStartDelay(800*time.Millisecond))
+			id := sessiontest.NewID()
+			r.open(id, "shell")
+			waitFor(t, "the opening registered", func() bool {
+				_, ok := r.mgr.liveOf(id)
+				return ok
+			})
+			if end == "close" {
+				r.mgr.Close(r.ctx, controlClose(id, "access_revoked"))
+			} else {
+				r.mgr.EndAll(r.ctx)
+			}
+			waitFor(t, "the PTY started", func() bool { return r.startCount() == 1 })
+			pid := r.startedPIDs()[0]
+			waitFor(t, "the late PTY ended", func() bool { return !pidAlive(pid) })
+			if r.mgr.Active() != 0 {
+				t.Errorf("active %d", r.mgr.Active())
+			}
+		})
+	}
+}
+
+// TestRepeatedOpenStartsOnePTY: a repeated session.open of an opening while the first waits for the
+// local confirmation starts exactly one PTY, on the newer connection (review M2).
+func TestRepeatedOpenStartsOnePTY(t *testing.T) {
+	fc := &fakeConfirm{allow: true, delay: 600 * time.Millisecond}
+	r := newRig(t, withConfirm(fc))
+	r.cfg.LocalConfirmTimeout = 3 * time.Second
+	r.open(sessA, "shell")
+	waitFor(t, "the first confirmation asked", func() bool {
+		fc.mu.Lock()
+		defer fc.mu.Unlock()
+		return len(fc.asked) == 1
+	})
+	dev2, dc2 := r.open(sessA, "shell")
+	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
+	time.Sleep(800 * time.Millisecond)
+	if r.startCount() != 1 || r.note.startedCount(sessA) != 1 || r.mgr.Active() != 1 {
+		t.Fatalf("PTYs %d, started %d, active %d", r.startCount(), r.note.startedCount(sessA), r.mgr.Active())
+	}
+	r.send(dc2, dev2, frame.Data([]byte("echo SEC''OND\n")))
+	r.readUntil(dc2, dev2, "SECOND")
+	if r.note.endedCount() != 0 {
+		t.Error("the stale opening reported an end")
+	}
+}

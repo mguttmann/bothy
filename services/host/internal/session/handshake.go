@@ -138,11 +138,23 @@ func (h *handshake) refuse(detail string) {
 // the data connection to the server (Design note 6).
 func (h *handshake) failOpening(ctx context.Context, cl Claims, detail string) {
 	m := h.m
+	if !m.current(h.o.SessionID, h.dc) {
+		// A newer session.open replaced this connection, or the server closed the session: this
+		// opening is stale and reports nothing.
+		h.abandon()
+		return
+	}
 	m.d.Log.LogAttrs(ctx, slog.LevelInfo, msgEnded, slog.String(attrSession, h.o.SessionID), slog.String(attrReason, ReasonOpenFailed),
 		slog.String(attrDetail, detail), slog.String(attrProfile, cl.Prf), slog.String(attrUser, cl.Osu))
 	m.markReported(h.o.SessionID)
 	m.report(ctx, control.SessionEnded{SessionID: h.o.SessionID, CloseReason: ReasonOpenFailed, CloseDetail: detail})
 	m.closeAfterReport(h.o.SessionID, h.dc, h.window)
+}
+
+// abandon closes the data connection of a stale opening with 1000 and reports nothing.
+func (h *handshake) abandon() {
+	h.dc.close(CodeNormal, "")
+	h.m.dropConn(h.o.SessionID, h.dc)
 }
 
 // firstFrame waits for the first transport message until expires_at and decodes it; it returns the
@@ -205,21 +217,23 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 		h.failOpening(ctx, cl, d)
 		return
 	}
-	if m.wasReported(cl.Sid) {
-		// session.close arrived during the gate or the confirmation: no PTY.
-		h.dc.close(CodeNormal, "")
-		m.dropConn(cl.Sid, h.dc)
+	s, ok := m.claimSession(cl, l, h.sidb, h.dc, tr, h.window)
+	if !ok {
+		// session.close, the end of all sessions or a newer session.open came during the gate or
+		// the confirmation: no PTY.
+		h.abandon()
 		return
 	}
-	s := m.newSession(cl, l, h.sidb, h.dc, tr, h.window)
 	if d := l.start(ctx, req); d != "" {
 		m.forget(s)
 		h.failOpening(ctx, cl, d)
 		return
 	}
 	req.APIKey = ""
-	if m.wasReported(cl.Sid) {
-		s.end(endSpec{reason: ReasonClientClosed, silent: true})
+	if s.isEnded() {
+		// The session ended while the helper started the PTY; the pty.stop of that end found no
+		// PTY yet, so this one ends it.
+		l.stop(cl.Sid)
 		return
 	}
 	m.d.Log.LogAttrs(ctx, slog.LevelInfo, msgStarted, slog.String(attrSession, cl.Sid), slog.String(attrProfile, cl.Prf), slog.String(attrUser, cl.Osu))

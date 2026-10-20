@@ -50,22 +50,45 @@ type endSpec struct {
 	window         time.Duration
 }
 
-// newSession registers the session of cl with a running PTY (registered before pty.start, so
-// output and exit find it).
-func (m *Manager) newSession(cl Claims, l *helperLink, idb [noise.IDLen]byte, dc *dataConn, tr *noise.Transport, window time.Duration) *session {
+// claimSession registers the session of cl before pty.start (so output and exit find it), but only
+// while dc is still the data connection of the session, the session was neither closed nor ended
+// and no other session holds its ID: the opening is atomic against session.close, the end of all
+// sessions and a newer session.open of the same session (which replaced dc). false: the opening is
+// abandoned without a PTY.
+func (m *Manager) claimSession(cl Claims, l *helperLink, idb [noise.IDLen]byte, dc *dataConn, tr *noise.Transport, window time.Duration) (*session, bool) {
 	now := m.d.Clock.Now()
 	s := &session{m: m, id: cl.Sid, idb: idb, sub: cl.Sub, osu: cl.Osu, prf: cl.Prf, link: l, dc: dc, tr: tr, window: window,
 		ring: NewRing(m.d.Config.ScrollbackBytes), lastInput: now, idle: dc.idle(), detach: dc.detach(), kick: make(chan struct{}, 1),
 		done: make(chan struct{})}
 	m.mu.Lock()
+	_, exists := m.sessions[cl.Sid]
+	if exists || !m.currentLocked(cl.Sid, dc) {
+		m.mu.Unlock()
+		return nil, false
+	}
 	m.sessions[cl.Sid] = s
 	m.mu.Unlock()
 	go s.watch()
-	return s
+	return s, true
 }
 
-// forget removes a session whose PTY did not start.
+// current reports whether dc is still the data connection of the session id and the session was
+// neither closed nor ended.
+func (m *Manager) current(id string, dc *dataConn) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.currentLocked(id, dc)
+}
+
+func (m *Manager) currentLocked(id string, dc *dataConn) bool {
+	_, reported := m.reported[id]
+	return !m.closed && !reported && m.conns[id] == dc
+}
+
+// forget removes a session whose PTY did not start; a pty.stop covers a start the helper still
+// completes after the service gave up waiting.
 func (m *Manager) forget(s *session) {
+	s.link.stop(s.id)
 	m.mu.Lock()
 	if m.sessions[s.id] == s {
 		delete(m.sessions, s.id)
