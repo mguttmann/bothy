@@ -30,7 +30,7 @@ func TestCSPViolations_DirectivesEqualDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.Count(t.Context(), "script-src-elem", "enforce")
+	c.Count(t.Context(), "script-src-elem", "enforce", 1)
 	m := metricstest.Find(t, reader, "bothy.console.csp_violations")
 	if n := metricstest.Sum(m, map[string]string{"bothy.csp.directive": "script-src-elem", "bothy.csp.disposition": "enforce"}); n != 1 {
 		t.Fatalf("count %v, want 1", n)

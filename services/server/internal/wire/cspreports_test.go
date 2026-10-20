@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -52,7 +53,7 @@ func TestCspReport(t *testing.T) {
 	}
 	metricstest.Strict(t)
 	mp, reader := metricstest.Provider(t)
-	reports, err := NewCSPReports(publicAllow{}, log, mp)
+	reports, err := NewCSPReports(publicAllow{}, log, mp, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,5 +127,59 @@ func TestCspReport(t *testing.T) {
 	m := metricstest.Find(t, reader, "bothy.console.csp_violations")
 	if n := metricstest.Sum(m, map[string]string{"bothy.csp.directive": "script-src-elem", "bothy.csp.disposition": "enforce"}); n != 1 {
 		t.Errorf("counter %v, want 1", n)
+	}
+}
+
+// TestCspReport_LogRecordsAreBounded: a report body of many violations writes one log record per
+// distinct violation and at most console.csp_report_max_records of them, while the counter counts
+// every violation; abuse within the rate limit raises a counter, not the log volume (brief M6-03
+// Design note 4).
+func TestCspReport_LogRecordsAreBounded(t *testing.T) {
+	logs := &captureHandler{}
+	log := slog.New(logs)
+	chain, err := NewChain(httpserver.DefaultChainConfig("https://chat.example.com"), nil, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallRateLimits(chain, loadValues(t), routes.Enabled(), clock.NewFake(time.Unix(0, 0))); err != nil {
+		t.Fatal(err)
+	}
+	metricstest.Strict(t)
+	mp, reader := metricstest.Provider(t)
+	reports, err := NewCSPReports(publicAllow{}, log, mp, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	if err := MountRoutes(RoleAPI, mux, Handlers{CSPReports: reports}, routes.SpecCatalog(), chain, log); err != nil {
+		t.Fatal(err)
+	}
+	h := chain.Public(mux)
+	var items []string
+	for i := range 2000 {
+		items = append(items, `{"type":"csp-violation","body":{"effectiveDirective":"img-src","disposition":"enforce","blockedURL":"https://h`+strconv.Itoa(i%20)+`.example.com/x"}}`)
+	}
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, httpserver.CSPReportPath, strings.NewReader("["+strings.Join(items, ",")+"]"))
+	req.Header.Set("Content-Type", "application/reports+json")
+	req.RemoteAddr = "192.0.2.1:4321"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status %d %s", rec.Code, rec.Body)
+	}
+	n := 0
+	logs.mu.Lock()
+	for _, r := range logs.records {
+		if r.msg == "csp violation reported" {
+			n++
+		}
+	}
+	logs.mu.Unlock()
+	if n != 5 {
+		t.Errorf("%d log records, want 5 (console.csp_report_max_records)", n)
+	}
+	m := metricstest.Find(t, reader, "bothy.console.csp_violations")
+	if c := metricstest.Sum(m, map[string]string{"bothy.csp.directive": "img-src", "bothy.csp.disposition": "enforce"}); c != 2000 {
+		t.Errorf("counter %v, want 2000", c)
 	}
 }

@@ -17,7 +17,9 @@ documented in this file. The format is based on
   `Cross-Origin-Resource-Policy: same-origin` and `Reporting-Endpoints`. `submitCspReport`
   (`POST /api/v1/csp-reports`, public, `rl.public_auth`) takes Reporting API and legacy reports as
   the new body kind `report`, logs only directive, disposition and blocked origin, counts
-  `bothy.console.csp_violations` and stores nothing. `bothy-smoke seed` prepares the console test.
+  `bothy.console.csp_violations` and stores nothing; identical violations share a log record, at
+  most `console.csp_report_max_records` records per request. `bothy-smoke seed` prepares the
+  console test.
 - Control connection of the host services (M2-43): `GET /api/v1/hosts/connect` on the public
   listener of the roles `api` and `all` (asyncapi `hostControl`). Login with an EdDSA proof over
   the challenge of `hello` with the key registered at pairing; close codes `4110` to `4114`, `4002`,

@@ -708,7 +708,7 @@ func (s *server) startSettings(context.Context) error {
 	if err != nil {
 		return err
 	}
-	if st.CSPReports, err = NewCSPReports(az, s.logger(), nil); err != nil {
+	if st.CSPReports, err = NewCSPReports(az, s.logger(), nil, int(s.values.Int(KeyCSPReportMaxRecords))); err != nil {
 		return err
 	}
 	s.mu.Lock()

@@ -111,6 +111,9 @@ Regeln:
    Reporting API format and legacy `report-uri` format, `http.max_json_body_bytes`, no storage; the
    log carries only the effective directive, the disposition and the origin of the blocked URL (or
    a keyword such as `inline`), the metric `bothy.console.csp_violations` counts the reports.
+   Identical violations of one request share one log record, and one request writes at most
+   `console.csp_report_max_records` records, so abuse within the rate limit raises a counter, not
+   the log volume.
 7. `frame-src` steht nur in der CSP, wenn `console.grafana_embed_url` gesetzt ist, und nennt genau
    deren Origin (`frame-src https://grafana.example.com`); sonst sperrt `default-src 'none'` jedes
    iframe. Die Einbettung ist optional und standardmäßig aus; ihre Bedingungen (Auth-Proxy,

@@ -47,15 +47,20 @@ type InstanceSettings struct {
 	CSPReports *instancehttp.CSPReports
 }
 
-// NewCSPReports returns the handler of submitCspReport over the Authorizer az, the logger log and
-// the counter bothy.console.csp_violations on mp (nil means the global meter provider).
-// Errors: the meter provider refuses the counter, or az is nil.
-func NewCSPReports(az authorize.Authorizer, log *slog.Logger, mp metric.MeterProvider) (*instancehttp.CSPReports, error) {
+// KeyCSPReportMaxRecords is console.csp_report_max_records, the most log records one request of
+// submitCspReport writes (M6-03).
+const KeyCSPReportMaxRecords = "console.csp_report_max_records"
+
+// NewCSPReports returns the handler of submitCspReport over the Authorizer az, the logger log, the
+// counter bothy.console.csp_violations on mp (nil means the global meter provider) and
+// maxRecords (console.csp_report_max_records). Errors: the meter provider refuses the counter, az
+// is nil or maxRecords is below 1.
+func NewCSPReports(az authorize.Authorizer, log *slog.Logger, mp metric.MeterProvider, maxRecords int) (*instancehttp.CSPReports, error) {
 	counter, err := instancemetrics.NewCSPViolations(mp)
 	if err != nil {
 		return nil, err
 	}
-	reports, err := instanceapp.NewCSPReports(az, log, counter)
+	reports, err := instanceapp.NewCSPReports(az, log, counter, maxRecords)
 	if err != nil {
 		return nil, err
 	}

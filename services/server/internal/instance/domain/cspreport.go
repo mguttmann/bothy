@@ -126,6 +126,30 @@ func ParseCSPReports(format CSPReportFormat, body []byte) ([]CSPViolation, error
 	return out, nil
 }
 
+// CSPViolationCount is one distinct violation of a report body and how often it occurs there.
+type CSPViolationCount struct {
+	CSPViolation
+	// Count is at least 1.
+	Count int64
+}
+
+// SummarizeCSPViolations folds identical violations into one entry with their count, in the
+// order of their first occurrence; a nil or empty input gives an empty result. A report body of
+// many equal reports so costs one log record, not one per report (R-AZ-33).
+func SummarizeCSPViolations(vs []CSPViolation) []CSPViolationCount {
+	out := []CSPViolationCount{}
+	index := map[CSPViolation]int{}
+	for _, v := range vs {
+		if i, ok := index[v]; ok {
+			out[i].Count++
+			continue
+		}
+		index[v] = len(out)
+		out = append(out, CSPViolationCount{CSPViolation: v, Count: 1})
+	}
+	return out
+}
+
 // violation reduces the three read fields to their fixed lists and the origin.
 func violation(directive, disposition, blocked string) CSPViolation {
 	v := CSPViolation{Directive: CSPOther, Disposition: CSPOther, BlockedOrigin: blockedOrigin(blocked)}

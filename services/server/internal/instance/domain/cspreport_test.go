@@ -67,3 +67,19 @@ func TestParseCSPReports(t *testing.T) {
 		}
 	}
 }
+
+// TestSummarizeCSPViolations: identical violations become one entry with their count, in the
+// order they first appear, so a large report body costs one log record per distinct violation.
+func TestSummarizeCSPViolations(t *testing.T) {
+	t.Parallel()
+	a := domain.CSPViolation{Directive: "script-src-elem", Disposition: "enforce", BlockedOrigin: "inline"}
+	b := domain.CSPViolation{Directive: "img-src", Disposition: "report", BlockedOrigin: "https://example.com"}
+	got := domain.SummarizeCSPViolations([]domain.CSPViolation{a, b, a, a, b})
+	want := []domain.CSPViolationCount{{CSPViolation: a, Count: 3}, {CSPViolation: b, Count: 2}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	if got := domain.SummarizeCSPViolations(nil); len(got) != 0 {
+		t.Fatalf("empty input gave %+v", got)
+	}
+}

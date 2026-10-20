@@ -986,6 +986,18 @@
       "doc": "Directory of the built web console that the api process serves under /console/; empty means no console."
     },
     {
+      "name": "console.csp_report_max_records",
+      "env": "BOTHY_CONSOLE__CSP_REPORT_MAX_RECORDS",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "16-betrieb.md",
+      "doc": "Most log records one CSP violation report request writes; identical violations share one record, every violation is counted."
+    },
+    {
       "name": "consumer.batch_size",
       "env": "BOTHY_CONSUMER__BATCH_SIZE",
       "kind": "int",

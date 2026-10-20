@@ -454,9 +454,12 @@ def main(
         say(str(e))
         return 2
     run_id = secrets.token_hex(4)
-    stack = Stack(
-        project=f"bothy-console-e2e-{run_id}", env=stack_env(environ, tmp, image, run_id), run=run
-    )
+    try:
+        env = stack_env(environ, tmp, image, run_id)
+    except Exception:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    stack = Stack(project=f"bothy-console-e2e-{run_id}", env=env, run=run)
     version = (ROOT / "services" / "server" / "VERSION").read_text(encoding="utf-8").strip()
     rc = 0
     try:

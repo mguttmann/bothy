@@ -83,19 +83,24 @@ NAVIGATION = [
 ]
 
 # Collects every violation event and every Trusted Types policy the page creates, before any
-# script of the page runs (Playwright init script, main world).
+# script of the page runs (Playwright init script, main world): in arrays of the document (the
+# negative test reads them) and through the bindings of the context into Python, so nothing is
+# lost when a navigation replaces the document.
 INIT_SCRIPT = """
 (() => {
   window.__e2eViolations = [];
   window.__e2ePolicies = [];
   document.addEventListener('securitypolicyviolation', (e) => {
-    window.__e2eViolations.push({directive: e.effectiveDirective, blocked: e.blockedURI,
-      disposition: e.disposition, sample: (e.sample || '').slice(0, 80)});
+    const v = {directive: e.effectiveDirective, blocked: e.blockedURI,
+      disposition: e.disposition, sample: (e.sample || '').slice(0, 80)};
+    window.__e2eViolations.push(v);
+    if (window.__e2eRecordViolation) window.__e2eRecordViolation(v);
   }, true);
   if (window.trustedTypes && window.trustedTypes.createPolicy) {
     const create = window.trustedTypes.createPolicy.bind(window.trustedTypes);
     window.trustedTypes.createPolicy = (name, rules) => {
       window.__e2ePolicies.push(name);
+      if (window.__e2eRecordPolicy) window.__e2eRecordPolicy(name);
       return create(name, rules);
     };
   }
@@ -175,13 +180,18 @@ class Session:
             ignore_https_errors=name != "chromium",
             viewport={"width": 1280, "height": 900},
         )
-        self.context.add_init_script(INIT_SCRIPT)
         self.requests: list[str] = []
         self.websockets: list[str] = []
         self.console_errors: list[str] = []
+        self.all_violations: list[dict[str, str]] = []
+        self.all_policies: set[str] = set()
+        self.context.expose_function("__e2eRecordViolation", self.all_violations.append)
+        self.context.expose_function("__e2eRecordPolicy", self.all_policies.add)
+        self.context.add_init_script(INIT_SCRIPT)
+        # Every request of every page of the context, the browser's own included.
+        self.context.on("request", lambda r: self.requests.append(r.url))
         self.page: Page = self.context.new_page()
         self.page.set_default_timeout(STEP_TIMEOUT_MS)
-        self.page.on("request", lambda r: self.requests.append(r.url))
         self.page.on("console", self._console)
         self.page.on("websocket", self._websocket)
 
@@ -194,14 +204,15 @@ class Session:
 
     def _websocket(self, ws: WebSocket) -> None:
         self.websockets.append(ws.url)
+        self.requests.append(ws.url)
 
     def violations(self) -> list[dict[str, str]]:
-        """The violation events of the current document."""
-        return cast("list[dict[str, str]]", self.page.evaluate("window.__e2eViolations || []"))
+        """The violation events of every document of the session so far."""
+        return list(self.all_violations)
 
     def policies(self) -> list[str]:
-        """The Trusted Types policy names the current document created."""
-        return cast("list[str]", self.page.evaluate("window.__e2ePolicies || []"))
+        """The Trusted Types policy names every document of the session created so far."""
+        return sorted(self.all_policies)
 
     def foreign(self) -> list[str]:
         """Requests to an origin other than the console origin (data: and blob: are local)."""
@@ -210,8 +221,11 @@ class Session:
             parts = urlsplit(url)
             if parts.scheme in ("data", "blob"):
                 continue
-            if f"{parts.scheme}://{parts.netloc}" != ORIGIN:
-                out.append(f"{parts.scheme}://{parts.netloc}")
+            # A WebSocket of the own origin uses ws or wss for the scheme of the page.
+            scheme = {"wss": "https", "ws": "http"}.get(parts.scheme, parts.scheme)
+            if f"{scheme}://{parts.netloc}" == ORIGIN:
+                continue
+            out.append(f"{parts.scheme}://{parts.netloc}")
         return sorted(set(out))
 
 
@@ -397,6 +411,12 @@ def negative_inline_script(session: Session) -> None:
         raise CheckError(f"no violation event for the inline script: {violations}")
     # Chromium sends the queued report after the short reporting delay (launch flag).
     page.wait_for_timeout(5_000)
+    # Control of the collector: after the next navigation the violation of this document must
+    # still be in the session, as the violations of the login and the navigation would be.
+    page.goto(CONSOLE)
+    wait_for_console(page)
+    if not any(v.get("directive") == "script-src-elem" for v in session.violations()):
+        raise CheckError("the collector lost a violation when the document changed")
 
 
 def launch(pw: Playwright, name: str, spki: str) -> Browser:

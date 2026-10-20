@@ -37,7 +37,7 @@ func NewCSPViolations(mp metric.MeterProvider) (*CSPViolations, error) {
 	return &CSPViolations{c: c}, nil
 }
 
-// Count adds one report; a directive or disposition outside the closed sets records as other.
-func (m *CSPViolations) Count(ctx context.Context, directive, disposition string) {
-	m.c.Add(ctx, 1, directive, disposition)
+// Count adds n reports; a directive or disposition outside the closed sets records as other.
+func (m *CSPViolations) Count(ctx context.Context, directive, disposition string, n int64) {
+	m.c.Add(ctx, n, directive, disposition)
 }
