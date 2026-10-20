@@ -524,6 +524,41 @@ func TestHeartbeatRevalidates(t *testing.T) {
 	wantClosed(t, fc, domain.CloseRevoked)
 }
 
+// TestDeadlineWaitsForAFrameInFlight: a deadline that passes while a frame that arrived before
+// it is still being handled closes nothing; the frame decides. An identify whose authentication
+// outlasts sync.identify_timeout ends ready, a heartbeat whose revalidation outlasts the heartbeat
+// deadline is acknowledged, and the deadlines apply again once the frame is handled.
+func TestDeadlineWaitsForAFrameInFlight(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t, nil)
+	ctx := context.Background()
+	c, fc := e.open()
+	e.auth.authenticating = func() {
+		e.clk.Set(t0.Add(e.cfg.IdentifyTimeout + time.Second))
+		e.gw.Tick(ctx, c, e.clk.Now())
+	}
+	e.identifyAlex(c)
+	wantOpen(t, fc)
+	if r := sent[app.Ready](fc); len(r) != 1 {
+		t.Fatalf("ready frames %d, want 1", len(r))
+	}
+	deadline := e.clk.Now().Add(e.cfg.HeartbeatInterval * time.Duration(e.cfg.HeartbeatMissLimit+1))
+	e.auth.mu.Lock()
+	e.auth.revalidate = func() error {
+		e.clk.Set(deadline.Add(time.Second))
+		e.gw.Tick(ctx, c, e.clk.Now())
+		return nil
+	}
+	e.auth.mu.Unlock()
+	e.send(c, "heartbeat", map[string]any{"last_seq": 0})
+	wantOpen(t, fc)
+	if acks := sent[app.HeartbeatAck](fc); len(acks) != 1 {
+		t.Fatalf("heartbeat_ack frames %d, want 1", len(acks))
+	}
+	e.gw.Tick(ctx, c, e.clk.Now().Add(e.cfg.HeartbeatInterval*time.Duration(e.cfg.HeartbeatMissLimit+1)))
+	wantClosed(t, fc, domain.CloseHeartbeatTimeout)
+}
+
 // TestHeartbeatAtExpiryCloses4011: a heartbeat whose revalidation refuses the credential as
 // unauthenticated once it has reached its expiry (also when the expiry passes during the
 // revalidation) closes with 4011 like the tick of the expiry, not with 4012; before the expiry,

@@ -171,7 +171,17 @@ func (g *Gateway) Open(ctx context.Context, conn Conn) (*Connection, error) {
 }
 
 // Handle dispatches the client op op with the raw body d on c (Dispatcher.Dispatch).
+// While the frame is handled, Tick closes for no identify or heartbeat deadline: the frame
+// arrived before the deadline it may meet (docs/DECISIONS.md M1-64/15).
 func (g *Gateway) Handle(ctx context.Context, c *Connection, op string, d json.RawMessage) {
+	c.mu.Lock()
+	c.handling++
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		c.handling--
+		c.mu.Unlock()
+	}()
 	g.ops.Dispatch(ctx, c, op, d)
 }
 
@@ -191,6 +201,10 @@ func (g *Gateway) Tick(_ context.Context, c *Connection, now time.Time) time.Tim
 	case domain.StateDetached, domain.StateClosed:
 		c.mu.Unlock()
 		return time.Time{}
+	}
+	if c.handling > 0 && (t.close == domain.CloseNotIdentified || t.close == domain.CloseHeartbeatTimeout) {
+		// The adapter ticks again after the frame (poke); this instant only bounds the wait.
+		t = tick{next: now.Add(g.cfg.IdentifyTimeout)}
 	}
 	c.mu.Unlock()
 	if t.close != 0 {

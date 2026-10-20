@@ -31,6 +31,9 @@ type Connection struct {
 	reauthSent bool
 	wasReady   bool
 	code       domain.CloseCode
+	// handling counts the frames Gateway.Handle is handling; Tick closes for no deadline but
+	// the expiry while it is above 0 (docs/DECISIONS.md M1-64/15).
+	handling int
 }
 
 // ID returns the id of the connection, for logs; it is not the gateway session id.

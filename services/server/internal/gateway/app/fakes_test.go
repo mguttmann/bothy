@@ -77,12 +77,17 @@ type fakeAuth struct {
 	revoked map[ids.ID]bool
 	// revalidate, when set, answers Revalidate instead of revoked.
 	revalidate func() error
+	// authenticating, when set, runs inside Authenticate before it answers.
+	authenticating func()
 }
 
 func (a *fakeAuth) Authenticate(_ context.Context, c actor.Credentials) (actor.Actor, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.creds = append(a.creds, c)
+	if a.authenticating != nil {
+		a.authenticating()
+	}
 	_, tok, _ := cutScheme(c.Authorization)
 	if err, ok := a.errs[tok]; ok {
 		return actor.Actor{}, err
