@@ -261,6 +261,21 @@ type RunAnchorCmd struct {
 	ThreadID, RunID, AgentID ids.ID
 }
 
+// TriggerMessage are the facts of a triggering message that runs reads at a delivery (M2-08
+// design note 5): place, author, origin and kind, the mentions now and the trigger state. It carries
+// no content.
+type TriggerMessage struct {
+	ID, ThreadID, ChannelID ids.ID
+	// Author is the author as PrincipalRef (the payload member triggered_by).
+	Author PrincipalRef
+	// Origin is human, agent, app, import or system; Kind text, system or run.
+	Origin, Kind string
+	// MentionedIDs are the stored mentions, sorted; empty for a tombstone.
+	MentionedIDs []ids.ID
+	// TriggerState and TriggerStateReason are the stored values; "" while NULL.
+	TriggerState, TriggerStateReason string
+}
+
 // AnchorRef names a written live box anchor.
 type AnchorRef struct {
 	// MessageID is the anchor; ThreadSeq its position in the thread.
@@ -342,4 +357,12 @@ type Messages interface {
 	// message.created and MessagePosted with Kind run. It never authorizes: runs accepted the
 	// trigger. Errors: internal outside a unit of work; not_found for an unknown thread.
 	CreateRunAnchor(ctx context.Context, cmd RunAnchorCmd) (AnchorRef, error)
+	// TriggerMessageOf reads the trigger facts of a message for runs (M2-08): the delivery check
+	// re-evaluates the trigger with the origin and the mentions of now. It never authorizes and
+	// returns no content; runs decides with agent.invoke. Errors: not_found for an unknown message.
+	//
+	// Example:
+	//
+	//	m, err := msgs.TriggerMessageOf(ctx, run.TriggeringMessageID)
+	TriggerMessageOf(ctx context.Context, messageID ids.ID) (TriggerMessage, error)
 }
