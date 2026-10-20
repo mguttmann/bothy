@@ -276,7 +276,10 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   `open_timeout` through the compare-and-swap `RelayOpeningTimedOut`; a `detached` session stays
   `detached`; a host data connection of a started session waits without a timer. The slot deadline
   waits while an unpaired side is present, and a slot that never saw `session.started` reads the
-  session state at its deadline.
+  session state at its deadline. With `multi` a side that arrives first builds the expectation of
+  the current grant from the row (`RelayExpectation`; an expectation of the grant the slot holds
+  changes nothing), and the log tail marks a slot started (`terminal_session.changed` with `active`
+  or `detached`).
 - Log records (constant messages, no ID): `terminal relay side unpaired`, `terminal signal
   dropped`, `terminal ephemeral listener lost`, `terminal ephemeral listener restored`, `terminal
   duplicate control connection`. No new instrument and no new attribute.

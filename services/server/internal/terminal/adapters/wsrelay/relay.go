@@ -31,6 +31,7 @@ type RelayUseCases interface {
 	// M2-47 (Design notes 3 and 8).
 	RelaySessionState(ctx context.Context, id ids.ID) (string, bool, error)
 	RelayOpeningTimedOut(ctx context.Context, id ids.ID) error
+	RelayExpectation(ctx context.Context, id ids.ID) (app.Expectation, bool)
 }
 
 // Compile-time check: the use cases of the module.
@@ -127,6 +128,8 @@ type slot struct {
 	wdi              *int
 	// gen counts the grants; a deadline of an older grant does nothing.
 	gen      int
+	// grant is the grant of the expectation (M2-47): the same grant again changes nothing.
+	grant ids.ID
 	stop     func() bool
 	dev, hst *side
 	paired   bool
@@ -202,6 +205,11 @@ func (r *Relay) Expect(e app.Expectation) {
 	ctx := context.Background()
 	r.mu.Lock()
 	s := r.slots[e.SessionID]
+	if s != nil && !e.Grant.IsZero() && s.grant == e.Grant {
+		// The same grant again (a side built it from the row first, or a signal twice).
+		r.mu.Unlock()
+		return
+	}
 	var fx effects
 	if s == nil {
 		s = &slot{id: e.SessionID}
@@ -212,7 +220,7 @@ func (r *Relay) Expect(e app.Expectation) {
 	if s.stop != nil {
 		s.stop()
 	}
-	s.host, s.device, s.started, s.confirm, s.wdi = e.HostID, e.DeviceID, e.Started, e.LocalConfirm, e.WorkdirIndex
+	s.host, s.device, s.started, s.confirm, s.wdi, s.grant = e.HostID, e.DeviceID, e.Started, e.LocalConfirm, e.WorkdirIndex, e.Grant
 	s.toDev, s.toHost, s.seenDev, s.seenHost, s.paired = queue{}, queue{}, false, false, false
 	s.pairedOnce, s.pairedElsewhere, s.overdue = false, false, false
 	s.gen++
@@ -435,6 +443,7 @@ func (r *Relay) newSide(kind domain.Side, sessionID ids.ID, ws *websocket.Conn) 
 // without an expectation on this node (no counterpart here), 4103 for a device that is not the
 // one of the current grant. A device side already present is replaced (4103 for the older).
 func (r *Relay) attachDevice(sessionID, deviceID ids.ID, ws *websocket.Conn) (*side, int) {
+	r.ensureSlot(sessionID)
 	r.mu.Lock()
 	s := r.slots[sessionID]
 	switch {
@@ -468,6 +477,7 @@ func (r *Relay) attachDevice(sessionID, deviceID ids.ID, ws *websocket.Conn) (*s
 // waits for session.open), 4100 for a session of another host. An unpaired older host side is
 // replaced (1000 for the older).
 func (r *Relay) attachHost(sessionID, hostID ids.ID, ws *websocket.Conn) (*side, int) {
+	r.ensureSlot(sessionID)
 	r.mu.Lock()
 	s := r.slots[sessionID]
 	switch {
@@ -496,6 +506,25 @@ func (r *Relay) attachHost(sessionID, hostID ids.ID, ws *websocket.Conn) (*side,
 	r.wakeSide(sd)
 	fx.run(context.Background())
 	return sd, 0
+}
+
+// ensureSlot applies the expectation of the current grant of a session, read from its row, when a
+// side arrives (M2-47): with several nodes terminal.session_open and the side race, and the
+// database is the source of the grant; Expect ignores the grant the slot already holds. With one
+// node the expectation always exists before the side.
+func (r *Relay) ensureSlot(sessionID ids.ID) {
+	if !r.cfg.Multi {
+		return
+	}
+	r.mu.Lock()
+	closing := r.closing
+	r.mu.Unlock()
+	if closing {
+		return
+	}
+	if e, ok := r.uc.RelayExpectation(context.Background(), sessionID); ok {
+		r.Expect(e)
+	}
 }
 
 // pairIfBoth pairs the two sides of s when both are present; r.mu is held. The lone timers of

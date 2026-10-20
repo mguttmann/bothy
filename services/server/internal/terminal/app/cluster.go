@@ -53,31 +53,48 @@ func (s *Service) HandleSignal(ctx context.Context, sig domain.Signal) {
 // row. Only an eligible control connection of an active host sends session.open (ControlLinks
 // answers ErrHostNotConnected or ErrHostNotReady elsewhere; a connection in probation defers it).
 func (s *Service) onSessionOpen(ctx context.Context, sig domain.Signal) {
-	rctx, cancel := s.bounded(ctx)
-	defer cancel()
-	wdi := s.notes.take(sig.SessionID)
-	ses, found, err := s.d.Store.Session(rctx, sig.SessionID)
-	if err != nil || !found || ses.State == domain.SessionClosed || ses.HostID != sig.HostID {
+	e, ses, h, ok := s.expectation(ctx, sig.HostID, sig.SessionID, s.notes.take(sig.SessionID))
+	if !ok {
 		return
 	}
-	h, found, err := s.d.Store.Host(rctx, sig.HostID)
-	if err != nil || !found {
-		return
-	}
-	started := ses.State != domain.SessionOpening
-	if started || domain.ProfileKind(h.Profiles, ses.Profile) != domain.ProfileKindClaude {
-		wdi = nil
-	}
-	deadline := s.d.Clock.Now().Add(s.cfg.OpenTimeout)
-	confirm := h.RequireLocalConfirm != nil && *h.RequireLocalConfirm
-	s.relayControl().Expect(Expectation{SessionID: ses.ID, HostID: h.ID, DeviceID: ses.DeviceID, Deadline: deadline, Started: started,
-		LocalConfirm: confirm, WorkdirIndex: wdi})
+	s.relayControl().Expect(e)
 	if h.State != domain.StateActive {
 		return
 	}
 	// An error means no eligible link here; the node of the link sends it, or the deadline ends the
 	// opening.
-	_ = s.control().OpenSession(ctx, h.ID, SessionOpen{SessionID: ses.ID, DataPath: DataPath(ses.ID), Profile: ses.Profile, ExpiresAt: deadline})
+	_ = s.control().OpenSession(ctx, h.ID, SessionOpen{SessionID: ses.ID, DataPath: DataPath(ses.ID), Profile: ses.Profile, ExpiresAt: e.Deadline})
+}
+
+// expectation reads the session and its host and builds the expectation of the current grant
+// with its deadline from now; ok is false for an unknown or closed session or one of another host
+// (hostID zero: any host). wdi is the index the grant of this node noted.
+func (s *Service) expectation(ctx context.Context, hostID, sessionID ids.ID, wdi *int) (Expectation, domain.Session, domain.Host, bool) {
+	rctx, cancel := s.bounded(ctx)
+	defer cancel()
+	ses, found, err := s.d.Store.Session(rctx, sessionID)
+	if err != nil || !found || ses.State == domain.SessionClosed || (!hostID.IsZero() && ses.HostID != hostID) {
+		return Expectation{}, domain.Session{}, domain.Host{}, false
+	}
+	h, found, err := s.d.Store.Host(rctx, ses.HostID)
+	if err != nil || !found {
+		return Expectation{}, domain.Session{}, domain.Host{}, false
+	}
+	started := ses.State != domain.SessionOpening
+	if started || domain.ProfileKind(h.Profiles, ses.Profile) != domain.ProfileKindClaude {
+		wdi = nil
+	}
+	confirm := h.RequireLocalConfirm != nil && *h.RequireLocalConfirm
+	return Expectation{SessionID: ses.ID, HostID: h.ID, DeviceID: ses.DeviceID, Deadline: s.d.Clock.Now().Add(s.cfg.OpenTimeout),
+		Started: started, LocalConfirm: confirm, WorkdirIndex: wdi, Grant: ses.TokenJTI}, ses, h, true
+}
+
+// RelayExpectation builds the expectation of the current grant of a session from its row, for a
+// side that reaches the relay of this node before terminal.session_open did (M2-47 Design note 3:
+// the receiver reads the state from the database). ok is false for an unknown or closed session.
+func (s *Service) RelayExpectation(ctx context.Context, sessionID ids.ID) (Expectation, bool) {
+	e, _, _, ok := s.expectation(ctx, ids.ID{}, sessionID, nil)
+	return e, ok
 }
 
 // onHostClose closes the control connections of hostID on this node with the code of the state

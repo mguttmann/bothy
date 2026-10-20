@@ -243,6 +243,12 @@ type cluster struct {
 // node A).
 func newCluster(t *testing.T, mode string) *cluster {
 	t.Helper()
+	return newClusterWith(t, mode, nil)
+}
+
+// newClusterWith is newCluster with the configuration overrides extra.
+func newClusterWith(t *testing.T, mode string, extra map[string]string) *cluster {
+	t.Helper()
 	clusterSlots <- struct{}{}
 	t.Cleanup(func() { <-clusterSlots })
 	conf := harness.RaisedRateLimits()
@@ -251,6 +257,9 @@ func newCluster(t *testing.T, mode string) *cluster {
 		"terminal.host_heartbeat_interval": heartbeatInterval.String(), "terminal.host_heartbeat_miss_limit": fmt.Sprint(heartbeatMisses),
 		"terminal.host_duplicate_probe_timeout": probeTimeout.String(), "database.listen_reconnect_backoff_cap": "200ms",
 	} {
+		conf[k] = v
+	}
+	for k, v := range extra {
 		conf[k] = v
 	}
 	c := &cluster{t: t, edge: newTestEdge(t), nodes: map[string]*node{nodeA: newNode(nodeA)}, conf: conf}
@@ -273,12 +282,16 @@ func newCluster(t *testing.T, mode string) *cluster {
 	return c
 }
 
-// worker starts instance C in role worker on the database of A (the worker case).
-func (c *cluster) worker() *node {
+// worker starts instance C in role worker on the database of A (the worker case) and returns it
+// with its terminal use cases, through which a test commits an end in the worker.
+func (c *cluster) worker() (*node, *terminalapp.Service) {
 	c.t.Helper()
 	w := newNode("")
-	w.srv = harness.StartNode(c.t, c.nodes[nodeA].srv, w.options(c.edge, c.conf, wire.RoleWorker))
-	return w
+	opts := w.options(c.edge, c.conf, wire.RoleWorker)
+	var svc *terminalapp.Service
+	opts.TerminalModule = func(s *terminalapp.Service) { svc = s }
+	w.srv = harness.StartNode(c.t, c.nodes[nodeA].srv, opts)
+	return w, svc
 }
 
 // n returns the node named name.
