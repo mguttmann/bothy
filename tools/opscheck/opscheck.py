@@ -59,6 +59,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "observability"))
 
 import fetch_tools
 import sli_bounds
+import tofu_providers
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 """Default `--root`: the checkout this file belongs to."""
@@ -252,6 +253,17 @@ class Context:
     root: Path
     workdir: Path
     tool: Callable[[str], Path]
+
+    def provider_mirror(self) -> Path:
+        """The OpenTofu provider mirror for the lock files of `root` (infra/tofu/test/*).
+
+        The archives are fetched and checked by tools/bin/tofu_providers.py into the cache of
+        this checkout (.cache/tofu-providers), like the validators of `pinned_tool`.
+        """
+        locks = sorted((self.root / TOFU_DIR / "test").glob("*/.terraform.lock.hcl"))
+        return tofu_providers.ensure_mirror(
+            locks, tofu_providers.DEFAULT_CACHE, fetch_tools.platform_key()
+        )
 
 
 Check = Callable[[Context], list[str]]
@@ -933,10 +945,13 @@ def check_tofu(ctx: Context) -> list[str]:
     A module is a directory with a configuration file OpenTofu reads (`TOFU_FILES`).
     The modules run in one work copy of infra/tofu/, so a module may use a sibling as
     module source. Each runs with a CLI configuration of its own, so no mirror,
-    credential or plugin cache of the caller is used. Its only provider source is an empty
-    local mirror: an empty configuration would let `tofu init` download providers from the
-    registry, a network call the gate must not make. A module with providers therefore
-    fails here until it can initialise offline.
+    credential or plugin cache of the caller is used. Its only provider source is the local
+    mirror of `tofu_providers.py` (tools/bin), filled before any validator runs with the
+    archives the lock files of infra/tofu/test/ pin, each checked against its `zh:` hash: an
+    empty configuration would let `tofu init` download providers from the registry, a network
+    call the validator must not make. A module with a provider the lock files do not pin
+    therefore fails here (docs/DECISIONS.md D-M7-16-2). The unpacked providers are shared
+    through a plugin cache in the work directory.
     """
     modules = sorted(
         d
@@ -947,13 +962,14 @@ def check_tofu(ctx: Context) -> list[str]:
         *others, last = (pattern.removeprefix("*") for pattern in TOFU_FILES)
         kinds = f"{', '.join(others)} or {last}"
         return [f"no OpenTofu module (a directory with {kinds} files) under {TOFU_MODULES}/"]
-    mirror = ctx.workdir / "provider-mirror"
-    mirror.mkdir()
+    try:
+        mirror = ctx.provider_mirror()
+    except (tofu_providers.ProviderError, OSError, ValueError, KeyError) as exc:
+        return [f"provider mirror: {exc}"]
+    plugins = ctx.workdir / "plugin-cache"
+    plugins.mkdir()
     cli_config = ctx.workdir / "offline.tfrc"
-    cli_config.write_text(
-        f'provider_installation {{\n  filesystem_mirror {{\n    path = "{mirror}"\n  }}\n}}\n',
-        encoding="utf-8",
-    )
+    cli_config.write_text(tofu_providers.cli_config(mirror, plugins), encoding="utf-8")
     env = {"TF_IN_AUTOMATION": "1", "TF_CLI_CONFIG_FILE": str(cli_config)}
     tofu = ctx.tool("tofu")
     found: list[str] = []

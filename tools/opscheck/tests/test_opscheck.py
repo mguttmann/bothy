@@ -1039,6 +1039,16 @@ def test_collector_gets_placeholder_secrets_and_the_pinned_datadog_host_name(
     assert all("datadog" in f.splitlines()[0] for f in result.findings)
 
 
+def test_broken_provider_lock_is_a_finding(tree: Path) -> None:
+    """The mirror is filled from the lock files of the test roots; a broken one stops the check."""
+    (tree / "infra/tofu/test/cloud/.terraform.lock.hcl").write_text(
+        "# no provider\n", encoding="utf-8"
+    )
+    [finding] = findings(tree, "tofu")
+    assert finding.startswith("provider mirror: ")
+    assert "no provider" in finding
+
+
 def test_placeholder_secret_is_long_enough_for_the_pseudonym_key() -> None:
     assert len(opscheck.SECRET_PLACEHOLDER) >= 32
     assert b"EXAMPLE" in opscheck.SECRET_PLACEHOLDER
@@ -1063,7 +1073,7 @@ def test_module_with_a_sibling_module_source(tree: Path) -> None:
     (modules / "zz-common" / "variables.tf").write_text(
         'variable "label" {\n  type    = string\n  default = "bothy"\n}\n', encoding="utf-8"
     )
-    (modules / "aws" / "main.tf").write_text(
+    (modules / "aws" / "common.tf").write_text(
         'module "common" {\n  source = "../zz-common"\n}\n', encoding="utf-8"
     )
     assert findings(tree, "tofu") == ()
