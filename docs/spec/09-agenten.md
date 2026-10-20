@@ -155,7 +155,9 @@ Für eine neue Nachricht M eines Prinzipals P im Thread T des Kanals C gilt in d
 7. `authorize(P, agent.invoke, {Ziel, Kandidat, M})` nach 05 Abschnitt 5 (Rechte, Agent aktiv,
    I2, Projekt bereit). Bei `allow`: Lauf `queued`, Live-Box-Anker, Ereignis `agent.invocation`,
    `trigger_state = received`. Bei Ablehnung: M bleibt gespeichert, `trigger_state = failed` mit
-   Grund.
+   Grund. The first successful delivery of `agent.invocation` moves `trigger_state` to `queued`;
+   a denial immediately before the delivery fails the run and sets `trigger_state = failed` with
+   the reason of 5.2 (04 section 15.3 step 2, M2-08).
 
 Order of the check and the auto thread (D-M2-05-2): with `auto_thread` in the main thread the check
 of point 7 names the thread of M, not the new thread, so the mention rule of point 3 and the guard
@@ -250,7 +252,9 @@ und Gäste erlaubt sind; diese Kanäle zählt I1 nicht zu seinen Zielen
 ### 3.7 Auto-Thread aus einer Kanal-Nachricht
 
 Der neue Thread T' bekommt `parent_message_id = M`, `operator_agent_id` = wirksamer Bediener von
-C, `title = ''` und `title_source = 'auto'`. Bis ein Titel gesetzt ist, zeigt der Client die erste
+C, `title = ''` und `title_source = 'auto'`. T' is written only after the `allow` of 3.4 point 7, so
+a denial creates no empty thread; the check before every delivery decides T' with the main-thread
+mention rule of the channel ("for new threads", 05 section 5 point 3; M2-08). Bis ein Titel gesetzt ist, zeigt der Client die erste
 Zeile von M. M bleibt im Hauptverlauf und trägt den `trigger_state`; Lauf, Live-Box-Anker,
 Antworten und Sitzung gehören zu T'.
 
@@ -788,7 +792,11 @@ keine Emoji ([01-produkt.md](01-produkt.md)).
 ## 7. Nachträge während eines Laufs
 
 Eine Nachricht, die nach 3.4 den Agenten des aktiven Laufs auslösen würde, wird ein Nachtrag
-(`run.followup.create`, 3.4 Punkt 6; 05 Abschnitt 5 Punkt 7 spricht von "der Auslösung"). Eine
+(`run.followup.create`, 3.4 Punkt 6; 05 Abschnitt 5 Punkt 7 spricht von "der Auslösung").
+`agent.followup` passes `agent.invoke` for the author of the follow-up immediately before every
+delivery; a denial sends nothing and sets the follow-up message to `trigger_state = failed` with the
+reason, but leaves the run unchanged, because the run's own trigger was checked for its own
+invocation and another person's follow-up must not end it (M2-08). Eine
 Nachricht ohne Auslösung (kein `trigger`, Erwähnungsregel nicht erfüllt) bleibt eine normale
 Nachricht und erreicht den Agenten nur als Kontext des nächsten Laufs. Grund: Ein Kanal mit
 Erwähnungspflicht soll Gespräche zwischen Menschen nicht in einen laufenden Turn schieben.

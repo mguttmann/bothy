@@ -63,6 +63,11 @@ Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, V
   `RestartConsumer`, `AckConsumer`, `GetConsumer` in `adapters/postgres/queries/consumer_cursors.sql`,
   run on the pool or the ambient transaction (single-row statements, no event).
 - `adapters/httpapi/consumers.go`: `getConsumerState`, `pollAgentEvents`, `ackAgentEvents`.
+  The poll reads through `ConsumerFeed`, the delivery engine of the gateway, so every
+  invocation-bearing event of a page passes `runs.Delivery` there with the same rules as on the
+  WebSocket (M2-08): an allowed one carries a fresh `invocation_token`, a refused one is not in
+  `events` and `next_cursor` covers it. `agents` imports nothing of `runs`, so no source port
+  `DeliverySource` is needed (D-M2-08-13).
 - Configuration keys: `agent.ack_timeout`, `agent.ack_persist_interval`,
   `agent.max_inflight_events` (bound by the gateway engine).
 - Rulings: docs/DECISIONS.md M2-07.

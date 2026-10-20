@@ -1,6 +1,6 @@
 # Modul `runs`
 
-Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). Delivery (M2-08), start, finish and cancel (M2-09), patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition` and `app.InvocationTokens`.
+Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, finish and cancel (M2-09), patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, `app.InvocationTokens` and `app.Service.Prepare`.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -87,7 +87,8 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 
 ## Port (Wurzelpaket `internal/runs`)
 
-- Incoming (M2-05): `Runs` (reads). Planned: start, resume, patch, finish, cancel (M2-09, M2-10), `Delivery` (M2-08), `Interactions` (M2-15), `CommandExec` (M2-16).
+- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). Planned: start, resume, patch, finish, cancel (M2-09, M2-10), `Interactions` (M2-15), `CommandExec` (M2-16).
+- Gibt dauerhafte Ereignisse aus (M2-08): `agent.invocation` (audience the agent, receive action `agent.events.consume`, resource the run without version, no token).
 - Gibt In-Tx-Ereignisse aus: keine.
 - Subscribes (M2-05): `messaging.MessagePosted` (the acceptance, `app.Acceptor`, registered after the subscriber of sync). Planned: `messaging.MessageDeleted`, `files.FileFinalized`, `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
 - Uses the ports `chat.Threads` (`Info`, `Locate`, `Create`), `chat.TriggerFacts`, `agents.Facts` and `messaging.Messages` (`CreateRunAnchor`, `SetTriggerState`).
@@ -100,6 +101,25 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 - Lock order: `runs` before `messages`; the acceptance holds the thread row of the message.
 - Every state change, the creation included, appends `run.state_changed`: resource `run` with the version of the run row, the receive action of reading a run, payload `RunStateChangedPayload` (the summary, the triggering message and the trigger state this change set).
 - Acceptance (`Acceptor.OnMessagePosted`): only `origin = human`, `kind = text`, no DM; facts through the ports; `Decide`; a candidate without mention is checked in filter mode first (no trigger right: nothing written, no audit); then `agent.invoke` in request mode, which audits denials; the auto thread only after `allow`; a disagreement of `Decide` and `authorize` fails closed. Until `Bind` the acceptor writes nothing (D-M2-05-19).
+
+## Delivery (M2-08)
+
+`app.Service.Prepare` implements `runs.Delivery` in one unit of work, immediately before every hand-over of an invocation-bearing event to an agent (04 15.3 step 2, invariant I2 "before every invocation"):
+
+1. A type outside `InvocationBearing` is an internal error; a type or trigger kind without a resolver (`interaction.created`, `command.invoked` and the trigger kinds `command` and `interaction` until M2-15 and M2-16) gives `Send = false` and an `Error` log line (fail closed).
+2. The run row is locked (`LockRun`, `SELECT ... FOR UPDATE`); a missing run or a run of another agent is an internal error.
+3. The delivery matrix (`domain.DeliveryMatrix`): terminal runs are skipped without a check; `agent.invocation` records its `jti` only while `queued`; `agent.followup` and `interaction.created` record it only in `waiting_input`; `command.invoked` never.
+4. A `queued` run at `queued_at + run.queued_max_age` or later fails with `agent_unavailable` without a check, a token or an audit entry.
+5. The resolver reads the trigger: for `agent.invocation` with `trigger_kind = message` the run's trigger and its triggering message now (origin, mention of the agent, `NewThread` when the message lives in another thread than the run, the auto thread); for `agent.followup` the author of the follow-up message of the payload.
+6. `agent.invoke` in filter mode for `actor.Recheck(trigger)` (R-AZ-29) at the permission version read once through `instance.Versions` and pinned, on the run's thread with `ActiveRunAgentID` = the run's agent.
+7. Denial: the authorize reason maps to a run reason (`domain.DeliveryReason`: I2, SR2, project, read-only and `principal_inactive` keep their codes as `billing_mode_personal_not_holder`, `tool_class_owner_only`, `project_not_ready`, `channel_read_only`, `user_disabled`; `agent_not_reachable` of an inactive agent is `agent_disabled`; everything else `access_revoked`). `agent.invocation` of a queued run fails the run through `Transition` (which sets `trigger_state = failed`); `agent.followup` fails the follow-up message and leaves the run; a started run stays. One `auditing.Recorder.Record` in the unit: action `agent.invoke`, decision `deny`, the exact authorize reason, resource the thread, attributes `run_id`, `agent_id`, `stage` (`delivery`), `event_type`, `trigger_kind`, the re-check principal as actor. After the commit `bothy.agent.invocation.denied` counts it.
+8. Allow: the token of `InvocationTokens.Issue` with the claims of `domain.DeliveryGrant` (`level = trigger`, the configured `billing_mode` and `tool_class`, the pinned `permission_version`); `RecordDelivery` stores `invocation_jti` (when recorded, with `renewed_from_jti = NULL`) and `billing_mode_expected` and raises `version` by one, only when a column changes; the first delivery of `agent.invocation` of a queued run moves `trigger_state` from `received` to `queued`. `Send = true` with the token, which is a delivery field only.
+
+The span `agent.dispatch` (PRODUCER, `bothy.run.id`, `bothy.agent.handle`, `bothy.decision`) covers every checked delivery. The tokens are bound in the signing keys step (`BindTokens`).
+
+Acceptance (M2-08 additions): `Open` schedules `runs.queued_expiry` at `queued_at + run.queued_max_age` in the creating transaction, and the acceptance appends `agent.invocation` as its last write (`domain.InvocationPayload`: IDs, `trigger_kind = message`, the author as `triggered_by`, the billing mode, `settings_version`; no content). The acceptance keeps the audit of its denials in request mode of `authz` (D-M2-08-8).
+
+Job `runs.queued_expiry` (`adapters/jobs`, queue `default`, args the run only): `ExpireQueued` locks the run; still queued and due, it fails with `agent_unavailable`; queued but not yet due (the key was raised), it schedules itself again; otherwise nothing.
 
 ## Invocation tokens (M2-06)
 
@@ -138,7 +158,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Ereignisse und WebSocket-Ops
 
-- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written; the others come with their tickets.
+- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 `agent.invocation` (the builder of `agent.followup`, `domain.FollowupPayload`, is ready for M2-11); the others come with their tickets.
 - Kurzlebig: `run.updated`, `command.autocomplete_requested`.
 - WebSocket-Ops (Client an Server): `run.update`, `command.autocomplete_result`.
 
@@ -150,6 +170,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 | `runs.stall_check` | periodisch, `run.stall_after` | `maintenance` |
 | `runs.component_expiry` | periodisch, `component.default_ttl` | `maintenance` |
 | `runs.invocation_hold_timeout` | terminiert, `file.invocation_hold_max` bzw. `voice.transcript_hold_max` | `default` |
+| `runs.queued_expiry` | terminiert, `run.queued_max_age` (M2-08) | `default` |
 
 ## Hinweise für den Bau
 

@@ -45,7 +45,8 @@ func TestAcceptance_ThreadMessageOpensRun(t *testing.T) {
 		t.Fatalf("trigger %s %s %d", st, reason, v)
 	}
 	evs := w.eventsAfter(before)
-	want := []string{"message.created", "message.created", "run.state_changed", "message.updated"}
+	// The acceptance ends with agent.invocation to the agent, without a token (M2-08).
+	want := []string{"message.created", "message.created", "run.state_changed", "message.updated", "agent.invocation"}
 	if !slices.Equal(types(evs), want) {
 		t.Fatalf("events %v, want %v", types(evs), want)
 	}
@@ -97,7 +98,7 @@ func TestAcceptance_MainThreadAutoThread(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM messages WHERE run_id = $1 AND thread_id = $2`, r.ID, th); n != 1 {
 		t.Fatalf("%d anchors in the new thread", n)
 	}
-	want := []string{"message.created", "thread.created", "message.created", "run.state_changed", "message.updated"}
+	want := []string{"message.created", "thread.created", "message.created", "run.state_changed", "message.updated", "agent.invocation"}
 	if got := types(w.eventsAfter(before)); !slices.Equal(got, want) {
 		t.Fatalf("events %v, want %v", got, want)
 	}
