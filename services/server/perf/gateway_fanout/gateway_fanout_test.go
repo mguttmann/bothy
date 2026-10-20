@@ -140,7 +140,7 @@ func TestPerf_FanoutLocalP99(t *testing.T) {
 			want[s.ClientMsgID] = s
 		}
 	}
-	deadline := time.Now().Add(settle)
+	deadline := time.Now().Add(settle) // nosemgrep: bothy-go-test-wall-clock-wait -- the settle time is a latency bound under test
 	for _, r := range recv {
 		for countSent(r.snapshot(), want) < len(want) && time.Now().Before(deadline) {
 			time.Sleep(100 * time.Millisecond)

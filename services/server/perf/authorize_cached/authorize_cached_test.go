@@ -38,7 +38,7 @@ func TestPerf_AuthorizeCachedP99(t *testing.T) {
 		args = append(args, "-cpu", strconv.Itoa(env.GOMAXPROCS))
 	}
 	args = append(args, "./internal/authz/app/")
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute) // nosemgrep: bothy-go-test-wall-clock-wait -- the time limit of a load run, longer than testkit.Patience
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", args...) // #nosec G204 -- fixed arguments
 	cmd.Dir = module
