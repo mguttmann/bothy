@@ -239,10 +239,6 @@ func (l *Links) CloseSession(_ context.Context, hostID, sessionID ids.ID, reason
 // CloseHost implements app.ControlLinks: the link closes with code; a code that comes with a
 // state change of the host detaches nothing (Design note 11).
 func (l *Links) CloseHost(hostID ids.ID, code domain.CloseCode) {
-	if r := l.relayOf(); r != nil && code.ChangesHostState() {
-		// Before the close: the host service ends its data connections when it reads the code.
-		r.HostEnding(hostID)
-	}
 	if k := l.get(hostID); k != nil {
 		k.close(code)
 	}

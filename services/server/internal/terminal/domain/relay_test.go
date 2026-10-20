@@ -25,8 +25,6 @@ func TestRelayDecide(t *testing.T) {
 	startedDev := domain.SlotState{Started: true, DevicePresent: true}
 	confirm := both
 	confirm.LocalConfirm = true
-	ending := started
-	ending.HostEnding = true
 	cases := []struct {
 		name string
 		s    domain.SlotState
@@ -50,8 +48,12 @@ func TestRelayDecide(t *testing.T) {
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4101, "token_expired"), a(domain.ActDetach, 0, "")}},
 		{"host refuses 4104, started", started, domain.RelayEvent{Kind: domain.EvHostClosed, Code: 4104, Reason: "token_invalid"},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4104, "token_invalid"), {Kind: domain.ActEndOpenFailed, Detail: "token_invalid"}}},
+		// The host side of a started session that ends by itself: the session detaches, and the
+		// device closes with 4102 only while the session is open; a session that ended elsewhere
+		// first (another node, a revocation, 4110 to 4112 at the control connection) closes the
+		// device with the code and reason of its end (found by M2-48).
 		{"host closes otherwise, started", started, domain.RelayEvent{Kind: domain.EvHostClosed, Code: 1000},
-			[]domain.RelayAction{a(domain.ActCloseDevice, 4102, ""), a(domain.ActDetach, 0, "")}},
+			[]domain.RelayAction{a(domain.ActHostLost, 0, "")}},
 		{"host closes otherwise, opening", both, domain.RelayEvent{Kind: domain.EvHostClosed, Code: 1001},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4102, "")}},
 		{"deadline, opening, host missing", devOnly, domain.RelayEvent{Kind: domain.EvDeadline},
@@ -82,6 +84,13 @@ func TestRelayDecide(t *testing.T) {
 		{"session.started without a paired device", hostOnly, domain.RelayEvent{Kind: domain.EvStarted},
 			[]domain.RelayAction{a(domain.ActDetach, 0, ""), a(domain.ActMeetDeadline, 0, "")}},
 		{"session.started paired", both, domain.RelayEvent{Kind: domain.EvStarted}, []domain.RelayAction{a(domain.ActMeetDeadline, 0, "")}},
+		// 24 9 item 4: a side that never met its counterpart closes with 4102 and counts as
+		// unpaired also when the end of the opening committed on the other node arrives first
+		// (found by the conformance suite of M2-48, TM-T15).
+		{"opening ends at open_timeout, lone host side", hostOnly, domain.RelayEvent{Kind: domain.EvSessionEnded, End: "open_failed", Detail: "open_timeout"},
+			[]domain.RelayAction{a(domain.ActCloseHost, 4102, ""), {Kind: domain.ActCountUnpaired, Side: domain.SideHost}, a(domain.ActDrop, 0, "")}},
+		{"opening ends at open_timeout, lone device side", devOnly, domain.RelayEvent{Kind: domain.EvSessionEnded, End: "open_failed", Detail: "open_timeout"},
+			[]domain.RelayAction{a(domain.ActCloseDevice, 4102, ""), {Kind: domain.ActCountUnpaired, Side: domain.SideClient}, a(domain.ActDrop, 0, "")}},
 		{"session ends", started, domain.RelayEvent{Kind: domain.EvSessionEnded, End: "open_failed", Detail: "token_invalid"},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4104, "open_failed"), a(domain.ActCloseHost, 4100, "open_failed"), a(domain.ActDrop, 0, "")}},
 		{"control link lost", started, domain.RelayEvent{Kind: domain.EvControlLost, Code: 1006},
@@ -89,12 +98,6 @@ func TestRelayDecide(t *testing.T) {
 		{"control link lost, opening with local confirmation", confirm, domain.RelayEvent{Kind: domain.EvControlLost, Code: 1006},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4102, ""), a(domain.ActCloseHost, 1000, ""), a(domain.ActRearmDeadline, 0, "")}},
 		{"control link ends with 4111", started, domain.RelayEvent{Kind: domain.EvControlLost, Code: 4111}, nil},
-		// The host service ends its data connections when its control connection closes with 4110,
-		// 4111 or 4112; those sessions ended in the commit of the change, whose
-		// terminal_session.changed closes the device with 4100 and the reason, so the loss of the
-		// host side neither closes the device with 4102 nor detaches (found by M2-48).
-		{"host side ends while the host is ending", ending, domain.RelayEvent{Kind: domain.EvHostClosed, Code: 1000}, nil},
-		{"host side refuses while the host is ending", ending, domain.RelayEvent{Kind: domain.EvHostClosed, Code: 4104, Reason: "token_invalid"}, nil},
 		{"shutdown", started, domain.RelayEvent{Kind: domain.EvShutdown},
 			[]domain.RelayAction{a(domain.ActCloseDevice, 4013, ""), a(domain.ActCloseHost, 4013, "")}},
 	}

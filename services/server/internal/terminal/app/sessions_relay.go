@@ -56,6 +56,23 @@ func (s *Service) RelayDetach(ctx context.Context, id ids.ID) error {
 	})
 }
 
+// RelayHostLost is RelayDetach after the loss of the host side of a started session: it
+// detaches an active session and reports, for a session that is already closed, its end (close
+// reason and detail) and true, so the relay closes the device with that end instead of 4102
+// (found by the conformance suite of M2-48).
+func (s *Service) RelayHostLost(ctx context.Context, id ids.ID) (domain.End, bool, error) {
+	var end domain.End
+	closed := false
+	err := s.lockForRelay(ctx, id, func(ctx context.Context, ses domain.Session) error {
+		if ses.State == domain.SessionClosed {
+			end, closed = domain.End{Reason: ses.CloseReason, Detail: ses.CloseDetail}, true
+			return nil
+		}
+		return s.detach(ctx, ses, s.d.Clock.Now())
+	})
+	return end, closed, err
+}
+
 // RelayOpenFailed ends a session that is not closed with open_failed and detail through the one
 // end path (terminal.terminate with the detail, terminal_session.changed).
 func (s *Service) RelayOpenFailed(ctx context.Context, id ids.ID, detail domain.CloseDetail) error {
