@@ -73,10 +73,8 @@ const InvariantFinding _conflict = InvariantFinding(
   organizationReady: false,
 );
 
-AccessNames _names(FakeAdminRepository r) => AccessNames(
-  people: r.peopleById.values.toList(),
-  agents: r.agentList,
-);
+AccessNames _names(FakeAdminRepository r) =>
+    AccessNames(people: r.peopleById.values.toList(), agents: r.agentList);
 
 final Map<String, Widget Function()> _views = {
   'list': () => _frame(AgentsList(repository: _repository(), onOpen: (_) {})),
