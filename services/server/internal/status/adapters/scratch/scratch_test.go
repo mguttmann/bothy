@@ -45,9 +45,9 @@ func (f *fakeTools) PgBackRestRestore(_ context.Context, label, pgPath string) e
 
 func (f *fakeTools) PgBackRestVerify(context.Context) error { return nil }
 
-func (f *fakeTools) ResticRestore(_ context.Context, tag string, includes []string, target string) error {
-	if tag != "objects" {
-		return errors.New("wrong tag")
+func (f *fakeTools) ResticRestore(_ context.Context, tag, path string, includes []string, target string) error {
+	if tag != "objects" || path != "/var/lib/bothy/files" {
+		return errors.New("wrong snapshot")
 	}
 	f.includes = append(f.includes, slices.Clone(includes))
 	for _, p := range includes {

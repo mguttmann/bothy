@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,9 @@ const (
 	defaultStopTimeout  = time.Minute
 	// pollInterval is the pause between two attempts to reach the starting copy.
 	pollInterval = 250 * time.Millisecond
+	// socketPort is the port of the scratch PostgreSQL: it listens on no TCP port, the number
+	// only names the socket file .s.PGSQL.<port> that Open connects to.
+	socketPort = 5432
 )
 
 // The entries of the scratch directory.
@@ -73,8 +77,8 @@ type Tools interface {
 	PgBackRestRestore(ctx context.Context, label, pgPath string) error
 	// PgBackRestVerify verifies repo1.
 	PgBackRestVerify(ctx context.Context) error
-	// ResticRestore restores includes of the newest snapshot with tag into target.
-	ResticRestore(ctx context.Context, tag string, includes []string, target string) error
+	// ResticRestore restores includes of the newest snapshot with tag and path into target.
+	ResticRestore(ctx context.Context, tag, path string, includes []string, target string) error
 }
 
 // Config is the configuration of the scratch area.
@@ -143,6 +147,10 @@ func (s *Scratch) Restore(ctx context.Context, label string) error {
 		return err
 	}
 	pgdata := filepath.Join(s.cfg.Dir, dirPGData)
+	// pgBackRest restores into an existing directory only; PostgreSQL wants it 0700.
+	if err := os.Mkdir(pgdata, 0o700); err != nil {
+		return execError(codeDirInvalid)
+	}
 	if err := s.cfg.Tools.PgBackRestRestore(ctx, label, pgdata); err != nil {
 		return err
 	}
@@ -176,8 +184,17 @@ func (s *Scratch) Start(ctx context.Context) (app.ScratchDB, error) {
 	if err := os.WriteFile(hba, []byte(hbaConf), 0o600); err != nil {
 		return nil, execError(codeStartFailed)
 	}
+	// PostgreSQL finds its own installation through argv[0], so it starts by its absolute path:
+	// the PATH of the child holds only the system directories.
+	bin, err := exec.LookPath(s.cfg.Postgres)
+	if err != nil {
+		return nil, execError(codeStartFailed)
+	}
+	if bin, err = filepath.Abs(bin); err != nil {
+		return nil, execError(codeStartFailed)
+	}
 	// #nosec G204 -- the configured server binary with a fixed argument list, no shell
-	cmd := exec.Command(s.cfg.Postgres, serverArgs(filepath.Join(s.cfg.Dir, dirPGData), socket, hba)...)
+	cmd := exec.Command(bin, serverArgs(filepath.Join(s.cfg.Dir, dirPGData), socket, hba)...)
 	cmd.Env = []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C.UTF-8", "HOME=/tmp"}
 	cmd.Stdout, cmd.Stderr = s.cfg.Stderr, s.cfg.Stderr
 	if err := cmd.Start(); err != nil {
@@ -206,13 +223,17 @@ func (s *Scratch) Start(ctx context.Context) (app.ScratchDB, error) {
 
 // serverArgs are the arguments of the scratch PostgreSQL. The command line wins over
 // postgresql.conf and postgresql.auto.conf of the restored directory: no TCP listener, the socket
-// in the scratch directory only for its owner, no WAL archiving (the copy must never push its own
-// timeline into the repository), no TLS (the certificates of production are not part of the
-// copy), and the log on stderr.
+// in the scratch directory only for its owner on the port that names the socket file, no WAL
+// archiving (the copy must never push its own timeline into the repository), no TLS (the
+// certificates of production are not part of the copy), no parallel query (its shared memory
+// segments would need the /dev/shm of a database container, which backup does not have), and the
+// log on stderr. max_connections and the other settings recovery compares with the primary stay
+// those of the copy.
 func serverArgs(pgdata, socket, hba string) []string {
 	return []string{
 		"-D", pgdata,
 		"-c", "listen_addresses=",
+		"-c", "port=" + strconv.Itoa(socketPort),
 		"-c", "unix_socket_directories=" + socket,
 		"-c", "unix_socket_permissions=0700",
 		"-c", "hba_file=" + hba,
@@ -220,7 +241,7 @@ func serverArgs(pgdata, socket, hba string) []string {
 		"-c", "ssl=off",
 		"-c", "logging_collector=off",
 		"-c", "log_destination=stderr",
-		"-c", "max_connections=20",
+		"-c", "max_parallel_workers_per_gather=0",
 	}
 }
 
@@ -269,7 +290,7 @@ func (s *Scratch) FetchObjects(ctx context.Context, keys []string) (map[string][
 	for _, k := range keys {
 		includes = append(includes, path.Join(filepath.ToSlash(s.cfg.FilesRoot), k))
 	}
-	if err := s.cfg.Tools.ResticRestore(ctx, objectsTag, includes, target); err != nil {
+	if err := s.cfg.Tools.ResticRestore(ctx, objectsTag, s.cfg.FilesRoot, includes, target); err != nil {
 		return nil, err
 	}
 	if err := afterFetch(ctx, target); err != nil {
