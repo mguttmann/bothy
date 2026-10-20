@@ -185,10 +185,12 @@ func (s *Service) putProjectBinding(ctx context.Context, st BindingStore, a acto
 		if next.CreatedAt, err = st.InsertBinding(ctx, next); err != nil {
 			return domain.ProjectBinding{}, err
 		}
-	default:
+	case domain.BindingReplaced:
 		if err := st.ReplaceBinding(ctx, next); err != nil {
 			return domain.ProjectBinding{}, err
 		}
+	case domain.BindingDeleted:
+		return domain.ProjectBinding{}, errs.New(errs.CodeInternalError, "chat: a PUT planned a delete")
 	}
 	if err := s.bindingChanged(ctx, c); err != nil {
 		return domain.ProjectBinding{}, err
@@ -327,43 +329,58 @@ func (s *Service) ApplyProjectReadiness(ctx context.Context, agentID ids.ID, rep
 	if err != nil {
 		return err
 	}
+	want, channels, err := readinessReports(reports)
+	if err != nil || len(channels) == 0 || agentID.IsZero() {
+		return err
+	}
+	return s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.applyReports(ctx, st, agentID, want, channels) })
+}
+
+// applyReports is ApplyProjectReadiness inside its unit of work: the locks, then every report
+// that differs from the stored value of a bound forum agentID serves.
+func (s *Service) applyReports(ctx context.Context, st BindingStore, agentID ids.ID, want map[ids.ID]bool, channels []ids.ID) error {
+	rows, err := s.shareReported(ctx, channels)
+	if err != nil {
+		return err
+	}
+	ready, err := st.LockReportedBindings(ctx, channels)
+	if err != nil {
+		return err
+	}
+	for _, id := range channels {
+		c, known := rows[id]
+		stored, bound := ready[id]
+		if !known || !bound || stored == want[id] || !servedBy(c, agentID) {
+			continue
+		}
+		if err := st.SetProjectReady(ctx, id, want[id]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// readinessReports returns the reported value per channel and the channels in ascending id.
+// Errors: validation_failed with code duplicate on /project_readiness for a channel reported twice.
+func readinessReports(reports []chat.ProjectReadiness) (map[ids.ID]bool, []ids.ID, error) {
 	want := make(map[ids.ID]bool, len(reports))
+	channels := make([]ids.ID, 0, len(reports))
 	for _, r := range reports {
 		if _, dup := want[r.ChannelID]; dup {
-			return errs.New(errs.CodeValidationFailed, "a channel is reported twice").
+			return nil, nil, errs.New(errs.CodeValidationFailed, "a channel is reported twice").
 				WithFields(errs.FieldError{Pointer: pointerProjectReadiness, Code: domain.FieldDuplicate, Detail: "a channel is reported twice"})
 		}
 		want[r.ChannelID] = r.Ready
-	}
-	if len(want) == 0 || agentID.IsZero() {
-		return nil
-	}
-	channels := make([]ids.ID, 0, len(want))
-	for id := range want {
-		channels = append(channels, id)
+		channels = append(channels, r.ChannelID)
 	}
 	slices.SortFunc(channels, compareIDs)
-	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		rows, err := s.shareReported(ctx, channels)
-		if err != nil {
-			return err
-		}
-		ready, err := st.LockReportedBindings(ctx, channels)
-		if err != nil {
-			return err
-		}
-		for _, id := range channels {
-			c, known := rows[id]
-			stored, bound := ready[id]
-			if !known || !bound || archived(c) || c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID != agentID || stored == want[id] {
-				continue
-			}
-			if err := st.SetProjectReady(ctx, id, want[id]); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	return want, channels, nil
+}
+
+// servedBy reports whether agent may report readiness for the channel row c: c is not archived
+// (nor in an archived space) and agent is its effective operator (09 section 4.8 "runner only").
+func servedBy(c ChannelRow, agent ids.ID) bool {
+	return !archived(c) && c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID == agent
 }
 
 // shareReported holds the spaces of the reported channels that inherit their operator FOR SHARE
