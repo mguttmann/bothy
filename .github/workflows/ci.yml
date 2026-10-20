@@ -338,7 +338,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -385,12 +385,12 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      - name: make test coverage
+      - name: make test coverage contract-test
         env:
           # As every step that reaches `make test` (docs/quality/gates.md, "Individual gates").
           MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: server
-        run: make test coverage COMPONENTS="$COMPONENTS" AREAS=none
+        run: make test coverage contract-test COMPONENTS="$COMPONENTS" AREAS=none
       # The coverage reports of `make test` in this job for the job sonar, which scans them
       # instead of running the tests again. REPORTS covers every report path of
       # sonar-project.properties (tools/ci/tests/test_sonar_coverage_handoff.py); a component
@@ -936,7 +936,7 @@ jobs:
     # the other jobs of this run through the API and combines their results. Its timeout
     # covers plan, gates and sonar in a row, with margin for queueing.
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 290
     permissions:
       actions: read # list the jobs of this run
       contents: read
