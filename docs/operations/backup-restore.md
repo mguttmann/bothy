@@ -47,7 +47,12 @@ reports the metrics `bothy.backup.*` and `bothy.storage.volume.*`. One kind by h
    `s3:https://<host>[:<port>]/<bucket>[/<prefix>]`, for example
    `s3:https://s3.example.com/bothy-backup/instance-1`; `backup.offsite.region` and
    `backup.offsite.use_path_style` describe the endpoint. The bucket needs versioning and Object
-   Lock with a default retention in mode Compliance of at least `backup.objects.retention`.
+   Lock with a default retention in mode Compliance of at least `backup.objects.retention`, and
+   a lifecycle rule on the whole prefix that expires noncurrent versions
+   (`NoncurrentVersionExpiration`, `NoncurrentDays` at least the Object Lock period) and removes
+   expired delete markers. Without that rule nothing ever leaves the bucket: on a versioned bucket
+   every deletion by restic or pgBackRest, the owner's expiry in section 9 included, only adds a
+   delete marker and keeps the old version (docs/DECISIONS.md D-M7-02-12).
    `secrets/offsite/` holds three files of the key of `backup`: `access_key_id`,
    `secret_access_key` and, for a private CA only, `ca.crt`. That key may list, read and write
    objects (for AWS: `s3:ListBucket`, `s3:ListBucketVersions`, `s3:GetObject`, `s3:PutObject`,
@@ -242,9 +247,13 @@ versions after the Object Lock period:
 3. The command runs `pgbackrest expire` on repo2 keeping `backup.pg.retention_full` full
    backups, and `restic forget --prune` for the snapshots of `logical` older than
    `backup.logical.retention`, of `objects` older than `backup.objects.retention` and of the
-   manifests older than the larger of both. What the Object Lock still holds stays and is removed
-   by a later run. Exit code `0` means every step succeeded.
+   manifests older than the larger of both. On the versioned bucket these deletions only add
+   delete markers: the forgotten files become noncurrent versions, and the lifecycle rule of
+   section 2 removes them `NoncurrentDays` later, once the Object Lock no longer holds them. So
+   off-site data lives up to its retention plus `NoncurrentDays`; the command does not delete
+   versions itself. Exit code `0` means every step succeeded, not that space was freed; the
+   bucket's version listing shows when the rule has run.
 4. Remove the temporary copy of the key afterwards.
 
 The object mirror of the driver `s3` (below `<prefix>/objects/`) keeps deleted objects; the owner
-removes them with a lifecycle rule of the bucket or by hand with the same key.
+removes them with the lifecycle rule of section 2 or by hand with the same key.

@@ -24,7 +24,8 @@ documented in this file. The format is based on
   manifest `backup_manifest.v1` into the row and as a restic snapshot next to the backup. The
   off-site target is an S3 bucket with versioning and Object Lock (`s3:https://...`, keys
   `backup.offsite.region` and `backup.offsite.use_path_style`, key files in `offsite/`), written
-  only append-only; an empty target backs up locally and warns "local backup only" in the start
+  only append-only, with a lifecycle rule for noncurrent versions that frees what the owner's
+  expiry removed (backup-restore.md 2 and 9); an empty target backs up locally and warns "local backup only" in the start
   log and in `bothy config check`. Metrics `bothy.backup.last_success.timestamp`,
   `bothy.backup.wal.last_archived.timestamp`, `bothy.backup.duration`, `bothy.backup.size`,
   `bothy.storage.volume.free` and `bothy.storage.volume.size` with `service.name = bothy-backupd`.

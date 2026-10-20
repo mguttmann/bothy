@@ -514,7 +514,7 @@ Begründungen:
    Kennzahlen (Kapitel 17). Die Admin-Konsole und die Statusseite lesen die Tabelle.
 
 As built (M7-02, [bothy-backupd README](../../services/server/cmd/bothy-backupd/README.md),
-docs/DECISIONS.md D-M7-02-1 to D-M7-02-9):
+docs/DECISIONS.md D-M7-02-1 to D-M7-02-12):
 
 1. `bothy-backupd` evaluates the five-field cron expressions of `backup.pg.full_schedule`,
    `backup.pg.diff_schedule`, `backup.logical.schedule` and `backup.objects.schedule` in UTC once
@@ -535,6 +535,9 @@ docs/DECISIONS.md D-M7-02-1 to D-M7-02-9):
    `<prefix>/objects/`. The keys in `offsite/` can write and read but the bucket's Object Lock
    refuses every deletion of a stored version (R-OP-09); expiry needs the owner's separate account
    (`bothy-backupd expire --offsite`, [backup-restore.md](../operations/backup-restore.md) 9).
+   Because the bucket is versioned, a deletion only adds a delete marker; a lifecycle rule of the
+   bucket that expires noncurrent versions after at least the Object Lock period frees the space
+   (backup-restore.md 2, docs/DECISIONS.md D-M7-02-12).
    With an empty target, logical and object backups go to a local restic repository in the
    volume `pgbackrest-repo`, and `bothy config check` and the start log of `bothy-backupd` warn
    "local backup only".
