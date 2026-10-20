@@ -9,7 +9,8 @@ run once per run: job `gates` packs the coverage reports of its `make test` (eve
 unpacks them and only scans, with the same quality gate and `sonar.qualitygate.wait=true`. When
 `gates` fails, `sonar` is skipped and `ci-ok` fails through `gates`. ci.yml also runs on every
 push to `main`, so SonarQube keeps an analysis of `main` (its overall state and the reference for
-new code); a push event only comes from this repository's own branch, so fork code never runs
+new code); a running analysis of `main` is never cancelled by the next merge, the newest
+push waits for it; a push event only comes from this repository's own branch, so fork code never runs
 with the secrets (fork pull requests keep the rules of push-discipline.md). Thresholds appear as names; their default values appear only in
 chapter 23, section 11.
 
