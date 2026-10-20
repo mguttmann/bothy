@@ -137,7 +137,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tap(tester, 'shell.settings');
+    await tap(tester, 'sidebar.settings');
     expect(find.byKey(const ValueKey('screen.settings')), findsOneWidget);
     expect(find.byKey(const ValueKey('settings.theme')), findsOneWidget);
 
@@ -162,7 +162,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tap(tester, 'shell.settings');
+    await tap(tester, 'sidebar.settings');
     final router = GoRouter.of(tester.element(find.byType(SettingsShell)));
     router.go('/settings/nothing');
     await tester.pumpAndSettle();
@@ -189,7 +189,7 @@ void main() {
     tester,
   ) async {
     final (control, self) = await pumpApp(tester);
-    await tap(tester, 'shell.settings');
+    await tap(tester, 'sidebar.settings');
     await tap(tester, 'settings.nav.devices');
     expect(find.byKey(const ValueKey('device.thisDevice')), findsOneWidget);
 
@@ -206,7 +206,7 @@ void main() {
 
   testWidgets('the app language follows the profile', (tester) async {
     await pumpApp(tester, locale: 'de');
-    await tap(tester, 'shell.settings');
+    await tap(tester, 'sidebar.settings');
     expect(find.text('Einstellungen'), findsWidgets);
   });
 }

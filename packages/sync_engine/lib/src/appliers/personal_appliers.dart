@@ -37,6 +37,7 @@ Future<void> _readState(ApplyContext c) async {
   final lastMessageSeq = thread?.lastMessageSeq ?? merged.lastReadSeq;
   final floor = thread?.unreadFloorSeq ?? const ThreadSeq(0);
   final sync = c.sync;
+  final seq = c.event.seq;
   c.after.steps.add(() {
     sync.counter.resetFrom(
       ReadState(
@@ -49,8 +50,10 @@ Future<void> _readState(ApplyContext c) async {
       ),
       lastMessageSeq: lastMessageSeq,
       unreadFloorSeq: floor,
+      at: seq == null ? null : GlobalSeq(seq),
     );
     sync.countedThreads.add(incoming.threadId);
+    sync.counterChannels[incoming.threadId] = incoming.channelId;
     sync.counterChanges.add(incoming.threadId);
   });
 }

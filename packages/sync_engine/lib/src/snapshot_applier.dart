@@ -108,8 +108,10 @@ final class SnapshotApplier {
       sync.me = s.principal.id;
       sync.ephemeral.seedPresence(s.agents);
       final previous = sync.countedThreads.toSet();
-      sync.counter = UnreadCounter();
+      // The counters of the snapshot hold every event up to its head (04 14).
+      sync.counter = UnreadCounter(heldUpTo: s.headSeq);
       sync.countedThreads.clear();
+      sync.counterChannels.clear();
       for (final u in s.unreadThreads) {
         sync.counter.resetFrom(
           ReadState(
@@ -126,6 +128,7 @@ final class SnapshotApplier {
           unreadFloorSeq: floors[u.threadId] ?? const ThreadSeq(0),
         );
         sync.countedThreads.add(u.threadId);
+        sync.counterChannels[u.threadId] = u.channelId;
       }
       for (final t in {...previous, ...sync.countedThreads}) {
         sync.counterChanges.add(t);

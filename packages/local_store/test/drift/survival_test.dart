@@ -2,9 +2,8 @@
 
 // The migration rule of 15 6.2 (Design note 4, docs/DECISIONS.md D-M4-12-6): outbox, drafts and
 // share inbox survive every migration. Each pair of stored schema versions (`from < to`) is
-// migrated with fixture rows in the preserved tables, which must be equal afterwards; with only
-// version 1 the pair loop is empty, and the round trip of version 1 (create, fill, close,
-// reopen with the key, compare) runs instead. A new schema version adds its fixture rows to
+// migrated with fixture rows in the preserved tables, which must be equal afterwards; the round
+// trip of the current version (create, fill, close, reopen with the key, compare) runs too. A new schema version adds its fixture rows to
 // `_fixtureRows`; the test fails when a stored version has none.
 
 import 'dart:io';
@@ -17,66 +16,71 @@ import 'package:test/test.dart';
 import '../support/fixtures.dart';
 import 'local_store/generated/schema.dart';
 
+/// The fixture rows of version 1; version 2 (M4-19, `forum_view_states`) left the preserved
+/// tables as they were.
+final Map<String, List<Map<String, Object?>>> _rowsV1 = {
+  'outbox': [
+    {
+      'id': uuid(1),
+      'kind': 'postMessage',
+      'thread_id': uuid(0x301),
+      'depends_on': uuid(2),
+      'payload': '{"content_md":"Hello from Alex"}',
+      'expected_version': 3,
+      'state': 'failed',
+      'attempts': 2,
+      'next_attempt_at': 1000,
+      'last_error_code': 'conflict',
+      'last_error_reason': 'version_mismatch',
+      'conflict_current': '{"version":4}',
+      'created_at': 10,
+      'state_changed_at': 20,
+    },
+    {
+      'id': uuid(2),
+      'kind': 'createUpload',
+      'thread_id': null,
+      'depends_on': null,
+      'payload': '{}',
+      'expected_version': null,
+      'state': 'pending',
+      'attempts': 0,
+      'next_attempt_at': null,
+      'last_error_code': null,
+      'last_error_reason': null,
+      'conflict_current': null,
+      'created_at': 5,
+      'state_changed_at': 5,
+    },
+  ],
+  'drafts': [
+    {
+      'id': uuid(0x401),
+      'thread_id': uuid(0x301),
+      'channel_id': uuid(0x201),
+      'content_md': 'Draft by Sam',
+      'reply_to_message_id': null,
+      'file_ids': '[]',
+      'version': 2,
+      'updated_by_device_id': uuid(0x901),
+      'updated_at': '2026-10-01T09:00:00.000Z',
+    },
+  ],
+  'share_inbox': [
+    {
+      'id': uuid(3),
+      'target_thread_id': null,
+      'payload': '{"text":"From Robin"}',
+      'file_paths': '["share/photo.png"]',
+      'created_at': 30,
+    },
+  ],
+};
+
 /// Fixture rows of the preserved tables per stored schema version, as column to value.
 final Map<int, Map<String, List<Map<String, Object?>>>> _fixtureRows = {
-  1: {
-    'outbox': [
-      {
-        'id': uuid(1),
-        'kind': 'postMessage',
-        'thread_id': uuid(0x301),
-        'depends_on': uuid(2),
-        'payload': '{"content_md":"Hello from Alex"}',
-        'expected_version': 3,
-        'state': 'failed',
-        'attempts': 2,
-        'next_attempt_at': 1000,
-        'last_error_code': 'conflict',
-        'last_error_reason': 'version_mismatch',
-        'conflict_current': '{"version":4}',
-        'created_at': 10,
-        'state_changed_at': 20,
-      },
-      {
-        'id': uuid(2),
-        'kind': 'createUpload',
-        'thread_id': null,
-        'depends_on': null,
-        'payload': '{}',
-        'expected_version': null,
-        'state': 'pending',
-        'attempts': 0,
-        'next_attempt_at': null,
-        'last_error_code': null,
-        'last_error_reason': null,
-        'conflict_current': null,
-        'created_at': 5,
-        'state_changed_at': 5,
-      },
-    ],
-    'drafts': [
-      {
-        'id': uuid(0x401),
-        'thread_id': uuid(0x301),
-        'channel_id': uuid(0x201),
-        'content_md': 'Draft by Sam',
-        'reply_to_message_id': null,
-        'file_ids': '[]',
-        'version': 2,
-        'updated_by_device_id': uuid(0x901),
-        'updated_at': '2026-10-01T09:00:00.000Z',
-      },
-    ],
-    'share_inbox': [
-      {
-        'id': uuid(3),
-        'target_thread_id': null,
-        'payload': '{"text":"From Robin"}',
-        'file_paths': '["share/photo.png"]',
-        'created_at': 30,
-      },
-    ],
-  },
+  1: _rowsV1,
+  2: _rowsV1,
 };
 
 void _insert(Database raw, Map<String, List<Map<String, Object?>>> rows) {
@@ -152,7 +156,7 @@ void main() {
     }
   }
 
-  test('round trip of version 1: create, fill, close, reopen with the key, compare', () async {
+  test('round trip of the current version: create, fill, close, reopen with the key, compare', () async {
     final dir = await tempDir();
     addTearDown(() => dir.delete(recursive: true));
     final file = File('${dir.path}/store.db');

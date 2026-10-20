@@ -118,11 +118,18 @@ final class SyncContext {
   /// One line per notable step, never content.
   final void Function(String line) log;
 
-  /// Unread and mention counters between two server values (04 14).
+  /// Unread and mention counters between two server values (04 14); every change passes the
+  /// global `seq` of its event, so the counter itself skips what its server values hold
+  /// (D-M4-19-10).
   UnreadCounter counter = UnreadCounter();
 
   /// The threads [counter] holds values for, so a new snapshot can announce the ones it resets.
   final Set<ThreadId> countedThreads = {};
+
+  /// The channel of every thread in [countedThreads], from the snapshot's `unread_threads`, the
+  /// read state and the message events; the sidebar sums the counters per channel without the
+  /// thread being stored (brief M4-19 Design note 1).
+  final Map<ThreadId, ChannelId> counterChannels = {};
 
   /// IDs of spaces, channels and threads removed in this process (04 8.3); a REST read that
   /// was in flight during the removal must not store their content again (code review of
@@ -326,6 +333,7 @@ final class Dispatcher {
     if (id == null) return;
     final type = c.event.type;
     final clientMsgId = c.clientMsgId;
+    final seq = c.event.seq;
     c.after.reads.add(() async {
       switch (kind) {
         case 'message':
@@ -335,6 +343,7 @@ final class Dispatcher {
             bundle,
             created: type == 'message.created',
             clientMsgId: clientMsgId,
+            seq: seq,
           );
         case 'thread':
           final thread = await sync.fetcher.thread(ThreadId.parse(id));

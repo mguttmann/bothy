@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Handlers of the personal state: read states, drafts and settings (04 14).
+/// Handlers of the personal state: read states, drafts, settings and the sidebar (04 14).
 library;
 
 import '../rest_fake.dart';
@@ -78,5 +78,21 @@ void registerPersonalHandlers(RestFake rest) {
     ..handle('deleteMySetting', (r) {
       world.deleteSetting(r.person.id, r.param('key'));
       return const FakeResponse.noContent();
-    });
+    })
+    ..handle(
+      'getMySidebar',
+      (r) => FakeResponse(200, {'items': world.sidebarOf(r.person.id)}),
+    )
+    ..handle(
+      'putMySidebarSpace',
+      (r) => FakeResponse(
+        200,
+        world.putSidebar(
+          r.person.id,
+          r.param('space_id'),
+          r.json,
+          deviceId: r.session!.deviceId,
+        ),
+      ),
+    );
 }

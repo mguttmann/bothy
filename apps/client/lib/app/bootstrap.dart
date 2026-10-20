@@ -31,6 +31,8 @@ import '../platform/frame_ticker.dart';
 import '../platform/loopback_redirect.dart';
 import '../platform/network_status.dart';
 import '../platform/secure_store.dart';
+import '../sync/sidebar_ops.dart';
+import '../sync/thread_ops.dart';
 import 'account_wiper.dart';
 import 'branding.dart';
 import 'deep_links.dart';
@@ -256,7 +258,8 @@ final class InstanceServices {
       redirects: ports.redirects(),
       passkeys: ports.passkeys,
     );
-    final engine = SyncEngine.create(
+    late final SyncEngine engine;
+    engine = SyncEngine.create(
       baseUrl: instance.address,
       auth: auth,
       store: database,
@@ -274,6 +277,16 @@ final class InstanceServices {
       ids: ids,
       keepConnectedInBackground: true,
       allowPlainHttpForTests: ports.allowPlainHttpForTests,
+      // The app's own writes (M4-19): the personal sidebar and new forum posts.
+      registerExecutors: (executors, api) {
+        SidebarOps.register(executors, api, database);
+        // The executor runs only after the engine exists, so `engine` is set by then.
+        ThreadOps.register(
+          executors,
+          api,
+          (thread) => engine.catchUp.storeConfirmedThread(thread),
+        );
+      },
     );
     var stopped = false;
     final wiper = AccountWiper(

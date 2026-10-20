@@ -1902,4 +1902,106 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAboutLicenses => 'Lizenzen';
+
+  @override
+  String get sidebarJumpTo => 'Springen zu';
+
+  @override
+  String get sidebarRunningNow => 'Läuft gerade';
+
+  @override
+  String get sidebarSettings => 'Einstellungen';
+
+  @override
+  String sidebarOwnAvatar(String name) {
+    return '$name, angemeldet';
+  }
+
+  @override
+  String get sidebarMoveUp => 'Nach oben verschieben';
+
+  @override
+  String get sidebarMoveDown => 'Nach unten verschieben';
+
+  @override
+  String get sidebarNoSpaces => 'Noch keine Bereiche';
+
+  @override
+  String get postListNewPost => 'Neuer Beitrag';
+
+  @override
+  String get postListFilterOpen => 'Offen';
+
+  @override
+  String get postListFilterWaitingForMe => 'Wartet auf mich';
+
+  @override
+  String get postListFilterTags => 'Tags';
+
+  @override
+  String postListFilterTagsCount(int count) {
+    return 'Tags ($count)';
+  }
+
+  @override
+  String get postListSortLastActivity => 'Letzte Aktivität';
+
+  @override
+  String get postListSortCreated => 'Neueste zuerst';
+
+  @override
+  String postListDone(int count) {
+    return 'Erledigt ($count)';
+  }
+
+  @override
+  String postListDoneMore(int count) {
+    return 'Erledigt ($count+)';
+  }
+
+  @override
+  String get postListEmpty => 'Kein offener Beitrag hier';
+
+  @override
+  String postListCreateFailed(String title) {
+    return '„$title“ konnte nicht gepostet werden';
+  }
+
+  @override
+  String get postListTryAgain => 'Erneut versuchen';
+
+  @override
+  String get postListDiscard => 'Verwerfen';
+
+  @override
+  String get postListLoadFailed =>
+      'Weitere Beiträge konnten nicht geladen werden';
+
+  @override
+  String get postListEdit => 'Bearbeiten';
+
+  @override
+  String postListFailureReason(String reason) {
+    return 'Grund: $reason';
+  }
+
+  @override
+  String postListLabel(String forum) {
+    return 'Beitragsliste von $forum';
+  }
+
+  @override
+  String get newPostTitle => 'Titel';
+
+  @override
+  String get newPostMessage => 'Erste Nachricht';
+
+  @override
+  String get newPostTags => 'Tags';
+
+  @override
+  String get newPostCreate => 'Beitrag erstellen';
+
+  @override
+  String get newPostCancel => 'Abbrechen';
 }

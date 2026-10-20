@@ -269,7 +269,8 @@ final class Outbox {
   /// Stops the outbox and its streams; the stored entries stay.
   Future<void> close() async {
     await _sender.close();
-    await _changes.close();
+    // Not awaited: a paused listener would hold the done event (D-M4-19-14).
+    unawaited(_changes.close());
   }
 
   /// The entries of [threadId] that are not confirmed, in FIFO order, for the display after

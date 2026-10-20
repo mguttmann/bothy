@@ -17373,6 +17373,239 @@ class ShareInboxCompanion extends UpdateCompanion<ShareInboxRow> {
   }
 }
 
+class $ForumViewStatesTable extends ForumViewStates
+    with TableInfo<$ForumViewStatesTable, ForumViewStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ForumViewStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _channelIdMeta = const VerificationMeta(
+    'channelId',
+  );
+  @override
+  late final GeneratedColumn<String> channelId = GeneratedColumn<String>(
+    'channel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _doneCollapsedMeta = const VerificationMeta(
+    'doneCollapsed',
+  );
+  @override
+  late final GeneratedColumn<bool> doneCollapsed = GeneratedColumn<bool>(
+    'done_collapsed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("done_collapsed" IN (0, 1))',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [channelId, doneCollapsed];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'forum_view_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ForumViewStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('channel_id')) {
+      context.handle(
+        _channelIdMeta,
+        channelId.isAcceptableOrUnknown(data['channel_id']!, _channelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_channelIdMeta);
+    }
+    if (data.containsKey('done_collapsed')) {
+      context.handle(
+        _doneCollapsedMeta,
+        doneCollapsed.isAcceptableOrUnknown(
+          data['done_collapsed']!,
+          _doneCollapsedMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_doneCollapsedMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {channelId};
+  @override
+  ForumViewStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ForumViewStateRow(
+      channelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}channel_id'],
+      )!,
+      doneCollapsed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}done_collapsed'],
+      )!,
+    );
+  }
+
+  @override
+  $ForumViewStatesTable createAlias(String alias) {
+    return $ForumViewStatesTable(attachedDatabase, alias);
+  }
+}
+
+class ForumViewStateRow extends DataClass
+    implements Insertable<ForumViewStateRow> {
+  /// The forum channel.
+  final String channelId;
+
+  /// Whether the section "Done (n)" is collapsed.
+  final bool doneCollapsed;
+  const ForumViewStateRow({
+    required this.channelId,
+    required this.doneCollapsed,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['channel_id'] = Variable<String>(channelId);
+    map['done_collapsed'] = Variable<bool>(doneCollapsed);
+    return map;
+  }
+
+  ForumViewStatesCompanion toCompanion(bool nullToAbsent) {
+    return ForumViewStatesCompanion(
+      channelId: Value(channelId),
+      doneCollapsed: Value(doneCollapsed),
+    );
+  }
+
+  factory ForumViewStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ForumViewStateRow(
+      channelId: serializer.fromJson<String>(json['channelId']),
+      doneCollapsed: serializer.fromJson<bool>(json['doneCollapsed']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'channelId': serializer.toJson<String>(channelId),
+      'doneCollapsed': serializer.toJson<bool>(doneCollapsed),
+    };
+  }
+
+  ForumViewStateRow copyWith({String? channelId, bool? doneCollapsed}) =>
+      ForumViewStateRow(
+        channelId: channelId ?? this.channelId,
+        doneCollapsed: doneCollapsed ?? this.doneCollapsed,
+      );
+  ForumViewStateRow copyWithCompanion(ForumViewStatesCompanion data) {
+    return ForumViewStateRow(
+      channelId: data.channelId.present ? data.channelId.value : this.channelId,
+      doneCollapsed: data.doneCollapsed.present
+          ? data.doneCollapsed.value
+          : this.doneCollapsed,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ForumViewStateRow(')
+          ..write('channelId: $channelId, ')
+          ..write('doneCollapsed: $doneCollapsed')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(channelId, doneCollapsed);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ForumViewStateRow &&
+          other.channelId == this.channelId &&
+          other.doneCollapsed == this.doneCollapsed);
+}
+
+class ForumViewStatesCompanion extends UpdateCompanion<ForumViewStateRow> {
+  final Value<String> channelId;
+  final Value<bool> doneCollapsed;
+  final Value<int> rowid;
+  const ForumViewStatesCompanion({
+    this.channelId = const Value.absent(),
+    this.doneCollapsed = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ForumViewStatesCompanion.insert({
+    required String channelId,
+    required bool doneCollapsed,
+    this.rowid = const Value.absent(),
+  }) : channelId = Value(channelId),
+       doneCollapsed = Value(doneCollapsed);
+  static Insertable<ForumViewStateRow> custom({
+    Expression<String>? channelId,
+    Expression<bool>? doneCollapsed,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (channelId != null) 'channel_id': channelId,
+      if (doneCollapsed != null) 'done_collapsed': doneCollapsed,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ForumViewStatesCompanion copyWith({
+    Value<String>? channelId,
+    Value<bool>? doneCollapsed,
+    Value<int>? rowid,
+  }) {
+    return ForumViewStatesCompanion(
+      channelId: channelId ?? this.channelId,
+      doneCollapsed: doneCollapsed ?? this.doneCollapsed,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (channelId.present) {
+      map['channel_id'] = Variable<String>(channelId.value);
+    }
+    if (doneCollapsed.present) {
+      map['done_collapsed'] = Variable<bool>(doneCollapsed.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ForumViewStatesCompanion(')
+          ..write('channelId: $channelId, ')
+          ..write('doneCollapsed: $doneCollapsed, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final SearchIndex searchIndex = SearchIndex(this);
@@ -17416,6 +17649,9 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
       $LoadedRangesTableTable(this);
   late final $FileCacheTable fileCache = $FileCacheTable(this);
   late final $ShareInboxTable shareInbox = $ShareInboxTable(this);
+  late final $ForumViewStatesTable forumViewStates = $ForumViewStatesTable(
+    this,
+  );
   late final Index channelsSpace = Index(
     'channels_space',
     'CREATE INDEX channels_space ON channels (space_id)',
@@ -17532,6 +17768,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     loadedRangesTable,
     fileCache,
     shareInbox,
+    forumViewStates,
     channelsSpace,
     forumTagsChannel,
     threadsChannel,

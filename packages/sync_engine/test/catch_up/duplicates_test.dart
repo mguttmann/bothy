@@ -50,7 +50,7 @@ void main() {
   });
 
   test('a live event repeated after a reconnect is applied once', () async {
-    await w.connect(cursor: 30);
+    await w.connect(cursor: 30, headSeq: 30);
     await w.push('catchup.complete', {'head_seq': 30});
     await w.dispatch([
       threadCreated(31, 1),

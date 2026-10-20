@@ -97,5 +97,7 @@ export 'src/wire.dart'
         UnreadThread,
         channelViewFromJson,
         messageFromJson,
+        sidebarFromJson,
         snapshotFromJson,
-        spaceViewFromJson;
+        spaceViewFromJson,
+        threadFromJson;

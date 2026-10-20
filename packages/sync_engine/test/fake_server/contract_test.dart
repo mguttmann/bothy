@@ -4,6 +4,8 @@
 // response and every frame validate against docs/api/; an invalid body or frame sent to the
 // fake fails with the JSON Pointer.
 
+import 'dart:typed_data';
+
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:built_value/json_object.dart';
@@ -114,6 +116,33 @@ void main() {
     );
     await prefs.listMySettings();
     await prefs.deleteMySetting(key: 'locale.default');
+
+    // The sidebar, a forum post and the logo (M4-19).
+    await prefs.putMySidebarSpace(
+      spaceId: w.space,
+      sidebarStatePut: SidebarStatePut(
+        (b) => b
+          ..collapsed = true
+          ..sortKey = 'a0V',
+      ),
+    );
+    await prefs.getMySidebar();
+    final forum = h.server.world.addForum(w.space, 'questions', {
+      w.alex.id: 'write',
+    });
+    h.server.world.addForumTag(forum, 'bug', color: 'rowan');
+    await api.getChannelsApi().listForumTags(channelId: forum);
+    await api.getThreadsApi().createThread(
+      channelId: forum,
+      threadCreate: ThreadCreate(
+        (b) => b
+          ..title = 'Printer jams'
+          ..firstMessage.clientMsgId = h.server.world.nextId()
+          ..firstMessage.contentMd = 'Since Monday',
+      ),
+    );
+    h.server.world.logo = Uint8List.fromList([137, 80, 78, 71]);
+    await api.getDiscoveryApi().getBrandingLogo();
 
     // A run of Robin, then its document and its cancellation.
     h.server.addAgent(

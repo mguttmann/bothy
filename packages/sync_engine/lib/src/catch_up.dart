@@ -23,6 +23,7 @@ import 'package:local_store/local_store.dart';
 
 import 'appliers/message_appliers.dart';
 import 'appliers/personal_appliers.dart';
+import 'appliers/thread_appliers.dart';
 import 'backoff.dart';
 import 'connection_state.dart';
 import 'dispatcher.dart';
@@ -137,6 +138,7 @@ final class CatchUpListener implements SessionListener {
   StreamSubscription<ConnectionState>? _states;
   Future<void> _background = Future<void>.value();
   int _pendingReads = 0;
+  bool _disposed = false;
   bool _live = false;
   bool _halted = false;
   bool _resyncing = false;
@@ -158,6 +160,50 @@ final class CatchUpListener implements SessionListener {
 
   /// The threads whose counts changed.
   Stream<ThreadId> get countChanges => _sync.counterChanges.stream;
+
+  /// The signed-in person as the last snapshot named it (`principal`), or null before the
+  /// first `ready` of this process (brief M4-19: "Waiting for me" and the own avatar).
+  PrincipalId? get me => _sync.me;
+
+  /// The counts of every thread of [channelId] this engine counts (04 14: the server's values
+  /// plus what it counted since), by thread. A thread whose counter it never touched is
+  /// absent; the caller then uses the stored read state. The sidebar sums them per channel
+  /// (brief M4-19 Design note 1).
+  Map<ThreadId, ThreadCounts> countsOfChannel(ChannelId channelId) => {
+    for (final t in _sync.countedThreads)
+      if (_sync.counterChannels[t] == channelId) t: _sync.counter.countsOf(t),
+  };
+
+  /// Loads one page of the threads of [channelId] (`listChannelThreads`, newest first by
+  /// [sort]) from [cursor] and stores them by the version rule; returns the cursor of the next
+  /// page, null on the last one (brief M4-19 Design note 3: the post list loads further pages
+  /// when scrolled near the end). Nothing is stored for a channel this device does not hold
+  /// or that was removed meanwhile, nor after a wipe. Throws what the read throws.
+  Future<String?> loadThreadPage(
+    ChannelId channelId, {
+    String? cursor,
+    ForumSort? sort,
+    int? limit,
+  }) async {
+    if (_wiped) return null;
+    final page = await _sync.fetcher.channelThreads(
+      channelId,
+      cursor: cursor,
+      sort: sort,
+      limit: limit,
+    );
+    await _db.transaction(() async {
+      if (_wiped || !await _sync.holdsChannel(_db, channelId)) return;
+      for (final thread in page.threads) {
+        if (thread.channelId != channelId ||
+            _sync.removedTargets.contains(thread.id.value)) {
+          continue;
+        }
+        await storeThread(_db, thread);
+      }
+    });
+    return page.nextCursor;
+  }
 
   /// Whether the database was wiped after a revocation; nothing is applied any more.
   bool get wiped => _wiped;
@@ -478,6 +524,23 @@ final class CatchUpListener implements SessionListener {
     );
   }
 
+  /// Stores the thread a confirmed `createThread` returned (API `Thread`), so the new post
+  /// shows at once and not only by its `thread.created`. The version rule applies and the
+  /// title is indexed (14 6); a thread of a channel this device does not hold or of a removed
+  /// target is not stored; after a wipe nothing happens.
+  Future<void> storeConfirmedThread(Map<String, Object?> json) async {
+    if (_wiped) return;
+    final thread = threadFromJson(json);
+    await _db.transaction(() async {
+      if (_wiped ||
+          _sync.removedTargets.contains(thread.id.value) ||
+          !await _sync.holdsChannel(_db, thread.channelId)) {
+        return;
+      }
+      await storeThread(_db, thread);
+    });
+  }
+
   /// Stores the answer of `putThreadDraft` of the app's write path (API `DraftPutResult`) and
   /// emits [DraftOverwritten] when it reports `overwrote_newer` (04 14).
   Future<void> applyDraftPutResult(Map<String, Object?> result) =>
@@ -502,7 +565,7 @@ final class CatchUpListener implements SessionListener {
   Future<void> _inBackground(Future<void> Function() read) {
     _pendingReads++;
     final run = _background.then((_) async {
-      if (_wiped) return;
+      if (_wiped || _disposed) return;
       try {
         await read();
       } on Object catch (e) {
@@ -541,12 +604,18 @@ final class CatchUpListener implements SessionListener {
   void _log(String line) => _logHook?.call('catch-up: $line');
 
   /// Stops watching the connection and closes the streams.
+  ///
+  /// Background reads that still wait for the network are not awaited: a read that never gets
+  /// its answer would keep the engine, and with it the database, open. Queued reads do not
+  /// start; a running read that ends later fails on the closed database and is logged like
+  /// every failed read (D-M4-19-15).
   Future<void> dispose() async {
+    _disposed = true;
     await _states?.cancel();
-    await idle();
     await ephemeral.dispose();
-    await _sync.counterChanges.close();
-    await _notices.close();
+    // Not awaited: a paused listener would hold the done event (D-M4-25-8, D-M4-19-14).
+    unawaited(_sync.counterChanges.close());
+    unawaited(_notices.close());
   }
 }
 

@@ -80,7 +80,18 @@ final class FakeRequest {
 /// The answer of a handler.
 final class FakeResponse {
   /// A response with [status], a JSON [body] (none when null) and extra [headers].
-  const FakeResponse(this.status, [this.body, this.headers = const {}]);
+  const FakeResponse(this.status, [this.body, this.headers = const {}])
+    : bytes = null,
+      _contentType = null;
+
+  /// A `200` with the binary [bytes] of [contentType] (an `image/*` download such as
+  /// `getBrandingLogo`); the contract check sees no JSON body.
+  const FakeResponse.bytes(
+    List<int> this.bytes, {
+    required String this._contentType,
+  }) : status = 200,
+       body = null,
+       headers = const {};
 
   /// `204 No Content`.
   const FakeResponse.noContent() : this(204);
@@ -93,6 +104,11 @@ final class FakeResponse {
 
   /// Extra headers.
   final Map<String, String> headers;
+
+  /// The binary body of [FakeResponse.bytes], or null.
+  final List<int>? bytes;
+
+  final String? _contentType;
 }
 
 /// Handles one operation; throw [FakeProblem] for a problem answer.
@@ -545,7 +561,11 @@ final class RestFake {
     final res = request.response..statusCode = out.status;
     res.headers.set('Correlation-Id', world.nextId());
     out.headers.forEach(res.headers.set);
-    if (out.body != null) {
+    final bytes = out.bytes;
+    if (bytes != null) {
+      res.headers.contentType = ContentType.parse(out._contentType!);
+      res.add(bytes);
+    } else if (out.body != null) {
       final problem =
           out.body is JsonMap &&
           (out.body! as JsonMap)['correlation_id'] != null &&

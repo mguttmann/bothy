@@ -45,4 +45,29 @@ final class RunsDao {
             ..orderBy([(t) => OrderingTerm(expression: t.queuedAt)]))
           .map(runFromRow)
           .watch();
+
+  /// The runs that have not ended (`queued`, `running`, `waiting_input`; 04 11.3 item 6), in
+  /// queue order. The sidebar shows a run dot per channel and the post list a state icon per
+  /// thread from them (components.md 6 and 7).
+  Stream<List<RunSummary>> watchActive() =>
+      (_db.select(_db.runs)
+            ..where(
+              (t) => t.state.isIn([
+                RunState.queued.code,
+                RunState.running.code,
+                RunState.waitingInput.code,
+              ]),
+            )
+            ..orderBy([(t) => OrderingTerm(expression: t.queuedAt)]))
+          .map(runFromRow)
+          .watch();
+
+  /// The stored runs of [channelId] in queue order: the post list shows the state of the
+  /// active run and the failure of the newest run per thread (components.md 6).
+  Stream<List<RunSummary>> watchForChannel(ChannelId channelId) =>
+      (_db.select(_db.runs)
+            ..where((t) => t.channelId.equals(channelId.value))
+            ..orderBy([(t) => OrderingTerm(expression: t.queuedAt)]))
+          .map(runFromRow)
+          .watch();
 }

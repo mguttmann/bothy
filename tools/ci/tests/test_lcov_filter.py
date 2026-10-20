@@ -21,6 +21,7 @@ def _record(path: str, found: int, hit: int) -> str:
         "lib/src/model.g.dart",
         "lib/src/model.freezed.dart",
         "lib/src/db.drift.dart",
+        "lib/src/database.steps.dart",
         "lib/src/generated/api.dart",
         "lib/src/generated/deep/model.dart",
         "build/x.dart",

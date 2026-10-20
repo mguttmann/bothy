@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The main view of the desktop after the login: the connection banner and the four column
-/// frames that M4-19 to M4-25 fill (docs/spec/01-product.md 5.1, 6.6, 6.7).
+/// frames that M4-19 to M4-25 fill (docs/spec/01-product.md 5.1, 6.6, 6.7); M4-19 fills the
+/// sidebar and the post list of a forum.
 library;
 
 import 'package:design_system/design_system.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
-import '../../onboarding/onboarding_controller.dart';
+import '../../forum/post_list_column.dart';
 import '../../settings/settings_providers.dart';
-import '../../settings/settings_shell.dart';
+import '../../sidebar/providers.dart';
+import '../../sidebar/sidebar_column.dart';
 import '../providers/ports.dart';
 import '../providers/session.dart';
 import '../providers/settings.dart';
@@ -45,6 +46,19 @@ class DesktopShell extends ConsumerWidget {
     final phase = ref.watch(connectionStateProvider).value?.phase;
     final widths = ref.watch(columnWidthsProvider);
     final parsed = parseLocation(location);
+    final resolving = ref.watch(routeSelectionProvider(location.toString()));
+    ref.listen(routeSelectionProvider(location.toString()), (_, next) {
+      if (next.value case final value?) {
+        ref.read(lastRouteSelectionProvider.notifier).keep(value);
+      }
+    });
+    // While a new route resolves, the last selection stays (no column leaves for a frame).
+    final RouteSelection selection =
+        resolving.value ??
+        (resolving.isLoading
+            ? ref.watch(lastRouteSelectionProvider)
+            : const RouteSelection());
+    final forum = selection.forum;
     final banner = switch (phase) {
       ConnectionPhase.updateRequired => DsBanner(
         key: const ValueKey('shell.updateRequired'),
@@ -75,45 +89,19 @@ class DesktopShell extends ConsumerWidget {
               minWidthThreeColumns: config.desktopMinWidthThreeColumns
                   .toDouble(),
               stackShowsHistory: parsed is ThreadLocation,
+              showPostList: forum != null,
               onWidthsChanged: (next) {
                 final settings = ref.read(settingsRepositoryProvider);
                 if (settings != null) ColumnWidthsWriter(settings).save(next);
               },
-              sidebar: Align(
-                alignment: Alignment.bottomLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(DsSpace.s8),
-                  child: Wrap(
-                    spacing: DsSpace.s8,
-                    children: [
-                      TextButton(
-                        key: const ValueKey('shell.settings'),
-                        onPressed: () =>
-                            context.go(SettingsSection.appearance.path),
-                        child: Text(
-                          l.settingsTitle,
-                          style: TextStyle(
-                            color: context.dsColors.textOnSidebar,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        key: const ValueKey('shell.logout'),
-                        onPressed: () => ref
-                            .read(onboardingControllerProvider.notifier)
-                            .logout(),
-                        child: Text(
-                          l.onboardingLogOut,
-                          style: TextStyle(
-                            color: context.dsColors.textOnSidebar,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              postList: const SizedBox.expand(),
+              sidebar: SidebarColumn(selectedChannel: selection.channel),
+              postList: forum == null
+                  ? const SizedBox.expand()
+                  : PostListColumn(
+                      key: ValueKey('postList.${forum.value}'),
+                      channelId: forum,
+                      selectedThread: selection.thread,
+                    ),
               history: _TargetView(location: location),
               session: const SizedBox.expand(),
             ),
