@@ -92,6 +92,17 @@ type PairingCode struct {
 	Hash []byte
 }
 
+// IncomingWebhookToken is a new token of an incoming webhook (bothy_whi_..., 08 section 12, ADR
+// 0061, M2-27): the secret, shown exactly once by createIncomingWebhook inside its URL, and its
+// HMAC-SHA-256 with the token pepper of auth.token_pepper_ref, the only form the module apps
+// stores (incoming_webhooks.token_hash). The secret prints "[redacted]" through fmt, slog and JSON.
+type IncomingWebhookToken struct {
+	// Secret is the token; only the createIncomingWebhook handler reveals it, once.
+	Secret Token
+	// Hash is HMAC-SHA-256(pepper, token).
+	Hash []byte
+}
+
 // Tokens is the API token port of identity (02 section 4.3, brief M1-44). Its methods authorize
 // nothing: the calling use case did. Each joins the ambient unit of work of ctx, or runs its own.
 // Every error is a kernel/errs error without the secret, the hash or SQL.
@@ -122,6 +133,16 @@ type Tokens interface {
 	// well-formed token of kind hpc (form, kind, checksum) is ErrTokenMalformed before any HMAC is
 	// computed; it reads and writes no database and authorizes nothing.
 	HashHostPairingCode(ctx context.Context, raw string) ([]byte, error)
+	// NewIncomingWebhookToken returns a new token of kind whi from crypto/rand with its HMAC
+	// (M2-27). It reads and writes no database and authorizes nothing: webhook_in.create did. The
+	// authenticator never accepts the token; the token check of the incoming webhooks does.
+	// Errors: internal_error when the random source fails.
+	NewIncomingWebhookToken(ctx context.Context) (IncomingWebhookToken, error)
+	// HashIncomingWebhookToken returns the HMAC of raw exactly as NewIncomingWebhookToken computes
+	// it, the value compared with incoming_webhooks.token_hash (M2-27 design note 2 b). A value
+	// that is not a well-formed token of kind whi (form, kind, checksum) is ErrTokenMalformed
+	// before any HMAC is computed; it reads and writes no database and authorizes nothing.
+	HashIncomingWebhookToken(ctx context.Context, raw string) ([]byte, error)
 }
 
 // ErrTokenMalformed reports a value that is not a well-formed token of the expected kind (ADR
