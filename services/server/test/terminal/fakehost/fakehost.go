@@ -154,6 +154,8 @@ type Host struct {
 	cond    *gosync.Cond
 	ctx     context.Context
 	cancel  context.CancelFunc
+	// ended is closed when the reader of the control connection returned (M2-47).
+	ended chan struct{}
 }
 
 // NewKey returns a fresh login key and Noise key pair of a host: the Ed25519 login key and 32
@@ -179,7 +181,7 @@ func Connect(t testing.TB, baseURL string, id ids.ID, key hosttest.Key, report m
 		t.Fatal(err)
 	}
 	h := &Host{t: t, base: baseURL, ID: id, Key: key, contract: contract, scripts: map[ids.ID]Script{}, seenJTI: map[string]bool{},
-		data: map[ids.ID]*DataConn{}, ctx: ctx, cancel: cancel}
+		data: map[ids.ID]*DataConn{}, ctx: ctx, cancel: cancel, ended: make(chan struct{})}
 	h.cond = gosync.NewCond(&h.mu)
 	h.Control = hosttest.Dial(t, ctx, baseURL)
 	h.addJWKS(h.Control.Hello().Jwks)
@@ -208,6 +210,31 @@ func Connect(t testing.TB, baseURL string, id ids.ID, key hosttest.Key, report m
 	go h.read()
 	t.Cleanup(h.Close)
 	return h
+}
+
+// ControlEnded reports whether the control connection has ended.
+func (h *Host) ControlEnded() bool {
+	select {
+	case <-h.ended:
+		return true
+	default:
+		return false
+	}
+}
+
+// ControlClose waits for the end of the control connection and returns the close code of the
+// server (0 without a close frame). Errors: ctx ending first.
+func (h *Host) ControlClose(ctx context.Context) (int, error) {
+	select {
+	case <-h.ended:
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
+	code, err := h.Control.ExpectClose(ctx)
+	if err != nil && ctx.Err() != nil {
+		return 0, err
+	}
+	return code, nil
 }
 
 // Close ends the control connection and every data connection.
@@ -251,6 +278,7 @@ func (h *Host) Send(op string, d any) error { return h.Control.Send(h.ctx, op, d
 
 // read handles the frames of the server until the connection ends.
 func (h *Host) read() {
+	defer close(h.ended)
 	for {
 		op, d, err := h.Control.Next(h.ctx)
 		if err != nil {

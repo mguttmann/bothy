@@ -140,6 +140,15 @@ type Deps struct {
 	// TerminalSignals wraps the signals of the terminal module (M2-47); a test wraps the NOTIFY
 	// signals to fail a unit after its signal was staged. nil in production.
 	TerminalSignals func(terminalapp.Signals) terminalapp.Signals
+	// TerminalListenerGate runs before every dial of the LISTEN ephemeral connection (M2-47); a
+	// test blocks it to keep a node deaf after it ended the listener's backend. nil in production.
+	TerminalListenerGate func(ctx context.Context) error
+	// TerminalMetrics replaces the instruments of the relay (M2-47): two nodes in one test process
+	// count bothy.terminal.relay.unpaired apart. nil creates the OpenTelemetry adapter.
+	TerminalMetrics terminalapp.Metrics
+	// TerminalModule receives the use cases of the terminal module once they are built (M2-47): a
+	// test commits an end in a worker process through them. nil in production.
+	TerminalModule func(*terminalapp.Service)
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -1021,6 +1030,9 @@ func (s *server) startTerminal(context.Context) error {
 	}
 	sig, local := terminalSignals(s.plan, pool, s.deps.TerminalSignals)
 	tm.Service.BindSignals(sig)
+	if s.deps.TerminalModule != nil {
+		s.deps.TerminalModule(tm.Service)
+	}
 	s.mu.Lock()
 	s.terminal, s.terminalLocal = tm, local
 	s.mu.Unlock()
@@ -1369,7 +1381,7 @@ func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *https
 		return errors.New("wire: the terminal streams need identity's authenticator and nonces and the signing keys")
 	}
 	ts, err := NewTerminalStreams(cfg, tm, hc, TerminalStreamsDeps{Authenticator: id.Authenticator, Nonces: id.DPoP, Signer: keys.Keys,
-		Timers: s.deps.TerminalTimers, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi})
+		Timers: s.deps.TerminalTimers, Metrics: s.deps.TerminalMetrics, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi})
 	if err != nil {
 		return err
 	}

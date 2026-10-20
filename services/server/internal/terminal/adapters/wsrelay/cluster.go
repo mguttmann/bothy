@@ -159,6 +159,10 @@ func (h *Hub) probe(d *link) {
 			if err := h.uc.ResolveDuplicate(ctx, host); err != nil {
 				h.log.LogAttrs(ctx, slog.LevelError, msgInternal, slog.String(logErrorType, errorInternal))
 			}
+			// The probing node closes its own connection with 4112 as M2-43 does on one node; the
+			// other nodes close theirs on terminal.host_close.
+			d.markHandled()
+			d.close(domain.CodeHostDuplicate)
 			return
 		}
 		h.log.LogAttrs(ctx, slog.LevelWarn, msgDuplicate, slog.Int(attr.CloseCode, int(domain.CodeHeartbeatTimeout)))
