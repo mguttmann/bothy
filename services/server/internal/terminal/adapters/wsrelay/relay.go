@@ -953,10 +953,12 @@ func (r *Relay) BindSender(send func(ctx context.Context, s domain.Signal) error
 
 // MarkPairedElsewhere records terminal.session_paired of another node for the slot of the session
 // (M2-47 Design note 3): an expectation without sides then only removes itself at its deadline.
+// A slot that holds a side or paired on this node keeps M2-44's rule: the node's own signal comes
+// back through the listener and must not spare its opening.
 func (r *Relay) MarkPairedElsewhere(sessionID ids.ID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if s := r.slots[sessionID]; s != nil {
+	if s := r.slots[sessionID]; s != nil && !s.pairedOnce && s.dev == nil && s.hst == nil {
 		s.pairedElsewhere = true
 	}
 }

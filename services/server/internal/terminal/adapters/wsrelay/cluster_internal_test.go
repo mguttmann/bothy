@@ -81,20 +81,24 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 // TestRelay_SidelessExpectationDeadline: the deadline of an expectation without sides decides by
 // the session state read from the database: a session still in opening ends (compare-and-swap),
 // an active one is left alone; on a host with require_local_confirm an expectation that received
-// terminal.session_paired only removes itself, without it the opening ends.
+// terminal.session_paired only removes itself, without it the opening ends; the node's own
+// terminal.session_paired, which comes back through the listener after a pairing here that ended
+// before session.started, changes nothing, so the opening still ends.
 func TestRelay_SidelessExpectationDeadline(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name          string
 		state         string
 		confirm, mark bool
+		pairedHere    bool
 		want          string
 		slotGone      bool
 	}{
-		{"opening", domain.SessionOpening, false, false, "open_failed:open_timeout", false},
-		{"active_elsewhere", domain.SessionActive, false, false, "", false},
-		{"confirm_paired_elsewhere", domain.SessionOpening, true, true, "", true},
-		{"confirm_never_paired", domain.SessionOpening, true, false, "open_failed:open_timeout", false},
+		{"opening", domain.SessionOpening, false, false, false, "open_failed:open_timeout", false},
+		{"active_elsewhere", domain.SessionActive, false, false, false, "", false},
+		{"confirm_paired_elsewhere", domain.SessionOpening, true, true, false, "", true},
+		{"confirm_never_paired", domain.SessionOpening, true, false, false, "open_failed:open_timeout", false},
+		{"confirm_own_pairing_returned", domain.SessionOpening, true, true, true, "open_failed:open_timeout", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -104,6 +108,12 @@ func TestRelay_SidelessExpectationDeadline(t *testing.T) {
 			session := ids.New()
 			r.Expect(app.Expectation{SessionID: session, HostID: ids.New(), DeviceID: ids.New(), Deadline: time.Now().Add(time.Minute),
 				LocalConfirm: c.confirm})
+			if c.pairedHere {
+				// A pairing on this node that ended before session.started.
+				r.mu.Lock()
+				r.slots[session].pairedOnce = true
+				r.mu.Unlock()
+			}
 			if c.mark {
 				r.MarkPairedElsewhere(session)
 			}
