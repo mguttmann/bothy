@@ -101,6 +101,12 @@
       "groupName": "local SonarQube"
     },
     {
+      "description": "OpenTofu providers of infra/tofu (brief M7-16): the exact pins in the module versions.tf files and the lock files of the test roots move in one pull request; tools/ci/tests/test_tofu_cloud_modules.py fails when they differ",
+      "matchManagers": ["terraform"],
+      "matchFileNames": ["infra/tofu/**"],
+      "groupName": "OpenTofu providers"
+    },
+    {
       "description": "Major updates wait for approval on the dependency dashboard",
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true

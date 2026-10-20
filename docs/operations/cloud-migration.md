@@ -21,6 +21,12 @@ so tokens, devices and invocation tokens stay valid.
    ([infra/tofu/modules/generic-vm/README.md](../../infra/tofu/modules/generic-vm/README.md)).
    The wizard generates fresh secrets on the target; step 2 replaces them with the bundle of the
    old instance before the first start of the restored data.
+   On Hetzner Cloud, AWS and Azure the modules `hetzner`, `aws` and `azure` create the network
+   (only the edge port public, SSH from `ssh_allowed_cidrs`) and the host and then call
+   `generic-vm` ([infra/tofu/README.md](../../infra/tofu/README.md)). Point the DNS name at the
+   address in the output `ssh_endpoint` only in step 7 of section 3. The off-site bucket of the
+   target (created by `aws` with `offsite_region`, by hand on Hetzner, elsewhere for Azure) gets
+   its keys by hand, as the module READMEs describe; until then the target backs up locally only.
 2. Load the secrets bundle. Push keys and app identity stay the same; push registrations
    of the devices therefore stay valid.
 3. Trial run: restore the latest backup of the old instance on the target
@@ -87,4 +93,7 @@ it only with the same `instance_id` (question for team B).
 
 1. To the managed service: as above, restore of the logical dump into the service. The OpenTofu
    module creates the roles. `bothy-backupd` then runs without pgBackRest.
+   As built (M7-16): not possible yet. Amazon RDS and Azure Database for PostgreSQL offer
+   PostgreSQL 18, but `install.sh` and the Compose stack cannot use an external database, so the
+   modules `aws` and `azure` refuse `database_mode = managed` (docs/DECISIONS.md D-M7-16-4).
 2. Back: as above, into a container database; immediately afterwards a full backup with pgBackRest.

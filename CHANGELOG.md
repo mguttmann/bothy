@@ -25,6 +25,20 @@ operated, and the order of the build.
 
 ### Added
 
+- OpenTofu modules `hetzner`, `aws` and `azure` (M7-16): each creates a network whose security
+  rules admit only the edge port 443 from the internet (and only with `edge_mode =
+  reverse_proxy`) and SSH only from `ssh_allowed_cidrs`, one host with the user data of
+  `generic-vm`, and on AWS, with `offsite_region`, an off-site bucket with Object Lock in
+  compliance mode and a writer that cannot delete versions. Database and files stay in the
+  Compose stack: the modules refuse `database_mode = managed` and `object_storage_mode = s3`,
+  because `install.sh` cannot use an external database or S3 service yet; Amazon RDS and Azure
+  Database for PostgreSQL offer PostgreSQL 18 (checked 2026-10-20, docs/spec/16-betrieb.md 3
+  rule 6). Providers pinned to one version (`hetznercloud/hcloud` 1.70.0, `hashicorp/aws`
+  6.69.1, `hashicorp/azurerm` 5.10.0) with lock files for every gate platform;
+  `tools/bin/tofu_providers.py` fills an offline mirror checked against them, and
+  `make tofu-check` runs `tofu test` with mocked providers. The validation root is the example
+  of an instance root with enforced state and plan encryption. No module was applied against a
+  provider account (OQ-09).
 - OpenTofu module `generic-vm` (M7-15): sets up an Ubuntu or Debian host from its inputs with
   cloud-init user data (output `user_data`) or the same setup over SSH (`provision_over_ssh`):
   Docker Engine and the Compose plugin from the Docker repository, the user `bothy`, the pinned
