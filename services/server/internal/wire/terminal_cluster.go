@@ -8,8 +8,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
@@ -103,15 +101,8 @@ func (s *server) startTerminalEphemeral(ctx context.Context) error {
 	if hub == nil || pool == nil {
 		return errors.New("wire: the terminal listener needs the hub of the relay and the pool")
 	}
-	gate := s.deps.TerminalListenerGate
-	l, err := terminalpg.NewEphemeralListener(func(ctx context.Context) (*pgx.Conn, error) {
-		if gate != nil {
-			if err := gate(ctx); err != nil {
-				return nil, err
-			}
-		}
-		return pool.DialDedicated(ctx, terminalpg.ApplicationName)
-	}, terminalpg.ListenerConfig{ReconnectBackoffCap: cfg.ReconnectBackoffCap}, hub, hub, s.runner.Fail, s.logger())
+	l, err := terminalpg.NewEphemeralListener(pool, terminalpg.ListenerConfig{ReconnectBackoffCap: cfg.ReconnectBackoffCap,
+		Gate: s.deps.TerminalListenerGate}, hub, hub, s.runner.Fail, s.logger())
 	if err != nil {
 		return err
 	}

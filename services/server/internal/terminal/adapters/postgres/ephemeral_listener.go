@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
@@ -44,6 +45,9 @@ type ListenerConfig struct {
 	// ReconnectBackoffCap is database.listen_reconnect_backoff_cap: after a lost connection the
 	// listener tries again at once and then at this interval.
 	ReconnectBackoffCap time.Duration
+	// Gate, when set, runs before every dial (a test seam: a test keeps a node deaf); nil in
+	// production.
+	Gate func(ctx context.Context) error
 }
 
 // EphemeralListener is the LISTEN ephemeral connection of an api process (M2-47 Design note 5): a
@@ -65,17 +69,22 @@ type EphemeralListener struct {
 	done   chan struct{}
 }
 
-// Dialer opens the dedicated connection of the listener (pg.Pool.DialDedicated with
-// ApplicationName).
-type Dialer func(ctx context.Context) (*pgx.Conn, error)
-
-// NewEphemeralListener returns the listener. fail receives an unexpected end of its goroutine (a
-// bug, not a lost connection; lifecycle.Runner.Fail); log nil means slog.Default(). Errors: a
+// NewEphemeralListener returns the listener over its own connection of pool
+// (pg.Pool.DialDedicated with ApplicationName). fail receives an unexpected end of its goroutine
+// (a bug, not a lost connection; lifecycle.Runner.Fail); log nil means slog.Default(). Errors: a
 // missing collaborator or a backoff cap below 1.
-func NewEphemeralListener(dial Dialer, cfg ListenerConfig, handler app.SignalHandler, reconcile Reconciler, fail func(error),
+func NewEphemeralListener(pool *pg.Pool, cfg ListenerConfig, handler app.SignalHandler, reconcile Reconciler, fail func(error),
 	log *slog.Logger) (*EphemeralListener, error) {
-	if dial == nil || handler == nil || reconcile == nil || fail == nil {
-		return nil, errors.New("postgres: the ephemeral listener needs the dialer, the handler, the reconciler and the fail hook")
+	if pool == nil || handler == nil || reconcile == nil || fail == nil {
+		return nil, errors.New("postgres: the ephemeral listener needs the pool, the handler, the reconciler and the fail hook")
+	}
+	dial := func(ctx context.Context) (*pgx.Conn, error) {
+		if cfg.Gate != nil {
+			if err := cfg.Gate(ctx); err != nil {
+				return nil, err
+			}
+		}
+		return pool.DialDedicated(ctx, ApplicationName)
 	}
 	if cfg.ReconnectBackoffCap <= 0 {
 		return nil, errors.New("postgres: database.listen_reconnect_backoff_cap must be positive")

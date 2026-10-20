@@ -33,8 +33,6 @@ rules:
     etappe: M4
   - match: client.outbox_retry_cap  # M4-15
     etappe: M4
-  - match: "cluster."  # M2-47
-    etappe: M2
   - match: "command."  # M2-16, M2-17
     etappe: M2
   - match: "component."  # M2-15

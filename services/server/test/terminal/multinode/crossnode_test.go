@@ -31,7 +31,7 @@ func (c *cluster) pgNotify(payload string) {
 func TestCrossNode_SessionOpenOnlyAfterCommit(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	h := c.connect(nodeB, c.key, false)
+	h := c.connect(nodeB)
 	c.n(nodeA).signals.set(false, true)
 	before := len(c.listen.kinds())
 	r := c.open(nodeA, c.alex)
@@ -59,7 +59,7 @@ func TestCrossNode_SessionOpenOnlyAfterCommit(t *testing.T) {
 func TestCrossNode_SignalsCarryOnlyIDs(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	c.connect(nodeB, c.key, false)
+	c.connect(nodeB)
 	g := c.opened(nodeA, c.alex)
 	d := c.device(c.alex, g.Session.ID)
 	c.handshake(d, g.SessionToken)
@@ -139,7 +139,7 @@ func (c *cluster) repair(node string, host ids.ID) {
 func TestCrossNode_ForgedSignalOpensNothing(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	h := c.connect(nodeB, c.key, false)
+	h := c.connect(nodeB)
 	ctx := c.ctx()
 	open := c.opened(nodeA, c.alex)
 	closed := c.opened(nodeA, c.alex)
@@ -183,7 +183,7 @@ func TestCrossNode_ForgedSignalOpensNothing(t *testing.T) {
 func TestCrossNode_SingleModeSendsNoNotify(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "single")
-	c.connect(nodeA, c.key, false)
+	c.connect(nodeA)
 	g := c.opened(nodeA, c.alex)
 	d := c.device(c.alex, g.Session.ID)
 	c.handshake(d, g.SessionToken)
@@ -245,7 +245,7 @@ func (c *cluster) relayed(h *fakehost.Host) (grantBody, *fakehost.Device, *fakeh
 func TestCrossNode_CloseReachesRelayAndControl(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "multi")
-	h := c.connect(nodeB, c.key, false)
+	h := c.connect(nodeB)
 	ctx := c.ctx()
 	check := func(name string, end func(session string), reason string) {
 		g, d, dc := c.relayed(h)

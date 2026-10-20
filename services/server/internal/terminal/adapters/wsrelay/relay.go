@@ -127,9 +127,9 @@ type slot struct {
 	started, confirm bool
 	wdi              *int
 	// gen counts the grants; a deadline of an older grant does nothing.
-	gen      int
+	gen int
 	// grant is the grant of the expectation (M2-47): the same grant again changes nothing.
-	grant ids.ID
+	grant    ids.ID
 	stop     func() bool
 	dev, hst *side
 	paired   bool

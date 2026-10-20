@@ -645,6 +645,37 @@ func (s *Service) duplicateTransition(ctx context.Context, h domain.Host, r doma
 	return err
 }
 
+// duplicateUnit is the unit of work of ResolveDuplicate; it reports whether it staged
+// terminal.host_close (a host in another state changes nothing).
+func (s *Service) duplicateUnit(ctx context.Context, hostID ids.ID) (bool, error) {
+	h, found, err := s.d.Store.LockHost(ctx, hostID)
+	if err != nil || !found {
+		return false, err
+	}
+	r, err := domain.Transition(h.State, h.DisabledReason, domain.CauseDuplicateConnection)
+	if err != nil {
+		return false, nil //nolint:nilerr // another state: the duplicate is decided by the state change that caused it
+	}
+	keyChanged := r.To == domain.StatePairing
+	if err := s.duplicateTransition(ctx, h, r); err != nil {
+		return false, err
+	}
+	if err := s.stage(ctx, hostCloseSignal(h.ID)); err != nil {
+		return false, err
+	}
+	if err := s.d.Audit.Record(ctx, auditing.Entry{
+		Action: string(authorize.ActionHostConnect), Decision: auditing.DecisionDeny, Reason: auditing.ReasonHostDuplicateConnection,
+		ResourceKind: resourceHost, ResourceID: h.ID, Attrs: auditing.Attrs{attrCode: auditing.Code(codeDuplicate)},
+	}); err != nil {
+		return false, err
+	}
+	st, _, err := s.load(ctx, h.ID)
+	if err != nil {
+		return false, err
+	}
+	return true, s.emitHostUpdated(ctx, s.view(ctx, st), keyChanged)
+}
+
 // StaleReplaced records the allow entry host.connect with code stale_connection_replaced: a
 // second control connection found the older one dead and replaced it (24 section 3.4).
 func (s *Service) StaleReplaced(ctx context.Context, hostID ids.ID) error {
@@ -673,34 +704,9 @@ func (s *Service) ResolveDuplicate(ctx context.Context, hostID ids.ID) error {
 	}
 	staged := false
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		staged = false
-		h, found, err := s.d.Store.LockHost(ctx, hostID)
-		if err != nil || !found {
-			return err
-		}
-		r, err := domain.Transition(h.State, h.DisabledReason, domain.CauseDuplicateConnection)
-		if err != nil {
-			return nil //nolint:nilerr // another state: the duplicate is decided by the state change that caused it
-		}
-		keyChanged := r.To == domain.StatePairing
-		if err := s.duplicateTransition(ctx, h, r); err != nil {
-			return err
-		}
-		if err := s.stage(ctx, hostCloseSignal(h.ID)); err != nil {
-			return err
-		}
-		staged = true
-		if err := s.d.Audit.Record(ctx, auditing.Entry{
-			Action: string(authorize.ActionHostConnect), Decision: auditing.DecisionDeny, Reason: auditing.ReasonHostDuplicateConnection,
-			ResourceKind: resourceHost, ResourceID: h.ID, Attrs: auditing.Attrs{attrCode: auditing.Code(codeDuplicate)},
-		}); err != nil {
-			return err
-		}
-		st, _, err := s.load(ctx, h.ID)
-		if err != nil {
-			return err
-		}
-		return s.emitHostUpdated(ctx, s.view(ctx, st), keyChanged)
+		var err error
+		staged, err = s.duplicateUnit(ctx, hostID)
+		return err
 	}, rightsChangeOf(authorize.ActionHostConnect, hostID, h.AssignedUserID))
 	if err == nil && staged {
 		// Every node closes the control connections of the host (M2-47 Design note 7 b).
