@@ -32,7 +32,9 @@ type FileRecord struct {
 	TranscriptStatus string
 	// TranscriptLanguage and TranscriptSource are "" for NULL.
 	TranscriptLanguage, TranscriptSource string
-	CreatedAt                            time.Time
+	// TranscriptText is "" for NULL; only FileForDelivery reads it (M3-05).
+	TranscriptText string
+	CreatedAt      time.Time
 	// Deleted reports deleted_at IS NOT NULL.
 	Deleted bool
 }
