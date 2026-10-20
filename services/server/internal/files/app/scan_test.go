@@ -330,7 +330,7 @@ func TestScanPassDrainsAfterEarlyVerdict(t *testing.T) {
 func TestScanPassInfected(t *testing.T) {
 	t.Parallel()
 	e := newScanEnv(t, scanCfg)
-	e.scanner.verdict = domain.Verdict{Kind: domain.VerdictInfected, Signature: "Bothy.Test.EICAR.UNOFFICIAL", Reason: domain.ReasonMalwareDetected}
+	e.scanner.verdict = domain.Verdict{Kind: domain.VerdictInfected, Signature: "Local.Test.EICAR.UNOFFICIAL", Reason: domain.ReasonMalwareDetected}
 	content := []byte("not really malware")
 	s := e.seed(t, content, content, false)
 	res, err := e.pass.Run(context.Background(), s.FileID, 0)
@@ -353,7 +353,7 @@ func TestScanPassInfected(t *testing.T) {
 	sum := sha256.Sum256(content)
 	if a.Action != "file.upload" || a.Decision != auditing.DecisionDeny || a.Reason != auditing.ReasonMalwareDetected ||
 		a.ResourceKind != "file" || a.ResourceID != s.FileID || len(a.Attrs) != 3 ||
-		a.Attrs["signature"].Data() != "bothy.test.eicar.unofficial" || a.Attrs["size_bytes"].Data() != int64(len(content)) ||
+		a.Attrs["signature"].Data() != "local.test.eicar.unofficial" || a.Attrs["size_bytes"].Data() != int64(len(content)) ||
 		a.Attrs["sha256"].Data() != hexOf(sum) {
 		t.Errorf("audit %+v", a)
 	}

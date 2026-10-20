@@ -176,7 +176,7 @@ func (c *Client) withDeadline(ctx context.Context) (context.Context, context.Can
 // connect dials the socket and ties the connection to ctx: its deadline becomes the connection
 // deadline, and cancelling ctx interrupts blocked reads and writes. stop closes the connection.
 func (c *Client) connect(ctx context.Context) (net.Conn, func(), error) {
-	var d net.Dialer
+	var d net.Dialer // nosemgrep: bothy-go-egress-only -- the local clamd Unix socket (clamd_address_unix), no HTTP and no network target
 	conn, err := d.DialContext(ctx, "unix", c.path)
 	if err != nil {
 		return nil, nil, c.transport(ctx, "connecting", err)
