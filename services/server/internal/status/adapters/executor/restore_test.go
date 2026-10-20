@@ -13,7 +13,7 @@ import (
 // TestRestoreCommands holds the commands of the restore test (brief M7-03): the restore of one
 // set from repo1 with recovery target immediate, promotion, archive_mode off and the repository
 // host acting as the database host, also in restore_command; verify of repo1; and the restic
-// restore of the sampled paths of the newest objects snapshot. Requests the commands cannot
+// restore of the sampled paths of the newest snapshot of the object backup (tag and path). Requests the commands cannot
 // express are refused before a binary runs.
 func TestRestoreCommands(t *testing.T) {
 	bin := t.TempDir()
@@ -44,11 +44,11 @@ func TestRestoreCommands(t *testing.T) {
 	}
 	checkEnv(t, calls[0], map[string]string{"PGBACKREST_EXPIRE_AUTO": "n"})
 
-	if err := e.ResticRestore(ctx, "objects", []string{"/var/lib/bothy/files/f/ab/1", "/var/lib/bothy/files/f/cd/2"}, "/var/lib/bothy-backup/restore/objects"); err != nil {
+	if err := e.ResticRestore(ctx, "objects", "/var/lib/bothy/files", []string{"/var/lib/bothy/files/f/ab/1", "/var/lib/bothy/files/f/cd/2"}, "/var/lib/bothy-backup/restore/objects"); err != nil {
 		t.Fatal(err)
 	}
 	rc := r.calls(t)
-	want := []string{"-r", "/var/lib/example/restic", "restore", "latest", "--tag", "objects", "--target", "/var/lib/bothy-backup/restore/objects",
+	want := []string{"-r", "/var/lib/example/restic", "restore", "latest", "--tag", "objects", "--path", "/var/lib/bothy/files", "--target", "/var/lib/bothy-backup/restore/objects",
 		"--include", "/var/lib/bothy/files/f/ab/1", "--include", "/var/lib/bothy/files/f/cd/2"}
 	if len(rc) != 1 || !slices.Equal(rc[0].args, want) {
 		t.Errorf("restic calls %+v, want one with %q", rc, want)
@@ -57,8 +57,9 @@ func TestRestoreCommands(t *testing.T) {
 	for _, err := range []error{
 		e.PgBackRestRestore(ctx, "latest", "/var/lib/bothy-backup/restore/pgdata"),
 		e.PgBackRestRestore(ctx, "20261018-020000F", "relative/pgdata"),
-		e.ResticRestore(ctx, "objects", nil, "/var/lib/bothy-backup/restore/objects"),
-		e.ResticRestore(ctx, "", []string{"/x"}, "/var/lib/bothy-backup/restore/objects"),
+		e.ResticRestore(ctx, "objects", "/var/lib/bothy/files", nil, "/var/lib/bothy-backup/restore/objects"),
+		e.ResticRestore(ctx, "", "/var/lib/bothy/files", []string{"/x"}, "/var/lib/bothy-backup/restore/objects"),
+		e.ResticRestore(ctx, "objects", "", []string{"/x"}, "/var/lib/bothy-backup/restore/objects"),
 	} {
 		if err == nil {
 			t.Error("an invalid request ran")

@@ -43,11 +43,13 @@ func (e *Executor) PgBackRestVerify(ctx context.Context) error {
 }
 
 // ResticRestore restores the files includes (absolute paths as stored) of the newest restic
-// snapshot with tag into target for the file sample of the restore test (16 8.3 item 6). It reads
-// the repository of the instance like ResticBackup and never changes it. The error is an
-// *app.ExecError (restic_exit_<n>, restic_request_invalid).
-func (e *Executor) ResticRestore(ctx context.Context, tag string, includes []string, target string) error {
-	if tag == "" || len(includes) == 0 || target == "" || !filepath.IsAbs(target) {
+// snapshot with tag and the backed-up path into target for the file sample of the restore test
+// (16 8.3 item 6). The path selects the object backup itself: the manifest of an objects run is
+// a snapshot with the same tag (docs/DECISIONS.md D-M7-02-6). It reads the repository of the
+// instance like ResticBackup and never changes it. The error is an *app.ExecError
+// (restic_exit_<n>, restic_request_invalid).
+func (e *Executor) ResticRestore(ctx context.Context, tag, path string, includes []string, target string) error {
+	if tag == "" || path == "" || !filepath.IsAbs(path) || len(includes) == 0 || target == "" || !filepath.IsAbs(target) {
 		return execError(codeResticRequestInvalid)
 	}
 	repo, env, err := e.resticRepo(e.serviceKeysDir())
@@ -56,7 +58,7 @@ func (e *Executor) ResticRestore(ctx context.Context, tag string, includes []str
 	}
 	e.resticMu.RLock()
 	defer e.resticMu.RUnlock()
-	args := []string{"restore", "latest", "--tag", tag, "--target", target}
+	args := []string{"restore", "latest", "--tag", tag, "--path", path, "--target", target}
 	for _, p := range includes {
 		args = append(args, "--include", p)
 	}
