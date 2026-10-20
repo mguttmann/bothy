@@ -34,6 +34,8 @@ type fakeRelayUC struct {
 	failCounters bool
 	// okWritten are the counts of the writes that succeeded.
 	okWritten []app.Counts
+	// ended, when set, is the end RelayHostLost reports for an already closed session (M2-48).
+	ended *domain.End
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -44,6 +46,17 @@ func (f *fakeRelayUC) add(s string) {
 
 func (f *fakeRelayUC) RelayActivate(context.Context, ids.ID) error { f.add("activate"); return nil }
 func (f *fakeRelayUC) RelayDetach(context.Context, ids.ID) error   { f.add("detach"); return nil }
+
+// RelayHostLost records a detach; ended makes it report an already ended session (M2-48).
+func (f *fakeRelayUC) RelayHostLost(context.Context, ids.ID) (domain.End, bool, error) {
+	f.add("detach")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.ended != nil {
+		return *f.ended, true, nil
+	}
+	return domain.End{}, false, nil
+}
 func (f *fakeRelayUC) RelayOpenFailed(_ context.Context, _ ids.ID, d domain.CloseDetail) error {
 	f.add("open_failed:" + string(d))
 	return nil
