@@ -12,8 +12,11 @@ import (
 
 // freeFormSchemas are the named schemas that stay open on purpose: JsonObject is free form by
 // design (its content is described by the member that uses it; W7, docs/spec/06-api.md row
-// "Unbekanntes").
-var freeFormSchemas = []string{"JsonObject"}
+// "Unbekanntes"). IncomingWebhookPost and AlertmanagerAlert carry the payload of a foreign
+// sender, Prometheus Alertmanager, which adds members in new versions and drops a notification
+// answered with 400; the server ignores members it does not name there and refuses them in a
+// native body itself (incoming.Classify, docs/DECISIONS.md D-M7-20-5).
+var freeFormSchemas = []string{"JsonObject", "IncomingWebhookPost", "AlertmanagerAlert"}
 
 // yamlFalse is the YAML scalar false of additionalProperties and unevaluatedProperties.
 const yamlFalse = "false"

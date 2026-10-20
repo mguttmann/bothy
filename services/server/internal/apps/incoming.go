@@ -44,7 +44,8 @@ type IncomingCreated struct {
 
 // PostIncomingCmd is one call of postIncomingWebhook or postIncomingWebhookWithBearer: the
 // verified webhook and the request body as JSON with the members the caller sent (schema
-// IncomingWebhookPost, already checked against the closed schema by the HTTP chain).
+// IncomingWebhookPost, already checked by the HTTP chain; members the schema does not name are
+// kept, and incoming.Classify refuses them in a native body, D-M7-20-5).
 type PostIncomingCmd struct {
 	WebhookID ids.ID
 	Body      json.RawMessage

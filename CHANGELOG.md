@@ -46,6 +46,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   modules offline; `make tofu-vm-test` boots a pinned Ubuntu cloud image in QEMU against the
   product trial, runs the smoke probe, a second delivery that changes nothing, and a wrong
   checksum and signature that stop the setup.
+- Alert routes (M7-20): `infra/compose/alert-setup.sh` writes the webhook URLs of the alert
+  channel "Operations", the external on-call channel and the heartbeat service into
+  `infra/compose/secrets/` (mode `0600`, only the fingerprint is printed, idempotent; the
+  channel's URL is rewritten to the internal listener); Alertmanager starts through a guard that
+  refuses to start while one of its URL files is missing or empty; `make alert-e2e` proves the
+  path from a test rule in Prometheus to the channel, the external stub and the heartbeat stub;
+  guide `docs/operations/alerting-setup.md`.
 - Setup wizard (M7-29): `infra/compose/install.sh`, a POSIX shell script and release artifact
   of the product, installs an instance with one command
   (`curl -fsSL https://github.com/OWNER/bothy/releases/download/v<version>/install.sh | sh`):
@@ -552,6 +559,10 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Fixed
 
+- Incoming webhooks (M7-20): an Alertmanager payload with members the documented payload does
+  not name (Alertmanager v0.34.1 sends `routeLabels` and `notification_reason`) is accepted and
+  rendered instead of refused with `400 unknown_member`, which made Alertmanager drop every alert;
+  a native body still refuses unknown members.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked`, which no response listed; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,

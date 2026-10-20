@@ -13,6 +13,166 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ListPinsWithResponse List pinned messages
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /threads/{thread_id}/pins (the `ListPins` operationId).
+func (c *ClientWithResponses) ListPinsWithResponse(ctx context.Context, threadId ThreadIdPath, reqEditors ...RequestEditorFn) (*ListPinsResponse, error) {
+	rsp, err := c.ListPins(ctx, threadId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPinsResponse(rsp)
+}
+
+// PutReadStateWithBodyWithResponse Advance the read position
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /threads/{thread_id}/read-state (the `PutReadState` operationId).
+func (c *ClientWithResponses) PutReadStateWithBodyWithResponse(ctx context.Context, threadId ThreadIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutReadStateResponse, error) {
+	rsp, err := c.PutReadStateWithBody(ctx, threadId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutReadStateResponse(rsp)
+}
+
+// PutReadStateWithResponse Advance the read position
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /threads/{thread_id}/read-state (the `PutReadState` operationId).
+func (c *ClientWithResponses) PutReadStateWithResponse(ctx context.Context, threadId ThreadIdPath, body PutReadStateJSONRequestBody, reqEditors ...RequestEditorFn) (*PutReadStateResponse, error) {
+	rsp, err := c.PutReadState(ctx, threadId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutReadStateResponse(rsp)
+}
+
+// MarkThreadUnreadWithBodyWithResponse Move the read position back
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /threads/{thread_id}/read-state/mark-unread (the `MarkThreadUnread` operationId).
+func (c *ClientWithResponses) MarkThreadUnreadWithBodyWithResponse(ctx context.Context, threadId ThreadIdPath, params *MarkThreadUnreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MarkThreadUnreadResponse, error) {
+	rsp, err := c.MarkThreadUnreadWithBody(ctx, threadId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMarkThreadUnreadResponse(rsp)
+}
+
+// MarkThreadUnreadWithResponse Move the read position back
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /threads/{thread_id}/read-state/mark-unread (the `MarkThreadUnread` operationId).
+func (c *ClientWithResponses) MarkThreadUnreadWithResponse(ctx context.Context, threadId ThreadIdPath, params *MarkThreadUnreadParams, body MarkThreadUnreadJSONRequestBody, reqEditors ...RequestEditorFn) (*MarkThreadUnreadResponse, error) {
+	rsp, err := c.MarkThreadUnread(ctx, threadId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMarkThreadUnreadResponse(rsp)
+}
+
+// ReopenThreadWithResponse Reopen a thread
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /threads/{thread_id}/reopen (the `ReopenThread` operationId).
+func (c *ClientWithResponses) ReopenThreadWithResponse(ctx context.Context, threadId ThreadIdPath, params *ReopenThreadParams, reqEditors ...RequestEditorFn) (*ReopenThreadResponse, error) {
+	rsp, err := c.ReopenThread(ctx, threadId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReopenThreadResponse(rsp)
+}
+
+// ListThreadRunsWithResponse List runs of a thread
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /threads/{thread_id}/runs (the `ListThreadRuns` operationId).
+func (c *ClientWithResponses) ListThreadRunsWithResponse(ctx context.Context, threadId ThreadIdPath, params *ListThreadRunsParams, reqEditors ...RequestEditorFn) (*ListThreadRunsResponse, error) {
+	rsp, err := c.ListThreadRuns(ctx, threadId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListThreadRunsResponse(rsp)
+}
+
+// SetThreadTagsWithBodyWithResponse Set forum tags of a thread
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /threads/{thread_id}/tags (the `SetThreadTags` operationId).
+func (c *ClientWithResponses) SetThreadTagsWithBodyWithResponse(ctx context.Context, threadId ThreadIdPath, params *SetThreadTagsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetThreadTagsResponse, error) {
+	rsp, err := c.SetThreadTagsWithBody(ctx, threadId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetThreadTagsResponse(rsp)
+}
+
+// SetThreadTagsWithResponse Set forum tags of a thread
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /threads/{thread_id}/tags (the `SetThreadTags` operationId).
+func (c *ClientWithResponses) SetThreadTagsWithResponse(ctx context.Context, threadId ThreadIdPath, params *SetThreadTagsParams, body SetThreadTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetThreadTagsResponse, error) {
+	rsp, err := c.SetThreadTags(ctx, threadId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetThreadTagsResponse(rsp)
+}
+
+// SetThreadTitleWithBodyWithResponse Set the title
+//
+// People set `title_source = manual`. The operator agent may only replace an `auto` title.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /threads/{thread_id}/title (the `SetThreadTitle` operationId).
+func (c *ClientWithResponses) SetThreadTitleWithBodyWithResponse(ctx context.Context, threadId ThreadIdPath, params *SetThreadTitleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetThreadTitleResponse, error) {
+	rsp, err := c.SetThreadTitleWithBody(ctx, threadId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetThreadTitleResponse(rsp)
+}
+
+// SetThreadTitleWithResponse Set the title
+//
+// People set `title_source = manual`. The operator agent may only replace an `auto` title.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /threads/{thread_id}/title (the `SetThreadTitle` operationId).
+func (c *ClientWithResponses) SetThreadTitleWithResponse(ctx context.Context, threadId ThreadIdPath, params *SetThreadTitleParams, body SetThreadTitleJSONRequestBody, reqEditors ...RequestEditorFn) (*SetThreadTitleResponse, error) {
+	rsp, err := c.SetThreadTitle(ctx, threadId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetThreadTitleResponse(rsp)
+}
+
+// RevokeTokenWithResponse Revoke an API token
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /tokens/{token_id} (the `RevokeToken` operationId).
+func (c *ClientWithResponses) RevokeTokenWithResponse(ctx context.Context, tokenId TokenIdPath, reqEditors ...RequestEditorFn) (*RevokeTokenResponse, error) {
+	rsp, err := c.RevokeToken(ctx, tokenId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeTokenResponse(rsp)
+}
+
 // AbortUploadWithResponse Abort an upload
 //
 // Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
@@ -22598,203 +22758,6 @@ func ParseGetTranscriptResponse(rsp *http.Response) (*GetTranscriptResponse, err
 		response.Headers429 = &headers
 	case true:
 		var headers GetTranscriptResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseSubmitTranscriptResponse parses an HTTP response from a SubmitTranscriptWithResponse call
-func ParseSubmitTranscriptResponse(rsp *http.Response) (*SubmitTranscriptResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SubmitTranscriptResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Transcript
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers SubmitTranscriptResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers SubmitTranscriptResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers SubmitTranscriptResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers SubmitTranscriptResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers SubmitTranscriptResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 429:
-		var headers SubmitTranscriptResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers SubmitTranscriptResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {

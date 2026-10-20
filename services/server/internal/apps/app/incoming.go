@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -462,13 +463,7 @@ func (s *IncomingService) parse(body []byte) (post, error) {
 	if err := json.Unmarshal(body, &members); err != nil {
 		return post{}, errs.New(errs.CodeMalformedRequest, "")
 	}
-	var present []string
-	for _, m := range append(incoming.NativeMembers(), incoming.AlertmanagerMembers()...) {
-		if _, ok := members[m]; ok {
-			present = append(present, m)
-		}
-	}
-	f, err := incoming.Classify(present)
+	f, err := incoming.Classify(slices.Collect(maps.Keys(members)))
 	if err != nil {
 		return post{}, err
 	}
@@ -535,8 +530,9 @@ func (u *anyUUID) id() *ids.ID {
 	return &id
 }
 
-// decodeStrict decodes body into v; the HTTP chain already checked it against the closed schema,
-// so a failure here is a malformed request.
+// decodeStrict decodes body into v; the HTTP chain already checked it against the schema, so a
+// failure here is a malformed request. Members v does not name are skipped: Classify has refused
+// them in a native body and ignores them in an Alertmanager payload (D-M7-20-5).
 func decodeStrict(body []byte, v any) error {
 	if err := json.NewDecoder(bytes.NewReader(body)).Decode(v); err != nil {
 		return errs.New(errs.CodeMalformedRequest, "")

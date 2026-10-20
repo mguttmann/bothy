@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -6395,7 +6396,7 @@ type AgentUpdatedEventAudience string
 // AgentUpdatedEventType defines model for AgentUpdatedEvent.Type.
 type AgentUpdatedEventType string
 
-// AlertmanagerAlert One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`).
+// AlertmanagerAlert One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`); other members are ignored (D-M7-20-5).
 type AlertmanagerAlert struct {
 	// Annotations Annotations of the alert; every value is a string.
 	Annotations *JsonObject `json:"annotations,omitempty"`
@@ -10346,11 +10347,14 @@ type IncomingWebhookList struct {
 }
 
 // IncomingWebhookPost Body of an incoming webhook call in one of two shapes, recognised per request (11 8.2,
-// docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
-// `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
-// `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
-// Alertmanager (format `alertmanager`) and must contain no native member; every other body is
-// `native` and needs `content_md`. Unknown members are refused.
+// docs/DECISIONS.md D-M2-27-5, D-M7-20-5). A body with at least one Alertmanager member
+// (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`,
+// `commonLabels`, `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook
+// payload of Prometheus Alertmanager (format `alertmanager`) and must contain no native
+// member; other members of such a payload, at the top and in each alert, are ignored, because
+// Alertmanager adds members in new versions and drops a notification answered with `400`.
+// Every other body is `native`, needs `content_md` and refuses every other member with
+// `400 validation_failed` and `errors[].code` `unknown_member`.
 type IncomingWebhookPost struct {
 	// Alerts Alertmanager. The alerts of the notification.
 	Alerts *[]AlertmanagerAlert `json:"alerts,omitempty"`
@@ -10396,7 +10400,8 @@ type IncomingWebhookPost struct {
 	TruncatedAlerts *int64 `json:"truncatedAlerts,omitempty"`
 
 	// Version Alertmanager. Version of the webhook payload.
-	Version *IncomingWebhookPostVersion `json:"version,omitempty"`
+	Version              *IncomingWebhookPostVersion `json:"version,omitempty"`
+	AdditionalProperties map[string]interface{}      `json:"-"`
 }
 
 // IncomingWebhookPostStatus Alertmanager. State of the group.
@@ -18245,6 +18250,269 @@ type OnThreadUpdatedEventJSONRequestBody = ThreadUpdatedEvent
 // OnUserUpdatedEventJSONRequestBody defines body for OnUserUpdatedEvent for application/json ContentType.
 type OnUserUpdatedEventJSONRequestBody = UserUpdatedEvent
 
+// Getter for additional properties for IncomingWebhookPost. Returns the specified
+// element and whether it was found
+func (a IncomingWebhookPost) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for IncomingWebhookPost
+func (a *IncomingWebhookPost) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for IncomingWebhookPost to handle AdditionalProperties
+func (a *IncomingWebhookPost) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["alerts"]; found {
+		err = json.Unmarshal(raw, &a.Alerts)
+		if err != nil {
+			return fmt.Errorf("error reading 'alerts': %w", err)
+		}
+		delete(object, "alerts")
+	}
+
+	if raw, found := object["client_msg_id"]; found {
+		err = json.Unmarshal(raw, &a.ClientMsgId)
+		if err != nil {
+			return fmt.Errorf("error reading 'client_msg_id': %w", err)
+		}
+		delete(object, "client_msg_id")
+	}
+
+	if raw, found := object["commonAnnotations"]; found {
+		err = json.Unmarshal(raw, &a.CommonAnnotations)
+		if err != nil {
+			return fmt.Errorf("error reading 'commonAnnotations': %w", err)
+		}
+		delete(object, "commonAnnotations")
+	}
+
+	if raw, found := object["commonLabels"]; found {
+		err = json.Unmarshal(raw, &a.CommonLabels)
+		if err != nil {
+			return fmt.Errorf("error reading 'commonLabels': %w", err)
+		}
+		delete(object, "commonLabels")
+	}
+
+	if raw, found := object["content_md"]; found {
+		err = json.Unmarshal(raw, &a.ContentMd)
+		if err != nil {
+			return fmt.Errorf("error reading 'content_md': %w", err)
+		}
+		delete(object, "content_md")
+	}
+
+	if raw, found := object["externalURL"]; found {
+		err = json.Unmarshal(raw, &a.ExternalURL)
+		if err != nil {
+			return fmt.Errorf("error reading 'externalURL': %w", err)
+		}
+		delete(object, "externalURL")
+	}
+
+	if raw, found := object["groupKey"]; found {
+		err = json.Unmarshal(raw, &a.GroupKey)
+		if err != nil {
+			return fmt.Errorf("error reading 'groupKey': %w", err)
+		}
+		delete(object, "groupKey")
+	}
+
+	if raw, found := object["groupLabels"]; found {
+		err = json.Unmarshal(raw, &a.GroupLabels)
+		if err != nil {
+			return fmt.Errorf("error reading 'groupLabels': %w", err)
+		}
+		delete(object, "groupLabels")
+	}
+
+	if raw, found := object["receiver"]; found {
+		err = json.Unmarshal(raw, &a.Receiver)
+		if err != nil {
+			return fmt.Errorf("error reading 'receiver': %w", err)
+		}
+		delete(object, "receiver")
+	}
+
+	if raw, found := object["status"]; found {
+		err = json.Unmarshal(raw, &a.Status)
+		if err != nil {
+			return fmt.Errorf("error reading 'status': %w", err)
+		}
+		delete(object, "status")
+	}
+
+	if raw, found := object["thread_id"]; found {
+		err = json.Unmarshal(raw, &a.ThreadId)
+		if err != nil {
+			return fmt.Errorf("error reading 'thread_id': %w", err)
+		}
+		delete(object, "thread_id")
+	}
+
+	if raw, found := object["title"]; found {
+		err = json.Unmarshal(raw, &a.Title)
+		if err != nil {
+			return fmt.Errorf("error reading 'title': %w", err)
+		}
+		delete(object, "title")
+	}
+
+	if raw, found := object["truncatedAlerts"]; found {
+		err = json.Unmarshal(raw, &a.TruncatedAlerts)
+		if err != nil {
+			return fmt.Errorf("error reading 'truncatedAlerts': %w", err)
+		}
+		delete(object, "truncatedAlerts")
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &a.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+		delete(object, "version")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for IncomingWebhookPost to handle AdditionalProperties
+func (a IncomingWebhookPost) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Alerts != nil {
+		object["alerts"], err = json.Marshal(a.Alerts)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'alerts': %w", err)
+		}
+	}
+
+	if a.ClientMsgId != nil {
+		object["client_msg_id"], err = json.Marshal(a.ClientMsgId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'client_msg_id': %w", err)
+		}
+	}
+
+	if a.CommonAnnotations != nil {
+		object["commonAnnotations"], err = json.Marshal(a.CommonAnnotations)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'commonAnnotations': %w", err)
+		}
+	}
+
+	if a.CommonLabels != nil {
+		object["commonLabels"], err = json.Marshal(a.CommonLabels)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'commonLabels': %w", err)
+		}
+	}
+
+	if a.ContentMd != nil {
+		object["content_md"], err = json.Marshal(a.ContentMd)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'content_md': %w", err)
+		}
+	}
+
+	if a.ExternalURL != nil {
+		object["externalURL"], err = json.Marshal(a.ExternalURL)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'externalURL': %w", err)
+		}
+	}
+
+	if a.GroupKey != nil {
+		object["groupKey"], err = json.Marshal(a.GroupKey)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'groupKey': %w", err)
+		}
+	}
+
+	if a.GroupLabels != nil {
+		object["groupLabels"], err = json.Marshal(a.GroupLabels)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'groupLabels': %w", err)
+		}
+	}
+
+	if a.Receiver != nil {
+		object["receiver"], err = json.Marshal(a.Receiver)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'receiver': %w", err)
+		}
+	}
+
+	if a.Status != nil {
+		object["status"], err = json.Marshal(a.Status)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'status': %w", err)
+		}
+	}
+
+	if a.ThreadId != nil {
+		object["thread_id"], err = json.Marshal(a.ThreadId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'thread_id': %w", err)
+		}
+	}
+
+	if a.Title != nil {
+		object["title"], err = json.Marshal(a.Title)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'title': %w", err)
+		}
+	}
+
+	if a.TruncatedAlerts != nil {
+		object["truncatedAlerts"], err = json.Marshal(a.TruncatedAlerts)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'truncatedAlerts': %w", err)
+		}
+	}
+
+	if a.Version != nil {
+		object["version"], err = json.Marshal(a.Version)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'version': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
 // AsMessageCreatedEvent returns the union data inside the Event as a MessageCreatedEvent
 func (t Event) AsMessageCreatedEvent() (MessageCreatedEvent, error) {
 	var body MessageCreatedEvent
@@ -25350,183 +25618,6 @@ func (c *Client) ListChannelCommands(ctx context.Context, channelId ChannelIdPat
 // Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
 func (c *Client) AutocompleteCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAutocompleteCommandRequestWithBody(c.Server, channelId, commandId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AutocompleteCommand Get suggestions for an option
-//
-// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
-func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// InvokeCommandWithBody Run a command
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
-func (c *Client) InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewInvokeCommandRequestWithBody(c.Server, channelId, commandId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// InvokeCommand Run a command
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
-func (c *Client) InvokeCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, body InvokeCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewInvokeCommandRequest(c.Server, channelId, commandId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// DeleteChannelDraft Delete the draft of a new forum post
-//
-// Corresponds with DELETE /channels/{channel_id}/draft (the `DeleteChannelDraft` operationId).
-func (c *Client) DeleteChannelDraft(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteChannelDraftRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutChannelDraftWithBody Save the draft of a new forum post
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
-func (c *Client) PutChannelDraftWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutChannelDraftRequestWithBody(c.Server, channelId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutChannelDraft Save the draft of a new forum post
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
-func (c *Client) PutChannelDraft(ctx context.Context, channelId ChannelIdPath, body PutChannelDraftJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutChannelDraftRequest(c.Server, channelId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ExportChannel Export the history of a channel
-//
-// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
-//
-// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
-// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
-// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
-// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
-// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
-// revocation ends the stream. An export cut after the first byte ends without a complete
-// response (no final chunk); a range without messages gives `200` with an empty body.
-//
-// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
-func (c *Client) ExportChannel(ctx context.Context, channelId ChannelIdPath, params *ExportChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportChannelRequest(c.Server, channelId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListIncomingWebhooks List incoming webhooks of a channel
-//
-// Corresponds with GET /channels/{channel_id}/incoming-webhooks (the `ListIncomingWebhooks` operationId).
-func (c *Client) ListIncomingWebhooks(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListIncomingWebhooksRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateIncomingWebhookWithBody Create an incoming webhook
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
-func (c *Client) CreateIncomingWebhookWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateIncomingWebhookRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateIncomingWebhook Create an incoming webhook
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
-func (c *Client) CreateIncomingWebhook(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, body CreateIncomingWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateIncomingWebhookRequest(c.Server, channelId, params, body)
 	if err != nil {
 		return nil, err
 	}

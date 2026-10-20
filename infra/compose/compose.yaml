@@ -408,6 +408,9 @@ services:
     profiles: [observability]
     restart: unless-stopped
     logging: *logging
+    # The start guard refuses to start while a webhook URL file is missing or empty, because
+    # Alertmanager itself would start and drop every alert (docs/observability/alerting.md 2).
+    entrypoint: ["/bin/sh", "/etc/alertmanager/start.sh", "/bin/alertmanager"]
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yaml"
       - "--storage.path=/alertmanager"

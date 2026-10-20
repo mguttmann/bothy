@@ -16,6 +16,183 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// AutocompleteCommand Get suggestions for an option
+//
+// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+// no choices when the owner does not answer in time.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InvokeCommandWithBody Run a command
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
+func (c *Client) InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvokeCommandRequestWithBody(c.Server, channelId, commandId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InvokeCommand Run a command
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
+func (c *Client) InvokeCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, body InvokeCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvokeCommandRequest(c.Server, channelId, commandId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteChannelDraft Delete the draft of a new forum post
+//
+// Corresponds with DELETE /channels/{channel_id}/draft (the `DeleteChannelDraft` operationId).
+func (c *Client) DeleteChannelDraft(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteChannelDraftRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutChannelDraftWithBody Save the draft of a new forum post
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
+func (c *Client) PutChannelDraftWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelDraftRequestWithBody(c.Server, channelId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutChannelDraft Save the draft of a new forum post
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
+func (c *Client) PutChannelDraft(ctx context.Context, channelId ChannelIdPath, body PutChannelDraftJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelDraftRequest(c.Server, channelId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportChannel Export the history of a channel
+//
+// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+//
+// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+// revocation ends the stream. An export cut after the first byte ends without a complete
+// response (no final chunk); a range without messages gives `200` with an empty body.
+//
+// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
+func (c *Client) ExportChannel(ctx context.Context, channelId ChannelIdPath, params *ExportChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportChannelRequest(c.Server, channelId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListIncomingWebhooks List incoming webhooks of a channel
+//
+// Corresponds with GET /channels/{channel_id}/incoming-webhooks (the `ListIncomingWebhooks` operationId).
+func (c *Client) ListIncomingWebhooks(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListIncomingWebhooksRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateIncomingWebhookWithBody Create an incoming webhook
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
+func (c *Client) CreateIncomingWebhookWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateIncomingWebhookRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateIncomingWebhook Create an incoming webhook
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
+func (c *Client) CreateIncomingWebhook(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, body CreateIncomingWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateIncomingWebhookRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // LeaveDm Leave a direct message channel
 //
 // Corresponds with POST /channels/{channel_id}/leave (the `LeaveDm` operationId).
@@ -26746,195 +26923,4 @@ func (r GetConsumerStateResponse) Status() string {
 		return r.HTTPResponse.Status
 	}
 	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetConsumerStateResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetConsumerStateResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// AckAgentEventsResponse200Headers the declared response headers of an HTTP 200 response for AckAgentEvents
-type AckAgentEventsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// AckAgentEventsResponse400Headers the declared response headers of an HTTP 400 response for AckAgentEvents
-type AckAgentEventsResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AckAgentEventsResponse401Headers the declared response headers of an HTTP 401 response for AckAgentEvents
-type AckAgentEventsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// AckAgentEventsResponse403Headers the declared response headers of an HTTP 403 response for AckAgentEvents
-type AckAgentEventsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AckAgentEventsResponse404Headers the declared response headers of an HTTP 404 response for AckAgentEvents
-type AckAgentEventsResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AckAgentEventsResponse429Headers the declared response headers of an HTTP 429 response for AckAgentEvents
-type AckAgentEventsResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// AckAgentEventsResponseDefaultHeaders the declared response headers of an HTTP default response for AckAgentEvents
-type AckAgentEventsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type AckAgentEventsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ConsumerState
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *AckAgentEventsResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *AckAgentEventsResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *AckAgentEventsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *AckAgentEventsResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *AckAgentEventsResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *AckAgentEventsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *AckAgentEventsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r AckAgentEventsResponse) GetJSON200() *ConsumerState {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r AckAgentEventsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r AckAgentEventsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r AckAgentEventsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r AckAgentEventsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// PollAgentEventsResponse200Headers the declared response headers of an HTTP 200 response for PollAgentEvents
-type PollAgentEventsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// PollAgentEventsResponse400Headers the declared response headers of an HTTP 400 response for PollAgentEvents
-type PollAgentEventsResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PollAgentEventsResponse401Headers the declared response headers of an HTTP 401 response for PollAgentEvents
-type PollAgentEventsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// PollAgentEventsResponse403Headers the declared response headers of an HTTP 403 response for PollAgentEvents
-type PollAgentEventsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PollAgentEventsResponse404Headers the declared response headers of an HTTP 404 response for PollAgentEvents
-type PollAgentEventsResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PollAgentEventsResponse410Headers the declared response headers of an HTTP 410 response for PollAgentEvents
-type PollAgentEventsResponse410Headers struct {
-	CorrelationId *CorrelationId
 }

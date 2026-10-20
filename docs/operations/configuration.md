@@ -902,9 +902,9 @@ kopiert.
 | `oidc/<anbieter>_client_secret` | geliefert | server | OIDC mit `client_secret_basic` (`client_secret_ref` in `identity_providers.config`) |
 | `oidc/<anbieter>_client_key.pem` | geliefert | server | OIDC mit `private_key_jwt`: privater Schlüssel der Client-Assertion, PKCS#8 (`client_key_ref`, [08-identitaet.md](../spec/08-identitaet.md) 2.6) |
 | `offsite/` | geliefert | backup | key of the off-site S3 bucket (`backup.offsite.target`): `access_key_id`, `secret_access_key`, optional `ca.crt` for a private CA; may write and read, never remove a stored version ([backup-restore.md](backup-restore.md) 2) |
-| `alertmanager_bothy_webhook_url` | geliefert | alertmanager | Eingangs-Webhook des Meldungskanals |
-| `alertmanager_external_webhook_url` | geliefert | alertmanager | externer Bereitschaftskanal |
-| `alertmanager_heartbeat_url` | geliefert | alertmanager | externer Herzschlag für den Watchdog |
+| `alertmanager_bothy_webhook_url` | geliefert | alertmanager | incoming webhook of the alert channel "Operations" on the internal listener (`http://api:8081/api/v1/hooks/<id>/<token>`); written by `infra/compose/alert-setup.sh channel` with mode `0600` ([alerting-setup.md](alerting-setup.md)) |
+| `alertmanager_external_webhook_url` | geliefert | alertmanager | external on-call channel of the operator's choice for `page` alerts; `alert-setup.sh external` |
+| `alertmanager_heartbeat_url` | geliefert | alertmanager | external heartbeat service of the operator's choice for the Watchdog; `alert-setup.sh heartbeat`. Alertmanager does not start while one of the three is missing or empty (start guard `infra/observability/alertmanager/start.sh`) |
 | `newrelic_license_key` | geliefert | collector | Overlay `newrelic` |
 | `grafana_otlp_authorization` | geliefert | collector | Overlay `grafana` (ganzer Kopfzeilenwert `Basic ...`) |
 | `datadog_api_key` | geliefert | collector | Overlay `datadog` |

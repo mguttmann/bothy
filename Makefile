@@ -107,7 +107,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog catalog catalog-check linkcheck \
-        trivy-image portability console-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
+        trivy-image portability console-e2e alert-e2e linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins install-options tofu-check tofu-vm-test commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
@@ -818,6 +818,9 @@ portability: ## Compose smoke test with the server image (SMOKE_SERVER_IMAGE, de
 
 console-e2e: ## SEC-T05: the console under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; tools/console-e2e/README.md)
 	$(UVRUN) python tools/console-e2e/console_e2e.py
+
+alert-e2e: ## M7-20: the alert path end to end (Prometheus, Alertmanager, the channel Operations, external and heartbeat stubs) against the Compose smoke stack (E2E_SERVER_IMAGE, default the tag of make image; docs/observability/alerting.md 5)
+	$(UVRUN) python tools/observability/alert_e2e.py
 
 # ---- platform tests of the apps (not part of `gates`: they need a desktop session or a device) -
 apps-platform: ## Platform tests of the members on this host and an attached Android device (platform-tests.json; CI jobs apps-macos, apps-windows, apps-android)

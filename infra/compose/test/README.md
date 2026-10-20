@@ -18,6 +18,7 @@ together.
 | `smoke.env` | Compose interpolation variables (`--env-file`); no secrets, environment `staging` |
 | `compose.console-e2e.yaml` | overlay of the console E2E test (M6-03, `make console-e2e`, `tools/console-e2e/README.md`): the TLS sidecar `tls`, the seed `console-seed` (`bothy-smoke seed`) and the browsers `console-browser`, all in the network namespace of `api`; `server.public_url` `https://localhost:8443` and the WebAuthn relying party `localhost` |
 | `console-e2e.env`, `console-e2e/Caddyfile` | the variables of that overlay (read after `smoke.env`) and the configuration of the sidecar |
+| `compose.alert-e2e.yaml`, `alert-e2e/rules.yaml` | overlay of the alert path test (M7-20, `make alert-e2e`, `tools/observability/alert_e2e.py`): Prometheus with a configuration derived from the real one plus the test rules (one `page`, one `ticket` alert), Alertmanager unchanged without a published port, the stub `alert-stub` for the external receivers and the metric of the test rules, the probe `alert-probe` in the network namespace of `api` ([alerting.md](../../../docs/observability/alerting.md) 5) |
 | `otel/file.yaml` | collector overlay `file`: the three signals as OTLP JSON lines into the volume `otel-smoke-out`, shorter `tail_sampling` and `batch` waits |
 
 The probe is the Go package `services/server/test/smoke` and its command `cmd/bothy-smoke`, built

@@ -11,7 +11,7 @@ import 'package:built_value/serializer.dart';
 
 part 'incoming_webhook_post.g.dart';
 
-/// Body of an incoming webhook call in one of two shapes, recognised per request (11 8.2, docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`, `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus Alertmanager (format `alertmanager`) and must contain no native member; every other body is `native` and needs `content_md`. Unknown members are refused.
+/// Body of an incoming webhook call in one of two shapes, recognised per request (11 8.2, docs/DECISIONS.md D-M2-27-5, D-M7-20-5). A body with at least one Alertmanager member (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`, `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus Alertmanager (format `alertmanager`) and must contain no native member; other members of such a payload, at the top and in each alert, are ignored, because Alertmanager adds members in new versions and drops a notification answered with `400`. Every other body is `native`, needs `content_md` and refuses every other member with `400 validation_failed` and `errors[].code` `unknown_member`.
 ///
 /// Properties:
 /// * [contentMd] - Native. Markdown content, at most `message.max_content_bytes` UTF-8 bytes.
