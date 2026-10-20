@@ -404,6 +404,7 @@ void main() {
       apiTokenCreate: ApiTokenCreate(
         (b) => b
           ..name = 'Adapter production'
+          ..dpopJkt = 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs'
           ..expiresAt = DateTime.utc(2027, 10, 10),
       ),
     )).data!;

@@ -127,12 +127,17 @@ void main() {
 
       go('/admin/agents/${agent.id}');
       await tester.pumpAndSettle();
+      // The server's comparison is false at once; the hint says how to switch the adapter.
+      await app.waitFor(find.byKey(const ValueKey('agentPage.switchHint')));
+
+      // A heartbeat that still reports personal brings the warning code (10 8).
+      world.agentHeartbeat(agent.id);
+      go('/admin/agents');
+      await tester.pumpAndSettle();
+      go('/admin/agents/${agent.id}');
+      await tester.pumpAndSettle();
       await app.waitFor(
         find.byKey(const ValueKey('agentPage.warning.billing_mode_mismatch')),
-      );
-      expect(
-        find.byKey(const ValueKey('agentPage.switchHint')),
-        findsOneWidget,
       );
 
       // The adapter switches its login; the next heartbeat reports organization.
@@ -146,6 +151,7 @@ void main() {
         find.byKey(const ValueKey('agentPage.warning.billing_mode_mismatch')),
         findsNothing,
       );
+      expect(find.byKey(const ValueKey('agentPage.switchHint')), findsNothing);
       expect(server.violations, isEmpty);
     } finally {
       await app.stop();

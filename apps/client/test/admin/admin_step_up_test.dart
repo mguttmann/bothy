@@ -265,6 +265,7 @@ void main() {
         helper.id,
         name: 'Adapter',
         expiresAt: DateTime.utc(2027, 10, 1),
+        dpopJkt: 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
         purpose: 'createToken',
       ),
       'revokeToken': () => admin.revokeToken(token.token.id),

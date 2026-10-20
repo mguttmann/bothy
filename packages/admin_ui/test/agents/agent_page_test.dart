@@ -179,8 +179,10 @@ void main() {
     expect(textOf(tester, 'agentPage.configured'), 'Organization');
     expect(textOf(tester, 'agentPage.reported'), 'Personal');
     expect(warningKeys(tester), isEmpty);
-    expect(find.byKey(const ValueKey('agentPage.switchHint')), findsNothing);
     expect(find.textContaining('Adapter reports'), findsNothing);
+    // The hint follows the server's comparison `billing_mode_matches = false` (10 8: the
+    // code itself comes only after `billing.mismatch_alert_after`).
+    expect(find.byKey(const ValueKey('agentPage.switchHint')), findsOneWidget);
   });
 
   testWidgets('an adapter that follows the configured mode per run reports '

@@ -121,6 +121,13 @@ void main() {
     expect(find.text('Enter a day as YYYY-MM-DD.'), findsOneWidget);
     expect(canSubmit(tester), isFalse);
     await type(tester, 'token.lastDay', '2026-12-31');
+    // 08 12: the DPoP thumbprint is required for an agent token.
+    expect(canSubmit(tester), isFalse);
+    await type(
+      tester,
+      'token.dpop',
+      'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
+    );
     expect(canSubmit(tester), isTrue);
     await tap(tester, 'confirm.submit');
 
@@ -247,6 +254,11 @@ void main() {
     await tap(tester, 'tokens.create');
     await type(tester, 'token.name', 'Deploy');
     await type(tester, 'token.lastDay', '2026-12-31');
+    await type(
+      tester,
+      'token.dpop',
+      'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
+    );
     await tap(tester, 'confirm.submit');
     expect(find.byKey(const ValueKey('tokens.create')), findsNothing);
     expect(find.byKey(const ValueKey('token.secret')), findsNothing);

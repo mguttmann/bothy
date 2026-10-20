@@ -1951,6 +1951,8 @@ final class FakeWorld {
       state: state,
       keyType: keyType,
     )..lastHeartbeatAt = stamp();
+    a.mismatchAtHeartbeat =
+        reportedBillingMode != null && reportedBillingMode != billingMode;
     agents[a.id] = a;
     return a;
   }
@@ -2020,21 +2022,27 @@ final class FakeWorld {
     }
     if (keyType != null) a.keyType = keyType;
     if (state != null) a.state = state;
+    a.mismatchAtHeartbeat =
+        a.reportedBillingMode != null && a.reportedBillingMode != a.billingMode;
     a.lastHeartbeatAt = stamp();
   }
 
   /// The codes of `AgentRuntimeStatus.warnings` for [a] as the server computes them at each
   /// heartbeat (10 8, 09 4.8), only while the runtime is `online` or `degraded`.
   ///
-  /// The fake treats `billing.mismatch_alert_after` as zero: `billing_mode_mismatch` shows as
-  /// soon as the reported mode differs. There is no `tool_class_mismatch`, because the fake has
+  /// The fake counts `billing.mismatch_alert_after` as one heartbeat: `billing_mode_mismatch`
+  /// shows once a heartbeat saw the reported mode differ from the configured one
+  /// ([FakeAgent.mismatchAtHeartbeat]); right after a switch only `billing_mode_matches` is
+  /// false, as on the server. There is no `tool_class_mismatch`, because the fake has
   /// no reported tool class.
   List<String> agentWarnings(FakeAgent a) {
     if (a.state != 'online' && a.state != 'degraded') return const [];
     final reported = a.reportedBillingMode;
     final supported = a.billingModesSupported;
     return [
-      if (reported != null && reported != a.billingMode)
+      if (a.mismatchAtHeartbeat &&
+          reported != null &&
+          reported != a.billingMode)
         'billing_mode_mismatch',
       if (reported == null &&
           supported != null &&

@@ -4576,7 +4576,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get adminTokenLastDayInvalid => 'Enter a day as YYYY-MM-DD.';
 
   @override
-  String get adminTokenDpop => 'DPoP key thumbprint (optional)';
+  String get adminTokenDpop => 'DPoP key thumbprint of the adapter';
 
   @override
   String adminTokenValidUntil(String when) {

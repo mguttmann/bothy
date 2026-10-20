@@ -75,6 +75,12 @@ final class FakeAgent {
   /// When the backend policy last changed, or null before the first change.
   String? billingModeChangedAt;
 
+  /// Whether the last heartbeat saw the reported mode differ from the configured one; the
+  /// server warns `billing_mode_mismatch` only for a mismatch that lasted longer than
+  /// `billing.mismatch_alert_after` (10 8), which the fake counts as one heartbeat. A change of
+  /// the configured mode clears it.
+  bool mismatchAtHeartbeat = false;
+
   /// When the last heartbeat arrived, or null before the first one.
   String? lastHeartbeatAt;
 

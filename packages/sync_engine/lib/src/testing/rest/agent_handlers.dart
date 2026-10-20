@@ -44,6 +44,7 @@ final class _Snapshot {
             a.credentialHolderId,
             a.version,
             a.billingModeChangedAt,
+            a.mismatchAtHeartbeat,
           ),
       },
       _grants = {
@@ -66,7 +67,7 @@ final class _Snapshot {
 
   final FakeWorld _world;
   final FakeAuditLog _log;
-  final Map<String, (String, String?, int, String?)> _agents;
+  final Map<String, (String, String?, int, String?, bool)> _agents;
   final Map<String, JsonMap> _grants;
   final Map<String, Map<String, String>> _access;
   final Map<String, Map<String, JsonMap>> _members;
@@ -75,13 +76,14 @@ final class _Snapshot {
   final int _rows;
 
   void restore() {
-    for (final MapEntry(key: id, value: (mode, holder, version, at))
+    for (final MapEntry(key: id, value: (mode, holder, version, at, seen))
         in _agents.entries) {
       _world.agents[id]
         ?..billingMode = mode
         ..credentialHolderId = holder
         ..version = version
-        ..billingModeChangedAt = at;
+        ..billingModeChangedAt = at
+        ..mismatchAtHeartbeat = seen;
     }
     _world.grants
       ..clear()
@@ -264,7 +266,8 @@ final class FakeI1Guard {
       ..billingMode = mode
       ..credentialHolderId = holder
       ..version += 1
-      ..billingModeChangedAt = world.stamp();
+      ..billingModeChangedAt = world.stamp()
+      ..mismatchAtHeartbeat = false;
     world.permissionVersion++;
   }
 
@@ -573,6 +576,17 @@ void registerAgentHandlers(
       owner(r);
       final a = tokenOwner(r);
       stepUp(r);
+      // 08 12: `auth.dpop_required_for` contains `agent` by default, so an agent token needs
+      // the thumbprint of the adapter's key.
+      if (r.json['dpop_jkt'] == null) {
+        throw const FakeProblem(
+          400,
+          'validation_failed',
+          errors: [
+            {'pointer': '/dpop_jkt', 'code': 'required'},
+          ],
+        );
+      }
       // ADR 0061 point 1: 43 Base62 characters of randomness, a CRC-32 over them in 6.
       final secretPart = [
         for (var i = 0; i < 43; i++) _base62[random.nextInt(62)],

@@ -1219,7 +1219,7 @@
   "adminTokenName": "Name",
   "adminTokenLastDay": "Letzter Tag (JJJJ-MM-TT)",
   "adminTokenLastDayInvalid": "Gib einen Tag als JJJJ-MM-TT ein.",
-  "adminTokenDpop": "Fingerabdruck des DPoP-Schlüssels (optional)",
+  "adminTokenDpop": "Fingerabdruck des DPoP-Schlüssels des Adapters",
   "adminTokenValidUntil": "gültig bis {when}",
   "adminTokenLastUsed": "zuletzt benutzt {when}",
   "adminTokenBound": "DPoP-gebunden",

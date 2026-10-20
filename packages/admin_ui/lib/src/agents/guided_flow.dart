@@ -222,10 +222,12 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   }
 }
 
-/// Step 5 of 10 11: per switched agent "... now uses Organization" with its badge, and while
-/// the server still warns `billing_mode_mismatch` (the adapter reports the old mode until its
-/// runtime is switched, 10 8) which mode it reports and how to switch it (10 10). The warning
-/// is the server's code; the dialog never compares the modes itself.
+/// Step 5 of 10 11: per switched agent "... now uses Organization" with its badge, the mode its
+/// adapter reports, and while the server says the reported mode does not match
+/// (`billing_mode_matches = false`, at once after the switch; the warning code
+/// `billing_mode_mismatch` follows only after `billing.mismatch_alert_after`, 10 8) which mode
+/// it reports and how to switch it (10 10). Every warning code the server reports is shown
+/// with its text. The comparison is the server's; the dialog never compares the modes itself.
 class GuidedResult extends StatefulWidget {
   /// Creates the result for [agentIds].
   const GuidedResult({
@@ -343,7 +345,33 @@ class _GuidedResultState extends State<GuidedResult> {
             AgentModeBadge(mode: agent.mode),
           ],
         ),
-        if (agent.runtime.warnings.contains('billing_mode_mismatch'))
+        if (agent.runtime.reportedMode case final mode?)
+          Wrap(
+            key: ValueKey('guided.reported.${agent.id}'),
+            spacing: DsSpace.s8,
+            children: [
+              Text(
+                l.adminAgentReported,
+                style: dsTextStyle(DsType.bodySm)
+                    .copyWith(color: context.dsColors.textSecondary),
+              ),
+              Text(agentModeLabel(l, mode), style: dsTextStyle(DsType.bodySm)),
+            ],
+          ),
+        for (final code in agent.runtime.warnings)
+          Padding(
+            key: ValueKey('guided.warning.${agent.id}.$code'),
+            padding: const EdgeInsets.only(top: DsSpace.s4),
+            child: DsBanner(
+              tone: DsTone.warning,
+              text: [
+                agentWarningText(l, agent, code),
+                ?agentWarningConsequence(l, code),
+              ].join(' '),
+            ),
+          ),
+        if (agent.runtime.modeMatches == false ||
+            agent.runtime.warnings.contains('billing_mode_mismatch'))
           Padding(
             key: ValueKey('guided.stillReports.${agent.id}'),
             padding: const EdgeInsets.only(top: DsSpace.s8),

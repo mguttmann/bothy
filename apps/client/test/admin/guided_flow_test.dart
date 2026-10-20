@@ -109,7 +109,10 @@ void main() {
     expect(record.mode, AgentBillingMode.organization);
     expect(record.holderId, isNull);
     expect(record.runtime.reportedMode, AgentBillingMode.personal);
-    expect(record.runtime.warnings, ['billing_mode_mismatch']);
+    // 10 8: right after the switch the server's comparison is false; the warning code follows
+    // only after `billing.mismatch_alert_after`, here the next heartbeat.
+    expect(record.runtime.modeMatches, isFalse);
+    expect(record.runtime.warnings, isEmpty);
     // The step-up answer (401) comes first; the refused and the guided request follow.
     expect(fake.server.requestsOf('createGrant').map((r) => r.status), [
       401,
@@ -117,6 +120,10 @@ void main() {
       201,
     ]);
 
+    world.agentHeartbeat(agent.id);
+    expect((await admin.agentRecord(agent.id)).runtime.warnings, [
+      'billing_mode_mismatch',
+    ]);
     world.agentHeartbeat(agent.id, reportedBillingMode: 'organization');
     expect((await admin.agentRecord(agent.id)).runtime.warnings, isEmpty);
     expect(fake.server.violations, isEmpty);
@@ -232,6 +239,7 @@ void main() {
       agent.id,
       name: 'Adapter',
       expiresAt: DateTime.utc(2027, 10, 1),
+      dpopJkt: 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
       purpose: 'token',
     );
     expect(created.secret, startsWith(created.token.prefix));

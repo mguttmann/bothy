@@ -762,11 +762,61 @@ void main() {
     },
   );
 
+  test('after a switch only billing_mode_matches is false; the code follows a heartbeat', () async {
+    final a = world.addAgent(
+      handle: 'helper',
+      displayName: 'Helper',
+      billingMode: 'personal',
+      credentialHolderId: w.alex.id,
+      reportedBillingMode: 'personal',
+    );
+    final agents = alex.api.getAgentsApi();
+    await agents.setAgentBillingMode(
+      agentId: a.id,
+      ifMatch: '"1"',
+      billingModeSet: BillingModeSet(
+        (b) => b
+          ..billingMode = BillingMode.organization
+          ..reason = 'Team uses it',
+      ),
+    );
+    // 10 8: the warning needs the mismatch to last `billing.mismatch_alert_after`.
+    var card = (await agents.getAgent(agentId: a.id)).data!;
+    expect(card.presence.billingModeMatches, isFalse);
+    expect(card.presence.warnings, isEmpty);
+    world.agentHeartbeat(a.id);
+    card = (await agents.getAgent(agentId: a.id)).data!;
+    expect(card.presence.warnings, ['billing_mode_mismatch']);
+    world.agentHeartbeat(a.id, reportedBillingMode: 'organization');
+    card = (await agents.getAgent(agentId: a.id)).data!;
+    expect(card.presence.warnings, isEmpty);
+    expect(card.presence.billingModeMatches, isTrue);
+  });
+
+  test('an agent token without a DPoP thumbprint is refused (08 12)', () async {
+    final tokens = alex.api.getTokensApi();
+    final refused = await failure(
+      tokens.createToken(
+        principalId: w.robin.id,
+        apiTokenCreate: ApiTokenCreate(
+          (b) => b
+            ..name = 'Bearer'
+            ..expiresAt = DateTime.utc(2027, 10, 10),
+        ),
+      ),
+    );
+    expect(refused?.response?.statusCode, 400);
+    expect(bodyOf(refused)['errors'], [
+      {'pointer': '/dpop_jkt', 'code': 'required'},
+    ]);
+  });
+
   test('a token shows its secret once; revoking needs no step-up', () async {
     final tokens = alex.api.getTokensApi();
     final body = ApiTokenCreate(
       (b) => b
         ..name = 'Adapter production'
+        ..dpopJkt = 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs'
         ..expiresAt = DateTime.utc(2027, 10, 10),
     );
     const key = '0193f2a7-0000-7000-8000-000000000a01';

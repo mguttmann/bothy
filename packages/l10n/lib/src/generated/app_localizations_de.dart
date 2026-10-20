@@ -4600,7 +4600,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get adminTokenLastDayInvalid => 'Gib einen Tag als JJJJ-MM-TT ein.';
 
   @override
-  String get adminTokenDpop => 'Fingerabdruck des DPoP-Schlüssels (optional)';
+  String get adminTokenDpop => 'Fingerabdruck des DPoP-Schlüssels des Adapters';
 
   @override
   String adminTokenValidUntil(String when) {

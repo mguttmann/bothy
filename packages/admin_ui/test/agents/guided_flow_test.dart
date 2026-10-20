@@ -381,4 +381,43 @@ void main() {
       );
     });
   });
+
+  testWidgets(
+    'the result follows the server: matches false and every warning code',
+    (tester) async {
+      // As the server answers right after the switch: billing_mode_matches is false, the code
+      // billing_mode_mismatch is not there yet (10 8), and the adapter cannot prove organization.
+      repository.agentRecordsById['support'] = fakeAgentRecord(
+        'support',
+        name: 'Support',
+        reported: AgentBillingMode.personal,
+        supported: const [AgentBillingMode.personal],
+        warnings: const ['billing_mode_unsupported'],
+      );
+      await pumpInApp(
+        tester,
+        GuidedResult(repository: repository, agentIds: const ['support']),
+        navigatorKey: navigator,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('guided.stillReports.support')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('guided.reported.support')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          const ValueKey('guided.warning.support.billing_mode_unsupported'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Adapter cannot prove this mode'),
+        findsOneWidget,
+      );
+    },
+  );
 }

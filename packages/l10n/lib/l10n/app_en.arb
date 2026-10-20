@@ -6874,7 +6874,7 @@
   "@adminTokenLastDayInvalid": {
     "description": "The last day of the token is no day."
   },
-  "adminTokenDpop": "DPoP key thumbprint (optional)",
+  "adminTokenDpop": "DPoP key thumbprint of the adapter",
   "@adminTokenDpop": {
     "description": "Field: the JWK thumbprint of the adapter key the token is bound to (08 section 12)."
   },

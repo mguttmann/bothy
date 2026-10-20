@@ -337,10 +337,11 @@ class _CreateTokenDialogState extends State<_CreateTokenDialog> {
       title: l.adminTokenCreateTitle(widget.agentName),
       body: l.adminTokenCreateBody(widget.agentName),
       confirmLabel: l.adminTokenCreate,
-      canConfirm: name.isNotEmpty && expiresAt != null,
+      // 08 12: an agent token is bound to the adapter's DPoP key (`auth.dpop_required_for`
+      // contains `agent` by default), so the thumbprint is required like the name and the day.
+      canConfirm: name.isNotEmpty && expiresAt != null && dpop.isNotEmpty,
       onConfirm: (_) =>
-          Navigator.of(context)
-              .pop(_TokenRequest(name, expiresAt!, dpop.isEmpty ? null : dpop)),
+          Navigator.of(context).pop(_TokenRequest(name, expiresAt!, dpop)),
       fields: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

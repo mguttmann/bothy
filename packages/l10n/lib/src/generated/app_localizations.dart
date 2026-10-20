@@ -7420,7 +7420,7 @@ abstract class AppLocalizations {
   /// Field: the JWK thumbprint of the adapter key the token is bound to (08 section 12).
   ///
   /// In en, this message translates to:
-  /// **'DPoP key thumbprint (optional)'**
+  /// **'DPoP key thumbprint of the adapter'**
   String get adminTokenDpop;
 
   /// Expiry of a token in the list.

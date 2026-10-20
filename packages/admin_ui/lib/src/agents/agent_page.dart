@@ -482,8 +482,11 @@ class _AgentPageState extends State<AgentPage>
       // Exactly one entry per code the server reports (10 8; 15 1 principle 1).
       for (final code in r.warnings) _warning(l, a, code),
       // 10 9.2, 11 step 5: the mismatch disappears only when the runtime reports the
-      // configured mode, so the page says how to switch the adapter.
-      if (r.warnings.contains('billing_mode_mismatch'))
+      // configured mode, so the page says how to switch the adapter. The server's comparison
+      // `billing_mode_matches` counts at once; its warning code follows only after
+      // `billing.mismatch_alert_after` (10 8).
+      if (a.runtime.modeMatches == false ||
+          a.runtime.warnings.contains('billing_mode_mismatch'))
         Text(
           l.adminAgentSwitchHint(agentModeLabel(l, a.mode, code: a.mode.wire)),
           key: const ValueKey('agentPage.switchHint'),

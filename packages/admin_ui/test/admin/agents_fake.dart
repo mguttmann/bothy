@@ -26,19 +26,25 @@ const Map<String, bool> agentsStepUpOf = {
 };
 
 /// The warning codes the server computes for an agent with these values (10 8, 09 4.8).
+///
+/// `billing_mode_mismatch` shows only when the mismatch already held at a heartbeat for longer
+/// than `billing.mismatch_alert_after` ([mismatchElapsed]); right after a switch the server
+/// reports `billing_mode_matches = false` without the code.
 List<String> serverWarnings({
   required AgentBillingMode mode,
   AgentBillingMode? reported,
   List<AgentBillingMode>? supported,
   String keyType = 'api_key',
   AgentLiveStateKind state = AgentLiveStateKind.online,
+  bool mismatchElapsed = true,
 }) {
   if (state != AgentLiveStateKind.online &&
       state != AgentLiveStateKind.degraded) {
     return const [];
   }
   return [
-    if (reported != null && reported != mode) 'billing_mode_mismatch',
+    if (mismatchElapsed && reported != null && reported != mode)
+      'billing_mode_mismatch',
     if (reported == null && supported != null && !supported.contains(mode))
       'billing_mode_unsupported',
     if (keyType == 'unknown') 'billing_evidence_unknown',
@@ -204,6 +210,8 @@ mixin FakeAgents {
           supported: r.modesSupported,
           keyType: r.evidence?.keyType ?? 'api_key',
           state: r.state,
+          // No heartbeat has seen the new mode yet, so the alert delay has not passed.
+          mismatchElapsed: false,
         ),
       ),
       version: a.version + 1,
@@ -374,6 +382,13 @@ mixin FakeAgents {
       '$principalId $name ${expiresAt.toUtc().toIso8601String()}',
       purpose,
     );
+    // 08 12: `auth.dpop_required_for` contains `agent` by default, so an agent token
+    // without a key thumbprint is refused.
+    if (dpopJkt == null) {
+      throw const SelfActionFailed(
+        ApiProblem(status: 400, code: 'validation_failed'),
+      );
+    }
     final n = _tokens++;
     final token = AgentToken(
       id: 'token-$n',
@@ -381,7 +396,7 @@ mixin FakeAgents {
       prefix: 'bothy_agt_EXAMP$n',
       createdAt: DateTime.utc(2026, 10, 17, 9),
       expiresAt: expiresAt,
-      dpopBound: dpopJkt != null,
+      dpopBound: true,
     );
     tokensById.putIfAbsent(principalId, () => []).add(token);
     return AgentTokenCreated(
