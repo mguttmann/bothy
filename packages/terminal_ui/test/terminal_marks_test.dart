@@ -100,7 +100,10 @@ final class _Scene {
         (boundary.currentContext!.findRenderObject()! as RenderBox)
             .localToGlobal(Offset.zero);
     final abs = h.controller.screen.terminal.buffer.scrollBack + y;
-    final o = rt.getOffset(CellOffset(x, abs)) + origin;
+    // Where xterm paints the cell: no left padding, the row of getOffset.
+    final o =
+        Offset(x * rt.cellSize.width, rt.getOffset(CellOffset(x, abs)).dy) +
+        origin;
     final top = o.dy.truncateToDouble();
     return Rect.fromLTWH(
       o.dx * dpr,
@@ -119,6 +122,7 @@ Future<_Scene> _pump(
   required DsThemeMode theme,
   required double dpr,
   required bool focused,
+  EdgeInsets padding = EdgeInsets.zero,
 }) async {
   tester.view
     ..physicalSize = _logical * dpr
@@ -139,12 +143,19 @@ Future<_Scene> _pump(
       theme: buildDsTheme(ds),
       builder: (context, app) => DsThemeScope(dsContext: ds, child: app!),
       home: Scaffold(
-        body: RepaintBoundary(
-          key: scene.boundary,
-          child: TerminalScreenView(
-            controller: h.controller,
-            fontSize: 14,
-            autofocus: focused,
+        body: MediaQuery(
+          data: MediaQueryData(
+            size: _logical,
+            devicePixelRatio: dpr,
+            padding: padding,
+          ),
+          child: RepaintBoundary(
+            key: scene.boundary,
+            child: TerminalScreenView(
+              controller: h.controller,
+              fontSize: 14,
+              autofocus: focused,
+            ),
           ),
         ),
       ),
@@ -273,6 +284,39 @@ void main() {
         );
       }
     }
+
+    testWidgets(
+      'cursor: ${theme.name}, left safe-area padding: still in its cell',
+      (tester) async {
+        // Review finding: xterm's getOffset adds the left padding, its painting does not.
+        final scene = await _pump(
+          tester,
+          theme: theme,
+          dpr: 1,
+          focused: true,
+          padding: const EdgeInsets.only(left: 24, top: 8),
+        );
+        scene.write('\x1b[2J\x1b[6;11HW\x1b[6;11H\x1b[?25l');
+        final hidden = await scene.shot();
+        scene.write('\x1b[?25h');
+        final shown = await scene.shot();
+        final (l, t, r, b) = _box(scene.cell(10, 5), shown, 1);
+        var inside = 0;
+        for (var y = 0; y < shown.height; y++) {
+          for (var x = 0; x < shown.width; x++) {
+            if (shown.at(x, y) == hidden.at(x, y)) continue;
+            expect(
+              x >= l && x < r && y >= t && y < b,
+              isTrue,
+              reason: '($x, $y)',
+            );
+            inside++;
+          }
+        }
+        expect(inside, greaterThan(0));
+        scene.h.controller.dispose();
+      },
+    );
 
     for (final dpr in [1.0, 1.25, 2.0]) {
       testWidgets(

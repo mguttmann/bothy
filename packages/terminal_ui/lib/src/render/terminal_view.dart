@@ -118,7 +118,13 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
     if (view == null || view.context.findRenderObject() == null) return null;
     final render = view.renderTerminal;
     if (!render.hasSize) return null;
-    return _Geometry(render.cellSize, render.getOffset);
+    // xterm paints a cell at column times cell width, without the left padding that its
+    // getOffset adds, and at getOffset's row position.
+    return _Geometry(
+      render.cellSize,
+      (cell) =>
+          Offset(cell.x * render.cellSize.width, render.getOffset(cell).dy),
+    );
   }
 
   @override
