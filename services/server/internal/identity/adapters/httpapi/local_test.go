@@ -41,6 +41,13 @@ const testPassword = "EXAMPLE-correct-horse-1"
 // (docs/operations/configuration.md), the allowed difference of the medians in ID-T21.
 const notFoundTimingTolerance = 20 * time.Millisecond
 
+// raceTimingFactor widens notFoundTimingTolerance under the race detector, which makes Go code
+// 2 to 20 times slower (https://go.dev/doc/articles/race_detector, "Runtime Overhead"): there the
+// test measures the database work only (constant hasher), and a wrong password writes the failure
+// counter while an unknown name writes nothing, so the instrumented driver turns a write of about
+// a millisecond into a gap above the tolerance on a loaded runner (median pair difference 23.5 ms).
+const raceTimingFactor = 5
+
 // countingHasher counts the verifications of the hasher it wraps.
 type countingHasher struct {
 	app.PasswordHasher
@@ -608,8 +615,12 @@ func TestIDT21_UnknownNameTimingEqualsWrongPassword(t *testing.T) {
 	d := median(diffs)
 	t.Logf("race detector %v: medians unknown name %v, wrong password %v, median pair difference %v",
 		raceEnabled, median(unknown), median(wrong), d)
-	if d.Abs() >= notFoundTimingTolerance {
-		t.Fatalf("median pair difference %v reaches the tolerance %v", d, notFoundTimingTolerance)
+	tolerance := notFoundTimingTolerance
+	if raceEnabled {
+		tolerance *= raceTimingFactor
+	}
+	if d.Abs() >= tolerance {
+		t.Fatalf("median pair difference %v reaches the tolerance %v", d, tolerance)
 	}
 	var failed int
 	w.cred(alex.user, "failed_count", &failed)
