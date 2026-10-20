@@ -490,7 +490,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"terminal.host_duplicate_probe_timeout = 5s  # default\n" +
 		"terminal.host_heartbeat_interval = 20s  # default\n" +
 		"terminal.host_heartbeat_miss_limit = 3  # default\n" +
+		"terminal.idle_grace = 2m  # default\n" +
 		"terminal.idle_timeout = 30m  # default\n" +
+		"terminal.max_session_duration = 12h  # default\n" +
+		"terminal.max_sessions_per_host = 10  # default\n" +
+		"terminal.max_sessions_per_person = 5  # default\n" +
 		"terminal.open_timeout = 20s  # default\n" +
 		"terminal.pairing_code_ttl = 15m  # default\n" +
 		"terminal.quick_reattach_window = 1m  # default\n" +
@@ -499,6 +503,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"terminal.report_max_entries = 64  # default\n" +
 		"terminal.session_token_ttl = 30s  # default\n" +
 		"terminal.step_up_max_age = 1m  # default\n" +
+		"terminal.sweep_interval = 30s  # default\n" +
 		"thread.max_tags = 5  # default\n" +
 		"thread.placeholder_titles = Neuer Chat, New chat, Chat, Ohne Titel, Untitled, Test  # default\n" +
 		"thread.title_max_chars = 200  # default\n" +
