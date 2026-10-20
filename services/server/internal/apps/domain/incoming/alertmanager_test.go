@@ -225,3 +225,33 @@ func TestRenderAlertmanager_ManyAlertsLinear(t *testing.T) {
 		t.Fatalf("%d bytes with %d items: one more would have fit", len(got), kept)
 	}
 }
+
+// TestRenderAlertmanager_URLsOnlyPrintableASCII (red team M2-27, Major): a URL with a character
+// outside printable ASCII (U+FEFF, which the client's autolink pattern counts as white space, a
+// bidi override, a non-ASCII letter) is left out, because it would break the autolink and let the
+// rest of the URL render as Markdown with a link whose text is not its target (SEC-OUT-1).
+func TestRenderAlertmanager_URLsOnlyPrintableASCII(t *testing.T) {
+	t.Parallel()
+	const masked = "https://wiki.example.com/[https://docs.example.com/](https://example.net/x)"
+	for name, bad := range map[string]string{
+		"zero width no-break space": masked + "\ufeff",
+		"bidi override":             "https://wiki.example.com/\u202eexe.txt",
+		"non-ASCII letter":          "https://wiki.example.com/caf\u00e9",
+	} {
+		t.Run(name, func(t *testing.T) {
+			n := incoming.Notification{Status: "firing", CommonLabels: map[string]string{"alertname": "A"}, ExternalURL: bad,
+				Alerts: []incoming.Alert{{Status: "firing", Labels: map[string]string{"alertname": "A"}, GeneratorURL: bad,
+					Annotations: map[string]string{"summary": "s", "runbook_url": bad}}}}
+			got := incoming.RenderAlertmanager(n, largeLimit)
+			if strings.Contains(got, "Runbook:") || strings.Contains(got, "Source:") || strings.Contains(got, "Alertmanager:") {
+				t.Fatalf("a URL line with %q was written: %q", bad, got)
+			}
+		})
+	}
+	ok := "https://wiki.example.com/[a](https://example.net/x)"
+	n := incoming.Notification{Status: "firing", CommonLabels: map[string]string{"alertname": "A"}, ExternalURL: ok,
+		Alerts: []incoming.Alert{{Status: "firing", Labels: map[string]string{"alertname": "A"}, Annotations: map[string]string{"summary": "s", "runbook_url": ok}}}}
+	if got := incoming.RenderAlertmanager(n, largeLimit); !strings.Contains(got, "Runbook: <"+ok+">") || !strings.Contains(got, "Alertmanager: <"+ok+">") {
+		t.Fatalf("a printable ASCII URL was left out: %q", got)
+	}
+}

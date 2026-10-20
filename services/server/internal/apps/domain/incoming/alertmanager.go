@@ -336,12 +336,15 @@ func escapeValue(s string) string {
 	return b.String()
 }
 
-// checkedURL returns s when it is an absolute http or https URL with a host, valid UTF-8 and
-// without white space, control characters, '<' or '>', so it can stand in an autolink whose
-// visible text is the target itself (SEC-OUT-1). The server never fetches it (SEC-OUT-2).
+// checkedURL returns s when it is an absolute http or https URL with a host made only of
+// printable ASCII without '<' and '>', so it can stand in an autolink whose visible text is the
+// target itself (SEC-OUT-1). Any other character is refused: clients count some of them as white
+// space (U+FEFF in the autolink pattern of the Dart markdown package), which would end the
+// autolink and let the rest render as Markdown, and bidi or other format characters would spoof
+// the visible text. The server never fetches it (SEC-OUT-2).
 func checkedURL(s string) (string, bool) {
-	if s == "" || !utf8.ValidString(s) || strings.ContainsFunc(s, func(r rune) bool {
-		return unicode.IsSpace(r) || unicode.IsControl(r) || r == '<' || r == '>'
+	if s == "" || strings.ContainsFunc(s, func(r rune) bool {
+		return r < '!' || r > '~' || r == '<' || r == '>'
 	}) {
 		return "", false
 	}
