@@ -66,6 +66,17 @@ type ThreadCounter struct {
 	LastMessageSeq, UnreadFloorSeq int64
 }
 
+// ThreadsByParent finds the thread that started from a message (03 threads: parent_message_id is
+// unique). It is a port of its own, so the implementations of Threads stay unchanged; the module
+// apps answers the replay of an incoming webhook post that created such a thread with it (M2-27
+// design note 6 c).
+type ThreadsByParent interface {
+	// ThreadByParentMessage returns the routing data of the thread whose parent_message_id is
+	// messageID, without authorizing; found is false when no thread started from it. Errors: the
+	// database error.
+	ThreadByParentMessage(ctx context.Context, messageID ids.ID) (ThreadInfo, bool, error)
+}
+
 // ParentMessage is the message of the main thread a thread starts from. The caller (messaging)
 // has verified that it exists and is not deleted.
 type ParentMessage struct {

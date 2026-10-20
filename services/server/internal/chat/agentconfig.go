@@ -86,6 +86,9 @@ type TriggerChannel struct {
 	Kind string
 	// EffectiveOperatorID is the operator after inheritance; zero for none.
 	EffectiveOperatorID ids.ID
+	// MainThreadID is the main thread of a text or DM channel, zero for a forum (the target of an
+	// incoming webhook post, M2-27 design note 5).
+	MainThreadID ids.ID
 	// The switches of 09 section 3.3.
 	RequireMention, ThreadRequireMention, FreeResponse, AutoThread, AllowMentionedAgents bool
 }

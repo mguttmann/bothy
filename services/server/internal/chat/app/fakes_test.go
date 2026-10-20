@@ -499,6 +499,18 @@ func (s *store) ShareThread(ctx context.Context, id ids.ID) (domain.Thread, bool
 	return s.Thread(ctx, id)
 }
 
+func (s *store) ThreadByParentMessage(_ context.Context, messageID ids.ID) (domain.Thread, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	for _, th := range s.threads {
+		if th.ParentMessageID == messageID && !messageID.IsZero() {
+			return th, true, s.fail
+		}
+	}
+	return domain.Thread{}, false, s.fail
+}
+
 func (s *store) ThreadCounters(_ context.Context, channels []ids.ID) ([]chat.ThreadCounter, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
