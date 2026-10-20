@@ -79,6 +79,10 @@ func guards(in *Input) (Decision, error) {
 			return Decision{}, internalError("token.create without the holder")
 		}
 		return tokenCreateGuard(in, in.Token), nil
+	case actionCommandRegister:
+		return commandRegisterGuard(in)
+	case actionCommandInvoke:
+		return commandInvokeGuard(in)
 	case actionAgentInvoke:
 		if in.Invoke == nil {
 			return Decision{}, internalError("agent.invoke without its trigger")

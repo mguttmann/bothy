@@ -32,7 +32,8 @@ func (a *Authorizer) eventTarget(ctx context.Context, act authorize.Action, r au
 	if err != nil {
 		return authorize.Resource{}, false, err
 	}
-	if slices.Contains(spec.Resources, string(r.Kind)) {
+	kinds := domain.ActionResourceKinds(spec)
+	if slices.Contains(kinds, string(r.Kind)) {
 		return r, true, nil
 	}
 	candidates, err := a.eventCandidates(ctx, r)
@@ -40,7 +41,7 @@ func (a *Authorizer) eventTarget(ctx context.Context, act authorize.Action, r au
 		return authorize.Resource{}, false, err
 	}
 	for _, c := range candidates {
-		if slices.Contains(spec.Resources, string(c.Kind)) {
+		if slices.Contains(kinds, string(c.Kind)) {
 			return c, true, nil
 		}
 	}
