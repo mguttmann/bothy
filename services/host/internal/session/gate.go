@@ -161,7 +161,7 @@ func (g *Gate) SetEnforce(f func(context.Context, Policy)) {
 // Other helpers are not run per opening: their latest periodic answers hold (D-M2-45 ruling).
 func (g *Gate) Admit(ctx context.Context, osu string) string {
 	res := g.runner.RunLightUser(ctx, osu)
-	return g.apply(ctx, res).Refusal(osu)
+	return g.apply(ctx, res, false).Refusal(osu)
 }
 
 // Last returns the last result of the runner (nil before the first run).
@@ -188,7 +188,7 @@ func (g *Gate) PeerMismatch(ctx context.Context) {
 
 // RunOnce is one periodic run: the Light run in every helper and HD11 for all.
 func (g *Gate) RunOnce(ctx context.Context) Policy {
-	return g.apply(ctx, g.runner.RunLight(ctx))
+	return g.apply(ctx, g.runner.RunLight(ctx), true)
 }
 
 // Loop runs RunOnce every host_service.credential_check_interval until ctx ends.
@@ -205,10 +205,12 @@ func (g *Gate) Loop(ctx context.Context) {
 	}
 }
 
-// apply publishes res and enforces its policy; a run whose HD10 passes lifts a peer mismatch.
-func (g *Gate) apply(ctx context.Context, res *doctor.Result) Policy {
+// apply publishes res and enforces its policy. Only a run that asked every helper (lift) and whose
+// HD10 has no peer_mismatch lifts a recorded peer mismatch: a Light run of one session user answers
+// the other helpers from the cache and proves nothing about them.
+func (g *Gate) apply(ctx context.Context, res *doctor.Result, lift bool) Policy {
 	g.mu.Lock()
-	if res != nil && !slices.ContainsFunc(res.Check(doctor.HD10).Entries, func(e doctor.Entry) bool { return e.Code == doctor.CodePeerMismatch }) {
+	if lift && res != nil && !slices.ContainsFunc(res.Check(doctor.HD10).Entries, func(e doctor.Entry) bool { return e.Code == doctor.CodePeerMismatch }) {
 		g.peerBroken = false
 	}
 	broken := g.peerBroken

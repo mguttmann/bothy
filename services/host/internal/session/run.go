@@ -51,8 +51,8 @@ type endSpec struct {
 }
 
 // claimSession registers the session of cl before pty.start (so output and exit find it), but only
-// while dc is still the data connection of the session, the session was neither closed nor ended
-// and no other session holds its ID: the opening is atomic against session.close, the end of all
+// while dc is still the data connection of the session, the session was neither closed nor ended,
+// the policy of the gate still admits it and no other session holds its ID: the opening is atomic against session.close, the end of all
 // sessions and a newer session.open of the same session (which replaced dc). false: the opening is
 // abandoned without a PTY.
 func (m *Manager) claimSession(cl Claims, l *helperLink, idb [noise.IDLen]byte, dc *dataConn, tr *noise.Transport, window time.Duration) (*session, bool) {
@@ -65,6 +65,15 @@ func (m *Manager) claimSession(cl Claims, l *helperLink, idb [noise.IDLen]byte, 
 	if exists || !m.currentLocked(cl.Sid, dc) {
 		m.mu.Unlock()
 		return nil, false
+	}
+	// The policy is read under m.mu: a run that found a violation while this opening waited in
+	// the confirmation either refuses it here or, when it enforces later, finds it among the
+	// sessions (Enforce takes its snapshot under m.mu after the result is stored).
+	if m.d.Gate != nil {
+		if d := m.d.Gate.Current().Refusal(cl.Osu); d != "" {
+			m.mu.Unlock()
+			return nil, false
+		}
 	}
 	m.sessions[cl.Sid] = s
 	m.mu.Unlock()

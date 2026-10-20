@@ -193,6 +193,19 @@ func (m *Manager) Close(_ context.Context, c control.SessionClose) {
 // EndAll implements control.Sessions: every PTY ends (4110, 4111, 4112, 4114); the server ends the
 // sessions itself, so nothing is reported.
 func (m *Manager) EndAll(context.Context) {
+	// Openings that wait in the gate or the confirmation must not start their PTY afterwards: they
+	// count as closed, like a session.close.
+	m.mu.Lock()
+	var dcs []*dataConn
+	for id, dc := range m.conns {
+		m.reported[id] = struct{}{}
+		dcs = append(dcs, dc)
+		delete(m.conns, id)
+	}
+	m.mu.Unlock()
+	for _, dc := range dcs {
+		dc.close(CodeNormal, "")
+	}
 	for _, s := range m.snapshot() {
 		s.end(endSpec{reason: ReasonHostPolicyViolation, silent: true})
 	}

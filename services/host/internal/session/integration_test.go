@@ -715,3 +715,43 @@ func TestRepeatedOpenStartsOnePTY(t *testing.T) {
 		t.Error("the stale opening reported an end")
 	}
 }
+
+// TestEndAllAndViolationDuringConfirmation (red team M1, M2): the end of all sessions or a
+// violation found by a run while an opening waits in the local confirmation starts no PTY; the
+// violation is reported like a refusal of the gate.
+func TestEndAllAndViolationDuringConfirmation(t *testing.T) {
+	for _, what := range []string{"endall", "hd6"} {
+		t.Run(what, func(t *testing.T) {
+			fc := &fakeConfirm{allow: true, delay: 600 * time.Millisecond}
+			r := newRig(t, withConfirm(fc))
+			r.cfg.LocalConfirmTimeout = 3 * time.Second
+			id := sessiontest.NewID()
+			r.open(id, "shell")
+			waitFor(t, "the confirmation asked", func() bool {
+				fc.mu.Lock()
+				defer fc.mu.Unlock()
+				return len(fc.asked) == 1
+			})
+			if what == "endall" {
+				r.mgr.EndAll(r.ctx)
+			} else {
+				res := shellResult(r.osu)
+				for i := range res.Checks {
+					if res.Checks[i].Check == doctor.HD6 {
+						res.Checks[i].Entries = []doctor.Entry{{Status: doctor.Fail, Code: doctor.CodeSubscriptionLogin, SessionUser: r.osu}}
+					}
+				}
+				r.runner.set(res)
+			}
+			time.Sleep(900 * time.Millisecond)
+			if r.startCount() != 0 || r.mgr.Active() != 0 || r.note.startedCount(id) != 0 {
+				t.Fatalf("PTYs %d, active %d, started %d", r.startCount(), r.mgr.Active(), r.note.startedCount(id))
+			}
+			if what == "hd6" {
+				if e := r.note.waitEnded(t, id); e.CloseReason != ReasonOpenFailed || e.CloseDetail != DetailSubscriptionLogin {
+					t.Errorf("ended %+v", e)
+				}
+			}
+		})
+	}
+}

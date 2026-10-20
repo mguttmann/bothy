@@ -219,8 +219,15 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 	}
 	s, ok := m.claimSession(cl, l, h.sidb, h.dc, tr, h.window)
 	if !ok {
-		// session.close, the end of all sessions or a newer session.open came during the gate or
-		// the confirmation: no PTY.
+		// session.close, the end of all sessions, a newer session.open or a violation found by a
+		// run during the gate or the confirmation: no PTY. A violation is reported like a refusal
+		// of the gate; a stale opening reports nothing (failOpening checks that).
+		if m.d.Gate != nil {
+			if d := m.d.Gate.Current().Refusal(cl.Osu); d != "" {
+				h.failOpening(ctx, cl, d)
+				return
+			}
+		}
 		h.abandon()
 		return
 	}

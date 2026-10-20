@@ -156,7 +156,14 @@ func TestGateRuns(t *testing.T) {
 	gr.mu.Lock()
 	gr.res = passing()
 	gr.mu.Unlock()
+	// The Light run of another session user answers the other helpers from the cache: it lifts
+	// HD6 but not the peer mismatch (red team M3).
+	if d := g.Admit(context.Background(), samOSU); d != DetailHelperUntrusted {
+		t.Errorf("a Light run of one session user lifted the peer mismatch: %q", d)
+	}
+	// Only a periodic run, which asks every helper, lifts it.
+	g.RunOnce(context.Background())
 	if d := g.Admit(context.Background(), alexOSU); d != "" {
-		t.Errorf("a passing run lifts the findings: %q", d)
+		t.Errorf("a passing periodic run lifts the findings: %q", d)
 	}
 }
