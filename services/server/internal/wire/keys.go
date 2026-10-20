@@ -108,7 +108,8 @@ func (k *SigningKeys) Ready(ctx context.Context) error {
 // startSigningKeys is the first extension point of start step 7 (M1-32, 02 section 15.1): it
 // builds the signing keys over the unit of work of the audit step and the Authorizer of the authz
 // step, creates the missing active keys (EnsureActive, every role) and registers the readiness
-// check signing_keys, and binds the keys to the outgoing webhooks of the apps step. A key store that
+// check signing_keys, and binds the keys to the outgoing webhooks of the apps step and to the
+// invocation tokens of the runs module of the chat step. A key store that
 // cannot be written ends the start here; the secrets step has already checked owner, mode and
 // writability of the directory.
 func (s *server) startSigningKeys(ctx context.Context) error {
@@ -133,6 +134,19 @@ func (s *server) startSigningKeys(ctx context.Context) error {
 	if ap != nil {
 		// The outgoing webhooks sign with the webhook_out keys (M2-26).
 		ap.BindKeys(keys.Keys)
+	}
+	s.mu.Lock()
+	rn := s.runs
+	s.mu.Unlock()
+	if rn != nil {
+		// The invocation tokens sign with the invocation keys (M2-06).
+		icfg, err := InvocationTokenConfigFrom(s.values)
+		if err != nil {
+			return err
+		}
+		if err := rn.BindInvocationTokens(icfg, keys.Keys, app.NewState(postgres.NewRepository(pool), a.UoW()), s.deps.Clock); err != nil {
+			return err
+		}
 	}
 	s.mu.Lock()
 	s.signingKeys = keys

@@ -27,6 +27,15 @@ documented in this file. The format is based on
   uploader. Events `user.updated` and `instance.updated` (only `branding.logo_file_id`); removing
   the logo stores the empty string and raises the branding version. No new configuration key,
   metric or job.
+- Invocation tokens (M2-06, invariant I3, ADR 0023): `runs/app.InvocationTokens` issues a compact
+  JWS with the header `alg = EdDSA`, `kid` and `typ = agent-invocation+jwt` over exactly the
+  claims of 05 section 5 per trigger kind, signed with the active key of purpose `invocation`,
+  with a new UUIDv7 `jti` on every call and nothing stored; `Verify` checks header, the published
+  key of purpose `invocation`, signature, claims, `iss`, `aud` and run, then the expiry with
+  `auth.clock_leeway`, and answers `403 invocation_token_invalid` with `reason` `invalid` or
+  `expired`. The token renders as `[redacted]` everywhere. The reference verifier of the adapter
+  check of 09 4.5 lives in `runs/adapters/runstest` (standard library only, not in the binary).
+  No new configuration key, operation, event, job or metric.
 - Images without metadata and thumbnails (M3-06, Ruling L16, ADR 0047): a clean or skipped JPEG,
   PNG, GIF or WebP stays `pending` after the scan until the new job `files.thumbnail` (queue
   `files`, River timeout `file.image.processing_timeout`, at most `file.image.max_concurrent` per
