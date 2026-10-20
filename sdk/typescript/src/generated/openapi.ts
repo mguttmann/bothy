@@ -2757,7 +2757,12 @@ export interface paths {
          * @description Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
          *     Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
          *     instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
-         *     for blocked or failed files; without read access always 404 (12, 9.3).
+         *     for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
+         *     gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
+         *     416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+         *     `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
+         *     CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
+         *     only (ADR 0048).
          */
         get: operations["downloadFile"];
         put?: never;
@@ -2777,7 +2782,10 @@ export interface paths {
         };
         /**
          * Download a thumbnail
-         * @description Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`.
+         * @description Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview
+         *     `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`; a variant
+         *     the file does not have gives 404. Thumbnails are always inline with their own type; range,
+         *     headers and caching as for `downloadFile` (12, 9.3).
          */
         get: operations["downloadThumbnail"];
         put?: never;
@@ -2799,7 +2807,12 @@ export interface paths {
         put?: never;
         /**
          * Create a short-lived fetch ticket
-         * @description For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+         * @description For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+         *     checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+         *     session of the caller: a principal without a session (agent, app, API token) gets 403
+         *     `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+         *     deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
+         *     404. A repeated call mints a new ticket.
          */
         post: operations["createFileTicket"];
         delete?: never;
@@ -2817,7 +2830,7 @@ export interface paths {
         };
         /**
          * Read the transcript of a voice message
-         * @description 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3).
+         * @description 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
          */
         get: operations["getTranscript"];
         /** Store a transcript created by the agent */
@@ -10833,6 +10846,17 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description Problem codes: `file_not_ready`, `file_blocked`. */
+        FileConflict: {
+            headers: {
+                "Correlation-Id": components["headers"]["Correlation-Id"];
+                "Retry-After": components["headers"]["Retry-After"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description Problem codes: `resync_required`, `message_deleted`, `gone`. */
         Gone: {
             headers: {
@@ -10877,6 +10901,7 @@ export interface components {
         RangeNotSatisfiable: {
             headers: {
                 "Correlation-Id": components["headers"]["Correlation-Id"];
+                "Content-Range": components["headers"]["Content-Range"];
                 [name: string]: unknown;
             };
             content: {
@@ -10986,6 +11011,23 @@ export interface components {
         InteractionIdPath: components["schemas"]["Uuid"];
         FileIdPath: components["schemas"]["Uuid"];
         PartNumberPath: number;
+        /**
+         * @description Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+         *     `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+         *     bearer secret: never logged.
+         */
+        FileTicketQuery: string;
+        /**
+         * @description One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+         *     `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+         *     a range that starts at or after the end gives 416 (12, 9.3).
+         */
+        Range: string;
+        /**
+         * @description Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+         *     included, gives the whole variant (200).
+         */
+        "If-Range": string;
         VariantPath: "small" | "medium" | "large" | "poster";
         TargetKindPath: "space" | "channel" | "thread";
         TargetIdPath: components["schemas"]["Uuid"];
@@ -11020,6 +11062,22 @@ export interface components {
         "Retry-After": number;
         /** @description Strong entity tag of the resource version, e.g. `"7"`. */
         ETag: string;
+        /** @description `"<sha256 hex>"`, the lowercase hex SHA-256 of the whole delivered variant (12, 9.3); not a version. */
+        "File-ETag": string;
+        /** @description `sha-256=:<base64>:` of the whole delivered variant (RFC 9530); the client checks it after the download. */
+        "Repr-Digest": string;
+        /** @description Always `bytes`; exactly one range is supported. */
+        "Accept-Ranges": string;
+        /** @description `bytes <first>-<last>/<size>` with 206, `bytes *\/<size>` with 416 (RFC 9110). */
+        "Content-Range": string;
+        /** @description `inline` only for the inline list of 12 9.3, otherwise `attachment`; always `filename="<ASCII fallback>"` before `filename*=UTF-8''<percent-encoded>` (RFC 6266, RFC 8187). */
+        "Content-Disposition": string;
+        /** @description Always `default-src 'none'; sandbox`, so an upload never runs as a page of the instance (12, 9.3). */
+        "File-Content-Security-Policy": string;
+        /** @description Always `same-origin`. */
+        "Cross-Origin-Resource-Policy": string;
+        /** @description `private, max-age=<client.cache_max_age>, immutable` with normal authentication, `private, no-store` with a ticket (12, 9.3; ADR 0048). */
+        "File-Cache-Control": string;
         /** @description `true` when the response is the stored original of an earlier identical request. */
         "Idempotent-Replay": boolean;
         /** @description Target of the redirect. */
@@ -17306,8 +17364,27 @@ export interface operations {
     };
     downloadFile: {
         parameters: {
-            query?: never;
-            header?: never;
+            query?: {
+                /**
+                 * @description Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+                 *     `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+                 *     bearer secret: never logged.
+                 */
+                ticket?: components["parameters"]["FileTicketQuery"];
+            };
+            header?: {
+                /**
+                 * @description One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+                 *     `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+                 *     a range that starts at or after the end gives 416 (12, 9.3).
+                 */
+                Range?: components["parameters"]["Range"];
+                /**
+                 * @description Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+                 *     included, gives the whole variant (200).
+                 */
+                "If-Range"?: components["parameters"]["If-Range"];
+            };
             path: {
                 file_id: components["parameters"]["FileIdPath"];
             };
@@ -17315,23 +17392,62 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK. */
+            /** @description The whole file (12, 9.3; ADR 0048). */
             200: {
                 headers: {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    "Content-Disposition": components["headers"]["Content-Disposition"];
+                    "Content-Security-Policy": components["headers"]["File-Content-Security-Policy"];
+                    "Cross-Origin-Resource-Policy": components["headers"]["Cross-Origin-Resource-Policy"];
+                    "Cache-Control": components["headers"]["File-Cache-Control"];
+                    ETag: components["headers"]["File-ETag"];
+                    "Repr-Digest": components["headers"]["Repr-Digest"];
+                    "Accept-Ranges": components["headers"]["Accept-Ranges"];
                     [name: string]: unknown;
                 };
                 content: {
                     "application/octet-stream": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/gif": string;
+                    "audio/mp4": string;
+                    "audio/mpeg": string;
+                    "video/mp4": string;
+                };
+            };
+            /** @description Exactly one byte range of the file (12, 9.3; ADR 0048). */
+            206: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    "Content-Disposition": components["headers"]["Content-Disposition"];
+                    "Content-Security-Policy": components["headers"]["File-Content-Security-Policy"];
+                    "Cross-Origin-Resource-Policy": components["headers"]["Cross-Origin-Resource-Policy"];
+                    "Cache-Control": components["headers"]["File-Cache-Control"];
+                    ETag: components["headers"]["File-ETag"];
+                    "Repr-Digest": components["headers"]["Repr-Digest"];
+                    "Accept-Ranges": components["headers"]["Accept-Ranges"];
+                    "Content-Range": components["headers"]["Content-Range"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/gif": string;
+                    "audio/mp4": string;
+                    "audio/mpeg": string;
+                    "video/mp4": string;
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
+            409: components["responses"]["FileConflict"];
             416: components["responses"]["RangeNotSatisfiable"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -17339,8 +17455,27 @@ export interface operations {
     };
     downloadThumbnail: {
         parameters: {
-            query?: never;
-            header?: never;
+            query?: {
+                /**
+                 * @description Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+                 *     `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+                 *     bearer secret: never logged.
+                 */
+                ticket?: components["parameters"]["FileTicketQuery"];
+            };
+            header?: {
+                /**
+                 * @description One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+                 *     `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+                 *     a range that starts at or after the end gives 416 (12, 9.3).
+                 */
+                Range?: components["parameters"]["Range"];
+                /**
+                 * @description Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+                 *     included, gives the whole variant (200).
+                 */
+                "If-Range"?: components["parameters"]["If-Range"];
+            };
             path: {
                 file_id: components["parameters"]["FileIdPath"];
                 variant: components["parameters"]["VariantPath"];
@@ -17349,23 +17484,53 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK. */
+            /** @description The whole thumbnail (12, 9.3; ADR 0048). */
             200: {
                 headers: {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    "Content-Disposition": components["headers"]["Content-Disposition"];
+                    "Content-Security-Policy": components["headers"]["File-Content-Security-Policy"];
+                    "Cross-Origin-Resource-Policy": components["headers"]["Cross-Origin-Resource-Policy"];
+                    "Cache-Control": components["headers"]["File-Cache-Control"];
+                    ETag: components["headers"]["File-ETag"];
+                    "Repr-Digest": components["headers"]["Repr-Digest"];
+                    "Accept-Ranges": components["headers"]["Accept-Ranges"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "image/*": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            /** @description Exactly one byte range of the thumbnail (12, 9.3; ADR 0048). */
+            206: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    "Content-Disposition": components["headers"]["Content-Disposition"];
+                    "Content-Security-Policy": components["headers"]["File-Content-Security-Policy"];
+                    "Cross-Origin-Resource-Policy": components["headers"]["Cross-Origin-Resource-Policy"];
+                    "Cache-Control": components["headers"]["File-Cache-Control"];
+                    ETag: components["headers"]["File-ETag"];
+                    "Repr-Digest": components["headers"]["Repr-Digest"];
+                    "Accept-Ranges": components["headers"]["Accept-Ranges"];
+                    "Content-Range": components["headers"]["Content-Range"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
+            409: components["responses"]["FileConflict"];
+            416: components["responses"]["RangeNotSatisfiable"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
@@ -17401,7 +17566,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
+            409: components["responses"]["FileConflict"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

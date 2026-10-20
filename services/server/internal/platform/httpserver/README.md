@@ -31,7 +31,11 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   the class `StageRateLimit` counts. The route class of transfers (`http.transfer_timeout` for the
   context and the write deadline) holds for a multipart or octet-stream request body and, since
   M1-50, for `Operation.Download`, a success that streams a body that is not JSON (the export of
-  the audit log).
+  the audit log; since M3-05 also `downloadFile` and `downloadThumbnail`, which therefore run
+  under `http.transfer_timeout`, not `http.request_timeout`, docs/DECISIONS.md D-M3-05-14). The
+  `Cache-Control: no-store` that `StageRoute` sets before the handler is overridden by the file
+  handler on `200` and `206` (`private, max-age=<client.cache_max_age>, immutable`, or
+  `private, no-store` with a download ticket); its problem responses keep the API headers.
 - `WriteProblem(w, r, err)`, `ValidationErrorHandler`, `MalformedRequestHandler`: the error
   writers; `internal/wire` passes them to `routes.Build`.
 - `NewSchemaValidator(spec, names)` and `SchemaValidator.Validate(name, body)`: a JSON value

@@ -115,7 +115,12 @@ and `x-rate-limit-class` present, the action in the catalogue, the class equal t
 action and not `none`, no action with the permission `system` (05, rule 10), exactly one server
 `/api/v1` (W6), no health operation (L2), and forms that the route table could not describe
 (DECISIONS.md, M1-17/13). An enabled operation must not have security requirements of its own
-(M1-17/19). Every object schema that the request body of an operation under `paths` reaches must
+(M1-17/19). One exception since M3-05 (docs/decisions.d/M3-05.md D-M3-05-14):
+an operation may list the requirement `fileTicket` (the download ticket in the query parameter
+`ticket`) beside a subset of the root security requirements; the generator records it as root
+security, so the chain authenticates the header as on every route and lets an anonymous request
+reach the handler, which checks the ticket itself (`downloadFile`, `downloadThumbnail`). Any other
+own requirement is still an override and fails. Every object schema that the request body of an operation under `paths` reaches must
 reject unknown members (`additionalProperties: false`, with `allOf` `unevaluatedProperties: false`;
 except `JsonObject` and maps), otherwise the generator names the schema (W7, DECISIONS.md M1-18/12).
 Checks and metadata come from the document that the loader of oapi-codegen

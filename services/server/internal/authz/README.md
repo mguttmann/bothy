@@ -275,7 +275,7 @@ visibility rule (`domain/visibility.go`, `fileVisible`; docs/DECISIONS.md D-M3-0
   `ChannelID`);
 - purposes `avatar`, `branding`, `gdpr_export` need no path (`resolve` gives them none). For
   `file.read` (M3-05, brief design note 7) an avatar is visible to every authenticated principal
-  with the requirement `Auth`, a branding file to everybody with `Public`, and a `gdpr_export` to
+  with the requirement `Auth`, a branding file to everybody with `Public` (an anonymous caller still gets `401` on `downloadFile`, which is not a public operation; it reaches the logo through `getBrandingLogo`, M3-10), and a `gdpr_export` to
   nobody (`no_grant`; it leaves only through `gdpr.export.download`). The requirement table keeps
   read for `file.read`, because list scopes and filter mode decide file events by their channel
   path; `domain.Decide` replaces it by purpose (`fileReadRequirement`). Every other action, such

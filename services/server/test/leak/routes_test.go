@@ -75,9 +75,16 @@ func TestSelectRoutesOfTheRepository(t *testing.T) {
 			t.Errorf("route %+v", r)
 		}
 	}
-	for _, want := range []string{"getSpace", "getChannel", "getThread", "getMessage", "getAgent", "getUser", "listTokens", "explainChannelAccess"} {
+	for _, want := range []string{"getSpace", "getChannel", "getThread", "getMessage", "getAgent", "getUser", "listTokens", "explainChannelAccess",
+		"downloadFile", "downloadThumbnail", "getTranscript"} {
 		if !slices.Contains(names, want) {
 			t.Errorf("%s not selected: %v", want, names)
+		}
+	}
+	// The variant of downloadThumbnail is no ID; FixedParams gives it a valid value (M3-05).
+	for _, r := range got {
+		if r.OperationID == "downloadThumbnail" && r.Build(map[string]string{"file_id": "f"}) != "/files/f/thumbnails/small" {
+			t.Errorf("downloadThumbnail builds %q", r.Build(map[string]string{"file_id": "f"}))
 		}
 	}
 	for _, not := range []string{"getSnapshot", "listEvents", "getMe", "getProblemType"} {
