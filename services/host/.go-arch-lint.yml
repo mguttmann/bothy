@@ -29,6 +29,7 @@ components:
   install:     { in: internal/install }
   startup:     { in: internal/startup }
   pairing:     { in: internal/pairing }
+  testkit:     { in: internal/platform/testkit }
   platformtest: { in: test/** }
   testdata:    { in: testdata/** }
 # M2-42: cmd may use every internal package; doctor, install, helper, startup and pairing use

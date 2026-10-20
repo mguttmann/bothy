@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // shortDir returns a temporary folder with a path short enough for a Unix socket.
@@ -113,7 +115,7 @@ func TestNoMessageBeforePeerCheck(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		_ = pair.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = pair.SetReadDeadline(testkit.Deadline())
 		b := make([]byte, 64)
 		n, _ := pair.Read(b)
 		got.Add(int64(n))
@@ -190,7 +192,7 @@ func TestAdminEndpoint(t *testing.T) {
 	// The server closes the connection at once; the client fails either at the peer check of the
 	// closed socket or at the call.
 	if c2, err := DialAdmin(context.Background(), path2, me); err == nil {
-		cctx, ccancel := context.WithTimeout(context.Background(), 2*time.Second)
+		cctx, ccancel := context.WithDeadline(context.Background(), testkit.Deadline())
 		defer ccancel()
 		if err := c2.Call(cctx, OpDoctorRun, nil, OpDoctorRun+".ok", nil); err == nil {
 			t.Error("client of another uid answered")

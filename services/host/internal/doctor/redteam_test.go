@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/hostos"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // stuckHelpers never answer until their context ends (a helper stopped with SIGSTOP).
@@ -48,7 +49,7 @@ func TestStoppedHelperBlocksOnlyItself(t *testing.T) {
 		if !has(codes(r, HD10), CodeHelperUnreachable+"@"+sam) {
 			t.Errorf("HD10 %v", codes(r, HD10))
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("the run waits for a stopped helper")
 	}
 	runner.WaitScans()
@@ -68,7 +69,7 @@ func TestScanOfStoppedHelperEnds(t *testing.T) {
 	go func() { runner.RunFull(context.Background()); runner.WaitScans(); close(done) }()
 	select {
 	case <-done:
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatal("a stopped helper holds the scans")
 	}
 	if r := runner.Last(); hd11For(r, sam) != CodeEntryScanTimeout {

@@ -18,6 +18,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // The world of the suite: the service user bothy-host and the session users A, B and a third.
@@ -171,7 +173,7 @@ func hasLine(out, line string) bool {
 // waitExit waits until the host service is stopped and returns whether it stopped with 78.
 func waitRefused(t *testing.T) bool {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())
 	defer cancel()
 	for ctx.Err() == nil {
 		if code, stopped := serviceExit(); stopped {

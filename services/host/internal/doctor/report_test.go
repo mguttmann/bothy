@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
 
@@ -72,7 +73,7 @@ func TestEntryScanSemantics(t *testing.T) {
 		}
 	}
 	// Wait until A's and Robin's scans finished: A is ready while B still runs.
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for {
 		_, a := runner.Readiness(alex)
 		_, r := runner.Readiness(robin)
