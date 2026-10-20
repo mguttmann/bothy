@@ -73,6 +73,9 @@ var (
 		"invalid_invocation_token", "project_not_ready", "agent_unavailable", "interrupted", "stale",
 		"runtime_error", "adapter_error", "runtime_not_authenticated", "user_disabled",
 	}
+	// restoreChecks are bothy.reason of bothy.backup.restore_test.failures: the seven checks of
+	// docs/spec/16-betrieb.md 8.3 as internal/status/domain names them (M7-03).
+	restoreChecks = []string{"pgbackrest", "manifest", "event_log", "audit_chain", "thread_sample", "file_sample", "duration"}
 )
 
 // The instruments of signals.md that this build registers. Every instrument the server creates
@@ -343,6 +346,26 @@ var (
 		Description: "Bytes the last backup run of a kind added to its repository.",
 		Attrs:       []Attr{{Key: keyBackupKind, Values: append(slices.Clone(backupKinds), "restore_test")}},
 	}
+	// BackupRestoreTestLastSuccess is bothy.backup.restore_test.last_success.timestamp (4.6,
+	// M7-03): the Unix time of the last restore test in which no check failed; the alert
+	// BothyRestoreTestStale reads it.
+	BackupRestoreTestLastSuccess = Spec{
+		Name: "bothy.backup.restore_test.last_success.timestamp", Kind: KindGauge, Unit: "s", Float: true,
+		Description: "Unix time of the last successful automatic restore test.",
+	}
+	// BackupRestoreTestDuration is bothy.backup.restore_test.duration (4.6, M7-03): the duration
+	// of the last restore test, the value check 7 compares with dr.rto_target.
+	BackupRestoreTestDuration = Spec{
+		Name: "bothy.backup.restore_test.duration", Kind: KindGauge, Unit: "s", Float: true,
+		Description: "Duration of the last automatic restore test.",
+	}
+	// BackupRestoreTestFailures is bothy.backup.restore_test.failures (4.6, M7-03): one per failed
+	// check of a restore test, bothy.reason the name of the check (docs/spec/16-betrieb.md 8.3).
+	BackupRestoreTestFailures = Spec{
+		Name: "bothy.backup.restore_test.failures", Kind: KindCounter, Unit: "{check}",
+		Description: "Failed checks of automatic restore tests.",
+		Attrs:       []Attr{{Key: keyReason, Values: restoreChecks}},
+	}
 	// StorageVolumeFree is bothy.storage.volume.free (4.6, M7-02): the bytes an unprivileged
 	// user may still write on a volume.
 	StorageVolumeFree = Spec{
@@ -446,6 +469,7 @@ func All() []Spec {
 		RunActive, RunStartLatency, RunDuration, RunFinished, AgentInvocationDenied,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
+		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,
 		StorageVolumeFree, StorageVolumeSize,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
 		ClientMetricsDiscarded,
