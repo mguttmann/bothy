@@ -44,3 +44,17 @@ func TestWithStructureScope(t *testing.T) {
 		t.Fatal("WithStructureScope installed a request memo")
 	}
 }
+
+// TestRecheck_ReadsCurrentVersion (M2-44, Design note 12): the recheck after the commit drops the
+// request memo, so it reads the rights version a revocation raised in between instead of the one
+// the request's first check memoised; it is a filter check and marked as a recheck.
+func TestRecheck_ReadsCurrentVersion(t *testing.T) {
+	t.Parallel()
+	ctx := authorize.Recheck(authorize.WithRequestScope(context.Background()))
+	if m, ok := authorize.RequestMemoFrom(ctx); ok || m != nil {
+		t.Fatalf("memo under Recheck: %p %v", m, ok)
+	}
+	if !authorize.IsFilter(ctx) || !authorize.IsRecheck(ctx) {
+		t.Fatal("Recheck is no filter recheck")
+	}
+}

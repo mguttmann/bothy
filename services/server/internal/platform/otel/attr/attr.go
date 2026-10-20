@@ -122,6 +122,10 @@ const (
 	SigningKeyToState = "bothy.signing_key.to_state"
 	// StepKind is tool_call, status, subagent, workflow or background_job.
 	StepKind = "bothy.step.kind"
+	// TerminalSide is the side of a connection in the relay of the terminal, client or host
+	// (docs/spec/24-terminal.md section 9, M2-44): on the counter bothy.terminal.relay.unpaired and
+	// the log records of the relay.
+	TerminalSide = "bothy.terminal.side"
 	// WebhookSubscriptionID is the UUID of an outgoing webhook subscription (logs of deliveries
 	// and subscription transitions, M2-26); never on metrics.
 	WebhookSubscriptionID = "bothy.webhook_subscription.id"
@@ -173,7 +177,7 @@ var scopes = map[string]scope{
 	PushProvider: scopeSpanLog, RatelimitClass: scopeSpanLog, Reason: scopeSpanLog,
 	RunState: scopeSpanLog, StepKind: scopeSpanLog, VersionOwn: scopeSpanLog, VersionRequired: scopeSpanLog,
 	SigningKeyPurpose: scopeSpanLog, SigningKeyKID: scopeSpanLog, SigningKeyFromState: scopeSpanLog,
-	SigningKeyToState: scopeSpanLog, WebhookSubscriptionID: scopeSpanLog,
+	SigningKeyToState: scopeSpanLog, WebhookSubscriptionID: scopeSpanLog, TerminalSide: scopeSpanLog,
 
 	ServerRole: scopeResource,
 	Signal:     scopeMetric,

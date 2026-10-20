@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -115,15 +116,18 @@ type Terminal struct {
 	Service *terminalapp.Service
 	// Handlers are the REST handlers.
 	Handlers *terminalhttp.Hosts
+	// Sessions are the REST handlers of the terminal sessions (M2-44).
+	Sessions *terminalhttp.TerminalSessions
 }
 
 // NewTerminal builds the terminal module over pool with the unit of work uow, the Authorizer az,
 // the recorder and appender of w, the identity module id (the pairing codes of identity.Tokens and
-// the directory of people) and the clock (nil means clock.System()). Presence is NoConnections
-// until M2-43 builds the control connections. It opens no connection. Errors: a missing
-// collaborator or a configuration value the use cases refuse.
+// the directory of people), the clock (nil means clock.System()) and the test seam
+// beforeOpenCommit (terminalapp.Deps.BeforeOpenCommit; nil in production). Presence is
+// NoConnections until M2-43 builds the control connections. It opens no connection. Errors: a
+// missing collaborator or a configuration value the use cases refuse.
 func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, w IdentityWrites, id *Identity,
-	clk clock.Clock, _ *slog.Logger) (*Terminal, error) {
+	clk clock.Clock, beforeOpenCommit func(), _ *slog.Logger) (*Terminal, error) {
 	if id == nil || id.Tokens == nil {
 		return nil, errors.New("wire: the terminal module needs the identity module")
 	}
@@ -132,11 +136,39 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 		Instance: instanceIdentity{state: instanceapp.NewState(instancepg.NewRepository(pool), uow)},
 		People:   people{dir: identityapp.NewDirectory(identitypg.NewRepository(pool))}, Presence: terminalapp.NoConnections{},
 		UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: terminalhttp.Cursors{}, Clock: clk,
+		StepUps: lateStepUps{id: id}, BeforeOpenCommit: beforeOpenCommit,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc)}, nil
+	return &Terminal{Service: svc, Handlers: terminalhttp.New(svc), Sessions: terminalhttp.NewSessions(svc.Sessions())}, nil
+}
+
+// fillHandlers sets the REST handlers of the module in h where none are set (tests inject their
+// own); a nil module sets nothing.
+func (t *Terminal) fillHandlers(h *Handlers) {
+	if t == nil {
+		return
+	}
+	if h.Hosts == nil {
+		h.Hosts = t.Handlers
+	}
+	if h.TerminalSessions == nil {
+		h.TerminalSessions = t.Sessions
+	}
+}
+
+// lateStepUps binds terminal/app.StepUps to identity's StepUps, which the sessions step of
+// identity sets after the terminal module is built (BindSessions); before it the consumption fails
+// closed.
+type lateStepUps struct{ id *Identity }
+
+// ConsumeFresh implements terminalapp.StepUps.
+func (l lateStepUps) ConsumeFresh(ctx context.Context, a actor.Actor) error {
+	if l.id == nil || l.id.StepUps == nil {
+		return errs.New(errs.CodeInternalError, "wire: the step-ups of identity are not bound")
+	}
+	return l.id.StepUps.ConsumeFresh(ctx, a)
 }
 
 // The route of the control connection of the host services (M2-43, asyncapi channel hostControl):

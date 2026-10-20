@@ -70,16 +70,77 @@ func (s *Service) endSessions(ctx context.Context, sel SessionSelector, reason d
 // system (05 rule 1.10) with session_id, close_reason, close_detail, bytes_in, bytes_out and
 // duration_ms, never content, and appends terminal_session.changed to the person.
 func (s *Service) endSession(ctx context.Context, ses domain.Session, end domain.HostSessionEnd, reported bool) error {
+	return s.finish(ctx, ses, endSpec{end: end, reported: reported})
+}
+
+// endSpec says how a session ends: the reason with detail and exit code (kept only when reported),
+// and for an end by a person (closeTerminalSession, M2-44) the person and the mandatory reason.
+type endSpec struct {
+	end      domain.HostSessionEnd
+	reported bool
+	by       ids.ID
+	reason   string
+}
+
+// finish is the one end path (M2-44 Design note 11): the live counts of the relay's pairing on
+// this node are taken and added to the row first (bytes_in, bytes_out, last_input_at), then the row
+// closes; an end by a person writes closed_by and the allow entry terminal.close with session_id,
+// closed_by and the reason, any other end terminal.terminate as the system; then
+// terminal_session.changed to the person, with the person as actor of a close by a person. The
+// connections and the host service learn of the end from the event log tail (ObserveLogEvent of
+// adapters/wsrelay).
+func (s *Service) finish(ctx context.Context, ses domain.Session, sp endSpec) error {
 	t := s.d.Clock.Now()
+	if err := s.takeCounts(ctx, &ses); err != nil {
+		return err
+	}
+	end := sp.end
 	var err error
-	if reported {
+	switch {
+	case !sp.by.IsZero():
+		end.Detail, end.ExitCode = "", nil
+		err = s.d.Store.CloseSessionByPerson(ctx, ses.ID, end.Reason, sp.by, t)
+	case sp.reported:
 		err = s.d.Store.CloseSessionReported(ctx, ses.ID, end, t)
-	} else {
+	default:
 		end.Detail, end.ExitCode = "", nil
 		err = s.d.Store.CloseSession(ctx, ses.ID, end.Reason, t)
 	}
 	if err != nil {
 		return err
+	}
+	if err := s.recordEnd(ctx, ses, end, sp, t); err != nil {
+		return err
+	}
+	ses.State, ses.ClosedAt, ses.CloseReason, ses.CloseDetail, ses.ExitCode = domain.SessionClosed, t, end.Reason, end.Detail, end.ExitCode
+	ses.DetachedAt, ses.ClosedBy = time.Time{}, sp.by
+	ses.Version++
+	return s.emitSessionChangedBy(ctx, ses, sp.by)
+}
+
+// takeCounts adds the live counts of the session's pairing on this node to the row and to ses.
+func (s *Service) takeCounts(ctx context.Context, ses *domain.Session) error {
+	c := s.relayControl().Counters(ses.ID)
+	if c.In == 0 && c.Out == 0 && c.LastInput.IsZero() {
+		return nil
+	}
+	if err := s.d.Store.AddCounters(ctx, ses.ID, c.In, c.Out, c.LastInput); err != nil {
+		return err
+	}
+	ses.BytesIn += c.In
+	ses.BytesOut += c.Out
+	return nil
+}
+
+// recordEnd writes the audit entry of an end: terminal.close with the person of ctx for a close by
+// a person, terminal.terminate as the system otherwise.
+func (s *Service) recordEnd(ctx context.Context, ses domain.Session, end domain.HostSessionEnd, sp endSpec, t time.Time) error {
+	if !sp.by.IsZero() {
+		return s.d.Audit.Record(ctx, auditing.Entry{
+			Action: string(authorize.ActionTerminalClose), Decision: auditing.DecisionAllow, ResourceKind: resourceSession, ResourceID: ses.ID,
+			Attrs: auditing.Attrs{attrSessionID: auditing.ID(ses.ID), attrClosedBy: auditing.ID(sp.by), attrCloseReason: auditing.Code(string(end.Reason)),
+				attrReason: auditing.ReasonText(sp.reason)},
+		})
 	}
 	// The server ends the session: the audit entry has no actor (system, 05 rule 1.10), the
 	// correlation of the request stays.
@@ -92,16 +153,10 @@ func (s *Service) endSession(ctx context.Context, ses domain.Session, end domain
 	if end.Detail != "" {
 		attrs[attrCloseDetail] = auditing.Code(string(end.Detail))
 	}
-	if err := s.d.Audit.Record(sys, auditing.Entry{
+	return s.d.Audit.Record(sys, auditing.Entry{
 		Action: string(authorize.ActionTerminalTerminate), Decision: auditing.DecisionAllow, ResourceKind: resourceSession,
 		ResourceID: ses.ID, Attrs: attrs,
-	}); err != nil {
-		return err
-	}
-	ses.State, ses.ClosedAt, ses.CloseReason, ses.CloseDetail, ses.ExitCode = domain.SessionClosed, t, end.Reason, end.Detail, end.ExitCode
-	ses.DetachedAt = time.Time{}
-	ses.Version++
-	return s.emitSessionChanged(ctx, ses)
+	})
 }
 
 // sessionJSON is the payload of terminal_session.changed (schema TerminalSession): metadata only,
@@ -129,6 +184,12 @@ type sessionJSON struct {
 // durable, personal to the person of the session (receive action self), resource terminal_session
 // with its version, no actor (the system), payload TerminalSession; never content.
 func (s *Service) emitSessionChanged(ctx context.Context, ses domain.Session) error {
+	return s.emitSessionChangedBy(ctx, ses, ids.ID{})
+}
+
+// emitSessionChangedBy is emitSessionChanged with the person by as actor (open, attach and close
+// by a person, M2-44); zero by means no actor.
+func (s *Service) emitSessionChangedBy(ctx context.Context, ses domain.Session, by ids.ID) error {
 	payload, err := json.Marshal(sessionJSON{
 		ID: ses.ID.String(), HostID: ses.HostID.String(), UserID: ses.UserID.String(), DeviceID: ses.DeviceID.String(),
 		Profile: ses.Profile, State: ses.State, OpenedAt: stamp(ses.OpenedAt), StartedAt: stamp(ses.StartedAt),
@@ -138,8 +199,12 @@ func (s *Service) emitSessionChanged(ctx context.Context, ses domain.Session) er
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "terminal: terminal_session.changed payload")
 	}
-	return s.d.Events.Append(ctx, eventlog.Event{
+	ev := eventlog.Event{
 		Type: eventSessionChanged, SchemaVersion: 1, ResourceKind: resourceSession, ResourceID: ses.ID, ResourceVersion: ses.Version,
 		AudiencePrincipalID: ses.UserID, ReceiveAction: receiveSelf, Payload: payload,
-	})
+	}
+	if !by.IsZero() {
+		ev.ActorKind, ev.ActorPrincipalID = eventlog.ActorUser, by
+	}
+	return s.d.Events.Append(ctx, ev)
 }

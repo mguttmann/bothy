@@ -127,6 +127,9 @@ func identifyOf(f *rest.HostIdentify) app.Identify {
 			in.LiveSessions = append(in.LiveSessions, ids.ID(id))
 		}
 	}
+	if f.SessionId != nil {
+		in.SessionID = ids.ID(*f.SessionId)
+	}
 	return in
 }
 
