@@ -132,7 +132,7 @@ func terminalConfigKeys() []config.Key {
 			Chapter: chapter24,
 		},
 		{
-			Name: "terminal.sweep_interval", Kind: config.KindDuration, Default: "30s", Min: "1s",
+			Name: "terminal.sweep_interval", Kind: config.KindDuration, Default: thirtySeconds, Min: "1s",
 			Doc:     "Interval of the job terminal.sweep.",
 			Chapter: chapter24,
 		},

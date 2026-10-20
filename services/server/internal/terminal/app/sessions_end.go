@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"net/netip"
 	"slices"
 	"time"
 
@@ -207,9 +208,10 @@ func (s *Service) recordEnd(ctx context.Context, ses domain.Session, end domain.
 				attrReason: auditing.ReasonText(reasonText)},
 		})
 	}
-	// The server ends the session: the audit entry has no actor (system, 05 rule 1.10), the
-	// correlation of the request stays.
-	sys := actor.WithActor(ctx, actor.Anonymous())
+	// The server ends the session: the audit entry is a system action (05 rule 1.10) without an
+	// actor and without the client IP of a request that caused it, so its details hold exactly the
+	// keys of 24 section 10.1; the correlation of the request stays.
+	sys := systemAudit{actor.WithActor(ctx, actor.Anonymous())}
 	attrs := auditing.Attrs{
 		attrSessionID: auditing.ID(ses.ID), attrCloseReason: auditing.Code(string(end.Reason)),
 		attrBytesIn: auditing.Int(ses.BytesIn), attrBytesOut: auditing.Int(ses.BytesOut),
@@ -222,6 +224,22 @@ func (s *Service) recordEnd(ctx context.Context, ses domain.Session, end domain.
 		Action: string(authorize.ActionTerminalTerminate), Decision: auditing.DecisionAllow, ResourceKind: resourceSession,
 		ResourceID: ses.ID, Attrs: attrs,
 	})
+}
+
+// systemAudit is ctx without the client IP of the request (kernel/reqmeta), for the audit entry of
+// a system action: the recorder then finds no IP to pseudonymise (ip_hmac, ip_key_id), as authz
+// does for folded expiries. The key of reqmeta is unexported, so the value is hidden by its type;
+// no other netip.Addr travels in a context. Every other value, the unit of work and the
+// correlation id included, stays.
+type systemAudit struct{ context.Context }
+
+// Value implements context.Context.
+func (c systemAudit) Value(key any) any {
+	v := c.Context.Value(key)
+	if _, ip := v.(netip.Addr); ip {
+		return nil
+	}
+	return v
 }
 
 // sessionJSON is the payload of terminal_session.changed (schema TerminalSession): metadata only,

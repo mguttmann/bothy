@@ -85,8 +85,15 @@ type Audit struct {
 //
 // Errors: a registry that cannot be built, and the errors of auditapp.NewRecorder.
 func NewAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek auditapp.KEKSource, log *slog.Logger) (*Audit, error) {
+	return NewAuditWithClock(pool, unitCfg, cfg, kek, nil, log)
+}
+
+// NewAuditWithClock is NewAudit with the clock of the rights hook of the registry (nil means
+// clock.System(); NewModulesWithClock, M2-46).
+func NewAuditWithClock(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek auditapp.KEKSource, clk clock.Clock,
+	log *slog.Logger) (*Audit, error) {
 	log = orDiscard(log)
-	mods := NewModules(pool, log)
+	mods := NewModulesWithClock(pool, clk, log)
 	reg, err := NewTxnRegistry(mods)
 	if err != nil {
 		return nil, err

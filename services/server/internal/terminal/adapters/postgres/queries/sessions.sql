@@ -27,13 +27,14 @@ UPDATE terminal_sessions SET state = 'active', detached_at = NULL, version = ver
 WHERE id = @id AND state = 'detached';
 
 -- name: AddTerminalSessionCounters :execrows
--- The counts of one pairing of the relay, added; last_input_at only forward. Metadata without an
--- event and without a new version (ruling D-M2-44-5).
+-- The counts of the relay since its last write, added; last_input_at only forward; only for a
+-- session that is not closed (M2-46 Design note 7 d). Metadata without an event and without a new
+-- version (ruling D-M2-44-5).
 UPDATE terminal_sessions
 SET bytes_in = bytes_in + @bytes_in, bytes_out = bytes_out + @bytes_out,
     last_input_at = CASE WHEN sqlc.narg(last_input_at)::timestamptz IS NULL THEN last_input_at
         ELSE greatest(coalesce(last_input_at, sqlc.narg(last_input_at)::timestamptz), sqlc.narg(last_input_at)::timestamptz) END
-WHERE id = @id;
+WHERE id = @id AND state <> 'closed';
 
 -- name: ListTerminalSessions :many
 -- One page of sessions in descending id after the keyset position: those of one person (zero

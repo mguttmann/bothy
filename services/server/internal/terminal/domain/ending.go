@@ -26,21 +26,17 @@ func ValidateEnd(r CloseReason, d CloseDetail) error {
 	if !slices.Contains(CloseReasons(), r) || (d != "" && !slices.Contains(CloseDetails(), d)) {
 		return errEndPair
 	}
-	switch r {
-	case CloseOpenFailed:
-		if d == "" {
-			return errEndPair
-		}
-	case CloseHostPolicyViolated:
-		if !slices.Contains(policyDetails, d) {
-			return errEndPair
-		}
-	default:
-		if d != "" {
-			return errEndPair
-		}
+	allowed, needs := detailRule()[r]
+	if needs && !slices.Contains(allowed, d) || !needs && d != "" {
+		return errEndPair
 	}
 	return nil
+}
+
+// detailRule returns the reasons that require a close detail with the details each allows (24
+// section 10.3): open_failed any detail, host_policy_violation those of policyDetails.
+func detailRule() map[CloseReason][]CloseDetail {
+	return map[CloseReason][]CloseDetail{CloseOpenFailed: CloseDetails(), CloseHostPolicyViolated: policyDetails}
 }
 
 // actionUserDisable is the authorize action that disables a person. terminal/domain may not

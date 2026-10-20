@@ -40,7 +40,9 @@ func (s *Subscribers) OnAccessChanged(ctx context.Context, ev authorize.AccessCh
 	for _, c := range ev.Changes {
 		users = append(users, c.PrincipalID)
 	}
-	return s.unbound(ctx, func(ctx context.Context) ([]domain.Session, error) { return s.store.LockOpenSessionsOfUsers(ctx, users) })
+	return s.unbound(ctx, func(ctx context.Context) ([]domain.Session, error) {
+		return s.store.LockOpenSessionsOfUsers(ctx, users)
+	})
 }
 
 // OnDeviceRevoked implements the subscription identity.DeviceRevoked -> terminal (Service.OnDeviceRevoked).
@@ -48,7 +50,9 @@ func (s *Subscribers) OnDeviceRevoked(ctx context.Context, ev identity.DeviceRev
 	if svc := s.svc.Load(); svc != nil {
 		return svc.OnDeviceRevoked(ctx, ev)
 	}
-	return s.unbound(ctx, func(ctx context.Context) ([]domain.Session, error) { return s.store.LockOpenSessionsOfDevice(ctx, ev.DeviceID) })
+	return s.unbound(ctx, func(ctx context.Context) ([]domain.Session, error) {
+		return s.store.LockOpenSessionsOfDevice(ctx, ev.DeviceID)
+	})
 }
 
 // OnSessionEnded implements the subscription identity.SessionEnded -> terminal (Service.OnSessionEnded).

@@ -118,7 +118,7 @@ func migrationReasons(t *testing.T) []string {
 	}
 	quoted := regexp.MustCompile(`'([a-z0-9_]+)'`)
 	for _, f := range files {
-		b, err := os.ReadFile(f)
+		b, err := os.ReadFile(f) //nolint:gosec // G304: a migration file of the repository found by the glob above
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,9 @@ func migrationReasons(t *testing.T) []string {
 			continue
 		}
 		rest := text[i:]
-		rest = rest[:strings.Index(rest, "))")]
+		if j := strings.Index(rest, "))"); j >= 0 {
+			rest = rest[:j]
+		}
 		var out []string
 		for _, m := range quoted.FindAllStringSubmatch(rest, -1) {
 			out = append(out, m[1])
@@ -192,22 +194,14 @@ func TestValidateEnd(t *testing.T) {
 	t.Parallel()
 	policy := []domain.CloseDetail{domain.DetailSubscriptionLoginDetected, domain.DetailHelperUntrusted, domain.DetailSharedLocation}
 	for _, r := range domain.CloseReasons() {
-		switch r {
-		case domain.CloseOpenFailed:
-			for _, d := range domain.CloseDetails() {
-				if err := domain.ValidateEnd(r, d); err != nil {
-					t.Errorf("%s/%s: %v", r, d, err)
-				}
-			}
-		case domain.CloseHostPolicyViolated:
-			for _, d := range policy {
-				if err := domain.ValidateEnd(r, d); err != nil {
-					t.Errorf("%s/%s: %v", r, d, err)
-				}
-			}
-		default:
-			if err := domain.ValidateEnd(r, ""); err != nil {
-				t.Errorf("%s without detail: %v", r, err)
+		allowed, ok := map[domain.CloseReason][]domain.CloseDetail{domain.CloseOpenFailed: domain.CloseDetails(),
+			domain.CloseHostPolicyViolated: policy}[r]
+		if !ok {
+			allowed = []domain.CloseDetail{""}
+		}
+		for _, d := range allowed {
+			if err := domain.ValidateEnd(r, d); err != nil {
+				t.Errorf("%s/%q: %v", r, d, err)
 			}
 		}
 	}

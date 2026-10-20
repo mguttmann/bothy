@@ -451,7 +451,16 @@ func (r *Relay) apply(s *slot, acts []domain.RelayAction) effects {
 	}
 	if wasPaired && !s.paired && !dropped {
 		id, c := s.id, s.take()
-		fx = append([]func(context.Context){func(ctx context.Context) { r.call(ctx, r.uc.RelayCounters(ctx, id, c)) }}, fx...)
+		fx = append([]func(context.Context){func(ctx context.Context) {
+			if err := r.uc.RelayCounters(ctx, id, c); err != nil {
+				r.call(ctx, err)
+				r.giveBack(id, c)
+			}
+		}}, fx...)
+	}
+	if s.dev == nil && s.hst == nil && !dropped {
+		// A session without a connection on this node is not held here (M2-46 Design note 12 b).
+		r.countState(s, "")
 	}
 	return fx
 }
@@ -467,6 +476,12 @@ func (r *Relay) applyOne(s *slot, a domain.RelayAction) func(context.Context) {
 	case domain.ActActivate:
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayActivate(ctx, id)) }
 	case domain.ActDetach:
+		// The detach limit starts now on this node; the committed detached_at of the log tail
+		// replaces the instant (M2-46 Design note 7 b).
+		if s.times.State == domain.SessionActive {
+			s.times.State, s.times.DetachedAt = domain.SessionDetached, r.clk.Now()
+			r.armLimit(s)
+		}
 		return func(ctx context.Context) { r.call(ctx, r.uc.RelayDetach(ctx, id)) }
 	case domain.ActEndOpenFailed:
 		detail := a.Detail

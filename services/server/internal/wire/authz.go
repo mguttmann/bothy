@@ -260,18 +260,22 @@ func AuthzExpiryConfig(v *config.Values) (authzapp.ExpiryConfig, error) {
 // NewExpiryService builds the use case of the jobs authz.expiry_sweep and authz.expiry_reminder
 // (M1-30) over pool: the unit of work and the rights hook of the audit step a (the hook must be
 // bound, start step 6c; its begin step folds the due expiries of a sweep batch in), the appender of
-// the sync step sy, the grant store of authz, the PrincipalSource of identity and the system clock.
+// the sync step sy, the grant store of authz, the PrincipalSource of identity and clk (nil means
+// clock.System(); the serve process passes wire.Deps.Clock, M2-46).
 // It opens no connection.
 //
 // Errors: those of authzapp.NewExpiryService.
-func NewExpiryService(pool *pg.Pool, a *Audit, sy *Sync, cfg authzapp.ExpiryConfig, log *slog.Logger) (*authzapp.ExpiryService, error) {
+func NewExpiryService(pool *pg.Pool, a *Audit, sy *Sync, cfg authzapp.ExpiryConfig, clk clock.Clock, log *slog.Logger) (*authzapp.ExpiryService, error) {
 	if a == nil || sy == nil {
 		return nil, errors.New("wire: NewExpiryService needs the audit and the sync step")
+	}
+	if clk == nil {
+		clk = clock.System()
 	}
 	return authzapp.NewExpiryService(cfg, authzapp.ExpiryDeps{
 		UoW: a.UoW(), Expiry: authzpg.NewRepository(pool), Rights: a.RightsHook(),
 		Principals: principalSource(pool),
-		Events:     sy.Appender(), Clock: clock.System(), Log: orDiscard(log),
+		Events:     sy.Appender(), Clock: clk, Log: orDiscard(log),
 	})
 }
 

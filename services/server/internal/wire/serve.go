@@ -693,7 +693,7 @@ func (s *server) startAudit(ctx context.Context) error {
 	s.mu.Lock()
 	pool := s.pool
 	s.mu.Unlock()
-	a, err := NewAudit(pool, unitCfg, cfg, kek, s.logger())
+	a, err := NewAuditWithClock(pool, unitCfg, cfg, kek, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
@@ -1513,7 +1513,7 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	expiry, err := NewExpiryService(pool, a, sy, expiryCfg, s.logger())
+	expiry, err := NewExpiryService(pool, a, sy, expiryCfg, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}

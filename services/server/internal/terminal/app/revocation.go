@@ -65,27 +65,23 @@ func (s *Service) endSR10Lost(ctx context.Context, action authorize.Action, user
 	if err != nil || owner {
 		return err
 	}
-	hosts := map[ids.ID]domain.Host{}
 	for _, ses := range open {
-		h, ok := hosts[ses.HostID]
-		if !ok {
-			var found bool
-			if h, found, err = s.d.Store.Host(ctx, ses.HostID); err != nil {
-				return err
-			}
-			if !found {
-				continue
-			}
-			hosts[ses.HostID] = h
-		}
-		if !domain.SR10Lost(false, userID, h) {
-			continue
-		}
-		if _, err := s.endSessions(ctx, SessionSelector{SessionID: ses.ID}, domain.ServerEnd(domain.ReasonForLostHost(string(action), h, userID))); err != nil {
+		if err := s.endIfSR10Lost(ctx, action, ses); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// endIfSR10Lost ends ses of a person who is no longer an active owner when SR10 no longer allows
+// it on its host, read fresh in the transaction (domain.SR10Lost).
+func (s *Service) endIfSR10Lost(ctx context.Context, action authorize.Action, ses domain.Session) error {
+	h, found, err := s.d.Store.Host(ctx, ses.HostID)
+	if err != nil || !found || !domain.SR10Lost(false, ses.UserID, h) {
+		return err
+	}
+	_, err = s.endSessions(ctx, SessionSelector{SessionID: ses.ID}, domain.ServerEnd(domain.ReasonForLostHost(string(action), h, ses.UserID)))
+	return err
 }
 
 // OnDeviceRevoked ends the open sessions whose current device (terminal_sessions.device_id, the

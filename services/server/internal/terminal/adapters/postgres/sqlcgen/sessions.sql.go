@@ -30,7 +30,7 @@ UPDATE terminal_sessions
 SET bytes_in = bytes_in + $1, bytes_out = bytes_out + $2,
     last_input_at = CASE WHEN $3::timestamptz IS NULL THEN last_input_at
         ELSE greatest(coalesce(last_input_at, $3::timestamptz), $3::timestamptz) END
-WHERE id = $4
+WHERE id = $4 AND state <> 'closed'
 `
 
 type AddTerminalSessionCountersParams struct {
@@ -40,8 +40,9 @@ type AddTerminalSessionCountersParams struct {
 	ID          pgtype.UUID
 }
 
-// The counts of one pairing of the relay, added; last_input_at only forward. Metadata without an
-// event and without a new version (ruling D-M2-44-5).
+// The counts of the relay since its last write, added; last_input_at only forward; only for a
+// session that is not closed (M2-46 Design note 7 d). Metadata without an event and without a new
+// version (ruling D-M2-44-5).
 func (q *Queries) AddTerminalSessionCounters(ctx context.Context, arg AddTerminalSessionCountersParams) (int64, error) {
 	result, err := q.db.Exec(ctx, addTerminalSessionCounters,
 		arg.BytesIn,

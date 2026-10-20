@@ -41,7 +41,9 @@ func (NoLimiter) AllowTerminal(ids.ID) (bool, int) { return true, 0 }
 func (NoLimiter) AllowHost(ids.ID) (bool, int) { return true, 0 }
 
 // ReserveCredentials implements Limiter.
-func (NoLimiter) ReserveCredentials(netip.Addr) (bool, int, func(bool)) { return true, 0, func(bool) {} }
+func (NoLimiter) ReserveCredentials(netip.Addr) (bool, int, func(bool)) {
+	return true, 0, func(bool) {}
+}
 
 // retryText is the close text of 4008: the wait time as the gateway writes it (retry_after=<s>).
 func retryText(seconds int) string { return "retry_after=" + strconv.Itoa(seconds) }

@@ -12,6 +12,7 @@ import (
 
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -55,8 +56,13 @@ type Modules struct {
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
 // where no unit of work runs (the golden test). It opens no connection. The rights hook gets the
 // empty structure and agent policy sources until M1-54 and M1-51.
-func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
-	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
+func NewModules(pool *pg.Pool, log *slog.Logger) *Modules { return NewModulesWithClock(pool, nil, log) }
+
+// NewModulesWithClock is NewModules with the clock of the rights hook (nil means clock.System()):
+// the serve process passes wire.Deps.Clock, so a test on a fake clock folds due expiries on that
+// clock (M2-46).
+func NewModulesWithClock(pool *pg.Pool, clk clock.Clock, log *slog.Logger) *Modules {
+	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, clk, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
 		SyncSubscribers: newSyncSubscribers(pool), NotifySubscribers: newNotifySubscribers(pool),
 		MessagingSubscribers: newMessagingSubscribers(pool), TerminalSubscribers: newTerminalSubscribers(pool)}
 }
@@ -161,6 +167,13 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.SyncSubscribers.OnThreadMoved); err != nil {
 		return err
 	}
+	return registerArchiveAndTerminal(reg, m)
+}
+
+// registerArchiveAndTerminal registers chat.ChannelArchived and chat.SpaceArchived -> notify
+// (M3-18), then kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal
+// (M2-46), in this order after the subscriptions of registerTxn.
+func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 	if m.NotifySubscribers == nil {
 		return errNoNotifySubscribers
 	}
