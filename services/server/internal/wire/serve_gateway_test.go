@@ -569,7 +569,10 @@ func TestGateway(t *testing.T) {
 	t.Run("TestFirstHeartbeatJitterTolerated", func(t *testing.T) {
 		p := w.newPerson("alex", identity.DeviceStateActive)
 		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
-		time.Sleep(1700 * time.Millisecond)
+		// Past one interval (1s) and inside the deadline of interval times (miss limit + 1) (2s),
+		// with room for the revalidation query of the heartbeat on a loaded runner: a heartbeat
+		// 300 ms before the deadline was closed with 4009 in CI while its query ran.
+		time.Sleep(1400 * time.Millisecond)
 		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
 			t.Fatal(err)
 		}
