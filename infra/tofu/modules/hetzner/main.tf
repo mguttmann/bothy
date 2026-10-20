@@ -1,4 +1,4 @@
-# Bothy on Hetzner Cloud (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a
+# The chat server on Hetzner Cloud (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a
 # firewall that admits only the edge port from the internet, the SSH keys, and one cloud server
 # whose cloud-init user data comes from generic-vm, which installs Docker, verifies the release
 # and runs the setup wizard on the host. PostgreSQL and the files stay in the Compose stack:
@@ -73,7 +73,7 @@ resource "hcloud_firewall" "host" {
 }
 
 # One key per entry of admin_ssh_public_keys. With at least one key Hetzner Cloud sets no root
-# password (and sends none by e-mail); cloud-init of generic-vm creates the user bothy with the
+# password (and sends none by e-mail); cloud-init of generic-vm creates its maintenance user with the
 # same keys.
 resource "hcloud_ssh_key" "admin" {
   count = length(var.admin_ssh_public_keys)

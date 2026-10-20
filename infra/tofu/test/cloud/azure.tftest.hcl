@@ -99,7 +99,7 @@ run "edge_port_only_public" {
     error_message = "azure runs PostgreSQL and the files in the stack and keeps the secrets on the host."
   }
   assert {
-    condition     = output.ssh_endpoint == "bothy@192.0.2.20"
+    condition     = endswith(output.ssh_endpoint, "@192.0.2.20")
     error_message = "ssh_endpoint names the public address of the host."
   }
   assert {

@@ -69,7 +69,7 @@ run "edge_port_only_public" {
     error_message = "hetzner runs PostgreSQL and the files in the stack and keeps the secrets on the host."
   }
   assert {
-    condition     = output.ssh_endpoint == "bothy@192.0.2.30"
+    condition     = endswith(output.ssh_endpoint, "@192.0.2.30")
     error_message = "ssh_endpoint names the server's public address."
   }
 }

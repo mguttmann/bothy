@@ -114,7 +114,7 @@ variable "telemetry_exporters" {
 }
 
 variable "admin_ssh_public_keys" {
-  description = "Public SSH keys of the maintenance user bothy (cloud-init); empty means no SSH login."
+  description = "Public SSH keys of the maintenance user of generic-vm (ssh_user, created by cloud-init); empty means no SSH login."
   type        = list(string)
   default     = []
   validation {
