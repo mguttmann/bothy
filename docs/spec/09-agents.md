@@ -768,11 +768,11 @@ stateDiagram-v2
 | Reason | State | Set by | Meaning |
 |---|---|---|---|
 | `user_cancelled` | `cancelled` | Server | A person stopped it |
-| `access_revoked` | `cancelled` | Server | Triggering person lost `trigger` (04 section 8.3) |
+| `access_revoked` | `cancelled`; `failed` on denial before delivery | Server | Triggering person lost `trigger` (04 section 8.3); at delivery every denial of `agent.invoke` without its own code below (AZ-M51) |
 | `cancel_timeout` | `cancelled` | Server | Adapter did not report the cancellation within `agent.cancel_grace` |
-| `agent_disabled` | `cancelled` | Server | Agent disabled |
+| `agent_disabled` | `cancelled`; `failed` on denial before delivery | Server | Agent disabled |
 | `billing_mode_personal_not_holder` | `failed` | Server | I2 at delivery |
-| `channel_read_only` | `cancelled` | Server | Channel became read-only or archived (04 section 8.3) |
+| `channel_read_only` | `cancelled`; `failed` on denial before delivery | Server | Channel became read-only or archived (04 section 8.3) |
 | `billing_mode_mismatch` | `failed` | Adapter or Server | I3 |
 | `tool_class_owner_only` | `failed` | Server | SR2 at delivery or at `run.token.renew` |
 | `tool_class_mismatch` | `failed` | Adapter or Server | actual tool class higher than the `tool_class` of the token (SR2) |
@@ -784,7 +784,7 @@ stateDiagram-v2
 | `runtime_error` | `failed` | Adapter | Runtime reports an error; details in the last step |
 | `adapter_error` | `failed` | Adapter | Error in the adapter itself |
 | `runtime_not_authenticated` | `failed` | Adapter | Runtime has no valid login |
-| `user_disabled` | `cancelled` | Server | The triggering person was disabled (`user.disable`, 02 section 4.3) |
+| `user_disabled` | `cancelled`; `failed` on denial before delivery | Server | The triggering person was disabled (`user.disable`, 02 section 4.3): `cancelled` on revocation, `failed` at delivery |
 
 The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
 unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the
