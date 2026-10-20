@@ -76,6 +76,7 @@ COPY packages/local_store/pubspec.yaml packages/local_store/
 COPY packages/sync_engine/pubspec.yaml packages/sync_engine/
 COPY packages/terminal_ui/pubspec.yaml packages/terminal_ui/
 RUN flutter pub get --enforce-lockfile >/dev/null
+COPY packages/admin_ui/lib packages/admin_ui/lib
 COPY packages/api_client/lib packages/api_client/lib
 COPY packages/auth/lib packages/auth/lib
 COPY packages/design_system/lib packages/design_system/lib
@@ -89,6 +90,21 @@ COPY services/server/VERSION services/server/
 WORKDIR /src/apps/console
 RUN flutter build web --release --base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run \
     && sh tool/version_json.sh ../../docs/api/openapi.yaml ../../services/server/VERSION build/web/version.json
+
+# The web bundle of the patrol suites of the console administration (brief M6-04 Design note 4):
+# integration_test/admin/admin_bundle.dart in place of lib/main.dart, built with the flags of the
+# console above, so the suites run under the same CSP as the real console. patrol_cli has no web
+# build command, so the bundle entry is hand-written. tools/console-e2e/console_e2e.py exports the
+# files with --target console-e2e-web and mounts them as console.assets_dir of its test api only;
+# no release image contains them, and the production stage stays last.
+FROM console AS console-e2e-build
+RUN flutter build web --release --target integration_test/admin/admin_bundle.dart \
+        --output /src/apps/console/build/admin-bundle \
+        --base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run \
+    && sh tool/version_json.sh ../../docs/api/openapi.yaml ../../services/server/VERSION build/admin-bundle/version.json
+
+FROM scratch AS console-e2e-web
+COPY --from=console-e2e-build /src/apps/console/build/admin-bundle /
 
 # The probe of the Compose smoke test (brief M1-73, infra/compose/test/compose.smoke.yaml target
 # smoke). It is built from the builder stage above and runs on the same runtime base as the
