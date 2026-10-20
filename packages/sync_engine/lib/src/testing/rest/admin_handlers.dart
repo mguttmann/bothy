@@ -33,8 +33,9 @@ void requireCatalogStepUp(
 /// Registers the administration handlers on [rest], with the step-up of [catalog].
 void registerAdminHandlers(RestFake rest, ActionCatalog catalog) {
   final world = rest.world;
-  final random = Random(7);
-  // 06 7: the enrollment code is a one-time secret.
+  // 06 7: the enrollment code is a one-time secret; it comes from the secure generator like
+  // the server's, and no test depends on its letters.
+  final random = Random.secure();
   rest.oneTimeSecrets.addAll(const {'createUser', 'createEnrollmentCode'});
 
   void owner(FakeRequest r) {
