@@ -561,11 +561,20 @@ func TestExportChannel(t *testing.T) {
 		// behind the gate (a lock of the test's own owner connection, not of the server's role).
 		g, lr, sent, done := stopAtSecondThreadPage(t, alex)
 		defer done()
+		// Only a transaction that was open and idle before the pause began counts: the server role
+		// also runs short units of work of its background jobs (runs, presence) during the pause,
+		// which are idle in a transaction for a moment between two statements (INT-W51/16).
+		var pauseStart time.Time
+		if err := e.db.QueryRow(t.Context(), `SELECT clock_timestamp()`).Scan(&pauseStart); err != nil {
+			t.Fatal(err)
+		}
 		pause := e.duration(t, "database.idle_in_tx_timeout") + time.Second
-		for end := time.Now().Add(pause); time.Now().Before(end); time.Sleep(100 * time.Millisecond) {
+		for end := time.Now().Add(pause); time.Now().Before(end); {
+			time.Sleep(100 * time.Millisecond)
 			var n int
 			if err := e.db.QueryRow(t.Context(), `SELECT count(*) FROM pg_stat_activity WHERE usename = 'bothy_app'
-				AND state IN ('idle in transaction', 'idle in transaction (aborted)')`).Scan(&n); err != nil {
+				AND state IN ('idle in transaction', 'idle in transaction (aborted)')
+				AND xact_start < $1 AND state_change < $1`, pauseStart).Scan(&n); err != nil {
 				t.Fatal(err)
 			}
 			if n != 0 {

@@ -29,9 +29,9 @@ func (sc *Scenario) images() {
 func (sc *Scenario) imagePart(method, path string) req {
 	sc.T.Helper()
 	img := image.NewNRGBA(image.Rect(0, 0, 8, 8))
-	for x := range 8 {
-		for y := range 8 {
-			img.Set(x, y, color.NRGBA{R: uint8(30 * x), G: uint8(30 * y), B: 90, A: 255})
+	for x := range uint8(8) {
+		for y := range uint8(8) {
+			img.Set(int(x), int(y), color.NRGBA{R: 30 * x, G: 30 * y, B: 90, A: 255})
 		}
 	}
 	var pic bytes.Buffer
