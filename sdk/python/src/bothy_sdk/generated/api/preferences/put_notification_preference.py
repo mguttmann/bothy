@@ -67,6 +67,11 @@ def _parse_response(
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
 
@@ -96,6 +101,13 @@ def sync_detailed(
     body: NotificationPreferencePut,
 ) -> Response[NotificationPreference | Problem]:
     """Set the notification level of a target
+
+     Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text
+    channel included. An unknown target, an id of another kind and a target without read right give the
+    same 404. An archived target (or a channel in an archived space) takes no new preference: 409
+    conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when
+    it has passed; a passed value has no effect. A write that changes nothing answers 200 without event
+    and without a new version.
 
     Args:
         target_kind (PutNotificationPreferenceTargetKind):
@@ -132,6 +144,13 @@ def sync(
 ) -> NotificationPreference | Problem | None:
     """Set the notification level of a target
 
+     Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text
+    channel included. An unknown target, an id of another kind and a target without read right give the
+    same 404. An archived target (or a channel in an archived space) takes no new preference: 409
+    conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when
+    it has passed; a passed value has no effect. A write that changes nothing answers 200 without event
+    and without a new version.
+
     Args:
         target_kind (PutNotificationPreferenceTargetKind):
         target_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -161,6 +180,13 @@ async def asyncio_detailed(
     body: NotificationPreferencePut,
 ) -> Response[NotificationPreference | Problem]:
     """Set the notification level of a target
+
+     Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text
+    channel included. An unknown target, an id of another kind and a target without read right give the
+    same 404. An archived target (or a channel in an archived space) takes no new preference: 409
+    conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when
+    it has passed; a passed value has no effect. A write that changes nothing answers 200 without event
+    and without a new version.
 
     Args:
         target_kind (PutNotificationPreferenceTargetKind):
@@ -194,6 +220,13 @@ async def asyncio(
     body: NotificationPreferencePut,
 ) -> NotificationPreference | Problem | None:
     """Set the notification level of a target
+
+     Sets the caller's level on a space, channel or thread the caller can read, the main thread of a text
+    channel included. An unknown target, an id of another kind and a target without read right give the
+    same 404. An archived target (or a channel in an archived space) takes no new preference: 409
+    conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when
+    it has passed; a passed value has no effect. A write that changes nothing answers 200 without event
+    and without a new version.
 
     Args:
         target_kind (PutNotificationPreferenceTargetKind):

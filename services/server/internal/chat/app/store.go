@@ -59,6 +59,9 @@ type Store interface {
 	Space(ctx context.Context, id ids.ID) (s domain.Space, found bool, err error)
 	// LockSpace returns the space id like Space and locks its row until the end of the unit.
 	LockSpace(ctx context.Context, id ids.ID) (s domain.Space, found bool, err error)
+	// ShareSpace returns the space id like Space and holds FOR SHARE on its row until the end of
+	// the unit (M3-18).
+	ShareSpace(ctx context.Context, id ids.ID) (s domain.Space, found bool, err error)
 	// LockActiveSpaces locks every space that is not archived in ascending id (create and move,
 	// docs/DECISIONS.md M1-52).
 	LockActiveSpaces(ctx context.Context) error
@@ -88,6 +91,13 @@ type Store interface {
 	Channel(ctx context.Context, id ids.ID) (c ChannelRow, found bool, err error)
 	// LockChannel returns the channel id like Channel and locks its row until the end of the unit.
 	LockChannel(ctx context.Context, id ids.ID) (c ChannelRow, found bool, err error)
+	// ShareChannel returns the channel id like Channel and holds FOR SHARE on its row until the
+	// end of the unit (M3-18).
+	ShareChannel(ctx context.Context, id ids.ID) (c ChannelRow, found bool, err error)
+	// ChannelIDsOfSpace returns every channel of space, archived ones included, ascending.
+	ChannelIDsOfSpace(ctx context.Context, space ids.ID) ([]ids.ID, error)
+	// ThreadIDsOfChannels returns every thread of the channels, ascending.
+	ThreadIDsOfChannels(ctx context.Context, channels []ids.ID) ([]ids.ID, error)
 	// ChannelOrder returns the channels of space that are not archived in their order (sort_key,
 	// id).
 	ChannelOrder(ctx context.Context, space ids.ID) ([]domain.Keyed, error)

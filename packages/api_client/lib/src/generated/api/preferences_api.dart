@@ -37,7 +37,7 @@ class PreferencesApi {
   const PreferencesApi(this._dio, this._serializers);
 
   /// Add a quiet hours rule
-  ///
+  /// Adds a rule. time_zone must be an IANA zone name (400 validation_failed with errors[].code unknown_time_zone); absent means the person&#39;s time zone. Every write sends the complete list in quiet_hours.updated; a write that would make that list larger than sync.event_payload_max_bytes is refused with 400 validation_failed and errors[].code limit_reached.
   ///
   /// Parameters:
   /// * [quietHoursRuleInput]
@@ -252,7 +252,7 @@ class PreferencesApi {
   }
 
   /// Inherit the notification level again
-  ///
+  /// Removes the caller&#39;s level on the target, so it inherits again. Answers 204 also when no row is stored (then without event); deleting stays possible on an archived target. A later put starts again at version 1.
   ///
   /// Parameters:
   /// * [targetKind]
@@ -586,7 +586,7 @@ class PreferencesApi {
   }
 
   /// List notification levels
-  ///
+  /// The caller&#39;s own levels, ordered by target kind, then target id. Only targets the caller can still read are listed; rows on targets the caller lost stay stored and appear again when the right returns.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1321,7 +1321,7 @@ class PreferencesApi {
   }
 
   /// Set the notification level of a target
-  ///
+  /// Sets the caller&#39;s level on a space, channel or thread the caller can read, the main thread of a text channel included. An unknown target, an id of another kind and a target without read right give the same 404. An archived target (or a channel in an archived space) takes no new preference: 409 conflict with reason target_archived. muted_until is stored as given (whole microseconds), also when it has passed; a passed value has no effect. A write that changes nothing answers 200 without event and without a new version.
   ///
   /// Parameters:
   /// * [targetKind]
@@ -1441,7 +1441,7 @@ class PreferencesApi {
   }
 
   /// Change a quiet hours rule
-  ///
+  /// Replaces the whole rule; an absent time_zone clears it (the rule then follows the person&#39;s time zone). Equal values answer 200 without event and without a new version. time_zone and the list size are checked as for createQuietHoursRule (unknown_time_zone, limit_reached).
   ///
   /// Parameters:
   /// * [ruleId]

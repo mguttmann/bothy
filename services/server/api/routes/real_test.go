@@ -637,6 +637,34 @@ func (stubServer) DeleteMySetting(context.Context, rest.DeleteMySettingRequestOb
 	return nil, nil
 }
 
+func (stubServer) ListMyNotificationPreferences(context.Context, rest.ListMyNotificationPreferencesRequestObject) (rest.ListMyNotificationPreferencesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutNotificationPreference(context.Context, rest.PutNotificationPreferenceRequestObject) (rest.PutNotificationPreferenceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteNotificationPreference(context.Context, rest.DeleteNotificationPreferenceRequestObject) (rest.DeleteNotificationPreferenceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMyQuietHours(context.Context, rest.ListMyQuietHoursRequestObject) (rest.ListMyQuietHoursResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateQuietHoursRule(context.Context, rest.CreateQuietHoursRuleRequestObject) (rest.CreateQuietHoursRuleResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PutQuietHoursRule(context.Context, rest.PutQuietHoursRuleRequestObject) (rest.PutQuietHoursRuleResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteQuietHoursRule(context.Context, rest.DeleteQuietHoursRuleRequestObject) (rest.DeleteQuietHoursRuleResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) GetMySidebar(context.Context, rest.GetMySidebarRequestObject) (rest.GetMySidebarResponseObject, error) {
 	return nil, nil
 }
@@ -743,8 +771,8 @@ func (stubServer) SetMyLocalCredential(context.Context, rest.SetMyLocalCredentia
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
-// records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), sending (M1-56)
-// and editing and deleting (M1-58). A handler
+// records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), sending (M1-56),
+// editing and deleting (M1-58) and the preferences (M3-18). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -965,6 +993,14 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-63
 		"listEvents":  {"GET /api/v1/events", "events.catch_up", "rl.read"},
 		"getSnapshot": {"GET /api/v1/sync/snapshot", "sync.snapshot.read", "rl.read"},
+		// M3-18
+		"listMyNotificationPreferences": {"GET /api/v1/me/notification-preferences", "settings.read", "rl.read"},
+		"putNotificationPreference":     {"PUT /api/v1/me/notification-preferences/{target_kind}/{target_id}", "notification_pref.update", "rl.write"},
+		"deleteNotificationPreference":  {"DELETE /api/v1/me/notification-preferences/{target_kind}/{target_id}", "notification_pref.update", "rl.write"},
+		"listMyQuietHours":              {"GET /api/v1/me/quiet-hours", "settings.read", "rl.read"},
+		"createQuietHoursRule":          {"POST /api/v1/me/quiet-hours", "quiet_hours.update", "rl.write"},
+		"putQuietHoursRule":             {"PUT /api/v1/me/quiet-hours/{rule_id}", "quiet_hours.update", "rl.write"},
+		"deleteQuietHoursRule":          {"DELETE /api/v1/me/quiet-hours/{rule_id}", "quiet_hours.update", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

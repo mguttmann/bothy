@@ -43,6 +43,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createIdentityProvider
   - createMessage
   - createPersonalTemplate
+  - createQuietHoursRule
   - createSpace
   - createStepUpChallenge
   - createThread
@@ -55,6 +56,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteIdentityProvider
   - deleteMessage
   - deleteMySetting
+  - deleteNotificationPreference
+  - deleteQuietHoursRule
   - deleteTemplate
   - deleteThreadDraft
   - deleteWebhookSubscription
@@ -107,6 +110,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listMyDevices
   - listMyDrafts
   - listMyMentions
+  - listMyNotificationPreferences
+  - listMyQuietHours
   - listMyReadStates
   - listMySessions
   - listMySettings
@@ -139,6 +144,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - putInstanceSetting
   - putMySetting
   - putMySidebarSpace
+  - putNotificationPreference
+  - putQuietHoursRule
   - putReadState
   - putThreadDraft
   - redeemEnrollmentCode
@@ -259,9 +266,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createPrice
     milestone: M2
     ticket: M2-22
-  - operation_id: createQuietHoursRule
-    milestone: M3
-    ticket: M3-18
   - operation_id: createStatusComponent
     milestone: M7
     ticket: M7-09
@@ -282,15 +286,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteMyAvatar
     milestone: M3
     ticket: M3-10
-  - operation_id: deleteNotificationPreference
-    milestone: M3
-    ticket: M3-18
   - operation_id: deleteProjectBinding
     milestone: M2
     ticket: M2-03
-  - operation_id: deleteQuietHoursRule
-    milestone: M3
-    ticket: M3-18
   - operation_id: deleteStatusComponent
     milestone: M7
     ticket: M7-09
@@ -420,12 +418,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
-  - operation_id: listMyNotificationPreferences
-    milestone: M3
-    ticket: M3-18
-  - operation_id: listMyQuietHours
-    milestone: M3
-    ticket: M3-18
   - operation_id: listPrices
     milestone: M2
     ticket: M2-22
@@ -462,15 +454,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: putChannelBehavior
     milestone: M2
     ticket: M2-02
-  - operation_id: putNotificationPreference
-    milestone: M3
-    ticket: M3-18
   - operation_id: putProjectBinding
     milestone: M2
     ticket: M2-03
-  - operation_id: putQuietHoursRule
-    milestone: M3
-    ticket: M3-18
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28

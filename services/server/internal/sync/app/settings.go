@@ -9,6 +9,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/domain"
 )
@@ -108,4 +109,13 @@ func (s *Personal) appendSetting(ctx context.Context, a actor.Actor, st sync.Use
 	e := personalEvent(a, authorize.EventSettingsUpdated, p)
 	e.ResourceKind, e.ResourceID = resourceUser, a.ID
 	return s.d.Events.Append(ctx, e)
+}
+
+// ValuesFor implements sync.Settings (M3-18): one read of the stored values, without authorize
+// and without defaults. No people or no keys read nothing.
+func (s Settings) ValuesFor(ctx context.Context, userIDs []ids.ID, keys []string) (map[ids.ID]map[string]json.RawMessage, error) {
+	if len(userIDs) == 0 || len(keys) == 0 {
+		return map[ids.ID]map[string]json.RawMessage{}, nil
+	}
+	return s.d.Store.SettingValues(ctx, userIDs, keys)
 }

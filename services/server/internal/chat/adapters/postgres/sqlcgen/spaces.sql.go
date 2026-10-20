@@ -224,6 +224,30 @@ func (q *Queries) MoveSpace(ctx context.Context, arg MoveSpaceParams) error {
 	return err
 }
 
+const shareSpace = `-- name: ShareSpace :one
+SELECT id, name, icon, color, sort_key, default_operator_agent_id, created_by, created_at, archived_at, version FROM spaces WHERE id = $1 FOR SHARE
+`
+
+// The space held FOR SHARE while notify writes a preference below it (M3-18): an archive holds
+// the row FOR UPDATE, so the write either commits before it or sees the archive.
+func (q *Queries) ShareSpace(ctx context.Context, id pgtype.UUID) (Space, error) {
+	row := q.db.QueryRow(ctx, shareSpace, id)
+	var i Space
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Icon,
+		&i.Color,
+		&i.SortKey,
+		&i.DefaultOperatorAgentID,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.ArchivedAt,
+		&i.Version,
+	)
+	return i, err
+}
+
 const spaceIDs = `-- name: SpaceIDs :many
 SELECT id FROM spaces ORDER BY id
 `

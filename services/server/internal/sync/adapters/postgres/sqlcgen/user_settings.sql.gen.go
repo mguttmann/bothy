@@ -132,3 +132,40 @@ func (q *Queries) PutSetting(ctx context.Context, arg PutSettingParams) (UserSet
 	)
 	return i, err
 }
+
+const settingValues = `-- name: SettingValues :many
+SELECT user_id, key, value FROM user_settings WHERE user_id = ANY ($1::uuid[]) AND key = ANY ($2::text[])
+`
+
+type SettingValuesParams struct {
+	UserIds []pgtype.UUID
+	Keys    []string
+}
+
+type SettingValuesRow struct {
+	UserID pgtype.UUID
+	Key    string
+	Value  []byte
+}
+
+// The stored values of the keys of many people in one read (M3-18: notify reads
+// notify.default_level of every candidate of a thread). No defaults: absent rows stay absent.
+func (q *Queries) SettingValues(ctx context.Context, arg SettingValuesParams) ([]SettingValuesRow, error) {
+	rows, err := q.db.Query(ctx, settingValues, arg.UserIds, arg.Keys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SettingValuesRow
+	for rows.Next() {
+		var i SettingValuesRow
+		if err := rows.Scan(&i.UserID, &i.Key, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

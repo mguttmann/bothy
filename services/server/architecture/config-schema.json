@@ -1695,6 +1695,22 @@
       "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_owner."
     },
     {
+      "name": "notify.user_default_level",
+      "env": "BOTHY_NOTIFY__USER_DEFAULT_LEVEL",
+      "kind": "enum",
+      "default": "mentions",
+      "required": false,
+      "enum": [
+        "all",
+        "mentions",
+        "mute"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Notification level of a person without any own setting."
+    },
+    {
       "name": "pin.max_per_thread",
       "env": "BOTHY_PIN__MAX_PER_THREAD",
       "kind": "int",

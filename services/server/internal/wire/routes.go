@@ -18,6 +18,7 @@ import (
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
+	notifyhttp "github.com/OWNER/bothy/services/server/internal/notify/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
@@ -131,6 +132,10 @@ type Handlers struct {
 	*synchttp.Personal
 	// Sync implements listEvents and getSnapshot (sync, M1-63).
 	*synchttp.Sync
+	// Preferences implements listMyNotificationPreferences, putNotificationPreference,
+	// deleteNotificationPreference, listMyQuietHours, createQuietHoursRule, putQuietHoursRule and
+	// deleteQuietHoursRule (notify, M3-18).
+	*notifyhttp.Preferences
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

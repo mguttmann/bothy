@@ -323,4 +323,29 @@ type Structure interface {
 	// owner, step-up) as a rights change checked against I1 (M1-54). The same assignment answers
 	// the channel without a change. Errors as SetSpaceOperator, conflict for an archived channel.
 	SetChannelOperator(ctx context.Context, a actor.Actor, cmd SetChannelOperatorCmd) (Channel, error)
+
+	// NotificationPath returns where the target kind/id of a notification preference sits (M3-18,
+	// for notify). It never authorizes: the caller authorizes the target with the returned path
+	// hints before it reveals anything. It reads in the ambient transaction of ctx when there is
+	// one. Errors: not_found for an unknown id and for an id of another kind than kind (a
+	// channel id sent as thread).
+	//
+	// Example:
+	//
+	//	p, err := structure.NotificationPath(ctx, chat.TargetThread, threadID)
+	NotificationPath(ctx context.Context, kind string, id ids.ID) (NotificationPath, error)
+	// LockNotificationPath returns NotificationPath and holds FOR SHARE on the thread row (kind
+	// thread), then the channel row (kinds thread and channel), then the space row (when the
+	// channel has one), in that order, until the end of the unit of work: an archive, which holds
+	// the channel or space row FOR UPDATE, either committed before or waits for the caller. It
+	// never authorizes. Errors: not_found as NotificationPath, internal outside a unit of work.
+	LockNotificationPath(ctx context.Context, kind string, id ids.ID) (NotificationPath, error)
+	// ChannelIDsOfSpace returns every channel of the space, archived ones included, ascending (the
+	// cleanup of notify when the space is archived, M3-18). It never authorizes: it runs inside
+	// an archive that space.archive allowed. An unknown space has no channels.
+	ChannelIDsOfSpace(ctx context.Context, spaceID ids.ID) ([]ids.ID, error)
+	// ThreadIDsOfChannels returns every thread of the channels, ascending (the cleanup of notify
+	// when a channel or space is archived, M3-18). It never authorizes; unknown channels have no
+	// threads.
+	ThreadIDsOfChannels(ctx context.Context, channelIDs []ids.ID) ([]ids.ID, error)
 }

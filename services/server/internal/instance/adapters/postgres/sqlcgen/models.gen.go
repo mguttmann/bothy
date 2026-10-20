@@ -518,6 +518,16 @@ type MessageTemplate struct {
 	Version     int64
 }
 
+type NotificationPreference struct {
+	UserID     pgtype.UUID
+	TargetKind string
+	TargetID   pgtype.UUID
+	Level      string
+	MutedUntil pgtype.Timestamptz
+	Version    int64
+	UpdatedAt  pgtype.Timestamptz
+}
+
 type Owner struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID
@@ -561,6 +571,17 @@ type Principal struct {
 	CreatedAt    pgtype.Timestamptz
 	DisabledAt   pgtype.Timestamptz
 	DeletedAt    pgtype.Timestamptz
+}
+
+type QuietHour struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	Weekdays   int16
+	StartLocal pgtype.Time
+	EndLocal   pgtype.Time
+	TimeZone   pgtype.Text
+	Enabled    bool
+	Version    int64
 }
 
 type Reaction struct {

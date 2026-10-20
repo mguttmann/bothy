@@ -98,3 +98,8 @@ SELECT id, channel_id, last_message_seq, unread_floor_seq
 FROM threads
 WHERE channel_id = ANY(sqlc.arg(channel_ids)::uuid[]) AND last_message_seq > unread_floor_seq
 ORDER BY id;
+
+-- name: ThreadIDsOfChannels :many
+-- Every thread of the channels, ascending: the targets of the cleanup of notification
+-- preferences when a channel or space is archived (M3-18).
+SELECT id FROM threads WHERE channel_id = ANY (@channel_ids::uuid[]) ORDER BY id;

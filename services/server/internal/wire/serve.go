@@ -173,6 +173,8 @@ type server struct {
 	personal *Personal
 	// syncReads is catch-up and snapshot of sync (M1-63), built in the chat step after personal.
 	syncReads *SyncReads
+	// notify is the notify module (M3-18), built in the chat step over chat, sync and identity.
+	notify *Notify
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -794,10 +796,33 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	n, err := s.startNotify(pool, a, az, sy, c, p, id)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	s.chat, s.messaging, s.personal, s.syncReads = c, m, p, r
+	s.chat, s.messaging, s.personal, s.syncReads, s.notify = c, m, p, r, n
 	s.mu.Unlock()
 	return nil
+}
+
+// startNotify builds the notify module (M3-18) in the chat step over the chat service, the
+// settings of the personal data of sync and the directory of identity, and binds the
+// in-transaction subscribers of notify of the unit of work to the appender and the chat paths.
+func (s *server) startNotify(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, p *Personal, id *Identity) (*Notify, error) {
+	cfg, err := NotifyConfig(s.values)
+	if err != nil {
+		return nil, err
+	}
+	n, err := NewNotify(cfg, pool, a.UoW(), az, sy.Appender(), NotifyDeps{Chat: c.Service, Settings: p.Service.Settings(), Users: id.Directory},
+		s.deps.Clock, s.logger())
+	if err != nil {
+		return nil, err
+	}
+	if err := a.NotifySubscribers().Bind(sy.Appender(), c.Service); err != nil {
+		return nil, err
+	}
+	return n, nil
 }
 
 // startTerminal is start step 6g (M2-39): the terminal module over the pool, the unit of work and
@@ -944,6 +969,7 @@ func (s *server) handlers() Handlers {
 	s.messaging.fillHandlers(&h)
 	s.personal.fillHandlers(&h)
 	s.syncReads.fillHandlers(&h)
+	s.notify.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}

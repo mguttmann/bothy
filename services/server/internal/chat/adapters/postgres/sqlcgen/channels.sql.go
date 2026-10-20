@@ -41,6 +41,32 @@ func (q *Queries) ActiveChannelKeys(ctx context.Context, spaceID pgtype.UUID) ([
 	return items, nil
 }
 
+const channelIDsOfSpace = `-- name: ChannelIDsOfSpace :many
+SELECT id FROM channels WHERE space_id = $1 ORDER BY id
+`
+
+// Every channel of a space, archived ones included, ascending: the targets of the cleanup of
+// notification preferences when the space is archived (M3-18).
+func (q *Queries) ChannelIDsOfSpace(ctx context.Context, spaceID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, channelIDsOfSpace, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getChannel = `-- name: GetChannel :one
 
 SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
@@ -383,4 +409,57 @@ func (q *Queries) SaveChannel(ctx context.Context, arg SaveChannelParams) error 
 		arg.ID,
 	)
 	return err
+}
+
+const shareChannel = `-- name: ShareChannel :one
+SELECT c.id, c.space_id, c.kind, c.name, c.topic, c.sort_key, c.operator_inherit, c.operator_agent_id, c.require_mention, c.thread_require_mention, c.free_response, c.auto_thread, c.allow_mentioned_agents, c.history_backfill_limit, c.prompt, c.forum_default_sort, c.default_notification_level, c.read_only, c.created_by, c.created_at, c.archived_at, c.version, c.settings_version, s.default_operator_agent_id AS space_operator_id,
+       (s.archived_at IS NOT NULL)::boolean AS space_archived, t.id AS main_thread_id
+FROM channels c
+LEFT JOIN spaces s ON s.id = c.space_id
+LEFT JOIN threads t ON t.channel_id = c.id AND t.kind = 'main'
+WHERE c.id = $1
+FOR SHARE OF c
+`
+
+type ShareChannelRow struct {
+	Channel         Channel
+	SpaceOperatorID pgtype.UUID
+	SpaceArchived   bool
+	MainThreadID    pgtype.UUID
+}
+
+// The channel held FOR SHARE while notify writes a preference on it or below it (M3-18); the
+// columns of GetChannel. The space row is not locked here: the caller shares it next.
+func (q *Queries) ShareChannel(ctx context.Context, id pgtype.UUID) (ShareChannelRow, error) {
+	row := q.db.QueryRow(ctx, shareChannel, id)
+	var i ShareChannelRow
+	err := row.Scan(
+		&i.Channel.ID,
+		&i.Channel.SpaceID,
+		&i.Channel.Kind,
+		&i.Channel.Name,
+		&i.Channel.Topic,
+		&i.Channel.SortKey,
+		&i.Channel.OperatorInherit,
+		&i.Channel.OperatorAgentID,
+		&i.Channel.RequireMention,
+		&i.Channel.ThreadRequireMention,
+		&i.Channel.FreeResponse,
+		&i.Channel.AutoThread,
+		&i.Channel.AllowMentionedAgents,
+		&i.Channel.HistoryBackfillLimit,
+		&i.Channel.Prompt,
+		&i.Channel.ForumDefaultSort,
+		&i.Channel.DefaultNotificationLevel,
+		&i.Channel.ReadOnly,
+		&i.Channel.CreatedBy,
+		&i.Channel.CreatedAt,
+		&i.Channel.ArchivedAt,
+		&i.Channel.Version,
+		&i.Channel.SettingsVersion,
+		&i.SpaceOperatorID,
+		&i.SpaceArchived,
+		&i.MainThreadID,
+	)
+	return i, err
 }

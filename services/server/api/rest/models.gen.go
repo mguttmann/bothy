@@ -5186,6 +5186,48 @@ func (e VariantPath) Valid() bool {
 	}
 }
 
+// Defines values for DeleteNotificationPreferenceParamsTargetKind.
+const (
+	DeleteNotificationPreferenceParamsTargetKindChannel DeleteNotificationPreferenceParamsTargetKind = "channel"
+	DeleteNotificationPreferenceParamsTargetKindSpace   DeleteNotificationPreferenceParamsTargetKind = "space"
+	DeleteNotificationPreferenceParamsTargetKindThread  DeleteNotificationPreferenceParamsTargetKind = "thread"
+)
+
+// Valid indicates whether the value is a known member of the DeleteNotificationPreferenceParamsTargetKind enum.
+func (e DeleteNotificationPreferenceParamsTargetKind) Valid() bool {
+	switch e {
+	case DeleteNotificationPreferenceParamsTargetKindChannel:
+		return true
+	case DeleteNotificationPreferenceParamsTargetKindSpace:
+		return true
+	case DeleteNotificationPreferenceParamsTargetKindThread:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutNotificationPreferenceParamsTargetKind.
+const (
+	PutNotificationPreferenceParamsTargetKindChannel PutNotificationPreferenceParamsTargetKind = "channel"
+	PutNotificationPreferenceParamsTargetKindSpace   PutNotificationPreferenceParamsTargetKind = "space"
+	PutNotificationPreferenceParamsTargetKindThread  PutNotificationPreferenceParamsTargetKind = "thread"
+)
+
+// Valid indicates whether the value is a known member of the PutNotificationPreferenceParamsTargetKind enum.
+func (e PutNotificationPreferenceParamsTargetKind) Valid() bool {
+	switch e {
+	case PutNotificationPreferenceParamsTargetKindChannel:
+		return true
+	case PutNotificationPreferenceParamsTargetKindSpace:
+		return true
+	case PutNotificationPreferenceParamsTargetKindThread:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessChangedEvent Durable event `access.changed`.
 type AccessChangedEvent struct {
 	Actor    *EventActor                 `json:"actor,omitempty"`
@@ -11784,7 +11826,7 @@ type QuietHoursList struct {
 
 // QuietHoursPayload defines model for QuietHoursPayload.
 type QuietHoursPayload struct {
-	// Rules Complete list after the change.
+	// Rules Complete list after the change, ascending by id.
 	Rules []QuietHoursRule `json:"rules"`
 }
 
@@ -11803,7 +11845,9 @@ type QuietHoursRule struct {
 	// Examples: 22:00
 	StartLocal string `json:"start_local"`
 
-	// TimeZone Examples: Europe/Berlin
+	// TimeZone IANA time zone name; absent means the person's time zone (users.time_zone).
+	//
+	// Examples: Europe/Berlin
 	TimeZone *string `json:"time_zone,omitempty"`
 	Version  int64   `json:"version"`
 
@@ -11823,7 +11867,9 @@ type QuietHoursRuleInput struct {
 	// StartLocal Examples: 22:00
 	StartLocal string `json:"start_local"`
 
-	// TimeZone Examples: Europe/Berlin
+	// TimeZone IANA time zone name; absent means the person's time zone (users.time_zone).
+	//
+	// Examples: Europe/Berlin
 	TimeZone *string `json:"time_zone,omitempty"`
 
 	// Weekdays Examples: 31
@@ -16060,8 +16106,20 @@ type ListMyMentionsParams struct {
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// DeleteNotificationPreferenceParamsTargetKind defines parameters for DeleteNotificationPreference.
+type DeleteNotificationPreferenceParamsTargetKind string
+
+// PutNotificationPreferenceParamsTargetKind defines parameters for PutNotificationPreference.
+type PutNotificationPreferenceParamsTargetKind string
+
 // UpdateMyProfileParams defines parameters for UpdateMyProfile.
 type UpdateMyProfileParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateQuietHoursRuleParams defines parameters for CreateQuietHoursRule.
+type CreateQuietHoursRuleParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -16505,11 +16563,20 @@ type CompleteIdentityLinkJSONRequestBody = IdentityLinkComplete
 // SetMyLocalCredentialJSONRequestBody defines body for SetMyLocalCredential for application/json ContentType.
 type SetMyLocalCredentialJSONRequestBody = LocalCredentialSet
 
+// PutNotificationPreferenceJSONRequestBody defines body for PutNotificationPreference for application/json ContentType.
+type PutNotificationPreferenceJSONRequestBody = NotificationPreferencePut
+
 // CompletePasskeyRegistrationJSONRequestBody defines body for CompletePasskeyRegistration for application/json ContentType.
 type CompletePasskeyRegistrationJSONRequestBody = PasskeyRegisterComplete
 
 // UpdateMyProfileJSONRequestBody defines body for UpdateMyProfile for application/json ContentType.
 type UpdateMyProfileJSONRequestBody = ProfileUpdate
+
+// CreateQuietHoursRuleJSONRequestBody defines body for CreateQuietHoursRule for application/json ContentType.
+type CreateQuietHoursRuleJSONRequestBody = QuietHoursRuleInput
+
+// PutQuietHoursRuleJSONRequestBody defines body for PutQuietHoursRule for application/json ContentType.
+type PutQuietHoursRuleJSONRequestBody = QuietHoursRuleInput
 
 // CreateExtensionSessionJSONRequestBody defines body for CreateExtensionSession for application/json ContentType.
 type CreateExtensionSessionJSONRequestBody = ExtensionSessionCreate

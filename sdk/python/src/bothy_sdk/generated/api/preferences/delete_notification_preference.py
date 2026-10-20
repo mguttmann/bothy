@@ -85,6 +85,10 @@ def sync_detailed(
 ) -> Response[Any | Problem]:
     """Inherit the notification level again
 
+     Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is
+    stored (then without event); deleting stays possible on an archived target. A later put starts again
+    at version 1.
+
     Args:
         target_kind (DeleteNotificationPreferenceTargetKind):
         target_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -117,6 +121,10 @@ def sync(
 ) -> Any | Problem | None:
     """Inherit the notification level again
 
+     Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is
+    stored (then without event); deleting stays possible on an archived target. A later put starts again
+    at version 1.
+
     Args:
         target_kind (DeleteNotificationPreferenceTargetKind):
         target_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -143,6 +151,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[Any | Problem]:
     """Inherit the notification level again
+
+     Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is
+    stored (then without event); deleting stays possible on an archived target. A later put starts again
+    at version 1.
 
     Args:
         target_kind (DeleteNotificationPreferenceTargetKind):
@@ -173,6 +185,10 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> Any | Problem | None:
     """Inherit the notification level again
+
+     Removes the caller's level on the target, so it inherits again. Answers 204 also when no row is
+    stored (then without event); deleting stays possible on an archived target. A later put starts again
+    at version 1.
 
     Args:
         target_kind (DeleteNotificationPreferenceTargetKind):
