@@ -122,6 +122,9 @@ final class FakeApi implements TerminalServerApi {
   /// Answers to attach in order before the grant: an error to throw, or null for the grant.
   final List<Object?> attachErrors = [];
   Object? openError;
+
+  /// When set, openSession waits for it before it answers.
+  Completer<void>? openGate;
   int tokens = 0;
 
   Host currentHost() => Host(
@@ -195,6 +198,7 @@ final class FakeApi implements TerminalServerApi {
   ) async {
     log.add('open');
     opens.add(request);
+    await openGate?.future;
     final error = openError;
     if (error != null) throw error;
     return grant();
@@ -254,6 +258,7 @@ final class Harness {
       stepUp: ({required purposeText}) async {
         log.add('stepUp');
         h.stepUps.add(purposeText);
+        await h.stepUpGate?.future;
         if (cancelStepUp) throw const StepUpCancelled();
       },
       links: h.links,
@@ -281,6 +286,9 @@ final class Harness {
   final FakeLinks links = FakeLinks();
   final FakeClock clock = FakeClock();
   final List<String> stepUps = [];
+
+  /// When set, the step-up waits for it.
+  Completer<void>? stepUpGate;
   final List<void Function()> ticks = [];
 
   /// Runs every scheduled frame tick.

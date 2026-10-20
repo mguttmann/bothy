@@ -139,12 +139,14 @@ final class TerminalController extends ChangeNotifier {
       _rows = rows;
       _set(const TerminalTabState(phase: TerminalPhase.preparing));
       final checked = await _prepare(host.value);
+      _alive();
       if (checked == null) return _set(TerminalTabState.initial);
       final h = checked.host;
       final choice = await _prompts.confirmOpen(
         h,
         OpenChoice(profile: profile, workdirIndex: workdirIndex),
       );
+      _alive();
       if (choice == null) return _set(TerminalTabState.initial);
       _set(
         _state.copyWith(
@@ -153,7 +155,9 @@ final class TerminalController extends ChangeNotifier {
         ),
       );
       final hash = await _freshKeyHash();
+      _alive();
       await _stepUp(purposeText: _prompts.stepUpPurpose(h, StepUpPurpose.open));
+      _alive();
       final grant = await _api.openSession(
         h.id,
         TerminalSessionOpen(
@@ -166,6 +170,13 @@ final class TerminalController extends ChangeNotifier {
             ..pinChanged = checked.pinChanged ? true : null,
         ),
       );
+      if (_disposed) {
+        // The tab closed while the server opened the session: nobody could reach it any
+        // more, so it is closed right away.
+        _dropKey();
+        await _closeQuietly(grant.session.id);
+        return;
+      }
       _set(
         _state.copyWith(
           sessionId: grant.session.id,
@@ -175,7 +186,7 @@ final class TerminalController extends ChangeNotifier {
       );
       _watchHost(h.id);
       if (!await _grantMatches(grant, h)) return;
-      await _connect(grant, h, checked);
+      await _connect(grant, h, checked, opening: true);
     } on StepUpCancelled {
       _dropKey();
       _set(TerminalTabState.initial);
@@ -201,6 +212,7 @@ final class TerminalController extends ChangeNotifier {
     try {
       _set(_state.copyWith(phase: TerminalPhase.preparing, clearCauses: true));
       final checked = await _prepare(host.id);
+      _alive();
       if (checked == null) return _set(before);
       final h = checked.host;
       _set(_state.copyWith(phase: TerminalPhase.connecting));
@@ -215,6 +227,7 @@ final class TerminalController extends ChangeNotifier {
       final purpose = _prompts.stepUpPurpose(h, StepUpPurpose.attach);
       if (before.detachCause == DetachCause.tokenStale) {
         await _stepUp(purposeText: purpose);
+        _alive();
       }
       TerminalSessionGrant grant;
       try {
@@ -223,10 +236,13 @@ final class TerminalController extends ChangeNotifier {
         if (_problemOf(e)?.code != 'step_up_required') rethrow;
         // The server decides whether a step-up is needed (24 6.2); one retry after it.
         await _stepUp(purposeText: purpose);
+        _alive();
         grant = await _api.attachSession(sessionId, request);
       }
+      // A closed tab leaves an attached session detached, as "Detach" would.
+      _alive();
       if (!await _grantMatches(grant, h)) return;
-      await _connect(grant, h, checked);
+      await _connect(grant, h, checked, opening: false);
     } on StepUpCancelled {
       _dropKey();
       _set(before);
@@ -371,8 +387,10 @@ final class TerminalController extends ChangeNotifier {
   Future<void> _connect(
     TerminalSessionGrant grant,
     Host host,
-    _Checked checked,
-  ) async {
+    _Checked checked, {
+    required bool opening,
+  }) async {
+    if (_disposed) throw const _Disposed();
     final generation = ++_generation;
     final TerminalChannel channel;
     try {
@@ -385,6 +403,12 @@ final class TerminalController extends ChangeNotifier {
           detachCause: DetachCause.connectionLost,
         ),
       );
+    }
+    if (_disposed) {
+      _dropKey();
+      await channel.close();
+      if (opening) await _closeQuietly(grant.session.id);
+      return;
     }
     if (generation != _generation || _state.phase != TerminalPhase.connecting) {
       _dropKey();
@@ -576,7 +600,7 @@ final class TerminalController extends ChangeNotifier {
 
   void _watchHost(String hostId) {
     final events = _events;
-    if (events == null || _hostChanges != null) return;
+    if (events == null || _hostChanges != null || _disposed) return;
     _hostChanges = events.watch(hostId).listen((change) {
       if (change is TerminalSessionUpdated &&
           change.closed &&
@@ -619,6 +643,19 @@ final class TerminalController extends ChangeNotifier {
     );
   }
 
+  // Throws when the tab was disposed during an await, so open and attach stop there.
+  void _alive() {
+    if (_disposed) throw const _Disposed();
+  }
+
+  Future<void> _closeQuietly(String sessionId) async {
+    try {
+      await _api.closeSession(sessionId);
+    } on Object {
+      // The server ends an unused opening after terminal.open_timeout anyway.
+    }
+  }
+
   void _dropKey() {
     final key = _ephemeral;
     _ephemeral = null;
@@ -653,6 +690,11 @@ final class TerminalController extends ChangeNotifier {
 }
 
 enum _Stage { hello, message2, frames }
+
+/// Ends an opening or attaching after the controller was disposed.
+final class _Disposed implements Exception {
+  const _Disposed();
+}
 
 final class _Checked {
   const _Checked(this.host, {required this.writePin, required this.pinChanged});

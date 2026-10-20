@@ -5,6 +5,7 @@
 // returned key, `exit`, detach and reattach with the replay, the stream close codes, the
 // coalesced `resize`, and the step-up of attach.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -330,5 +331,34 @@ void main() {
     await h.host.close(4100, 'process_exited');
     await h.settle();
     expect(notified, 0);
+  });
+
+  test('dispose during the step-up opens nothing', () async {
+    final h = await Harness.create();
+    h.stepUpGate = Completer<void>();
+    final opening = h.open();
+    await h.settle();
+    expect(h.log, ['getHost', 'stepUp']);
+    h.controller.dispose();
+    h.stepUpGate!.complete();
+    await opening;
+    await h.settle();
+    expect(h.api.opens, isEmpty);
+    expect(h.transport.connected, isEmpty);
+  });
+
+  test('dispose while the server opens closes the new session and connects nothing', () async {
+    final h = await Harness.create();
+    h.api.openGate = Completer<void>();
+    final opening = h.open();
+    await h.settle();
+    expect(h.log, ['getHost', 'stepUp', 'open']);
+    h.controller.dispose();
+    h.api.openGate!.complete();
+    await opening;
+    await h.settle();
+    expect(h.api.closes, [sessionIdText]);
+    expect(h.transport.connected, isEmpty);
+    expect(h.host.frames, isEmpty);
   });
 }
