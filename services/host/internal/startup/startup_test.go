@@ -306,6 +306,9 @@ func TestDoctorCommandInRunningService(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() { done <- s.Serve(ctx) }()
+	// The entry scans of the start read the fake file system in the background; they finish
+	// before the test changes it.
+	s.Runner().WaitScans()
 	// An HD11 finding blocks only its session user; the service stays.
 	x.w.Node("/home/" + alex).Sec.Mode = 0o755
 	a := askDoctor(t, path)
