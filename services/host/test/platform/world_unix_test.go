@@ -5,6 +5,7 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,7 +62,9 @@ func claudeCmd(dir string, args ...string) string {
 
 // pidAlive reports whether pid exists and is no zombie.
 func pidAlive(pid int) bool {
-	out, err := exec.Command("/bin/ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output() //nolint:gosec // a number
+	ctx, cancel := context.WithTimeout(context.Background(), waitShort)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "/bin/ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output() //nolint:gosec // a number
 	if err != nil {
 		return false
 	}
@@ -102,7 +105,7 @@ func setLoginEnv(t *testing.T, user string, e loginEnv) {
 		b.WriteString("export CLAUDE_CODE_OAUTH_TOKEN=\"$(cat '" + e.TokenFile + "')\"\n")
 	}
 	p := loginFile(user)
-	if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte(b.String()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	chownTo(t, p, user)
@@ -187,7 +190,7 @@ func helperPID(t *testing.T, user string) int {
 // startAs starts args as user in the background and returns its stop.
 func startAs(t *testing.T, user string, args ...string) func() {
 	t.Helper()
-	cmd := exec.Command("/usr/bin/sudo", append([]string{"-n", "-u", user, "--"}, args...)...) //nolint:gosec // commands of the suite
+	cmd := exec.CommandContext(context.WithoutCancel(context.Background()), "/usr/bin/sudo", append([]string{"-n", "-u", user, "--"}, args...)...) //nolint:gosec // commands of the suite
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -244,12 +247,12 @@ func normalIdentity(s string) string { return strings.TrimSpace(s) }
 // openForAll creates p, if missing, writable by every user: the start log, which every session
 // user's fake claude appends to.
 func openForAll(p string) error {
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY, 0o666)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY, 0o666) //nolint:gosec // G302, G304: the start log every session user appends to
 	if err != nil {
 		return err
 	}
 	_ = f.Close()
-	return os.Chmod(p, 0o666)
+	return os.Chmod(p, 0o666) //nolint:gosec // G302: every session user appends to it
 }
 
 // sharedBin is a folder in the PATH of every account, the service user included (systemd's

@@ -19,7 +19,7 @@ import (
 
 // tokenCanary is the subscription token of Robin's login shell in TM-T25; it must never leave
 // her session user.
-const tokenCanary = "EXAMPLE-OAUTH-TOKEN-CANARY-91c4"
+const tokenCanary = "EXAMPLE-OAUTH-TOKEN-CANARY-91c4" //nolint:gosec // G101: a canary of the test, no credential
 
 // forbiddenEnv are the variables the claude profile with organization never sets (09 18.3).
 var forbiddenEnv = []string{"ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_PROFILE", "CLAUDE_CODE_USE_BEDROCK",
@@ -37,11 +37,11 @@ func hasName(names []string, n string) bool {
 	return false
 }
 
-// claudeOffered waits for a report that offers claude with n working directories of sessionUser.
-func claudeOffered(w *world, sessionUser string, n int) sessiontest.Report {
+// claudeOffered waits for a report that offers claude with one working directory of sessionUser.
+func claudeOffered(w *world, sessionUser string) {
 	w.t.Helper()
-	return w.report(0, "the claude profile", func(r sessiontest.Report) bool {
-		return r.HasProfile("claude") && len(r.Workdirs(sessionUser)) == n
+	w.report(0, "the claude profile", func(r sessiontest.Report) bool {
+		return r.HasProfile("claude") && len(r.Workdirs(sessionUser)) == 1
 	})
 }
 
@@ -66,15 +66,15 @@ func TestPlatform_TMT29g_Token(t *testing.T) {
 	mkdirOwned(t, wa, userA)
 	w := newWorld(t, "organization", claudeYAML(t)+workdirsYAML(map[string][][2]string{userA: {{"Alex", wa}}}), userA)
 	writeAPIKey(t)
-	claudeOffered(w, userA, 1)
+	claudeOffered(w, userA)
 	for _, wdi := range []int{1, 9} {
-		w.refused(claudeOf(userA, wdi), codeHandshakeFail, "profile_unknown")
+		w.refused(claudeOf(userA, wdi), "profile_unknown")
 	}
 	if len(interactiveStarts(t)) != 0 {
 		t.Fatal("a refused token started claude")
 	}
 	s := w.open(claudeOf(userA, 0))
-	e := waitInteractive(t, 1)[0]
+	e := firstInteractive(t)
 	if !samePath(realPath(e["cwd"]), realPath(wa)) {
 		t.Error("claude did not start in the working directory of wdi 0")
 	}
@@ -99,7 +99,7 @@ func TestPlatform_TMT29c_Open(t *testing.T) {
 	track(t)
 	resetStartLog(t)
 	shared, wa, further := programDir("work-shared"), programDir("work-alex"), programDir("work-sam-further")
-	if err := os.MkdirAll(shared, 0o755); err != nil {
+	if err := os.MkdirAll(shared, 0o755); err != nil { //nolint:gosec // G301: both session users must reach it
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(shared) })
@@ -117,7 +117,7 @@ func TestPlatform_TMT29c_Open(t *testing.T) {
 		t.Errorf("reported lists %v and %v, want [Alex] and [Further]", r.Workdirs(userA), r.Workdirs(userB))
 	}
 	s := w.open(claudeOf(userB, 0))
-	if e := waitInteractive(t, 1)[0]; !samePath(realPath(e["cwd"]), realPath(further)) {
+	if e := firstInteractive(t); !samePath(realPath(e["cwd"]), realPath(further)) {
 		t.Error("index 0 of Sam did not start claude in his further directory")
 	}
 	exitClaude(s)
@@ -135,18 +135,18 @@ func TestPlatform_TMT29a_Session(t *testing.T) {
 	mkdirOwned(t, wb, userB)
 	w := newWorld(t, "organization", claudeYAML(t)+workdirsYAML(map[string][][2]string{userA: {{"Alex", wa}}, userB: {{"Sam", wb}}}), userA, userB)
 	writeAPIKey(t)
-	claudeOffered(w, userB, 1)
+	claudeOffered(w, userB)
 	running := w.open(shellOf(userB))
 	hook := canary(t, programDir("canary"), "hook-canary")
 	keyHelper := canary(t, programDir("canary"), "key-helper-canary")
 	makeWritableBy(t, wb, userA)
 	settings := filepath.Join(wb, ".claude")
-	if err := os.MkdirAll(settings, 0o755); err != nil {
+	if err := os.MkdirAll(settings, 0o755); err != nil { //nolint:gosec // G301: Sam's claude must read it
 		t.Fatal(err)
 	}
 	chownTo(t, settings, userA)
 	body := `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"` + jsonPath(hook) + `"}]}]},"apiKeyHelper":"` + jsonPath(keyHelper) + `"}`
-	if err := os.WriteFile(filepath.Join(settings, "settings.json"), []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(settings, "settings.json"), []byte(body), 0o644); err != nil { //nolint:gosec // G306: Sam's claude must read it
 		t.Fatal(err)
 	}
 	chownTo(t, filepath.Join(settings, "settings.json"), userA)
@@ -154,9 +154,9 @@ func TestPlatform_TMT29a_Session(t *testing.T) {
 	if e := w.openFails(claudeOf(userB, 0)); e.CloseReason != reasonOpenFailed || e.CloseDetail != "shared_location" {
 		t.Errorf("Sam's opening ended %s %s, want open_failed shared_location", e.CloseReason, e.CloseDetail)
 	}
-	running.expectEnd(reasonPolicy, "shared_location")
-	r := w.report(mark, "HD11 of Sam", func(r sessiontest.Report) bool { return failedFor(r, hd.HD11, userB) })
-	if failedFor(r, hd.HD11, userA) {
+	running.expectPolicyEnd("shared_location")
+	r := w.report(mark, "HD11 of Sam", func(r sessiontest.Report) bool { return hd11Failed(r, userB) })
+	if hd11Failed(r, userA) {
 		t.Error("report blames Alex's session user")
 	}
 	if ran(t, hook) || ran(t, keyHelper) {
@@ -182,10 +182,10 @@ func TestPlatform_TMT29f_Operation(t *testing.T) {
 	a, b := w.open(shellOf(userA)), w.open(shellOf(userB))
 	mark := w.srv.ReportCount()
 	makeWritableBy(t, tool, userA)
-	a.expectEnd(reasonPolicy, "shared_location")
-	b.expectEnd(reasonPolicy, "shared_location")
-	r := w.report(mark, "HD11 for all", func(r sessiontest.Report) bool { return failedFor(r, hd.HD11, "") })
-	if failedFor(r, hd.HD11, userA) || failedFor(r, hd.HD11, userB) {
+	a.expectPolicyEnd("shared_location")
+	b.expectPolicyEnd("shared_location")
+	r := w.report(mark, "HD11 for all", func(r sessiontest.Report) bool { return hd11Failed(r, "") })
+	if hd11Failed(r, userA) || hd11Failed(r, userB) {
 		t.Error("report names a session user for a location for all")
 	}
 	if e := w.openFails(shellOf(userB)); e.CloseReason != reasonOpenFailed || e.CloseDetail != "shared_location" {
@@ -193,7 +193,7 @@ func TestPlatform_TMT29f_Operation(t *testing.T) {
 	}
 	mark = w.srv.ReportCount()
 	revokeWrite(t, tool, userA)
-	w.report(mark, "HD11 passing again", func(r sessiontest.Report) bool { return !failedFor(r, hd.HD11, "") })
+	w.report(mark, "HD11 passing again", func(r sessiontest.Report) bool { return !hd11Failed(r, "") })
 	w.open(shellOf(userA)).closeByClient()
 	w.open(shellOf(userB)).closeByClient()
 }
@@ -208,12 +208,12 @@ func TestPlatform_TMT29k(t *testing.T) {
 	fake := fakeClaude(t)
 	wr, outside := programDir("work-robin"), programDir("outside-config")
 	mkdirOwned(t, wr, userC)
-	if err := os.MkdirAll(outside, 0o755); err != nil {
+	if err := os.MkdirAll(outside, 0o755); err != nil { //nolint:gosec // G301: an existing folder Robin can reach
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(outside) })
 	w := newWorld(t, "personal", "  profiles: [shell, claude]\n"+workdirsYAML(map[string][][2]string{userC: {{"Robin", wr}}}), userC)
-	claudeOffered(w, userC, 1)
+	claudeOffered(w, userC)
 	link, dangling, inside := filepath.Join(home(userC), "cfg-link"), filepath.Join(home(userC), "cfg-dangling"), filepath.Join(home(userC), "cfg-inside")
 	symlinkOf(t, userC, outside, link)
 	symlinkOf(t, userC, filepath.Join(home(userC), "cfg-missing"), dangling)
@@ -233,7 +233,7 @@ func TestPlatform_TMT29k(t *testing.T) {
 	t.Run("folder in the home", func(t *testing.T) {
 		setLoginEnv(t, userC, loginEnv{PathDir: filepath.Dir(fake), ConfigDir: inside})
 		s := w.open(claudeOf(userC, 0))
-		if e := waitInteractive(t, 1)[0]; !samePath(realPath(e["config_dir"]), realPath(inside)) {
+		if e := firstInteractive(t); !samePath(realPath(e["config_dir"]), realPath(inside)) {
 			t.Error("claude did not get exactly the folder in the home as CLAUDE_CONFIG_DIR")
 		}
 		exitClaude(s)
@@ -253,7 +253,7 @@ func TestPlatform_TMT25(t *testing.T) {
 	wr := programDir("work-robin")
 	mkdirOwned(t, wr, userC)
 	w := newWorld(t, "personal", "  profiles: [shell, claude]\n"+workdirsYAML(map[string][][2]string{userC: {{"Robin", wr}}}), userC)
-	claudeOffered(w, userC, 1)
+	claudeOffered(w, userC)
 	tokenFile := writeSecretOf(t, userC, ".bothy-platform-token", tokenCanary)
 	setLoginEnv(t, userC, loginEnv{PathDir: filepath.Dir(fake), TokenFile: tokenFile})
 	stopTrace, traced := traceService(t)
@@ -264,7 +264,7 @@ func TestPlatform_TMT25(t *testing.T) {
 	}
 	shell.closeByClient()
 	s := w.open(claudeOf(userC, 0))
-	e := waitInteractive(t, 1)[0]
+	e := firstInteractive(t)
 	if !hasName(envNames(e), "CLAUDE_CODE_OAUTH_TOKEN") {
 		t.Error("claude with personal did not get the token of Robin's login shell")
 	}
@@ -313,9 +313,9 @@ func TestPlatform_TMT29l(t *testing.T) {
 	w := newWorld(t, "organization", claudeYAML(t)+workdirs, userB)
 	setLoginEnv(t, userB, loginEnv{PathDir: filepath.Dir(own)})
 	writeAPIKey(t)
-	claudeOffered(w, userB, 1)
+	claudeOffered(w, userB)
 	s := w.open(claudeOf(userB, 0))
-	waitInteractive(t, 1)
+	firstInteractive(t)
 	exitClaude(s)
 	if !ran(t, fake) || ran(t, shared) || ran(t, own) {
 		t.Errorf("started: host_service.claude_bin %v, canary in the shared PATH %v, canary in Sam's PATH %v", ran(t, fake), ran(t, shared), ran(t, own))
@@ -332,10 +332,10 @@ func TestPlatform_TMT29l(t *testing.T) {
 				t.Fatalf("this runner has node in %s, which is in the search list of HD6; the case needs a runner without it", d)
 			}
 		}
-		if err := os.MkdirAll(filepath.Dir(claudeBin), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(claudeBin), 0o755); err != nil { //nolint:gosec // G301: the folder of a program
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(claudeBin, []byte("#!/usr/bin/env node\n"), 0o755); err != nil {
+		if err := os.WriteFile(claudeBin, []byte("#!/usr/bin/env node\n"), 0o755); err != nil { //nolint:gosec // G306: a program
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = os.Remove(claudeBin) })
@@ -349,7 +349,7 @@ func TestPlatform_TMT29l(t *testing.T) {
 	if !r.Has(hd.HD6, hd.CodeAuthStatusUnchecked) {
 		t.Error("report lacks auth_status_unchecked")
 	}
-	w.refused(claudeOf(userB, 0), codeHandshakeFail, "profile_unknown")
+	w.refused(claudeOf(userB, 0), "profile_unknown")
 	if ran(t, node) {
 		t.Error("the node canary ran")
 	}

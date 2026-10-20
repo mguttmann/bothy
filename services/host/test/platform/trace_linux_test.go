@@ -5,6 +5,7 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +25,7 @@ func traceService(t *testing.T) (func() string, bool) {
 		t.Fatal("host service not running")
 	}
 	out := filepath.Join(t.TempDir(), "service.trace")
-	cmd := exec.Command("/usr/bin/strace", "-f", "-qq", "-s", "65535", "-o", out, //nolint:gosec // the trace of the suite
+	cmd := exec.CommandContext(context.WithoutCancel(context.Background()), "/usr/bin/strace", "-f", "-qq", "-s", "65535", "-o", out, //nolint:gosec // the trace of the suite
 		"-e", "trace=open,openat,openat2,read,write,readv,writev,sendto,recvfrom,sendmsg,recvmsg", "-p", strconv.Itoa(pid))
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("strace: %v", err)
@@ -43,7 +44,7 @@ func traceService(t *testing.T) (func() string, bool) {
 			_ = cmd.Process.Signal(syscall.SIGINT)
 			_ = cmd.Wait()
 		}
-		b, _ := os.ReadFile(out)
+		b, _ := os.ReadFile(out) //nolint:gosec // G304: the trace of the suite
 		return string(b)
 	}
 	t.Cleanup(func() { stop() })

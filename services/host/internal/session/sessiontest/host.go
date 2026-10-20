@@ -450,6 +450,12 @@ func (h *HostServer) live() (*Conn, bool) {
 	return h.cur, h.reported
 }
 
+// Connected reports whether a control connection is logged in.
+func (h *HostServer) Connected() bool {
+	c, _ := h.live()
+	return c != nil
+}
+
 // WaitReady waits until a control connection is logged in and the host sent its report after the
 // last ready, the point from which session.open is allowed.
 func (h *HostServer) WaitReady(ctx context.Context) error {

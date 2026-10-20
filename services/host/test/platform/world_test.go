@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	hd "github.com/OWNER/bothy/services/host/internal/doctor"
 	"github.com/OWNER/bothy/services/host/internal/frame"
 	"github.com/OWNER/bothy/services/host/internal/noise"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
@@ -69,7 +70,7 @@ const (
 )
 
 // apiKeyCanary is the content of claude_api_key; only its SHA-256 may reach the start log.
-const apiKeyCanary = "EXAMPLE-API-KEY-CANARY-3b1d"
+const apiKeyCanary = "EXAMPLE-API-KEY-CANARY-3b1d" //nolint:gosec // G101: a canary of the test, no credential
 
 // world is one installed and paired host service with the fake server.
 type world struct {
@@ -89,7 +90,7 @@ func newWorld(t *testing.T, decl, extra string, users ...string) *world {
 	w := &world{t: t, ctx: ctx, srv: sessiontest.NewHostServer(t, sessiontest.HostOptions{Code: pairingCode, Declaration: decl})}
 	installed(t, extra, users...)
 	ca := filepath.Join(t.TempDir(), "server-ca.pem")
-	if err := os.WriteFile(ca, w.srv.CAPEM(), 0o644); err != nil {
+	if err := os.WriteFile(ca, w.srv.CAPEM(), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if out, code := host("pair", "--server", w.srv.URL, "--code", pairingCode, "--ca-file", ca); code != 0 {
@@ -161,15 +162,6 @@ func (w *world) lastReport() sessiontest.Report {
 		w.t.Fatal("no report yet")
 	}
 	return rs[len(rs)-1]
-}
-
-// setDeclaration sends a further ready with decl and waits for the report that follows it.
-func (w *world) setDeclaration(decl string) {
-	w.t.Helper()
-	if err := w.srv.SetDeclaration(w.ctx, decl); err != nil {
-		w.t.Fatal(err)
-	}
-	w.waitReady()
 }
 
 // opening describes one session.open with its token.
@@ -252,9 +244,11 @@ func (w *world) handshake(o opening) (*tsess, int, string) {
 	return s, 0, ""
 }
 
-// refused opens o and expects the refusal of the handshake with code and detail, without a PTY:
-// no session.started and no session.ended (the host service reports nothing for a refusal).
-func (w *world) refused(o opening, code int, detail string) {
+// refused opens o and expects the refusal of the handshake with 4104 and detail, without a PTY:
+// no session.started and no session.ended (the host service reports nothing for a refusal). The
+// details of the platform tests are all 4104 details (24 5.3 table).
+func (w *world) refused(o opening, detail string) {
+	const code = codeHandshakeFail
 	w.t.Helper()
 	s, got, reason := w.handshake(o)
 	if s.dev != nil {
@@ -381,6 +375,8 @@ func (s *tsess) readOne(ctx context.Context) bool {
 	case frame.TypeExit:
 		c := f.ExitCode
 		s.exit = &c
+	case frame.TypeReplayBegin, frame.TypeReplayEnd, frame.TypeStart, frame.TypeResize, frame.TypeClose:
+		// No output: the replay markers frame the scrollback; the others never come from the host.
 	}
 	return true
 }
@@ -428,10 +424,11 @@ func (s *tsess) closeByClient() {
 	s.serverEnd()
 }
 
-// expectEnd waits for session.ended with reason and detail, then ends the data connection as the
-// server does.
-func (s *tsess) expectEnd(reason, detail string) {
+// expectPolicyEnd waits for session.ended with host_policy_violation and detail, then ends the
+// data connection as the server does.
+func (s *tsess) expectPolicyEnd(detail string) {
 	s.w.t.Helper()
+	const reason = reasonPolicy
 	e := s.ended()
 	if e.CloseReason != reason || e.CloseDetail != detail {
 		s.w.t.Errorf("session of %s ended %s %s, want %s %s", s.o.osu, e.CloseReason, e.CloseDetail, reason, detail)
@@ -488,7 +485,7 @@ func waitGone(t *testing.T, what string, pids []int) {
 // checkout, which a session user cannot reach on a hosted runner).
 var (
 	fakeOnce sync.Once
-	fakeErr  error
+	errFake  error
 )
 
 // fakeDir is the folder of the fake programs and the start log.
@@ -497,9 +494,9 @@ func fakeDir() string { return programDir("fake") }
 // fakeClaude returns the path of the fake claude, built on first use.
 func fakeClaude(t *testing.T) string {
 	t.Helper()
-	fakeOnce.Do(func() { fakeErr = buildFake() })
-	if fakeErr != nil {
-		t.Fatalf("build the fake claude: %v", fakeErr)
+	fakeOnce.Do(func() { errFake = buildFake() })
+	if errFake != nil {
+		t.Fatalf("build the fake claude: %v", errFake)
 	}
 	return filepath.Join(fakeDir(), exeName("claude"))
 }
@@ -508,14 +505,16 @@ func fakeClaude(t *testing.T) string {
 func startLogPath() string { return filepath.Join(fakeDir(), "claude-starts.log") }
 
 func buildFake() error {
-	if err := os.MkdirAll(fakeDir(), 0o755); err != nil {
+	if err := os.MkdirAll(fakeDir(), 0o755); err != nil { //nolint:gosec // G301: every session user runs the programs in it
 		return err
 	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("go", "build", "-ldflags", "-X 'main.startLog="+startLogPath()+"'", //nolint:gosec // the build of the suite
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "build", "-ldflags", "-X 'main.startLog="+startLogPath()+"'", //nolint:gosec // the build of the suite
 		"-o", filepath.Join(fakeDir(), exeName("claude")), "./testdata/fakeclaude")
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -556,17 +555,17 @@ func interactiveStarts(t *testing.T) []map[string]string {
 	return out
 }
 
-// waitInteractive waits for n interactive entries in the start log.
-func waitInteractive(t *testing.T, n int) []map[string]string {
+// firstInteractive waits for the first interactive entry in the start log.
+func firstInteractive(t *testing.T) map[string]string {
 	t.Helper()
 	deadline := time.Now().Add(waitShort)
 	for time.Now().Before(deadline) {
-		if e := interactiveStarts(t); len(e) >= n {
-			return e
+		if e := interactiveStarts(t); len(e) > 0 {
+			return e[0]
 		}
 		time.Sleep(pollEvery)
 	}
-	t.Fatalf("the fake claude logged fewer than %d interactive starts", n)
+	t.Fatal("the fake claude logged no interactive start")
 	return nil
 }
 
@@ -655,7 +654,7 @@ func noCanaryIn(t *testing.T, w *world, dir, canary string) {
 		if err != nil || d.IsDir() {
 			return nil
 		}
-		if b, err := os.ReadFile(p); err == nil && bytes.Contains(b, []byte(canary)) {
+		if b, err := os.ReadFile(p); err == nil && bytes.Contains(b, []byte(canary)) { //nolint:gosec // G304: the files of the state directory
 			t.Errorf("the canary is in the state directory (file %s)", d.Name())
 		}
 		return nil
@@ -667,11 +666,11 @@ func noCanaryIn(t *testing.T, w *world, dir, canary string) {
 	}
 }
 
-// failedFor reports a failed entry of check that names sessionUser ("" for an entry without a
-// session user name, a location for all).
-func failedFor(r sessiontest.Report, check, sessionUser string) bool {
+// hd11Failed reports a failed HD11 entry that names sessionUser ("" for an entry without a session
+// user name, a location for all).
+func hd11Failed(r sessiontest.Report, sessionUser string) bool {
 	return slices.ContainsFunc(r.Doctor, func(c sessiontest.ReportCheck) bool {
-		return c.Check == check && !c.OK && c.SessionUser == sessionUser
+		return c.Check == hd.HD11 && !c.OK && c.SessionUser == sessionUser
 	})
 }
 
@@ -695,4 +694,9 @@ func realPath(p string) string {
 		return r
 	}
 	return p
+}
+
+// anyFailed reports any failed entry of check.
+func anyFailed(r sessiontest.Report, check string) bool {
+	return slices.ContainsFunc(r.Doctor, func(c sessiontest.ReportCheck) bool { return c.Check == check && !c.OK })
 }

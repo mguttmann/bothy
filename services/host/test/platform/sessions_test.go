@@ -71,7 +71,7 @@ func TestPlatform_PTYRunsAsSessionUser(t *testing.T) {
 func TestPlatform_TMT28c(t *testing.T) {
 	track(t)
 	w := newWorld(t, "organization", "", userA, userB)
-	w.refused(shellOf(userC), codeHandshakeFail, "session_user_unknown")
+	w.refused(shellOf(userC), "session_user_unknown")
 	s := w.open(shellOf(userA))
 	s.closeByClient()
 	if got := bindingOf(t, userA); got != subAlex {
@@ -80,13 +80,13 @@ func TestPlatform_TMT28c(t *testing.T) {
 	// Sam with Alex's session user: the assignment changed in the database bypassing the server.
 	samOnAlex := shellOf(userA)
 	samOnAlex.mut = func(c map[string]any) { c["sub"] = subSam }
-	w.refused(samOnAlex, codeHandshakeFail, "session_user_mismatch")
+	w.refused(samOnAlex, "session_user_mismatch")
 	if got := bindingOf(t, userA); got != subAlex {
 		t.Error("a refused opening changed the binding")
 	}
 	notOwner := shellOf(userB)
 	notOwner.mut = func(c map[string]any) { c["own"] = false }
-	w.refused(notOwner, codeHandshakeFail, "server_host_owner_only")
+	w.refused(notOwner, "server_host_owner_only")
 }
 
 // TestPlatform_TMT28d (TM-T28 (d), macOS): with organization and an empty host_service.claude_bin

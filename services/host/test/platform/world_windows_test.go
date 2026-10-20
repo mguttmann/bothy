@@ -202,7 +202,7 @@ func serviceLog() (string, bool) { return "", false }
 // openForAll creates p, if missing, and lets the group Users modify it: the start log, which
 // every session user's fake claude appends to.
 func openForAll(p string) error {
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY, 0o666)
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY, 0o666) //nolint:gosec // G302, G304: the start log every session user appends to
 	if err != nil {
 		return err
 	}
@@ -214,4 +214,4 @@ func openForAll(p string) error {
 }
 
 // sharedBin is a folder in the system PATH of every account and service.
-func sharedBin() string { return os.Getenv("SystemRoot") }
+func sharedBin() string { return os.Getenv("SystemRoot") } //nolint:forbidigo // the folder of the system the suite runs on

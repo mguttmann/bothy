@@ -229,6 +229,13 @@ func TestHostServerReconnect(t *testing.T) {
 	first, _ := login(t, ctx, h, st, []string{})
 	first.next(ctx) // ready
 	_ = first.ws.Close(websocket.StatusNormalClosure, "")
+	deadline := time.Now().Add(10 * time.Second)
+	for h.Connected() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if h.Connected() {
+		t.Fatal("a closed control connection still counts as connected")
+	}
 	second, _ := login(t, ctx, h, st, []string{"0192f4a0-0000-7000-8000-0000000000e2"})
 	if op, d := second.next(ctx); op != "ready" || !strings.Contains(string(d), "personal") {
 		t.Fatalf("ready on the second connection %s %s", op, d)
