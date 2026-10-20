@@ -24,10 +24,10 @@ import (
 // passed with wait steps before).
 const checkWait = 90 * time.Second
 
-// poll runs f every pollEvery until it returns no mismatch or the deadline passes, and returns the
+// poll runs f every pollEvery until it returns no mismatch or checkWait passes, and returns the
 // last mismatches.
-func (w *instance) poll(limit time.Duration, f func() []string) []string {
-	ctx, cancel := w.deadline(limit)
+func (w *instance) poll(f func() []string) []string {
+	ctx, cancel := w.deadline(checkWait)
 	defer cancel()
 	for {
 		msgs := f()
@@ -47,19 +47,19 @@ func (w *instance) check(s Step) []string {
 	exp := *s.Expect
 	switch s.Check {
 	case "session":
-		return w.poll(checkWait, func() []string { return w.checkSession(s, exp) })
+		return w.poll(func() []string { return w.checkSession(s, exp) })
 	case "host":
-		return w.poll(checkWait, func() []string { return w.checkHost(s, exp) })
+		return w.poll(func() []string { return w.checkHost(s, exp) })
 	case "audit":
-		return w.poll(checkWait, func() []string { return w.checkAudit(exp) })
+		return w.poll(func() []string { return w.checkAudit(exp) })
 	case "processes":
-		return w.poll(checkWait, func() []string { return w.checkProcesses(s, exp) })
+		return w.poll(func() []string { return w.checkProcesses(s, exp) })
 	case "markers":
 		return w.checkMarkers(s, exp)
 	case "canary":
-		return w.checkCanary(s, exp)
+		return w.checkCanary(exp)
 	case "metric":
-		return w.poll(checkWait, func() []string { return w.checkMetric(exp) })
+		return w.poll(func() []string { return w.checkMetric(exp) })
 	case "readyz":
 		return w.checkReadyz(exp)
 	}

@@ -71,8 +71,6 @@ type sessInst struct {
 	streamPath string
 	expires    time.Time
 	conns      []*device.Conn
-	// opened is the time of the last grant (TM-T03 measures its budget from it).
-	opened time.Time
 }
 
 // instance is the world of one case.
@@ -175,9 +173,10 @@ func display(name string) string {
 // owner returns the client of the case's Owner.
 func (w *instance) owner() *harness.Client { return w.people["owner"].client }
 
-// mustDo sends r as c, with a step-up when the server asks for one, and fails the case unless the
-// status is want; it returns the answer.
-func (w *instance) mustDo(c *harness.Client, r harness.Request, want int) harness.Response {
+// mustCreate sends r as c, with a step-up when the server asks for one, and fails the case unless
+// the status is 201; it returns the answer.
+func (w *instance) mustCreate(c *harness.Client, r harness.Request) harness.Response {
+	const want = http.StatusCreated
 	w.t.Helper()
 	resp, err := harness.DoWithStepUp(w.ctx, c, r)
 	if err != nil {
@@ -203,8 +202,8 @@ func (w *instance) addPerson(name string) {
 // makeOwner makes the person an owner (addOwner by the bootstrap owner).
 func (w *instance) makeOwner(name string) {
 	w.t.Helper()
-	w.mustDo(w.env.Server.Owner, harness.Request{Method: http.MethodPost, Path: "/owners",
-		Body: map[string]any{"user_id": w.people[name].client.PrincipalID, "reason": "terminal suite"}}, http.StatusCreated)
+	w.mustCreate(w.env.Server.Owner, harness.Request{Method: http.MethodPost, Path: "/owners",
+		Body: map[string]any{"user_id": w.people[name].client.PrincipalID, "reason": "terminal suite"}})
 }
 
 // addDevice enrolls a further device of a person: a recovery code of the case's Owner
@@ -215,7 +214,7 @@ func (w *instance) addDevice(d DeviceSpec) {
 	if !ok {
 		w.t.Fatalf("%s/%s: world: device %s of unknown person %s", w.sc.ID, w.c.Name, d.Name, d.Person)
 	}
-	resp := w.mustDo(w.owner(), harness.Request{Method: http.MethodPost, Path: "/users/" + p.client.PrincipalID + "/enrollment-codes"}, http.StatusCreated)
+	resp := w.mustCreate(w.owner(), harness.Request{Method: http.MethodPost, Path: "/users/" + p.client.PrincipalID + "/enrollment-codes"})
 	var code struct {
 		Code string `json:"code"`
 	}
@@ -239,13 +238,13 @@ func (w *instance) addGroup(g GroupSpec) {
 	var grp struct {
 		ID string `json:"id"`
 	}
-	w.mustDo(w.owner(), harness.Request{Method: http.MethodPost, Path: "/groups", Body: map[string]any{"name": display(g.Name) + " " + w.sfx}}, http.StatusCreated).JSON(w.t, &grp)
+	w.mustCreate(w.owner(), harness.Request{Method: http.MethodPost, Path: "/groups", Body: map[string]any{"name": display(g.Name) + " " + w.sfx}}).JSON(w.t, &grp)
 	for _, m := range g.Members {
 		body := map[string]any{"user_id": w.people[m].client.PrincipalID}
 		if g.Expires != "" {
 			body["expires_at"] = w.inFuture(g.Expires)
 		}
-		w.mustDo(w.owner(), harness.Request{Method: http.MethodPost, Path: "/groups/" + grp.ID + "/members", Body: body}, http.StatusCreated)
+		w.mustCreate(w.owner(), harness.Request{Method: http.MethodPost, Path: "/groups/" + grp.ID + "/members", Body: body})
 	}
 	w.groups[g.Name] = grp.ID
 }
@@ -267,12 +266,12 @@ func (w *instance) addApp(name string) {
 	var app struct {
 		ID string `json:"id"`
 	}
-	w.mustDo(w.env.Server.Owner, harness.Request{Method: http.MethodPost, Path: "/apps", Body: map[string]any{
+	w.mustCreate(w.env.Server.Owner, harness.Request{Method: http.MethodPost, Path: "/apps", Body: map[string]any{
 		"manifest": map[string]any{"schema_version": 1, "slug": slug, "name": display(name), "description": "Test app of the terminal suite.",
 			"publisher": "Example Org", "version": "1.0.0", "min_api_version": "0.1",
 			"scopes": map[string]any{"required": []string{"messages:read"}, "optional": []string{}}},
 		"granted_scopes": []string{"messages:read"}, "reason": "terminal suite",
-	}}, http.StatusCreated).JSON(w.t, &app)
+	}}).JSON(w.t, &app)
 	w.apps[name] = w.env.Server.NewTokenClient(w.t, &harness.Client{PrincipalID: app.ID})
 }
 
@@ -291,7 +290,7 @@ func (w *instance) addGrant(g GrantSpec) {
 	var grant struct {
 		ID string `json:"id"`
 	}
-	w.mustDo(w.owner(), harness.Request{Method: http.MethodPost, Path: "/grants", Body: body}, http.StatusCreated).JSON(w.t, &grant)
+	w.mustCreate(w.owner(), harness.Request{Method: http.MethodPost, Path: "/grants", Body: body}).JSON(w.t, &grant)
 	if g.Name != "" {
 		w.grants[g.Name] = grant.ID
 	}

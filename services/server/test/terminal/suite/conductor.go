@@ -454,7 +454,7 @@ func (w *instance) deviceStep(s Step) []string {
 	}
 	switch s.Do {
 	case "connect":
-		return w.connect(c, s, ses, conn)
+		return w.connect(c, s, conn)
 	case "handshake":
 		return w.handshake(s, ses, conn)
 	case "start":
@@ -560,7 +560,7 @@ func (w *instance) openOrAttach(c *harness.Client, s Step) []string {
 }
 
 // connect opens the device stream of the newest connection.
-func (w *instance) connect(c *harness.Client, s Step, ses *sessInst, conn *device.Conn) []string {
+func (w *instance) connect(c *harness.Client, s Step, conn *device.Conn) []string {
 	// An agent or app has no device; its identify names a random one (TM-T17), so the frame is
 	// well formed and only the kind of the token decides.
 	deviceID := c.DeviceID
