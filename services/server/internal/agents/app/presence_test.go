@@ -221,7 +221,9 @@ func (allowAgents) Observe(context.Context, authorize.LogEvent) {}
 // runUoW runs the function directly.
 type runUoW struct{}
 
-func (runUoW) Do(ctx context.Context, fn func(ctx context.Context) error, _ ...txn.Option) error { return fn(ctx) }
+func (runUoW) Do(ctx context.Context, fn func(ctx context.Context) error, _ ...txn.Option) error {
+	return fn(ctx)
+}
 
 // fakeRecorder records the entries.
 type fakeRecorder struct {
