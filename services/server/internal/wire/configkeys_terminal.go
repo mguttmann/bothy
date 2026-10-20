@@ -14,7 +14,8 @@ import (
 // of a pairing code (24 section 17), and the validity of a session token, which sets the window
 // a retiring signing key of the purpose terminal stays usable (19 section 10); and since M2-40 the
 // windows of the fresh step-up and of the quick reattach (24 section 17), read by authz; and since
-// M2-41 the confirmation of the fingerprint and the bounds of a report of a host.
+// M2-41 the confirmation of the fingerprint and the bounds of a report of a host; and since M2-45
+// the idle and detach windows the host service applies.
 func terminalConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -92,6 +93,18 @@ func terminalConfigKeys() []config.Key {
 		{
 			Name: "terminal.relay_buffer_max_bytes", Kind: config.KindInt, Default: "262144", Min: "1",
 			Doc:     "Buffer of the relay per direction and session, in bytes of queued messages.",
+			Chapter: chapter24,
+		},
+		// The windows of a session the host service applies, announced in hello (M2-45, 24
+		// sections 6.2 and 6.3); the server's own checks with them follow in M2-46.
+		{
+			Name: "terminal.idle_timeout", Kind: config.KindDuration, Default: "30m", Min: "1s",
+			Doc:     "Without input from the device for this long, the session ends; announced to the host service in hello.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.detach_grace", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s",
+			Doc:     "This long a detached session stays attachable; announced to the host service in hello.",
 			Chapter: chapter24,
 		},
 		{

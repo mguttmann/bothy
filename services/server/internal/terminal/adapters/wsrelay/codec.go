@@ -200,11 +200,15 @@ func encode(op string, d any) []byte {
 	return b
 }
 
-// helloFrame is hello (schema HostChannelHello).
-func helloFrame(challenge string, at time.Time, interval time.Duration, missLimit int, keys []app.JWK) []byte {
+// helloFrame is hello (schema HostChannelHello) on the control and the data connection: the
+// heartbeat keys and the server values of cfg the host service applies to a session (M2-45
+// Design note 2a).
+func helloFrame(challenge string, at time.Time, cfg Config, keys []app.JWK) []byte {
 	return encode(opHello, rest.HostChannelHello{
 		ProtocolVersions: domain.SupportedProtocolVersions(), Challenge: challenge, ServerTime: stamp(at),
-		HeartbeatIntervalMs: interval.Milliseconds(), HeartbeatMissLimit: missLimit, Jwks: jwks(keys),
+		HeartbeatIntervalMs: cfg.HeartbeatInterval.Milliseconds(), HeartbeatMissLimit: cfg.HeartbeatMissLimit,
+		ClockLeewayMs: cfg.ClockLeeway.Milliseconds(), IdleTimeoutMs: cfg.IdleTimeout.Milliseconds(),
+		DetachGraceMs: cfg.DetachGrace.Milliseconds(), Jwks: jwks(keys),
 	})
 }
 
