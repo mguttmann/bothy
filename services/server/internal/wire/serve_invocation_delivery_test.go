@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -296,6 +297,12 @@ func TestInvocationDelivery(t *testing.T) {
 			t.Fatalf("a redelivery changed the trigger state again: %d updates", n)
 		}
 		sendAck(t, c, g.Seq)
+		// The generic catch-up listEvents is not a delivery path: an agent never gets an
+		// invocation-bearing event there, only through runs.Delivery (review M1 of M2-08).
+		code, b := w.call(w.base, a, http.MethodGet, "/api/v1/events?after="+strconv.FormatInt(f.Seq-1, 10), nil)
+		if code != http.StatusOK || strings.Contains(string(b), `"agent.invocation"`) {
+			t.Fatalf("listEvents of the agent = %d %s", code, b)
+		}
 	})
 
 	t.Run("TestDelivery_AG07_AZM51_RevokedBeforeDelivery", func(t *testing.T) {

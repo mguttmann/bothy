@@ -146,9 +146,11 @@ main-thread mention rule ("in the main thread and for new threads", 05 section 5
 with `thread_require_mention`.
 
 A personal event whose receive action takes the principal kind `agent` (`agent.events.consume` of
-`agent.invocation`, 05 section 6) is decided on its audience: sync sets
-`EventScope.AudienceID` after it matched the audience with the receiver, and `eventTarget` adds the
-agent of the audience as the last candidate (D-M2-08-14).
+`agent.invocation`, 05 section 6) is decided on its audience only for the page reads of the agent
+consumer engine (`sync.PageInput.AgentConsumer`), which pass every such event through
+`runs.Delivery`: sync then sets `EventScope.AudienceID` after it matched the audience with the
+receiver, and `eventTarget` adds the agent of the audience as the last candidate. The generic
+catch-up `listEvents` never sets it, so an agent never gets an invocation there (D-M2-08-14).
 
 ## Scope of agent.config.read (M2-02)
 
