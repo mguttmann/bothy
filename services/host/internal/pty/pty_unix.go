@@ -39,8 +39,12 @@ type unixProcess struct {
 	sup    *Supervisor
 	tree   sessionTree
 	master *os.File
-	cmd    *exec.Cmd
-	pid    int
+	// tty is the parent's copy of the terminal side: kept open until Kill, so the output of a
+	// leader that exits at once stays readable (macOS discards unread output when the last
+	// terminal descriptor closes).
+	tty *os.File
+	cmd *exec.Cmd
+	pid int
 
 	treeMu    sync.Mutex
 	treeEnded bool
@@ -86,14 +90,14 @@ func (s *Supervisor) start(spec *StartSpec) (Process, error) {
 		return nil, err
 	}
 	startErr := cmd.Start()
-	_ = tty.Close()
 	if startErr != nil {
+		_ = tty.Close()
 		_ = tree.started(0)
 		_ = tree.release()
 		_ = master.Close()
 		return nil, failure(ErrStart, startErr)
 	}
-	p := &unixProcess{sup: s, tree: tree, master: master, cmd: cmd, pid: cmd.Process.Pid, done: make(chan struct{})}
+	p := &unixProcess{sup: s, tree: tree, master: master, tty: tty, cmd: cmd, pid: cmd.Process.Pid, done: make(chan struct{})}
 	recordErr := tree.started(p.pid)
 	go p.reap()
 	if recordErr != nil {
@@ -169,6 +173,7 @@ func (p *unixProcess) Kill() error {
 	p.killOnce.Do(func() {
 		treeErr := p.endTree()
 		<-p.done
+		_ = p.tty.Close()
 		_ = p.master.Close()
 		p.sup.forget(p)
 		if treeErr != nil || p.releaseErr != nil {
