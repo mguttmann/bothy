@@ -531,6 +531,13 @@ type PasskeyCredential struct {
 	RevokedAt      pgtype.Timestamptz
 }
 
+type Pin struct {
+	MessageID pgtype.UUID
+	ThreadID  pgtype.UUID
+	PinnedBy  pgtype.UUID
+	PinnedAt  pgtype.Timestamptz
+}
+
 type Principal struct {
 	ID           pgtype.UUID
 	Kind         string
@@ -541,6 +548,13 @@ type Principal struct {
 	CreatedAt    pgtype.Timestamptz
 	DisabledAt   pgtype.Timestamptz
 	DeletedAt    pgtype.Timestamptz
+}
+
+type Reaction struct {
+	MessageID   pgtype.UUID
+	PrincipalID pgtype.UUID
+	Emoji       string
+	CreatedAt   pgtype.Timestamptz
 }
 
 type RefreshToken struct {

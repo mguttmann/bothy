@@ -569,6 +569,30 @@ func (stubServer) ListMessageRevisions(context.Context, rest.ListMessageRevision
 	return nil, nil
 }
 
+func (stubServer) AddReaction(context.Context, rest.AddReactionRequestObject) (rest.AddReactionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RemoveReaction(context.Context, rest.RemoveReactionRequestObject) (rest.RemoveReactionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListReactions(context.Context, rest.ListReactionsRequestObject) (rest.ListReactionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PinMessage(context.Context, rest.PinMessageRequestObject) (rest.PinMessageResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UnpinMessage(context.Context, rest.UnpinMessageRequestObject) (rest.UnpinMessageResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListPins(context.Context, rest.ListPinsRequestObject) (rest.ListPinsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetThreadTags(context.Context, rest.SetThreadTagsRequestObject) (rest.SetThreadTagsResponseObject, error) {
 	return nil, nil
 }
@@ -862,6 +886,13 @@ func TestRealTable_Enabled(t *testing.T) {
 		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
 		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},
 		"listMessageRevisions": {"GET /api/v1/messages/{message_id}/revisions", "message.revisions.read", "rl.read"},
+		// M1-59
+		"addReaction":    {"PUT /api/v1/messages/{message_id}/reactions/{emoji}", "reaction.add", "rl.write"},
+		"removeReaction": {"DELETE /api/v1/messages/{message_id}/reactions/{emoji}", "reaction.remove", "rl.write"},
+		"listReactions":  {"GET /api/v1/messages/{message_id}/reactions", "message.read", "rl.read"},
+		"pinMessage":     {"PUT /api/v1/messages/{message_id}/pin", "pin.create", "rl.write"},
+		"unpinMessage":   {"DELETE /api/v1/messages/{message_id}/pin", "pin.delete", "rl.write"},
+		"listPins":       {"GET /api/v1/threads/{thread_id}/pins", "thread.read", "rl.read"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

@@ -12,12 +12,17 @@ import (
 )
 
 // Register declares the durable events messaging appends (M1-25, docs/spec/05-actions.md
-// section 6): message.created (M1-56), message.updated and message.deleted (M1-58). internal/wire
-// lists it in moduleRegistrations.
+// section 6): message.created (M1-56), message.updated and message.deleted (M1-58),
+// reaction.added, reaction.removed, pin.added and pin.removed (M1-59). internal/wire lists it in
+// moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("messaging", authorize.EventMessageCreated)
 	r.Event("messaging", authorize.EventMessageUpdated)
 	r.Event("messaging", authorize.EventMessageDeleted)
+	r.Event("messaging", authorize.EventReactionAdded)
+	r.Event("messaging", authorize.EventReactionRemoved)
+	r.Event("messaging", authorize.EventPinAdded)
+	r.Event("messaging", authorize.EventPinRemoved)
 }
 
 // MessageDeleted is published inside the deleting transaction, after the tombstone, the removal
@@ -111,10 +116,10 @@ type PrincipalRef struct {
 	AvatarFileID ids.ID
 }
 
-// Message is a message as the API shows it (schema Message) without attachments, reactions,
-// components and pins, which later tickets add. Zero values are absent members. It is the one
-// message DTO of the port (the MessageView of brief M1-57): Create, CreateThread, History and Get
-// return it. A deleted message is a tombstone: empty content, no mentions, DeletedAt set.
+// Message is a message as the API shows it (schema Message) without attachments and components,
+// which later tickets add. Zero values are absent members. It is the one message DTO of the port
+// (the MessageView of brief M1-57): Create, CreateThread, History and Get return it. A deleted
+// message is a tombstone: empty content, no mentions, no reactions, not pinned, DeletedAt set.
 type Message struct {
 	ID, ThreadID, ChannelID ids.ID
 	ThreadSeq               int64
@@ -133,7 +138,15 @@ type Message struct {
 	Silent    bool
 	// MentionIDs are the resolved mentions, sorted; never nil.
 	MentionIDs []ids.ID
-	Version    int64
+	// Reactions is the summary per symbol, ordered by the earliest reaction of each symbol, then
+	// by symbol; never nil (M1-59).
+	Reactions []ReactionCount
+	// MyReactions are the symbols of the principal of the request in the order of Reactions;
+	// never nil. Only REST responses carry them, never events (schema Message).
+	MyReactions []string
+	// Pinned reports a pin of the message.
+	Pinned  bool
+	Version int64
 	// EditedAt and DeletedAt are zero while not edited or deleted.
 	EditedAt, DeletedAt, CreatedAt time.Time
 }

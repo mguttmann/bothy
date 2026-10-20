@@ -16076,6 +16076,16 @@ type UpdateMessageParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ListReactionsParams defines parameters for ListReactions.
+type ListReactionsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Emoji Only this emoji.
+	Emoji *string `form:"emoji,omitempty" json:"emoji,omitempty"`
+}
+
 // AddOwnerParams defines parameters for AddOwner.
 type AddOwnerParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.

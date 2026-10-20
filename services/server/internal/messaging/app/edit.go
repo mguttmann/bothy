@@ -35,6 +35,14 @@ func (s *Service) visible(ctx context.Context, a actor.Actor) ([]ids.ID, error) 
 // it answers a missing one: a missing and an invisible message take the same path, an unknown
 // thread hint, and give the same 404 (02 section 9.2).
 func (s *Service) loadMessage(ctx context.Context, a actor.Actor, act authorize.Action, id ids.ID) (domain.Message, []ids.ID, error) {
+	return s.loadAs(ctx, a, act, id, messageResource)
+}
+
+// loadAs is loadMessage with the resource of act built by resource from the message (the
+// reaction of the caller for reaction.remove, M1-59); a missing message is checked as that
+// resource of a message with the id as thread hint, which no thread has.
+func (s *Service) loadAs(ctx context.Context, a actor.Actor, act authorize.Action, id ids.ID,
+	resource func(domain.Message) authorize.Resource) (domain.Message, []ids.ID, error) {
 	visible, err := s.visible(ctx, a)
 	if err != nil {
 		return domain.Message{}, nil, err
@@ -43,9 +51,9 @@ func (s *Service) loadMessage(ctx context.Context, a actor.Actor, act authorize.
 	if err != nil {
 		return domain.Message{}, nil, err
 	}
-	r := authorize.Resource{Kind: authorize.ResourceMessage, ID: id, ThreadID: id}
+	r := resource(domain.Message{ID: id, ThreadID: id})
 	if found {
-		r = messageResource(m)
+		r = resource(m)
 	}
 	if err := s.check(ctx, a, act, r); err != nil {
 		return domain.Message{}, nil, err
@@ -102,7 +110,7 @@ func (s *Service) edit(ctx context.Context, a actor.Actor, c messaging.UpdateCom
 	if !row.DeletedAt.IsZero() {
 		return messaging.Message{}, errs.New(errs.CodeMessageDeleted, "the message was deleted")
 	}
-	cur, err := s.stored(ctx, row)
+	cur, err := s.stored(ctx, row, visible)
 	if err != nil {
 		return messaging.Message{}, err
 	}
@@ -131,6 +139,8 @@ func (s *Service) edit(ctx context.Context, a actor.Actor, c messaging.UpdateCom
 		return messaging.Message{}, err
 	}
 	out := view(updated, cur.Author, mentions)
+	// The row lock serialises reactions and pins with the edit, so those of cur are current.
+	out.Reactions, out.MyReactions, out.Pinned = cur.Reactions, cur.MyReactions, cur.Pinned
 	return out, s.emitMessage(ctx, authorize.EventMessageUpdated, info, out, false)
 }
 
@@ -212,7 +222,13 @@ func (s *Service) remove(ctx context.Context, a actor.Actor, m domain.Message, v
 	if err := s.d.Store.DeleteMentionsExcept(ctx, row.ID, visible, nil); err != nil {
 		return err
 	}
-	// M1-59 deletes the reactions and the pin of the message here (design note 8).
+	// The reactions and the pin of the message go in the same transaction (M1-59 design note 9).
+	if err := s.d.Store.DeleteReactions(ctx, row.ID, visible); err != nil {
+		return err
+	}
+	if _, _, err := s.d.Store.DeletePin(ctx, row.ID, visible); err != nil {
+		return err
+	}
 	if err := s.d.Threads.DecrementMessageCount(ctx, row.ThreadID); err != nil {
 		return err
 	}

@@ -36,8 +36,9 @@ func (s *Service) author(ctx context.Context, id ids.ID) (messaging.PrincipalRef
 	return messaging.PrincipalRef{ID: p.ID, Kind: string(p.Kind), Handle: p.Handle, DisplayName: p.DisplayName, AvatarFileID: p.AvatarFileID}, nil
 }
 
-// stored returns the current representation of a stored message: its author and mentions now.
-func (s *Service) stored(ctx context.Context, m domain.Message) (messaging.Message, error) {
+// base returns the representation of a stored message with its author and mentions now, without
+// reactions and pin (decorate adds them).
+func (s *Service) base(ctx context.Context, m domain.Message) (messaging.Message, error) {
 	author, err := s.author(ctx, m.AuthorID)
 	if err != nil {
 		return messaging.Message{}, err
@@ -49,10 +50,69 @@ func (s *Service) stored(ctx context.Context, m domain.Message) (messaging.Messa
 	return view(m, author, mentions), nil
 }
 
+// stored returns the current representation of a stored message for the principal of the
+// request: its author, mentions, reactions, own reactions and pin now, read with the visible
+// channels of the caller.
+func (s *Service) stored(ctx context.Context, m domain.Message, visible []ids.ID) (messaging.Message, error) {
+	v, err := s.base(ctx, m)
+	if err != nil {
+		return messaging.Message{}, err
+	}
+	list := []messaging.Message{v}
+	if err := s.decorate(ctx, visible, list); err != nil {
+		return messaging.Message{}, err
+	}
+	return list[0], nil
+}
+
+// decorate fills reactions, my_reactions (for the principal of the request) and pinned of the
+// live messages of list with one statement each for the whole list (brief M1-59 design note 7);
+// a tombstone keeps empty reactions and pinned false.
+func (s *Service) decorate(ctx context.Context, visible []ids.ID, list []messaging.Message) error {
+	live := make([]ids.ID, 0, len(list))
+	for _, m := range list {
+		if m.DeletedAt.IsZero() {
+			live = append(live, m.ID)
+		}
+	}
+	if len(live) == 0 || len(visible) == 0 {
+		return nil
+	}
+	groups, err := s.d.Store.ReactionGroups(ctx, live, visible)
+	if err != nil {
+		return err
+	}
+	var own map[ids.ID]map[string]bool
+	if viewer := caller(ctx); !viewer.ID.IsZero() {
+		if own, err = s.d.Store.OwnReactions(ctx, viewer.ID, live, visible); err != nil {
+			return err
+		}
+	}
+	pinned, err := s.d.Store.Pinned(ctx, live, visible)
+	if err != nil {
+		return err
+	}
+	for i := range list {
+		m := &list[i]
+		if !m.DeletedAt.IsZero() {
+			continue
+		}
+		ordered := domain.OrderSummary(groups[m.ID])
+		m.Reactions = make([]messaging.ReactionCount, 0, len(ordered))
+		for _, g := range ordered {
+			m.Reactions = append(m.Reactions, messaging.ReactionCount{Emoji: g.Emoji, Count: g.Count})
+		}
+		m.MyReactions = domain.OwnInOrder(ordered, own[m.ID])
+		m.Pinned = pinned[m.ID]
+	}
+	return nil
+}
+
 // view converts a row into the port DTO; the mentions are never nil. It is the one representation
-// of a message (brief M1-57 note 6, also for M1-58): a deleted message is a tombstone with empty
-// content and no mentions, every other field as stored (attachments, reactions and components stay
-// empty and pinned false in the REST and event forms).
+// of a message (brief M1-57 note 6, also for M1-58 and M1-59): a deleted message is a tombstone
+// with empty content, no mentions, no reactions and not pinned, every other field as stored
+// (attachments and components stay empty in the REST and event forms). Reactions and the pin
+// start empty; decorate fills them for a stored message.
 func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) messaging.Message {
 	if mentions == nil || !m.DeletedAt.IsZero() {
 		mentions = []ids.ID{}
@@ -63,7 +123,8 @@ func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) me
 	return messaging.Message{
 		ID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, ThreadSeq: m.ThreadSeq, Author: author, ClientMsgID: m.ClientMsgID,
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: m.SystemCode, ContentMD: m.ContentMD,
-		ContentFormat: int(m.ContentFormat), ReplyToID: m.ReplyToID, Silent: m.Silent, MentionIDs: mentions, Version: m.Version,
+		ContentFormat: int(m.ContentFormat), ReplyToID: m.ReplyToID, Silent: m.Silent, MentionIDs: mentions,
+		Reactions: []messaging.ReactionCount{}, MyReactions: []string{}, Version: m.Version,
 		EditedAt: m.EditedAt, DeletedAt: m.DeletedAt, CreatedAt: m.CreatedAt,
 	}
 }
@@ -90,32 +151,39 @@ type principalJSON struct {
 	AvatarFileID string `json:"avatar_file_id,omitempty"`
 }
 
-// messageJSON is the schema Message in an event (brief D7): attachments, reactions and components
-// empty, pinned false, without my_reactions. Optional members are left out, never null (ADR 0053).
+// reactionCountJSON is the schema ReactionSummary.
+type reactionCountJSON struct {
+	Emoji string `json:"emoji"`
+	Count int    `json:"count"`
+}
+
+// messageJSON is the schema Message in an event (brief D7): attachments and components empty, the
+// reaction summary and pinned as decorated (M1-59), never my_reactions, which only REST responses
+// carry. Optional members are left out, never null (ADR 0053).
 type messageJSON struct {
-	ID               string        `json:"id"`
-	ThreadID         string        `json:"thread_id"`
-	ChannelID        string        `json:"channel_id"`
-	ThreadSeq        int64         `json:"thread_seq"`
-	Author           principalJSON `json:"author"`
-	ClientMsgID      string        `json:"client_msg_id"`
-	Origin           string        `json:"origin"`
-	Kind             string        `json:"kind"`
-	SystemCode       string        `json:"system_code,omitempty"`
-	ContentMD        string        `json:"content_md"`
-	ContentFormat    int           `json:"content_format"`
-	ContentTruncated bool          `json:"content_truncated,omitempty"`
-	ReplyToMessageID string        `json:"reply_to_message_id,omitempty"`
-	Silent           bool          `json:"silent"`
-	Attachments      []struct{}    `json:"attachments"`
-	MentionIDs       []string      `json:"mention_ids"`
-	Reactions        []struct{}    `json:"reactions"`
-	Pinned           bool          `json:"pinned"`
-	Components       []struct{}    `json:"components"`
-	Version          int64         `json:"version"`
-	EditedAt         string        `json:"edited_at,omitempty"`
-	DeletedAt        string        `json:"deleted_at,omitempty"`
-	CreatedAt        string        `json:"created_at"`
+	ID               string              `json:"id"`
+	ThreadID         string              `json:"thread_id"`
+	ChannelID        string              `json:"channel_id"`
+	ThreadSeq        int64               `json:"thread_seq"`
+	Author           principalJSON       `json:"author"`
+	ClientMsgID      string              `json:"client_msg_id"`
+	Origin           string              `json:"origin"`
+	Kind             string              `json:"kind"`
+	SystemCode       string              `json:"system_code,omitempty"`
+	ContentMD        string              `json:"content_md"`
+	ContentFormat    int                 `json:"content_format"`
+	ContentTruncated bool                `json:"content_truncated,omitempty"`
+	ReplyToMessageID string              `json:"reply_to_message_id,omitempty"`
+	Silent           bool                `json:"silent"`
+	Attachments      []struct{}          `json:"attachments"`
+	MentionIDs       []string            `json:"mention_ids"`
+	Reactions        []reactionCountJSON `json:"reactions"`
+	Pinned           bool                `json:"pinned"`
+	Components       []struct{}          `json:"components"`
+	Version          int64               `json:"version"`
+	EditedAt         string              `json:"edited_at,omitempty"`
+	DeletedAt        string              `json:"deleted_at,omitempty"`
+	CreatedAt        string              `json:"created_at"`
 }
 
 // messageBody converts a message into the JSON form of the schema Message.
@@ -123,6 +191,10 @@ func messageBody(m messaging.Message) messageJSON {
 	mentions := make([]string, 0, len(m.MentionIDs))
 	for _, id := range m.MentionIDs {
 		mentions = append(mentions, id.String())
+	}
+	reactions := make([]reactionCountJSON, 0, len(m.Reactions))
+	for _, r := range m.Reactions {
+		reactions = append(reactions, reactionCountJSON{Emoji: r.Emoji, Count: r.Count})
 	}
 	return messageJSON{
 		ID: m.ID.String(), ThreadID: m.ThreadID.String(), ChannelID: m.ChannelID.String(), ThreadSeq: m.ThreadSeq,
@@ -132,7 +204,7 @@ func messageBody(m messaging.Message) messageJSON {
 		},
 		ClientMsgID: m.ClientMsgID.String(), Origin: m.Origin, Kind: m.Kind, SystemCode: m.SystemCode, ContentMD: m.ContentMD,
 		ContentFormat: m.ContentFormat, ReplyToMessageID: optionalID(m.ReplyToID), Silent: m.Silent, Attachments: []struct{}{},
-		MentionIDs: mentions, Reactions: []struct{}{}, Components: []struct{}{}, Version: m.Version, EditedAt: stamp(m.EditedAt),
+		MentionIDs: mentions, Reactions: reactions, Pinned: m.Pinned, Components: []struct{}{}, Version: m.Version, EditedAt: stamp(m.EditedAt),
 		DeletedAt: stamp(m.DeletedAt), CreatedAt: stamp(m.CreatedAt),
 	}
 }

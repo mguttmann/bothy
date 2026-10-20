@@ -154,7 +154,9 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, chat, files]
-    adapter_vendors: [pgx]   # sqlc code and the repository (M1-56)
+    # sqlc code and the repository (M1-56); UAX #29 grapheme clusters and NFC of the reaction
+    # symbol rule, only in adapters/unicode (M1-59).
+    adapter_vendors: [pgx, xtext, uniseg]
   status:
     tables: [status_components, status_incidents, status_incident_updates,
              status_incident_components, backup_runs]
@@ -269,6 +271,9 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   # BCP 47 language tags of users.locale (identity adapters/locale, M1-31); NFC of passwords
   # (identity adapters/passwordpolicy, M1-39).
   xtext: [golang.org/x/text/language, golang.org/x/text/unicode/norm]
+  # Extended grapheme clusters (UAX #29) of the reaction symbol rule (messaging adapters/unicode,
+  # M1-59).
+  uniseg: [github.com/rivo/uniseg]
   # Argon2id password hashes of local accounts (identity adapters/passwordhash, M1-39).
   xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,

@@ -42,6 +42,15 @@ type Config struct {
 	PageSizeDefault int `config:"api.page_size_default"`
 	// PageSizeMax is api.page_size_max; larger limits are capped.
 	PageSizeMax int `config:"api.page_size_max"`
+	// EmojiMaxBytes is reaction.emoji_max_bytes, the largest reaction symbol in UTF-8 bytes
+	// (M1-59).
+	EmojiMaxBytes int `config:"reaction.emoji_max_bytes"`
+	// MaxDistinctReactions is reaction.max_distinct_per_message, the most distinct symbols of one
+	// message.
+	MaxDistinctReactions int `config:"reaction.max_distinct_per_message"`
+	// MaxPinsPerThread is pin.max_per_thread, the most pins of one thread; listPins is not
+	// paginated.
+	MaxPinsPerThread int `config:"pin.max_per_thread"`
 }
 
 // check refuses limits below 1 and a default page above the largest.
@@ -54,6 +63,9 @@ func (c Config) check() error {
 	}
 	if c.TemplateNameMaxChars < 1 || c.TemplateMaxPerScope < 1 || c.PageSizeDefault < 1 || c.PageSizeMax < 1 {
 		return errors.New("messaging: template.name_max_chars, template.max_per_scope, api.page_size_default and api.page_size_max must be at least 1")
+	}
+	if c.EmojiMaxBytes < 1 || c.MaxDistinctReactions < 1 || c.MaxPinsPerThread < 1 {
+		return errors.New("messaging: reaction.emoji_max_bytes, reaction.max_distinct_per_message and pin.max_per_thread must be at least 1")
 	}
 	return nil
 }
@@ -84,8 +96,11 @@ type Deps struct {
 	Threads chat.Threads
 	// Directory resolves mention handles and the author of a message (identity).
 	Directory identity.Directory
-	// Cursors encodes and checks the cursors of listMyMentions (platform/httpserver).
+	// Cursors encodes and checks the cursors of listMyMentions and listReactions
+	// (platform/httpserver).
 	Cursors Cursors
+	// Symbols normalises and checks reaction symbols (adapters/unicode, M1-59).
+	Symbols SymbolNormalizer
 	// Errors counts filter mismatches of the mention and history lists in bothy.authz.errors (07
 	// section 7.4 rule 3); nil counts nothing.
 	Errors ErrorCounter
@@ -104,8 +119,18 @@ type Cursors interface {
 	Decode(list string, binding []byte, s string, key any) error
 }
 
+// SymbolNormalizer is the outgoing port of the reaction symbol rule (brief M1-59 design note 3);
+// adapters/unicode implements it, because the rule needs UAX #29 and NFC from third-party
+// libraries the application layer may not import.
+type SymbolNormalizer interface {
+	// Normalize returns the NFC form of raw when it is exactly one permitted grapheme cluster of
+	// at most maxBytes bytes. Errors: any refusal; the use case answers 400 invalid_emoji.
+	Normalize(raw string, maxBytes int) (string, error)
+}
+
 // Service implements messaging.Messages (M1-56, M1-57, M1-58); Service.Mentions and Service.Templates return
-// the ports messaging.Mentions and messaging.Templates over it (M1-60). It is safe for concurrent
+// the ports messaging.Mentions and messaging.Templates over it (M1-60), Service.Reactions and
+// Service.Pins the ports messaging.Reactions and messaging.Pins (M1-59). It is safe for concurrent
 // use.
 type Service struct {
 	cfg Config
@@ -117,12 +142,14 @@ var (
 	_ messaging.Messages  = (*Service)(nil)
 	_ messaging.Mentions  = Mentions{}
 	_ messaging.Templates = Templates{}
+	_ messaging.Reactions = Reactions{}
+	_ messaging.Pins      = Pins{}
 )
 
 // New returns the use cases. Errors: a missing collaborator or a limit below 1.
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Events == nil || d.Threads == nil || d.Directory == nil ||
-		d.Cursors == nil || d.Redactor == nil || d.Audit == nil {
+		d.Cursors == nil || d.Redactor == nil || d.Audit == nil || d.Symbols == nil {
 		return nil, errors.New("messaging: New needs every collaborator")
 	}
 	if err := cfg.check(); err != nil {

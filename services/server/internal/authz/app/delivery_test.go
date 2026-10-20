@@ -86,3 +86,30 @@ func TestWebhookDeliverFilterWritesNoDenial(t *testing.T) {
 		t.Fatalf("filter mode wrote %d denials and %d entries", denials, detached)
 	}
 }
+
+// TestWebhookDeliverStoredKindOutsideTheReceiveAction: a stored event whose resource kind is not
+// a resource of its receive action (pin.added names a message, thread.read takes a thread, M1-59)
+// is decided on the object of its scope that the action takes, as catch-up does; without one it
+// is not delivered. An internal error would stall the delivery job of the subscription.
+func TestWebhookDeliverStoredKindOutsideTheReceiveAction(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	deliver := authorize.ActionWebhookOutDeliver
+	app := w.deliveryApp(domain.ScopeEventsSubscribe, domain.ScopeMessagesRead)
+	ctx := authorize.Filter(context.Background())
+	for _, c := range []struct {
+		name    string
+		r       authorize.Resource
+		outcome authorize.Outcome
+	}{
+		{"pin in a granted channel", delivery(w.msg(w.eskalation, w.alex), authorize.ActionThreadRead, ids.ID{}), authorize.OutcomeAllow},
+		{"pin in another channel", delivery(w.msg(w.allgemein, w.alex), authorize.ActionThreadRead, ids.ID{}), authorize.OutcomeNotFound},
+		{"no thread in the scope", delivery(authorize.Resource{Kind: authorize.ResourceMessage, ID: ids.New()}, authorize.ActionThreadRead, ids.ID{}),
+			authorize.OutcomeNotFound},
+	} {
+		d, err := w.az.Authorize(ctx, app, deliver, c.r)
+		if err != nil || d.Outcome != c.outcome {
+			t.Errorf("%s: %s, %v; want %s", c.name, d.Outcome, err, c.outcome)
+		}
+	}
+}

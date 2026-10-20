@@ -301,6 +301,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"migrate.maint_password_ref = file:/run/bothy/secrets/db_maint_password  # default\n" +
 		"migrate.monitor_password_ref = file:/run/bothy/secrets/db_monitor_password  # default\n" +
 		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
+		"pin.max_per_thread = 50  # default\n" +
 		"principal.display_name_max_chars = 64  # default\n" +
 		"principal.handle_max_chars = 32  # default\n" +
 		"privacy.audit_ip_kek_ref = file:/run/bothy/secrets/audit_ip_kek  # default\n" +
@@ -343,6 +344,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"ratelimit.rl.write.burst = 30  # default\n" +
 		"ratelimit.rl.write.per_minute = 120  # default\n" +
 		"ratelimit.sweep_interval = 1m  # default\n" +
+		"reaction.emoji_max_bytes = 64  # default\n" +
+		"reaction.max_distinct_per_message = 20  # default\n" +
 		"retention.audit = 365d  # default\n" +
 		"search.languages = german, english  # default\n" +
 		"search.locale_map = {\"de\":\"german\",\"en\":\"english\"}  # default\n" +

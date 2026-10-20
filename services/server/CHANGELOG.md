@@ -93,6 +93,19 @@ documented in this file. The format is based on
   and offers `healthcheck` (TLS handshake with the stack's CA) and `version`.
 - `bothy secrets init` generates `pgbackrest_tls/` (M7-01): an own CA and ECDSA P-256 certificates
   for `postgres` and `backup`, copied only to those two services; the CA key is not kept.
+- Reactions and pins (M1-59): `addReaction` and `removeReaction` add and remove the caller's
+  reaction, one normalised Unicode grapheme cluster of at most the new key
+  `reaction.emoji_max_bytes`; `listReactions` pages the reactions of a message with the principals
+  and an optional `emoji` filter. `pinMessage` and `unpinMessage` need `manage` (also in a
+  read-only channel), `listPins` lists the pins of a thread newest first. Migration `00041`
+  creates `reactions` and `pins`. All six operations are idempotent; the four writes append
+  `reaction.added`, `reaction.removed`, `pin.added` or `pin.removed` only on a change, with exact
+  counts under the message row lock; none changes `trigger_state` or the message version. A
+  deleted message refuses reactions and pins with `410`, and deleting a message removes both.
+  Every `Message` now carries the reaction summary and `pinned`, REST responses also
+  `my_reactions`. The new keys `reaction.max_distinct_per_message` and `pin.max_per_thread`
+  bound distinct symbols per message and pins per thread (`400 validation_failed` (reason
+  `limit_reached`)).
 - Mentions and templates (M1-60): `listMyMentions` lists the caller's mentions in channels it may
   read, newest first, with a cursor bound to the list and the caller; a mention in an unreadable
   channel stays stored but is never listed or counted. The port `messaging.Mentions` adds

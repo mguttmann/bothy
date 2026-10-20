@@ -84,6 +84,70 @@ type Store interface {
 	DeleteRevisions(ctx context.Context, message ids.ID, visible []ids.ID) error
 	// DeleteMentionsExcept removes the mentions of message whose principal is not in keep.
 	DeleteMentionsExcept(ctx context.Context, message ids.ID, visible, keep []ids.ID) error
+
+	// The statements of reactions and pins (M1-59) join messages with the visible channels of
+	// the caller (brief design note 13); the writes run under the row lock of LockMessage.
+
+	// ReactionStats returns the number of distinct symbols of message and the number of
+	// reactions with emoji.
+	ReactionStats(ctx context.Context, message ids.ID, emoji string, visible []ids.ID) (distinct, ofEmoji int, err error)
+	// InsertReaction writes the reaction of principal with emoji at; inserted is false when it
+	// exists.
+	InsertReaction(ctx context.Context, message, principal ids.ID, emoji string, at time.Time, visible []ids.ID) (inserted bool, err error)
+	// DeleteReaction removes the reaction of principal with emoji; deleted is false when there
+	// was none.
+	DeleteReaction(ctx context.Context, message, principal ids.ID, emoji string, visible []ids.ID) (deleted bool, err error)
+	// DeleteReactions removes every reaction of message (its deletion, M1-59 design note 9).
+	DeleteReactions(ctx context.Context, message ids.ID, visible []ids.ID) error
+	// ReactionGroups returns the symbols of each live message of messages with count and first
+	// reaction, in one statement; a message without reactions is absent.
+	ReactionGroups(ctx context.Context, messages, visible []ids.ID) (map[ids.ID][]domain.ReactionGroup, error)
+	// OwnReactions returns the symbols principal reacted with on each of messages, in one
+	// statement.
+	OwnReactions(ctx context.Context, principal ids.ID, messages, visible []ids.ID) (map[ids.ID]map[string]bool, error)
+	// ListReactions returns up to q.Limit reactions of one live message in keyset order.
+	ListReactions(ctx context.Context, q ReactionRead) ([]ReactionRow, error)
+	// Pinned returns the live messages of messages that have a pin, in one statement.
+	Pinned(ctx context.Context, messages, visible []ids.ID) (map[ids.ID]bool, error)
+	// Pin reads the pin of message; found is false without one.
+	Pin(ctx context.Context, message ids.ID, visible []ids.ID) (p PinRow, found bool, err error)
+	// CountPins counts the pins of thread.
+	CountPins(ctx context.Context, thread ids.ID, visible []ids.ID) (int, error)
+	// InsertPin writes the pin p of its message in the thread of that message; inserted is
+	// false when the message is pinned already.
+	InsertPin(ctx context.Context, p PinRow, visible []ids.ID) (inserted bool, err error)
+	// DeletePin removes the pin of message and returns it; found is false without one.
+	DeletePin(ctx context.Context, message ids.ID, visible []ids.ID) (p PinRow, found bool, err error)
+	// ThreadPins returns the pins of the live messages of thread, newest pin first, then by
+	// message id descending.
+	ThreadPins(ctx context.Context, thread ids.ID, visible []ids.ID) ([]PinRow, error)
+}
+
+// ReactionRead is the input of Store.ListReactions.
+type ReactionRead struct {
+	MessageID ids.ID
+	Visible   []ids.ID
+	// Emoji filters to one symbol; "" reads every symbol.
+	Emoji string
+	// HasAfter starts after the keyset position After.
+	HasAfter bool
+	After    domain.ReactionKey
+	Limit    int
+}
+
+// ReactionRow is one row of reactions.
+type ReactionRow struct {
+	PrincipalID ids.ID
+	Emoji       string
+	CreatedAt   time.Time
+}
+
+// PinRow is one row of pins; ChannelID and AuthorID are those of the pinned message (ThreadPins
+// only), for its check with message.read.
+type PinRow struct {
+	MessageID, ThreadID, PinnedBy ids.ID
+	PinnedAt                      time.Time
+	ChannelID, AuthorID           ids.ID
 }
 
 // MentionQuery is one batch of the mention list (Store.MyMentions).
