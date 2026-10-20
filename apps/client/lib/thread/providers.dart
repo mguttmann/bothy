@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Riverpod providers of the thread view over the local database, the outbox and the engine
-/// (docs/spec/15-client-architektur.md 4: one provider per query; brief M4-20 Design notes 1 to
+/// (docs/spec/15-client-architecture.md 4: one provider per query; brief M4-20 Design notes 1 to
 /// 6). Widgets never query the database themselves (R-CL-03).
 library;
 
