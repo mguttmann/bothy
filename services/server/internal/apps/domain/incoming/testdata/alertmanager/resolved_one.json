@@ -1,0 +1,36 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"DiskFull\"}",
+  "truncatedAlerts": 0,
+  "status": "resolved",
+  "receiver": "bothy-ops",
+  "groupLabels": {
+    "alertname": "DiskFull"
+  },
+  "commonLabels": {
+    "alertname": "DiskFull",
+    "instance": "db1.example.com",
+    "severity": "warning"
+  },
+  "commonAnnotations": {
+    "summary": "Disk usage back below the threshold"
+  },
+  "externalURL": "https://alertmanager.example.com",
+  "alerts": [
+    {
+      "status": "resolved",
+      "labels": {
+        "alertname": "DiskFull",
+        "instance": "db1.example.com",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "Disk usage back below the threshold"
+      },
+      "startsAt": "2026-10-10T07:00:00Z",
+      "endsAt": "2026-10-10T07:30:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=disk_used_ratio",
+      "fingerprint": "c3d4e5f60718293a"
+    }
+  ]
+}

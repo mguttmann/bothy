@@ -1,0 +1,46 @@
+{
+  "version": "4",
+  "groupKey": "{}:{job=\"batch\"}",
+  "truncatedAlerts": 0,
+  "status": "firing",
+  "receiver": "bothy-ops",
+  "groupLabels": {
+    "job": "batch"
+  },
+  "commonLabels": {
+    "job": "batch"
+  },
+  "commonAnnotations": {},
+  "externalURL": "https://alertmanager.example.com",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "JobFailed",
+        "job": "batch",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "Nightly export failed"
+      },
+      "startsAt": "2026-10-10T02:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=job_failed",
+      "fingerprint": "d4e5f60718293a4b"
+    },
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "JobSlow",
+        "job": "batch"
+      },
+      "annotations": {
+        "summary": "Nightly export took too long"
+      },
+      "startsAt": "2026-10-10T02:05:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=job_duration_seconds",
+      "fingerprint": "e5f60718293a4b5c"
+    }
+  ]
+}

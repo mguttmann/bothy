@@ -1,0 +1,33 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"QueueBacklog\"}",
+  "truncatedAlerts": 0,
+  "status": "firing",
+  "receiver": "bothy-ops",
+  "groupLabels": {
+    "alertname": "QueueBacklog"
+  },
+  "commonLabels": {
+    "alertname": "QueueBacklog",
+    "severity": "warning"
+  },
+  "commonAnnotations": {},
+  "externalURL": "alertmanager.example.com/#/alerts",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "QueueBacklog",
+        "severity": "warning"
+      },
+      "annotations": {
+        "summary": "Queue backlog is growing",
+        "runbook_url": "javascript:alert(1)"
+      },
+      "startsAt": "2026-10-10T10:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "/graph?g0.expr=queue_depth",
+      "fingerprint": "0718293a4b5c6d7e"
+    }
+  ]
+}
