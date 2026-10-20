@@ -117,6 +117,34 @@ Ablauf in `bothy-backupd` nach `backup.restore_test.schedule`:
 Ein Fehlschlag ist ein Alarm `ticket`; zwei Fehlschläge in Folge oder ein Fehler der
 Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
 
+As built (M7-03, [16-betrieb.md](../spec/16-betrieb.md) 8.3, docs/DECISIONS.md D-M7-03-1 to
+D-M7-03-9):
+
+1. The scratch directory is `/var/lib/bothy-backup/restore` in the volume `backup-scratch`; every
+   test empties it first and last, also after a failed or panicking check.
+2. `pgbackrest --repo=1 --reset-pg1-host --pg1-path=<scratch>/pgdata --set=<label> --type=immediate
+   --target-action=promote --archive-mode=off restore`, the label from the manifest of the newest
+   succeeded `pg_full` or `pg_diff`; `restore_command` carries the same options, so the copy reads
+   the WAL of the backup from the local repository. Then `pgbackrest --repo=1 verify`.
+3. `postgres -D <scratch>/pgdata` with `listen_addresses` empty, `port=5432` (the name of the
+   socket file only), `unix_socket_directories=<scratch>/socket` with mode `0700`, its own
+   `pg_hba.conf` (`local all all trust`), `archive_mode=off`, `ssl=off`, no parallel query.
+   `bothy-backupd` connects over the socket as `migrate.bootstrap_user`.
+4. The checks run in the order of 16 8.3; each has its own result and duration in
+   `backup_runs.checks` (`restore_test_checks.v1`).
+5. The sampled objects come from `restic restore latest --tag objects --path <file.fs.root>` with
+   one `--include` per object into `<scratch>/objects`; with the driver `s3` the file sample is
+   skipped (`objects_driver_s3`).
+6. The server is stopped with `SIGINT` (fast shutdown), after a minute with `SIGKILL`, and the
+   directory is emptied.
+7. `backup_runs` gets the row `restore_test` (`succeeded`, or `failed` with `checks_failed` or
+   `scratch_cleanup_failed`) and the metrics of 16 8.3 "As built" item 5.
+
+By hand: `docker compose exec backup bothy-backupd restore-test` (exit `0` when no check failed).
+The result is in the newest row `SELECT state, error, checks FROM backup_runs WHERE kind =
+'restore_test' ORDER BY started_at DESC LIMIT 1`. Not proven by this build: the duration of a
+restore of a production-sized database against `dr.rto_target`.
+
 ## 5. Wiederherstellen
 
 ### 5.1 Zeitpunkt wählen
