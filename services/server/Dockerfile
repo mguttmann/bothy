@@ -93,6 +93,7 @@ COPY packages/local_store/pubspec.yaml packages/local_store/
 COPY packages/sync_engine/pubspec.yaml packages/sync_engine/
 COPY packages/terminal_ui/pubspec.yaml packages/terminal_ui/
 RUN flutter pub get --enforce-lockfile >/dev/null
+COPY packages/admin_ui/lib packages/admin_ui/lib
 COPY packages/api_client/lib packages/api_client/lib
 COPY packages/auth/lib packages/auth/lib
 COPY packages/design_system/lib packages/design_system/lib
@@ -106,6 +107,21 @@ COPY services/server/VERSION services/server/
 WORKDIR /src/apps/console
 RUN flutter build web --release --base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run \
     && sh tool/version_json.sh ../../docs/api/openapi.yaml ../../services/server/VERSION build/web/version.json
+
+# The web bundle of the patrol suites of the console administration (brief M6-04 Design note 4):
+# integration_test/admin/admin_bundle.dart in place of lib/main.dart, built with the flags of the
+# console above, so the suites run under the same CSP as the real console. patrol_cli has no web
+# build command, so the bundle entry is hand-written. tools/console-e2e/console_e2e.py exports the
+# files with --target console-e2e-web and mounts them as console.assets_dir of its test api only;
+# no release image contains them, and the production stage stays last.
+FROM console AS console-e2e-build
+RUN flutter build web --release --target integration_test/admin/admin_bundle.dart \
+        --output /src/apps/console/build/admin-bundle \
+        --base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run \
+    && sh tool/version_json.sh ../../docs/api/openapi.yaml ../../services/server/VERSION build/admin-bundle/version.json
+
+FROM scratch AS console-e2e-web
+COPY --from=console-e2e-build /src/apps/console/build/admin-bundle /
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 ARG VERSION REVISION
