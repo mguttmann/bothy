@@ -56,8 +56,10 @@ class ConsoleRequestInterceptor extends Interceptor {
 /// Builds the generated API root for the console at [origin], the origin the console is served
 /// from (same origin as the API).
 ///
-/// [onUnauthorized] receives the problem of every `401`; [adapter] replaces the browser's HTTP
-/// stack in tests (null keeps Dio's browser adapter, which sends the cookies of the same origin).
+/// [onUnauthorized] receives the problem of every `401`; [interceptors] run after the CSRF
+/// interceptor (the console passes its step-up adapter, brief M6-04 Design note 2); [adapter]
+/// replaces the browser's HTTP stack in tests (null keeps Dio's browser adapter, which sends the
+/// cookies of the same origin).
 /// Reads are not retried: the console fetches on opening (15 10, row Web). Throws an
 /// [ArgumentError] when [origin] is not an absolute http or https address.
 ///
@@ -72,6 +74,7 @@ class ConsoleRequestInterceptor extends Interceptor {
 ApiClient createConsoleApiClient({
   required Uri origin,
   required void Function(ApiProblem problem) onUnauthorized,
+  List<Interceptor> interceptors = const [],
   HttpClientAdapter? adapter,
   Random? random,
 }) {
@@ -86,6 +89,7 @@ ApiClient createConsoleApiClient({
     ),
     authInterceptors: [
       ConsoleRequestInterceptor(onUnauthorized: onUnauthorized),
+      ...interceptors,
     ],
     adapter: adapter,
   );
