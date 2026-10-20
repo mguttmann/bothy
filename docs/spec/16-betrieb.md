@@ -714,7 +714,7 @@ docs/DECISIONS.md D-M7-03-1 to D-M7-03-9):
 4. Check 1 covers the restore, `pgbackrest verify` of repo1 and the start of the copy; when the
    copy cannot be restored or started, checks 2 to 6 are `skipped` with `restore_failed`. Check 2
    compares schema version, instance and sync epoch, the set of tables and, when the copy reached
-   the event and audit heads of its manifest, every row count except that of `backup_runs`
+   the event and audit heads of its manifest, the row counts of `event_log` and `audit_events`
    (D-M7-03-3). Check 4 is the verification of `audit.verify` through the port
    `audit.RowsVerifier` over the rows of the copy, with the checkpoints of its `audit_checkpoints`.
    Checks 5 and 6 draw their samples at random per test; check 6 samples files with

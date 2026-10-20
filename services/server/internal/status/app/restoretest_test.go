@@ -219,8 +219,8 @@ func TestRestoreChecksDetectDamage(t *testing.T) {
 		{"a table is missing", func(r *restoreEnv) {
 			r.scratch.db.facts.RowCounts = map[string]int64{"event_log": 120}
 		}, domain.CheckManifest, "table_missing"},
-		{"a row is missing", func(r *restoreEnv) {
-			r.scratch.db.facts.RowCounts = map[string]int64{"messages": 99, "event_log": 120}
+		{"an event row is missing", func(r *restoreEnv) {
+			r.scratch.db.facts.RowCounts = map[string]int64{"messages": 100, "event_log": 119}
 		}, domain.CheckManifest, "row_counts_differ"},
 		{"the copy is newer than its manifest", func(r *restoreEnv) { r.scratch.db.facts.HeadSeq = 121 }, domain.CheckManifest, "copy_newer_than_manifest"},
 		{"gap in a partition", func(r *restoreEnv) { r.scratch.db.events.Partitions[0].Count = 98 }, domain.CheckEventLog, "event_log_gap"},
@@ -256,8 +256,8 @@ func TestRestoreChecksDetectDamage(t *testing.T) {
 
 // TestRestoreManifestWindow: writes between the end of the backup and its manifest
 // (docs/DECISIONS.md D-M7-02-6) leave the copy behind its manifest; the row counts are then not
-// compared, while schema version, instance and tables still are, and backup_runs is never
-// compared, because concurrent runs write it.
+// compared, while schema version, instance and tables still are; at equal heads only the counts
+// of event_log and audit_events are compared (docs/DECISIONS.md D-M7-03-3).
 func TestRestoreManifestWindow(t *testing.T) {
 	t.Parallel()
 	r := newRestoreEnv(t, nil)
@@ -274,6 +274,13 @@ func TestRestoreManifestWindow(t *testing.T) {
 	}
 	if _, checks, err := q.test(t); err != nil || !checks.Passed() {
 		t.Errorf("backup_runs differs: %v %v", err, outcomes(checks))
+	}
+	// Tables written without an event or audit row (sessions, tokens, cleanup jobs) may change
+	// while the heads stay: their counts are never compared, only event_log and audit_events.
+	s := newRestoreEnv(t, nil)
+	s.scratch.db.facts.RowCounts = map[string]int64{"messages": 97, "event_log": 120}
+	if _, checks, err := s.test(t); err != nil || !checks.Passed() {
+		t.Errorf("a table without events differs at equal heads: %v %v", err, outcomes(checks))
 	}
 }
 
