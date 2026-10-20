@@ -172,7 +172,7 @@ func TestRelay_SlowDevice4014(t *testing.T) {
 
 // TestRelay_OpenTimeoutHostMissing, TestRelay_OpenTimeoutDeviceMissing and
 // TestRelay_OpenTimeoutNoStart: at the deadline an opening without a host side gives the device
-// 4102 and ends open_failed open_timeout; without a device the host side gets 4100; with both
+// 4102 and ends open_failed open_timeout; without a device the host side gets 4102 (M2-47); with both
 // paired and no start both get 4100.
 func TestRelay_OpenTimeout(t *testing.T) {
 	t.Parallel()
@@ -201,7 +201,9 @@ func TestRelay_OpenTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.timers.Fire()
-	w.closeCode("device missing", func() (int, string) { return h.CloseCode(ctx) }, 4100, "open_failed")
+	// A lone host data connection of an opening closes with 4102 (M2-47 Design note 8 b, ruling
+	// D-M2-47-14; M2-44 closed it with 4100 and open_failed).
+	w.closeCode("device missing", func() (int, string) { return h.CloseCode(ctx) }, 4102, "")
 	w.waitState(g2.Session.ID, "closed:open_failed:open_timeout")
 
 	g3 := w.opened(w.alex, w.r1, openBody("shell"))

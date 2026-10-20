@@ -51,6 +51,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
+	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
@@ -136,6 +137,9 @@ type Deps struct {
 	// the commit, so a test commits a revocation between the decision and the commit. nil in
 	// production.
 	TerminalBeforeOpenCommit func()
+	// TerminalSignals wraps the signals of the terminal module (M2-47); a test wraps the NOTIFY
+	// signals to fail a unit after its signal was staged. nil in production.
+	TerminalSignals func(terminalapp.Signals) terminalapp.Signals
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -199,6 +203,13 @@ type server struct {
 	// terminalStreams are the relay and the stream routes of api and all (M2-44); the log tail
 	// feeds the relay.
 	terminalStreams *TerminalStreams
+	// plan is what cluster.mode means for the role (M2-47); terminalLocal are the local signals of
+	// one node, whose handler the hub becomes; terminalHub is the handler of the signals of an api
+	// process with its configuration hubCfg.
+	plan          ClusterPlan
+	terminalLocal *terminalapp.LocalSignals
+	terminalHub   *wsrelay.Hub
+	hubCfg        ClusterHubConfig
 	// apps is the module apps (M2-24): the app use cases and their REST handlers.
 	apps *Apps
 	// messaging is the messaging module (M1-56), built in the chat step over the threads of chat.
@@ -311,6 +322,7 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 	if err := s.bind(); err != nil {
 		return nil, err
 	}
+	s.plan = TerminalClusterPlan(clusterMode(v), role)
 	if deps.Stdout == nil {
 		s.deps.Stdout = os.Stdout
 	}
@@ -461,6 +473,10 @@ func (s *server) components() []lifecycle.Component {
 	}
 	if s.api() {
 		cs = append(cs, step("public_listener", s.startPublic))
+	}
+	if s.plan.Listener {
+		// M2-47: the LISTEN ephemeral connection after the HTTP listeners (soft dependency).
+		cs = append(cs, step("terminal_ephemeral", s.startTerminalEphemeral))
 	}
 	return append(cs, step("ready", s.ready))
 }
@@ -1003,8 +1019,10 @@ func (s *server) startTerminal(context.Context) error {
 	if err != nil {
 		return err
 	}
+	sig, local := terminalSignals(s.plan, pool, s.deps.TerminalSignals)
+	tm.Service.BindSignals(sig)
 	s.mu.Lock()
-	s.terminal = tm
+	s.terminal, s.terminalLocal = tm, local
 	s.mu.Unlock()
 	return nil
 }
@@ -1336,9 +1354,9 @@ func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserve
 
 // mountTerminalStreams builds the relay and the two stream routes of the terminal sessions
 // (M2-44) over the module, the control connection, identity's authenticator and nonces and the
-// signing keys, reconciles the sessions of the previous process (Design note 14: one node, the
-// only mode this build runs; M2-47 adds cluster.mode multi, which skips it), mounts both routes on
-// mux and registers the stop step of the relay.
+// signing keys, builds the hub of the signals across nodes (M2-47), reconciles the sessions of the
+// previous process (Design note 14, only with cluster.mode single), mounts both routes on mux and
+// registers the stop step of the relay.
 func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, log *slog.Logger) error {
 	cfg, err := TerminalStreamsConfigFrom(s.values)
 	if err != nil {
@@ -1351,17 +1369,28 @@ func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *https
 		return errors.New("wire: the terminal streams need identity's authenticator and nonces and the signing keys")
 	}
 	ts, err := NewTerminalStreams(cfg, tm, hc, TerminalStreamsDeps{Authenticator: id.Authenticator, Nonces: id.DPoP, Signer: keys.Keys,
-		Timers: s.deps.TerminalTimers, Clock: s.deps.Clock, Log: log})
+		Timers: s.deps.TerminalTimers, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi})
 	if err != nil {
 		return err
 	}
-	if err := tm.Service.Reconcile(ctx); err != nil {
+	s.mu.Lock()
+	local := s.terminalLocal
+	s.mu.Unlock()
+	hub, hubCfg, err := newTerminalHub(s.values, s.plan, tm, hc, ts, local, s.deps.Clock, log)
+	if err != nil {
 		return err
+	}
+	if !s.plan.Multi {
+		// One node: the slots and connections of the previous process are gone (M2-44 Design
+		// note 14); with several nodes the other nodes still hold theirs.
+		if err := tm.Service.Reconcile(ctx); err != nil {
+			return err
+		}
 	}
 	ts.Mount(mux, chain)
 	s.runner.OnStop(ts.StopConnections())
 	s.mu.Lock()
-	s.terminalStreams = ts
+	s.terminalStreams, s.terminalHub, s.hubCfg = ts, hub, hubCfg
 	s.mu.Unlock()
 	return nil
 }
