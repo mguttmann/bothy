@@ -106,19 +106,8 @@ func (m *sessionMetrics) closedOf(r domain.CloseReason) int {
 	return m.closed[r]
 }
 
-// activeOf returns bothy.terminal.sessions.active of state.
-func (m *sessionMetrics) activeOf(state string) int64 {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.active[state]
-}
-
-// connected returns bothy.terminal.hosts.connected.
-func (m *sessionMetrics) connected() int64 {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.hosts
-}
+// Compile-time check: the counters replace the session instruments of the server.
+var _ terminalapp.SessionMetrics = (*sessionMetrics)(nil)
 
 // newSessionMetrics returns empty counters.
 func newSessionMetrics() *sessionMetrics {
@@ -151,7 +140,6 @@ type world struct {
 	alexGrant, engineering, engGrant string
 
 	svcMu gosync.Mutex
-	svc   *terminalapp.Service
 	jobs  *wire.JobModules
 }
 
@@ -164,13 +152,15 @@ type worldOptions struct {
 }
 
 // testConfig is the configuration of every world: raised rate limits, the windows of the tests, a
-// wide auth.clock_leeway (the fake clock jumps ahead of the clients' real clock) and periods of the
+// wide auth.clock_leeway and auth.dpop_proof_max_age (the fake clock jumps ahead of the clients'
+// real clock) and periods of the
 // jobs long enough that only the tests run them.
 func testConfig(over map[string]string) map[string]string {
 	conf := harness.RaisedRateLimits()
 	for k, v := range map[string]string{
 		"audit.deny_aggregate_window":   "50ms",
 		"auth.clock_leeway":             "48h",
+		"auth.dpop_proof_max_age":       "48h",
 		"terminal.sweep_interval":       "24h",
 		"authz.expiry_sweep_interval":   "24h",
 		"terminal.open_timeout":         seconds(openTimeout),
@@ -199,8 +189,7 @@ func newWorld(t *testing.T, o worldOptions) *world {
 	w := &world{t: t, clk: clk, timers: fakehost.NewClockTimers(clk), metrics: newSessionMetrics(), logs: &syncBuffer{}}
 	w.s = harness.Start(t, harness.Options{Config: testConfig(o.cfg), Clock: clk, TerminalTimers: w.timers, EgressDenyAll: true,
 		LogWriter: w.logs, Role: o.role, TerminalSessionMetrics: w.metrics,
-		TerminalModule: func(s *terminalapp.Service) { w.svcMu.Lock(); w.svc = s; w.svcMu.Unlock() },
-		JobModules:     func(m *wire.JobModules) { w.svcMu.Lock(); w.jobs = m; w.svcMu.Unlock() }})
+		JobModules: func(m *wire.JobModules) { w.svcMu.Lock(); w.jobs = m; w.svcMu.Unlock() }})
 	w.robin = w.s.Owner
 	w.alex = w.s.NewUser(t, harness.UserSpec{Handle: "alex", DisplayName: "Alex"})
 	w.sam = w.s.NewUser(t, harness.UserSpec{Handle: "sam", DisplayName: "Sam"})
@@ -215,16 +204,9 @@ func newWorld(t *testing.T, o worldOptions) *world {
 	w.alexGrant = w.grant("user", w.alex.PrincipalID, w.r1.String(), "")
 	w.engineering = w.group("Engineering", w.sam.PrincipalID, "")
 	w.engGrant = w.grant("group", w.engineering, w.r2.String(), "")
-	w.h1 = w.connect(w.r1, w.k1, r1Users(), false)
-	w.h2 = w.connect(w.r2, w.k2, r2Users(), false)
+	w.h1 = w.connect(w.r1, w.k1, r1Users())
+	w.h2 = w.connect(w.r2, w.k2, r2Users())
 	return w
-}
-
-// service returns the use cases of the terminal module of the server.
-func (w *world) service() *terminalapp.Service {
-	w.svcMu.Lock()
-	defer w.svcMu.Unlock()
-	return w.svc
 }
 
 // jobModules returns the use cases of the jobs of the server.
@@ -255,7 +237,8 @@ func (w *world) expirySweep() {
 
 // syncClock moves the frozen fake clock forward to the real time when it lags behind (before a
 // phase of requests: the clients sign with the real clock), never backwards, and runs what became
-// due.
+// due. auth.clock_leeway and auth.dpop_proof_max_age are wide in testConfig, so the clients' proofs
+// still pass after a jump of the fake clock ahead of the real clock.
 func (w *world) syncClock() {
 	if d := time.Now().UTC().Truncate(time.Millisecond).Sub(w.clk.Now()); d > 0 {
 		w.timers.Advance(d)
@@ -294,10 +277,11 @@ func report(u []any, serverHost bool) map[string]any {
 		"require_local_confirm": false, "os_version": "Debian 13"}
 }
 
-// connect connects the Fake-Host of host with its report; every session is accepted (echo).
-func (w *world) connect(host ids.ID, key hosttest.Key, u []any, serverHost bool, live ...ids.ID) *fakehost.Host {
+// connect connects the Fake-Host of host with its report (not a server host); every session is
+// accepted (echo).
+func (w *world) connect(host ids.ID, key hosttest.Key, u []any) *fakehost.Host {
 	w.syncClock()
-	h := fakehost.Connect(w.t, w.s.PublicURL, host, key, report(u, serverHost), live...)
+	h := fakehost.Connect(w.t, w.s.PublicURL, host, key, report(u, false))
 	h.Default(fakehost.Script{Kind: fakehost.Accept})
 	return h
 }
