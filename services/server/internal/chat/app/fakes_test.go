@@ -37,6 +37,29 @@ type store struct {
 	// policies are the agent policies storePolicies answers.
 	policies map[ids.ID]authz.AgentPolicy
 	fail     error
+	// faults fail single methods by name; movedTo makes LockThread report the thread in that
+	// channel (a move that committed between the read and the lock), and spaceGone makes
+	// ShareSpace find no space. The move tests set them before the call (M1-62).
+	faults    map[string]error
+	movedTo   ids.ID
+	spaceGone bool
+}
+
+// fault returns the injected failure of the method name, or nil.
+func (s *store) fault(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.faults[name]
+}
+
+// inject makes the method name fail with err (nil removes the failure).
+func (s *store) inject(name string, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.faults == nil {
+		s.faults = map[string]error{}
+	}
+	s.faults[name] = err
 }
 
 func newStore() *store {
@@ -51,6 +74,9 @@ func (s *store) row(c domain.Channel) app.ChannelRow {
 }
 
 func (s *store) Channel(_ context.Context, id ids.ID) (app.ChannelRow, bool, error) {
+	if err := s.fault("Channel"); err != nil {
+		return app.ChannelRow{}, false, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	c, ok := s.channels[id]
@@ -386,15 +412,21 @@ func (r *recorder) Record(_ context.Context, e auditing.Entry) error {
 func (r *recorder) RecordDenial(context.Context, auditing.Entry) error   { return nil }
 func (r *recorder) RecordDetached(context.Context, auditing.Entry) error { return nil }
 
-// appender keeps the events.
+// appender keeps the events; an event whose type is in fail is refused with that error.
 type appender struct {
-	mu  sync.Mutex
-	evs []eventlog.Event
+	mu   sync.Mutex
+	evs  []eventlog.Event
+	fail map[string]error
 }
 
 func (a *appender) Append(_ context.Context, evs ...eventlog.Event) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	for _, ev := range evs {
+		if err := a.fail[ev.Type]; err != nil {
+			return err
+		}
+	}
 	a.evs = append(a.evs, evs...)
 	return nil
 }
@@ -489,7 +521,16 @@ func (s *store) Thread(_ context.Context, id ids.ID) (domain.Thread, bool, error
 }
 
 func (s *store) LockThread(ctx context.Context, id ids.ID) (domain.Thread, bool, error) {
-	return s.Thread(ctx, id)
+	if err := s.fault("LockThread"); err != nil {
+		return domain.Thread{}, false, err
+	}
+	th, ok, err := s.Thread(ctx, id)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.movedTo.IsZero() {
+		th.ChannelID = s.movedTo
+	}
+	return th, ok, err
 }
 
 func (s *store) ShareThread(ctx context.Context, id ids.ID) (domain.Thread, bool, error) {
@@ -653,14 +694,26 @@ func (cursors) Decode(list string, binding []byte, s string, key any) error {
 }
 
 func (s *store) ShareChannel(ctx context.Context, id ids.ID) (app.ChannelRow, bool, error) {
+	if err := s.fault("ShareChannel"); err != nil {
+		return app.ChannelRow{}, false, err
+	}
 	return s.Channel(ctx, id)
 }
 
 func (s *store) ShareSpace(ctx context.Context, id ids.ID) (domain.Space, bool, error) {
-	return s.Space(ctx, id)
+	if err := s.fault("ShareSpace"); err != nil {
+		return domain.Space{}, false, err
+	}
+	sp, ok, err := s.Space(ctx, id)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return sp, ok && !s.spaceGone, err
 }
 
 func (s *store) MoveThread(_ context.Context, id, channel ids.ID, at time.Time) (domain.Thread, error) {
+	if err := s.fault("MoveThread"); err != nil {
+		return domain.Thread{}, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ensureThreads()
@@ -672,6 +725,9 @@ func (s *store) MoveThread(_ context.Context, id, channel ids.ID, at time.Time) 
 }
 
 func (s *store) DeleteThreadTags(_ context.Context, thread ids.ID) error {
+	if err := s.fault("DeleteThreadTags"); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ensureThreads()
