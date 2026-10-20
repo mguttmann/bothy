@@ -10,6 +10,7 @@ import 'package:auth/auth.dart' show StepUpPrompt;
 import 'package:client/app/bootstrap.dart';
 import 'package:client/app/discovery.dart';
 import 'package:client/app/providers/ports.dart';
+import 'package:client/files/file_ports.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sync_engine/testing.dart';
@@ -48,6 +49,7 @@ class FakeInstance {
     Map<String, String> config = fastConfig,
     DiscoveryClient Function(DiscoveryClient real)? discovery,
     StepUpPrompt? stepUpPrompt,
+    FilePorts? files,
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -55,7 +57,7 @@ class FakeInstance {
       ),
     );
     final seed = WorldSeed.standard(server.world);
-    return _on(server, seed, config, discovery, stepUpPrompt);
+    return _on(server, seed, config, discovery, stepUpPrompt, files);
   }
 
   /// A second app of Alex on the same fake: its own data folder, keys and secrets (a second
@@ -63,7 +65,7 @@ class FakeInstance {
   Future<FakeInstance> sibling({
     Map<String, String> config = fastConfig,
     StepUpPrompt? stepUpPrompt,
-  }) => _on(server, seed, config, null, stepUpPrompt);
+  }) => _on(server, seed, config, null, stepUpPrompt, null);
 
   static Future<FakeInstance> _on(
     FakeServer server,
@@ -71,6 +73,7 @@ class FakeInstance {
     Map<String, String> config,
     DiscoveryClient Function(DiscoveryClient real)? discovery,
     StepUpPrompt? stepUpPrompt,
+    FilePorts? files,
   ) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
@@ -87,6 +90,7 @@ class FakeInstance {
       deviceKeys: keys,
       discovery: discovery == null ? real : discovery(real),
       stepUpPrompt: stepUpPrompt,
+      files: files,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }
