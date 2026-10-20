@@ -5417,6 +5417,30 @@ func (e EndViewAsParamsXConsoleRequest) Valid() bool {
 	}
 }
 
+// Defines values for DownloadThumbnailParamsVariant.
+const (
+	DownloadThumbnailParamsVariantLarge  DownloadThumbnailParamsVariant = "large"
+	DownloadThumbnailParamsVariantMedium DownloadThumbnailParamsVariant = "medium"
+	DownloadThumbnailParamsVariantPoster DownloadThumbnailParamsVariant = "poster"
+	DownloadThumbnailParamsVariantSmall  DownloadThumbnailParamsVariant = "small"
+)
+
+// Valid indicates whether the value is a known member of the DownloadThumbnailParamsVariant enum.
+func (e DownloadThumbnailParamsVariant) Valid() bool {
+	switch e {
+	case DownloadThumbnailParamsVariantLarge:
+		return true
+	case DownloadThumbnailParamsVariantMedium:
+		return true
+	case DownloadThumbnailParamsVariantPoster:
+		return true
+	case DownloadThumbnailParamsVariantSmall:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeleteNotificationPreferenceParamsTargetKind.
 const (
 	DeleteNotificationPreferenceParamsTargetKindChannel DeleteNotificationPreferenceParamsTargetKind = "channel"
@@ -15894,6 +15918,9 @@ type EmojiPath = string
 // FileIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type FileIdPath = Uuid
 
+// FileTicketQuery defines model for FileTicketQuery.
+type FileTicketQuery = string
+
 // GrantIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type GrantIdPath = Uuid
 
@@ -15911,6 +15938,9 @@ type IdempotencyKey = Uuid
 
 // IdentityIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type IdentityIdPath = Uuid
+
+// IfRange defines model for If-Range.
+type IfRange = string
 
 // IfMatchOptional Examples: "7"
 type IfMatchOptional = string
@@ -15950,6 +15980,9 @@ type PrincipalIdPath = Uuid
 
 // ProviderIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type ProviderIdPath = Uuid
+
+// Range defines model for Range.
+type Range = string
 
 // RegistrationIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type RegistrationIdPath = Uuid
@@ -16031,6 +16064,10 @@ type ConsoleLogin = ConsoleSession
 // Error Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Error = Problem
+
+// FileConflict Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
+// path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
+type FileConflict = Problem
 
 // Forbidden Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
@@ -16473,6 +16510,43 @@ type PutFeatureFlagParams struct {
 	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
 	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
 }
+
+// DownloadFileParams defines parameters for DownloadFile.
+type DownloadFileParams struct {
+	// Ticket Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+	// `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+	// bearer secret: never logged.
+	Ticket *FileTicketQuery `form:"ticket,omitempty" json:"ticket,omitempty"`
+
+	// Range One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+	// `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+	// a range that starts at or after the end gives 416 (12, 9.3).
+	Range *Range `json:"Range,omitempty"`
+
+	// IfRange Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+	// included, gives the whole variant (200).
+	IfRange *IfRange `json:"If-Range,omitempty"`
+}
+
+// DownloadThumbnailParams defines parameters for DownloadThumbnail.
+type DownloadThumbnailParams struct {
+	// Ticket Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+	// `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+	// bearer secret: never logged.
+	Ticket *FileTicketQuery `form:"ticket,omitempty" json:"ticket,omitempty"`
+
+	// Range One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+	// `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+	// a range that starts at or after the end gives 416 (12, 9.3).
+	Range *Range `json:"Range,omitempty"`
+
+	// IfRange Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+	// included, gives the whole variant (200).
+	IfRange *IfRange `json:"If-Range,omitempty"`
+}
+
+// DownloadThumbnailParamsVariant defines parameters for DownloadThumbnail.
+type DownloadThumbnailParamsVariant string
 
 // ListGrantsParams defines parameters for ListGrants.
 type ListGrantsParams struct {
@@ -17125,6 +17199,9 @@ type RevokeDeviceJSONRequestBody = ReasonBody
 
 // PutFeatureFlagJSONRequestBody defines body for PutFeatureFlag for application/json ContentType.
 type PutFeatureFlagJSONRequestBody = FeatureFlagPut
+
+// CreateFileTicketJSONRequestBody defines body for CreateFileTicket for application/json ContentType.
+type CreateFileTicketJSONRequestBody = FileTicketCreate
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate
