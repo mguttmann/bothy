@@ -171,6 +171,9 @@ func (s *Setup) authorizer(v *config.Values, sy *Sync, log *slog.Logger) (author
 	if err := s.audit.RightsHook().Bind(authzapp.RightsBindings{Events: sy.Appender(), Audit: s.audit.Recorder()}); err != nil {
 		return nil, err
 	}
+	if err := s.audit.SyncSubscribers().Bind(sy.Appender()); err != nil {
+		return nil, err
+	}
 	return az, nil
 }
 

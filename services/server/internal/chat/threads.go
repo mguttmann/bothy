@@ -53,6 +53,10 @@ type ThreadInfo struct {
 	Version int64
 	// ChannelArchived reports an archived channel or a channel of an archived space.
 	ChannelArchived bool
+	// LastMessageSeq and UnreadFloorSeq are the counters of the thread (03 threads): the read
+	// position of a person lies in 0..LastMessageSeq, and messages up to UnreadFloorSeq count as
+	// unread for nobody (M1-61).
+	LastMessageSeq, UnreadFloorSeq int64
 }
 
 // ParentMessage is the message of the main thread a thread starts from. The caller (messaging)
@@ -164,6 +168,16 @@ type Threads interface {
 	// Info returns routing and state data of a thread without authorizing; callers authorize
 	// before they reveal anything derived from it. Errors: not_found for an unknown thread.
 	Info(ctx context.Context, threadID ids.ID) (ThreadInfo, error)
+	// InfoForShare returns Info and holds FOR SHARE on the thread row until the end of the unit of
+	// work of ctx (M1-61): a concurrent move (M1-62 updates the row) either committed before, so
+	// the channel copied into read_states or drafts is the new one, or waits for the caller's
+	// commit. It does not authorize. Errors: not_found for an unknown thread, internal outside a
+	// unit of work.
+	//
+	// Example:
+	//
+	//	info, err := threads.InfoForShare(ctx, threadID) // inside uow.Do
+	InfoForShare(ctx context.Context, threadID ids.ID) (ThreadInfo, error)
 
 	// List returns a page of the threads of kind thread of a channel (thread.read on the channel,
 	// then per item in filter mode, 07 section 7.4), newest first by last_activity or created,

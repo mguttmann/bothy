@@ -106,6 +106,24 @@ documented in this file. The format is based on
   `my_reactions`. The new keys `reaction.max_distinct_per_message` and `pin.max_per_thread`
   bound distinct symbols per message and pins per thread (`400 validation_failed` (reason
   `limit_reached`)).
+
+- Read state, drafts and personal settings (M1-61): migration `00042` creates `read_states`,
+  `drafts` and `user_settings`. `putReadState` only moves the read position forward,
+  `markThreadUnread` moves it back with a required `If-Match` (`428`, `412` with `current`) and
+  answers the `ETag`; `listMyReadStates` lists the own rows of a readable channel. Every read
+  state carries `mention_count`, computed from the unread mentions when the answer is built and
+  never stored. `putThreadDraft`, `putChannelDraft` (forums only), `deleteThreadDraft`,
+  `deleteChannelDraft` and `listMyDrafts` keep one draft per thread and per forum with last write
+  wins in server order and `overwrote_newer`; an empty draft is deleted, drafts work in read-only
+  and archived channels, and `clear_draft` on sending deletes the draft in the transaction of the
+  message (subscription `messaging.MessagePosted -> sync`). `listMySettings`, `putMySetting` and
+  `deleteMySetting` accept exactly the keys and values of 01 section 11 and 13 section 3.3;
+  `getMySidebar` reads the own sidebar rows. Every change appends one personal event
+  (`read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated`, audience the
+  person, with `updated_by_device_id`); a no-op and a mention append none. Agents and apps get
+  `403 forbidden` (reason `subject_kind_not_allowed`) on all twelve operations from
+  `authorize`. The chat port adds `Threads.InfoForShare`, the messaging port `ReplyTargets`.
+
 - Mentions and templates (M1-60): `listMyMentions` lists the caller's mentions in channels it may
   read, newest first, with a cursor bound to the list and the caller; a mention in an unreadable
   channel stays stored but is never listed or counted. The port `messaging.Mentions` adds

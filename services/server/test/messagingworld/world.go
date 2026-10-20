@@ -65,9 +65,11 @@ var chatConfig = chatapp.Config{
 
 // Limits of the world, small enough for the tests to reach them.
 const (
-	MaxContent  = 4096
-	MaxMentions = 4
-	PayloadMax  = 2048
+	MaxContent = 4096
+	// MaxAttachments is message.max_attachments of the drafts (M1-61).
+	MaxAttachments = 3
+	MaxMentions    = 4
+	PayloadMax     = 2048
 	// TemplateNameMax and TemplateMax are template.name_max_chars and template.max_per_scope.
 	TemplateNameMax = 20
 	TemplateMax     = 5
@@ -161,11 +163,28 @@ type World struct {
 
 	rec   *Recorder
 	audit *auditapp.Recorder
+
+	// Personal is the personal data of sync (M1-61); nil unless built by NewPersonal.
+	Personal *syncapp.Personal
 }
 
 // New builds a world on a new database with the owner "owner"; subscribe registers the test
 // subscriber of MessagePosted of the calling package; opts change the messaging configuration.
 func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
+	t.Helper()
+	return build(t, subscribe, false, opts)
+}
+
+// NewPersonal builds the world of New with the personal data of sync (M1-61): its REST handlers in
+// the harness and its in-transaction subscriber of MessagePosted (drafts with clear_draft) in the
+// registry, bound to the appender of the world, as internal/wire registers it (INT-W25/2).
+func NewPersonal(t *testing.T, subscribe Subscribe, opts ...Option) *World {
+	t.Helper()
+	return build(t, subscribe, true, opts)
+}
+
+// build builds the world of New; personal adds the personal data of sync.
+func build(t *testing.T, subscribe Subscribe, personal bool, opts []Option) *World {
 	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
@@ -182,7 +201,11 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reg := registry(t, hook, wire.NewModules(pool, log), subscribe, w.rec)
+	var subs *syncapp.Subscribers
+	if personal {
+		subs = syncapp.NewSubscribers(syncpg.NewPersonalRepository(pool))
+	}
+	reg := registry(t, hook, wire.NewModules(pool, log), subscribe, w.rec, subs)
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
 	rec, err := auditapp.NewRecorder(auditapp.Config{
 		DenyAggregateWindow: time.Hour, DenyAggregateMaxKeys: 100, IPKeyPeriod: 30 * 24 * time.Hour,
@@ -236,7 +259,11 @@ func New(t *testing.T, subscribe Subscribe, opts ...Option) *World {
 		t.Fatal(err)
 	}
 	w.Svc, w.Threads, w.Authorizer, w.audit = m.Service, c.Service, az, rec
-	w.H = harness(t, pool, uow, w.actors, wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers}, w.Clock)
+	handlers := wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers}
+	if subs != nil {
+		w.personal(subs, pool, uow, az, appender, c, m, &handlers)
+	}
+	w.H = harness(t, pool, uow, w.actors, handlers, w.Clock)
 	w.OwnerID = w.Person("owner", true)
 	return w
 }
@@ -252,9 +279,25 @@ func SearchLanguages(t testing.TB) searchlang.Map {
 	return m
 }
 
+// personal binds the subscribers of sync to the appender and adds the personal data of sync to
+// the world and to handlers (NewPersonal).
+func (w *World) personal(subs *syncapp.Subscribers, pool *pg.Pool, uow *pg.UnitOfWork, az authorize.Authorizer, appender *syncapp.Appender,
+	c *wire.Chat, m *wire.Messaging, handlers *wire.Handlers) {
+	w.t.Helper()
+	if err := subs.Bind(appender); err != nil {
+		w.t.Fatal(err)
+	}
+	p, err := wire.NewPersonal(syncapp.PersonalConfig{MaxContentBytes: MaxContent, MaxAttachments: MaxAttachments, EventPayloadMaxBytes: PayloadMax},
+		pool, uow, az, appender, c.Service, m.Service, w.Clock)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	w.Personal, handlers.Personal = p.Service, p.Handlers
+}
+
 // registry returns the sealed txn registry with the rights hooks, the sync and audit hooks and
 // the test subscriber of MessagePosted.
-func registry(t *testing.T, hook *authzapp.RightsHook, mods *wire.Modules, subscribe Subscribe, rec *Recorder) *txn.Registry {
+func registry(t *testing.T, hook *authzapp.RightsHook, mods *wire.Modules, subscribe Subscribe, rec *Recorder, subs *syncapp.Subscribers) *txn.Registry {
 	t.Helper()
 	reg := txn.NewRegistry()
 	for _, h := range []struct {
@@ -265,7 +308,14 @@ func registry(t *testing.T, hook *authzapp.RightsHook, mods *wire.Modules, subsc
 			t.Fatal(err)
 		}
 	}
-	// The test subscriber of MessagePosted, the way runs, sync and notify subscribe later.
+	// The subscriber of sync first, so a veto of the test subscriber after it rolls back what it
+	// did (M1-61).
+	if subs != nil {
+		if err := txn.Subscribe(reg, subs.OnMessagePosted); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The test subscriber of MessagePosted, the way runs and notify subscribe later.
 	if err := subscribe(reg, rec); err != nil {
 		t.Fatal(err)
 	}
@@ -361,6 +411,27 @@ func (w *World) Person(name string, owner bool) ids.ID {
 	w.creds.PutSession(s, fake.Session{PrincipalID: id, DeviceID: d, ExpiresAt: start.Add(365 * 24 * time.Hour)})
 	w.actors.Set(name, httpservertest.InSession(id, s, d, w.Clock.Now()))
 	return id
+}
+
+// Device registers token name for the person on a new active device in its own session, the
+// second device of a person (M1-61); it returns the device.
+func (w *World) Device(name string, person ids.ID) ids.ID {
+	w.t.Helper()
+	s, d := ids.New(), ids.New()
+	w.SQL(`INSERT INTO devices (id, user_id, name, platform, state) VALUES ($1, $2, 'Phone', 'ios', 'active')`, d.String(), person.String())
+	w.creds.PutDevice(d, fake.Device{PrincipalID: person, State: authz.DeviceActive})
+	w.creds.PutSession(s, fake.Session{PrincipalID: person, DeviceID: d, ExpiresAt: start.Add(365 * 24 * time.Hour)})
+	w.actors.Set(name, httpservertest.InSession(person, s, d, w.Clock.Now()))
+	return d
+}
+
+// Actor returns the principal of token name, for a test that calls a use case directly.
+func (w *World) Actor(name string) actor.Actor { return w.actors.Get(name) }
+
+// DeviceOf returns the device of the session of token name.
+func (w *World) DeviceOf(name string) ids.ID {
+	w.t.Helper()
+	return w.actors.Get(name).DeviceID
 }
 
 // Agent inserts an active agent with handle name, an agents row and an organization policy, and

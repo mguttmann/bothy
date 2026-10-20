@@ -131,6 +131,12 @@ var appPrivileges = map[string][]string{
 	// deletion of the message removes both (03 messages).
 	"reactions": {"SELECT", "INSERT", "DELETE"},
 	"pins":      {"SELECT", "INSERT", "DELETE"},
+	// M1-61: the personal sync tables of sync. A read state is never deleted by the use cases
+	// (it goes with its person, thread or channel by ON DELETE CASCADE); an empty draft and a
+	// reset setting are deleted.
+	"read_states":   {"SELECT", "INSERT", "UPDATE"},
+	"drafts":        {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"user_settings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},

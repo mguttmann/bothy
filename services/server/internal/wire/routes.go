@@ -19,6 +19,7 @@ import (
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
 )
 
@@ -124,6 +125,10 @@ type Handlers struct {
 	// updateWebhookSubscription, deleteWebhookSubscription, listWebhookDeliveries and
 	// redeliverWebhook (apps, M2-26).
 	*appshttp.Webhooks
+	// Personal implements listMyReadStates, putReadState, markThreadUnread, putThreadDraft,
+	// deleteThreadDraft, putChannelDraft, deleteChannelDraft, listMyDrafts, listMySettings,
+	// putMySetting, deleteMySetting and getMySidebar (sync, M1-61).
+	*synchttp.Personal
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the
