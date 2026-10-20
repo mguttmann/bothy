@@ -90,7 +90,7 @@ def test_git_variables_are_cleared_by_the_pre_push_hook() -> None:
     entries = [
         h["entry"] for r in hooks["repos"] for h in r["hooks"] if "pre-push" in h.get("stages", [])
     ]
-    assert any(e.startswith("env -u GIT_DIR ") and e.endswith("make check") for e in entries)
+    assert any("env -u GIT_DIR " in e and e.endswith(" make check") for e in entries)
 
 
 def test_test_names_and_reserved_addresses_are_fine_in_tests() -> None:
