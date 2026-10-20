@@ -302,3 +302,26 @@ func TestCrossNode_StepUpConsumedOnce(t *testing.T) {
 		t.Fatalf("%d rows", n)
 	}
 }
+
+// TestCrossNode_ControlLossKeepsRemotePairing (code review M2-47): the control connection of the
+// host ends on A while a session is paired on B; A detaches the sessions of the host (M2-43), and
+// B, whose pairing is alive, makes the session active again; the device on B stays connected.
+func TestCrossNode_ControlLossKeepsRemotePairing(t *testing.T) {
+	t.Parallel()
+	c := newCluster(t, "multi")
+	h := c.connect(nodeA)
+	g := c.hashedTo(nodeB, c.host)
+	d := c.device(c.alex, g.Session.ID)
+	c.handshake(d, g.SessionToken)
+	c.waitState(g.Session.ID, "active")
+	h.Control.StopHeartbeat()
+	_ = h.Control.Close()
+	c.eventually("the detach of A", func() bool {
+		return c.count(`SELECT count(*) FROM event_log WHERE type = 'terminal_session.changed' AND resource_id = $1
+			AND payload->>'state' = 'detached'`, g.Session.ID) > 0
+	})
+	c.waitState(g.Session.ID, "active")
+	if d.Ended() {
+		t.Fatal("the device on B was closed")
+	}
+}

@@ -1670,7 +1670,8 @@ connection does), once its log tail delivered `terminal_session.changed` with `a
 from the database. A side that reaches a node before `terminal.session_open` did builds the
 expectation of the current grant from the row; an expectation carries its grant (the token `jti`),
 and the same grant again changes nothing, so the signal and the side may arrive in either order
-(D-M2-47-21). The deadline of an expectation waits while an unpaired side is present, because that
+(D-M2-47-21). A node that still relays both sides of a started session makes it `active` again when
+another node detached it because its control connection of the host ended (D-M2-47-25). The deadline of an expectation waits while an unpaired side is present, because that
 side's own timer decides; an expectation without sides ends a session still in `opening` through the
 same compare-and-swap. On a host whose last `report` says `require_local_confirm = true` an
 expectation without sides that received `terminal.session_paired` only removes itself at its

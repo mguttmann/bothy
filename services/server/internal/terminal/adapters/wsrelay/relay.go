@@ -877,8 +877,16 @@ func (r *Relay) observeStarted(ctx context.Context, id ids.ID, state string) {
 	}
 	r.mu.Lock()
 	var fx effects
-	if s := r.slots[id]; s != nil && !s.started {
+	s := r.slots[id]
+	switch {
+	case s == nil:
+	case !s.started:
 		fx = r.markStarted(s, state)
+	case state == domain.SessionDetached && s.paired:
+		// Another node detached a session this node still relays (its control connection of the
+		// host ended, M2-43 ConnectionLost): both sides here are alive, so the session is active
+		// again (code review M2-47; RelayActivate changes only a detached row).
+		fx = effects{func(ctx context.Context) { r.call(ctx, r.uc.RelayActivate(ctx, id)) }}
 	}
 	r.mu.Unlock()
 	fx.run(ctx)
