@@ -67,19 +67,24 @@ func SessionUserAdd(t Target, name string, configured []string, bindings map[str
 const closedHomeSDDL = "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;<user-sid>)"
 
 // SessionUserRemove returns the plan of "session-user remove <name>": remove the name from
-// host_service.session_users and host_service.claude_workdirs, remove the helper service, close
-// the home (mode 0700, on Windows an ACL only for the user and the trusted owners) and restart.
+// host_service.session_users and host_service.claude_workdirs, stop the host service (Linux and
+// macOS), remove the helper service, close the home (mode 0700, on Windows an ACL only for the
+// user and the trusted owners) and restart.
 // The binding stays, and no process of the user is ended.
 func SessionUserRemove(t Target, name string, configured []string) ([]Step, error) {
 	if !slices.Contains(configured, name) {
 		return nil, fmt.Errorf("bothy-host session-user remove: %s: %w", name, ErrNotConfigured)
 	}
 	steps := []Step{{Kind: KindConfigRemove, Path: t.ConfigPath, Name: name}}
+	// The host service stops before the helper goes, so the sessions of the name end with the
+	// restart at the end (host_restarted, R-TM-27) and not as an exit of their processes when the
+	// helper stops (found by the conformance suite of M2-48).
 	switch t.GOOS {
 	case hostos.Linux:
 		socket := "bothy-host-helper-" + name + ".socket"
 		service := hostos.HelperServiceName(hostos.Linux, name)
 		steps = append(steps,
+			run("/usr/bin/systemctl", "stop", "bothy-host.service"),
 			run("/usr/bin/systemctl", "disable", "--now", socket, service),
 			Step{Kind: KindRemove, Path: filepath.Join(SystemdDir, socket)},
 			Step{Kind: KindRemove, Path: filepath.Join(SystemdDir, service)},
@@ -87,7 +92,10 @@ func SessionUserRemove(t Target, name string, configured []string) ([]Step, erro
 			Step{Kind: KindChmod, Path: "~" + name, Mode: 0o700, Owner: name})
 	case hostos.Darwin:
 		label := hostos.HelperServiceName(hostos.Darwin, name)
+		// SIGTERM is no crash, so KeepAlive {Crashed: true} does not start it again before the
+		// kickstart of Restart.
 		steps = append(steps,
+			run("/bin/launchctl", "kill", "SIGTERM", "system/bothy-host"),
 			run("/bin/launchctl", "bootout", "system/"+label),
 			Step{Kind: KindRemove, Path: filepath.Join(LaunchDaemonsDir, label+".plist")},
 			Step{Kind: KindChmod, Path: "~" + name, Mode: 0o700, Owner: name})

@@ -257,7 +257,10 @@ func TestSessionUserRemove(t *testing.T) {
 	if err != nil || len(c.SessionUsers) != 1 || len(c.ClaudeWorkdirs) != 0 {
 		t.Errorf("config %+v %v", c, err)
 	}
+	// The host service stops first, so the sessions of the removed name end with the restart
+	// (host_restarted, R-TM-27) and not through the stop of its helper (found by M2-48).
 	want := []string{
+		"run /usr/bin/systemctl stop bothy-host.service",
 		"run /usr/bin/systemctl disable --now bothy-host-helper-bothy-s-sam.socket bothy-host-helper-bothy-s-sam.service",
 		"remove /etc/systemd/system/bothy-host-helper-bothy-s-sam.socket", "remove /etc/systemd/system/bothy-host-helper-bothy-s-sam.service",
 		"run /usr/bin/systemctl daemon-reload", "chmod /home/bothy-s-sam 0700 bothy-s-sam",
