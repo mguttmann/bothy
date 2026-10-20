@@ -117,6 +117,14 @@ jobs:
         with:
           go-version-file: services/server/go.mod
           cache: false
+      # The product build checks that every image compose.yaml names exists under
+      # ghcr.io/<owner> (docs/spec/18-release.md 2.1 rule 4), so it reads the registry too.
+      - if: steps.info.outputs.component == 'bothy'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
       - name: Build release artifacts (component Makefile, target release-build)
         env:
           COMPONENT_PATH: ${{ steps.info.outputs.path }}
@@ -581,6 +589,96 @@ jobs:
           path: dist
           if-no-files-found: error
 
+  # Product (tag v<version>, brief M7-29): the bundle and install.sh of the build, signed and
+  # verified like every release file (18 section 6, ADR 0062): SBOMs, SHA256SUMS, one
+  # .sigstore.json per file.
+  product-signing:
+    name: signing (product bundle and install.sh)
+    needs: [resolve, build]
+    if: needs.resolve.outputs.component == 'bothy'
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # keyless signing in the public phase
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (T-SC-05,
+      # rule release-untrusted-output in tools/ci/check_runners.py).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - name: Bundle and install.sh of the build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: SBOMs (SPDX and CycloneDX) of the bundle and install.sh
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sbom --dist dist \
+            --version "$VERSION" --binary "dist/bothy-compose-${VERSION}.tar.gz" --binary dist/install.sh
+      - name: Sign with the key pair of the private phase (ADR 0062)
+        if: github.event.repository.visibility != 'public'
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sign --mode private \
+            --dist dist --version "$VERSION" \
+            --binary "dist/bothy-compose-${VERSION}.tar.gz" --binary dist/install.sh
+      - name: Verify like an instance operator (private phase)
+        if: github.event.repository.visibility != 'public'
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py verify --mode private \
+            --key quality/release/cosign-private-phase.pub --dist dist
+      - name: Sign keyless with the workflow identity (public phase)
+        if: github.event.repository.visibility == 'public'
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py sign --mode public \
+            --dist dist --version "$VERSION" \
+            --binary "dist/bothy-compose-${VERSION}.tar.gz" --binary dist/install.sh
+      # install.sh checks the bundle against this identity (docs/spec/16-operations.md 3.1 step 2).
+      - name: Verify like an instance operator (public phase)
+        if: github.event.repository.visibility == 'public'
+        run: |
+          uv run --project tools --locked --quiet python tools/ci/release_chain.py verify --mode public \
+            --identity-regexp "^https://github\\.com/${GITHUB_REPOSITORY}/\\.github/workflows/release\\.yml@refs/tags/v" \
+            --issuer https://token.actions.githubusercontent.com --dist dist
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-product
+          path: dist
+          if-no-files-found: error
+
   build-apple:
     name: build (macOS and iOS apps)
     needs: [resolve, gates]
@@ -686,11 +784,13 @@ jobs:
 
   publish:
     name: publish
-    needs: [resolve, build, supply-chain, build-apple, build-windows]
+    needs: [resolve, build, supply-chain, product-signing, build-apple, build-windows]
     if: >-
       always() && needs.build.result == 'success' &&
       contains(fromJSON('["success","skipped"]'), needs.supply-chain.result) &&
       (needs.resolve.outputs.component != 'server' || needs.supply-chain.result == 'success') &&
+      contains(fromJSON('["success","skipped"]'), needs.product-signing.result) &&
+      (needs.resolve.outputs.component != 'bothy' || needs.product-signing.result == 'success') &&
       contains(fromJSON('["success","skipped"]'), needs.build-apple.result) &&
       contains(fromJSON('["success","skipped"]'), needs.build-windows.result)
     environment: release
@@ -738,8 +838,16 @@ jobs:
           artifact-ids: ${{ needs.supply-chain.outputs.dist_id }}
           path: dist
           merge-multiple: true
+      # Product: the signed set of the product-signing job, by id.
+      - name: Signed artifacts of the product
+        if: steps.info.outputs.component == 'bothy'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.product-signing.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
       - name: Artifacts of the Linux build
-        if: steps.info.outputs.component != 'server' && needs.build.outputs.dist_id != ''
+        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy' && needs.build.outputs.dist_id != ''
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.build.outputs.dist_id }}
@@ -760,7 +868,7 @@ jobs:
           path: dist
           merge-multiple: true
       - name: SBOM of all release artifacts
-        if: steps.info.outputs.component != 'server'
+        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy'
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: dist
@@ -769,7 +877,7 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
       - name: Checksums
-        if: steps.info.outputs.component != 'server'
+        if: steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy'
         run: |
           mv sbom.spdx.json dist/
           (cd dist && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > "$RUNNER_TEMP/SHA256SUMS")
@@ -780,7 +888,7 @@ jobs:
         with:
           subject-path: dist/*
       - name: SBOM attestation (public phase only)
-        if: github.event.repository.visibility == 'public' && steps.info.outputs.component != 'server'
+        if: github.event.repository.visibility == 'public' && steps.info.outputs.component != 'server' && steps.info.outputs.component != 'bothy'
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: dist/*

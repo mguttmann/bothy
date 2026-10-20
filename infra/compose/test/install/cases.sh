@@ -337,9 +337,9 @@ test_scan_default_follows_memory() {
 	inst STUB_MEMTOTAL=2147483648 sh "$INSTALL" --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
 	expect_rc 0
 	expect_env COMPOSE_PROFILES direct
-	inst STUB_MEMTOTAL=2147483648 sh "$INSTALL" --dir bothy2 --scan on --observability on --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
+	inst STUB_MEMTOTAL=2147483648 sh "$INSTALL" --dir second --scan on --observability on --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
 	expect_rc 0
-	expect_env COMPOSE_PROFILES direct,scan,observability "$CASE/bothy2/infra/compose/.env"
+	expect_env COMPOSE_PROFILES direct,scan,observability "$CASE/second/infra/compose/.env"
 	expect_in "$ERR" "3 GiB"
 }
 
@@ -361,7 +361,7 @@ test_bundle_versions_pass_through() {
 test_start_order_and_finish_text() {
 	inst sh "$INSTALL" --yes --public-url "$PUBLIC_URL" --owner-handle alex --owner-name Alex
 	expect_rc 0
-	order=$(grep -E '^docker compose (config --quiet|up --no-start|up -d|exec -T api bothy (healthcheck|setup))' "$STUB_LOG" | uniq | cut -d' ' -f3-7)
+	order=$(grep -E '^docker compose (config --quiet|up --no-start|up -d|exec -T api bothy healthcheck|exec -T api bothy setup)' "$STUB_LOG" | uniq | cut -d' ' -f3-7)
 	expected=$(printf '%s\n' 'config --quiet' 'up --no-start' 'up -d' 'exec -T api bothy healthcheck' 'exec -T api bothy setup')
 	[ "$order" = "$expected" ] || {
 		show
