@@ -22,9 +22,9 @@ Unit tests: `TestNormalize*`, `TestSelectRoutes*`, `TestToleranceFromReference`,
 
 - `routes.go`: `SelectRoutes` reads `api/operations.yaml` (documented format) and the contract
   (`rest.Spec`, byte-equal to `docs/api/openapi.yaml`).
-- `fixtures.go`: `ParamFixture` per path parameter name, `PrepareExtras` (a login driver,
-  created by the owner; the ticket that enables the routes of apps, webhook subscriptions or
-  hosts adds their fixtures, M1-70/9).
+- `fixtures.go`: `ParamFixture` per path parameter name, `PrepareExtras` (a login driver, a
+  host, an app and a webhook subscription of the app, created by the owner; a later ticket that
+  enables a route with a new path parameter adds its fixture, M1-70/9, M1-70/10, M1-70/11).
 - `normalize.go`: drops `Correlation-Id`, `Date`, `DPoP-Nonce`, keeps the policy name of
   `RateLimit`, drops `correlation_id` and replaces the requested IDs in `instance` of a problem
   body; `Diff` lists every remaining difference.

@@ -48,7 +48,7 @@ func newP4World(t *testing.T) *p4World {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: harness.RaisedRateLimits()})
+	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: ExtrasConfig(harness.RaisedRateLimits())})
 	w := harness.BuildMatrixWorld(t, s)
 	PrepareExtras(t, w)
 	return &p4World{w: w, routes: routes, requesters: map[string]*harness.Client{"Alex": w.People["Alex"], "Lotse": w.Agents["Lotse"]}}
