@@ -5,7 +5,9 @@
 /// with a global `seq` and a sync epoch, read states, drafts, settings and runs; since M4-19
 /// also forums with tags, sidebar states and the instance logo; since M4-20 message
 /// revisions, pins, templates, the capabilities of a channel view, main threads, threads from
-/// a message, title, close, reopen, move and mark unread.
+/// a message, title, close, reopen, move and mark unread; since M4-22 the files of 12 2 and 3:
+/// upload sessions with parts, completion, the scan result, thumbnails, transcripts and file
+/// tickets.
 library;
 
 import 'dart:convert';
@@ -16,6 +18,7 @@ import 'package:domain/domain.dart' show EventCatalog, FractionalIndex;
 
 import 'fake_host.dart';
 
+part 'world_files.dart';
 part 'world_thread_view.dart';
 
 /// A JSON object of the API.
@@ -454,6 +457,24 @@ final class FakeWorld {
 
   /// The permission version of the instance; every access change raises it (04 8.2).
   int permissionVersion = 1;
+
+  /// The `InstanceLimits` that `getInstance` reports (D-W-115); tests lower them.
+  final JsonMap limits = {
+    'message_max_content_bytes': 65536,
+    'message_max_attachments': 10,
+    'file_max_upload_bytes': 104857600,
+    'thread_title_max_chars': 120,
+    'voice_max_duration_ms': 600000,
+  };
+
+  /// The files of 03 `files` by ID with their bytes, upload session and transcript (M4-22).
+  final Map<String, FakeFile> files = {};
+
+  /// The settings of the file handlers (part size, scan, transcription, faults).
+  final FakeFileSettings fileSettings = FakeFileSettings();
+
+  /// The file tickets of `createFileTicket` by token (12 9.2).
+  final Map<String, FakeFileTicket> fileTickets = {};
 
   /// Events per catch-up page (`sync.catchup_page_size`).
   int catchupPageSize = 500;
@@ -1073,6 +1094,9 @@ final class FakeWorld {
     final mentions = [
       ...?(body['mention_ids'] as List<Object?>?)?.cast<String>(),
     ];
+    final attachments = _attachable(authorId, channelId, [
+      ...?(body['attachment_file_ids'] as List<Object?>?)?.cast<String>(),
+    ], kind: body['kind'] as String? ?? 'text');
     final message = <String, Object?>{
       'id': id,
       'thread_id': threadId,
@@ -1086,7 +1110,7 @@ final class FakeWorld {
       'content_format': 1,
       'reply_to_message_id': ?body['reply_to_message_id'],
       'silent': body['silent'] ?? false,
-      'attachments': <Object?>[],
+      'attachments': attachments,
       'mention_ids': mentions,
       'reactions': <Object?>[],
       'pinned': false,
@@ -1095,6 +1119,7 @@ final class FakeWorld {
       'created_at': stamp(),
     };
     messages[id] = message;
+    _attach(id, attachments);
     _threadMessages[threadId]!.add(id);
     _clientMsgIds['$authorId|$cmid'] = (id: id, hash: hash);
     thread

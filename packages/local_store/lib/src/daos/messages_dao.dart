@@ -346,6 +346,54 @@ final class MessagesDao {
     return row == null ? null : fileFromRow(row);
   }
 
+  /// The metadata of file [id] on every change (`file.updated`, 12 2), null while unknown.
+  Stream<FileMeta?> watchFile(FileId id) => (_db.select(
+    _db.files,
+  )..where((t) => t.id.equals(id.value))).map(fileFromRow).watchSingleOrNull();
+
+  /// The files attached to [messageId] in their order, on every change of the attachments or
+  /// of a file's metadata; an attachment whose file row is missing is left out.
+  Stream<List<FileMeta>> watchAttachedFiles(MessageId messageId) {
+    final a = _db.messageAttachments;
+    final f = _db.files;
+    final query = _db.select(a).join([innerJoin(f, f.id.equalsExp(a.fileId))])
+      ..where(a.messageId.equals(messageId.value))
+      ..orderBy([OrderingTerm(expression: a.position)]);
+    return query.watch().map(
+      (rows) => [for (final r in rows) fileFromRow(r.readTable(f))],
+    );
+  }
+
+  /// The files attached to the messages of [threadId], the newest message first and in their
+  /// order within a message, on every change (the section "Files" of the session column,
+  /// 01 5.1 D1).
+  Stream<List<AttachedFile>> watchThreadFiles(ThreadId threadId) {
+    final a = _db.messageAttachments;
+    final f = _db.files;
+    final m = _db.messages;
+    final query =
+        _db.select(a).join([
+            innerJoin(f, f.id.equalsExp(a.fileId)),
+            innerJoin(m, m.id.equalsExp(a.messageId)),
+          ])
+          ..where(a.threadId.equals(threadId.value))
+          ..orderBy([
+            OrderingTerm(expression: m.threadSeq, mode: OrderingMode.desc),
+            OrderingTerm(expression: a.position),
+          ]);
+    return query.watch().map(
+      (rows) => [
+        for (final r in rows)
+          AttachedFile(
+            messageId: MessageId.parse(r.readTable(a).messageId),
+            threadSeq: ThreadSeq(r.readTable(m).threadSeq),
+            position: r.readTable(a).position,
+            file: fileFromRow(r.readTable(f)),
+          ),
+      ],
+    );
+  }
+
   /// Replaces the attachments of [messageId] with [attachments] in one transaction.
   Future<void> putAttachments(
     MessageId messageId,

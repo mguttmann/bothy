@@ -344,6 +344,41 @@ final class FileCacheEntry {
       Object.hash(fileId, variant, path, sizeBytes, lastAccessedAt);
 }
 
+/// A file attached to a message of a thread, as the section "Files" of the session column
+/// lists it (01 5.1 D1, M4-22).
+final class AttachedFile {
+  /// Creates an [AttachedFile].
+  const AttachedFile({
+    required this.messageId,
+    required this.threadSeq,
+    required this.position,
+    required this.file,
+  });
+
+  /// The message the file is attached to.
+  final MessageId messageId;
+
+  /// The position of that message in its thread.
+  final ThreadSeq threadSeq;
+
+  /// The position of the file among the attachments of the message.
+  final int position;
+
+  /// The metadata of the file.
+  final FileMeta file;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AttachedFile &&
+      other.messageId == messageId &&
+      other.threadSeq == threadSeq &&
+      other.position == position &&
+      other.file == file;
+
+  @override
+  int get hashCode => Object.hash(messageId, threadSeq, position, file);
+}
+
 /// A share entry taken over from an extension (15 12).
 final class ShareInboxEntry {
   /// Creates a [ShareInboxEntry].
