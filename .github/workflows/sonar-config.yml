@@ -4,7 +4,8 @@
 # SonarQube Cloud and check them (docs/quality/sonarqube-local.md, section 6;
 # docs/quality/public-switch.md, step 12). On the cloud the gate and the profiles are
 # assigned to the project of the variable SONAR_PROJECT_KEY, and the project's main branch is
-# named `main` (ci.yml analyses main only after that, see SONAR_MAIN_ANALYSIS). The token exists only as the secret SONAR_TOKEN,
+# named `main` (ci.yml analyses main only after that, see SONAR_MAIN_ANALYSIS) and the project
+# is made public (a private project on the free plan is capped in lines of code). The token exists only as the secret SONAR_TOKEN,
 # so the maintainer starts this run by hand after a change under quality/sonar/ or the
 # monthly check: gh workflow run sonar-config.yml --ref main.
 #
@@ -57,6 +58,12 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: make sonar-main-branch SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
+      # The free plan caps the lines of code of a private project and refused the analysis of
+      # main; a public project has no such cap, and the repository is public anyway.
+      - name: make sonar-visibility
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: make sonar-visibility SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
       - name: make sonar-config
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

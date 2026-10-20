@@ -20,6 +20,12 @@ are the names of the project's other branches; rename to one of them answers HTT
 "Impossible to update branch name: a branch with name ... already exists", as SonarQube Cloud
 answered on 2026-10-20 for a `main` its failed analyses had left as a short-lived branch.
 `ce_tasks` are the background tasks of api/ce/task by ID.
+Restore overwrites a profile of the same name and language, as the restore description of both
+Web APIs says: its own rules become those of the backup and the parent link is gone, which is
+how SonarQube Cloud left every profile without a parent on the sonar-config run of 2026-10-20.
+`project` is the key of the only project and `visibility` its visibility (api/projects/search
+and update_visibility, both answer only for that key); `visibility_refused` answers
+update_visibility with HTTP 400 "Organization ... is not allowed to perform this action".
 """
 
 from __future__ import annotations
@@ -64,6 +70,9 @@ class State:
     branch_rename_refused: bool = False
     other_branches: list[str] = field(default_factory=lambda: ["feature"])
     ce_tasks: dict[str, dict[str, str]] = field(default_factory=dict)
+    project: str = "example-project"
+    visibility: str = "private"
+    visibility_refused: bool = False
     project_profiles: dict[str, str] = field(default_factory=dict)
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
@@ -316,8 +325,11 @@ def _qp_restore(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     if prof is None:
         prof = Profile(f"r-{lang}", name, lang)
         state.profiles.append(prof)
-    for repo, key in re.findall(r"<repositoryKey>(.*?)</repositoryKey>\s*<key>(.*?)</key>", xml):
-        prof.own_rules.add(f"{repo}:{key}")
+    prof.parent = None
+    prof.own_rules = {
+        f"{repo}:{key}"
+        for repo, key in re.findall(r"<repositoryKey>(.*?)</repositoryKey>\s*<key>(.*?)</key>", xml)
+    }
     return 200, {"profile": {"key": prof.key}}, "application/json"
 
 
@@ -378,6 +390,23 @@ def _branch_delete(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     return 204, "", "text/plain"
 
 
+def _projects_search(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    keys = p.get("projects", "").split(",")
+    found = [{"key": k, "visibility": state.visibility} for k in keys if k == state.project]
+    return 200, {"components": found}, "application/json"
+
+
+def _update_visibility(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if state.visibility_refused:
+        return _NOT_ALLOWED
+    if p.get("visibility") not in ("private", "public"):
+        return _BAD_REQUEST
+    if p.get("project") != state.project:
+        return 404, {"errors": [{"msg": "Project not found"}]}, "application/json"
+    state.visibility = p["visibility"]
+    return 204, "", "text/plain"
+
+
 def _ce_task(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     task = state.ce_tasks.get(p.get("id", ""))
     if task is None:
@@ -407,6 +436,8 @@ ROUTES = {
     ("POST", "/api/project_branches/rename"): _branch_rename,
     ("POST", "/api/project_branches/delete"): _branch_delete,
     ("GET", "/api/ce/task"): _ce_task,
+    ("GET", "/api/projects/search"): _projects_search,
+    ("POST", "/api/projects/update_visibility"): _update_visibility,
 }
 
 
