@@ -3668,7 +3668,7 @@ export interface paths {
         put?: never;
         /**
          * Subscribe a URL to events
-         * @description The host must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`.
+         * @description The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
          */
         post: operations["createWebhookSubscription"];
         delete?: never;
@@ -3691,7 +3691,10 @@ export interface paths {
         delete: operations["deleteWebhookSubscription"];
         options?: never;
         head?: never;
-        /** Change, pause or rotate a subscription */
+        /**
+         * Change, pause or rotate a subscription
+         * @description A new host must be in `webhook.allowed_hosts`. `rotate_hmac_secret` returns the new `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
+         */
         patch: operations["updateWebhookSubscription"];
         trace?: never;
     };
@@ -5560,7 +5563,7 @@ export interface components {
             /** @example whk-2026-10 */
             kid: string;
             /**
-             * @description Ed25519 public key, base64, with prefix `whpk_`.
+             * @description Ed25519 public key with prefix `whpk_`, followed by the standard base64 (with padding) of its DER-encoded SubjectPublicKeyInfo (RFC 8410).
              * @example whpk_MCowBQYDK2VwAyEA6h3uZ0Q4i1Yv1o1Wg8bQq3c0o8bq9oQm3Kc8n3m3v0I=
              */
             public_key: string;
@@ -7989,8 +7992,11 @@ export interface components {
             event_id: components["schemas"]["Uuid"];
             /** Format: int64 */
             event_seq: number;
-            /** @example message.created */
-            event_type: string;
+            /**
+             * @description Type of the event, read from the event log; absent once the event left the event log (`sync.event_retention`).
+             * @example message.created
+             */
+            event_type?: string;
             attempt: number;
             status: components["schemas"]["WebhookDeliveryStatus"];
             response_code?: number;
@@ -19203,6 +19209,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -19275,6 +19282,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];

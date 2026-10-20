@@ -33,4 +33,8 @@ const (
 	defaultTrue = "true"
 	// defaultQuarterHour is a default of 15 minutes.
 	defaultQuarterHour = "15m"
+	// defaultTenSeconds is a default of 10 seconds.
+	defaultTenSeconds = "10s"
+	// defaultDay is a default of 24 hours.
+	defaultDay = "24h"
 )

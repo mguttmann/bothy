@@ -122,6 +122,9 @@ const (
 	SigningKeyToState = "bothy.signing_key.to_state"
 	// StepKind is tool_call, status, subagent, workflow or background_job.
 	StepKind = "bothy.step.kind"
+	// WebhookSubscriptionID is the UUID of an outgoing webhook subscription (logs of deliveries
+	// and subscription transitions, M2-26); never on metrics.
+	WebhookSubscriptionID = "bothy.webhook_subscription.id"
 	// VersionOwn is the SemVer version of this server build in the start check of
 	// instance.min_server_version (M1-15); the resource carries it as service.version, which the
 	// stdout log drops.
@@ -170,7 +173,7 @@ var scopes = map[string]scope{
 	PushProvider: scopeSpanLog, RatelimitClass: scopeSpanLog, Reason: scopeSpanLog,
 	RunState: scopeSpanLog, StepKind: scopeSpanLog, VersionOwn: scopeSpanLog, VersionRequired: scopeSpanLog,
 	SigningKeyPurpose: scopeSpanLog, SigningKeyKID: scopeSpanLog, SigningKeyFromState: scopeSpanLog,
-	SigningKeyToState: scopeSpanLog,
+	SigningKeyToState: scopeSpanLog, WebhookSubscriptionID: scopeSpanLog,
 
 	ServerRole: scopeResource,
 	Signal:     scopeMetric,

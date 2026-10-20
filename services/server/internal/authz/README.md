@@ -154,9 +154,23 @@ The snapshot (`domain.Snapshot`) holds the direct grant maxima per target, the o
 
 The requirement entries of `domain.DeferredActions()` (held by `domain/testdata/deferred_actions.golden`) need facts of a later milestone. `Authorize` and `Scope` answer them like an unknown action, and `VerifyRegistrations` rejects a route, op, channel op or event type that names one (D3). The ticket that builds one replaces its row in the table and removes it from the golden file.
 
+### Delivery check `webhook_out.deliver` (M2-26)
+
+`webhook_out.deliver` is no longer deferred: its requirement is `Delivery`, decided by
+`Authorizer.authorizeDelivery` with `domain.DeliveryGate` before the receive action. In this order:
+the liveness check of the receiving principal; a principal that is not an app is `forbidden
+subject_kind_not_allowed` (agents until the agent transport); an app without `events:subscribe`
+in its granted scopes is `forbidden scope_missing`; a personal event (`Resource.Audience` set) is
+allowed for its audience and `not_found not_self` for anyone else; otherwise the full decision of
+the receive action `Resource.DeliveryOf` on the same resource (visibility, requirement and the app
+scope of the action, for example `messages:read` for `message.read`) is the result. A personal
+event carries no `DeliveryOf` (its receive action is `self`); without an audience an empty
+`DeliveryOf` or `webhook_out.deliver` itself is an internal error.
+The delivery job calls it in filter mode, so no denial is written (AZ-P13).
+
 ### How a module builds a `Resource`
 
-Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
 
 ### Tests
 

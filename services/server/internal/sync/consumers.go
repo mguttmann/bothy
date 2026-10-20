@@ -48,6 +48,30 @@ type ConsumerHandler interface {
 	HandleEvent(ctx context.Context, ev Event) error
 }
 
+// ConsumerLossHandler is implemented by a ConsumerHandler that must learn the events retention
+// removed before its consumer read them (sync.event_retention; ADR 0051 Consequences, R-EX-07):
+// the webhooks consumer disables the subscriptions that could have matched them (M2-26 design
+// note 3 f). Consumers without it (push) are unaffected.
+//
+// Contract: when the round finds a lost range, HandleLost runs once in the round's transaction,
+// before the first HandleEvent, with the first and last lost seq (inclusive). It follows the rules
+// of HandleEvent; an error or panic rolls back the whole round.
+type ConsumerLossHandler interface {
+	// HandleLost handles the lost range from..to inside the round's transaction of ctx.
+	HandleLost(ctx context.Context, from, to int64) error
+}
+
+// LogReader reads single events of the event log for the delivery jobs of the worker consumers
+// (M2-26): the event of a pending delivery and the smallest retained seq. It reads without the
+// visible-channel predicate like the consumers; the job checks the rights of its receiver before
+// it sends (R-AZ-11). Implementations read in the ambient transaction of ctx or on the pool.
+type LogReader interface {
+	// EventBySeq returns the event seq; found is false when it is not (or no longer) in the log.
+	EventBySeq(ctx context.Context, seq int64) (Event, bool, error)
+	// MinRetainedSeq returns min(seq) of event_log, 0 when it is empty.
+	MinRetainedSeq(ctx context.Context) (int64, error)
+}
+
 // ConsumerState is the position of one worker consumer, as the lag gauges read it.
 type ConsumerState struct {
 	// Name is the consumer.

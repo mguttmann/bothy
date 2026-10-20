@@ -16,7 +16,7 @@ func appsConfigKeys() []config.Key {
 		},
 		{
 			Name: "webhook.allowed_hosts", Kind: config.KindStringList, Default: "",
-			Doc:     "Hosts an app manifest may name in its delivery addresses and outgoing webhooks may reach; exact host names, compared without regard to case.",
+			Doc:     "Targets an app manifest may name in its delivery addresses and outgoing webhooks may reach: entries host[:port], the host compared without regard to case, without a port only 443.",
 			Chapter: chapter03,
 		},
 		{

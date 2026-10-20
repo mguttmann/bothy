@@ -15,13 +15,15 @@ import (
 // Suspend implements apps.Apps (M2-24 design note 9 b): active to suspended; every grant and
 // token stays, the tokens stop working because the installation is not active, and the empty
 // snapshot of the app writes access.changed. A suspended app is without effect; an uninstalled
-// one is 409 invalid_state_transition. Later tickets add their parts of 11 section 4.3 here
-// (M2-25 commands and components, M2-26 deliveries).
+// one is 409 invalid_state_transition. Deliveries stop and keep their state: the delivery job sends
+// nothing for a suspended installation (M2-26). Later tickets add their parts of 11 section 4.3
+// here (M2-25 commands and components).
 func (s *Service) Suspend(ctx context.Context, a actor.Actor, appID ids.ID) error {
 	return s.transition(ctx, a, appID, domain.TransitionSuspend, authorize.ActionAppSuspend, "")
 }
 
-// Resume implements apps.Apps (M2-24 design note 9 c): suspended to active.
+// Resume implements apps.Apps (M2-24 design note 9 c): suspended to active; the heads of the
+// active subscriptions become due now (ResumeInstallation, M2-26 design note 14).
 func (s *Service) Resume(ctx context.Context, a actor.Actor, appID ids.ID) error {
 	return s.transition(ctx, a, appID, domain.TransitionResume, authorize.ActionAppResume, "")
 }
@@ -29,8 +31,9 @@ func (s *Service) Resume(ctx context.Context, a actor.Actor, appID ids.ID) error
 // Uninstall implements apps.Apps (M2-24 design note 9 d): active or suspended to uninstalled with
 // uninstalled_at and uninstalled_by; in the same unit every active token of the app is revoked,
 // every active grant with the app as subject is revoked with the reason, and the principal is
-// disabled; its messages keep their author. An uninstalled app is without effect. Later tickets
-// add their parts of 11 section 4.3 here (M2-25, M2-26, M2-27).
+// disabled; its messages keep their author; every subscription of the installation becomes disabled
+// (M2-26). An uninstalled app is without effect. Later tickets add their parts of 11 section 4.3
+// here (M2-25, M2-27).
 func (s *Service) Uninstall(ctx context.Context, a actor.Actor, appID ids.ID, reason string) error {
 	return s.transition(ctx, a, appID, domain.TransitionUninstall, authorize.ActionAppUninstall, reason)
 }
@@ -114,10 +117,20 @@ func (s *Service) applyTransition(ctx context.Context, a actor.Actor, c stateCha
 		return err
 	}
 	attrs := c.attrs(inst.ID)
-	if c.t == domain.TransitionUninstall {
+	switch c.t {
+	case domain.TransitionUninstall:
 		if err := s.revokeAll(ctx, a, c.appID, c.reason, attrs); err != nil {
 			return err
 		}
+		if err := s.d.Webhooks.disableInstallation(ctx, inst.ID); err != nil {
+			return err
+		}
+	case domain.TransitionResume:
+		if err := s.d.Webhooks.ResumeInstallation(ctx, inst.ID); err != nil {
+			return err
+		}
+	case domain.TransitionSuspend:
+		// The delivery job sends nothing for a suspended installation; rows keep their state.
 	}
 	return s.record(ctx, c.act, c.appID, attrs)
 }

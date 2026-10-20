@@ -218,15 +218,19 @@ but without `messages:read` can post without reading along.
 | Own process | outside the server, any language, any location |
 | Own token | only the hash is stored; optionally DPoP-bound ([08-identity.md](08-identity.md)) |
 | Rate limits | classes from 05 per principal; incoming webhooks per webhook (`rl.webhook_in`) |
-| Delivery quota | at most `webhook.max_pending_per_subscription` open deliveries per subscription; above that the subscription becomes `paused` and the owner is notified |
+| Delivery quota | at most `webhook.max_pending_per_subscription` open (`pending`) deliveries per subscription; the round whose insert reaches the quota sets an `active` subscription `paused` and audits `webhook_out.transition` with cause `max_pending`; rows keep being created while paused, so no event is lost; the owner learns it from the audit entry and the state in `listWebhookSubscriptions` ([DECISIONS.md](../DECISIONS.md) D-M2-26-2) |
 | Timeouts | `webhook.delivery_timeout` per delivery, `app.interaction_timeout` per synchronous request |
 | Suspension | `app.suspend`, `app.uninstall`; automatically `disabled` after `webhook.max_consecutive_failures` |
 | Never allowed | triggering agents (`origin = app`), step-up actions (R-AZ-03), DM channels, channel prompts, `manage`, `trigger` |
 
-Deliveries come from the event log, not from a copy: a paused subscription resumes at
-`last_delivered_seq`. If this position lies before the retention window
-(`sync.event_retention`), the subscription becomes `disabled` with the note "gap" instead of
-silently skipping events.
+Deliveries come from the event log, not from a copy: a paused subscription continues with its
+pending deliveries where it stood. A gap is detected at two points ([DECISIONS.md](../DECISIONS.md)
+D-M2-26-5): at the head of a subscription, when the event of its lowest pending delivery is no
+longer in the log (`sync.event_retention`), and in the round of the worker consumer `webhooks`,
+when retention removed events before the consumer read them (the lost range of the round). In both
+cases the subscription becomes `disabled` with cause `gap` instead of skipping events silently, its
+expired pending deliveries become `dead` with `last_error = event_expired`, and the audit entry of
+`webhook_out.transition` names the lost range.
 
 ## 7. Outgoing webhooks
 
@@ -237,8 +241,8 @@ silently skipping events.
 | Signature | Standard Webhooks, headers `webhook-id` (= event ID), `webhook-timestamp`, `webhook-signature` with scheme `v1a` (Ed25519) |
 | Key | `server_signing_keys` with purpose `webhook_out` and `alg = 'EdDSA'`; ES256 is not allowed for this purpose because `v1a` only knows Ed25519 |
 | Order | strictly by `seq` per subscription; the next event only after the previous one succeeded |
-| Check | before every delivery `webhook_out.deliver` with the current permissions and scopes of the app; events that are no longer visible are skipped, not counted as errors |
-| Success | only `2xx`; `410` switches the subscription off; `429`, `502`, `504` throttle and respect `retry-after` |
+| Check | before every attempt `webhook_out.deliver` with the current grants and scopes of the app (filter mode, no denial in the audit); an event the app may no longer receive ends `dead` with `last_error = not_authorized`, without a request and without counting as a failure |
+| Success | only `2xx`; `410` disables the subscription; `429`, `502`, `503` and `504` throttle and honour `Retry-After`; redirects are never followed, a `3xx` is a failure ([../api/webhooks.md](../api/webhooks.md), section 4) |
 | Retry | backoff with jitter between `webhook.retry_backoff_base` and `webhook.retry_backoff_cap` (03) |
 | Timeout | `webhook.delivery_timeout`; the response body is not stored |
 | SSRF protection | only `https`, host in `webhook.allowed_hosts`, delivery through the egress client with an address check after DNS resolution ([19-security.md](19-security.md), SEC-NET-1 to SEC-NET-5), connection bound to the checked address, no redirects |
@@ -532,6 +536,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `webhook.max_pending_per_subscription` | Server | `10000` | open deliveries per subscription, above that `paused` |
 | `webhook.retry_max_age` | Server | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) |
 | `webhook.secret_rotation_overlap` | Server | `24h` | how long the server signs with the old and the new HMAC generation |
+| `webhook.hmac_master_key_ref` | Server | `file:<secrets.dir>/webhook_hmac_master_key` | reference to the master key from which the HMAC secrets of the subscriptions are derived ([webhooks.md](../api/webhooks.md), section 2.1) |
 | `webhook.receiver_tolerance` | Receiver | `5m` | recommendation, not a server value: tolerance for `webhook-timestamp` at the receiver and default of the check function of the SDKs |
 | `webhook_in.max_body_bytes` | Server | `1048576` | size of an incoming body |
 | `webhook_in.formats_enabled` | Server | `native, alertmanager` | enabled incoming formats |

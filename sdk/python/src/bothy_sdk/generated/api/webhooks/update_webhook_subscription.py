@@ -65,6 +65,11 @@ def _parse_response(
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 422:
         response_422 = Problem.from_dict(response.json())
 
@@ -99,6 +104,10 @@ def sync_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | WebhookSubscriptionCreated]:
     """Change, pause or rotate a subscription
+
+     A new host must be in `webhook.allowed_hosts`. `rotate_hmac_secret` returns the new `v1` secret
+    once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict`
+    with `reason` `one_time_secret`.
 
     Args:
         subscription_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -135,6 +144,10 @@ def sync(
 ) -> Problem | WebhookSubscriptionCreated | None:
     """Change, pause or rotate a subscription
 
+     A new host must be in `webhook.allowed_hosts`. `rotate_hmac_secret` returns the new `v1` secret
+    once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict`
+    with `reason` `one_time_secret`.
+
     Args:
         subscription_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -164,6 +177,10 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Problem | WebhookSubscriptionCreated]:
     """Change, pause or rotate a subscription
+
+     A new host must be in `webhook.allowed_hosts`. `rotate_hmac_secret` returns the new `v1` secret
+    once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict`
+    with `reason` `one_time_secret`.
 
     Args:
         subscription_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -197,6 +214,10 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Problem | WebhookSubscriptionCreated | None:
     """Change, pause or rotate a subscription
+
+     A new host must be in `webhook.allowed_hosts`. `rotate_hmac_secret` returns the new `v1` secret
+    once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict`
+    with `reason` `one_time_secret`.
 
     Args:
         subscription_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

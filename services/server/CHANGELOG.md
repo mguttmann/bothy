@@ -23,6 +23,25 @@ documented in this file. The format is based on
   configuration is missing in the database or the database does not fold the case of non-ASCII
   letters. Adding the generated columns rewrites `messages` and `threads` once (no release
   exists yet).
+- Outgoing webhooks (M2-26): migrations `00037_webhook_subscriptions.sql` and
+  `00038_webhook_deliveries.sql`; the port `apps.Webhooks` with the operations
+  `createWebhookSubscription`, `updateWebhookSubscription`, `deleteWebhookSubscription`,
+  `listWebhookSubscriptions`, `listWebhookDeliveries` and `redeliverWebhook`, and `getWebhookKeys`
+  (public keys of the purpose `webhook_out` as `whpk_`). The worker consumer `webhooks` creates one
+  delivery per matching subscription; the job `apps.webhook_deliver` (queue `delivery`) sends them
+  as Standard Webhooks through the egress client, strictly in `seq` order per subscription, signed
+  with `v1a` (Ed25519) and, per subscription, `v1` (HMAC with a derived secret shown once), after a
+  check of `webhook_out.deliver` with the current grants and scopes; with backoff and full jitter,
+  `Retry-After`, `410`, failure limit, retry deadline, gap and delivery quota. Committed test
+  vectors `docs/api/webhook-test-vectors.json` (gate G10). `webhook.allowed_hosts` entries take the
+  form `host[:port]` (without a port only `443`), also for manifest addresses. `sync` gains
+  `ConsumerLossHandler` and `LogReader`, `instance.Keys` gains `Signers` and `PublicKeys`, authz
+  decides `webhook_out.deliver`, and the system action `webhook_out.transition` audits automatic
+  subscription changes. New keys `webhook.max_consecutive_failures`, `webhook.retry_backoff_base`,
+  `webhook.retry_backoff_cap`, `webhook.max_pending_per_subscription`, `webhook.retry_max_age`,
+  `webhook.secret_rotation_overlap` and `webhook.hmac_master_key_ref` with the cross-checks
+  `webhook_backoff_order` and `webhook_retry_within_retention`; new generated secret
+  `webhook_hmac_master_key`; new log attribute `bothy.webhook_subscription.id`.
 - Apps (M2-24): the migrations `00030_apps.sql` and `00031_app_installations.sql` (with the trigger
   `apps_principal_kind_check`), the port `apps.Apps` and the operations `listApps`, `installApp`,
   `validateManifest`, `getApp`, `upgradeAppManifest`, `setAppScopes`, `suspendApp`, `resumeApp` and

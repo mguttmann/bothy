@@ -240,7 +240,8 @@ func (s *ConsumerService) Ensure(ctx context.Context) error {
 // Errors (the unit rolls back: no job and no cursor move): kind internal for a name without a
 // handler, a handler panic and appended durable events; domain.ErrConsumerGap for a hole that
 // retention does not explain; the handler's error; the errors of the database and the unit of
-// work. The result is zero with an error.
+// work. The result is zero with an error. A handler that implements sync.ConsumerLossHandler learns
+// a retention loss of the round before its first event (M2-26).
 func (s *ConsumerService) Round(ctx context.Context, name sync.ConsumerName) (RoundResult, error) {
 	h := s.handler(name)
 	if h == nil {
@@ -283,6 +284,11 @@ func (s *ConsumerService) round(ctx context.Context, name sync.ConsumerName, h s
 	if err != nil {
 		return RoundResult{}, domain.RoundPlan{}, err
 	}
+	if lh, ok := h.(sync.ConsumerLossHandler); ok && plan.LostFrom != 0 {
+		if err := handleLost(ctx, name, lh, plan.LostFrom, plan.LostTo); err != nil {
+			return RoundResult{}, domain.RoundPlan{}, err
+		}
+	}
 	for _, ev := range events {
 		if err := handle(ctx, name, h, ev); err != nil {
 			return RoundResult{}, domain.RoundPlan{}, err
@@ -324,6 +330,16 @@ func handle(ctx context.Context, name sync.ConsumerName, h sync.ConsumerHandler,
 		}
 	}()
 	return h.HandleEvent(ctx, ev)
+}
+
+// handleLost calls the loss handler and turns a panic into an error of kind internal, like handle.
+func handleLost(ctx context.Context, name sync.ConsumerName, h sync.ConsumerLossHandler, from, to int64) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errs.New(errs.CodeInternalError, fmt.Sprintf("sync: the loss handler of the worker consumer %s panicked at seq %d", name, from))
+		}
+	}()
+	return h.HandleLost(ctx, from, to)
 }
 
 // States implements sync.Consumers.States: one read of every cursor row with the head, then the

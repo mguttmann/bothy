@@ -77,7 +77,7 @@ type Handlers struct {
 	// People implements listUsers, createUser, getUser, updateUser, enableUser, listOwners,
 	// addOwner, revokeOwner, getMe and updateMyProfile (identity, M1-31).
 	*identityhttp.People
-	// Keys implements getJwks and rotateSigningKey (instance, M1-32).
+	// Keys implements getJwks, getWebhookKeys and rotateSigningKey (instance, M1-32, M2-26).
 	*instancehttp.Keys
 	// Admin implements getDiscovery, getInstance, listInstanceSettings, putInstanceSetting,
 	// updateBranding and getProblemType (instance, M1-46), listFeatureFlags and putFeatureFlag
@@ -120,6 +120,10 @@ type Handlers struct {
 	// Apps implements listApps, installApp, validateManifest, getApp, upgradeAppManifest,
 	// setAppScopes, suspendApp, resumeApp and uninstallApp (apps, M2-24).
 	*appshttp.Apps
+	// Webhooks implements listWebhookSubscriptions, createWebhookSubscription,
+	// updateWebhookSubscription, deleteWebhookSubscription, listWebhookDeliveries and
+	// redeliverWebhook (apps, M2-26).
+	*appshttp.Webhooks
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

@@ -189,7 +189,7 @@ func newEnv(t *testing.T) *env {
 	}
 	var rs []httpservertest.Route
 	for _, r := range built {
-		if r.Operation.ID == "getJwks" || r.Operation.ID == "rotateSigningKey" {
+		if r.Operation.ID == "getJwks" || r.Operation.ID == "rotateSigningKey" || r.Operation.ID == "getWebhookKeys" {
 			rs = append(rs, httpservertest.Route{Op: wire.HTTPOperation(r.Operation), Handler: r.Handler.ServeHTTP})
 		}
 	}

@@ -229,6 +229,7 @@ func TestCatalogPendingAndGenerators(t *testing.T) {
 		"telemetry_pseudonym_key": {stack.GeneratorKey, ""},
 		"audit_ip_kek":            {stack.GeneratorKey, ""},
 		"file_ticket_key":         {stack.GeneratorKey, ""},
+		"webhook_hmac_master_key": {stack.GeneratorKey, ""},
 		"totp_key":                {stack.GeneratorKey, ""},
 		"pgbackrest_tls/":         {stack.GeneratorPGBackRestTLS, ""},
 		"s3_access_key":           {stack.GeneratorPending, "M3"},

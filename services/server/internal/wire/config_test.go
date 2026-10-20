@@ -250,6 +250,16 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		// M3-13
 		"search.languages":  {Kind: config.KindStringList, Default: `["german","english"]`, Chapter: "14-search.md"},
 		"search.locale_map": {Kind: config.KindStringMap, Default: `{"de":"german","en":"english"}`, Chapter: "14-search.md"},
+
+		// M2-26
+		"webhook.max_consecutive_failures":     {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "03-data-model.md"},
+		"webhook.retry_backoff_base":           {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "03-data-model.md"},
+		"webhook.retry_backoff_cap":            {Kind: config.KindDuration, Default: "1h", Min: "1ms", Chapter: "03-data-model.md"},
+		"webhook.max_pending_per_subscription": {Kind: config.KindInt, Default: "10000", Min: "1", Chapter: "11-extensions.md"},
+		"webhook.retry_max_age":                {Kind: config.KindDuration, Default: "72h", Min: "1ms", Chapter: "11-extensions.md"},
+		"webhook.secret_rotation_overlap":      {Kind: config.KindDuration, Default: "24h", Min: "1ms", Chapter: "11-extensions.md"},
+		"webhook.hmac_master_key_ref": {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/webhook_hmac_master_key",
+			Chapter: "11-extensions.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{
@@ -711,6 +721,65 @@ func TestConfigCheckConsumerAlertBelowRetention(t *testing.T) {
 			if strings.Contains(msg, v) {
 				t.Errorf("the problem names the value %s: %q", v, msg)
 			}
+		}
+	}
+}
+
+// TestConfigCheckWebhookBackoffOrder: webhook.retry_backoff_base must be at most
+// webhook.retry_backoff_cap (cross-check webhook_backoff_order, M2-26); the problem names both
+// keys and no value.
+func TestConfigCheckWebhookBackoffOrder(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		base, limit string
+		ok          bool
+	}{
+		{"10s", "1h", true},
+		{"1h", "1h", true},
+		{"61m", "1h", false},
+	} {
+		got := load(t, "BOTHY_WEBHOOK__RETRY_BACKOFF_BASE="+c.base, "BOTHY_WEBHOOK__RETRY_BACKOFF_CAP="+c.limit)
+		checkPairProblem(t, got, c.ok, "webhook.retry_backoff_base", "webhook.retry_backoff_cap", c.base, c.limit)
+	}
+}
+
+// TestConfigCheckWebhookRetryWithinRetention: webhook.retry_max_age must be strictly below
+// sync.event_retention (cross-check webhook_retry_within_retention, M2-26), because a retry needs
+// its event in the log; equal and greater fail, smaller passes, and the problem names both keys
+// and no value.
+func TestConfigCheckWebhookRetryWithinRetention(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		age, retention string
+		ok             bool
+	}{
+		{"72h", "30d", true},
+		{"30d", "30d", false},
+		{"31d", "30d", false},
+	} {
+		got := load(t, "BOTHY_WEBHOOK__RETRY_MAX_AGE="+c.age, "BOTHY_SYNC__EVENT_RETENTION="+c.retention)
+		checkPairProblem(t, got, c.ok, "webhook.retry_max_age", "sync.event_retention", c.age, c.retention)
+	}
+}
+
+// checkPairProblem checks the problems of a cross-check over two keys: none when ok, else a
+// problem that names both keys and neither value.
+func checkPairProblem(t *testing.T, got []config.Problem, ok bool, key1, key2, v1, v2 string) {
+	t.Helper()
+	if (len(got) == 0) != ok {
+		t.Errorf("%s=%s %s=%s: problems %v, want ok %v", key1, v1, key2, v2, got, ok)
+		return
+	}
+	if len(got) == 0 {
+		return
+	}
+	msg := got[0].String()
+	if !strings.Contains(msg, key1) || !strings.Contains(msg, key2) {
+		t.Errorf("the problem does not name both keys: %q", msg)
+	}
+	for _, v := range []string{v1, v2} {
+		if strings.Contains(msg, v) {
+			t.Errorf("the problem names the value %s: %q", v, msg)
 		}
 	}
 }

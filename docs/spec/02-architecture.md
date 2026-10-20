@@ -185,7 +185,7 @@ of lower modules that the module implements.
 
 | Module | Port (excerpt) | Emits (in-tx) | Subscribes (in-tx) | Implements sources |
 |---|---|---|---|---|
-| `instance` | `Settings`, `Flags`, `Keys` (signer per purpose, JWKS, rotation), `Counters` (only for the phase hooks of `authz`, `sync`, `audit`), `Versions` (read counter values without a lock, for example `permission_version` for the permission cache, `event_seq` for catch-up); declares `LoginOptionsSource` (login drivers and password path for the discovery), `FlagUserSource` (people of a rollout), `FlagGroupSource` (valid groups of a person for the evaluation) | | | |
+| `instance` | `Settings`, `Flags`, `Keys` (signer per purpose, `Signers` and `PublicKeys` of a purpose for the outgoing webhooks, JWKS, rotation), `Counters` (only for the phase hooks of `authz`, `sync`, `audit`), `Versions` (read counter values without a lock, for example `permission_version` for the permission cache, `event_seq` for catch-up); declares `LoginOptionsSource` (login drivers and password path for the discovery), `FlagUserSource` (people of a rollout), `FlagGroupSource` (valid groups of a person for the evaluation) | | | |
 | `audit` | `Log` (query, verification) | | | kernel `auditing.Recorder` |
 | `authz` | `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person, revocation of all grants of a subject in the caller's permission change), `AppScopes` (scope table for the event subscriptions of an app); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource` | kernel `authorize.AccessChanged` (with the triggering action; `runs` cancels with reason `user_disabled` on `user.disable`, otherwise with `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (posting, correction, totals), `Prices` | | | |
@@ -195,12 +195,12 @@ of lower modules that the module implements.
 | `files` | `Uploads` (sessions, parts), `Files` (read, open, preview, file tickets, delete), `Attachments`, `Transcripts`, `TextExtracts`; declares `AttachmentLocator` | `FileFinalized` (scan and, if applicable, transcript final) | `chat.ThreadMoved` (copy `message_attachments.channel_id`) | `identity.AvatarFiles`, kernel `personaldata.Participant` |
 | `messaging` | `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
 | `runs` | `Runs` (read, context, start, resume, patch, end, cancel, overview), `Delivery` (delivery preparation with I2, guard rules and token), `Interactions`, `CommandExec` (including autocompletion) | | `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (write the held-back invocation), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged` | `messaging.ComponentReader`, kernel `personaldata.Participant` |
-| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (worker cursors), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (clear the draft), `chat.ThreadMoved` (copies of `channel_id`) | kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
+| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (worker cursors, with `ConsumerLossHandler` for a retention loss), `LogReader` (one event by `seq` and the smallest retained `seq` for delivery jobs), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (clear the draft), `chat.ThreadMoved` (copies of `channel_id`) | kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
 | `notify` | `Preferences`, `QuietHours`, `PushRegistrations` | | `identity.DeviceRevoked`, `identity.SessionEnded` (deactivate the registrations of the session), `chat.ChannelArchived`, `chat.SpaceArchived` | kernel `personaldata.Participant` |
 | `gateway` | none for other modules | | | kernel `eventlog.EphemeralPublisher` |
 | `search` | `Search` | | | |
 | `stats` | `Stats` (queries, timeline, traffic light, backend view), `Live` (base frame per interval, filter per receiver) | | | kernel `measure.Recorder` |
-| `apps` | `Apps`, `Webhooks`, `IncomingWebhooks` | | `chat.ChannelArchived` | `identity.AppInstallations` |
+| `apps` | `Apps`, `Webhooks` (`apps.Webhooks`: subscriptions, deliveries, redelivery, `ResumeInstallation`), `IncomingWebhooks` | | `chat.ChannelArchived` | `identity.AppInstallations` |
 | `importer` | `Imports` (sources, batches through `import.apply`) | | | |
 | `privacy` | `Requests` | | | collects all kernel `personaldata.Participant` |
 | `status` | `Status`, `BackupRuns` (for `bothy-backupd`) | | `agents.AgentDisabled` | |
@@ -1019,7 +1019,7 @@ Reason: every other job would write state that would be missing on the target.
 | `files.cleanup_pending` | `files` | periodic | `maintenance` | 12 |
 | `files.purge_objects` | `files` | periodic, deleted files | `maintenance` | 12, 20 |
 | `notify.push_send` | `notify` | consumer `push` | `delivery` | 13 |
-| `apps.webhook_deliver` | `apps` | consumer `webhooks`, `webhook_out.redeliver` | `delivery` | 11 |
+| `apps.webhook_deliver` | `apps` | one attempt of a subscription (args: the subscription only, M2-26): a round of the consumer `webhooks`, the chain after a finished delivery, a scheduled retry, the lease wake-up after `webhook.delivery_timeout`, an owner resume or re-enable, `webhook_out.redeliver` and `app.resume`; jobs of one subscription serialize on its row lock | `delivery` | 11 |
 | `runs.cancel_timeout` | `runs` | periodic, `agent.cancel_grace` | `maintenance` | 09 |
 | `runs.stall_check` | `runs` | periodic, `run.stall_after` | `maintenance` | 09 |
 | `runs.component_expiry` | `runs` | periodic, `component.default_ttl` | `maintenance` | 09 |
@@ -1093,7 +1093,10 @@ server loads.
    IPv4-mapped IPv6 address counts as its IPv4 address). Port `0` may occur twice, because tests
    bind port 0. `consumer.pending_alert_after` is strictly below `sync.event_retention`
    (cross-check `consumer_alert_below_retention`, M2-01), so the alarm `BothyEventConsumerLag`
-   fires while a stalled worker consumer can still catch up. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
+   fires while a stalled worker consumer can still catch up. `webhook.retry_backoff_base` is at
+   most `webhook.retry_backoff_cap` (cross-check `webhook_backoff_order`, M2-26), and
+   `webhook.retry_max_age` is strictly below `sync.event_retention` (cross-check
+   `webhook_retry_within_retention`, M2-26), because a retry needs its event in the log. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
    clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
    M3-01), because a relative root would depend on the working directory of the process; with
    `s3` the root is not read. With `file.storage.driver = s3` the cross-check `file_s3` (M3-02)

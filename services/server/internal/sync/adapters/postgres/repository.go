@@ -155,6 +155,19 @@ func (r *Repository) EventsAfter(ctx context.Context, after int64, limit int) ([
 	return out, nil
 }
 
+// Compile-time check: Repository is the log reader of the delivery jobs.
+var _ sync.LogReader = (*Repository)(nil)
+
+// EventBySeq returns the event seq (sync.LogReader); found is false when it is not in the log.
+// Outside a unit of work it reads on the pool.
+func (r *Repository) EventBySeq(ctx context.Context, seq int64) (sync.Event, bool, error) {
+	rows, err := r.queries(ctx).EventBySeq(ctx, seq)
+	if err != nil || len(rows) == 0 {
+		return sync.Event{}, false, err
+	}
+	return toEvent(rows[0]), true, nil
+}
+
 // toEvent maps a row to the port type; NULL becomes the zero value. The payload is compacted:
 // the text form of jsonb carries a space after every colon and comma, and the compact form of
 // the normalised value is never larger than the payload the appender checked.

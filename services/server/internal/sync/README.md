@@ -11,7 +11,7 @@ Event log (append, tail, catch-up, redaction, partitions), snapshot, idempotency
 
 | Package | Content |
 |---|---|
-| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap`; worker consumers: `ConsumerName` (`ConsumerPush`, `ConsumerWebhooks`, `ConsumerNames`, `Valid`), `ConsumerHandler`, `ConsumerState`, `Consumers` |
+| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap`; worker consumers: `ConsumerName` (`ConsumerPush`, `ConsumerWebhooks`, `ConsumerNames`, `Valid`), `ConsumerHandler`, `ConsumerLossHandler`, `ConsumerState`, `Consumers`, `LogReader` |
 | `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`), the gap check of the tail (`CheckContiguous`, `GapError`) and the round plan of a worker consumer (`PlanRound`, `RoundPlan`, `ErrConsumerGap`) |
 | `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`, `ConsumerService` (implements `sync.Consumers`: `Register`, `Ensure`, `Round`, `States`) and `ConsumerRunner`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows`, `ConsumerCursorStore`, `ConsumerLogReader`, `Waker` |
 | `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`) |
@@ -70,6 +70,14 @@ consumers of the event log in the worker (02 "Worker consumers", ADR 0051). They
 agent consumers of the module `agents` (`agent_consumer_cursors`, M2-07), which that port also
 calls `Consumers`: worker consumers are internal, have no API, consuming is no action and writes
 no audit entry.
+
+A handler that also implements `ConsumerLossHandler` (M2-26, the consumer `webhooks`) learns the
+range retention removed before the round read it: `HandleLost(from, to)` runs once in the round's
+transaction before the first `HandleEvent`, and its error rolls the round back like a handler
+error. `LogReader` (implemented by `adapters/postgres.Repository`) reads one event by `seq`
+(`EventBySeq`, found false once retention removed it) and the smallest retained `seq` for the
+delivery jobs. `DeliveryFields.SyncEpoch` sets the member `sync_epoch` of the envelope, which only
+webhook deliveries carry.
 
 - **Table.** Migration `00009_event_consumer_cursors.sql`: `event_consumer_cursors` as 03 4.10
   (`name` with `CHECK (name IN ('push','webhooks'))`, `last_seq` default `0`, `updated_at`,

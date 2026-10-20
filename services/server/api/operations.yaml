@@ -47,10 +47,12 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createThread
   - createToken
   - createUser
+  - createWebhookSubscription
   - deleteForumTag
   - deleteGroup
   - deleteIdentityProvider
   - deleteTemplate
+  - deleteWebhookSubscription
   - disableAgent
   - disableUser
   - enableAgent
@@ -77,6 +79,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getThread
   - getUser
   - getUserCredentials
+  - getWebhookKeys
   - handleOidcCallback
   - installApp
   - issueHostPairingCode
@@ -105,6 +108,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUserDevices
   - listUserSessions
   - listUsers
+  - listWebhookDeliveries
+  - listWebhookSubscriptions
   - loginWithPassword
   - loginWithTrustedHeader
   - logout
@@ -117,6 +122,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - putInstanceSetting
   - putMySidebarSpace
   - redeemEnrollmentCode
+  - redeliverWebhook
   - refreshToken
   - removeGroupMember
   - reopenThread
@@ -154,6 +160,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateSpace
   - updateTemplate
   - updateUser
+  - updateWebhookSubscription
   - upgradeAppManifest
   - validateManifest
   - verifyAuditChain
@@ -209,7 +216,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M3-03
   - operation_id: createAgentWebhookSubscription
     milestone: M2
-    ticket: M2-26
   - operation_id: createDm
     milestone: V3
     ticket: V3-01
@@ -245,9 +251,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createUpload
     milestone: M3
     ticket: M3-03
-  - operation_id: createWebhookSubscription
-    milestone: M2
-    ticket: M2-26
   - operation_id: decideGdprRequest
     milestone: M7
   - operation_id: deleteBrandingLogo
@@ -283,9 +286,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteThreadDraft
     milestone: M1
     ticket: M1-61
-  - operation_id: deleteWebhookSubscription
-    milestone: M2
-    ticket: M2-26
   - operation_id: downloadFile
     milestone: M3
     ticket: M3-05
@@ -384,9 +384,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getUsageStats
     milestone: M6
     ticket: M6-05
-  - operation_id: getWebhookKeys
-    milestone: M2
-    ticket: M2-26
   - operation_id: invokeCommand
     milestone: M2
     ticket: M2-16
@@ -401,7 +398,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M2-12
   - operation_id: listAgentWebhookSubscriptions
     milestone: M2
-    ticket: M2-26
   - operation_id: listChannelCommands
     milestone: M2
     ticket: M2-16
@@ -464,12 +460,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listThreadRuns
     milestone: M2
     ticket: M2-05
-  - operation_id: listWebhookDeliveries
-    milestone: M2
-    ticket: M2-26
-  - operation_id: listWebhookSubscriptions
-    milestone: M2
-    ticket: M2-26
   - operation_id: markThreadUnread
     milestone: M1
     ticket: M1-61
@@ -521,9 +511,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28
-  - operation_id: redeliverWebhook
-    milestone: M2
-    ticket: M2-26
   - operation_id: registerCommand
     milestone: M2
     ticket: M2-16
@@ -611,9 +598,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateStatusComponent
     milestone: M7
     ticket: M7-09
-  - operation_id: updateWebhookSubscription
-    milestone: M2
-    ticket: M2-26
   - operation_id: uploadBrandingLogo
     milestone: M3
     ticket: M3-10
