@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// The tests of this file run real POSIX shells and resolve real paths with Unix semantics; the
+// Windows variants of the start are covered by the quoting cases of TestPersonalStartCommand,
+// which only run here.
+
+//go:build linux || darwin
+
 package profiles
 
 import (

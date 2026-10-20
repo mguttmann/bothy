@@ -151,6 +151,9 @@ func createSuspended(spec *StartSpec, console windows.Handle) (*windows.ProcessI
 	}
 	si := windows.StartupInfoEx{ProcThreadAttributeList: attrs.List()}
 	si.Cb = uint32(unsafe.Sizeof(si))
+	// Without STARTF_USESTDHANDLES and zero handles the child takes the standard handles of the
+	// helper (redirected under a service manager) instead of the pseudo console.
+	si.Flags |= windows.STARTF_USESTDHANDLES
 	app, err := windows.UTF16PtrFromString(spec.Path)
 	if err != nil {
 		return nil, err
