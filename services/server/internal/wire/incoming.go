@@ -6,7 +6,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	stdsync "sync"
 
+	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -49,6 +51,23 @@ func webhookPostOperations() []routes.Operation {
 	return out
 }
 
+// webhookPostOperationIDs returns the operation ids of webhookPostOperations.
+func webhookPostOperationIDs() []string {
+	var ids []string
+	for _, op := range webhookPostOperations() {
+		ids = append(ids, op.ID)
+	}
+	return ids
+}
+
+// internalHooksValidator compiles the request validator of the two webhook post operations once
+// per process. The internal chain serves nothing else, so it does not need the validator of every
+// enabled operation, whose compile takes seconds under load and would delay the readiness of a
+// worker role, which mounts no public API.
+var internalHooksValidator = stdsync.OnceValues(func() (*httpserver.Validator, error) {
+	return httpserver.NewValidator(rest.Spec, webhookPostOperationIDs())
+})
+
 // mountInternalHooks mounts the two post operations of the incoming webhooks on the internal
 // listener, in every role (16 section 4.2, 02 section 3.2, M2-27 design note 12): senders inside
 // the stack (Alertmanager) reach the same routes there. They run through a chain built for this
@@ -64,7 +83,11 @@ func (s *server) mountInternalHooks(cat routes.Catalog, log *slog.Logger) error 
 	}
 	cfg := s.chainCfg
 	cfg.TrustedProxies, cfg.CORSAllowedOrigins = nil, nil
-	chain, err := NewChain(cfg, actor.AnonymousOnly{}, log)
+	v, err := internalHooksValidator()
+	if err != nil {
+		return err
+	}
+	chain, err := httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: actor.AnonymousOnly{}, Validator: v})
 	if err != nil {
 		return err
 	}

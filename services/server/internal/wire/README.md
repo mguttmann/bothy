@@ -110,7 +110,7 @@ transaction (docs/DECISIONS.md D-M2-27-21).
   `internal_listener` keeps its mux (`server.internalMux`), and the two post operations are mounted
   there through a chain of their own: the chain configuration of the public listener with empty
   `server.trusted_proxies` and CORS origins (the client IP is the peer address, forwarded headers
-  are never read, R-SE-09), `actor.AnonymousOnly` as the authenticator, its own rate limiter over
+  are never read, R-SE-09), `actor.AnonymousOnly` as the authenticator, a request validator of only the two post operations (`internalHooksValidator`, so a worker role does not compile the validator of the whole API before it is ready), its own rate limiter over
   only these two operations (so `rl.webhook_in` and `rl.public_auth` count per listener; its
   sweeper registers a second stop step `ratelimit_sweeper`), `InstallWebhookToken` and
   `WebhookBodyLimit`. Nothing else of the API is mounted there (docs/DECISIONS.md D-M2-27-18).
