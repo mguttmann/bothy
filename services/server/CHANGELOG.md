@@ -116,25 +116,6 @@ documented in this file. The format is based on
   counts `bothy.terminal.relay.unpaired`; an opening then ends `open_failed` once, by
   compare-and-swap, and a detached session stays detached. With `cluster.mode = single` nothing of
   this runs and no `NOTIFY` is sent.
-- Terminal sessions and relay (M2-44): `openTerminalSession`, `attachTerminalSession`,
-  `listTerminalSessions`, `getTerminalSession` and `closeTerminalSession` are enabled. An opening
-  runs `authorize` with SR10 to SR12, the fresh step-up (consumed in the same transaction), the
-  host `active` and connected and the profile known, writes the session, `terminal.open` and
-  `terminal_session.changed`, and returns a one-time session token (compact JWS, `typ =
-  terminal-session+jwt`, purpose `terminal`, the claims of 24 5.3 with `osu` from the own
-  assignment and `wdi` only from the own list); a recheck after the commit ends a session whose
-  rights were revoked in between. Two upgrade routes on the public listener: the device stream
-  `GET /api/v1/terminal/sessions/{session_id}/stream` (`hello` with the DPoP nonce, `identify` with
-  an access token and proof, only the device of the current token) and the data connection
-  `GET /api/v1/hosts/sessions/{session_id}/stream` of the host service after `session.open`. The
-  in-memory relay forwards every binary frame unchanged (at most 65535 bytes), counts bytes
-  without the handshake, closes slow ends with `4014`, ends an opening without counterpart after
-  `terminal.open_timeout` with `open_failed`, closes an older device with `4103`, text frames with
-  `4002`, hands the host's refusal codes `4101` and `4104` to the device, and closes both sides of
-  every ended session from the event log tail. Start reconciles the sessions of the previous
-  process; shutdown closes the relay with `4013`. Configuration keys `terminal.open_timeout` and
-  `terminal.relay_buffer_max_bytes`; metric `bothy.terminal.relay.unpaired` with the attribute
-  `bothy.terminal.side`; the Fake-Host `test/terminal/fakehost`.
 - Upload sessions, parts and completion (M3-03): `createUpload`, `uploadPart`, `getUpload`,
   `completeUpload`, `abortUpload` and `getFile` in mode `direct`. The tables `files`,
   `file_upload_sessions` and `file_upload_parts` (with `files.search_vector`) and the validated
