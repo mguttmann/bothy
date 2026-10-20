@@ -44,12 +44,12 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: cd services/host && go test -race -count=1 ./...
-      # The packages of the terminal sessions (M2-45) that carry Windows code; the tests of the M2-42
-      # packages build their fake worlds with Unix paths and do not run on Windows yet.
+      # The packages of the terminal sessions (M2-45) whose tests run on Windows; the tests of the
+      # M2-42 packages and of internal/profiles simulate Unix paths and do not run on Windows yet.
       - name: Unit tests (Windows, runner user)
         if: runner.os == 'Windows'
         shell: bash
-        run: cd services/host && go test -count=1 ./internal/session/... ./internal/pty/... ./internal/profiles/... ./internal/confirm/...
+        run: cd services/host && go test -count=1 ./internal/session/... ./internal/pty/... ./internal/confirm/...
       # TestPlatform_TMT25 traces the file opens and local channels of the service user on Linux.
       - name: Install strace (Linux)
         if: ${{ !cancelled() && runner.os == 'Linux' }}
