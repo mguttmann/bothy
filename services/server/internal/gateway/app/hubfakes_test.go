@@ -191,7 +191,9 @@ type hubWorld struct {
 	operator     map[ids.ID]map[ids.ID]bool
 	instanceWide map[ids.ID]bool
 	revoked      map[ids.ID]bool
-	log          []sync.Event
+	// connect is the decision of gateway.connect per principal; absent allows.
+	connect map[ids.ID]authorize.Decision
+	log     []sync.Event
 	// onPage runs before each catch-up page, outside the lock.
 	onPage func(after int64)
 	// gate runs before each catch-up page after onPage, outside the lock, with the page's context.
@@ -267,7 +269,12 @@ func (w *hubWorld) sees(p, space, channel ids.ID) bool {
 }
 
 // Authorize allows gateway.connect; Revalidate refuses a revoked principal.
-func (w *hubWorld) Authorize(context.Context, authorize.Principal, authorize.Action, authorize.Resource) (authorize.Decision, error) {
+func (w *hubWorld) Authorize(_ context.Context, p authorize.Principal, a authorize.Action, _ authorize.Resource) (authorize.Decision, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if d, ok := w.connect[p.PrincipalID()]; ok && a == authorize.ActionGatewayConnect {
+		return d, nil
+	}
 	return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
 }
 

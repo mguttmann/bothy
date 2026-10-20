@@ -146,10 +146,8 @@ func (g *Gateway) authorizeConnect(ctx context.Context, a actor.Actor) error {
 		return closeWith(domain.CloseRevoked)
 	case dec.Outcome == authorize.OutcomeUnauthenticated:
 		return closeWith(domain.CloseAuthenticationFailed)
-	case dec.Outcome == authorize.OutcomeForbidden && (dec.Reason == "device_pending" || dec.Reason == "principal_pending"):
-		return closeWith(domain.CloseDevicePending)
 	}
-	return closeWith(domain.CloseForbidden)
+	return closeWith(forbiddenClose(dec))
 }
 
 // authClose maps an error of the Authenticator to its close code: an expired access token 4011, a

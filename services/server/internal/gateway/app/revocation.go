@@ -56,8 +56,9 @@ func removedTargets(list []authorize.AccessTarget) domain.Targets {
 
 // revalidate is step (a): identity reads the credential again (session, device, token) and authz
 // decides gateway.connect with the new rights; an unauthenticated answer of either closes m with
-// 4012. Another error keeps the connection (logged): the admission of every later event still
-// fails closed. It reports whether m stays open.
+// 4012, a forbidden gateway.connect closes like at identify (4016 or 4018, docs/DECISIONS.md
+// M1-65/18). Another error keeps the connection (logged): the admission of every later event
+// still fails closed. It reports whether m stays open.
 func (h *Hub) revalidate(ctx context.Context, m *member) bool {
 	_, a := m.c.current()
 	err := h.d.Authenticator.Revalidate(ctx, a)
@@ -66,6 +67,11 @@ func (h *Hub) revalidate(ctx context.Context, m *member) bool {
 		d, err = h.d.Authorizer.Authorize(authorize.Delivery(ctx), a, authorize.ActionGatewayConnect, authorize.Resource{Kind: authorize.ResourceInstance})
 		if err == nil && d.Outcome == authorize.OutcomeUnauthenticated {
 			err = d.Err()
+		}
+		if err == nil && !d.Allowed() {
+			// A forbidden gateway.connect closes like at identify (authorizeConnect).
+			h.closeMember(m, forbiddenClose(d))
+			return false
 		}
 	}
 	switch {
@@ -77,6 +83,15 @@ func (h *Hub) revalidate(ctx context.Context, m *member) bool {
 	}
 	h.d.Log.LogAttrs(ctx, slog.LevelWarn, msgRevalidateFailed, slog.String(logKeyErrorType, errorTypeRevalidate))
 	return true
+}
+
+// forbiddenClose is the close code of a gateway.connect that is neither allowed nor
+// unauthenticated, as authorizeConnect maps it: 4016 for a pending device or principal, else 4018.
+func forbiddenClose(d authorize.Decision) domain.CloseCode {
+	if d.Outcome == authorize.OutcomeForbidden && (d.Reason == "device_pending" || d.Reason == "principal_pending") {
+		return domain.CloseDevicePending
+	}
+	return domain.CloseForbidden
 }
 
 // reindex is step (b): the visible sets of m are read again in delivery mode and replace its index

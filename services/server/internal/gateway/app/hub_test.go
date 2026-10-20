@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
@@ -224,6 +225,29 @@ func TestHub_UnauthenticatedDecisionCloses4012(t *testing.T) {
 	h.Dispatch(context.Background(), msg(1, support, allgemein))
 	if code := qc.closedWith(); code != domain.CloseRevoked {
 		t.Fatalf("closed with %d, want 4012", code)
+	}
+}
+
+// TestHub_ForbiddenConnectAtRevalidationCloses: when access.changed revalidates a connection and
+// gateway.connect is now forbidden, the connection closes like at identify: 4016 for a pending
+// device, 4018 for any other forbidden.
+func TestHub_ForbiddenConnectAtRevalidationCloses(t *testing.T) {
+	t.Parallel()
+	for reason, want := range map[authorize.Reason]domain.CloseCode{"device_pending": domain.CloseDevicePending, "subject_kind_not_allowed": domain.CloseForbidden} {
+		w := newHubWorld()
+		support := ids.New()
+		allgemein := w.channel(support)
+		alex := person()
+		w.grantChannel(alex.ID, allgemein)
+		h := newHub(t, w, hubCfg)
+		qc := connect(t, h, alex, 10, 0, 0)
+		w.mu.Lock()
+		w.connect = map[ids.ID]authorize.Decision{alex.ID: {Outcome: authorize.OutcomeForbidden, Reason: reason}}
+		w.mu.Unlock()
+		h.Dispatch(context.Background(), accessChanged(1, alex.ID))
+		if code := qc.closedWith(); code != want {
+			t.Fatalf("%s: closed with %d, want %d", reason, code, want)
+		}
 	}
 }
 
