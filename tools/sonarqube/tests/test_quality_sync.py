@@ -605,3 +605,58 @@ def test_restore_keeps_a_rule_of_the_parent_inherited() -> None:
     prof = state.profile("go", "Bothy way")
     assert prof is not None
     assert prof.own_rules == {"go:S1135"}
+
+
+def test_new_code_period_is_set_to_30_days_without_the_organization() -> None:
+    # SonarQube Cloud has no api/new_code_periods; its project setting is two api/settings/set
+    # calls, and api/settings/values refuses component and organization together.
+    state = State(cloud=True)
+    with running(state) as url:
+        assert qs.ensure_new_code_period(_client(url, organization=ORG), 30) is None
+        assert _posts(state, "/api/settings/set") == [
+            {"component": PROJECT, "key": "sonar.leak.period", "value": "30"},
+            {"component": PROJECT, "key": "sonar.leak.period.type", "value": "days"},
+        ]
+        assert state.settings == {"sonar.leak.period": "30", "sonar.leak.period.type": "days"}
+
+
+def test_new_code_period_already_set_on_the_project_is_kept() -> None:
+    state = State(
+        cloud=True,
+        settings={
+            "sonar.leak.period": "previous_version",
+            "sonar.leak.period.type": "previous_version",
+        },
+    )
+    with running(state) as url:
+        found = qs.ensure_new_code_period(_client(url, organization=ORG), 30)
+        assert found == "previous_version previous_version"
+        assert _posts(state, "/api/settings/set") == []
+
+
+def test_new_code_command_sets_then_reports_no_change(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True)
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    monkeypatch.setenv("SONAR_PROJECT_KEY", PROJECT)
+    with running(state) as url:
+        args = ["new-code", "--url", url, "--organization", ORG]
+        assert qs.main(args) == 0
+        assert qs.main(args) == 0
+    out = capsys.readouterr().out
+    assert f"quality_sync: new code of '{PROJECT}' set to the last 30 days" in out
+    assert f"quality_sync: new code of '{PROJECT}' already set (days 30), unchanged" in out
+    assert len(_posts(state, "/api/settings/set")) == 2
+
+
+def test_new_code_refusal_fails_with_the_server_message(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(cloud=True, settings_refused=True)
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    monkeypatch.setenv("SONAR_PROJECT_KEY", PROJECT)
+    with running(state) as url:
+        assert qs.main(["new-code", "--url", url, "--organization", ORG]) == 1
+    assert state.settings == {}
+    assert "api/settings/set: HTTP 403: Insufficient privileges" in capsys.readouterr().err

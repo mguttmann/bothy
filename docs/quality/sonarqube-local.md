@@ -123,6 +123,13 @@ The analysis of `main` also needs the project to be public: the free plan caps t
 of code of a private project and refuses a larger analysis ("maximum allowed lines limit"),
 a public one has no such cap. `make sonar-visibility` (same variables) sets the visibility to
 `public` through `api/projects/update_visibility` when `api/projects/search` reports it private.
+The gate of `main` needs a new code definition: without one of the project's own the cloud falls
+back to the previous version, which needs a `sonar.projectVersion` the repository does not send,
+and the gate has no status. `make sonar-new-code` (same variables) sets the last 30 days through
+`api/settings/set` (`sonar.leak.period`, then `sonar.leak.period.type`; the cloud has no
+`api/new_code_periods`) when `api/settings/values` shows no value of the project's own. The scan
+of `main` does not wait for the gate (`SONAR_QUALITYGATE_WAIT=false` in ci.yml): it records the
+overall state and the baseline and must not block `main`; pull requests wait and fail with it.
 
 Where the token exists only as the GitHub Actions secret `SONAR_TOKEN`, the manual workflow
 `.github/workflows/sonar-config.yml` runs these targets against the cloud

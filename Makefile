@@ -42,6 +42,9 @@ PERF_HOST ?= $(shell uname -s)
 SONAR_HOST_URL ?= http://127.0.0.1:9000
 SONAR_ORGANIZATION ?=
 SONAR_PROJECT_KEY ?= bothy
+# Whether the scan waits for the quality gate and fails with it; ci.yml sets false on main, whose
+# analysis records the overall state and the new code baseline and must not block main.
+SONAR_QUALITYGATE_WAIT ?= true
 SONAR_STARTUP_TIMEOUT_S ?= 300
 # renovate: datasource=go depName=github.com/google/go-licenses/v2
 GO_LICENSES_VERSION := v2.0.1
@@ -123,7 +126,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
   ci/tests/test_bothy_noise_package.py
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
-        sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility semgrep trivy osv gitleaks \
+        sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
         runners-check release-pins commitlint \
@@ -636,7 +639,7 @@ sonar-scan: ## SonarQube analysis of the coverage reports already on disk (CI jo
 	elif [ "$${SONAR_SKIP:-0}" = 1 ]; then $(call skip,sonar,SONAR_SKIP=1 for fork contributors; maintainers and CI run it); \
 	elif [ -z "$${SONAR_TOKEN:-}" ]; then echo "sonar: SONAR_TOKEN is not set (docs/quality/sonarqube-local.md)"; exit 1; \
 	else $(call need_node,sonar-scanner-npm); $(NODE_BIN)/sonar-scanner-npm -Dsonar.host.url=$(SONAR_HOST_URL) -Dsonar.projectKey=$(SONAR_PROJECT_KEY) \
-	  $(if $(SONAR_ORGANIZATION),-Dsonar.organization=$(SONAR_ORGANIZATION)) -Dsonar.qualitygate.wait=true \
+	  $(if $(SONAR_ORGANIZATION),-Dsonar.organization=$(SONAR_ORGANIZATION)) -Dsonar.qualitygate.wait=$(SONAR_QUALITYGATE_WAIT) \
 	  || { SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) $(UVRUN) python tools/sonarqube/quality_sync.py ce-error; exit 1; }; fi
 
 sonar-up: ## Start the local SonarQube Community Build (tools/sonarqube/compose.yaml)
@@ -667,6 +670,10 @@ sonar-main-branch: ## Name the main branch of the SonarQube Cloud project main
 sonar-visibility: ## Make the SonarQube Cloud project public (a private one is capped in lines)
 	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) SONAR_PROJECT_KEY=$(SONAR_PROJECT_KEY) \
 	  $(UVRUN) python tools/sonarqube/quality_sync.py visibility
+
+sonar-new-code: ## Give the SonarQube Cloud project the new code of the last 30 days unless set
+	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) SONAR_PROJECT_KEY=$(SONAR_PROJECT_KEY) \
+	  $(UVRUN) python tools/sonarqube/quality_sync.py new-code
 
 # ---- release support ------------------------------------------------------------------
 release-build: ## Product release bundle (tag v<version>): Compose installation, license, changelog

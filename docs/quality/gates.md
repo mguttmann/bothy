@@ -7,7 +7,8 @@ CI runs the same targets: the jobs of section "CI jobs" run `make gates` in para
 `make sonar-scan`. In CI the tests run once per run: each test job packs the coverage reports of
 its `make test` (every report path of `sonar-project.properties`) into the artifact
 `sonar-coverage-<part>`, and job `sonar` waits for the test jobs, unpacks every artifact and only
-scans, with the same quality gate and `sonar.qualitygate.wait=true`. When a test job fails,
+scans, with the same quality gate and `sonar.qualitygate.wait=true` (on `main` `false`: that
+analysis must not block `main`). When a test job fails,
 `sonar` is skipped and `ci-ok` fails through that job. ci.yml also runs on every
 push to `main`, so SonarQube keeps an analysis of `main` (its overall state and the reference for
 new code; on `main` only with the repository variable `SONAR_MAIN_ANALYSIS`, sonarqube-local.md

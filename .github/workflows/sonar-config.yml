@@ -5,7 +5,8 @@
 # docs/quality/public-switch.md, step 12). On the cloud the gate and the profiles are
 # assigned to the project of the variable SONAR_PROJECT_KEY, and the project's main branch is
 # named `main` (ci.yml analyses main only after that, see SONAR_MAIN_ANALYSIS) and the project
-# is made public (a private project on the free plan is capped in lines of code). The token exists only as the secret SONAR_TOKEN,
+# is made public (a private project on the free plan is capped in lines of code) and gets a new
+# code definition of 30 days unless it has one. The token exists only as the secret SONAR_TOKEN,
 # so the maintainer starts this run by hand after a change under quality/sonar/ or the
 # monthly check: gh workflow run sonar-config.yml --ref main.
 #
@@ -64,6 +65,12 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: make sonar-visibility SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
+      # Without a new code definition of its own the project falls back to the previous version,
+      # which this repository does not send, and the gate of main has no status.
+      - name: make sonar-new-code
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: make sonar-new-code SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="$SONAR_PROJECT_KEY"
       - name: make sonar-config
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

@@ -25,6 +25,12 @@ the same result, as SonarQube Cloud answered a search filtered to one profile on
 `project` is the key of the only project and `visibility` its visibility (api/projects/search
 and update_visibility, both answer only for that key); `visibility_refused` answers
 update_visibility with HTTP 400 "Organization ... is not allowed to perform this action".
+`settings` are the values set on that project (api/settings/values and set, as SonarQube Cloud
+documents them on 2026-10-20: it has no api/new_code_periods, the new code definition is the
+settings sonar.leak.period and sonar.leak.period.type). Values answers a key not set on the
+project with its inherited default, and refuses component and organization together, as
+its description says; set refuses an organization too. `settings_refused` answers set with
+HTTP 403 "Insufficient privileges".
 """
 
 from __future__ import annotations
@@ -72,6 +78,8 @@ class State:
     project: str = "example-project"
     visibility: str = "private"
     visibility_refused: bool = False
+    settings: dict[str, str] = field(default_factory=dict)
+    settings_refused: bool = False
     project_profiles: dict[str, str] = field(default_factory=dict)
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
@@ -417,6 +425,41 @@ def _update_visibility(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     return 204, "", "text/plain"
 
 
+# What SonarQube Cloud falls back to without a project setting: the previous version, which
+# needs a `sonar.projectVersion` this repository does not send.
+_SETTING_DEFAULTS = {
+    "sonar.leak.period": "previous_version",
+    "sonar.leak.period.type": "previous_version",
+}
+
+
+def _settings_values(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if p.get("organization") and p.get("component"):
+        msg = "Both 'component' and 'organization' parameters cannot be used together"
+        return 400, {"errors": [{"msg": msg}]}, "application/json"
+    if p.get("component") != state.project:
+        return 404, {"errors": [{"msg": "Component not found"}]}, "application/json"
+    found = []
+    for key in p.get("keys", "").split(","):
+        if key in state.settings:
+            found.append({"key": key, "value": state.settings[key], "inherited": False})
+        elif key in _SETTING_DEFAULTS:
+            found.append({"key": key, "value": _SETTING_DEFAULTS[key], "inherited": True})
+    return 200, {"settings": found}, "application/json"
+
+
+def _settings_set(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if state.settings_refused:
+        return 403, {"errors": [{"msg": "Insufficient privileges"}]}, "application/json"
+    if p.get("organization"):
+        msg = f"Setting '{p.get('key')}' cannot be set at organization level"
+        return 400, {"errors": [{"msg": msg}]}, "application/json"
+    if p.get("component") != state.project or not p.get("key") or "value" not in p:
+        return _BAD_REQUEST
+    state.settings[p["key"]] = p["value"]
+    return 204, "", "text/plain"
+
+
 def _ce_task(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     task = state.ce_tasks.get(p.get("id", ""))
     if task is None:
@@ -448,6 +491,8 @@ ROUTES = {
     ("GET", "/api/ce/task"): _ce_task,
     ("GET", "/api/projects/search"): _projects_search,
     ("POST", "/api/projects/update_visibility"): _update_visibility,
+    ("GET", "/api/settings/values"): _settings_values,
+    ("POST", "/api/settings/set"): _settings_set,
 }
 
 
