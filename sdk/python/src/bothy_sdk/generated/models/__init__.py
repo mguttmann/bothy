@@ -517,6 +517,7 @@ from .read_state_updated_event import ReadStateUpdatedEvent
 from .read_state_updated_event_type import ReadStateUpdatedEventType
 from .reason_body import ReasonBody
 from .reconcile_entry import ReconcileEntry
+from .resolve_i1 import ResolveI1
 from .run import Run
 from .run_api_retry import RunApiRetry
 from .run_await_input import RunAwaitInput
@@ -1255,6 +1256,7 @@ __all__ = (
     "ReadStateUpdatedEventType",
     "ReasonBody",
     "ReconcileEntry",
+    "ResolveI1",
     "Run",
     "RunApiRetry",
     "RunAwaitInput",

@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/resolve_i1.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -13,6 +14,7 @@ part 'owner_add.g.dart';
 /// Properties:
 /// * [userId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [reason]
+/// * [resolveI1]
 @BuiltValue()
 abstract class OwnerAdd implements Built<OwnerAdd, OwnerAddBuilder> {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
@@ -21,6 +23,9 @@ abstract class OwnerAdd implements Built<OwnerAdd, OwnerAddBuilder> {
 
   @BuiltValueField(wireName: r'reason')
   String get reason;
+
+  @BuiltValueField(wireName: r'resolve_i1')
+  ResolveI1? get resolveI1;
 
   OwnerAdd._();
 
@@ -55,6 +60,13 @@ class _$OwnerAddSerializer implements PrimitiveSerializer<OwnerAdd> {
       object.reason,
       specifiedType: const FullType(String),
     );
+    if (object.resolveI1 != null) {
+      yield r'resolve_i1';
+      yield serializers.serialize(
+        object.resolveI1,
+        specifiedType: const FullType(ResolveI1),
+      );
+    }
   }
 
   @override
@@ -95,6 +107,14 @@ class _$OwnerAddSerializer implements PrimitiveSerializer<OwnerAdd> {
             specifiedType: const FullType(String),
           ) as String;
           result.reason = valueDes;
+          break;
+        case r'resolve_i1':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ResolveI1),
+          ) as ResolveI1?;
+          if (valueDes == null) continue;
+          result.resolveI1.replace(valueDes);
           break;
         default:
           unhandled.add(key);

@@ -1,0 +1,7 @@
+Zuerst wird Assistent auf Organisation umgestellt; die Kosten trägt dann der Organisations-Key.
+Zuerst wird Helfer auf Organisation umgestellt; die Kosten trägt dann der Organisations-Key.
+Der Adapter von Helfer meldet noch keinen Organisations-Key. Aufrufe scheitern, bis er umgestellt ist.
+Sam erhält die Stufe "Auslösen" im Kanal Research/Notizen.
+Sam kann damit: Nachrichten lesen und schreiben, Threads anlegen, Agent Assistent auslösen.
+Dateien hochladen: nein. Freigabe-Karten bestätigen: nein.
+Hinweis: Die Freigabe für Sam hat kein Ablaufdatum.

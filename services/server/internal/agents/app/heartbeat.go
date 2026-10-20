@@ -25,8 +25,8 @@ import (
 //     subject_kind_not_allowed from AgentSelf, audited by authz; the body carries no agent id, so
 //     an agent reports only for itself;
 //  2. decode and validate (domain.DecodeHeartbeat): one validation_failed with every field error;
-//  3. under the entry lock read the configured and stored values, every heartbeat, so a value
-//     changed in another process counts at once;
+//  3. read the configured and stored values, every heartbeat, so a value changed in another
+//     process counts at once;
 //  4. project readiness, only when the list changed since this process applied it, in its own
 //     unit of work through chat (D-M2-20-10);
 //  5. a change of the reported mode or class: lock the row, compare again, store at once and
@@ -35,6 +35,13 @@ import (
 //  7. publish agent.presence_changed when state or reported mode changed (D-M2-20-4).
 //
 // It writes no agents.version, no agent.updated, no permission_version and no event_log row.
+//
+// Locks (docs/DECISIONS.md D-M2-21-11): the heartbeats of one agent run one after the other under
+// the entry's beat lock, which only Heartbeat takes and never inside a unit of work (the route is
+// exempt from Idempotency-Key). Steps 3 to 5 wait for the database, so they run under the beat
+// lock only; the entry lock guards the fields and is never held across a database call, because
+// its other holders (reads for agent.updated, Changed, the gauges, the flush, the timer) may run
+// in a unit that holds the agents or a channel row a heartbeat waits for.
 func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.PresenceStatus, error) {
 	a, ok := actor.FromContext(ctx)
 	if !ok {
@@ -55,16 +62,21 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	if err != nil {
 		return agents.PresenceStatus{}, internal(err, "agents: the principal of a heartbeat")
 	}
+	e.beat.Lock()
+	defer e.beat.Unlock()
 	e.mu.Lock()
-	defer e.mu.Unlock()
+	changes := e.changes
+	e.mu.Unlock()
 	row, found, err := t.d.Store.GetPresenceRow(ctx, a.ID)
 	if err != nil || !found {
 		return agents.PresenceStatus{}, internal(err, "agents: the record of a heartbeat")
 	}
 	now := t.d.Clock.Now()
+	e.mu.Lock()
 	if !e.loaded {
 		t.fill(e, row, now)
 	}
+	e.mu.Unlock()
 	if err := t.applyReadiness(ctx, e, report); err != nil {
 		return agents.PresenceStatus{}, err
 	}
@@ -72,7 +84,13 @@ func (t *Tracker) Heartbeat(ctx context.Context, body json.RawMessage) (agents.P
 	if err != nil {
 		return agents.PresenceStatus{}, err
 	}
-	e.target, e.report, e.last, e.state = row.Target, report, now, report.State
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	// A Changed that ran since the read above took newer configured values.
+	if e.changes == changes {
+		e.target = row.Target
+	}
+	e.report, e.last, e.state = report, now, report.State
 	e.dirty = !wrote
 	e.deadline = now.Add(t.cfg.PresenceTimeout)
 	t.reassess(e, now)
@@ -94,7 +112,8 @@ func internal(err error, what string) error {
 }
 
 // applyReadiness applies project_readiness of r through chat when the member is present and the
-// list differs from the last one this process applied for the agent (the caller holds e.mu). Any
+// list differs from the last one this process applied for the agent (the caller holds e.beat,
+// which guards the applied list). Any
 // error of the port fails the heartbeat with internal_error, except the validation error of a
 // duplicate channel, which domain.DecodeHeartbeat already refuses.
 func (t *Tracker) applyReadiness(ctx context.Context, e *entry, r domain.Report) error {

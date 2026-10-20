@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:built_collection/built_collection.dart';
+import 'package:api_client/src/generated/model/resolve_i1.dart';
 import 'package:api_client/src/generated/model/target_kind.dart';
 import 'package:api_client/src/generated/model/capability.dart';
 import 'package:api_client/src/generated/model/level.dart';
@@ -24,6 +25,7 @@ part 'grant_create.g.dart';
 /// * [capabilities]
 /// * [expiresAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [reason]
+/// * [resolveI1]
 @BuiltValue()
 abstract class GrantCreate implements Built<GrantCreate, GrantCreateBuilder> {
   @BuiltValueField(wireName: r'subject_kind')
@@ -55,6 +57,9 @@ abstract class GrantCreate implements Built<GrantCreate, GrantCreateBuilder> {
 
   @BuiltValueField(wireName: r'reason')
   String get reason;
+
+  @BuiltValueField(wireName: r'resolve_i1')
+  ResolveI1? get resolveI1;
 
   GrantCreate._();
 
@@ -127,6 +132,13 @@ class _$GrantCreateSerializer implements PrimitiveSerializer<GrantCreate> {
       object.reason,
       specifiedType: const FullType(String),
     );
+    if (object.resolveI1 != null) {
+      yield r'resolve_i1';
+      yield serializers.serialize(
+        object.resolveI1,
+        specifiedType: const FullType(ResolveI1),
+      );
+    }
   }
 
   @override
@@ -215,6 +227,14 @@ class _$GrantCreateSerializer implements PrimitiveSerializer<GrantCreate> {
             specifiedType: const FullType(String),
           ) as String;
           result.reason = valueDes;
+          break;
+        case r'resolve_i1':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(ResolveI1),
+          ) as ResolveI1?;
+          if (valueDes == null) continue;
+          result.resolveI1.replace(valueDes);
           break;
         default:
           unhandled.add(key);

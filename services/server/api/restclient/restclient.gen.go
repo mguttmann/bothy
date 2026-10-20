@@ -9165,6 +9165,9 @@ type GrantCreate struct {
 	// Reason Examples: Support team works in this space
 	Reason string `json:"reason"`
 
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
+
 	// SubjectId UUIDv7 (RFC 9562), lowercase canonical form.
 	SubjectId   Uuid             `json:"subject_id"`
 	SubjectKind GrantSubjectKind `json:"subject_kind"`
@@ -9339,6 +9342,9 @@ type GroupMember struct {
 type GroupMemberAdd struct {
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	ExpiresAt *Timestamp `json:"expires_at,omitempty"`
+
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
 
 	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
 	UserId Uuid `json:"user_id"`
@@ -11429,6 +11435,9 @@ type OperatorSet struct {
 
 	// Reason Examples: Support agent takes over
 	Reason string `json:"reason"`
+
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
 }
 
 // Owner defines model for Owner.
@@ -11448,6 +11457,9 @@ type Owner struct {
 type OwnerAdd struct {
 	// Reason Examples: Second owner as deputy
 	Reason string `json:"reason"`
+
+	// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+	ResolveI1 *ResolveI1 `json:"resolve_i1,omitempty"`
 
 	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
 	UserId Uuid `json:"user_id"`
@@ -12433,6 +12445,15 @@ type ReconcileEntry struct {
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
+}
+
+// ResolveI1 Guided flow (05 rule 1.6, 10 section 11): switch these agents to `organization` first, in the same transaction as the change.
+type ResolveI1 struct {
+	// Reason Reason of the switch, in the audit entry of every switched agent; at most `audit.reason_max_chars` characters, no control or bidi characters.
+	//
+	// Examples: Sam triggers the assistant too
+	Reason               string `json:"reason"`
+	SwitchToOrganization []Uuid `json:"switch_to_organization"`
 }
 
 // Run Run document (`run_document.v1`), the content of the live box.
@@ -20978,12 +20999,16 @@ type ClientInterface interface {
 
 	// SetChannelOperatorWithBody Set or inherit the operator of a channel
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
 	SetChannelOperatorWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetChannelOperator Set or inherit the operator of a channel
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21537,12 +21562,16 @@ type ClientInterface interface {
 
 	// CreateGrantWithBody Create a grant
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /grants (the `CreateGrant` operationId).
 	CreateGrantWithBody(ctx context.Context, params *CreateGrantParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateGrant Create a grant
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21556,7 +21585,10 @@ type ClientInterface interface {
 	// The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
 	// `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
 	// is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-	// (07, 9.3).
+	// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+	// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+	// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+	// `organization` before the grant, and `text` names each agent the request would switch.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -21570,7 +21602,10 @@ type ClientInterface interface {
 	// The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
 	// `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
 	// is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-	// (07, 9.3).
+	// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+	// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+	// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+	// `organization` before the grant, and `text` names each agent the request would switch.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21646,12 +21681,16 @@ type ClientInterface interface {
 
 	// AddGroupMemberWithBody Add a member
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /groups/{group_id}/members (the `AddGroupMember` operationId).
 	AddGroupMemberWithBody(ctx context.Context, groupId GroupIdPath, params *AddGroupMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AddGroupMember Add a member
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -22607,12 +22646,16 @@ type ClientInterface interface {
 
 	// AddOwnerWithBody Make a person owner
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /owners (the `AddOwner` operationId).
 	AddOwnerWithBody(ctx context.Context, params *AddOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AddOwner Make a person owner
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -22982,12 +23025,16 @@ type ClientInterface interface {
 
 	// SetSpaceOperatorWithBody Set the default operator of a space
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /spaces/{space_id}/operator (the `SetSpaceOperator` operationId).
 	SetSpaceOperatorWithBody(ctx context.Context, spaceId SpaceIdPath, params *SetSpaceOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetSpaceOperator Set the default operator of a space
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25480,121 +25527,6 @@ func (c *Client) CreateIncomingWebhookWithBody(ctx context.Context, channelId Ch
 // Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
 func (c *Client) CreateIncomingWebhook(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, body CreateIncomingWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateIncomingWebhookRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// LeaveDm Leave a direct message channel
-//
-// Corresponds with POST /channels/{channel_id}/leave (the `LeaveDm` operationId).
-func (c *Client) LeaveDm(ctx context.Context, channelId ChannelIdPath, params *LeaveDmParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLeaveDmRequest(c.Server, channelId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// MoveChannelWithBody Change the position of a channel in its space
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/move (the `MoveChannel` operationId).
-func (c *Client) MoveChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *MoveChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewMoveChannelRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// MoveChannel Change the position of a channel in its space
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/move (the `MoveChannel` operationId).
-func (c *Client) MoveChannel(ctx context.Context, channelId ChannelIdPath, params *MoveChannelParams, body MoveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewMoveChannelRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetChannelOperatorWithBody Set or inherit the operator of a channel
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
-func (c *Client) SetChannelOperatorWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetChannelOperatorRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetChannelOperator Set or inherit the operator of a channel
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
-func (c *Client) SetChannelOperator(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, body SetChannelOperatorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetChannelOperatorRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// DeleteProjectBinding Remove the project binding
-//
-// Corresponds with DELETE /channels/{channel_id}/project-binding (the `DeleteProjectBinding` operationId).
-func (c *Client) DeleteProjectBinding(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteProjectBindingRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutProjectBindingWithBody Bind a forum to a project
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
-func (c *Client) PutProjectBindingWithBody(ctx context.Context, channelId ChannelIdPath, params *PutProjectBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutProjectBindingRequestWithBody(c.Server, channelId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

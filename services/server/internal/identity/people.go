@@ -114,14 +114,25 @@ type People interface {
 	UpdateMyProfile(ctx context.Context, a actor.Actor, cmd ProfileCmd) (UserView, error)
 }
 
+// ResolveI1 is the request member resolve_i1 of owner.add (OpenAPI ResolveI1, M2-21): the agents
+// to switch to organization first, in request order, and the reason of the switch. identity/app
+// converts it into authz.ResolveI1; the port keeps its own type (02 section 5 rule 1, R-AR-03).
+type ResolveI1 struct {
+	AgentIDs []ids.ID
+	Reason   string
+}
+
 // Owners is the incoming port of the owner use cases (PLAN M1-31). Owner changes are rights
 // changes: I1 and SR8 hold after every call.
 type Owners interface {
 	// ListOwners returns the active owners ordered by granted_at (user.read), unpaginated.
 	ListOwners(ctx context.Context, a actor.Actor) ([]OwnerView, error)
-	// AddOwner grants the owner role to the active person userID (owner.add). Errors: not_found,
-	// conflict for a person that is not active or already an owner, i1_violation.
-	AddOwner(ctx context.Context, a actor.Actor, userID ids.ID, reason string) (OwnerView, error)
+	// AddOwner grants the owner role to the active person userID (owner.add). resolve is the
+	// optional guided flow (05 rule 1.6, M2-21): the listed agents are switched to organization
+	// in the same transaction before the owners row is written; nil for none. Errors: not_found,
+	// conflict for a person that is not active or already an owner, i1_violation, and for resolve
+	// validation_failed, not_found, forbidden or step_up_required of a listed agent.
+	AddOwner(ctx context.Context, a actor.Actor, userID ids.ID, reason string, resolve *ResolveI1) (OwnerView, error)
 	// RevokeOwner revokes the owner role of userID (owner.remove). Errors: not_found without an
 	// active owner row, last_owner.
 	RevokeOwner(ctx context.Context, a actor.Actor, userID ids.ID, reason string) error

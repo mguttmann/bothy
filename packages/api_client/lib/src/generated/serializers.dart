@@ -405,6 +405,7 @@ import 'package:api_client/src/generated/model/read_state_put.dart';
 import 'package:api_client/src/generated/model/read_state_updated_event.dart';
 import 'package:api_client/src/generated/model/reason_body.dart';
 import 'package:api_client/src/generated/model/reconcile_entry.dart';
+import 'package:api_client/src/generated/model/resolve_i1.dart';
 import 'package:api_client/src/generated/model/run.dart';
 import 'package:api_client/src/generated/model/run_api_retry.dart';
 import 'package:api_client/src/generated/model/run_await_input.dart';
@@ -977,6 +978,7 @@ part 'serializers.g.dart';
   ReadStateUpdatedEvent,
   ReasonBody,
   ReconcileEntry,
+  ResolveI1,
   Run,
   RunApiRetry,
   RunAwaitInput,

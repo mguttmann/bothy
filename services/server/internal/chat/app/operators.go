@@ -4,7 +4,9 @@ package app
 
 import (
 	"context"
+	"slices"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -51,6 +53,56 @@ func operatorAttrs(kind string, target ids.ID, old, want domain.OperatorAssignme
 func withNoChange(attrs auditing.Attrs) auditing.Attrs {
 	attrs[attrNoChange] = auditing.Bool(true)
 	return attrs
+}
+
+// resolveRequest converts the guided flow of the port into the request of authz; nil stays nil.
+func resolveRequest(r *chat.ResolveI1) *authz.ResolveI1 {
+	if r == nil {
+		return nil
+	}
+	return &authz.ResolveI1{AgentIDs: slices.Clone(r.AgentIDs), Reason: r.Reason}
+}
+
+// errNoResolver is the refusal of a guided flow without a bound resolver (fail closed).
+func errNoResolver() error {
+	return errs.New(errs.CodeInternalError, "chat: the guided flow needs the resolver of authz")
+}
+
+// checkOperatorBody validates the operator body (checkOperator) and the guided flow req together, so their
+// field errors come in one answer (06 section 5 point 3; M2-21 design note 2).
+func (s *Service) checkOperatorBody(ctx context.Context, want domain.OperatorAssignment, space bool, kind domain.ChannelKind, reason string, req *authz.ResolveI1) error {
+	var resolveErr error
+	if req != nil {
+		if s.d.Resolver == nil {
+			return errNoResolver()
+		}
+		resolveErr = s.d.Resolver.CheckResolveI1(*req)
+	}
+	err := s.checkOperator(ctx, want, space, kind, reason)
+	if resolveErr == nil {
+		return err
+	}
+	if err == nil {
+		return resolveErr
+	}
+	e, ok := errs.As(err)
+	if !ok || e.Code != errs.CodeValidationFailed {
+		return err
+	}
+	re, _ := errs.As(resolveErr)
+	return errs.New(errs.CodeValidationFailed, e.Detail).WithFields(append(slices.Clone(e.Fields), re.Fields...)...)
+}
+
+// resolve runs the switch part of the guided flow inside the second unit of an operator change,
+// after the checks under the lock and before the first write (M2-21 design note 3 e).
+func (s *Service) resolve(ctx context.Context, a actor.Actor, req *authz.ResolveI1) error {
+	if req == nil {
+		return nil
+	}
+	if s.d.Resolver == nil {
+		return errNoResolver()
+	}
+	return s.d.Resolver.ResolveI1(ctx, a, *req)
 }
 
 // checkOperator validates a request of D1: mode and agent_id (inherit only for a channel), the
@@ -116,6 +168,7 @@ func (s *Service) SetChannelOperator(ctx context.Context, a actor.Actor, cmd cha
 		return chat.Channel{}, err
 	}
 	want := assignment(cmd.Operator)
+	req := resolveRequest(cmd.ResolveI1)
 	var (
 		out    ChannelRow
 		change bool
@@ -128,7 +181,7 @@ func (s *Service) SetChannelOperator(ctx context.Context, a actor.Actor, cmd cha
 		if err := channelPrecondition(cmd.IfMatch, c); err != nil {
 			return err
 		}
-		if err := s.checkOperator(ctx, want, false, c.Channel.Kind, cmd.Reason); err != nil {
+		if err := s.checkOperatorBody(ctx, want, false, c.Channel.Kind, cmd.Reason, req); err != nil {
 			return err
 		}
 		if archived(c) {
@@ -148,14 +201,15 @@ func (s *Service) SetChannelOperator(ctx context.Context, a actor.Actor, cmd cha
 	ref := txn.Ref{Kind: resourceChannel, ID: cmd.ChannelID}
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		out, err = s.setChannelOperatorWrite(ctx, cmd, want)
+		out, err = s.setChannelOperatorWrite(ctx, a, cmd, want, req)
 		return err
 	}, txn.DeclareRightsChange(txn.RightsChangeSpec{Action: string(authorize.ActionChannelOperatorSet), Resource: ref}))
 	return channelDTO(out), err
 }
 
 // setChannelOperatorWrite is the second unit of SetChannelOperator.
-func (s *Service) setChannelOperatorWrite(ctx context.Context, cmd chat.SetChannelOperatorCmd, want domain.OperatorAssignment) (ChannelRow, error) {
+func (s *Service) setChannelOperatorWrite(ctx context.Context, a actor.Actor, cmd chat.SetChannelOperatorCmd, want domain.OperatorAssignment,
+	req *authz.ResolveI1) (ChannelRow, error) {
 	c, err := s.lockChannel(ctx, cmd.ChannelID)
 	if err != nil {
 		return ChannelRow{}, err
@@ -171,6 +225,9 @@ func (s *Service) setChannelOperatorWrite(ctx context.Context, cmd chat.SetChann
 		// A concurrent call set the same assignment first: answered as without effect.
 		return c, s.recordChannel(ctx, authorize.ActionChannelOperatorSet, c.Channel.ID,
 			withNoChange(operatorAttrs(resourceChannel, c.Channel.ID, want, want, cmd.Reason)))
+	}
+	if err := s.resolve(ctx, a, req); err != nil {
+		return ChannelRow{}, err
 	}
 	before := c.Channel.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID
 	after := domain.EffectiveOperator(want.Mode == domain.OperatorInherit, want.AgentID, c.SpaceDefaultOperatorID)
@@ -207,6 +264,7 @@ func (s *Service) SetSpaceOperator(ctx context.Context, a actor.Actor, cmd chat.
 		return chat.Space{}, err
 	}
 	want := assignment(cmd.Operator)
+	req := resolveRequest(cmd.ResolveI1)
 	var (
 		out    domain.Space
 		change bool
@@ -219,7 +277,7 @@ func (s *Service) SetSpaceOperator(ctx context.Context, a actor.Actor, cmd chat.
 		if err := precondition(cmd.IfMatch, sp); err != nil {
 			return err
 		}
-		if err := s.checkOperator(ctx, want, true, "", cmd.Reason); err != nil {
+		if err := s.checkOperatorBody(ctx, want, true, "", cmd.Reason, req); err != nil {
 			return err
 		}
 		if sp.Archived() {
@@ -238,14 +296,15 @@ func (s *Service) SetSpaceOperator(ctx context.Context, a actor.Actor, cmd chat.
 	ref := txn.Ref{Kind: resourceSpace, ID: cmd.SpaceID}
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		out, err = s.setSpaceOperatorWrite(ctx, cmd, want)
+		out, err = s.setSpaceOperatorWrite(ctx, a, cmd, want, req)
 		return err
 	}, txn.DeclareRightsChange(txn.RightsChangeSpec{Action: string(authorize.ActionSpaceOperatorSet), Resource: ref}))
 	return spaceView(out), err
 }
 
 // setSpaceOperatorWrite is the second unit of SetSpaceOperator.
-func (s *Service) setSpaceOperatorWrite(ctx context.Context, cmd chat.SetSpaceOperatorCmd, want domain.OperatorAssignment) (domain.Space, error) {
+func (s *Service) setSpaceOperatorWrite(ctx context.Context, a actor.Actor, cmd chat.SetSpaceOperatorCmd, want domain.OperatorAssignment,
+	req *authz.ResolveI1) (domain.Space, error) {
 	sp, err := s.lock(ctx, cmd.SpaceID)
 	if err != nil {
 		return domain.Space{}, err
@@ -263,6 +322,9 @@ func (s *Service) setSpaceOperatorWrite(ctx context.Context, cmd chat.SetSpaceOp
 	}
 	inheriting, err := s.d.Store.LockInheritingChannels(ctx, sp.ID)
 	if err != nil {
+		return domain.Space{}, err
+	}
+	if err := s.resolve(ctx, a, req); err != nil {
 		return domain.Space{}, err
 	}
 	if err := s.d.RightsChanges.AddAffected(ctx, old.AgentID, want.AgentID); err != nil {

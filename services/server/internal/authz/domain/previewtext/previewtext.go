@@ -78,6 +78,14 @@ type I1 struct {
 	Agent, Holder string
 }
 
+// Switch is one agent the guided flow of the request switches from personal to organization
+// first (resolve_i1, M2-21): its name and whether its adapter reports organization among its
+// billing_modes_supported.
+type Switch struct {
+	Agent             string
+	OrganizationReady bool
+}
+
 // Horizon is one hint H1 (read_horizon): agent Agent also reads Space/Channel; Count is the
 // number of members of a group subject who may not read it (ignored for other subjects).
 type Horizon struct {
@@ -119,6 +127,9 @@ type Input struct {
 	// host (M2-40).
 	HostI6       []I6
 	NotEffective NotEffective
+	// Switches are the agents the guided flow switches first (M2-21); each gets a switch line
+	// and, without OrganizationReady, the not-ready line, by agent name before the summary.
+	Switches []Switch
 }
 
 // Language returns the language of locale: its primary subtag when it is de or en, otherwise de,
@@ -131,7 +142,8 @@ func Language(locale string) string {
 	return LangDE
 }
 
-// Render returns the text of in and its language. Lines follow this order: summary, abilities,
+// Render returns the text of in and its language. Lines follow this order: the switch lines of the
+// guided flow (by agent name, each followed by its not-ready line), summary, abilities,
 // capabilities, then one line per hint: denial, I1 violations (by agent name), tool class (by
 // agent name), read horizon (by agent, space and channel name), group reach, missing expiry. A
 // grant on a host (M2-40) has no abilities and no capabilities line, which describe levels in the
@@ -144,11 +156,26 @@ func Render(in Input) (text, lang string) {
 		r.c = catalogEN
 	}
 	if in.Target.Kind == domain.TargetHost {
-		return strings.Join(append([]string{r.summaryHost()}, r.hostHints()...), "\n"), lang
+		return strings.Join(append(append(r.switches(), r.summaryHost()), r.hostHints()...), "\n"), lang
 	}
-	lines := []string{r.summary(), r.abilities(), r.caps()}
+	lines := append(r.switches(), r.summary(), r.abilities(), r.caps())
 	lines = append(lines, r.hints()...)
 	return strings.Join(lines, "\n"), lang
+}
+
+// switches are the lines of the guided flow: per agent by name the switch line and, when its
+// adapter does not report organization, the not-ready line (10 section 11 point 2).
+func (r renderer) switches() []string {
+	list := slices.Clone(r.in.Switches)
+	slices.SortStableFunc(list, func(a, b Switch) int { return cmp.Compare(a.Agent, b.Agent) })
+	var out []string
+	for _, sw := range list {
+		out = append(out, r.fill("switch.organization", "agent", sw.Agent))
+		if !sw.OrganizationReady {
+			out = append(out, r.fill("switch.not_ready", "agent", sw.Agent))
+		}
+	}
+	return out
 }
 
 // renderer renders one input with one catalogue.

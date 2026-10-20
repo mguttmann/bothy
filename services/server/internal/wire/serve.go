@@ -773,6 +773,17 @@ func (s *server) startAuthz(context.Context) error {
 	return nil
 }
 
+// resolver returns the guided flow of authz (M2-21) as the port identity and chat call; nil
+// before startAuthz, which identity and chat then refuse with kind internal.
+func (s *server) resolver() authz.I1Resolver {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.authzAdmin == nil || s.authzAdmin.Resolver == nil {
+		return nil
+	}
+	return s.authzAdmin.Resolver
+}
+
 // startSettings is start step 6d (M1-46): the instance settings,
 // branding and discovery over the pool, the unit of work and recorder of audit, the appender of
 // sync and the Authorizer. It comes before identity, because createUser reads locale.default
@@ -831,7 +842,7 @@ func (s *server) startIdentity(ctx context.Context) error {
 		return err
 	}
 	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin,
-		Fresh: fresh, Apps: NewAppInstallations(pool), Search: s.search}, pepper, s.deps.Clock, s.logger())
+		Fresh: fresh, Apps: NewAppInstallations(pool), Search: s.search, Resolver: s.resolver()}, pepper, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
@@ -844,7 +855,8 @@ func (s *server) startIdentity(ctx context.Context) error {
 
 // startAgents is start step 6e (M1-51): the agents module over the pool, the unit of work, the
 // recorder and the rights hook of the audit step, the appender of the sync step, the Authorizer
-// and the identity module.
+// and the identity module; it binds the switch of the module into the guided flow of authz
+// (M2-21, bindGuidedFlow).
 func (s *server) startAgents(context.Context) error {
 	cfg, err := AgentsConfig(s.values)
 	if err != nil {
@@ -858,6 +870,12 @@ func (s *server) startAgents(context.Context) error {
 	}
 	ag, err := NewAgents(cfg, pool, a.UoW(), az, a.RightsHook(), IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock, s.logger())
 	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	admin := s.authzAdmin
+	s.mu.Unlock()
+	if err := bindGuidedFlow(admin, ag); err != nil {
 		return err
 	}
 	pcfg, err := PresenceConfigFrom(s.values)
@@ -876,6 +894,21 @@ func (s *server) startAgents(context.Context) error {
 	s.mu.Lock()
 	s.agents = ag
 	s.mu.Unlock()
+	return nil
+}
+
+// bindGuidedFlow binds the switch of the agents module ag into the resolver of the guided flow of
+// admin (M2-21): from then on resolve_i1 switches agents through the agents module. It fails the
+// start when the resolver still holds authz.EmptyAgentPolicySwitch afterwards, so the production
+// graph never serves the guided flow with the empty switch.
+func bindGuidedFlow(admin *AuthzAdmin, ag *Agents) error {
+	if admin == nil || admin.Resolver == nil || ag == nil || ag.Switch == nil {
+		return errors.New("wire: the guided flow needs the resolver of authz and the switch of the agents module")
+	}
+	admin.BindAgentPolicySwitch(ag.Switch)
+	if admin.Resolver.UsesEmptySwitch() {
+		return errors.New("wire: the guided flow still uses the empty agent policy switch")
+	}
 	return nil
 }
 
@@ -904,7 +937,7 @@ func (s *server) startChat(context.Context) error {
 		return errors.New("wire: the chat step needs audit, sync, the Authorizer of authz and identity")
 	}
 	c, err := NewChat(cfg, pool, a.UoW(), az, rights, ChatWrites{Audit: a.Recorder(), Events: sy.Appender(), Rights: a.RightsHook(),
-		Directory: id.Directory}, nil, s.deps.Clock)
+		Directory: id.Directory, Resolver: s.resolver()}, nil, s.deps.Clock)
 	if err != nil {
 		return err
 	}

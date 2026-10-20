@@ -295,6 +295,17 @@ type AuthzAdmin struct {
 	Admin *authzapp.AdminService
 	// Handlers are the REST handlers of the twelve operations of 06 "Groups" and "Access".
 	Handlers *authzhttp.Access
+	// Resolver is the guided flow resolve_i1 (M2-21): the Admin use cases use it, identity and chat
+	// get it as authz.I1Resolver, and the agents step binds the switch of the agents module into it
+	// (BindAgentPolicySwitch); until then it fails closed.
+	Resolver *authzapp.Resolver
+}
+
+// BindAgentPolicySwitch binds the switch of the agents module (authzsource.NewSwitch) into the
+// resolver of the guided flow (M2-21). The agents module is built after authz, so the start steps
+// bind it once it exists, before any route serves.
+func (a *AuthzAdmin) BindAgentPolicySwitch(sw authz.AgentPolicySwitch) {
+	a.Resolver.BindSwitch(sw)
 }
 
 // NewAuthzAdmin builds the Admin use cases over pool (M1-48): the unit of work and the rights hook
@@ -311,14 +322,19 @@ func NewAuthzAdmin(pool *pg.Pool, cfg authzapp.AdminConfig, a *Audit, sy *Sync, 
 	if clk == nil {
 		clk = clock.System()
 	}
+	resolver, err := authzapp.NewResolver(authzapp.ResolverDeps{Authorizer: az, Policies: NewAgentPolicySource(pool), Rights: a.RightsHook(),
+		ReasonMaxChars: cfg.ReasonMaxChars})
+	if err != nil {
+		return nil, err
+	}
 	admin, err := authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: a.UoW(), Authorizer: az, Store: authzpg.NewRepository(pool),
 		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: NewStructureSource(pool), Hosts: NewHostSource(pool),
 		Rights: a.RightsHook(), Audit: a.Recorder(), Clock: clk, Events: sy.Appender(), Scopes: az, Cursors: authzhttp.Cursors{},
-		Config: cfg, Views: identityapp.NewConsoleViews(identitypg.NewRepository(pool)),
+		Config: cfg, Views: identityapp.NewConsoleViews(identitypg.NewRepository(pool)), Resolver: resolver,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &AuthzAdmin{Admin: admin, Handlers: authzhttp.New(admin)}, nil
+	return &AuthzAdmin{Admin: admin, Handlers: authzhttp.New(admin), Resolver: resolver}, nil
 }

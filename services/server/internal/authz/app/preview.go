@@ -62,6 +62,12 @@ func (s *AdminService) PreviewGrant(ctx context.Context, caller actor.Actor, cmd
 	if err != nil {
 		return authz.GrantPreview{}, err
 	}
+	if p.resolve != nil {
+		// Every listed agent with the target action agent.billing_mode.set (M2-21 design note 9).
+		if err := p.s.d.Resolver.AuthorizePreview(ctx, caller, p.resolve.AgentIDs); err != nil {
+			return authz.GrantPreview{}, err
+		}
+	}
 	denial, err := delegationLimit(ctx, p.x.a, caller, res, p.grant)
 	if err != nil {
 		return authz.GrantPreview{}, err
@@ -92,17 +98,15 @@ func (s *AdminService) newPreviewer(caller actor.Actor, cmd authz.CreateGrantCmd
 	if err != nil {
 		return nil, err
 	}
-	subject, target, level, caps, err := grantParts(cmd)
-	if err != nil {
-		return nil, err
-	}
 	now := s.d.Clock.Now()
 	reason := strings.TrimSpace(cmd.Reason)
-	if err := domain.CheckGrantShape(subject, target, level, caps, cmd.ExpiresAt, reason, now); err != nil {
+	subject, target, level, caps, err := grantShape(cmd, reason, now)
+	if err := joinFields(err, s.checkResolve(cmd.ResolveI1)); err != nil {
 		return nil, err
 	}
 	g := domain.Grant{Subject: subject, Target: target, Level: level, Caps: caps, ExpiresAt: cmd.ExpiresAt, Reason: reason, GrantedBy: caller.ID, GrantedAt: now}
-	return &previewer{s: s, hook: hook, x: &explainer{a: eng, t: now, states: map[ids.ID]*principalState{}}, caller: caller, grant: g, targetID: cmd.TargetID}, nil
+	return &previewer{s: s, hook: hook, x: &explainer{a: eng, t: now, states: map[ids.ID]*principalState{}}, caller: caller, grant: g, targetID: cmd.TargetID,
+		resolve: cmd.ResolveI1}, nil
 }
 
 // authorize decides access.preview with the requirement of grant.create on the target.
@@ -126,16 +130,22 @@ func (p *previewer) dryRun(ctx context.Context) (authz.GrantPreview, previewFact
 		if err != nil {
 			return err
 		}
-		if err := p.s.createGrant(ctx, row); err != nil {
+		if err := p.s.createGrant(ctx, row, func(ctx context.Context) error {
+			var err error
+			facts.switches, err = p.switchPreview(ctx)
+			return err
+		}); err != nil {
 			return err
 		}
 		ev, err := p.hook.Evaluate(ctx)
 		if err != nil {
 			return err
 		}
+		switches := facts.switches
 		if out, facts, err = p.evaluate(ctx, ev); err != nil {
 			return err
 		}
+		facts.switches = switches
 		return errPreviewRollback
 	}, grantRightsChange(g.Subject, g.Target, p.targetID))
 	if errors.Is(err, errPreviewRollback) {
@@ -208,6 +218,44 @@ type previewer struct {
 	targetID ids.ID
 	// callerView is the caller as authorize sees it, loaded by callerReads.
 	callerView *actingPrincipal
+	// resolve is the guided flow of the request; nil for none (M2-21).
+	resolve *authz.ResolveI1
+}
+
+// switchLines are the agents of the switch lines of the text with their names (M2-21).
+func switchLines(list []previewSwitch, name func(ids.ID) string) []previewtext.Switch {
+	var out []previewtext.Switch
+	for _, sw := range list {
+		out = append(out, previewtext.Switch{Agent: name(sw.agent), OrganizationReady: sw.organizationReady})
+	}
+	return out
+}
+
+// previewSwitch is one agent the previewed request switches from personal (M2-21 design note 9).
+type previewSwitch struct {
+	agent ids.ID
+	// organizationReady reports organization among the agent's billing_modes_supported.
+	organizationReady bool
+}
+
+// switchPreview runs the switch part of the guided flow inside the dry run (AddAffected and the
+// switch, rolled back with the preview) and returns the agents it switched from personal, read
+// before the switch, ascending.
+func (p *previewer) switchPreview(ctx context.Context) ([]previewSwitch, error) {
+	if p.resolve == nil {
+		return nil, nil
+	}
+	var out []previewSwitch
+	for _, id := range ascending(p.resolve.AgentIDs) {
+		pol, found, err := p.x.a.policies.AgentPolicy(ctx, id)
+		if err != nil {
+			return nil, sourceError("agent policy source", err)
+		}
+		if found && pol.BillingMode == domain.BillingPersonal {
+			out = append(out, previewSwitch{agent: id, organizationReady: slices.Contains(pol.BillingModesSupported, billingOrgSupports)})
+		}
+	}
+	return out, p.s.d.Resolver.ApplyPreview(ctx, p.caller, p.resolve.AgentIDs, p.resolve.Reason)
 }
 
 // previewFacts are the facts of the text that only the dry run knows.
@@ -223,6 +271,8 @@ type previewFacts struct {
 	// host (M2-40).
 	i6           []authz.I6Conflict
 	notEffective previewtext.NotEffective
+	// switches are the agents the guided flow of the request switches from personal (M2-21).
+	switches []previewSwitch
 }
 
 // evaluate turns the evaluation of the rights check into the effects, violations and hints of the
@@ -785,6 +835,7 @@ func (p *previewer) textInput(ctx context.Context, facts previewFacts) (previewt
 	for _, op := range facts.toolClass {
 		in.ToolClass = append(in.ToolClass, name(op))
 	}
+	in.Switches = switchLines(facts.switches, name)
 	if err := p.horizonNames(ctx, facts.horizon, name, &in); err != nil {
 		return in, err
 	}
@@ -844,6 +895,9 @@ func (p *previewer) names(ctx context.Context, ops []ids.ID, facts previewFacts)
 	}
 	for _, h := range facts.horizon {
 		names = append(names, h.AgentID)
+	}
+	for _, sw := range facts.switches {
+		names = append(names, sw.agent)
 	}
 	if p.grant.Subject.Kind != domain.SubjectGroup {
 		names = append(names, p.grant.Subject.PrincipalID)

@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -84,4 +85,25 @@ func (s *Source) AgentPolicy(ctx context.Context, agentID ids.ID) (authz.AgentPo
 // builds them (SR3).
 func (s *Source) DevEnvironmentReady(context.Context, ids.ID, ids.ID) (bool, error) {
 	return false, nil
+}
+
+// Switch implements authz.AgentPolicySwitch over the use case SwitchToOrganization of the agents
+// module (M2-21): authz calls it in the guided flow after it authorized every listed agent; the
+// agents module writes its rows, agent.updated and the audit entries of agent.billing_mode.set.
+// internal/wire binds it into the resolver of authz. It is safe for concurrent use.
+type Switch struct {
+	svc *app.Service
+}
+
+// Compile-time check: Switch is the source port of authz.
+var _ authz.AgentPolicySwitch = (*Switch)(nil)
+
+// NewSwitch returns the switch over the use cases svc.
+func NewSwitch(svc *app.Service) *Switch {
+	return &Switch{svc: svc}
+}
+
+// SwitchToOrganization implements authz.AgentPolicySwitch (app.Service.SwitchToOrganization).
+func (s *Switch) SwitchToOrganization(ctx context.Context, by actor.Actor, agentIDs []ids.ID, reason string) error {
+	return s.svc.SwitchToOrganization(ctx, by, agentIDs, reason)
 }

@@ -124,7 +124,7 @@ func (h *People) ListOwners(ctx context.Context, _ rest.ListOwnersRequestObject)
 
 // AddOwner implements rest.StrictServerInterface (POST /owners).
 func (h *People) AddOwner(ctx context.Context, req rest.AddOwnerRequestObject) (rest.AddOwnerResponseObject, error) {
-	o, err := h.owners.AddOwner(ctx, principal(ctx), ids.ID(req.Body.UserId), req.Body.Reason)
+	o, err := h.owners.AddOwner(ctx, principal(ctx), ids.ID(req.Body.UserId), req.Body.Reason, ownerResolve(req.Body.ResolveI1))
 	if err != nil {
 		return nil, err
 	}
@@ -211,4 +211,16 @@ func emailOf[T ~string](e *T) string {
 func setString[T ~string](dst **T, s string) {
 	v := T(s)
 	*dst = &v
+}
+
+// ownerResolve converts the member resolve_i1 of OwnerAdd (schema ResolveI1, M2-21); nil stays nil.
+func ownerResolve(r *rest.ResolveI1) *identity.ResolveI1 {
+	if r == nil {
+		return nil
+	}
+	out := &identity.ResolveI1{Reason: r.Reason, AgentIDs: make([]ids.ID, 0, len(r.SwitchToOrganization))}
+	for _, id := range r.SwitchToOrganization {
+		out.AgentIDs = append(out.AgentIDs, ids.ID(id))
+	}
+	return out
 }
