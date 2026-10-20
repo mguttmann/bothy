@@ -35,8 +35,15 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-added-large-files
-        # Named value repo.max_file_kb (docs/spec/23-qualitaet.md).
+        # Named value repo.max_file_kb (docs/spec/23-qualitaet.md), every file but the REST contract
+        # and its single-file copies, which the next hook checks.
         args: [--maxkb=1024, --enforce-all]
+        exclude: ^(docs/api/openapi\.yaml|services/server/api/rest/openapi\.gen\.yaml|sdk/typescript/src/generated/openapi\.ts)$
+      - id: check-added-large-files
+        name: check for added large files (REST contract)
+        # Named value api.contract_max_file_kb (docs/spec/23-qualitaet.md, docs/DECISIONS.md INT-W50/4).
+        args: [--maxkb=2048, --enforce-all]
+        files: ^(docs/api/openapi\.yaml|services/server/api/rest/openapi\.gen\.yaml|sdk/typescript/src/generated/openapi\.ts)$
       - id: detect-private-key
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
