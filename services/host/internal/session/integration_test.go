@@ -381,7 +381,7 @@ func TestSessionCloseAndDataClose(t *testing.T) {
 		id := sessiontest.NewID()
 		dev, dc := r.open(id, "shell")
 		r.note.wait(t, "started", func() bool { return r.note.startedCount(id) == 1 })
-		r.send(dc, dev, frame.Data([]byte("set +H 2>/dev/null; sleep 1000 & echo b''g=$! ; echo ST''ARTED\n")))
+		r.send(dc, dev, frame.Data([]byte("sleep 1000 & echo b''g=$! ; echo ST''ARTED\n")))
 		out := r.readUntil(dc, dev, "STARTED")
 		var all strings.Builder
 		for _, f := range out {

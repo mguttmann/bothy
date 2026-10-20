@@ -44,22 +44,25 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: cd services/host && go test -race -count=1 ./...
+      # The packages of the terminal sessions (M2-45); the tests of the M2-42 packages build their
+      # fake worlds with Unix paths and do not run on Windows yet.
       - name: Unit tests (Windows, runner user)
         if: runner.os == 'Windows'
         shell: bash
-        run: cd services/host && go test -count=1 ./...
+        run: cd services/host && go test -count=1 ./internal/session/... ./internal/pty/... ./internal/profiles/... ./internal/confirm/... ./internal/localchan/...
       # TestPlatform_TMT25 traces the file opens and local channels of the service user on Linux.
       - name: Install strace (Linux)
-        if: runner.os == 'Linux'
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
         shell: bash
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends strace
+      # The suite runs even when a unit test failed: both results are kept.
       - name: Platform suite (Linux and macOS, as root)
-        if: runner.os != 'Windows'
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
         shell: bash
         # sudo resets PATH to secure_path; env hands the Go of setup-go to make.
         run: sudo env "PATH=$PATH" "GOPATH=$(go env GOPATH)" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" BOTHY_PLATFORM_DISPOSABLE=1 make -C services/host platform-test
       - name: Platform suite (Windows, elevated)
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
         shell: bash
         env:
           BOTHY_PLATFORM_DISPOSABLE: "1"
