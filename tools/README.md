@@ -41,7 +41,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `catalog/` | load and check the action catalogue `docs/spec/actions.yaml`, generate the tables of chapter 05 and the lists in `docs/api/redocly.yaml` from it ([README](catalog/README.md)); `event_catalog_dart.py` writes the event catalogue of `packages/domain`, `contract_documents_dart.py` the copy of `docs/api/` in the fake server of `packages/sync_engine` | `catalog`, `catalog-check`, `event-catalog`, `contract-documents` | `catalog/tests/` |
 | `api-checks/` | check the copies of the API contracts against their sources (chapter 06, G2), generate the generated tables of 06 and `docs/api/webhooks.md` and check them against a fresh generation (G3) ([README](api-checks/README.md)) | `api-checks` (G2 and G3), `api-tables` | `api-checks/tests/` |
 | `docs/tests/test_config_values.py`, `docs/tests/test_toolchain_doc.py` | number and version guards for the docs | `test` | |
-| `sonarqube/` | local SonarQube and syncing of profile and gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check`, `sonar-main-branch`, `sonar-visibility` | `sonarqube/tests/` |
+| `sonarqube/` | local SonarQube and syncing of profile and gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check`, `sonar-main-branch`, `sonar-visibility`, `sonar-new-code` | `sonarqube/tests/` |
 | `design-tokens/` | translate design tokens into CSS, Dart, contrast table and preview (chapter 15, design system) | `tokens` (`design-tokens/Makefile`, target `check`) | `design-tokens/tests/` (unittest, via `make tokens`) |
 
 Rules for new tools: Python with the standard library or PyYAML (a MkDocs hook

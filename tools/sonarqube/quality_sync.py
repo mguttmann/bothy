@@ -12,11 +12,21 @@ Usage (token only from the environment variable SONAR_TOKEN, never printed):
   quality_sync.py check --url https://sonarcloud.io --organization <org> --project <key>
   quality_sync.py main-branch --url https://sonarcloud.io --organization <org> --project <key>
   quality_sync.py visibility --url https://sonarcloud.io --organization <org> --project <key>
+  quality_sync.py new-code --url https://sonarcloud.io --organization <org> --project <key>
   quality_sync.py ce-error --url https://sonarcloud.io --organization <org>
 
 `visibility` makes the project public (api/projects/update_visibility) when it is private: the
 free plan of SonarQube Cloud caps the lines of code of a private project and refuses a larger
 analysis, while a public project has no such cap. The repository is public anyway.
+
+`new-code` gives the project a new code definition of the last NEW_CODE_DAYS days when the
+project has none of its own. Without one SonarQube Cloud falls back to the previous version,
+which needs a `sonar.projectVersion` this repository does not send, and the gate of `main`
+stays without a status. SonarQube Cloud has no api/new_code_periods: its documentation
+(docs.sonarsource.com, "New code definition", read on 2026-10-20) sets the definition with two
+api/settings/set calls on the project, `sonar.leak.period` and then `sonar.leak.period.type`,
+read back with api/settings/values (an inherited value is not the project's own). Both calls
+go without the organization: values refuses component and organization together.
 
 `ce-error` prints why the server's background task of the last scan failed: the scanner only
 reports "CE Task finished abnormally", the reason stays on the server (api/ce/task with the
@@ -65,6 +75,8 @@ DEFAULT_REPORT_TASK = Path(".scannerwork") / "report-task.txt"
 _PLAN_REFUSAL = re.compile(r": Organization '[^']*' is not allowed to ")
 _RULE = re.compile(r"<repositoryKey>([^<]+)</repositoryKey>\s*<key>([^<]+)</key>")
 _TIMEOUT_S = 60
+NEW_CODE_DAYS = 30
+_NEW_CODE_KEYS = ("sonar.leak.period", "sonar.leak.period.type")
 _MAX_ERROR_CHARS = 300
 _MAX_ERROR_BODY_BYTES = 65536
 GATE_NOT_DEFAULT = "gate not default: plan does not allow it"
@@ -179,8 +191,10 @@ class Client:
         self.is_cloud = organization is not None
         self.project = project
 
-    def _params(self, params: dict[str, str]) -> dict[str, str]:
-        return {**params, "organization": self._organization} if self._organization else params
+    def _params(self, params: dict[str, str], send_organization: bool = True) -> dict[str, str]:
+        if self._organization and send_organization:
+            return {**params, "organization": self._organization}
+        return params
 
     def _send(self, req: urllib.request.Request) -> bytes:
         req.add_header("Authorization", f"Bearer {self._token}")
@@ -199,10 +213,18 @@ class Client:
                 exc.code,
             ) from None
 
+    def _get(self, path: str, params: dict[str, str], send_organization: bool) -> bytes:
+        query = urllib.parse.urlencode(self._params(params, send_organization))
+        return self._send(urllib.request.Request(f"{self._url}/{path}?{query}"))  # noqa: S310
+
+    def _post(self, path: str, params: dict[str, str], send_organization: bool) -> None:
+        data = urllib.parse.urlencode(self._params(params, send_organization)).encode()
+        req = urllib.request.Request(f"{self._url}/{path}", data=data, method="POST")  # noqa: S310
+        self._send(req)
+
     def get(self, path: str, **params: str) -> bytes:
         """Send a GET request and return the body; raises SonarError on an HTTP error."""
-        query = urllib.parse.urlencode(self._params(params))
-        return self._send(urllib.request.Request(f"{self._url}/{path}?{query}"))  # noqa: S310
+        return self._get(path, params, send_organization=True)
 
     def get_json(self, path: str, **params: str) -> Any:
         """Send a GET request and return the parsed JSON body."""
@@ -210,9 +232,15 @@ class Client:
 
     def post(self, path: str, **params: str) -> None:
         """Send a form-encoded POST request."""
-        data = urllib.parse.urlencode(self._params(params)).encode()
-        req = urllib.request.Request(f"{self._url}/{path}", data=data, method="POST")  # noqa: S310
-        self._send(req)
+        self._post(path, params, send_organization=True)
+
+    def get_json_unscoped(self, path: str, **params: str) -> Any:
+        """Like get_json, but without the organization (calls addressed by a component)."""
+        return json.loads(self._get(path, params, send_organization=False))
+
+    def post_unscoped(self, path: str, **params: str) -> None:
+        """Like post, but without the organization (calls addressed by a component)."""
+        self._post(path, params, send_organization=False)
 
     def post_file(self, path: str, field_name: str, filename: str, content: str) -> None:
         """Upload `content` as a multipart file field (profile restore)."""
@@ -430,6 +458,29 @@ def ensure_public(client: Client) -> str | None:
     return str(current)
 
 
+def ensure_new_code_period(client: Client, days: int) -> str | None:
+    """Give the project the new code of the last `days` days unless it has its own definition.
+
+    Returns the project's own definition (`<type> <value>`) if it had one and nothing changed,
+    None after setting it. Raises SonarError if the server refuses a call.
+    """
+    project = _cloud_project(client) if client.is_cloud else client.project
+    if not project:
+        raise SonarError(
+            "the new code period needs the project key (--project or SONAR_PROJECT_KEY)"
+        )
+    found = client.get_json_unscoped(
+        "api/settings/values", component=project, keys=",".join(_NEW_CODE_KEYS)
+    )["settings"]
+    own = {s["key"]: str(s.get("value", "")) for s in found if not s.get("inherited")}
+    period, kind = (own.get(key, "") for key in _NEW_CODE_KEYS)
+    if kind:
+        return f"{kind} {period}".strip()
+    for key, value in zip(_NEW_CODE_KEYS, (str(days), "days"), strict=True):
+        client.post_unscoped("api/settings/set", component=project, key=key, value=value)
+    return None
+
+
 def check(client: Client, config: Config) -> Report:
     """Compare gate and profiles on the server with the config without changing anything."""
     report = Report()
@@ -541,12 +592,12 @@ def _check_project_profile(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command line entry point (`apply`, `check`, `main-branch`, `visibility`, `ce-error`).
+    """Command line entry point; returns the exit code.
 
-    Returns the exit code.
+    Commands: `apply`, `check`, `main-branch`, `visibility`, `new-code`, `ce-error`.
     """
     parser = argparse.ArgumentParser(description="Apply or check the SonarQube quality setup.")
-    commands = ("apply", "check", "main-branch", "visibility", "ce-error")
+    commands = ("apply", "check", "main-branch", "visibility", "new-code", "ce-error")
     parser.add_argument("command", choices=commands)
     parser.add_argument("--url", default=os.environ.get("SONAR_HOST_URL", "http://127.0.0.1:9000"))
     parser.add_argument("--organization", default=os.environ.get("SONAR_ORGANIZATION") or None)
@@ -568,6 +619,8 @@ def main(argv: list[str] | None = None) -> int:
         return _ce_error(client, args.report_task)
     if args.command == "visibility":
         return _visibility(client)
+    if args.command == "new-code":
+        return _new_code(client)
     try:
         config = load_config(args.config)
         report = apply(client, config) if args.command == "apply" else check(client, config)
@@ -643,6 +696,20 @@ def _visibility(client: Client) -> int:
         print(f"quality_sync: project '{client.project}' is already public")
     else:
         print(f"quality_sync: project '{client.project}' changed from {old} to public")
+    return 0
+
+
+def _new_code(client: Client) -> int:
+    """Run `new-code`: give the project the new code of the last NEW_CODE_DAYS days."""
+    try:
+        own = ensure_new_code_period(client, NEW_CODE_DAYS)
+    except (SonarError, LookupError, urllib.error.URLError) as exc:
+        print(f"quality_sync: {exc}", file=sys.stderr)
+        return 1
+    if own is None:
+        print(f"quality_sync: new code of '{client.project}' set to the last {NEW_CODE_DAYS} days")
+    else:
+        print(f"quality_sync: new code of '{client.project}' already set ({own}), unchanged")
     return 0
 
 

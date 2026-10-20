@@ -209,3 +209,23 @@ def test_unpack_step_reads_one_or_several_artifacts(tmp_path: Path, single: bool
     assert done.returncode == 0, done.stderr
     for part in parts:
         assert (work / reports[part]).read_text(encoding="utf-8") == part
+
+
+def test_main_analysis_does_not_wait_for_the_gate() -> None:
+    # The analysis of main records the overall state and the new code baseline; it must not
+    # block main. Pull requests keep waiting for the gate, which is their blocking check.
+    [step] = [s for s in _steps("sonar") if "make sonar-scan" in str(s.get("run", ""))]
+    wait = "${{ github.ref == 'refs/heads/main' && 'false' || 'true' }}"
+    assert step["env"]["SONAR_QUALITYGATE_WAIT"] == wait
+    assert 'SONAR_QUALITYGATE_WAIT="$SONAR_QUALITYGATE_WAIT"' in str(step["run"])
+
+
+@pytest.mark.parametrize(("given", "want"), [(None, "true"), ("false", "false")])
+def test_sonar_scan_passes_the_gate_wait(given: str | None, want: str) -> None:
+    args = ["make", "-n", "--no-print-directory", "sonar-scan", "SONAR_TOKEN=fake"]
+    if given is not None:
+        args.append(f"SONAR_QUALITYGATE_WAIT={given}")
+    done = subprocess.run(  # nosec B603 B607 - a dry run of the repository's own Makefile
+        args, cwd=REPO, capture_output=True, text=True, check=True
+    )
+    assert f"-Dsonar.qualitygate.wait={want} " in done.stdout

@@ -487,6 +487,12 @@ operated, and the order of the build.
 
 ### Fixed
 
+- `make sonar-new-code` (`quality_sync.py new-code`, also a step of the manual workflow
+  `sonar-config.yml`) gives the SonarQube Cloud project a new code definition of the last 30
+  days when it has none of its own (`api/settings/set` with `sonar.leak.period` and
+  `sonar.leak.period.type`; the cloud has no `api/new_code_periods`). Without it the project
+  fell back to the previous version, which the repository does not send, and the quality gate
+  of `main` had no status.
 - `make sonar-visibility` (`quality_sync.py visibility`, also a step of the manual workflow
   `sonar-config.yml`) makes the SonarQube Cloud project public through
   `api/projects/update_visibility` when it is private: the free plan caps the lines of code of a
@@ -556,6 +562,9 @@ operated, and the order of the build.
 
 ### Changed
 
+- CI: the scan of `main` no longer waits for the quality gate (`SONAR_QUALITYGATE_WAIT=false`,
+  `make sonar-scan`): it records the overall state and the new code baseline and must not block
+  `main`. Pull requests still wait for the gate and fail with it.
 - CI: the job `sonar` analyses `main` only once the repository variable `SONAR_MAIN_ANALYSIS`
   is `true`, because SonarQube Cloud fails the analysis of `main` until the main branch of the
   project is named `main` (docs/quality/sonarqube-local.md, section 6).
