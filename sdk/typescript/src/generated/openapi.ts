@@ -6614,8 +6614,7 @@ export interface components {
             repository_url?: string;
             /** @example main */
             default_branch?: string;
-            /** @description Schema `project_runner_config.v1`. No secrets. */
-            runner_config: components["schemas"]["JsonObject"];
+            runner_config: components["schemas"]["ProjectRunnerConfig"];
             ready: boolean;
             /** Format: int64 */
             version: number;
@@ -6627,9 +6626,14 @@ export interface components {
             repository_url?: string;
             /** @example main */
             default_branch?: string;
-            runner_config?: components["schemas"]["JsonObject"];
+            runner_config?: components["schemas"]["ProjectRunnerConfig"];
             /** @example Website project moves to this forum */
             reason: string;
+        };
+        /** @description Schema `project_runner_config.v1`. No secrets. */
+        ProjectRunnerConfig: {
+            model?: string;
+            allowed_tools?: string[];
         };
         /** @description Configuration an operator agent loads for a channel it serves. */
         AgentChannelConfig: {
@@ -14728,6 +14732,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

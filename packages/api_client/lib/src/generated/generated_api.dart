@@ -406,6 +406,7 @@ export 'package:api_client/src/generated/model/profile_update.dart';
 export 'package:api_client/src/generated/model/project_binding.dart';
 export 'package:api_client/src/generated/model/project_binding_put.dart';
 export 'package:api_client/src/generated/model/project_readiness.dart';
+export 'package:api_client/src/generated/model/project_runner_config.dart';
 export 'package:api_client/src/generated/model/public_branding.dart';
 export 'package:api_client/src/generated/model/push_environment.dart';
 export 'package:api_client/src/generated/model/push_preview.dart';
