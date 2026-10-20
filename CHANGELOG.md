@@ -20,6 +20,17 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- OpenTofu module `generic-vm` (M7-15): sets up an Ubuntu or Debian host from its inputs with
+  cloud-init user data (output `user_data`) or the same setup over SSH (`provision_over_ssh`):
+  Docker Engine and the Compose plugin from the Docker repository, the user `bothy`, the pinned
+  cosign, the release files of `bothy_version` verified by signature and checksum before
+  anything is unpacked, an nftables table with only the edge port public, the setup wizard
+  `install.sh --bundle` with options derived from the inputs (secrets generated on the host,
+  the enrollment code kept out of the logs) and `bothy.service`; inputs the wizard cannot honour
+  stop the plan. `make tofu-check` (in `make check`) validates a root that calls all four
+  modules offline; `make tofu-vm-test` boots a pinned Ubuntu cloud image in QEMU against the
+  product trial, runs the smoke probe, a second delivery that changes nothing, and a wrong
+  checksum and signature that stop the setup.
 - Setup wizard (M7-29): `infra/compose/install.sh`, a POSIX shell script and release artifact
   of the product, installs an instance with one command
   (`curl -fsSL https://github.com/OWNER/bothy/releases/download/v<version>/install.sh | sh`):
