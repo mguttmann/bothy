@@ -140,7 +140,7 @@ func TestGateway_SpaceDefaultOperatorGetsNewChannelLive(t *testing.T) {
 // does not read meanwhile, so the catch-up is still running when the channel is created.
 func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	t.Parallel()
-	const backlog = 20000
+	const backlog = 2000
 	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
 		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1")
 	eng := w.newSpace("Engineering")

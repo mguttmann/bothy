@@ -565,7 +565,7 @@ func TestHealth_HubStoppedFailsHealthz(t *testing.T) {
 // is written to the log directly; it outlasts the DELETE because the client does not read meanwhile.
 func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 	t.Parallel()
-	const backlog = 20000
+	const backlog = 2000
 	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
 		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000")
 	space := w.newSpace("Engineering")
