@@ -4,6 +4,7 @@ package metrics
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -40,8 +41,10 @@ func (k Kind) String() string {
 }
 
 // Source names a closed value set that comes from generated or registered code instead of a
-// literal list: the instrument's owner passes its values at construction (Values). A Source
-// outside the constants below is an open set and fails Check.
+// literal list: the instrument's owner passes its values at construction (Values). A pattern
+// source (SourceAgentHandles) is the exception: the operator bounds its set at runtime, so the
+// binder checks each value against the pattern instead. A Source outside the constants below is
+// an open set and fails Check.
 type Source string
 
 // The closed sources of attribute values (signals.md "Cardinality" item 1).
@@ -64,12 +67,24 @@ const (
 	// SourceTables are the table names of the module register, read from the embedded
 	// migrations (platform/pg).
 	SourceTables Source = "tables"
+	// SourceAgentHandles are the agent handles (03 principals.handle), a set the operator bounds
+	// (signals.md section 2 item 1): agents are created and renamed at runtime, so the owner
+	// passes no values; every value that matches the handle pattern belongs to the set and every
+	// other value records as "other". The pattern keeps IDs, display names and free text out.
+	SourceAgentHandles Source = "agent_handles"
 )
 
 // knownSources is the set of Source constants.
 var knownSources = map[Source]bool{
 	SourceActions: true, SourceRateClasses: true, SourceEventTypes: true, SourceRoutes: true,
 	SourceHTTPStatus: true, SourceCloseCodes: true, SourceJobKinds: true, SourceTables: true,
+	SourceAgentHandles: true,
+}
+
+// patternSources are the sources whose set is a pattern instead of values passed at
+// construction; the pattern of SourceAgentHandles is the CHECK of 03 principals.handle.
+var patternSources = map[Source]*regexp.Regexp{
+	SourceAgentHandles: regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`),
 }
 
 // Other is the value an attribute takes when the recorded value lies outside its closed set; it

@@ -36,7 +36,10 @@ const (
 	keyPrincipalKind = "bothy.principal.kind"
 	keyBackupKind    = "bothy.backup.kind"
 	keyVolume        = "bothy.volume"
+	keyAgentHandle   = "bothy.agent.handle"
+	keyRunState      = "bothy.run.state"
 	unitConnection   = "{connection}"
+	unitRun          = "{run}"
 )
 
 // Closed literal sets shared by several instruments.
@@ -53,6 +56,17 @@ var (
 	backupKinds = []string{"physical", "logical", "objects"}
 	// volumes are bothy.volume: the volumes bothy-backupd measures (signals.md 4.6).
 	volumes = []string{"pgdata", "files", "pgbackrest-repo", "backup-scratch"}
+	// runEndStates are bothy.run.state of an ended run (09 5.1).
+	runEndStates = []string{"completed", "failed", "cancelled"}
+	// runReasons are bothy.reason of bothy.run.finished: the codes of runs.state_reason, the 17
+	// rows of 09 5.2 plus user_disabled (02 4.3, D-M2-05-7). The platform cannot import the runs
+	// domain, so the adapter test holds this list equal to domain's reason table.
+	runReasons = []string{
+		"user_cancelled", "access_revoked", "cancel_timeout", "agent_disabled", "billing_mode_personal_not_holder",
+		"channel_read_only", "billing_mode_mismatch", "tool_class_owner_only", "tool_class_mismatch",
+		"invalid_invocation_token", "project_not_ready", "agent_unavailable", "interrupted", "stale",
+		"runtime_error", "adapter_error", "runtime_not_authenticated", "user_disabled",
+	}
 )
 
 // The instruments of signals.md that this build registers. Every instrument the server creates
@@ -327,6 +341,49 @@ var (
 		Description: "Telemetry items that never reached the collector.",
 		Attrs:       []Attr{{Key: "bothy.signal", Values: []string{"traces", "metrics", "logs"}}},
 	}
+	// RunActive is bothy.run.active (4.3, M2-05): the active runs per agent handle and state,
+	// observed per collection from the runs table.
+	RunActive = Spec{
+		Name: "bothy.run.active", Kind: KindGauge, Unit: unitRun,
+		Description: "Runs in the states queued, running and waiting_input.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: keyRunState, Values: []string{"queued", "running", "waiting_input"}},
+		},
+	}
+	// RunStartLatency is bothy.run.start.latency (4.3, M2-05): queued_at until the run left
+	// queued, per outcome and billing mode (the reported mode, else the expected one).
+	RunStartLatency = Spec{
+		Name: "bothy.run.start.latency", Kind: KindHistogram, Unit: "s",
+		Description: "Time from queued_at until a run leaves the state queued.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: keyOutcome, Values: []string{"started", "failed", "cancelled"}},
+			{Key: "bothy.billing_mode", Values: []string{"personal", "organization"}},
+		},
+		Buckets: BucketsSeconds,
+	}
+	// RunDuration is bothy.run.duration (4.3, M2-05): started_at until the end of a started run.
+	RunDuration = Spec{
+		Name: "bothy.run.duration", Kind: KindHistogram, Unit: "s",
+		Description: "Time from started_at until a started run ends.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: keyRunState, Values: runEndStates},
+		},
+		Buckets: BucketsLong,
+	}
+	// RunFinished is bothy.run.finished (4.3, M2-05): one per run that reached an end state.
+	// bothy.reason is absent for completed, which has no state_reason.
+	RunFinished = Spec{
+		Name: "bothy.run.finished", Kind: KindCounter, Unit: unitRun,
+		Description: "Runs that reached an end state.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: keyRunState, Values: runEndStates},
+			{Key: keyReason, Values: runReasons, Optional: true},
+		},
+	}
 	// TerminalRelayUnpaired is bothy.terminal.relay.unpaired (4.3a, M2-44): a side of the relay
 	// that found no counterpart before terminal.open_timeout, once per connection.
 	TerminalRelayUnpaired = Spec{
@@ -351,6 +408,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
+		RunActive, RunStartLatency, RunDuration, RunFinished,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		StorageVolumeFree, StorageVolumeSize,

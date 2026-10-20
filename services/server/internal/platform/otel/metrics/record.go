@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -43,12 +44,18 @@ func SetStrict(report func(error)) (restore func()) {
 
 // binder turns a value tuple into the cached attribute set of a spec.
 type binder struct {
-	spec  Spec
-	sets  []map[string]bool
+	spec Spec
+	sets []map[string]bool
+	// patterns holds, per attribute of a pattern source, the pattern its values must match; nil
+	// for the other attributes.
+	patterns []*regexp.Regexp
+	// cache grows with the tuples seen: bounded by the closed sets, and for a pattern source by
+	// the set the operator bounds (for example the agents of the instance).
 	cache sync.Map // string -> attribute.Set
 }
 
-// newBinder checks s against kind and builds the closed sets from the literal values and v.
+// newBinder checks s against kind and builds the closed sets from the literal values and v; a
+// pattern source takes no values from v.
 func newBinder(s Spec, kinds []Kind, v Values) (*binder, error) {
 	if problems := Check([]Spec{s}); len(problems) > 0 {
 		return nil, fmt.Errorf("%w: %w", ErrSpec, errors.Join(problems...))
@@ -60,10 +67,11 @@ func newBinder(s Spec, kinds []Kind, v Values) (*binder, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %s is a %s", ErrSpec, s.Name, s.Kind)
 	}
-	b := &binder{spec: s, sets: make([]map[string]bool, len(s.Attrs))}
+	b := &binder{spec: s, sets: make([]map[string]bool, len(s.Attrs)), patterns: make([]*regexp.Regexp, len(s.Attrs))}
 	for i, a := range s.Attrs {
 		vals := a.Values
-		if a.Source != "" {
+		b.patterns[i] = patternSources[a.Source]
+		if a.Source != "" && b.patterns[i] == nil {
 			got, given := v[a.Source]
 			if !given {
 				return nil, fmt.Errorf("%w: %s: no values for the source %s of %s", ErrSpec, s.Name, a.Source, a.Key)
@@ -80,7 +88,8 @@ func newBinder(s Spec, kinds []Kind, v Values) (*binder, error) {
 	return b, nil
 }
 
-// attrs returns the attribute set of values, each outside its closed set replaced by "other".
+// attrs returns the attribute set of values, each outside its closed set (or its pattern)
+// replaced by "other".
 // The sets are cached by the normalised tuple, so the cache stays as small as the closed sets.
 func (b *binder) attrs(values []string) attribute.Set {
 	if len(values) != len(b.spec.Attrs) {
@@ -92,7 +101,7 @@ func (b *binder) attrs(values []string) attribute.Set {
 		if i < len(values) {
 			v = values[i]
 		}
-		if (v != "" || !a.Optional) && !b.sets[i][v] {
+		if (v != "" || !a.Optional) && !b.sets[i][v] && (b.patterns[i] == nil || !b.patterns[i].MatchString(v)) {
 			report(fmt.Errorf("metrics: %s: value %q of %s is not in its closed set", b.spec.Name, v, a.Key))
 			v = Other
 		}
