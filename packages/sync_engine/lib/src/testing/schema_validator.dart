@@ -603,3 +603,9 @@ final class ContractSchemas {
 /// cannot be read.
 String embeddedActionsYaml() =>
     utf8.decode(gzip.decode(base64.decode(_actionsGzip.join())));
+
+/// The text of `docs/spec/07-permissions.md` compiled into this library
+/// (`contract_documents.g.dart`, docs/DECISIONS.md D-M4-27-7), for the grant preview example of
+/// the fake where the repository cannot be read.
+String embeddedPermissionsChapter() =>
+    utf8.decode(gzip.decode(base64.decode(_permissionsGzip.join())));

@@ -14,23 +14,24 @@ import 'dart:io';
 
 import '../action_catalog.dart';
 import '../rest_fake.dart';
+import '../schema_validator.dart' show embeddedPermissionsChapter;
 import '../world.dart';
 import 'admin_handlers.dart' show requireCatalogStepUp;
 
 /// The example text of 07 9.3: the first fenced block between the `language-check` markers
-/// after the heading `### 9.3` of `docs/spec/07-permissions.md` (or the older name
-/// `07-rechte.md`) of the repository that holds [from] (default: the working directory).
+/// after the heading `### 9.3` of `docs/spec/07-permissions.md` of the repository that holds
+/// [from] (default: the working directory). Without such a repository (an app under test in
+/// the macOS app sandbox) it reads the copy compiled into the fake
+/// (`contract_documents.g.dart`, docs/DECISIONS.md D-M4-27-7).
 ///
-/// Throws a [StateError] when no repository root or no marked example is found.
+/// Throws a [StateError] when the chapter has no marked example.
 String grantPreviewExample({Directory? from}) {
   var dir = (from ?? Directory.current).absolute;
   while (true) {
-    for (final name in ['07-permissions.md', '07-rechte.md']) {
-      final file = File('${dir.path}/docs/spec/$name');
-      if (file.existsSync()) return _example(file.readAsStringSync());
-    }
+    final file = File('${dir.path}/docs/spec/07-permissions.md');
+    if (file.existsSync()) return _example(file.readAsStringSync());
     if (dir.parent.path == dir.path) {
-      throw StateError('no docs/spec/07 above the working directory');
+      return _example(embeddedPermissionsChapter());
     }
     dir = dir.parent;
   }
