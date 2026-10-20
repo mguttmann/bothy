@@ -675,12 +675,12 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `backup.offsite.region` | `BOTHY_BACKUP__OFFSITE__REGION` | Server | string | `us-east-1` | region of the off-site bucket (signing of S3 requests) | active |
 | `backup.offsite.use_path_style` | `BOTHY_BACKUP__OFFSITE__USE_PATH_STYLE` | Server | bool | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts | active |
 | `backup.max_age` | `BOTHY_BACKUP__MAX_AGE` | Server |  | `26h` | no successful backup for longer than this: alert | planned (M7) |
-| `backup.restore_test.schedule` | `BOTHY_BACKUP__RESTORE_TEST__SCHEDULE` | Server |  | `0 5 * * 6` | schedule of the restore test (cron) | planned (M7) |
-| `backup.restore_test.sample_files` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_FILES` | Server |  | `200` | files checked per test | planned (M7) |
-| `backup.restore_test.sample_threads` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_THREADS` | Server |  | `200` | threads checked per test | planned (M7) |
+| `backup.restore_test.schedule` | `BOTHY_BACKUP__RESTORE_TEST__SCHEDULE` | Server | string | `0 5 * * 6` | schedule of the restore test (cron) | active |
+| `backup.restore_test.sample_files` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_FILES` | Server | int | `200` | files checked per test | active |
+| `backup.restore_test.sample_threads` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_THREADS` | Server | int | `200` | threads checked per test | active |
 | `backup.restore_test.max_age` | `BOTHY_BACKUP__RESTORE_TEST__MAX_AGE` | Server |  | `8d` | no successful test for longer than this: alert | planned (M7) |
 | `dr.rpo_target` | `BOTHY_DR__RPO_TARGET` | Server |  | `5m` | target for the largest data loss | planned (M7) |
-| `dr.rto_target` | `BOTHY_DR__RTO_TARGET` | Server |  | `4h` | target for the duration of the restore | planned (M7) |
+| `dr.rto_target` | `BOTHY_DR__RTO_TARGET` | Server | duration | `4h` | target for the duration of the restore | active |
 | `status.check_interval` | `BOTHY_STATUS__CHECK_INTERVAL` | Server |  | `30s` | interval of the automatic checks | planned (M7) |
 | `status.degrade_after` | `BOTHY_STATUS__DEGRADE_AFTER` | Server |  | `2m` | how long errors last until `degraded` | planned (M7) |
 | `status.incident_after` | `BOTHY_STATUS__INCIDENT_AFTER` | Server |  | `5m` | how long `major_outage` lasts until the automatic incident | planned (M7) |

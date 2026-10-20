@@ -849,6 +849,38 @@ The result goes into `backup_runs` (kind `restore_test`) and into the metrics. I
 successful test for longer than `backup.restore_test.max_age`, the system raises an alert. Guide:
 [backup-restore.md](../operations/backup-restore.md).
 
+As built (M7-03, [status README](../../services/server/internal/status/README.md),
+docs/decisions.d/M7-03.md D-M7-03-1 to D-M7-03-9):
+
+1. `bothy-backupd` starts the test on `backup.restore_test.schedule` (five-field cron in UTC, the
+   cross-check `backup_schedules` holds it) in a slot of its own, next to the backups;
+   `bothy-backupd restore-test` runs it at once and exits `0` when no check failed, else `1`.
+2. The test restores the newest succeeded `pg_full` or `pg_diff` by the `pgbackrest.label` of its
+   manifest from repo1 into `/var/lib/bothy-backup/restore` of the volume `backup-scratch`,
+   recovery target `immediate`, promoted, `archive_mode` off. The scratch PostgreSQL runs with
+   `listen_addresses` empty and its socket in that directory (mode `0700`); it is stopped and the
+   directory emptied after every test, also after a failed or panicking check. The production
+   database is touched only through `backup_runs` with the role `bothy_backup`.
+3. `backup_runs.checks` is `restore_test_checks.v1`: `schema`, `backup_id` and
+   `pgbackrest_label` of the restored backup, and `checks`, the seven results in the order above,
+   each `{name, result, duration_ms, reason, items}` with the names `pgbackrest`, `manifest`,
+   `event_log`, `audit_chain`, `thread_sample`, `file_sample`, `duration`; `result` is `passed`,
+   `failed` or `skipped`, `reason` a code on every failed and skipped check. A test with a failed
+   check is `failed` with the error `checks_failed`.
+4. Check 1 covers the restore, `pgbackrest verify` of repo1 and the start of the copy; when the
+   copy cannot be restored or started, checks 2 to 6 are `skipped` with `restore_failed`. Check 2
+   compares schema version, instance and sync epoch, the set of tables and, when the copy reached
+   the event and audit heads of its manifest, every row count except that of `backup_runs`
+   (D-M7-03-3). Check 4 is the verification of `audit.verify` through the port
+   `audit.RowsVerifier` over the rows of the copy, with the checkpoints of its `audit_checkpoints`.
+   Checks 5 and 6 draw their samples at random per test; check 6 samples files with
+   `deleted_at IS NULL` and `upload_state = 'complete'` and fetches the objects with restic from the
+   newest object backup; with the driver `s3` it is `skipped` with `objects_driver_s3`.
+5. Metrics: `bothy.backup.restore_test.duration` and `bothy.backup.duration` with
+   `bothy.backup.kind = restore_test`, `bothy.backup.restore_test.last_success.timestamp` after a
+   test without a failed check, and one `bothy.backup.restore_test.failures` per failed check with
+   `bothy.reason` the name of the check.
+
 ### 8.4 Restore and sync
 
 A restore resets the global sequence. R-SY-04 detects this only as long as
