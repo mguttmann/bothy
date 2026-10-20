@@ -172,7 +172,11 @@ var requirementGroups = []struct {
 	{"owner; self bei eigenen", Any(Self, Owner), []string{"token.list"}},
 	{"human und write", All(Human, AtLeast(LevelWrite)), []string{"typing.start"}},
 	{"human; Apps mit Scope", Any(Human, AppKind), []string{"user.read"}},
-	{"public mit Token; App braucht write", Deferred("M2"), []string{"webhook_in.post"}},
+	// The post of an incoming webhook (M2-27 design note 3a): the token stage makes the actor the
+	// app of the webhook, which needs write on the webhook's channel. The right is not Public, so an
+	// anonymous principal fails closed with unauthenticated before the expression; a person gets
+	// subject_kind_not_allowed.
+	{"public mit Token; App braucht write", All(AppKind, AtLeast(LevelWrite)), []string{"webhook_in.post"}},
 	{"Freigaben und Scope des Empfängers", Delivery, []string{"webhook_out.deliver"}},
 }
 
