@@ -78,6 +78,7 @@ final class FramePump {
 
   void _flushResize() {
     _tickScheduled = false;
+    if (_broken) return;
     final size = _pendingResize;
     _pendingResize = null;
     if (size == null) return;
@@ -88,6 +89,13 @@ final class FramePump {
   /// [FrameException]; both end the session with a hard warning.
   Future<TerminalFrame> receive(List<int> message) async =>
       decodeFrame(await _transport.decrypt(message), FrameSender.host);
+
+  /// Stops the pump: queued and later frames, and a pending resize tick, are dropped. The
+  /// controller stops the pump of a stream it closes.
+  void stop() {
+    _broken = true;
+    _pendingResize = null;
+  }
 
   /// Completes when every frame queued so far was handed to the stream.
   Future<void> get drained => _tail;

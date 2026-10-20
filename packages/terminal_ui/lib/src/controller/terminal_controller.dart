@@ -212,11 +212,12 @@ final class TerminalController extends ChangeNotifier {
     try {
       _set(_state.copyWith(phase: TerminalPhase.preparing, clearCauses: true));
       final checked = await _prepare(host.id);
-      _alive();
+      _attaching();
       if (checked == null) return _set(before);
       final h = checked.host;
       _set(_state.copyWith(phase: TerminalPhase.connecting));
       final hash = await _freshKeyHash();
+      _attaching();
       final request = TerminalSessionAttach(
         (b) => b
           ..cols = _cols
@@ -227,7 +228,7 @@ final class TerminalController extends ChangeNotifier {
       final purpose = _prompts.stepUpPurpose(h, StepUpPurpose.attach);
       if (before.detachCause == DetachCause.tokenStale) {
         await _stepUp(purposeText: purpose);
-        _alive();
+        _attaching();
       }
       TerminalSessionGrant grant;
       try {
@@ -236,20 +237,23 @@ final class TerminalController extends ChangeNotifier {
         if (_problemOf(e)?.code != 'step_up_required') rethrow;
         // The server decides whether a step-up is needed (24 6.2); one retry after it.
         await _stepUp(purposeText: purpose);
-        _alive();
+        _attaching();
         grant = await _api.attachSession(sessionId, request);
       }
       // A closed tab leaves an attached session detached, as "Detach" would.
-      _alive();
+      _attaching();
       if (!await _grantMatches(grant, h)) return;
       await _connect(grant, h, checked, opening: false);
     } on StepUpCancelled {
       _dropKey();
-      _set(before);
+      if (_stillAttaching) _set(before);
     } on Object catch (e) {
       _dropKey();
-      final problem = _problemOf(e);
-      _set(before.copyWith(problemCode: problem?.code ?? 'attach_failed'));
+      // "End", a revocation or a closed tab during the attach win; nothing is overwritten.
+      if (_stillAttaching) {
+        final problem = _problemOf(e);
+        _set(before.copyWith(problemCode: problem?.code ?? 'attach_failed'));
+      }
     } finally {
       _busy = false;
     }
@@ -475,12 +479,18 @@ final class TerminalController extends ChangeNotifier {
             initiator = null;
             // R-CL-15: the private part is not needed after message 2.
             _dropKey();
-            final pump = FramePump(
+            late final FramePump pump;
+            pump = FramePump(
               transport: result.transport,
               send: channel.sendBinary,
               scheduleTick: _scheduleTick,
-              onError: (_) =>
-                  _blockAndClose(channel, BlockCause.handshakeFailed),
+              // Only the current pump may block the tab; a stopped one is silent (red team
+              // M4-35: a stale resize tick after detach blocked the tab as tampering).
+              onError: (_) {
+                if (identical(_pump, pump)) {
+                  _blockAndClose(channel, BlockCause.handshakeFailed);
+                }
+              },
             );
             _pump = pump;
             await pump.sendFrame(StartFrame(_cols, _rows));
@@ -517,9 +527,10 @@ final class TerminalController extends ChangeNotifier {
       // object is dropped on purpose; it may hold bytes of the stream.
       failure = BlockCause.handshakeFailed;
     }
-    _dropKey();
+    // An older stream loop must not touch the key of a newer attach.
     if (generation != _generation) return;
-    _pump = null;
+    _dropKey();
+    _stopPump();
     _channel = null;
     if (failure != null) {
       await channel.close();
@@ -582,7 +593,7 @@ final class TerminalController extends ChangeNotifier {
 
   void _blockAndClose(TerminalChannel channel, BlockCause cause) {
     _generation++;
-    _pump = null;
+    _stopPump();
     _channel = null;
     _set(_state.copyWith(phase: TerminalPhase.blocked, blockCause: cause));
     unawaited(channel.close());
@@ -590,7 +601,7 @@ final class TerminalController extends ChangeNotifier {
 
   Future<void> _closeStream() async {
     _generation++;
-    _pump = null;
+    _stopPump();
     _replay = null;
     _dropKey();
     final channel = _channel;
@@ -648,12 +659,27 @@ final class TerminalController extends ChangeNotifier {
     if (_disposed) throw const _Disposed();
   }
 
+  bool get _stillAttaching =>
+      !_disposed &&
+      (_state.phase == TerminalPhase.preparing ||
+          _state.phase == TerminalPhase.connecting);
+
+  // Throws when the tab was disposed, ended or blocked while an attach awaited.
+  void _attaching() {
+    if (!_stillAttaching) throw const _Disposed();
+  }
+
   Future<void> _closeQuietly(String sessionId) async {
     try {
       await _api.closeSession(sessionId);
     } on Object {
       // The server ends an unused opening after terminal.open_timeout anyway.
     }
+  }
+
+  void _stopPump() {
+    _pump?.stop();
+    _pump = null;
   }
 
   void _dropKey() {

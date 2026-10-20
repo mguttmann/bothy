@@ -1149,5 +1149,6 @@
   "terminalKeyLatched": "{key}, eingerastet",
   "terminalKeyHeld": "{key}, gehalten",
   "terminalStepUpOpen": "Terminal auf {name} öffnen",
-  "terminalStepUpAttach": "Terminal auf {name} wiederanhängen"
+  "terminalStepUpAttach": "Terminal auf {name} wiederanhängen",
+  "terminalLinkHost": "Rechner: {name}"
 }

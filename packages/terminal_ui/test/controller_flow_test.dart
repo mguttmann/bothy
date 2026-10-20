@@ -361,4 +361,77 @@ void main() {
     expect(h.transport.connected, isEmpty);
     expect(h.host.frames, isEmpty);
   });
+
+  test('End during a pending attach wins: the tab stays ended and nothing connects', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    await h.controller.detach();
+    h.api.attachGate = Completer<void>();
+    final attaching = h.controller.attach();
+    await h.settle();
+    expect(h.log.last, 'attach');
+    await h.controller.end();
+    h.api.attachGate!.complete();
+    await attaching;
+    await h.settle();
+    expect(h.controller.state.phase, TerminalPhase.ended);
+    expect(h.host.connections, 1);
+  });
+
+  test('a revocation during a pending attach stays blocked', () async {
+    final events = FakeHostEvents();
+    final h = await Harness.create(events: events);
+    await h.open();
+    await h.connected();
+    await h.controller.detach();
+    h.api.attachGate = Completer<void>();
+    h.api.attachErrors.add(
+      const ApiProblem(status: 409, code: 'host_unavailable'),
+    );
+    final attaching = h.controller.attach();
+    await h.settle();
+    events.changes.add(
+      const TerminalSessionUpdated(
+        sessionIdText,
+        closed: true,
+        closeReason: 'access_revoked',
+      ),
+    );
+    await h.settle();
+    h.api.attachGate!.complete();
+    await attaching;
+    expect(h.controller.state.phase, TerminalPhase.blocked);
+    expect(h.controller.state.blockCause, BlockCause.revoked);
+  });
+
+  test(
+    'a resize tick due after detach sends nothing and blocks nothing',
+    () async {
+      final h = await Harness.create();
+      await h.open();
+      await h.connected();
+      h.controller.resize(100, 30);
+      await h.controller.detach();
+      h.tick();
+      await h.settle();
+      expect(h.host.frames.whereType<ResizeFrame>(), isEmpty);
+      expect(h.controller.state.phase, TerminalPhase.detached);
+      expect(h.controller.state.detachCause, DetachCause.person);
+    },
+  );
+
+  test('a stale tick of the old stream leaves a new attach alone', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    h.controller.resize(100, 30);
+    await h.controller.detach();
+    await h.controller.attach();
+    await h.connected();
+    h.tick();
+    await h.settle();
+    expect(h.controller.state.phase, TerminalPhase.connected);
+    expect(h.host.frames.whereType<ResizeFrame>(), isEmpty);
+  });
 }

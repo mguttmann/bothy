@@ -100,4 +100,26 @@ void main() {
     // Let the double tap timer of the renderer's gesture detector run out.
     await tester.pump(const Duration(seconds: 1));
   });
+
+  test('pasted text loses ESC and the controls that could run a line', () {
+    expect(sanitizePaste('ls\x1b[201~ && echo x\x0f'), 'ls[201~ && echo x');
+    expect(sanitizePaste('a\tb\r\nc'), 'a\tb\r\nc');
+    expect(sanitizePaste('x\u009by\x7f'), 'xy');
+  });
+
+  testWidgets(
+    'a single line with ESC[201~ and Ctrl-O sends no control (red team M4-35)',
+    (tester) async {
+      final h = await _connected(
+        tester,
+        'ls\x1b[201~ && echo x > f\x0f\x1b[201~',
+      );
+      await tester.tap(find.byType(TerminalScreenView));
+      await tester.pumpAndSettle();
+      await _pressPaste(tester);
+      await pumpUntil(tester, () => _sent(h).isNotEmpty);
+      expect(_sent(h), 'ls[201~ && echo x > f[201~');
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
 }

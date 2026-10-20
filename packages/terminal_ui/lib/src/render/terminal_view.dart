@@ -16,10 +16,16 @@ import 'package:flutter/services.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
 import 'package:terminal_ui/src/render/paste_guard.dart';
 import 'package:terminal_ui/src/render/semantics.dart';
+import 'package:terminal_ui/src/render/terminal_screen.dart';
 import 'package:terminal_ui/src/render/terminal_theme.dart';
 import 'package:terminal_ui/src/widgets/link_confirm_dialog.dart';
 import 'package:xterm/xterm.dart'
-    show CellOffset, TerminalStyle, TerminalView, TerminalViewState;
+    show
+        CellOffset,
+        TerminalCursorType,
+        TerminalStyle,
+        TerminalView,
+        TerminalViewState;
 
 /// The intent of a paste through the guard; the shortcuts of the view map the paste keys to
 /// it instead of xterm's own paste, which would paste without asking.
@@ -126,6 +132,10 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                           fontFamilyFallback: mono.fontFamilyFallback!,
                         ),
                         autofocus: widget.autofocus,
+                        // xterm 4.0.0 cannot draw the character under a block cursor in
+                        // color.terminal.cursor-text; an underline keeps the character at full
+                        // contrast and the cursor opaque (D-M4-35-9).
+                        cursorType: TerminalCursorType.underline,
                         shortcuts: terminalShortcuts(defaultTargetPlatform),
                       ),
                     ),
@@ -198,7 +208,8 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
         ? await read()
         : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     if (text == null || text.isEmpty || !mounted) return;
-    if (!await confirmPaste(context, text)) return;
-    _c.screen.terminal.paste(text);
+    final clean = sanitizePaste(text);
+    if (clean.isEmpty || !await confirmPaste(context, clean)) return;
+    _c.screen.paste(clean);
   }
 }

@@ -20,12 +20,25 @@ const int maxLinkRecords = 512;
 /// Whether a link [target] may open at all: an absolute `https` or `http` URI with a host
 /// (docs/spec/24-terminal.md 11.2); every other scheme stays closed.
 bool isOpenableLink(String target) {
+  if (target.codeUnits.any((c) => c < 0x21 || c > 0x7e)) return false;
   final uri = Uri.tryParse(target);
   return uri != null &&
       uri.hasAuthority &&
       uri.host.isNotEmpty &&
       (uri.isScheme('https') || uri.isScheme('http'));
 }
+
+/// Returns [text] without ESC, DEL and the C0 and C1 controls other than tab, line feed and
+/// carriage return; what remains is what the person can see in the paste confirmation.
+String sanitizePaste(String text) => String.fromCharCodes(
+  text.runes.where(
+    (r) =>
+        r == 0x09 ||
+        r == 0x0a ||
+        r == 0x0d ||
+        (r >= 0x20 && r != 0x7f && !(r >= 0x80 && r <= 0x9f)),
+  ),
+);
 
 /// A hyperlink of OSC 8, rewritten into inert text and this record (Design note 2).
 final class TerminalLink {
@@ -36,6 +49,11 @@ final class TerminalLink {
 
   final CellAnchor _start;
   CellAnchor? _end;
+
+  void _release() {
+    _start.dispose();
+    _end?.dispose();
+  }
 
   /// Whether the cell [offset] lies inside the visible text of the link.
   bool contains(CellOffset offset) {
@@ -100,6 +118,9 @@ final class TerminalScreen extends ChangeNotifier {
     _filter.reset();
     _decoder = null;
     _decoded.clear();
+    for (final link in _links) {
+      link._release();
+    }
     _links.clear();
     _openLink = null;
     _terminal = _newTerminal()..resize(size.$1, size.$2);
@@ -130,12 +151,30 @@ final class TerminalScreen extends ChangeNotifier {
   /// The text of [range] for copying by the person.
   String textOf(BufferRangeLine range) => _terminal.buffer.getText(range);
 
+  /// xterm 4.0.0 answers the cursor position report zero-based (`ESC[0;0R` at the home
+  /// position); the host expects rows and columns from 1 (D-M4-35-5).
+  static String _fixCursorReport(String data) {
+    final m = _cursorReport.firstMatch(data);
+    if (m == null) return data;
+    final row = int.parse(m.group(1)!) + 1;
+    final col = int.parse(m.group(2)!) + 1;
+    return '\x1b[$row;${col}R';
+  }
+
+  static final RegExp _cursorReport = RegExp(r'^\x1b\[(\d{1,5});(\d{1,5})R$');
+
+  /// Pastes [text] of the person through the renderer (bracketed when the program asked for
+  /// it), without ESC and the other C0 controls except tab, line feed and carriage return:
+  /// they could end the bracketed paste early or run a line without the confirmation of
+  /// 15 23.4 (red team M4-35).
+  void paste(String text) => _terminal.paste(sanitizePaste(text));
+
   Terminal _newTerminal() => Terminal(
     maxLines: _scrollbackLines,
     // The second layer of 24 11.2: title, icon and private OSC handlers stay unset, so even
     // a sequence the filter missed changes nothing and answers nothing; xterm has no
     // clipboard handler at all.
-    onOutput: _onInput,
+    onOutput: (data) => _onInput(_fixCursorReport(data)),
     onResize: (cols, rows, _, _) => onResize?.call(cols, rows),
   );
 
@@ -154,7 +193,9 @@ final class TerminalScreen extends ChangeNotifier {
           );
           _openLink = link;
           _links.add(link);
-          if (_links.length > maxLinkRecords) _links.removeAt(0);
+          // A dropped record releases its anchors; xterm keeps every anchor on its line and
+          // walks them on each edit (red team M4-35: the view froze otherwise).
+          if (_links.length > maxLinkRecords) _links.removeAt(0)._release();
         case LinkEnd():
           _flush(terminal);
           _closeLink(terminal);

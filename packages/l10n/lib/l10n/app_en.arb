@@ -6405,5 +6405,15 @@
         "example": "Build host"
       }
     }
+  },
+  "terminalLinkHost": "Host: {name}",
+  "@terminalLinkHost": {
+    "description": "The host of a terminal link in the link confirmation, shown before the full target.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "example.com"
+      }
+    }
   }
 }

@@ -177,4 +177,21 @@ void main() {
     expect(h.controller.screen.visibleText(), 'xyz');
     expect(h.controller.screen.links.single.target, 'https://example.com/a');
   });
+
+  testWidgets('the link confirmation shows the host before a long target', (
+    tester,
+  ) async {
+    final h = await _connected(tester);
+    final target = 'https://evil.example/${'a' * 1900}';
+    await _send(tester, h, '$_esc]8;;$target${_st}x$_esc]8;;$_st');
+    final onLink =
+        tester.getTopLeft(find.byType(TerminalView)) + const Offset(6, 6);
+    await _click(tester, onLink);
+    final host = find.text('Host: evil.example');
+    expect(host, findsOneWidget);
+    expect(
+      tester.getRect(host).bottom,
+      lessThan(tester.view.physicalSize.height),
+    );
+  });
 }

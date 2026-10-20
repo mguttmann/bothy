@@ -39,8 +39,8 @@ final class LinkStart extends FilteredChunk {
   /// Records the opening of a link to [target].
   const LinkStart(this.target);
 
-  /// The target URI: non-empty, valid UTF-8, without control characters, at most
-  /// [EscapeFilter.maxLinkTargetBytes] bytes long. Not checked for a scheme: the view shows it
+  /// The target URI: non-empty, printable ASCII only (no space, no control, no non-ASCII
+  /// character), at most [EscapeFilter.maxLinkTargetBytes] bytes long. Not checked for a scheme: the view shows it
   /// and asks before opening (24 11.2).
   final String target;
 }
@@ -98,10 +98,10 @@ final class LinkEnd extends FilteredChunk {
 ///    (params such as `id=` are ignored), with an empty URI [LinkEnd] (only while a link is
 ///    open). The link text between them passes as [FilteredText], so the link is inert text
 ///    plus a record. A [LinkStart] while a link is open first emits [LinkEnd]. An OSC 8 whose
-///    URI is longer than [maxLinkTargetBytes], not valid UTF-8 or holds a control character
-///    (C0, DEL, C1, or a Unicode bidi control that would make the shown target read
-///    differently) is dropped like any other OSC and emits nothing; an open link then stays
-///    open. OSC 8 without the second `;` emits nothing.
+///    URI is longer than [maxLinkTargetBytes] or holds anything but printable ASCII (a space,
+///    a control, a line separator, a bidi control or any non-ASCII character could hide or
+///    disguise the shown target) is dropped like any other OSC and emits nothing; an open
+///    link then stays open. OSC 8 without the second `;` emits nothing.
 /// 5. CAN (0x18) or SUB (0x1A) inside a sequence aborts it; the sequence and the CAN or SUB
 ///    byte are dropped. An ESC inside a sequence that is not ST aborts the sequence and starts
 ///    a new one at that ESC. Further rules of the VT500 parser that keep the byte view equal
@@ -457,25 +457,17 @@ final class EscapeFilter {
     _toGround();
   }
 
-  /// Decodes an OSC 8 target; null when it is not valid UTF-8 or holds a C1 control.
+  /// Decodes an OSC 8 target; null unless every character is printable ASCII (0x21 to 0x7E).
+  ///
+  /// A URI is ASCII (RFC 3986; an IRI travels percent-encoded), and the target is shown before
+  /// it opens (24 11.2): spaces, line and paragraph separators, bidi controls or look-alike
+  /// letters could push the real host out of view or make it read differently.
   static String? _decodeTarget(Uint8List raw) {
-    try {
-      final target = const Utf8Decoder().convert(raw);
-      return target.runes.any(_isHiddenControl) ? null : target;
-    } on FormatException {
-      return null;
+    for (final b in raw) {
+      if (b < 0x21 || b > 0x7e) return null;
     }
+    return ascii.decode(raw);
   }
-
-  /// C1 controls and the Unicode bidi controls (ALM, LRM, RLM, LRE to RLO, LRI to PDI): the
-  /// target is shown before it opens (24 11.2), and these would make it read differently.
-  static bool _isHiddenControl(int rune) =>
-      (rune >= 0x80 && rune <= 0x9f) ||
-      rune == 0x061c ||
-      rune == 0x200e ||
-      rune == 0x200f ||
-      (rune >= 0x202a && rune <= 0x202e) ||
-      (rune >= 0x2066 && rune <= 0x2069);
 
   void _stringDropByte(int byte) {
     if (_stringEscape) {

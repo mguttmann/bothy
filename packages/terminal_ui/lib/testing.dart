@@ -254,7 +254,11 @@ final class _FakeStream implements TerminalChannel {
   void sendText(String text) => _enqueue(text);
 
   @override
-  void sendBinary(Uint8List bytes) => _enqueue(Uint8List.fromList(bytes));
+  void sendBinary(Uint8List bytes) {
+    // Like the sink of a closed WebSocket, a send after close throws.
+    if (closed) throw StateError('stream closed');
+    _enqueue(Uint8List.fromList(bytes));
+  }
 
   void _enqueue(Object message) {
     // The host handles messages strictly in order, like one WebSocket.

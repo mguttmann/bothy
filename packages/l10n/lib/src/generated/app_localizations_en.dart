@@ -4283,4 +4283,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String terminalStepUpAttach(String name) {
     return 'Reattach to the terminal on $name';
   }
+
+  @override
+  String terminalLinkHost(String name) {
+    return 'Host: $name';
+  }
 }

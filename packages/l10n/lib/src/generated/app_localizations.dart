@@ -7002,6 +7002,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reattach to the terminal on {name}'**
   String terminalStepUpAttach(String name);
+
+  /// The host of a terminal link in the link confirmation, shown before the full target.
+  ///
+  /// In en, this message translates to:
+  /// **'Host: {name}'**
+  String terminalLinkHost(String name);
 }
 
 class _AppLocalizationsDelegate

@@ -943,14 +943,18 @@ Ports von `terminal_ui`, umgesetzt je App:
   output cannot end the session as tampering.
 - As built (M4-35): `buildTerminalTheme` generates the xterm `TerminalTheme` from `DsColors`
   (`color.terminal.*` of docs/design/components.md 12), so the screen follows light and dark
-  mode without a colour of its own. Cursor and selection keep their token colour at the named
-  opacity `terminalOverlayAlpha`, because xterm paints both over the text; xterm 4.0.0 has no
-  field for `color.terminal.cursor-text`, so that role stays unused.
+  mode without a colour of its own. xterm paints the cursor and the selection over the text and
+  has no field for `color.terminal.cursor-text`: the cursor is therefore an opaque underline in
+  `color.terminal.cursor` (the character keeps full contrast), and the selection keeps its token
+  colour at the named opacity `terminalOverlayAlpha`; `cursor-text` stays unused. A pasted text
+  loses ESC and the other controls except tab and line breaks before it is shown and sent, and
+  a link target is only printable ASCII; the confirmation shows its host first.
 - xterm state found by M4-35 (2026-10-20; sources in [24-terminal.md](24-terminal.md),
   section 12): version 4.0.0, published 2024-02-27, the latest release. Read in its source: OSC
   0/1/2 call `onTitleChange` and `onIconChange`; every other OSC, OSC 52 and OSC 8 included,
   goes to `onPrivateOSC`; there is no clipboard handler; all three are null by default. It
-  answers DA1, DA2, DA3, DSR 5 n, CPR (zero-based, a bug: `ESC[0;0R` at the home position) and
+  answers DA1, DA2, DA3, DSR 5 n, CPR (zero-based, a bug: `ESC[0;0R` at the home position; the
+  view adds one to row and column) and
   `CSI 18 t` through `onOutput`, resizes the terminal on `CSI 8;r;c t`, ignores `CSI 20 t` and
   `CSI 21 t`, and does not parse DCS (its content would be printed as text). Bugs: palette index
   15 (SGR 97) resolves to white instead of bright white; selection and block cursor are painted

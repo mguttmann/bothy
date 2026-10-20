@@ -123,6 +123,9 @@ final class FakeApi implements TerminalServerApi {
   final List<Object?> attachErrors = [];
   Object? openError;
 
+  /// When set, attachSession waits for it before it answers.
+  Completer<void>? attachGate;
+
   /// When set, openSession waits for it before it answers.
   Completer<void>? openGate;
   int tokens = 0;
@@ -216,6 +219,7 @@ final class FakeApi implements TerminalServerApi {
   ) async {
     log.add('attach');
     attaches.add(request);
+    await attachGate?.future;
     if (attachErrors.isNotEmpty) {
       final error = attachErrors.removeAt(0);
       if (error != null) throw error;

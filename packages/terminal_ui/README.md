@@ -84,8 +84,10 @@ app implements them its own way:
 - **OSC 8 links**: rewritten into inert text plus a record (`TerminalLink`). A click shows the
   full target in a confirmation; only absolute `https` and `http` URIs with a host open
   (`isOpenableLink`), through `LinkOpener`.
-- **Paste guard**: text with a line break is shown with its line count before it is pasted
-  ("Paste with line breaks?"); the paste keys map to the guard, never to xterm's own paste.
+- **Paste guard**: pasted text loses ESC and the other controls except tab and line breaks
+  (they could end a bracketed paste early or run a line); text with a line break is then shown
+  with its line count before it is pasted ("Paste with line breaks?"); the paste keys map to
+  the guard, never to xterm's own paste.
 - **Copy only by the person**: selection plus the copy shortcut (Cmd on Apple platforms,
   Ctrl+Shift elsewhere, so Ctrl+C and Ctrl+V stay with the shell). The host cannot write the
   clipboard: OSC 52 is filtered and xterm has no clipboard handler.
@@ -105,7 +107,8 @@ issues. What xterm itself does with hostile output (read in its source):
 
 - OSC 0/1/2 call `onTitleChange` and `onIconChange`; every other OSC, OSC 52 and OSC 8
   included, goes to `onPrivateOSC`; there is no clipboard handler. All three stay unset here.
-- It answers DA1, DA2, DA3, DSR 5, CPR (zero-based, a bug: `ESC[0;0R` at the home position) and
+- It answers DA1, DA2, DA3, DSR 5, CPR (zero-based, a bug: `ESC[0;0R` at the home position;
+  the screen adds one to row and column) and
   `CSI 18 t` through `onOutput`; `CSI 8;r;c t` resizes the terminal. The filter drops all of
   these but CPR, DA1 and DA2.
 - DCS is not parsed; its content would be printed as text. The filter drops it.
@@ -115,9 +118,9 @@ issues. What xterm itself does with hostile output (read in its source):
   escape filter above).
 
 The theme comes from the tokens: `buildTerminalTheme` maps `DsColors` `color.terminal.*` to
-xterm's `TerminalTheme`; cursor and selection keep their token colour at
-`terminalOverlayAlpha`, because xterm paints them over the text, and `cursor-text` has no
-field in xterm 4.0.0 (15 23.4).
+xterm's `TerminalTheme`. xterm paints cursor and selection over the text and has no field for
+`cursor-text`, so the cursor is an opaque underline and the selection keeps its token colour
+at `terminalOverlayAlpha` (15 23.4).
 
 ## Layout
 

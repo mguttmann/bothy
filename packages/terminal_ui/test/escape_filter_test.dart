@@ -292,11 +292,31 @@ void main() {
       expectAllSplits(b('a\x1b]8;;\x07b'), ['T:ab']);
     });
 
-    test('a UTF-8 target is decoded, also when split', () {
-      expectAllSplits(b('\x1b]8;;https://example.com/grüße\x1b\\'), [
-        'S:https://example.com/grüße',
-      ]);
-    });
+    test(
+      'a percent-encoded target is kept; a raw non-ASCII one is dropped',
+      () {
+        expectAllSplits(
+          b('\x1b]8;;https://example.com/gr%C3%BC%C3%9Fe\x1b\\'),
+          ['S:https://example.com/gr%C3%BC%C3%9Fe'],
+        );
+        expectAllSplits(b('a\x1b]8;;https://example.com/grüße\x1b\\b'), [
+          'T:ab',
+        ]);
+      },
+    );
+
+    test(
+      'a line separator or a space in the target drops it (red team M4-35)',
+      () {
+        expectAllSplits(
+          b('a\x1b]8;;https://example.com\u2028\u2028@evil.example/\x07b'),
+          ['T:ab'],
+        );
+        expectAllSplits(b('a\x1b]8;;https://example.com @evil.example/\x07b'), [
+          'T:ab',
+        ]);
+      },
+    );
 
     test('malformed UTF-8 or control characters in the target drop it', () {
       expectAllSplits(

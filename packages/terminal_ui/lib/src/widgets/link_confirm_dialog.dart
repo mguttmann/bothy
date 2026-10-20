@@ -27,28 +27,41 @@ class LinkConfirmDialog extends StatelessWidget {
     final l = dsL10n(context);
     final c = context.dsColors;
     final openable = isOpenableLink(target);
+    final host = openable ? Uri.parse(target).host : null;
     return AlertDialog(
       title: Text(l.terminalLinkTitle),
+      // The host comes first and the target scrolls, so a long target cannot push the host
+      // out of view (red team M4-35).
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: DsLayout.columnMin * 3),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l.terminalLinkBody),
-            const SizedBox(height: DsSpace.s8),
-            SelectableText(
-              target,
-              style: dsTextStyle(DsType.code).copyWith(color: c.textPrimary),
-            ),
-            if (!openable) ...[
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l.terminalLinkBody),
+              if (host != null) ...[
+                const SizedBox(height: DsSpace.s8),
+                Text(
+                  l.terminalLinkHost(host),
+                  style: dsTextStyle(DsType.bodyStrong)
+                      .copyWith(color: c.textPrimary),
+                ),
+              ],
               const SizedBox(height: DsSpace.s8),
-              Text(
-                l.terminalLinkUnsupported,
-                style: dsTextStyle(DsType.bodySm).copyWith(color: c.dangerFg),
+              SelectableText(
+                target,
+                style: dsTextStyle(DsType.code).copyWith(color: c.textPrimary),
               ),
+              if (!openable) ...[
+                const SizedBox(height: DsSpace.s8),
+                Text(
+                  l.terminalLinkUnsupported,
+                  style: dsTextStyle(DsType.bodySm).copyWith(color: c.dangerFg),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [

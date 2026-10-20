@@ -4305,4 +4305,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String terminalStepUpAttach(String name) {
     return 'Terminal auf $name wiederanhängen';
   }
+
+  @override
+  String terminalLinkHost(String name) {
+    return 'Rechner: $name';
+  }
 }

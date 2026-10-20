@@ -7,8 +7,8 @@ library;
 import 'package:design_system/design_system.dart';
 import 'package:xterm/xterm.dart' show TerminalTheme;
 
-/// The opacity of the cursor and the selection, which xterm paints over the text: the token
-/// colour stays, only its alpha drops so the character below remains readable (D-M4-35-9).
+/// The opacity of the selection, which xterm paints over the text: the token colour stays,
+/// only its alpha drops so the selected characters remain readable (D-M4-35-9).
 const double terminalOverlayAlpha = 0.5;
 
 /// The xterm [TerminalTheme] of the terminal screen, every field taken from a token of
@@ -16,12 +16,12 @@ const double terminalOverlayAlpha = 0.5;
 /// its own.
 ///
 /// - Screen: `background` is `color.terminal.bg`, `foreground` is `color.terminal.fg`.
-/// - Cursor: `cursor` is `color.terminal.cursor` at [terminalOverlayAlpha]. xterm 4.0.0 has no
-///   colour for the character under the cursor: `TerminalPainter.paintCursor` fills the cell
-///   with `cursor` after the text is painted, so an opaque block cursor would hide the
-///   character. `color.terminal.cursor-text` ([DsColors.terminalCursorText]) therefore has no
-///   field here; the translucent cursor keeps the character readable (docs/DECISIONS.md
-///   D-M4-35-9).
+/// - Cursor: `cursor` is `color.terminal.cursor`, opaque. xterm 4.0.0 has no colour for the
+///   character under the cursor: `TerminalPainter.paintCursor` fills a block cell with
+///   `cursor` after the text is painted, so the view draws the cursor as an underline, which
+///   keeps the character at full contrast and the cursor at the contrast of its pairing.
+///   `color.terminal.cursor-text` ([DsColors.terminalCursorText]) therefore has no field here
+///   (docs/DECISIONS.md D-M4-35-9).
 /// - Selection: `selection` is `color.terminal.selection-bg` at [terminalOverlayAlpha]. The
 ///   design pairs it as the background under `color.terminal.fg` (design/design-rules.json),
 ///   but xterm 4.0.0 paints the selection as a filled rectangle after the text, so the opaque
@@ -44,7 +44,7 @@ const double terminalOverlayAlpha = 0.5;
 /// TerminalView(terminal, theme: buildTerminalTheme(DsColors.dark));
 /// ```
 TerminalTheme buildTerminalTheme(DsColors colors) => TerminalTheme(
-  cursor: colors.terminalCursor.withValues(alpha: terminalOverlayAlpha),
+  cursor: colors.terminalCursor,
   selection: colors.terminalSelectionBg.withValues(alpha: terminalOverlayAlpha),
   foreground: colors.terminalFg,
   background: colors.terminalBg,
