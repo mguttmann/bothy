@@ -21,11 +21,22 @@
 /// steps with the server's [PreviewPanel], the [GrantsList] per target with
 /// [RevokeGrantDialog], [WhoHasAccess] with its [SourceChain], [ViewAsPerson] and the data
 /// source [AccessRepository] ([ApiAccessRepository]), which [AdminRepository] includes.
+///
+/// M4-29 adds the audit log of A6: [AuditLogView] with its [AuditFilters], the details
+/// ([AuditEntryDetail]), "Check chain" ([AuditChainCheckButton], [AuditChainPanel]), the export
+/// ([AuditExportBar], [AuditSaveTarget], [auditNdjsonToCsv]) and the data source
+/// [AuditRepository] ([ApiAuditRepository]), which [AdminRepository] includes.
 library;
 
 export 'src/access/source_chain.dart';
 export 'src/access/view_as_person.dart';
 export 'src/access/who_has_access.dart';
+export 'src/audit/audit_entry_detail.dart';
+export 'src/audit/audit_export.dart';
+export 'src/audit/audit_filters.dart';
+export 'src/audit/audit_list.dart';
+export 'src/audit/audit_repository.dart';
+export 'src/audit/chain_check.dart';
 export 'src/common/admin_action.dart';
 export 'src/common/code_text.dart';
 export 'src/common/confirm_change.dart';

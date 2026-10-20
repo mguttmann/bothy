@@ -74,6 +74,13 @@ operated, and the order of the build.
   the step-up, the grants of a target with revoke (immediate, required reason), "Who has
   access?" with the source chains of 07 9.1 and "View as person" as a read-only snapshot; the
   fake server answers the grant operations and the example of 07 9.3, read at run time.
+- Audit log of the administration (M4-29): `packages/admin_ui` lists the audit log of 01 5.2 A6
+  (virtualized, newest first, cursor paging) with filters for action, person, result, resource
+  and time range, shows an entry's details, checks the hash chain (`verifyAuditChain`, intact
+  or the first broken entry with the warnings) and exports a time range as the server's NDJSON
+  with hashes or as a CSV converted on the device with a guard against formula injection. The
+  fake server of `sync_engine` serves the three audit operations over a hash chain that a test
+  can break at a given entry.
 - Administration of people, groups and devices (M4-26): `packages/admin_ui` has the shell of
   01 5.2 A1 (People, Groups, Devices with the count of waiting devices) and its screens: the
   people list with search and filters, "Add person" with an enrollment code shown once, a

@@ -9,6 +9,8 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../audit/audit_export.dart';
+import '../audit/audit_list.dart';
 import '../data/admin_repository.dart';
 import '../devices/waiting_devices.dart';
 import '../grants/grants_list.dart';
@@ -25,6 +27,7 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
       AdminSection.groups => l.adminNavGroups,
       AdminSection.grants => l.adminNavGrants,
       AdminSection.devices => l.adminNavDevices,
+      AdminSection.audit => l.adminNavAudit,
       // Entries without a screen are not listed (AdminSection.listed).
       _ => section.segment,
     };
@@ -56,6 +59,7 @@ class AdminShell extends StatefulWidget {
     this.onExit,
     this.timeZone = 'UTC',
     this.clock = DateTime.now,
+    this.saveTarget,
   });
 
   /// The administration's calls.
@@ -75,6 +79,10 @@ class AdminShell extends StatefulWidget {
 
   /// The current time.
   final DateTime Function() clock;
+
+  /// The host's save dialog for the audit export, or null for no export (brief M4-29 Design
+  /// note 3).
+  final AuditSaveTarget? saveTarget;
 
   @override
   State<AdminShell> createState() => _AdminShellState();
@@ -139,6 +147,12 @@ class _AdminShellState extends State<AdminShell> {
         onTarget: (key) =>
             widget.onNavigate(AdminLocation(AdminSection.grants, id: key)),
         onChanged: changed,
+      ),
+      AdminSection.audit => AuditLogView(
+        repository: r,
+        timeZone: widget.timeZone,
+        clock: widget.clock,
+        saveTarget: widget.saveTarget,
       ),
       AdminSection.devices => WaitingDevicesView(
         repository: r,
@@ -213,19 +227,28 @@ class _AdminShellState extends State<AdminShell> {
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(DsSpace.s24),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 880),
-                  child: KeyedSubtree(
-                    key: ValueKey('admin.body.${widget.location.path}'),
-                    child: _body(),
+            child: widget.location.section == AdminSection.audit
+                // The audit list scrolls itself (virtualized), so it gets the body's height.
+                ? Padding(
+                    padding: const EdgeInsets.all(DsSpace.s24),
+                    child: KeyedSubtree(
+                      key: ValueKey('admin.body.${widget.location.path}'),
+                      child: _body(),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(DsSpace.s24),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 880),
+                        child: KeyedSubtree(
+                          key: ValueKey('admin.body.${widget.location.path}'),
+                          child: _body(),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),

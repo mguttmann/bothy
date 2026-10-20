@@ -2571,6 +2571,206 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get adminNavAudit => 'Audit';
+
+  @override
+  String get auditTitle => 'Audit-Log';
+
+  @override
+  String get auditFilterAction => 'Aktion';
+
+  @override
+  String get auditFilterActorAll => 'Alle Personen';
+
+  @override
+  String get auditResultAll => 'Alle Ergebnisse';
+
+  @override
+  String get auditResultAllow => 'erlaubt';
+
+  @override
+  String get auditResultDeny => 'abgelehnt';
+
+  @override
+  String get auditResultError => 'Fehler';
+
+  @override
+  String get auditFilterResourceKind => 'Ressourcenart';
+
+  @override
+  String get auditFilterResourceId => 'Ressourcen-ID';
+
+  @override
+  String get auditFilterFrom => 'Von (JJJJ-MM-TT)';
+
+  @override
+  String get auditFilterTo => 'Bis (JJJJ-MM-TT)';
+
+  @override
+  String get auditFilterApply => 'Filter anwenden';
+
+  @override
+  String get auditFilterInvalidDate => 'Datum als JJJJ-MM-TT eingeben.';
+
+  @override
+  String get auditColTime => 'Zeit';
+
+  @override
+  String get auditColWho => 'Wer';
+
+  @override
+  String get auditColResult => 'Ergebnis';
+
+  @override
+  String get auditColResource => 'Ressource';
+
+  @override
+  String get auditColReason => 'Grund';
+
+  @override
+  String get auditEmpty => 'Keine Einträge zu diesen Filtern.';
+
+  @override
+  String get auditStepUpNeeded =>
+      'Das Audit-Log zu lesen braucht deine Bestätigung.';
+
+  @override
+  String get auditCheckChain => 'Kette prüfen';
+
+  @override
+  String auditChainOk(int seq) {
+    return 'Kette geprüft bis Nr. $seq: unverändert.';
+  }
+
+  @override
+  String auditChainBroken(int seq, String reason) {
+    return 'Kette gebrochen bei Nr. $seq: $reason';
+  }
+
+  @override
+  String auditChainRange(int from, int to, int count) {
+    return 'Geprüft Nr. $from bis $to; verglichene Prüfpunkte: $count.';
+  }
+
+  @override
+  String get auditChainReasonHash => 'der Eintrag passt nicht zu seinem Hash.';
+
+  @override
+  String get auditChainReasonLink =>
+      'der Eintrag verweist nicht auf den Eintrag davor.';
+
+  @override
+  String get auditChainReasonGap => 'ein Eintrag fehlt.';
+
+  @override
+  String get auditChainReasonCheckpoint => 'ein Prüfpunkt passt nicht.';
+
+  @override
+  String get auditChainReasonCheckpointInvalid => 'ein Prüfpunkt ist ungültig.';
+
+  @override
+  String auditChainReasonOther(String code) {
+    return 'Grund $code.';
+  }
+
+  @override
+  String get auditChainWarningNoSink =>
+      'Warnung: Es ist kein Ziel für Prüfpunkte eingerichtet, Prüfpunkte gibt es nur in der Datenbank.';
+
+  @override
+  String auditChainWarning(String code) {
+    return 'Warnung: $code';
+  }
+
+  @override
+  String get auditExport => 'Exportieren';
+
+  @override
+  String get auditExportCsv => 'Als CSV exportieren';
+
+  @override
+  String get auditExportNeedsRange =>
+      'Für den Export einen Zeitraum (von und bis) wählen.';
+
+  @override
+  String get auditExportDone => 'Export gespeichert.';
+
+  @override
+  String get auditExportFailed =>
+      'Der Export brach ab; die Datei ist unvollständig.';
+
+  @override
+  String get stepUpPurposeAuditRead => 'Audit-Log lesen';
+
+  @override
+  String get stepUpPurposeAuditVerify => 'Hash-Kette des Audit-Logs prüfen';
+
+  @override
+  String get stepUpPurposeAuditExport => 'Audit-Log exportieren';
+
+  @override
+  String auditDetailTitle(int seq) {
+    return 'Eintrag Nr. $seq';
+  }
+
+  @override
+  String get auditDetailCorrelation => 'Korrelations-ID';
+
+  @override
+  String get auditDetailDenyReason => 'Ablehnungsgrund';
+
+  @override
+  String get auditDetailDetails => 'Details';
+
+  @override
+  String get auditDetailHash => 'Hash';
+
+  @override
+  String get auditDetailPrevHash => 'Vorheriger Hash';
+
+  @override
+  String get auditDetailClose => 'Schließen';
+
+  @override
+  String get auditActionAuditRead => 'Audit-Log lesen';
+
+  @override
+  String get auditActionAuditVerify => 'Audit-Kette prüfen';
+
+  @override
+  String get auditActionGrantCreate => 'Freigabe anlegen';
+
+  @override
+  String get auditActionGrantRevoke => 'Freigabe widerrufen';
+
+  @override
+  String get auditActionOwnerAdd => 'Owner hinzufügen';
+
+  @override
+  String get auditActionOwnerRemove => 'Owner entfernen';
+
+  @override
+  String get auditActionUserCreate => 'Person anlegen';
+
+  @override
+  String get auditActionUserDisable => 'Person deaktivieren';
+
+  @override
+  String get auditActionUserEnable => 'Person aktivieren';
+
+  @override
+  String get auditActionDeviceApprove => 'Gerät bestätigen';
+
+  @override
+  String get auditActionDeviceRevoke => 'Gerät widerrufen';
+
+  @override
+  String get auditActionGroupCreate => 'Gruppe anlegen';
+
+  @override
+  String get auditActionStepUp => 'Mit Step-up bestätigen';
+
+  @override
   String get adminNavGrants => 'Freigaben';
 
   @override

@@ -16,6 +16,7 @@
 library;
 
 export 'src/testing/action_catalog.dart';
+export 'src/testing/audit_log.dart';
 export 'src/testing/dpop_verifier.dart';
 export 'src/testing/fake_server.dart';
 export 'src/testing/faults.dart';

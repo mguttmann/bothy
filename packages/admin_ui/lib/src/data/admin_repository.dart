@@ -12,6 +12,7 @@ import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
 
+import '../audit/audit_repository.dart';
 import 'access_repository.dart';
 import 'self_repository.dart';
 
@@ -284,9 +285,13 @@ final class WaitingDevice {
 /// repository never asks for a step-up on its own (fixed requirement 10). It also holds the
 /// grant calls of [AccessRepository] (M4-27), so a host passes one repository to the shell.
 ///
+/// The audit log of A6 is part of it ([AuditRepository], brief M4-29), so the shell hands one
+/// repository to every screen.
+///
 /// Errors: [SelfActionFailed] with the server's problem (null without an answer),
 /// [StepUpCancelled] when the person cancels the step-up.
-abstract interface class AdminRepository implements AccessRepository {
+abstract interface class AdminRepository
+    implements AccessRepository, AuditRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
     String? query,
@@ -503,6 +508,8 @@ final class ApiAdminRepository implements AdminRepository {
   @override
   Future<ViewAsResult> viewAs(String userId, {required String purpose}) =>
       _access.viewAs(userId, purpose: purpose);
+
+  late final ApiAuditRepository _auditLog = ApiAuditRepository(_api);
 
   UsersApi get _users => _api.getUsersApi();
   GroupsApi get _groups => _api.getGroupsApi();
@@ -902,6 +909,31 @@ final class ApiAdminRepository implements AdminRepository {
       extra: _purpose(purpose),
     ),
   );
+
+  @override
+  Future<AuditPage> auditEvents(
+    AuditFilter filter, {
+    String? cursor,
+    required String purpose,
+  }) => _auditLog.auditEvents(filter, cursor: cursor, purpose: purpose);
+
+  @override
+  Future<AuditChainCheck> verifyAuditChain({
+    int? fromSeq,
+    int? toSeq,
+    required String purpose,
+  }) => _auditLog.verifyAuditChain(
+    fromSeq: fromSeq,
+    toSeq: toSeq,
+    purpose: purpose,
+  );
+
+  @override
+  Stream<List<int>> exportAudit({
+    required DateTime from,
+    required DateTime to,
+    required String purpose,
+  }) => _auditLog.exportAudit(from: from, to: to, purpose: purpose);
 
   Future<List<Session>> _sessions(String userId) =>
       _all<Session>((cursor) async {
