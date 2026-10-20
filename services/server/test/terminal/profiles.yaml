@@ -100,18 +100,19 @@ profiles:
       terminal.open_timeout: 40s
       # Below terminal.detach_grace of this profile.
       terminal.quick_reattach_window: 5s
-      # TM-T11 waits until a detached session expires.
-      terminal.detach_grace: 30s
+      # TM-T11 waits until a detached session expires; below terminal.idle_timeout, so the detach
+      # grace ends a detached session before idle does.
+      terminal.detach_grace: 15s
       # Interval times miss limit stays below terminal.detach_grace.
-      terminal.host_heartbeat_interval: 5s
+      terminal.host_heartbeat_interval: 3s
       # With terminal.host_heartbeat_interval.
       terminal.host_heartbeat_miss_limit: 3
       # TM-T11 waits until a session without input ends.
-      terminal.idle_timeout: 20s
+      terminal.idle_timeout: 30s
       # TM-T11 (manipulated host): the server ends after idle_timeout plus this grace.
       terminal.idle_grace: 5s
       # TM-T11 reaches the maximum duration across an attach; above idle_timeout plus idle_grace.
-      terminal.max_session_duration: 60s
+      terminal.max_session_duration: 70s
       # As in default.
       terminal.step_up_max_age: 20s
       # As in default.

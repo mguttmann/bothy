@@ -26,6 +26,9 @@ type Scenario struct {
 	Sources []string `yaml:"sources"`
 	// Profile is the stack profile (default, limits, twonode).
 	Profile string `yaml:"profile"`
+	// Sequential runs the cases one after the other: they change state the stack shares (the
+	// routing of the TLS front, a restart of the server).
+	Sequential bool `yaml:"sequential"`
 	// World is instantiated once per case.
 	World World `yaml:"world"`
 	// Cases run in parallel, each in its own world.
@@ -254,6 +257,10 @@ type Expect struct {
 	// readyz: the readiness of the api containers.
 	Ready *bool `yaml:"ready"`
 
+	// relay_nodes: the number of api nodes whose relay paired a session of the case (the pairing
+	// records of the relay in their logs, TM-T15).
+	NodesAtLeast *int `yaml:"nodes_at_least"`
+
 	// canary: no finding in any sink, and the positive control seen.
 	Findings *int `yaml:"findings"`
 
@@ -305,7 +312,7 @@ var (
 	deviceOps = []string{"enroll", "step_up", "open", "attach", "connect", "handshake", "start", "send", "expect_output", "replay_message1", "cut", "close", "wait_close"}
 	hostOps   = []string{"exec", "exec_as", "restart_service", "reboot", "pause", "unpause", "net_down", "net_up", "clone_state", "doctor", "pair"}
 	serverOps = []string{"restart", "front_mode", "sql"}
-	checkOps  = []string{"session", "host", "audit", "processes", "markers", "canary", "metric", "readyz"}
+	checkOps  = []string{"session", "host", "audit", "processes", "markers", "canary", "metric", "readyz", "relay_nodes"}
 )
 
 // ErrScenario reports a scenario file that breaks the rules of Design note 7.

@@ -4,9 +4,9 @@
 # the terminal conformance suite (brief M2-48 Design note 3, services/server/test/terminal). It
 # stands where the operator's edge stands in the profile direct. The suite renders this template
 # into its temporary folder (TERMSUITE_FRONT_DIR): the timeouts come from the profile of the stack,
-# for the stream paths terminal.idle_timeout plus terminal.idle_grace and for everything else
-# terminal.host_heartbeat_interval times terminal.host_heartbeat_miss_limit, as M2-47's edge
-# computes them. routing.conf (one of routing-single.conf, routing-hash.conf, routing-split.conf)
+# for everything else terminal.host_heartbeat_interval times terminal.host_heartbeat_miss_limit,
+# for the stream paths terminal.idle_timeout plus terminal.idle_grace plus that window, so the
+# front never cuts a quiet stream before the server ends it. routing.conf (one of routing-single.conf, routing-hash.conf, routing-split.conf)
 # names the three upstreams; the suite switches the mode by replacing it and running nginx -s
 # reload.
 worker_processes 1;

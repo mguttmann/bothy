@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T11 of 24 14 in the stack profile limits: idle (the real host ends with idle_timeout after
+# terminal.idle_timeout), the maximum duration across an attach from a second device
+# (max_duration), detach beyond terminal.detach_grace (detach_expired) and the manipulated host
+# service: M2-44's Fake-Host with Noise, which never reports idle, paired through pairHost and
+# connected through the TLS front; the server ends that session after terminal.idle_timeout plus
+# terminal.idle_grace with idle_timeout (24 6.3, 10.3; brief M2-48 Design note 9).
+id: tm-t11
+title: Idle, maximum duration, detach beyond terminal.detach_grace, tampered host service without an idle report
+sources: ["24 14 TM-T11", "24 6.3", "24 10.3", "24 13"]
+profile: limits
+world:
+  people: [alex]
+  devices: [{name: alex2, person: alex}]
+  hosts:
+    - {name: r1, assigned_to: alex, session_users: [term-alex], assign: {alex: term-alex}}
+  fake_hosts:
+    - {name: f1, assigned_to: alex, assign: {alex: term-alex}}
+  grants:
+    - {subject: alex, host: r1}
+    - {subject: alex, host: f1}
+cases:
+  - name: idle_real_host
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - wait: terminal.idle_timeout
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: idle_timeout}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: idle_timeout}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: max_duration_across_attach
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' one ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "one-${marker}"}}
+      - {device: alex2, do: step_up}
+      - {device: alex2, do: attach, session: s1, expect: {status: 200}}
+      - {device: alex2, do: connect, session: s1, expect: {}}
+      - {device: alex2, do: handshake, session: s1, expect: {}}
+      - {device: alex2, do: start, session: s1}
+      - wait: [terminal.idle_grace, terminal.idle_grace]
+      - {device: alex2, do: send, session: s1, text: "printf '%s-%s\\n' two ${marker}\n"}
+      - wait: [terminal.idle_grace, terminal.idle_grace]
+      - {device: alex2, do: send, session: s1, text: "printf '%s-%s\\n' three ${marker}\n"}
+      - wait: [terminal.idle_grace, terminal.idle_grace]
+      - {device: alex2, do: send, session: s1, text: "printf '%s-%s\\n' four ${marker}\n"}
+      - wait: [terminal.idle_grace, terminal.idle_grace]
+      - {device: alex2, do: send, session: s1, text: "printf '%s-%s\\n' five ${marker}\n"}
+      - wait: [terminal.idle_grace, terminal.idle_grace]
+      - {device: alex2, do: send, session: s1, text: "printf '%s-%s\\n' six ${marker}\n"}
+      - {device: alex2, do: wait_close, session: s1, expect: {close: {code: 4100, reason: max_duration}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: max_duration}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: detach_grace
+    hosts: [r1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - {device: alex, do: send, session: s1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: s1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: cut, session: s1}
+      - check: session
+        session: s1
+        expect: {state: detached}
+      - wait: terminal.detach_grace
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: detach_expired}
+      - check: processes
+        host: r1
+        user: term-alex
+        expect: {shells: 0, processes: 0}
+  - name: manipulated_host
+    hosts: [f1]
+    steps:
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: f1, session: s1, expect: {status: 201}}
+      - {device: alex, do: connect, session: s1, expect: {}}
+      - {device: alex, do: handshake, session: s1, expect: {}}
+      - {device: alex, do: start, session: s1}
+      - wait: [terminal.idle_timeout, terminal.idle_grace]
+      - {device: alex, do: wait_close, session: s1, expect: {close: {code: 4100, reason: idle_timeout}}}
+      - check: session
+        session: s1
+        expect: {state: closed, close_reason: idle_timeout}

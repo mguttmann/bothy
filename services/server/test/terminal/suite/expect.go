@@ -479,6 +479,14 @@ func CompareMetric(exp Expect, rise float64) []string {
 	return nil
 }
 
+// CompareRelayNodes compares the number of api nodes that paired a session of the case.
+func CompareRelayNodes(exp Expect, nodes int) []string {
+	if exp.NodesAtLeast != nil && nodes < *exp.NodesAtLeast {
+		return []string{fmt.Sprintf("%d api nodes paired a session, want at least %d", nodes, *exp.NodesAtLeast)}
+	}
+	return nil
+}
+
 // CompareReadyz compares the readiness of the api containers with exp.
 func CompareReadyz(exp Expect, ready map[string]bool) []string {
 	var out []string

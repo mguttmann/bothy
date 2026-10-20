@@ -62,6 +62,8 @@ func (w *instance) check(s Step) []string {
 		return w.poll(func() []string { return w.checkMetric(exp) })
 	case "readyz":
 		return w.checkReadyz(exp)
+	case "relay_nodes":
+		return w.poll(func() []string { return w.checkRelayNodes(exp) })
 	}
 	return []string{"unknown check " + s.Check}
 }
@@ -462,4 +464,67 @@ func (w *instance) checkReadyz(exp Expect) []string {
 		ready[svc] = err == nil && code == 0
 	}
 	return CompareReadyz(exp, ready)
+}
+
+// relayRecord is the one record of the relay at the end of a side (wsrelay logClose): message and
+// session ID only are read.
+type relayRecord struct {
+	Msg       string `json:"msg"`
+	SessionID string `json:"bothy.terminal.session_id"`
+}
+
+// checkRelayNodes counts the api nodes whose logs, since the start of the case, hold a record
+// "terminal relay connection closed": the nodes that paired a session of the case (TM-T15).
+func (w *instance) checkRelayNodes(exp Expect) []string {
+	w.mu.Lock()
+	ids := map[string]bool{}
+	for _, s := range w.sessions {
+		ids[s.id] = true
+	}
+	w.mu.Unlock()
+	svcs := []string{"api"}
+	if w.env.Stack.Profile == stack.ProfileTwoNode {
+		svcs = append(svcs, "api-2")
+	}
+	nodes := 0
+	var seen []string
+	for _, svc := range svcs {
+		// The records of the relay carry no session ID in the logs (the attribute allowlist of
+		// the logs drops it), so a node counts when its logs since the start of the case hold a
+		// record of a closed device side; the cases of TM-T15 run one after the other.
+		logs, err := w.env.Stack.Compose(w.ctx, "logs", "--no-color", "--since", w.from.UTC().Format(time.RFC3339), svc)
+		if err != nil {
+			return []string{err.Error()}
+		}
+		records, ours := relayRecords(logs, ids)
+		seen = append(seen, fmt.Sprintf("%s %d records since the start of the case, %d with a session ID of the case", svc, records, ours))
+		if records > 0 {
+			nodes++
+		}
+	}
+	if msgs := CompareRelayNodes(exp, nodes); len(msgs) > 0 {
+		return append(msgs, strings.Join(seen, "; "))
+	}
+	return nil
+}
+
+// relayRecords counts the records "terminal relay connection closed" in the logs and those of the
+// sessions of the case.
+func relayRecords(logs []byte, sessions map[string]bool) (all, ours int) {
+	for _, raw := range bytes.Split(logs, []byte("\n")) {
+		line := string(raw)
+		i := strings.IndexByte(line, '{')
+		if i < 0 {
+			continue
+		}
+		var r relayRecord
+		if json.Unmarshal([]byte(line[i:]), &r) != nil || r.Msg != "terminal relay connection closed" {
+			continue
+		}
+		all++
+		if sessions[r.SessionID] {
+			ours++
+		}
+	}
+	return all, ours
 }

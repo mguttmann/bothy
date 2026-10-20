@@ -39,6 +39,7 @@ func TestProfiles_Relations(t *testing.T) {
 		{"quick reattach beyond grace", "limits", map[string]string{"terminal.quick_reattach_window": "40s"}, []string{"terminal.quick_reattach_window", "terminal.detach_grace"}},
 		{"heartbeat beyond grace", "limits", map[string]string{"terminal.host_heartbeat_interval": "20s"}, []string{"terminal.host_heartbeat_interval", "terminal.host_heartbeat_miss_limit", "terminal.detach_grace"}},
 		{"idle beyond maximum", "limits", map[string]string{"terminal.max_session_duration": "20s"}, []string{"terminal.idle_timeout", "terminal.idle_grace", "terminal.max_session_duration"}},
+		{"detach beyond idle", "limits", map[string]string{"terminal.detach_grace": "40s", "terminal.max_session_duration": "2m"}, []string{"terminal.detach_grace", "terminal.idle_timeout"}},
 		{"default reaches idle", "default", map[string]string{"terminal.idle_timeout": "1m"}, []string{"terminal.idle_timeout"}},
 		{"low rate limit", "default", map[string]string{"ratelimit.rl.terminal.burst": "5"}, []string{"ratelimit.rl.terminal.burst"}},
 		{"long sweep", "default", map[string]string{"terminal.sweep_interval": "5m"}, []string{"terminal.sweep_interval"}},
