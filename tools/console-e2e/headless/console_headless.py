@@ -185,8 +185,8 @@ class Session:
         self.console_errors: list[str] = []
         self.all_violations: list[dict[str, str]] = []
         self.all_policies: set[str] = set()
-        self.context.expose_function("__e2eRecordViolation", self.all_violations.append)
-        self.context.expose_function("__e2eRecordPolicy", self.all_policies.add)
+        self.context.expose_function("__e2eRecordViolation", self._record_violation)
+        self.context.expose_function("__e2eRecordPolicy", self._record_policy)
         self.context.add_init_script(INIT_SCRIPT)
         # Every request of every page of the context, the browser's own included.
         self.context.on("request", lambda r: self.requests.append(r.url))
@@ -194,6 +194,12 @@ class Session:
         self.page.set_default_timeout(STEP_TIMEOUT_MS)
         self.page.on("console", self._console)
         self.page.on("websocket", self._websocket)
+
+    def _record_violation(self, violation: dict[str, str]) -> None:
+        self.all_violations.append(violation)
+
+    def _record_policy(self, name: str) -> None:
+        self.all_policies.add(name)
 
     def _console(self, msg: ConsoleMessage) -> None:
         text = msg.text
@@ -360,7 +366,14 @@ def websocket_check(session: Session) -> None:
     blocked = [v for v in session.violations() if v.get("directive") == "connect-src"]
     if blocked or "thrown" in outcome:
         raise CheckError(f"the policy blocked the WebSocket: {outcome} {blocked}")
-    reached = any(url.endswith("/api/v1/gateway") for url in session.websockets)
+    # A frame of the server or a close code other than 1006 (no handshake) shows that the
+    # handshake reached the server; Playwright's websocket event is a second, not always timely,
+    # witness (Firefox).
+    reached = (
+        outcome.get("message") is True
+        or outcome.get("closed") not in (None, 1006)
+        or any(url.endswith("/api/v1/gateway") for url in session.websockets)
+    )
     if not reached:
         raise CheckError(f"the WebSocket never reached the network: {outcome}")
 
