@@ -112,3 +112,23 @@ func TestAgentInvoke_NewThreadUsesMainRule(t *testing.T) {
 	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.ThreadRequireMention, c.RequireMention = false, true })
 	w.expect(t, alex, authorize.ActionAgentInvoke, r, forbidden, "agent_not_reachable")
 }
+
+// TestEventTarget_AudienceAgent (D-M2-08-14): agent.events.consume of a run event with an
+// audience is allowed for the audience agent and refused for any other agent; without the
+// audience the event has no object the action takes.
+func TestEventTarget_AudienceAgent(t *testing.T) {
+	w := newWorld(t)
+	ctx := authorize.Filter(context.Background())
+	r := authorize.ResourceFromEvent("run", ids.New(), w.support, w.allgemein, w.mainThread[w.allgemein])
+	without := r
+	r.Event = &authorize.EventScope{SpaceID: w.support, ChannelID: w.allgemein, ThreadID: w.mainThread[w.allgemein], AudienceID: w.lotse}
+	if d := w.decide(t, ctx, w.agent(w.lotse), authorize.ActionAgentEventsConsume, r); !d.Allowed() {
+		t.Fatalf("audience: %+v", d)
+	}
+	if d := w.decide(t, ctx, w.agent(w.texter), authorize.ActionAgentEventsConsume, r); d.Allowed() {
+		t.Fatalf("another agent: %+v", d)
+	}
+	if d := w.decide(t, ctx, w.agent(w.lotse), authorize.ActionAgentEventsConsume, without); d.Allowed() {
+		t.Fatalf("without the audience: %+v", d)
+	}
+}

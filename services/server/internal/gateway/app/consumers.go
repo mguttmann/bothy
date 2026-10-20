@@ -586,7 +586,7 @@ func (e *ConsumerEngine) readPage(ctx context.Context, a actor.Actor, mu *gosync
 	// unauthenticated; the delivery mode of the hub would only learn it from the next event
 	// (docs/DECISIONS.md D-M2-07-7). A REST poll keeps the memo of its request.
 	page, err := e.d.CatchUp.PageEvents(actorCtx(authorize.WithRequestScope(authorize.Filter(ctx)), a),
-		sync.PageInput{After: after, Head: pos, Limit: e.cfg.PageSize})
+		sync.PageInput{After: after, Head: pos, Limit: e.cfg.PageSize, AgentConsumer: true})
 	if err != nil {
 		return true, err
 	}
