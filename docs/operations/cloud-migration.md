@@ -28,6 +28,12 @@ is handled like a restore with a new epoch ([16-betrieb.md](../spec/16-betrieb.m
    ([infra/tofu/modules/generic-vm/README.md](../../infra/tofu/modules/generic-vm/README.md)).
    The wizard generates fresh secrets on the target; step 2 replaces them with the bundle of the
    old instance before the first start of the restored data.
+   On Hetzner Cloud, AWS and Azure the modules `hetzner`, `aws` and `azure` create the network
+   (only the edge port public, SSH from `ssh_allowed_cidrs`) and the host and then call
+   `generic-vm` ([infra/tofu/README.md](../../infra/tofu/README.md)). Point the DNS name at the
+   address in the output `ssh_endpoint` only in step 7 of section 3. The off-site bucket of the
+   target (created by `aws` with `offsite_region`, by hand on Hetzner, elsewhere for Azure) gets
+   its keys by hand, as the module READMEs describe; until then the target backs up locally only.
 2. Secrets-Bündel einspielen. Push-Schlüssel und App-Identität bleiben gleich; Push-Registrierungen
    der Geräte bleiben darum gültig.
 3. Probe: letzte Sicherung der alten Instanz auf dem Ziel zurückspielen
@@ -104,4 +110,7 @@ ihn nur bei gleicher `instance_id` (Frage an Team B).
 
 1. Hin zum verwalteten Dienst: wie oben, Restore des logischen Abzugs in den Dienst. Rollen legt
    das OpenTofu-Modul an. `bothy-backupd` läuft danach ohne pgBackRest.
+   As built (M7-16): not possible yet. Amazon RDS and Azure Database for PostgreSQL offer
+   PostgreSQL 18, but `install.sh` and the Compose stack cannot use an external database, so the
+   modules `aws` and `azure` refuse `database_mode = managed` (docs/DECISIONS.md D-M7-16-4).
 2. Zurück: wie oben in eine Container-Datenbank; danach sofort Vollsicherung mit pgBackRest.

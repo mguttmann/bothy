@@ -552,21 +552,29 @@ release-pins: ## Server version pinned by the product bundle: SemVer, no server 
 install-options: ## Options of the portability test equal 16 3.1; documented install command names VERSION (brief M7-29)
 	$(UVRUN) python tools/ci/install_options_check.py check
 
-# OpenTofu modules (brief M7-15, infra/tofu/README.md): format, then init and validate of the root
-# that calls all four modules and of the test root of generic-vm. As in ops-check, the only
-# provider source is an empty local mirror, so init never downloads (the modules need no
-# provider today; one that does fails here until it has a pinned offline path,
-# docs/DECISIONS.md D-M7-15-3). Data directory and CLI configuration are temporary.
-TOFU_ROOTS := infra/tofu/test/validate infra/tofu/test/generic-vm
-tofu-check: ## OpenTofu: fmt -check, offline init -backend=false and validate of the roots that call every module
+# OpenTofu modules (briefs M7-15 and M7-16, infra/tofu/README.md): format, then init and validate
+# of the roots that call every module, then `tofu test` of the cloud modules with mocked
+# providers (infra/tofu/test/cloud). The only provider source is the local mirror that
+# tools/bin/tofu_providers.py fills from the lock files of the test roots (each archive checked
+# against its `zh:` hash), so init never reaches a registry, and `-lockfile=readonly` refuses
+# any provider the lock files do not pin (docs/DECISIONS.md D-M7-16-2). Data directories, the
+# plugin cache and the CLI configuration are temporary.
+TOFU_ROOTS := infra/tofu/test/validate infra/tofu/test/generic-vm infra/tofu/test/cloud
+TOFU_TEST_ROOTS := infra/tofu/test/cloud
+tofu-check: ## OpenTofu: fmt -check, offline init and validate of the roots that call every module, tofu test with mocked providers
 	@tofu=$(call tool,tofu) || exit 1; \
+	mirror=$$($(UVRUN) python tools/bin/tofu_providers.py mirror) || exit 1; \
 	"$$tofu" fmt -check -recursive -diff infra/tofu || exit 1; \
-	tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT; mkdir "$$tmp/mirror"; \
-	printf 'provider_installation {\n  filesystem_mirror {\n    path = "%s"\n  }\n}\n' "$$tmp/mirror" >"$$tmp/offline.tfrc"; \
+	tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT; mkdir "$$tmp/plugins"; \
+	printf 'plugin_cache_dir = "%s"\nplugin_cache_may_break_dependency_lock_file = true\nprovider_installation {\n  filesystem_mirror {\n    path = "%s"\n  }\n}\n' "$$tmp/plugins" "$$mirror" >"$$tmp/offline.tfrc"; \
 	for root in $(TOFU_ROOTS); do \
 	  data="$$tmp/data-$$(basename "$$root")"; \
-	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" init -backend=false -input=false -no-color >/dev/null || exit 1; \
+	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" init -backend=false -input=false -lockfile=readonly -no-color >/dev/null || exit 1; \
 	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" validate -no-color || exit 1; \
+	done; \
+	for root in $(TOFU_TEST_ROOTS); do \
+	  data="$$tmp/data-$$(basename "$$root")"; \
+	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" test -no-color || exit 1; \
 	done
 
 # The local VM test of generic-vm (brief M7-15 Design note 2): the product trial on this host, a

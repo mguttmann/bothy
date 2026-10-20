@@ -42,7 +42,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 | `runners-check` | `tools/ci/check_runners.py` | Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte | | ja |
 | `release-pins` | `tools/ci/components.py pins` | the server version that the product bundle pins (`BOTHY_VERSION=` in `infra/compose/.env.example`): exactly one line, SemVer without `v` or the placeholder of the template, and a stable product (`VERSION` without a pre-release identifier) pins no server pre-release, which only a product beta (`X.Y.Z-beta.N`) may pin; so a typo fails at the latest in the required check `ci-ok` of the pull request with the release commit, that is before the tag ([18 2.1](../spec/18-release.md#21-server-version-and-registry-in-the-product-bundle)) | | ja |
 | `install-options` | `tools/ci/install_options_check.py check` | the options of the portability test in `tests/portability/install-options` equal the options after `sh -s --` of the second block of [16 3.1](../spec/16-betrieb.md) in order, except the value of `--storage` and a `--bundle`; the version in every documented command `https://github.com/<owner>/bothy/releases/download/v<version>/install.sh` of `README.md` and `docs/operations/install-compose.md` equals `VERSION` (brief M7-29 requirement 19) | | ja |
-| `tofu-check` | `tofu` 1.13.1 (pinned in `tools/bin/tools.lock.json`) | `tofu fmt -check` over `infra/tofu`, then `tofu init -backend=false` with an empty local provider mirror (offline) and `tofu validate` of `infra/tofu/test/validate` (a root that calls all four modules) and of the test root `infra/tofu/test/generic-vm` (brief M7-15); the rendered user data of `generic-vm` is checked by `tools/ci/tests/test_tofu_generic_vm.py` in `test` | | ja |
+| `tofu-check` | `tofu` 1.13.1 (pinned in `tools/bin/tools.lock.json`) | `tofu fmt -check` over `infra/tofu`, then `tofu init -backend=false -lockfile=readonly` with the local provider mirror of `tools/bin/tofu_providers.py` as the only source (offline, each archive checked against the lock files) and `tofu validate` of `infra/tofu/test/validate` (a root that calls all four modules), of the test root `infra/tofu/test/generic-vm` (brief M7-15) and of `infra/tofu/test/cloud`, then `tofu test` there: the cloud modules against mocked providers (brief M7-16); the rendered user data of `generic-vm` is checked by `tools/ci/tests/test_tofu_generic_vm.py` and the interface of the cloud modules by `tools/ci/tests/test_tofu_cloud_modules.py` in `test` | | ja |
 | `labels-check` | `tools/ci/labels.py` | Label-Datei gültig, Vorlagen und GOVERNANCE.md nutzen nur definierte Labels | | ja |
 | `gitleaks` | gitleaks mit `.gitleaks.toml` | Secrets in jedem von `HEAD` erreichbaren Commit; vor dem Öffentlich-Schalten in allen Refs | | ja |
 | `apps-platform` (not in `gates`) | `tools/ci/apps_platform.py` | the platform tests that a member lists in `platform-tests.json` (argument lists per system, no shell) for the host system, in the member folder; SKIP for the other system and without such a member; the system `android` runs on any host when `adb devices` lists exactly one device or emulator (`SKIP ... android: no device` without one, a failure with two or more; `--system android` runs only it); needs a desktop session or a device, so CI runs it in the jobs `apps-macos` (`macos-15`), `apps-windows` (`windows-2025`) and `apps-android` (`ubuntu-24.04` with hardware acceleration, emulators with API 26 and 36, x86_64 Google APIs images), which `ci-ok` accepts as `success` or `skipped` | | SKIP until the first member has platform tests (M4-10) |
@@ -252,10 +252,13 @@ Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
   der Portabilitätstest. Grafana-Dashboards und ihr Provisioning prüft `ops-check` nicht: die
   Metrik-Namen und das PromQL der Dashboards prüft `signal-check` (PLAN M1-68), das Provisioning
   der Portabilitätstest.
-* Ein OpenTofu-Modul mit Providern oder entfernten Modulquellen muss `tofu init` offline
-  schaffen. `ops-check` gibt `tofu` als einzige Provider-Quelle einen leeren lokalen Mirror und
-  jedem Validator einen geschlossenen Proxy, damit das Gate nichts aus dem Netz lädt; ein solches
-  Modul scheitert, bis das Ticket mit dem ersten Provider einen gepinnten Weg ohne Netz festlegt.
+* An OpenTofu module must pass `tofu init` offline. `ops-check` and `tofu-check` give `tofu` the
+  local mirror of `tools/bin/tofu_providers.py` as the only provider source; before any validator
+  runs it holds only the archives the lock files under `infra/tofu/test/` pin, each checked
+  against its `zh:` hash (D-M7-16-2), and `ops-check` gives every validator a closed proxy. A
+  provider the lock files do not pin and a remote module source therefore fail. Filling the
+  mirror needs the network once per version and platform, like the tools of
+  `tools/bin/tools.lock.json`.
 * Dass kein Validator das Netz erreicht, beweist ein Test nur unter macOS
   (`test_no_validator_reaches_the_network` in `tools/opscheck/tests/`, mit `sandbox-exec`). Unter
   Linux, also in CI, gibt es keine gleichwertige Sperre im Test; dort wirken der geschlossene Proxy

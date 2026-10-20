@@ -77,10 +77,14 @@ Befunde.
   also inside another reference (`${env:NAME:-${https:...}}`): the collector resolves such a
   reference while it validates, and most of these providers fetch over the network with clients
   that may bypass the proxy.
-* `tofu`: Die CLI-Konfiguration erlaubt als einzige Provider-Quelle einen leeren lokalen Mirror,
-  und Modulquellen aus Registry oder HTTP scheitern am geschlossenen Proxy (Git-Quellen am leeren
-  `PATH`). Ein Modul mit Providern oder entfernten Modulen scheitert darum, bis es offline
-  initialisiert (siehe `docs/quality/gates.md`, "Was die Gates nicht abdecken").
+* `tofu`: The only provider source of the CLI configuration is the local mirror of
+  `tools/bin/tofu_providers.py` (cache `.cache/tofu-providers/`), filled before any validator runs
+  with the archives that the lock files `infra/tofu/test/*/.terraform.lock.hcl` of the checked
+  root pin, each checked against its `zh:` hash; a plugin cache in the work directory shares the
+  unpacked providers between the modules. Module sources from a registry or over HTTP fail at the
+  closed proxy (Git sources at the empty `PATH`). A provider the lock files do not pin and a
+  remote module therefore fail (see `docs/quality/gates.md`, "Was die Gates nicht abdecken"); a
+  broken lock file is the finding `provider mirror: <reason>`.
   A Google Cloud Storage module source (`gcs::`) uses a client of its own that the proxy does
   not stop: in the red team's run on 2026-10-11 it waited until `COMMAND_TIMEOUT_S` and was then
   reported. An `s3::` source failed at the closed proxy in a review run on 2026-10-11.
