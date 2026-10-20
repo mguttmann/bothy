@@ -158,7 +158,7 @@ func TestAuditSignature(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
 		"Win.Test.EICAR_HDB-1":        "win.test.eicar_hdb-1",
-		"Bothy.Test.EICAR.UNOFFICIAL": "bothy.test.eicar.unofficial",
+		"Local.Test.EICAR.UNOFFICIAL": "local.test.eicar.unofficial",
 		"Some Name/With Slash":        "some_name_with_slash",
 		"":                            "unknown",
 		"_lead":                       "x_lead",

@@ -132,7 +132,7 @@ func TestScan(t *testing.T) {
 		_ = json.Unmarshal(details, &d)
 		sig, _ := d["signature"].(string)
 		if decision != "deny" || reason != "malware_detected" || kind != "file" || actor != nil || len(d) != 3 ||
-			!strings.HasPrefix(sig, "bothy.test.eicar") || d["sha256"] != sha(clamdtest.EICAR()) || d["size_bytes"] != float64(len(clamdtest.EICAR())) {
+			!strings.HasPrefix(sig, "local.test.eicar") || d["sha256"] != sha(clamdtest.EICAR()) || d["size_bytes"] != float64(len(clamdtest.EICAR())) {
 			t.Errorf("audit %s %s %s %v %s", decision, reason, kind, actor, details)
 		}
 		if n := audits(u.FileID); n != 1 {
@@ -273,7 +273,7 @@ func TestScan(t *testing.T) {
 
 	t.Run("NoNamesOrSignaturesOutsideAudit", func(t *testing.T) {
 		out := logs.String()
-		for _, canary := range []string{"canary-eicar-name", "Bothy.Test.EICAR", "bothy.test.eicar", "FOUND"} {
+		for _, canary := range []string{"canary-eicar-name", "Local.Test.EICAR", "local.test.eicar", "FOUND"} {
 			if strings.Contains(out, canary) {
 				t.Errorf("the logs carry %q", canary)
 			}

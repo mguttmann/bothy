@@ -43,7 +43,7 @@ const (
 
 // SignatureName is the name of the one test signature; clamd reports it with the suffix
 // .UNOFFICIAL, so tests compare a prefix.
-const SignatureName = "Bothy.Test.EICAR"
+const SignatureName = "Local.Test.EICAR"
 
 // The halves of the EICAR test string; EICAR joins them at run time, so the repository never holds
 // the whole string.
@@ -240,7 +240,7 @@ func (c *Clamd) Terminate(ctx context.Context) error {
 
 // ping sends zPING on the socket at path and wants PONG.
 func ping(ctx context.Context, path string) error {
-	var d net.Dialer
+	var d net.Dialer // nosemgrep: bothy-go-egress-only -- test helper; the Unix socket of the clamd test container
 	conn, err := d.DialContext(ctx, "unix", path)
 	if err != nil {
 		return err
@@ -309,7 +309,7 @@ func (r *relay) pipe(c net.Conn) {
 	addr, err := r.resolve(ctx)
 	var up net.Conn
 	if err == nil {
-		var d net.Dialer
+		var d net.Dialer // nosemgrep: bothy-go-egress-only -- test helper; the mapped TCP port of the clamd test container
 		up, err = d.DialContext(ctx, "tcp", addr)
 	}
 	cancel()
