@@ -103,6 +103,7 @@ final class TerminalController extends ChangeNotifier {
   int _rows = 24;
   int _generation = 0;
   bool _busy = false;
+  bool _disposed = false;
   BytesBuilder? _replay;
 
   /// Changes what the renderer sends before it reaches the host; the view sets it to the
@@ -300,6 +301,10 @@ final class TerminalController extends ChangeNotifier {
 
   @override
   void dispose() {
+    // The stream loop and pending requests check the generation and the flag, so nothing
+    // notifies after this point.
+    _disposed = true;
+    _generation++;
     unawaited(_hostChanges?.cancel());
     unawaited(_channel?.close());
     _dropKey();
@@ -312,7 +317,7 @@ final class TerminalController extends ChangeNotifier {
   Future<_Checked?> _prepare(String hostId) async {
     final h = await _api.getHost(hostId);
     _host = h;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
     final key = h.noisePublicKey;
     final fingerprint = h.keyFingerprint;
     if (key == null || fingerprint == null) {
@@ -621,6 +626,7 @@ final class TerminalController extends ChangeNotifier {
   }
 
   void _set(TerminalTabState next) {
+    if (_disposed) return;
     _state = next;
     notifyListeners();
   }

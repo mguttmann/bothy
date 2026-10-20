@@ -924,6 +924,38 @@ Ports von `terminal_ui`, umgesetzt je App:
   öffnen erst nach Klick mit sichtbarem Ziel und Bestätigung, Abfragen von Fenstertitel und
   Zwischenablage bleiben unbeantwortet. Die Sperren liegen in `terminal_ui` vor dem Renderer, damit
   sie nicht von dessen Version abhängen (Test TM-T14).
+- As built (M4-35, docs/DECISIONS.md D-M4-35): the filter is `EscapeFilter` in `terminal_ui`,
+  in front of xterm, on the byte stream of the host before UTF-8 decoding (ESC and every byte of
+  a sequence are ASCII, so the byte view and the renderer's decoded view see the same
+  sequences); it is pure Dart and independent of the renderer version. Allow list in short:
+  text, C0 controls and plain ESC sequences pass; DCS, SOS, PM and APC are dropped with their
+  content; CSI passes except window operations and reports (final `t`), status reports other
+  than CPR (`CSI 6 n`), device attributes other than DA1 and DA2, `$` requests, DECREQTPARM and
+  XTVERSION, so the only answers that reach the host are CPR and DA1/DA2; every OSC (OSC 52,
+  titles, colour queries) is dropped except OSC 8, which becomes inert text plus a link record
+  that opens only after a click on a confirmation showing the target, and only for `https` and
+  `http`; CSI sequences that make xterm 4.0.0 throw or hang are dropped too (parameters above
+  9999, SGR 38/48 without sub-parameters or with an index above 255, large REP counts,
+  `CSI 0 X`). A sequence may be split at any byte across frames; memory per sequence is
+  bounded; the filter logs nothing. The full list is the doc comment of `EscapeFilter`.
+  Second layer: the screen of the view (`TerminalScreen`) leaves `onTitleChange`,
+  `onIconChange` and `onPrivateOSC` of xterm unset and catches renderer exceptions, so hostile
+  output cannot end the session as tampering.
+- As built (M4-35): `buildTerminalTheme` generates the xterm `TerminalTheme` from `DsColors`
+  (`color.terminal.*` of docs/design/components.md 12), so the screen follows light and dark
+  mode without a colour of its own. Cursor and selection keep their token colour at the named
+  opacity `terminalOverlayAlpha`, because xterm paints both over the text; xterm 4.0.0 has no
+  field for `color.terminal.cursor-text`, so that role stays unused.
+- xterm state found by M4-35 (2026-10-20; sources in [24-terminal.md](24-terminal.md),
+  section 12): version 4.0.0, published 2024-02-27, the latest release. Read in its source: OSC
+  0/1/2 call `onTitleChange` and `onIconChange`; every other OSC, OSC 52 and OSC 8 included,
+  goes to `onPrivateOSC`; there is no clipboard handler; all three are null by default. It
+  answers DA1, DA2, DA3, DSR 5 n, CPR (zero-based, a bug: `ESC[0;0R` at the home position) and
+  `CSI 18 t` through `onOutput`, resizes the terminal on `CSI 8;r;c t`, ignores `CSI 20 t` and
+  `CSI 21 t`, and does not parse DCS (its content would be printed as text). Bugs: palette index
+  15 (SGR 97) resolves to white instead of bright white; selection and block cursor are painted
+  over the text; `TerminalView.onTapUp` is never called (the view detects link clicks with its
+  own pointer listener); the sequences listed above make it throw or hang.
 - Kopieren nur durch die Person (Auswahl und Kürzel bzw. Menü); Einfügen von mehr als einer Zeile
   zeigt vorher den Text ("Einfügen mit Zeilenumbrüchen?").
 - Mobil: Sondertasten-Leiste nach 01, Screen M8; Ctrl und Alt als einmal wirkende bzw. gehaltene

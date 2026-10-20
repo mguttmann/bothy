@@ -20,6 +20,18 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Terminal view (M4-35): `packages/terminal_ui` runs a terminal session through ports for the
+  server API, the stream, the pin store, the step-up, host events and links: pin check against
+  `getHost` with the hard warning and `pin_changed`, the warning before the step-up on a host
+  assigned to another person, the dialog "Open terminal", a fresh ephemeral key per handshake
+  that is destroyed after message 2, the Noise handshake with the session token, `start`, input
+  and coalesced `resize`, `exit`, detach and reattach with the replay, and a reaction to every
+  stream close code. An escape filter in front of the renderer `xterm` drops OSC 52, title and
+  window reports and other queries and turns OSC 8 into links that open only after a click and
+  a confirmation; pasting text with line breaks asks first. Header, tabs, states, semantics and
+  the extra keys bar read their texts from `l10n`; the renderer theme comes from the new roles
+  `color.terminal.*`. `packages/domain` gains the fingerprint display rules.
+
 - Desktop thread view (M4-20): the history column shows a thread or the main history of a text
   channel from the local database with grouping, origin badges, safe Markdown, "Show more",
   tombstones and system lines, loads older pages and fills gaps, focuses the visible threads and

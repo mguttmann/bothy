@@ -6,8 +6,11 @@
 /// hyperlinks that open only after a click and a confirmation.
 library;
 
+import 'dart:async';
+
 import 'package:design_system/design_system.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:terminal_ui/src/controller/terminal_controller.dart';
@@ -80,6 +83,7 @@ class TerminalScreenView extends StatefulWidget {
 class _TerminalScreenViewState extends State<TerminalScreenView> {
   final GlobalKey<TerminalViewState> _view = GlobalKey();
   String? _hoverTarget;
+  Offset? _down;
 
   TerminalController get _c => widget.controller;
 
@@ -104,20 +108,26 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
                 child: MouseRegion(
                   onHover: _hover,
                   onExit: (_) => _setHover(null),
-                  child: TerminalScreenSemantics(
-                    screen: _c.screen,
-                    child: TerminalView(
-                      terminal,
-                      key: _view,
-                      theme: buildTerminalTheme(c),
-                      textStyle: TerminalStyle(
-                        fontSize: widget.fontSize,
-                        fontFamily: mono.fontFamily!,
-                        fontFamilyFallback: mono.fontFamilyFallback!,
+                  // xterm 4.0.0 never calls TerminalView.onTapUp (its gesture detector drops
+                  // the callback), so a click on a link is detected here, outside the gesture
+                  // arena, without taking anything from the renderer.
+                  child: Listener(
+                    onPointerDown: (e) => _down = e.localPosition,
+                    onPointerUp: _up,
+                    child: TerminalScreenSemantics(
+                      screen: _c.screen,
+                      child: TerminalView(
+                        terminal,
+                        key: _view,
+                        theme: buildTerminalTheme(c),
+                        textStyle: TerminalStyle(
+                          fontSize: widget.fontSize,
+                          fontFamily: mono.fontFamily!,
+                          fontFamilyFallback: mono.fontFamilyFallback!,
+                        ),
+                        autofocus: widget.autofocus,
+                        shortcuts: terminalShortcuts(defaultTargetPlatform),
                       ),
-                      autofocus: widget.autofocus,
-                      shortcuts: terminalShortcuts(defaultTargetPlatform),
-                      onTapUp: (_, offset) => _tap(offset),
                     ),
                   ),
                 ),
@@ -149,6 +159,15 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
         );
       },
     );
+  }
+
+  void _up(PointerUpEvent event) {
+    final down = _down;
+    _down = null;
+    final view = _view.currentState;
+    if (down == null || view == null) return;
+    if ((event.localPosition - down).distance > kTouchSlop) return;
+    unawaited(_tap(view.renderTerminal.getCellOffset(event.localPosition)));
   }
 
   void _hover(PointerHoverEvent event) {

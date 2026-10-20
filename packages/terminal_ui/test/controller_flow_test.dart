@@ -318,4 +318,17 @@ void main() {
       'http://example.com/b',
     ]);
   });
+
+  test('dispose with an open stream notifies nothing afterwards', () async {
+    final h = await Harness.create();
+    await h.open();
+    await h.connected();
+    var notified = 0;
+    h.controller.addListener(() => notified++);
+    h.controller.dispose();
+    await h.host.sendData(utf8.encode('late'));
+    await h.host.close(4100, 'process_exited');
+    await h.settle();
+    expect(notified, 0);
+  });
 }
