@@ -27,8 +27,9 @@ carries another name, such as the `master` a new SonarQube Cloud project starts 
 then the server takes an analysis of `main` for a short-lived branch and fails it. A
 short-lived branch `main` those analyses left is deleted before the rename.
 
-`apply` restores each profile before it sets the parent: restore overwrites a profile of the
-same name, its parent link included.
+`check` resolves a profile's parent by its key: api/qualityprofiles/search filtered to one
+profile names the parent only by `parentKey` (no `parentName` unless the parent is in the same
+result, seen on SonarQube Cloud on 2026-10-20).
 
 Languages the server does not know (Dart and Swift on the Community Build) are skipped
 and listed; the Cloud check covers them.
@@ -348,18 +349,17 @@ def apply(client: Client, config: Config) -> Report:
             )
         if _profile(client, language, config.profile_name) is None:
             client.post("api/qualityprofiles/create", language=language, name=config.profile_name)
-        # Restore overwrites the profile, parent link included, so the parent is set after it.
-        client.post_file(
-            "api/qualityprofiles/restore",
-            "backup",
-            xml_path.name,
-            xml_path.read_text(encoding="utf-8"),
-        )
         client.post(
             "api/qualityprofiles/change_parent",
             language=language,
             qualityProfile=config.profile_name,
             parentQualityProfile=parent,
+        )
+        client.post_file(
+            "api/qualityprofiles/restore",
+            "backup",
+            xml_path.name,
+            xml_path.read_text(encoding="utf-8"),
         )
         if not client.is_cloud:
             client.post(
@@ -476,7 +476,7 @@ def check(client: Client, config: Config) -> Report:
             continue
         if client.is_cloud:
             _check_project_profile(used.get(language), language, config.profile_name, report)
-        parent = profile.get("parentName")
+        parent = _parent_name(client, profile, language, want_parent)
         if parent != want_parent:
             report.problems.append(
                 f"profile {language}: parent is {parent!r}, want {want_parent!r}"
@@ -492,6 +492,20 @@ def check(client: Client, config: Config) -> Report:
                 f"want {sorted(want_rules)}"
             )
     return report
+
+
+def _parent_name(client: Client, profile: dict[str, Any], language: str, want: str) -> str | None:
+    """Return the name of the profile's parent, `key <key>` if it is not `want`, None without one.
+
+    A search filtered to one profile carries only the parent's key, not its name.
+    """
+    if profile.get("parentName"):
+        return str(profile["parentName"])
+    key = profile.get("parentKey")
+    if not key:
+        return None
+    wanted = _profile(client, language, want)
+    return want if wanted is not None and wanted.get("key") == key else f"key {key}"
 
 
 def _check_project_gate(client: Client, name: str, project: str, report: Report) -> None:

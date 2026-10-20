@@ -20,9 +20,8 @@ are the names of the project's other branches; rename to one of them answers HTT
 "Impossible to update branch name: a branch with name ... already exists", as SonarQube Cloud
 answered on 2026-10-20 for a `main` its failed analyses had left as a short-lived branch.
 `ce_tasks` are the background tasks of api/ce/task by ID.
-Restore overwrites a profile of the same name and language, as the restore description of both
-Web APIs says: its own rules become those of the backup and the parent link is gone, which is
-how SonarQube Cloud left every profile without a parent on the sonar-config run of 2026-10-20.
+Search names a profile's parent by `parentKey`, and by `parentName` only when the parent is in
+the same result, as SonarQube Cloud answered a search filtered to one profile on 2026-10-20.
 `project` is the key of the only project and `visibility` its visibility (api/projects/search
 and update_visibility, both answer only for that key); `visibility_refused` answers
 update_visibility with HTTP 400 "Organization ... is not allowed to perform this action".
@@ -294,13 +293,23 @@ def _qp_search(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
                     "language": x.language,
                     "isBuiltIn": x.builtin,
                     "isDefault": x.default,
-                    "parentName": x.parent,
+                    **_parent_fields(state, x, found),
                 }
                 for x in found
             ]
         },
         "application/json",
     )
+
+
+def _parent_fields(state: State, x: Profile, found: list[Profile]) -> dict[str, str]:
+    parent = state.profile(x.language, x.parent) if x.parent else None
+    if parent is None:
+        return {}
+    fields = {"parentKey": parent.key}
+    if parent in found:
+        fields["parentName"] = parent.name
+    return fields
 
 
 def _qp_create(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
@@ -325,11 +334,8 @@ def _qp_restore(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     if prof is None:
         prof = Profile(f"r-{lang}", name, lang)
         state.profiles.append(prof)
-    prof.parent = None
-    prof.own_rules = {
-        f"{repo}:{key}"
-        for repo, key in re.findall(r"<repositoryKey>(.*?)</repositoryKey>\s*<key>(.*?)</key>", xml)
-    }
+    for repo, key in re.findall(r"<repositoryKey>(.*?)</repositoryKey>\s*<key>(.*?)</key>", xml):
+        prof.own_rules.add(f"{repo}:{key}")
     return 200, {"profile": {"key": prof.key}}, "application/json"
 
 
