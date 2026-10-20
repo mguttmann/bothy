@@ -199,6 +199,13 @@ actions, explanation, preview and view-as with real sources).
   (query `LocateThreads`, `id = ANY($1)`, joined with channel and space), ascending by id; an
   unknown id is absent. It does not authorize and reads in the ambient transaction: runs keeps only
   threads whose channel is in its `Authorizer.Scope` and authorizes per item ("Running now").
+- Port `chat.ThreadsByParent` (`threads.go`, M2-27): `ThreadByParentMessage(ctx, messageID)`
+  returns the `ThreadInfo` of the thread whose `parent_message_id` is `messageID` and `found =
+  false` when no thread started from it, without authorization (callers authorize first). It is a
+  port of its own, so the implementations of `Threads` stay unchanged; `app.Service` implements it
+  over `Store.ThreadByParentMessage` (query `GetThreadByParentMessage`). The module apps answers
+  the replay of an incoming webhook post with a title in a text channel with it: the answer names
+  the thread of the first answer (docs/DECISIONS.md D-M2-27-19).
 - Domain (`domain/thread.go`): `Thread` with `ThreadKind`, `ThreadState`, `TitleSource`; `Close`
   (a main thread is `409 invalid_state_transition`, a closed thread unchanged), `Reopen`,
   `SetTitle`; `CheckThreadTitle` (`thread.title_max_chars` Unicode characters, SEC-IN-4 through
@@ -321,7 +328,10 @@ an agent or app), in the unit of work of the insert ([14-suche.md](../../../../d
 - Port `chat.TriggerFacts` (`agentconfig.go`, M2-05): `TriggerChannel` returns kind, space, the
   effective operator after inheritance from the space (`domain.Channel.Operator`) and the five
   trigger switches of a channel for the trigger decision of runs, through `Store.Channel` (query
-  `GetChannel`), without authorization; `not_found` for an unknown channel.
+  `GetChannel`), without authorization; `not_found` for an unknown channel. Since M2-27
+  `TriggerChannel.MainThreadID` is the main thread of a text or DM channel, zero for a forum: the
+  target of an incoming webhook post, whose webhook actor holds only `messages:write`, so
+  `channel.read` and `getChannel` are closed to it (docs/DECISIONS.md D-M2-27-19).
 - Domain (`domain/behavior.go`): `Behavior`, `BehaviorLimits` (`channel.prompt_max_bytes`,
   `channel.history_backfill_limit_max` at request time), `ValidateBehavior` (all failures at once:
   `too_small`, `too_large`, `too_long`, `required`, `invalid_characters`, `duplicate`; no detail
@@ -396,7 +406,7 @@ canary scenario `test/canary/scenario_project.go`.
 
 ## Port (Wurzelpaket `internal/chat`)
 
-- Eingehend: `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info, Locate), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
+- Eingehend: `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info, Locate), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
 - Gibt In-Tx-Ereignisse aus: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `authz.StructureSource`, kernel `personaldata.Participant`.

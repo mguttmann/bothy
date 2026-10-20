@@ -1,6 +1,6 @@
 # Modul `apps`
 
-Status: M2-24 brings the app manifest, the installation, upgrade, scope change, suspend, resume and uninstall of apps with their nine REST operations (section "Apps (M2-24)" below). M2-26 brings the outgoing webhooks (section "Outgoing webhooks (M2-26)" below). Incoming webhooks, commands and components of apps come with M2-25 and M2-27.
+Status: M2-24 brings the app manifest, the installation, upgrade, scope change, suspend, resume and uninstall of apps with their nine REST operations (section "Apps (M2-24)" below). M2-26 brings the outgoing webhooks (section "Outgoing webhooks (M2-26)" below). M2-27 brings the incoming webhooks (section "Incoming webhooks (M2-27)" below). Commands and components of apps come with M2-25.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -23,6 +23,11 @@ Apps und Manifeste, Installationen, Scopes, ausgehende Webhooks mit Verbraucher 
 - `adapters/webhookhttp/` (M2-26): `Sender`, the `WebhookSender` over one egress client with the span `webhook.deliver`.
 - `adapters/hmackey/` (M2-26): `Master`, the `HMACMasterKey` over `webhook.hmac_master_key_ref`.
 - `adapters/httpapi/` (M2-26): `Webhooks`, the strict-server handlers of the six webhook operations.
+- `internal/apps` (`incoming.go`, M2-27): the port `IncomingWebhooks` with `ListIncoming`, `CreateIncoming`, `RevokeIncoming`, `AuthenticateIncoming`, `PostIncoming` and the DTOs `IncomingWebhook`, `CreateIncomingCmd`, `IncomingCreated`, `PostIncomingCmd`, `IncomingPosted`.
+- `domain/incoming/` (M2-27): the pure rules of 11 section 8: `Classify` and `CheckEnabled` (`format.go`), `CheckNative` (`native.go`), `ParseAlertmanager` and `RenderAlertmanager` (`alertmanager.go`, goldens in `testdata/alertmanager`), `ChooseTarget` (`target.go`), `HashContext` (`hashctx.go`).
+- `app/` (M2-27): `IncomingService` (`incoming.go`, built by `NewIncoming` with `IncomingConfig` and `IncomingDeps`; the use cases of the port and `revokeIncomingForApp` for the uninstall), `WebhookActor`, the outgoing port `IncomingStore`, the consumer ports `IncomingTokens`, `IncomingThreads`, `IncomingMessages`, and `ArchiveSubscriber` (`NewArchiveSubscriber`, `OnChannelArchived`).
+- `adapters/postgres/` (M2-27): `queries/incoming_webhooks.sql` and `incoming.go`, the `IncomingStore` of `Repository`.
+- `adapters/httpapi/` (M2-27): `Incoming` (`incoming.go`), the strict-server handlers of the five incoming webhook operations, and `TokenStage` with `CredentialGuard` and `VerifiedWebhook` (`incoming_stage.go`).
 - `adapters/appstest/` (M2-24): `Install` and `Manifest` for the tests of M2-24 to M2-28; only `_test.go` files import it.
 - `services/server/test/appsworld/` (M2-24): the integration world (PostgreSQL, the real modules, the full HTTP chain); the integration tests of `app`, `adapters/httpapi` and `adapters/postgres` share it, so each package is measured by its own tests (D-M2-24-23).
 - Their components come from `tools/archgen` and `architecture/modules.yaml`; a package outside these layers fails in `make arch`.
@@ -112,8 +117,8 @@ Normative: [11-erweiterungen.md](../../../../docs/spec/11-erweiterungen.md) sect
   `owner_only` for a non-owner); `getApp` on the app (404 for a non-owner, like an unknown id).
 
 Later tickets extend these use cases with their parts of 11 section 4.3: M2-25 commands and
-components (hide on suspend, remove on uninstall), M2-27 incoming webhooks (revoke on uninstall).
-M2-26 added the deliveries and subscriptions (below).
+components (hide on suspend, remove on uninstall). M2-26 added the deliveries and subscriptions,
+M2-27 the incoming webhooks (revoke on uninstall, refuse posts while suspended; both below).
 
 ## Outgoing webhooks (M2-26)
 
@@ -156,3 +161,66 @@ sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D
   `webhook_hmac_master_key`, generator `key`); changing it changes every derived secret, owners
   then rotate (`rotate_hmac_secret`). Committed test vectors:
   [docs/api/webhook-test-vectors.json](../../../../docs/api/webhook-test-vectors.json).
+
+## Incoming webhooks (M2-27)
+
+Normative: [docs/api/webhooks.md](../../../../docs/api/webhooks.md) section 8,
+[11-erweiterungen.md](../../../../docs/spec/11-erweiterungen.md) section 8, 05 section 4.11, 08
+section 12. Rulings: `docs/DECISIONS.md` D-M2-27-1 to D-M2-27-23.
+
+- **Webhooks** (`incoming_webhooks`, migration `00055_apps_incoming_webhooks.sql`, retention class
+  `config`): `createIncomingWebhook` (`webhook_in.create`, `manage` on the channel, step-up,
+  audited with `{webhook_id, app_id, thread_id}` only) for an app with an `active` installation
+  that may write in the channel (checked with its webhook actor in filter mode), optionally with a
+  fixed thread of the channel; else `400 validation_failed` with `app_not_installed`,
+  `app_cannot_write` or `not_in_channel`. The answer carries the absolute URL from
+  `server.public_url` with the `bothy_whi_` token once (`idempotency.MarkOneTimeSecret`); the row
+  holds only the HMAC (`identity.Tokens.NewIncomingWebhookToken`). `listIncomingWebhooks`
+  (`webhook_in.read`, `manage`) lists the active webhooks of the channel, never a token or hash;
+  `revokeIncomingWebhook` (`webhook_in.revoke`, step-up, audited) sets `revoked_at`, a second
+  revoke is audited with `no_change: true`.
+- **Token check** (`TokenStage` at `httpserver.StageWebhookToken`, installed by
+  `wire.InstallWebhookToken`): after `StageRateLimit` (`rl.webhook_in` per `webhook_id`) and
+  before `StageMaintenance` and the body stages, only for operations with action
+  `webhook_in.post`. `postIncomingWebhook` takes the path value `token`,
+  `postIncomingWebhookWithBearer` exactly one `Authorization: Bearer <token>`; `StageAuthenticate`
+  leaves both anonymous (`httpserver.Operation.AnonymousCredentials`). `AuthenticateIncoming`
+  hashes the token (`HashIncomingWebhookToken`, a malformed one without a lookup), reads the
+  webhook with its installation that is not uninstalled by the primary key and compares with
+  `hmac.Equal`. Unknown id, wrong or malformed token, revoked webhook and an installation that is
+  not `active` give the same `404 not_found`; a failure keeps one token of `rl.public_auth` of the
+  client IP (`CredentialGuard` over `ratelimit.Limiter.FailedCredentialGuard`), and while that
+  bucket is empty the stage answers `429 rate_limited` without checking. Success puts the webhook
+  actor into the context and the id for `VerifiedWebhook`; the handler uses the path id only when
+  it equals that id. A declared length above `webhook_in.max_body_bytes`
+  (`httpserver.Operation.BodyLimit`) is refused at `StageBody`, so the token answers first.
+- **Webhook actor** (`WebhookActor`): the app principal with its active installation and the
+  granted scopes of the installation intersected with `messages:write`, without token, session or
+  device; a stolen URL can only post. `webhook_in.post` requires `All(AppKind,
+  AtLeast(LevelWrite))` on the webhook's channel.
+- **Post** (`PostIncoming`): `Classify` decides the format per request (`format_mixed`), the
+  format must be in `webhook_in.formats_enabled` (`format_disabled`), then `CheckNative` (content
+  within `message.max_content_bytes`, `client_msg_id` a UUIDv7 or a new server one) or
+  `ParseAlertmanager` and `RenderAlertmanager` (one message per notification, a new server
+  `client_msg_id` every time). One unit of work locks the row `FOR SHARE`, `ChooseTarget` picks
+  the fixed thread (a fixed thread moved to another channel is `404`), the body's `thread_id` in
+  the same channel, a new thread with `title` (forum post, or in a text channel a thread started
+  from the message in the main thread, `TriggerChannel.MainThreadID`) or the main thread
+  (`required_for_forum_post` in a forum), authorizes `webhook_in.post` and writes through
+  `messaging` with `SkipMentions` and `HashContext`. The message has `origin = app` with the app
+  as author, resolves no mentions and triggers no agent. A replay answers `200` with
+  `Idempotent-Replay: true` and, for a text-channel title, the thread found through
+  `chat.ThreadsByParent`. Every refusal of the app's rights and a message that ended in another
+  channel become the `404` of an unknown webhook. After the commit `last_used_at` moves at most
+  once per `identity.last_active_granularity`; a failure is logged without the token.
+- **Lifecycle**: uninstall revokes every active webhook of the app in its unit of work
+  (`revokeIncomingForApp`); suspend keeps the rows and posts give `404` until resume;
+  `ArchiveSubscriber.OnChannelArchived` (`chat.ChannelArchived`, registered after the runs
+  acceptor) revokes the active webhooks of the channel with `ArchivedAt` as `revoked_at` in the
+  archive transaction.
+- **Internal listener**: both post operations are mounted there in every role through a chain of
+  their own with empty trusted proxies (client IP = peer) and its own rate limiter; nothing else of
+  the API.
+- **Configuration**: `webhook_in.max_body_bytes`, `webhook_in.formats_enabled` (start check
+  `webhook_in_formats`), `message.max_content_bytes`, `identity.last_active_granularity`,
+  `server.public_url`, `ratelimit.rl.webhook_in.*`, `ratelimit.rl.public_auth.*`.
