@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The commands the suite types into a PTY on Windows (PowerShell, the login shell of Design note
@@ -89,6 +90,8 @@ func sidOf(t *testing.T, user string) string {
 func setLoginEnv(t *testing.T, user string, e loginEnv) {
 	t.Helper()
 	key := `HKU\` + sidOf(t, user) + `\Environment`
+	// Registered first, so it runs after the values are deleted: the next test gets a clean block.
+	t.Cleanup(func() { restartHelper(t, user) })
 	set := func(name, value string) {
 		sh(t, "reg", "add", key, "/v", name, "/t", "REG_SZ", "/d", value, "/f")
 		t.Cleanup(func() { _, _ = try("reg", "delete", key, "/v", name, "/f") })
@@ -106,6 +109,57 @@ func setLoginEnv(t *testing.T, user string, e loginEnv) {
 		}
 		set("CLAUDE_CODE_OAUTH_TOKEN", string(b))
 	}
+	// The helper builds the environment block of its token once at its start, so the new values
+	// reach a PTY only after a restart of the helper service (the probe of HD6 reads the hive at
+	// every run).
+	restartHelper(t, user)
+}
+
+// restartHelper restarts the helper service of user and waits until it runs.
+func restartHelper(t *testing.T, user string) {
+	t.Helper()
+	svc := "bothy-host-helper-" + user
+	_, _ = try("sc.exe", "stop", svc)
+	waitService(t, svc, "STOPPED")
+	_, _ = try("sc.exe", "start", svc)
+	waitService(t, svc, "RUNNING")
+}
+
+func waitService(t *testing.T, svc, state string) {
+	t.Helper()
+	deadline := time.Now().Add(waitShort)
+	for time.Now().Before(deadline) {
+		if out, _ := try("sc.exe", "query", svc); strings.Contains(out, state) {
+			return
+		}
+		time.Sleep(pollEvery)
+	}
+	t.Errorf("the service %s did not reach %s", svc, state)
+}
+
+// homeOpen reports whether the group Users holds a grant on the home p.
+func homeOpen(t *testing.T, p string) bool {
+	t.Helper()
+	out := sh(t, "icacls", p)
+	return strings.Contains(out, `BUILTIN\Users:`)
+}
+
+// closedDir creates p with an ACL for SYSTEM and Administrators only.
+func closedDir(t *testing.T, p string) {
+	t.Helper()
+	if err := os.MkdirAll(p, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	sh(t, "icacls", p, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F")
+	t.Cleanup(func() { _ = os.RemoveAll(p) })
+}
+
+// removeAddedUser removes what session-user add created for user (its helper service and the
+// account), never the host service, its state or its configuration.
+func removeAddedUser(_ *testing.T, user string) {
+	_, _ = try("sc.exe", "stop", "bothy-host-helper-"+user)
+	_, _ = try("sc.exe", "delete", "bothy-host-helper-"+user)
+	_, _ = try("net", "user", user, "/delete")
 }
 
 // writeSecretOf writes a file of user with content.
@@ -125,7 +179,8 @@ func symlinkOf(t *testing.T, user, target, p string) {
 	t.Helper()
 	_ = os.Remove(p)
 	sh(t, "cmd", "/c", "mklink", "/J", p, target)
-	chownTo(t, p, user)
+	// The owner of the junction itself; without /L icacls follows it and fails on a dangling one.
+	sh(t, "icacls", p, "/setowner", user, "/L")
 	t.Cleanup(func() { _ = os.Remove(p) })
 }
 

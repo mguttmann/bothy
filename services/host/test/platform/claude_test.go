@@ -99,10 +99,9 @@ func TestPlatform_TMT29c_Open(t *testing.T) {
 	track(t)
 	resetStartLog(t)
 	shared, wa, further := programDir("work-shared"), programDir("work-alex"), programDir("work-sam-further")
-	if err := os.MkdirAll(shared, 0o755); err != nil { //nolint:gosec // G301: both session users must reach it
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(shared) })
+	// Closed to both session users: HD11 checks every configured working directory as a place of
+	// each session user, also one HD7 drops, and a folder both could read would block both.
+	closedDir(t, shared)
 	mkdirOwned(t, wa, userA)
 	mkdirOwned(t, further, userB)
 	w := newWorld(t, "organization", claudeYAML(t)+workdirsYAML(map[string][][2]string{
@@ -255,6 +254,8 @@ func TestPlatform_TMT25(t *testing.T) {
 	w := newWorld(t, "personal", "  profiles: [shell, claude]\n"+workdirsYAML(map[string][][2]string{userC: {{"Robin", wr}}}), userC)
 	claudeOffered(w, userC)
 	tokenFile := writeSecretOf(t, userC, ".bothy-platform-token", tokenCanary)
+	// CLAUDE_CONFIG_DIR stays unset, so personal uses the default folder, which must exist.
+	mkdirOwned(t, filepath.Join(home(userC), ".claude"), userC)
 	setLoginEnv(t, userC, loginEnv{PathDir: filepath.Dir(fake), TokenFile: tokenFile})
 	stopTrace, traced := traceService(t)
 	shell := w.open(shellOf(userC))

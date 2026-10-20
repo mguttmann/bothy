@@ -67,12 +67,17 @@ func TestPlatform_TMT21_Sessions(t *testing.T) {
 	})
 
 	t.Run("(d) session-user remove of Alex", func(t *testing.T) {
+		// Alex's home is readable for all before the removal; remove closes it and restarts the
+		// host service itself.
+		openHome(t, home(userA))
+		n, mark := w.srv.Logins(), w.srv.ReportCount()
 		if out, code := host("session-user", "remove", userA); code != 0 {
 			t.Fatalf("remove: exit %d: %s", code, firstLine(out))
 		}
-		openHome(t, home(userA))
-		mark := w.srv.ReportCount()
-		w.restart()
+		w.waitLogin(n + 1)
+		if homeOpen(t, home(userA)) {
+			t.Error("remove left Alex's home readable for all")
+		}
 		r := w.report(mark, "the report after the restart", func(sessiontest.Report) bool { return true })
 		if r.Names(userA) || r.Lists(userA) {
 			t.Error("the report still names Alex's session user")
@@ -92,13 +97,14 @@ func TestPlatform_TMT21_Sessions(t *testing.T) {
 		}
 	})
 
+	// What session-user add creates for Robin's name in (f) goes after (g), never the host service.
+	t.Cleanup(func() { removeAddedUser(t, userC) })
 	t.Run("(f) session-user add while Sam has a session", func(t *testing.T) {
 		sam := w.open(shellOf(userB))
 		pids := sam.background()
 		sam.typeLine(shellPIDCmd)
 		pids = append(pids, atoiOr(sam.expect(shellPIDRe)[1]))
 		n, mark := w.srv.Logins(), w.srv.ReportCount()
-		t.Cleanup(func() { uninstall(t, []string{userC}) })
 		if out, code := host("session-user", "add", userC); code != 0 {
 			t.Fatalf("add: exit %d: %s", code, firstLine(out))
 		}

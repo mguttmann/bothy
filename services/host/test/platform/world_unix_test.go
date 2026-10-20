@@ -135,6 +135,46 @@ func symlinkOf(t *testing.T, user, target, p string) {
 	t.Cleanup(func() { _ = os.Remove(p) })
 }
 
+// homeOpen reports whether others may list the home p.
+func homeOpen(t *testing.T, p string) bool {
+	t.Helper()
+	fi, err := os.Stat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fi.Mode().Perm()&0o005 != 0
+}
+
+// closedDir creates p for the administrator only.
+func closedDir(t *testing.T, p string) {
+	t.Helper()
+	if err := os.MkdirAll(p, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(p, 0o700); err != nil { //nolint:gosec // G302: a folder needs its search bit
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(p) })
+}
+
+// removeAddedUser removes what session-user add created for user (its helper and the account),
+// never the host service, its state or its configuration.
+func removeAddedUser(t *testing.T, user string) {
+	t.Helper()
+	if runtime.GOOS == "darwin" {
+		_, _ = try("/bin/launchctl", "bootout", "system/bothy-host.helper."+user)
+		_ = os.Remove("/Library/LaunchDaemons/bothy-host.helper." + user + ".plist")
+		_, _ = try("/usr/sbin/sysadminctl", "-deleteUser", user)
+		_, _ = try("/usr/bin/dscl", ".", "-delete", "/Groups/"+user)
+		return
+	}
+	_, _ = try("/usr/bin/systemctl", "disable", "--now", "bothy-host-helper-"+user+".socket", "bothy-host-helper-"+user+".service")
+	_ = os.Remove("/etc/systemd/system/bothy-host-helper-" + user + ".socket")
+	_ = os.Remove("/etc/systemd/system/bothy-host-helper-" + user + ".service")
+	_, _ = try("/usr/bin/systemctl", "daemon-reload")
+	_, _ = try("/usr/sbin/userdel", "-r", user)
+}
+
 // revokeWrite removes what makeWritableBy granted.
 func revokeWrite(t *testing.T, p, user string) {
 	t.Helper()

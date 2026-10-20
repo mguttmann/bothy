@@ -454,6 +454,16 @@ func (s *tsess) background() []int {
 		if n <= 0 {
 			s.w.t.Fatal("no process ID of a background process")
 		}
+		if runtime.GOOS == "darwin" && i == 1 {
+			// The documented limit of Design note 12 on macOS: a child that left the session with
+			// setsid after its parent ended is not found; the suite ends it itself.
+			s.w.t.Cleanup(func() {
+				if p, err := os.FindProcess(n); err == nil {
+					_ = p.Kill()
+				}
+			})
+			continue
+		}
 		pids = append(pids, n)
 	}
 	return pids

@@ -105,6 +105,11 @@ func TestPlatform_TMT28d(t *testing.T) {
 	robin.typeLine(claudeCmd(filepath.Dir(fake), "login"))
 	robin.expect(loginRe)
 	robin.closeByClient()
+	// The login left no file HD6 checks: Robin still opens, HD6 names nobody.
+	w.open(shellOf(userC)).closeByClient()
+	if w.lastReport().Failed(hd.HD6, hd.CodeSubscriptionLogin, userC) {
+		t.Error("HD6 detected the keychain-style login")
+	}
 	r := w.report(0, "the warnings of an empty claude_bin", func(r sessiontest.Report) bool {
 		return r.Has(hd.HD6, hd.CodeAuthStatusUnchecked) && r.Has(hd.HD7, hd.CodeClaudeProfileUnavailable)
 	})
