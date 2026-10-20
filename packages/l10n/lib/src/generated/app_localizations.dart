@@ -7008,6 +7008,546 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Host: {name}'**
   String terminalLinkHost(String name);
+
+  /// Entry Agents of the administration (01 section 5.2 A5).
+  ///
+  /// In en, this message translates to:
+  /// **'Agents'**
+  String get adminNavAgents;
+
+  /// Heading of the agent list (A5).
+  ///
+  /// In en, this message translates to:
+  /// **'Agents'**
+  String get adminAgentsTitle;
+
+  /// The agent list has no entries.
+  ///
+  /// In en, this message translates to:
+  /// **'No agents.'**
+  String get adminAgentsEmpty;
+
+  /// Button of the agent list: switch the backend of several agents (10 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch all agents'**
+  String get adminAgentsSwitchAll;
+
+  /// Label of a disabled agent in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get adminAgentDisabled;
+
+  /// Number of server warnings of an agent in the list (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 warning} other{{count} warnings}}'**
+  String adminAgentWarningCount(int count);
+
+  /// Button of the agent page back to the list.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the agents'**
+  String get adminAgentBack;
+
+  /// Presence of an agent: heartbeat received.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get adminAgentStateOnline;
+
+  /// Presence of an agent: online with problems.
+  ///
+  /// In en, this message translates to:
+  /// **'Degraded'**
+  String get adminAgentStateDegraded;
+
+  /// Presence of an agent: no heartbeat within the timeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get adminAgentStateOffline;
+
+  /// Presence of an agent: no heartbeat so far.
+  ///
+  /// In en, this message translates to:
+  /// **'No heartbeat yet'**
+  String get adminAgentStateUnknown;
+
+  /// Adapter of an agent on its page (A5).
+  ///
+  /// In en, this message translates to:
+  /// **'Adapter {kind}'**
+  String adminAgentAdapter(String kind);
+
+  /// Version of the agent runtime from the heartbeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime version {version}'**
+  String adminAgentRuntimeVersion(String version);
+
+  /// Time of the last heartbeat of the agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Last heartbeat {when}'**
+  String adminAgentLastHeartbeat(String when);
+
+  /// Label of the configured backend of the agent (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Configured mode'**
+  String get adminAgentConfigured;
+
+  /// Label of the backend the adapter reports in its heartbeat (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Reported mode'**
+  String get adminAgentReported;
+
+  /// Reported mode of an adapter that reports none because it follows the configured mode per run (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Follows the configured mode per run'**
+  String get adminAgentReportedPerRun;
+
+  /// Evidence source of the reported mode (billing_evidence.method, 10 section 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Evidence: {method}'**
+  String adminAgentEvidence(String method);
+
+  /// Modes the adapter can prove (billing_modes_supported, 10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Can prove: {modes}'**
+  String adminAgentSupported(String modes);
+
+  /// The adapter reported no billing_modes_supported.
+  ///
+  /// In en, this message translates to:
+  /// **'Can prove: not reported'**
+  String get adminAgentSupportedNone;
+
+  /// Credential holder of an agent in mode personal (10 section 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Holder: {name}'**
+  String adminAgentHolder(String name);
+
+  /// Warning billing_mode_mismatch of the server (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Adapter reports {reported}, {configured} is configured'**
+  String adminAgentWarnMismatch(String reported, String configured);
+
+  /// Warning billing_mode_unsupported of the server (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Adapter cannot prove this mode'**
+  String get adminAgentWarnUnsupported;
+
+  /// Warning billing_evidence_unknown of the server (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Login type of the runtime unknown'**
+  String get adminAgentWarnEvidenceUnknown;
+
+  /// Warning tool_class_mismatch of the server (09 section 2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Adapter reports a different tool class'**
+  String get adminAgentWarnToolClass;
+
+  /// A warning code of the server this build does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning {code}'**
+  String adminAgentWarnUnknown(String code);
+
+  /// Consequence of the warnings billing_mode_mismatch and billing_mode_unsupported (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Invocations fail until the adapter is switched.'**
+  String get adminAgentWarnFailUntilSwitched;
+
+  /// Consequence of the warning billing_evidence_unknown (10 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'All invocations fail.'**
+  String get adminAgentWarnFailAll;
+
+  /// Instructions on the agent page while the adapter still reports the old mode (10 sections 9.2, 10 and 11 step 5).
+  ///
+  /// In en, this message translates to:
+  /// **'To switch the adapter, whoever runs the instance changes the login of its runtime to {mode}. The warning disappears with the next heartbeat that reports {mode}.'**
+  String adminAgentSwitchHint(String mode);
+
+  /// Heading of the spaces and channels the agent operates (10 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Operates'**
+  String get adminAgentTargets;
+
+  /// The agent operates no space and no channel.
+  ///
+  /// In en, this message translates to:
+  /// **'No space and no channel'**
+  String get adminAgentTargetsNone;
+
+  /// A space whose default operator is the agent.
+  ///
+  /// In en, this message translates to:
+  /// **'{target}, by default'**
+  String adminAgentTargetDefault(String target);
+
+  /// Heading of the backend section of the agent page (10 section 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Backend'**
+  String get adminAgentBackend;
+
+  /// Button that opens the switch of one agent (10 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch backend'**
+  String get adminAgentSwitch;
+
+  /// Button that changes the credential holder of a personal agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Change holder'**
+  String get adminAgentHolderChange;
+
+  /// Explanation of the backend switch on the agent page (01 section 5.2 A5).
+  ///
+  /// In en, this message translates to:
+  /// **'Switching needs a reason and confirmation. Personal works only while exactly one person may trigger the agent (I1).'**
+  String get adminAgentSwitchExplain;
+
+  /// Title of the switch dialog of one agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch {agent}'**
+  String adminSwitchTitle(String agent);
+
+  /// What a switch to organization changes (10 sections 9.1 and 13).
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} then uses the organization key: the organization bears the costs, and everyone with Trigger agents may trigger it. The holder is cleared.'**
+  String adminSwitchToOrgBody(String agent);
+
+  /// What a switch to personal changes (10 sections 9.1 and 13).
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} then uses the personal subscription of the holder: the holder pays, and only the holder may trigger it.'**
+  String adminSwitchToPersonalBody(String agent);
+
+  /// Picker of the credential holder.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the holder'**
+  String get adminSwitchHolderPick;
+
+  /// Confirm button of a switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch'**
+  String get adminSwitchConfirm;
+
+  /// Notice after a switch of one agent.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} now uses {mode}'**
+  String adminSwitched(String agent, String mode);
+
+  /// Purpose of the step-up of agent.billing_mode.set.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch the backend of {agent}'**
+  String stepUpPurposeSwitchAgent(String agent);
+
+  /// Purpose of the step-up of agent.billing_mode.set_all.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch the backend of several agents'**
+  String get stepUpPurposeSwitchAll;
+
+  /// Purpose of the step-up of agent.credential_holder.set.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the holder of {agent}'**
+  String stepUpPurposeSetHolder(String agent);
+
+  /// Purpose of the step-up of token.create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a token for {agent}'**
+  String stepUpPurposeCreateToken(String agent);
+
+  /// Title of the holder dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the holder of {agent}'**
+  String adminHolderTitle(String agent);
+
+  /// What a change of the credential holder does (10 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} keeps running on Personal, on the subscription of the new holder. Only the new holder may trigger it.'**
+  String adminHolderBody(String agent);
+
+  /// Notice after a change of the holder.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now the holder of {agent}'**
+  String adminHolderChanged(String name, String agent);
+
+  /// Heading of the explanation of an I1 rejection (10 section 5.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Personal is not possible right now'**
+  String get adminI1Title;
+
+  /// One agent of an I1 rejection with the other principals the caller may read (10 section 5.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} would use the subscription of {holder}, but these may trigger it too: {names}'**
+  String adminI1Agent(String agent, String holder, String names);
+
+  /// One agent of an I1 rejection without a holder in the answer.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} may also be triggered by: {names}'**
+  String adminI1AgentNoHolder(String agent, String names);
+
+  /// Principals of an I1 rejection whose names the caller may not read (10 section 5.4).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 more you cannot see} other{{count} more you cannot see}}'**
+  String adminI1Hidden(int count);
+
+  /// The way back to personal is not a guided flow (10 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke their access grants, group memberships or owner rights first, or keep Organization.'**
+  String get adminI1Way;
+
+  /// Title of the switch of several agents (10 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch several agents'**
+  String get adminSwitchAllTitle;
+
+  /// What all to organization does (10 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Every agent then runs on the organization key; holders are cleared. Use this when there are doubts about a personal operation.'**
+  String get adminSwitchAllOrgBody;
+
+  /// What all to personal does, all or nothing (10 section 9.1, BR-08).
+  ///
+  /// In en, this message translates to:
+  /// **'The checked agents then run on the personal subscription of the holder. If one of them would break I1, nothing changes.'**
+  String get adminSwitchAllPersonalBody;
+
+  /// The list of all to personal is proposed from the audit (10 section 9.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed: the agents the last switch of several agents to Organization changed'**
+  String get adminSwitchAllProposed;
+
+  /// The audit has no earlier switch of several agents.
+  ///
+  /// In en, this message translates to:
+  /// **'No earlier switch to propose from. Check the agents yourself.'**
+  String get adminSwitchAllNoProposal;
+
+  /// Notice after the switch of several agents.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No agent changed} =1{1 agent changed} other{{count} agents changed}}'**
+  String adminSwitchAllDone(int count);
+
+  /// Heading of the tokens of the agent (08 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'API tokens'**
+  String get adminTokensTitle;
+
+  /// The agent has no tokens.
+  ///
+  /// In en, this message translates to:
+  /// **'No tokens.'**
+  String get adminTokensEmpty;
+
+  /// Button that creates a token for the agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Create token'**
+  String get adminTokenCreate;
+
+  /// Title of the token form.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a token for {agent}'**
+  String adminTokenCreateTitle(String agent);
+
+  /// What a new token does (08 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'The adapter acts as {agent} with this token. Its secret is shown only once.'**
+  String adminTokenCreateBody(String agent);
+
+  /// Field: name of the token.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get adminTokenName;
+
+  /// Field: the last day the token is valid (expires_at, required).
+  ///
+  /// In en, this message translates to:
+  /// **'Last day (YYYY-MM-DD)'**
+  String get adminTokenLastDay;
+
+  /// The last day of the token is no day.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a day as YYYY-MM-DD.'**
+  String get adminTokenLastDayInvalid;
+
+  /// Field: the JWK thumbprint of the adapter key the token is bound to (08 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'DPoP key thumbprint (optional)'**
+  String get adminTokenDpop;
+
+  /// Expiry of a token in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'valid until {when}'**
+  String adminTokenValidUntil(String when);
+
+  /// Last use of a token in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'last used {when}'**
+  String adminTokenLastUsed(String when);
+
+  /// Label of a token bound to a DPoP key.
+  ///
+  /// In en, this message translates to:
+  /// **'DPoP-bound'**
+  String get adminTokenBound;
+
+  /// Label of a revoked token in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get adminTokenRevokedLabel;
+
+  /// Button that revokes a token.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get adminTokenRevoke;
+
+  /// Title of the confirmation before a token is revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke the token {name}?'**
+  String adminTokenRevokeTitle(String name);
+
+  /// What revoking a token does.
+  ///
+  /// In en, this message translates to:
+  /// **'An adapter that uses this token loses its access at once.'**
+  String get adminTokenRevokeBody;
+
+  /// Notice after a token was revoked.
+  ///
+  /// In en, this message translates to:
+  /// **'The token {name} is revoked.'**
+  String adminTokenRevokedNotice(String name);
+
+  /// Title of the view of a new token secret.
+  ///
+  /// In en, this message translates to:
+  /// **'Token {name}'**
+  String adminTokenSecretTitle(String name);
+
+  /// Warning of the one-time token secret (08 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'This secret is shown only once. Copy it into the adapter\'s secret store now.'**
+  String get adminTokenSecretOnce;
+
+  /// Semantics label of the token secret.
+  ///
+  /// In en, this message translates to:
+  /// **'Token secret'**
+  String get adminTokenSecretLabel;
+
+  /// Plain-language explanation of the guided flow (10 section 11 step 2).
+  ///
+  /// In en, this message translates to:
+  /// **'This grant allows {person} to trigger the agent {agent}. {agent} uses the personal subscription of {holder}. {agent} must first be switched to Organization; the organization key then bears the costs.'**
+  String adminGuidedExplainGrant(String person, String agent, String holder);
+
+  /// Explanation of the guided flow when adding a group member or an owner (10 section 11 step 2).
+  ///
+  /// In en, this message translates to:
+  /// **'This change allows {person} to trigger the agent {agent}. {agent} uses the personal subscription of {holder}. {agent} must first be switched to Organization; the organization key then bears the costs.'**
+  String adminGuidedExplainChange(String person, String agent, String holder);
+
+  /// Extra sentence when organization_ready is false (10 section 11 step 2).
+  ///
+  /// In en, this message translates to:
+  /// **'The adapter of {agent} does not report an organization key yet. Invocations fail until it is switched.'**
+  String adminGuidedNotReady(String agent);
+
+  /// Button of the guided flow in the grant preview (10 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch {agent} to Organization and grant'**
+  String adminGuidedGrant(String agent);
+
+  /// Button of the guided flow when adding a group member or an owner (10 section 11).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch {agent} to Organization and continue'**
+  String adminGuidedContinue(String agent);
+
+  /// Title of the reason dialog of the guided flow (10 section 11 step 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Organization'**
+  String get adminGuidedTitle;
+
+  /// Result of the guided flow (10 section 11 step 5).
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} now uses Organization, and the change is saved.'**
+  String adminGuidedDone(String agent);
+
+  /// The adapter has not switched yet after the guided flow (10 section 11 step 5).
+  ///
+  /// In en, this message translates to:
+  /// **'The adapter of {agent} still reports {mode}.'**
+  String adminGuidedStillReports(String agent, String mode);
+
+  /// Button that closes the result of the guided flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get adminGuidedDoneClose;
+
+  /// Button that opens the agent page after the guided flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open {agent}'**
+  String adminGuidedOpenAgent(String agent);
 }
 
 class _AppLocalizationsDelegate
