@@ -32,8 +32,8 @@ const (
 
 // Binaries are the programs the suite builds once per test binary for the host containers.
 type Binaries struct {
-	// BothyHost is bothy-host for linux/<arch> of the Docker host.
-	BothyHost string
+	// HostService is the binary of the host service for linux/<arch> of the Docker host.
+	HostService string
 	// FakeClaude is M2-42's Fake-claude (services/host/testdata/fakeclaude) for the same platform.
 	FakeClaude string
 }
@@ -47,9 +47,9 @@ type Binaries struct {
 //
 // Errors: a failed build with its output.
 func BuildHostBinaries(ctx context.Context, root, dir, arch string) (Binaries, error) {
-	b := Binaries{BothyHost: filepath.Join(dir, "bothy-host"), FakeClaude: filepath.Join(dir, "claude")}
+	b := Binaries{HostService: filepath.Join(dir, "bothy-host"), FakeClaude: filepath.Join(dir, "claude")}
 	builds := [][]string{
-		{"build", "-trimpath", "-ldflags", "-X github.com/OWNER/bothy/services/host/internal/buildinfo.PlatformSuite=1", "-o", b.BothyHost, "./cmd/bothy-host"},
+		{"build", "-trimpath", "-ldflags", "-X github.com/OWNER/bothy/services/host/internal/buildinfo.PlatformSuite=1", "-o", b.HostService, "./cmd/bothy-host"},
 		{"build", "-trimpath", "-o", b.FakeClaude, "./testdata/fakeclaude"},
 	}
 	for _, args := range builds {
@@ -170,7 +170,7 @@ func (h *Host) Provision(ctx context.Context, bins Binaries) error {
 	if _, err := h.Shell(ctx, "install -d -o root -g root -m 0755 "+HostBinDir); err != nil {
 		return err
 	}
-	for src, name := range map[string]string{bins.BothyHost: "bothy-host", bins.FakeClaude: "claude"} {
+	for src, name := range map[string]string{bins.HostService: "bothy-host", bins.FakeClaude: "claude"} {
 		if err := h.CopyIn(ctx, src, HostBinDir+"/"+name); err != nil {
 			return err
 		}
@@ -185,9 +185,9 @@ func (h *Host) Provision(ctx context.Context, bins Binaries) error {
 	return err
 }
 
-// Bothy runs bothy-host with args as root (the operator) and returns the result; a code other
+// Service runs bothy-host with args as root (the operator) and returns the result; a code other
 // than 0 is no error here.
-func (h *Host) Bothy(ctx context.Context, args ...string) (ExecResult, error) {
+func (h *Host) Service(ctx context.Context, args ...string) (ExecResult, error) {
 	bin := "/opt/bothy-host/bin/bothy-host"
 	if len(args) > 0 && args[0] == "install" {
 		bin = HostBinDir + "/bothy-host"
@@ -203,11 +203,11 @@ func (h *Host) Install(ctx context.Context, sessionUsers []string) error {
 	if len(sessionUsers) == 0 {
 		return errors.New("stack: a host needs at least one session user")
 	}
-	if r, err := h.Bothy(ctx, "install", "--session-user", sessionUsers[0]); err != nil || r.Code != 0 {
+	if r, err := h.Service(ctx, "install", "--session-user", sessionUsers[0]); err != nil || r.Code != 0 {
 		return fmt.Errorf("stack: install on %s: %d %s: %w", h.Name, r.Code, lastLine(r.Stderr), errOr(err))
 	}
 	for _, u := range sessionUsers[1:] {
-		if r, err := h.Bothy(ctx, "session-user", "add", u); err != nil || r.Code != 0 {
+		if r, err := h.Service(ctx, "session-user", "add", u); err != nil || r.Code != 0 {
 			return fmt.Errorf("stack: session-user add on %s: %d %s: %w", h.Name, r.Code, lastLine(r.Stderr), errOr(err))
 		}
 	}
@@ -231,7 +231,7 @@ func (h *Host) WriteConfig(ctx context.Context, content []byte) error {
 	if _, err := h.Exec(ctx, bytes.NewReader(content), "bash", "-c", "cat > "+HostConfig+".new && chmod 0644 "+HostConfig+".new && mv "+HostConfig+".new "+HostConfig); err != nil {
 		return err
 	}
-	r, err := h.Bothy(ctx, "restart")
+	r, err := h.Service(ctx, "restart")
 	if err != nil {
 		return err
 	}
@@ -269,7 +269,7 @@ func (h *Host) Pair(ctx context.Context, code string) (string, int, error) {
 
 // PairResult runs bothy-host pair like Pair and returns the whole result of the command.
 func (h *Host) PairResult(ctx context.Context, code string) (ExecResult, error) {
-	return h.Bothy(ctx, "pair", "--server", InstanceOrigin, "--code", code)
+	return h.Service(ctx, "pair", "--server", InstanceOrigin, "--code", code)
 }
 
 // Fingerprint returns the fingerprint of the output of a successful bothy-host pair, or "".
@@ -282,7 +282,7 @@ func Fingerprint(r ExecResult) string {
 }
 
 // Doctor runs bothy-host doctor and returns its output and exit code.
-func (h *Host) Doctor(ctx context.Context) (ExecResult, error) { return h.Bothy(ctx, "doctor") }
+func (h *Host) Doctor(ctx context.Context) (ExecResult, error) { return h.Service(ctx, "doctor") }
 
 // Journal returns the journal of the bothy-host units (messages only).
 func (h *Host) Journal(ctx context.Context) ([]byte, error) {
