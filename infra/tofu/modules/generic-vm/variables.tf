@@ -144,6 +144,12 @@ variable "ssh_port" {
   default     = 22
 }
 
+variable "sshd_port" {
+  description = "Port sshd listens on, on the host; the firewall admits it. null means ssh_port; set it only when ssh_port is a forwarded port in front of the host (NAT)."
+  type        = number
+  default     = null
+}
+
 variable "provision_over_ssh" {
   description = "false: the module only renders user_data, which the caller passes to its VM resource (new hosts); true: the same setup runs on the existing host ssh_host over SSH (the key comes from the SSH agent, never from an input)."
   type        = bool

@@ -28,6 +28,7 @@ Inputs of this module:
 | Input | Default | Meaning |
 |---|---|---|
 | `ssh_host`, `ssh_port`, `ssh_user` | -, `22`, `bothy` | the host for the SSH delivery and the output `ssh_endpoint` |
+| `sshd_port` | `ssh_port` | the port of sshd on the host, which the firewall admits; set it only when `ssh_port` is a forwarded port (NAT) |
 | `provision_over_ssh` | `false` | `true` runs the setup on `ssh_host` over SSH; the key comes from the SSH agent |
 | `release_repository` | - | `<owner>/<name>` of the product releases |
 | `release_base_url` | GitHub release of `bothy_version` | download address of the release files |
@@ -50,7 +51,7 @@ before they run the same script ([files/bothy-setup.sh](files/bothy-setup.sh)):
 | `/usr/local/lib/bothy/bothy-setup` | the setup script (POSIX `sh`) |
 | `/etc/bothy/setup.env` | version, download address, signing mode and identity, registry, edge, the pinned cosign; no secret |
 | `/etc/bothy/install-options` | the options of `install.sh`, one per line |
-| `/etc/bothy/firewall.nft` | the nftables table `inet bothy_edge`: input policy drop, SSH and the edge port only |
+| `/etc/bothy/firewall.nft` | the nftables table `inet bothy_edge`: input policy drop, the sshd port and the edge port only |
 | `/etc/bothy/release.pub` | only with `release_public_key` |
 
 The script, in this order:
@@ -68,10 +69,12 @@ The script, in this order:
    bundle and `install.sh` from it, their own signatures, then the registry of the bundle. A
    wrong checksum or signature stops the setup (exit code 1, step `verify`).
 7. The firewall table and the unit `bothy-firewall.service`.
-8. `install.sh --bundle <bundle> --dir <stack_dir>` with the options, as the user `bothy`. The
-   enrollment code of the first owner is replaced in the log by the command that issues a new
-   one (`bothy setup issue-enrollment-code --user <owner_handle>`), because cloud-init and the SSH
-   delivery keep the output in a log.
+8. `install.sh --bundle <bundle> --dir <stack_dir>` with the options, as the user `bothy`, in a
+   new session without a controlling terminal (`setsid`, standard input closed; the SSH delivery
+   runs under a pseudo terminal, and with a terminal `install.sh` would print the code to
+   `/dev/tty`). The enrollment code of the first owner is replaced in the log by the command that
+   issues a new one (`bothy setup issue-enrollment-code --user <owner_handle>`), because cloud-init
+   and the SSH delivery keep the output in a log.
 9. The unit `bothy.service` (`docker compose up -d` at boot), enabled and started.
 
 A second run changes nothing: every file is compared before it is written, Docker and cosign

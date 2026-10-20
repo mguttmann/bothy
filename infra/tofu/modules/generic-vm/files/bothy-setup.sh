@@ -91,6 +91,13 @@ put_file() {
 	return 0
 }
 
+# detached runs a command in a new session without a controlling terminal and with standard
+# input closed. The SSH delivery runs under a pseudo terminal, and with a terminal install.sh
+# prints the enrollment code to /dev/tty, past the filter of its standard output.
+detached() {
+	setsid -w "$@" </dev/null
+}
+
 # apt_get runs apt-get without prompts. On the first boot of a cloud image unattended-upgrades
 # often holds the package locks; DPkg::Lock::Timeout covers the dpkg lock only, so a failed run
 # is retried for up to ten minutes.
@@ -315,7 +322,7 @@ step_install() {
 			TS_AUTHKEY=$si_ts
 			export TS_AUTHKEY
 		fi
-		runuser -u bothy -- /bin/sh "$work/install.sh" --bundle "$work/$bundle" --dir "$stack_dir" "$@"
+		detached runuser -u bothy -- /bin/sh "$work/install.sh" --bundle "$work/$bundle" --dir "$stack_dir" "$@"
 		echo "$?" >"$work/install.rc"
 	) | sed "s|^Enrollment code (shown once): .*|Enrollment code: withheld from this log; issue one with: cd $stack_dir/infra/compose \\&\\& sudo -u bothy docker compose exec api bothy setup issue-enrollment-code --user $(cfg SETUP_OWNER_HANDLE)|"
 	si_ts=

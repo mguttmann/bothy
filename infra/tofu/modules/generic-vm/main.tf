@@ -75,8 +75,11 @@ locals {
         mode    = "0644"
       }
       "/etc/bothy/firewall.nft" = {
-        content = templatefile("${path.module}/templates/firewall.nft.tftpl", { edge_port = local.edge_port })
-        mode    = "0644"
+        content = templatefile("${path.module}/templates/firewall.nft.tftpl", {
+          edge_port = local.edge_port
+          ssh_port  = coalesce(var.sshd_port, var.ssh_port)
+        })
+        mode = "0644"
       }
     },
     var.release_public_key == null ? {} : {
