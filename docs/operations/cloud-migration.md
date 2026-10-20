@@ -10,7 +10,14 @@ Mac zu Linux-VM, VM zu Cloud, Cloud zu Cloud, Container-Datenbank zu verwaltetem
 Ein Umzug ist eine Wiederherstellung ohne Datenverlust: Die alte Instanz nimmt im Wartungsmodus
 nichts mehr an, ihr letzter Stand zieht vollständig um. Darum bleibt die Sync-Epoche gleich, und
 Clients setzen mit ihrem Cursor fort. `instance_id`, Token-Pepper und Signierschlüssel ziehen mit;
-damit bleiben Tokens, Geräte und Aufruf-Marken gültig.
+damit bleiben Tokens, Geräte und Aufruf-Marken gültig. `bothy restore finalize --relocation` proves
+on the target that nothing was lost (section 3 step 4) before it keeps the epoch.
+
+A move to a managed PostgreSQL service with automatic failover: a failover raises the timeline,
+and the start lock holds the server not ready until `bothy restore finalize` ran
+([disaster-recovery.md](disaster-recovery.md), case G). Set `database.restore_guard = off` only
+where the provider documents that a failover loses no committed transaction; otherwise a failover
+is handled like a restore with a new epoch ([16-betrieb.md](../spec/16-betrieb.md) 8.4).
 
 ## 2. Vorbereitung (Tage vorher)
 
@@ -52,6 +59,16 @@ damit bleiben Tokens, Geräte und Aufruf-Marken gültig.
    Notfall-Widerruf danach fehlt auf dem Ziel.
 4. Ziel: Restore des logischen Abzugs und der Objekte; Manifest vergleichen (Zeilenzahlen,
    `head_seq`, Audit-Kopf, Dateizahl). Abweichung heißt: abbrechen, alte Instanz wieder schreibbar.
+   Then save the manifest of the final backup (`backup_runs.manifest` of that run on the old
+   instance) as `manifest.json` next to the Compose file and run
+   `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro migrate restore finalize --relocation /tmp/manifest.json`
+   (the `migrate` container is read-only and sees only its secrets, so the file is mounted): it compares
+   `event_log.head_seq`, `audit.last_seq`, `audit.last_hash` and `sync_epoch` with the restored
+   database and stores the identity of the new cluster, keeping the epoch and every cursor. The
+   target runs on a new cluster, so without this step it stays not ready (`restore_not_finalized`,
+   [16-betrieb.md](../spec/16-betrieb.md) 8.4). Exit `1` names the differing field and changes
+   nothing: abort as above, or, if the target must go live with what it has, run
+   `bothy restore finalize` without the option (new epoch, clients reload).
 5. Ziel starten, Wiederherstellungstest von Hand, Smoke-Tests ([16-betrieb.md](../spec/16-betrieb.md) 11.1).
 6. Notfall-Widerrufe, die nach der Abschluss-Sicherung auf der alten Instanz fielen (Audit-Log
    der alten Instanz ab dem notierten Zeitpunkt), auf dem Ziel wiederholen.

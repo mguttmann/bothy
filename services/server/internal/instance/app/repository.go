@@ -33,4 +33,28 @@ type Repository interface {
 	// SetVersions sets schema_version and min_server_version unless the row records a larger
 	// schema_version (an older binary must never lower what a newer one wrote).
 	SetVersions(ctx context.Context, schemaVersion int64, minServerVersion string) error
+	// ClusterIdentity reads the current identity of the database cluster from
+	// pg_control_system() and pg_control_checkpoint() (R-DM-50).
+	ClusterIdentity(ctx context.Context) (instance.DatabaseIdentity, error)
+	// FillIdentity stores id in the instance row while both identity columns are empty and
+	// reports whether it changed the row (bothy migrate up, 03 4.1).
+	FillIdentity(ctx context.Context, id instance.DatabaseIdentity) (bool, error)
+}
+
+// RestoreRepository is the outgoing port of bothy restore finalize to the tables instance and
+// sequence_counters and to the session view of the database. adapters/postgres implements it.
+type RestoreRepository interface {
+	// LoadInstance and LockInstance as in Repository.
+	LoadInstance(ctx context.Context) (rec instance.Record, found bool, err error)
+	LockInstance(ctx context.Context) (rec instance.Record, found bool, err error)
+	// CounterValue reads a counter without a lock; event_seq is head_seq.
+	CounterValue(ctx context.Context, name string) (int64, error)
+	// ClusterIdentity as in Repository.
+	ClusterIdentity(ctx context.Context) (instance.DatabaseIdentity, error)
+	// FinalizeInstance sets sync_epoch and the identity of the instance row; it requires a unit
+	// of work. A missing row is kind not_found.
+	FinalizeInstance(ctx context.Context, syncEpoch ids.ID, id instance.DatabaseIdentity) error
+	// OtherSessionsOfRole counts the sessions of role on the current database besides the
+	// caller's own (pg_stat_activity).
+	OtherSessionsOfRole(ctx context.Context, role string) (int64, error)
 }

@@ -357,6 +357,13 @@ database from `pgtest.Durable()` (`fsync` and `synchronous_commit` on, ADR 0063 
 below the value of 02; the threshold comes from the table of 02 through
 `perf/internal/report`.
 
+- Restore cursors (M7-04): the port `RestoreCursors` (`restore.go`) with `MoveCursorsTo(ctx,
+  headSeq)`, implemented by `app.NewRestoreCursors` over the outgoing port `CursorMoveStore`
+  (`adapters/postgres`, query `MoveAllConsumerCursors`): it sets `event_consumer_cursors.last_seq` of every row to the
+  head of the restored log inside the caller's unit of work and refuses to run outside one.
+  `bothy restore finalize` calls it through `internal/wire` (`RestoreCursors`) in the transaction
+  that sets the new sync epoch (docs/spec/03-datenmodell.md 6.7 item 1).
+
 ## Stored settings of many people (M3-18)
 
 - Port: `Settings.ValuesFor(ctx, userIDs, keys)` returns the stored values of the keys for many people in one query (`SettingValues`), without defaults and without `authorize`: `notify` reads `notify.default_level` of every candidate of a thread (M3-18), and M3-19 reads its switches the same way.

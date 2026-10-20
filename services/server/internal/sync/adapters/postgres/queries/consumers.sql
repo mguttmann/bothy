@@ -38,3 +38,8 @@ SELECT occurred_at FROM event_log
 WHERE seq > sqlc.arg(after_seq)::bigint
 ORDER BY seq
 LIMIT 1;
+
+-- name: MoveAllConsumerCursors :execrows
+-- bothy restore finalize (M7-04, 03 6.7 item 1): every worker consumer to the head of the
+-- restored log, in the caller's transaction.
+UPDATE event_consumer_cursors SET last_seq = sqlc.arg(head_seq)::bigint, updated_at = now();

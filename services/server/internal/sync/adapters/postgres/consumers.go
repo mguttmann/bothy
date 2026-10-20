@@ -85,3 +85,16 @@ func (r *Repository) OldestEventAfter(ctx context.Context, after int64) (time.Ti
 	}
 	return rows[0].Time.UTC(), true, nil
 }
+
+// MoveAllConsumerCursors sets last_seq of every worker consumer to headSeq in the unit of work of
+// ctx (app.CursorMoveStore, bothy restore finalize).
+func (r *Repository) MoveAllConsumerCursors(ctx context.Context, headSeq int64) (int64, error) {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return sqlcgen.New(tx).MoveAllConsumerCursors(ctx, headSeq)
+}
+
+// Compile-time check: Repository moves the cursors of bothy restore finalize.
+var _ app.CursorMoveStore = (*Repository)(nil)

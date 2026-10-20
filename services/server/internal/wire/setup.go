@@ -89,7 +89,14 @@ func NewSetup(ctx context.Context, v *config.Values, env []string, log *slog.Log
 
 // setupPool opens the pool of the application role and checks the schema.
 func setupPool(ctx context.Context, v *config.Values, sp *secrets.Provider, log *slog.Logger) (*pg.Pool, error) {
-	db, err := DatabaseConfig(v, "bothy-setup")
+	return commandPool(ctx, v, sp, log, "bothy-setup")
+}
+
+// commandPool opens the pool of database.user for a host command with application_name appName,
+// waits up to startup.dependency_wait for the database and checks the schema against the
+// embedded migrations (bothy setup, bothy restore finalize).
+func commandPool(ctx context.Context, v *config.Values, sp *secrets.Provider, log *slog.Logger, appName string) (*pg.Pool, error) {
+	db, err := DatabaseConfig(v, appName)
 	if err != nil {
 		return nil, err
 	}

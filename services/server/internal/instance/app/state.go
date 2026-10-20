@@ -42,8 +42,8 @@ func (s *state) Load(ctx context.Context) (instance.Record, error) {
 	return rec, nil
 }
 
-// RecordMigration creates the row if missing and records the versions in one unit of work
-// (instance.State.RecordMigration). The IDs are new UUIDv7 values of the application (R-DM-01);
+// RecordMigration creates the row if missing, records the versions and fills an empty database
+// identity in one unit of work (instance.State.RecordMigration). The IDs are new UUIDv7 values of the application (R-DM-01);
 // when the row exists they are discarded by ON CONFLICT DO NOTHING.
 func (s *state) RecordMigration(ctx context.Context, schemaVersion int64, minServerVersion string) (instance.Record, error) {
 	if schemaVersion < 1 {
@@ -60,7 +60,14 @@ func (s *state) RecordMigration(ctx context.Context, schemaVersion int64, minSer
 		if err := s.repo.SetVersions(ctx, schemaVersion, minServerVersion); err != nil {
 			return err
 		}
-		var err error
+		// R-DM-50: the first identity of the cluster; the statement keeps a stored one.
+		id, err := s.repo.ClusterIdentity(ctx)
+		if err != nil {
+			return err
+		}
+		if _, err := s.repo.FillIdentity(ctx, id); err != nil {
+			return err
+		}
 		rec, err = s.Load(ctx)
 		return err
 	})
@@ -95,4 +102,21 @@ func (s *state) CompleteSetup(ctx context.Context, at time.Time) error {
 		return errs.New(errs.CodeConflict, "instance: setup is already complete")
 	}
 	return nil
+}
+
+// CheckIdentity implements instance.State: the stored identity of the row against the current
+// one of the cluster (R-DM-50).
+func (s *state) CheckIdentity(ctx context.Context) (instance.IdentityCheck, error) {
+	rec, err := s.Load(ctx)
+	if err != nil {
+		return instance.IdentityCheck{}, err
+	}
+	current, err := s.repo.ClusterIdentity(ctx)
+	if err != nil {
+		return instance.IdentityCheck{}, err
+	}
+	return instance.IdentityCheck{
+		Stored: rec.DatabaseIdentity, Current: current,
+		Mismatch: domain.IdentityMismatch(toDomainIdentity(rec.DatabaseIdentity), toDomainIdentity(current)),
+	}, nil
 }

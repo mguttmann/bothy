@@ -326,3 +326,16 @@ func consumerRow(acked int64, err error, what string) (int64, bool, error) {
 	}
 	return acked, true, nil
 }
+
+// MoveAllConsumers sets acked_seq of every consumer to headSeq in the unit of work of ctx
+// (app.CursorMoveStore, bothy restore finalize).
+func (r *Repository) MoveAllConsumers(ctx context.Context, headSeq int64) (int64, error) {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return sqlcgen.New(tx).MoveAllConsumers(ctx, headSeq)
+}
+
+// Compile-time check: Repository moves the cursors of bothy restore finalize.
+var _ app.CursorMoveStore = (*Repository)(nil)

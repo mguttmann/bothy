@@ -163,3 +163,58 @@ func TestState_SetupAsApp(t *testing.T) {
 		t.Fatalf("Load = %+v, %v; want setup_completed_at %v", rec, err, at)
 	}
 }
+
+// clusterIdentity reads the identity of the test cluster as the superuser.
+func clusterIdentity(t *testing.T, db *pgtest.DB) instance.DatabaseIdentity {
+	t.Helper()
+	var id instance.DatabaseIdentity
+	if err := db.SuperConn(t).QueryRow(context.Background(), `SELECT s.system_identifier::text, c.timeline_id::bigint
+		FROM pg_control_system() s, pg_control_checkpoint() c`).Scan(&id.SystemIdentifier, &id.TimelineID); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// TestState_RecordMigrationFillsIdentityOnlyWhileEmpty: bothy migrate up stores the identity of
+// the cluster while it is empty (a fresh install or an instance older than M7-04) and never
+// replaces a stored one (03 4.1, R-DM-50); bothy_app reads it with the row.
+func TestState_RecordMigrationFillsIdentityOnlyWhileEmpty(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	owner := stateOf(t, db, pg.RoleOwner)
+	want := clusterIdentity(t, db)
+	if want.SystemIdentifier == "" || want.TimelineID < 1 {
+		t.Fatalf("cluster identity %+v", want)
+	}
+	first, err := owner.RecordMigration(ctx, 2, "0.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.DatabaseIdentity != want {
+		t.Fatalf("after the first migrate up: identity %+v, want %+v", first.DatabaseIdentity, want)
+	}
+	// A stored identity stays, also when it differs from the cluster (only restore finalize
+	// replaces it).
+	if _, err := db.SuperConn(t).Exec(ctx, `UPDATE instance SET pg_system_identifier = '1', pg_timeline_id = 9`); err != nil {
+		t.Fatal(err)
+	}
+	second, err := owner.RecordMigration(ctx, 3, "0.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.DatabaseIdentity != (instance.DatabaseIdentity{SystemIdentifier: "1", TimelineID: 9}) || second.SyncEpoch != first.SyncEpoch {
+		t.Fatalf("a stored identity or the epoch changed: %+v after %+v", second, first)
+	}
+	// Empty again (as after the migration of an older instance): the next run fills it.
+	if _, err := db.SuperConn(t).Exec(ctx, `UPDATE instance SET pg_system_identifier = NULL, pg_timeline_id = NULL`); err != nil {
+		t.Fatal(err)
+	}
+	third, err := owner.RecordMigration(ctx, 3, "0.0.0")
+	if err != nil || third.DatabaseIdentity != want || third.SyncEpoch != first.SyncEpoch {
+		t.Fatalf("refill: %+v, %v", third, err)
+	}
+	if loaded, err := stateOf(t, db, pg.RoleApp).Load(ctx); err != nil || loaded.DatabaseIdentity != want {
+		t.Fatalf("Load as bothy_app = %+v, %v", loaded, err)
+	}
+}

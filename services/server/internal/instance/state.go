@@ -25,6 +25,9 @@ type Record struct {
 	MinServerVersion string
 	// SyncEpoch names the timeline of the event log; new after every restore (03 6.7).
 	SyncEpoch ids.ID
+	// DatabaseIdentity is the stored identity of the database cluster (R-DM-50); zero while
+	// empty (an instance migrated before M7-04, until the next bothy migrate up fills it).
+	DatabaseIdentity DatabaseIdentity
 	// CreatedAt is when the row was created.
 	CreatedAt time.Time
 }
@@ -44,7 +47,9 @@ type State interface {
 	// and sync_epoch, and sets schema_version and min_server_version. It never changes
 	// instance_id, sync_epoch, setup_completed_at or created_at, and it never lowers
 	// schema_version: a call with a smaller schemaVersion than recorded (an older binary racing
-	// a newer one) leaves the row unchanged. It returns the row as it is afterwards.
+	// a newer one) leaves the row unchanged. While the stored database identity is empty it
+	// stores the current one (R-DM-50); a stored identity changes only through Restore.Finalize.
+	// It returns the row as it is afterwards.
 	//
 	// It runs in a unit of work of its own, or joins the ambient one when ctx is inside a unit.
 	// Errors: kind internal for schemaVersion < 1 or a minServerVersion that is not SemVer;
@@ -61,4 +66,9 @@ type State interface {
 	// stays unchanged and the call fails with kind conflict. Errors: kind internal outside a unit
 	// of work; the database error otherwise.
 	CompleteSetup(ctx context.Context, at time.Time) error
+	// CheckIdentity reads the stored database identity of the instance row and the current one
+	// of the database and compares them, the start lock of R-DM-50 (an empty stored identity
+	// never mismatches). Errors: kind not_found without the instance row, the database error
+	// otherwise.
+	CheckIdentity(ctx context.Context) (IdentityCheck, error)
 }

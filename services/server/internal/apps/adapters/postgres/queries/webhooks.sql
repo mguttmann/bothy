@@ -115,3 +115,8 @@ WHERE subscription_id = @subscription_id
   AND (NOT @has_after::boolean OR (event_seq, id) < (@after_seq::bigint, @after_id::uuid))
 ORDER BY event_seq DESC, id DESC
 LIMIT @lim;
+
+-- name: MoveAllSubscriptionCursors :execrows
+-- bothy restore finalize (M7-04, 03 6.7 item 1): every subscription to the head of the restored
+-- log, in the caller's transaction, so receivers get no event of the old timeline.
+UPDATE webhook_subscriptions SET last_delivered_seq = @head_seq;

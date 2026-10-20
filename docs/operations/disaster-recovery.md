@@ -52,7 +52,9 @@ automatische Wiederherstellungstest misst die Dauer bei jedem Lauf.
 3. `docker compose up -d secrets-init postgres backup`, dann Restore aus repo2 nach
    [backup-restore.md](backup-restore.md) 5.2 ab Schritt 4 (Ziel: letzter Stand).
 4. Objekte aus restic zurückspielen.
-5. `bothy restore finalize`, Wiederherstellungstest, dann alle Dienste starten.
+5. `bothy restore finalize`, Wiederherstellungstest, dann alle Dienste starten. Without this step
+   `api` and `worker` stay not ready with `restore_not_finalized`, because the database identity
+   of the new host differs from the stored one ([16-betrieb.md](../spec/16-betrieb.md) 8.4).
 6. DNS bzw. Tailscale-Gerät auf den neuen Host. Bei `tailscale` ist das Gerät neu; `TS_HOSTNAME`
    gleich halten, das alte Gerät in der Tailnet-Verwaltung entfernen.
 7. Dauer festhalten und mit `dr.rto_target` vergleichen.
@@ -89,6 +91,23 @@ automatische Wiederherstellungstest misst die Dauer bei jedem Lauf.
    neu erzeugen, OIDC-Client-Secret neu).
 3. Wiederherstellung aus dem Off-site-Ziel; dieses ist nur anhängend und darum unversehrt.
 4. Zeitpunkt vor der Übernahme wählen (Fall A), wenn Daten manipuliert sein könnten.
+
+### Case G: managed database failed over, server not ready
+
+`api` and `worker` report `restore_not_finalized` after the provider promoted a standby: the
+timeline of the database changed without a restore ([16-betrieb.md](../spec/16-betrieb.md) 8.4).
+
+1. Ask the provider whether the failover can have lost committed transactions. When it cannot
+   (synchronous replication, documented by the provider): `docker compose stop api worker`, run
+   a backup (`docker compose exec backup bothy-backupd backup logical`), save the manifest of that
+   run (`backup_runs.manifest` of the newest row) as `manifest.json` next to the Compose file and run
+   `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro migrate restore finalize --relocation /tmp/manifest.json`: nothing was
+   written since the backup, so the facts match, the new identity is stored and the epoch stays.
+   For such a service, `database.restore_guard = off` keeps the server ready across future
+   failovers and R-SY-04 remains.
+2. When it can, or when unsure: treat it like a restore. `docker compose stop api worker`,
+   `docker compose run --rm migrate restore finalize` (new epoch, cursors to `head_seq`),
+   then start the services; clients reload and keep their outbox.
 
 ## 4. Nach jedem Fall
 

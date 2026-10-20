@@ -138,8 +138,15 @@ Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
    `pgbackrest restore` mit `--delta` auf das Volume `pgdata` auf).
 5. `docker compose start postgres`; PostgreSQL spielt WAL bis zum Ziel und beginnt eine neue
    Zeitlinie.
-6. `docker compose run --rm migrate bothy restore finalize`: neue `sync_epoch`, Cursor der
-   Agenten, Webhooks und Worker-Verbraucher auf `head_seq`, Audit-Eintrag (03 Abschnitt 6.7).
+6. `docker compose run --rm migrate restore finalize` (the entrypoint of the image is `bothy`): neue `sync_epoch`, Cursor der
+   Agenten, Webhooks und Worker-Verbraucher auf `head_seq`, Audit-Eintrag (03 Abschnitt 6.7). It
+   also stores the identity of the restored database (`instance.pg_system_identifier`,
+   `instance.pg_timeline_id`, R-DM-50), all in one transaction; on an error nothing changes and
+   the command can run again. It refuses with exit `1` while `api` or `worker` is connected
+   (step 1 stopped them). Skipping this step is caught: a server whose database identity differs
+   from the stored one stays not ready with `restore_not_finalized`, serves and delivers nothing and logs this step
+   ([16-betrieb.md](../spec/16-betrieb.md) 8.4); the switch `database.restore_guard = off` is only
+   for a managed failover without loss of committed transactions (section 6).
 7. Wiederherstellungstest gegen den neuen Stand von Hand auslösen.
 8. `docker compose start api worker`. Clients bekommen `resync_required` mit Grund
    `epoch_changed` und laden neu; ihr Ausgangsfach bleibt erhalten.
@@ -151,7 +158,10 @@ Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
    laufen lassen.
 2. `pg_restore --clean --if-exists --no-owner --role=bothy_owner` aus dem restic-Snapshot.
 3. Objekte aus restic in das Volume `files` (bzw. in den Bucket) zurückspielen.
-4. `bothy restore finalize`, dann Start und Wiederherstellungstest.
+4. `bothy restore finalize`, dann Start und Wiederherstellungstest. The logical restore created a
+   new cluster, so without this step the server stays not ready (`restore_not_finalized`). For a
+   relocation without data loss use `bothy restore finalize --relocation <manifest>` instead
+   ([cloud-migration.md](cloud-migration.md) 3).
 
 ## 6. Verwalteter PostgreSQL-Dienst
 
@@ -159,6 +169,14 @@ Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
 2. `bothy-backupd` läuft ohne pgBackRest: logischer Abzug, Objektsicherung, Manifest,
    Wiederherstellungstest (Restore des logischen Abzugs in eine Scratch-Datenbank im Container).
 3. Eine PITR beim Anbieter erzeugt eine neue Datenbank-Instanz; danach gilt 5.2 ab Schritt 6.
+4. Automatic failover of the provider promotes a standby and raises the timeline, which the start
+   lock treats like a restore (`restore_not_finalized`). Only where the provider documents that a
+   failover loses no committed transaction (synchronous replication) set
+   `database.restore_guard = off`; otherwise run `bothy restore finalize` after a failover, which
+   starts a new epoch, because a lost commit would let new writes reuse sequence numbers clients
+   already hold ([16-betrieb.md](../spec/16-betrieb.md) 8.4). Whether a provider shows
+   `pg_control_system()` and `pg_control_checkpoint()` to the application role is not checked;
+   PostgreSQL 18 grants both to `PUBLIC`.
 
 ## 7. Grenzen
 

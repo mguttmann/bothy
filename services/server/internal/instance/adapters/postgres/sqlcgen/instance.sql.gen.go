@@ -44,17 +44,20 @@ func (q *Queries) EnsureInstance(ctx context.Context, arg EnsureInstanceParams) 
 
 const loadInstance = `-- name: LoadInstance :one
 
-SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at
+SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at,
+       pg_system_identifier, pg_timeline_id
 FROM instance WHERE id = 1
 `
 
 type LoadInstanceRow struct {
-	InstanceID       pgtype.UUID
-	SetupCompletedAt pgtype.Timestamptz
-	SchemaVersion    int64
-	MinServerVersion pgtype.Text
-	SyncEpoch        pgtype.UUID
-	CreatedAt        pgtype.Timestamptz
+	InstanceID         pgtype.UUID
+	SetupCompletedAt   pgtype.Timestamptz
+	SchemaVersion      int64
+	MinServerVersion   pgtype.Text
+	SyncEpoch          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	PgSystemIdentifier pgtype.Text
+	PgTimelineID       pgtype.Int8
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -68,22 +71,27 @@ func (q *Queries) LoadInstance(ctx context.Context) (LoadInstanceRow, error) {
 		&i.MinServerVersion,
 		&i.SyncEpoch,
 		&i.CreatedAt,
+		&i.PgSystemIdentifier,
+		&i.PgTimelineID,
 	)
 	return i, err
 }
 
 const lockInstance = `-- name: LockInstance :one
-SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at
+SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at,
+       pg_system_identifier, pg_timeline_id
 FROM instance WHERE id = 1 FOR UPDATE
 `
 
 type LockInstanceRow struct {
-	InstanceID       pgtype.UUID
-	SetupCompletedAt pgtype.Timestamptz
-	SchemaVersion    int64
-	MinServerVersion pgtype.Text
-	SyncEpoch        pgtype.UUID
-	CreatedAt        pgtype.Timestamptz
+	InstanceID         pgtype.UUID
+	SetupCompletedAt   pgtype.Timestamptz
+	SchemaVersion      int64
+	MinServerVersion   pgtype.Text
+	SyncEpoch          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	PgSystemIdentifier pgtype.Text
+	PgTimelineID       pgtype.Int8
 }
 
 // bothy setup (M1-37): the row locked until the end of the unit of work, so two setups serialise.
@@ -98,6 +106,8 @@ func (q *Queries) LockInstance(ctx context.Context) (LockInstanceRow, error) {
 		&i.MinServerVersion,
 		&i.SyncEpoch,
 		&i.CreatedAt,
+		&i.PgSystemIdentifier,
+		&i.PgTimelineID,
 	)
 	return i, err
 }

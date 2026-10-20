@@ -55,6 +55,9 @@ type gwWorld struct {
 	// owner is the pool of sql, opened once: a pool per statement would hold its idle
 	// connection until the test ends and use up the slots of the shared test container.
 	owner *pg.Pool
+	// app is the bothy_app pool of the side identity; the restore tests close it, because
+	// bothy restore finalize refuses while a bothy_app session is connected (M7-04).
+	app *pg.Pool
 }
 
 // newGatewayWorld starts an api process with the gateway windows of extra (environment entries).
@@ -128,7 +131,7 @@ func newGatewayWorld(t *testing.T, extra ...string) *gwWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &gwWorld{t: t, db: db, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env}
+	return &gwWorld{t: t, db: db, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env, app: pool}
 }
 
 // sql runs a statement as the schema owner.

@@ -24,6 +24,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `ratelimit.go`, `configkeys_ratelimit.go` | `RateLimitConfig`, `InstallRateLimits` and the start check (M1-19); the keys `ratelimit.*` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
 | `setup.go` | `InstallSetupGate` and `RouteActions` (the setup gate over the instance row, M1-37); `Setup` (`NewSetup`, `BootstrapOwner`, `IssueRecoveryCode`, `Close`): the parts of the server `bothy setup` needs, as `bothy_app` |
+| `restore.go` | `RestoreFinalize` (`NewRestoreFinalize`, `Finalize`, `Close`): `bothy restore finalize` as `database.user` (the schema owner); `NewRestoreService`, `RestoreCursors` (the cursor ports of agents, apps and sync, in this order), `ParseRelocationManifest` (`backup_manifest.v1`); the start lock `checkRestoreGuard` with the readiness check `restore_not_finalized` and `database.restore_guard`; while it holds, `whileFinalized` skips the steps `log_tail`, `jobs`, `event_consumers` and `public_listener` (M7-04, R-DM-50) |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 
 ## Serve assembly
@@ -38,7 +39,7 @@ components, in start order:
 | `internal_listener` | opens `server.internal_listen_addr` with `/healthz` and `/readyz`, logs `internal listener started` | all |
 | `database` | `pg.Open`, `WaitReady` within `startup.dependency_wait`; readiness check `database` | all |
 | `schema` | `pg.CheckSchema` against the highest embedded version; older aborts with the hint to run `bothy migrate up` | all |
-| `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15) | all |
+| `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15); unless `database.restore_guard` is `off`, a database identity that differs from the stored one registers `restore_not_finalized`, which fails for good (M7-04) | all |
 | `audit` | resolves `privacy.audit_ip_kek_ref` once (fail fast), builds the audit module with the unit of work of the role (`NewAudit`) and starts the aggregator of denials (`Audit.Start`), registering the stop step `audit_denials` (M1-24) | all |
 | `identity` | after `audit`, `sync` and `authz`: resolves `auth.token_pepper_ref` once (32 bytes as hex, fail fast), builds `Identity` over the unit of work of `audit` and the Authorizer, starts the sweeper of the jti store with the stop step `dpop_replay_sweeper` in `PhaseHTTP`; `routes` mounts its device handlers unless `Deps.Handlers` names one (M1-33) | all |
 | `agents` | after `identity`: builds `Agents` (`NewAgents`) over the unit of work, recorder and rights hook of `audit`, the appender of `sync`, the Authorizer and the principal writer, directory and token revocation of identity; `routes` mounts its handlers unless `Deps.Handlers` names one (M1-51) | all |

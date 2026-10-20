@@ -515,13 +515,15 @@ type IdentityProvider struct {
 }
 
 type Instance struct {
-	ID               int16
-	InstanceID       pgtype.UUID
-	SetupCompletedAt pgtype.Timestamptz
-	SchemaVersion    int64
-	MinServerVersion pgtype.Text
-	SyncEpoch        pgtype.UUID
-	CreatedAt        pgtype.Timestamptz
+	ID                 int16
+	InstanceID         pgtype.UUID
+	SetupCompletedAt   pgtype.Timestamptz
+	SchemaVersion      int64
+	MinServerVersion   pgtype.Text
+	SyncEpoch          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	PgSystemIdentifier pgtype.Text
+	PgTimelineID       pgtype.Int8
 }
 
 type InstanceSetting struct {

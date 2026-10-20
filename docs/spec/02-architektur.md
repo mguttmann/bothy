@@ -95,7 +95,7 @@ nennen nur Befehle von hier.
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung: erster Owner per Server-Befehl (Systemaktion `instance.bootstrap`), Einladungs-Code zur Wiederherstellung | [08-identitaet.md](08-identitaet.md) |
 | `bothy config check\|print` | Konfiguration prüfen, redigiert ausgeben; `check --secrets` löst zusätzlich jeden Verweis `*_ref` über den Secret-Provider auf und nennt je Schlüssel nur `ok` oder den Fehlercode | Abschnitt 13 |
 | `bothy import login\|logout`, `bothy import discord ...` | login of the import tool as a `cli` device through device pairing; import and read mirror through the import API (`import.read`, `import.apply`) | [22-import-migration.md](22-import-migration.md) |
-| `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche, Cursor auf `head_seq`, Audit | [16-betrieb.md](16-betrieb.md), [03-datenmodell.md](03-datenmodell.md) 6.7 |
+| `bothy restore finalize [--relocation <manifest>]` | nach einer Wiederherstellung: neue Sync-Epoche, Cursor auf `head_seq`, gespeicherte Datenbank-Identität (R-DM-50), Audit, in einer Transaktion; as the schema owner and only while no `bothy_app` session is connected (exit `1` otherwise). `--relocation` takes the manifest of the final backup of a relocation without data loss: when `event_log.head_seq`, the audit head and `sync_epoch` equal it, only the identity is stored and epoch and cursors stay; a difference is exit `1` naming the field | [16-betrieb.md](16-betrieb.md) 8.4, [03-datenmodell.md](03-datenmodell.md) 6.7 |
 | `bothy secrets init\|export` | Geheimnisse anlegen und sichern: `init --target DIR [--source DIR] [--owner DIENST=UID:GID ...] [--adopt-source]` gleicht die Ablage `_store/` mit der Quelle ab und kopiert je Dienst; `export --from DIR --age-recipient SCHLÜSSEL [--age-recipient ...] [--signing-key-dir DIR] [--output DATEI\|-] [--armor]` schreibt das age-verschlüsselte Bündel (mit dem Schlüsselspeicher unter `signing-keys/`); beide lesen nur ihre Flags, ohne Konfigurationsdatei und Datenbank | [16-betrieb.md](16-betrieb.md) 5.3, 5.4 |
 | `bothy healthcheck --url URL [--timeout DURATION]` | Gesundheitsprüfung für Container ohne Shell gegen den internen Listener. `--url` takes only `http://` with a loopback host (`127.0.0.0/8`, `::1`, `localhost`), anything else is exit `2`; `--timeout` bounds the whole request (default `5s`, the timeout of the Compose healthcheck); no configuration, secrets or database; exit `0` for `2xx`, else `1` with one line naming the status code or the error class | [16-betrieb.md](16-betrieb.md) |
 | `bothy files rescan` | Wartung: Dateien erneut prüfen lassen | [12-dateien.md](12-dateien.md) |
@@ -1283,7 +1283,13 @@ Clients nehmen nach 04 wieder auf.
    nicht an der Einrichtung, sonst öffnete ein Orchestrator den Weg zum Einlösen des Codes nie.
    Verlangt
    `instance.min_server_version` eine neuere Version als die eigene, läuft der Prozess weiter,
-   wird aber nie bereit: `/readyz` scheitert mit `schema_requires_newer_server`.
+   wird aber nie bereit: `/readyz` scheitert mit `schema_requires_newer_server`. The same holds
+   for the start lock of R-DM-50 ([16-betrieb.md](16-betrieb.md) 8.4, M7-04): unless
+   `database.restore_guard` is `off`, a database identity (`pg_control_system().system_identifier`,
+   `pg_control_checkpoint().timeline_id`) that differs from the one stored in `instance` keeps
+   every role not ready with `restore_not_finalized` and logs once that `bothy restore finalize`
+   must run; the process then skips step 8 (no log tail, River, worker consumers or public
+   listener), so it takes no writes and delivers nothing. An empty stored identity never blocks.
 6. Signierschlüssel sicherstellen: Jeder Zweck ohne `active`-Schlüssel bekommt einen
    ([19-sicherheit.md](19-sicherheit.md), Abschnitt 10; [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)).
    Keys whose private file is missing from the key store (a restore without it) are retired
@@ -1315,8 +1321,9 @@ Auf dem internen Listener `server.internal_listen_addr`, nicht in der öffentlic
   14.5); darum braucht `/healthz` keine eigene Prüfung dafür. The same holds for the runner of the
   worker consumers (worker, M2-01); a failing round is no such end (11.5 item 7).
 - `/readyz` (bereit): Start abgeschlossen (`startup`), Datenbank erreichbar (`database`), Version
-  zum Schema passend (`schema_requires_newer_server`), je Zweck ein aktiver Signierschlüssel
-  (`signing_keys`), kein Shutdown begonnen (`shutting_down`). Weitere Prüfungen bringen die
+  zum Schema passend (`schema_requires_newer_server`), die Datenbank-Identität wie gespeichert
+  oder die Wiederherstellung abgeschlossen (`restore_not_finalized`, 16 8.4), je Zweck ein
+  aktiver Signierschlüssel (`signing_keys`), kein Shutdown begonnen (`shutting_down`). Weitere Prüfungen bringen die
   Fachkapitel mit (z. B. `trusted_header_requires_loopback`, 16 Abschnitt 4.3). Antwortformat:
   16, Abschnitt 4.2.
 

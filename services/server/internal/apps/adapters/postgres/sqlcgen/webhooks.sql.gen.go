@@ -562,6 +562,20 @@ func (q *Queries) LockSubscription(ctx context.Context, id pgtype.UUID) (LockSub
 	return i, err
 }
 
+const moveAllSubscriptionCursors = `-- name: MoveAllSubscriptionCursors :execrows
+UPDATE webhook_subscriptions SET last_delivered_seq = $1
+`
+
+// bothy restore finalize (M7-04, 03 6.7 item 1): every subscription to the head of the restored
+// log, in the caller's transaction, so receivers get no event of the old timeline.
+func (q *Queries) MoveAllSubscriptionCursors(ctx context.Context, headSeq int64) (int64, error) {
+	result, err := q.db.Exec(ctx, moveAllSubscriptionCursors, headSeq)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const shareLiveInstallation = `-- name: ShareLiveInstallation :one
 SELECT i.id, i.app_id, i.granted_scopes, i.event_subscriptions, i.state, i.installed_by, i.installed_at, i.uninstalled_at, i.uninstalled_by FROM app_installations i
 WHERE i.app_id = $1 AND i.state IN ('active', 'suspended')

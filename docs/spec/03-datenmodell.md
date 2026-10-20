@@ -124,12 +124,14 @@ Zweck: genau eine Zeile mit der Identität dieser Installation. Modul: `instance
 | `schema_version` | `bigint` | nein | | letzte angewandte Migration, nur zur Anzeige |
 | `min_server_version` | `text` | ja | | SemVer; kleinste Server-Version, die mit diesem Schema laufen darf; gesetzt von `bothy migrate`. Ein Server mit kleinerer Version meldet nicht bereit ([16-betrieb.md](16-betrieb.md), Abschnitt 10) |
 | `sync_epoch` | `uuid` | nein | | UUIDv7 der aktuellen Zeitlinie des Ereignis-Logs; beim ersten `bothy migrate up` erzeugt, nach jeder Wiederherstellung neu (Abschnitt 6.7) |
+| `pg_system_identifier` | `text` | ja | | `system_identifier` of `pg_control_system()` of the database cluster, as decimal text (the value is an unsigned 64-bit number); set by `bothy migrate up` while empty and by `bothy restore finalize` (section 6.7, R-DM-50) |
+| `pg_timeline_id` | `bigint` | ja | | `timeline_id` of `pg_control_checkpoint()`, read together with `pg_system_identifier` (R-DM-50) |
 | `created_at` | `timestamptz` | nein | `now()` | |
 
 PK: `id`. FK: keine. Unique: `instance_id`. Indexe: keine weiteren.
 Aufbewahrung: `config`. `bothy migrate up` legt die Zeile an, falls sie fehlt
 (`INSERT ... ON CONFLICT (id) DO NOTHING`), und setzt danach `schema_version` und
-`min_server_version`; `instance_id`, `sync_epoch` und `setup_completed_at` ändert es nie. Grund:
+`min_server_version`; `instance_id`, `sync_epoch` und `setup_completed_at` ändert es nie, and it sets `pg_system_identifier` and `pg_timeline_id` only while they are empty. Grund:
 `migrate` ist der erste Schritt jeder Installation, und die Bereitschaftsprüfung braucht
 `min_server_version`, bevor es einen Owner gibt.
 
@@ -2615,6 +2617,7 @@ Eine Wiederherstellung aus der Sicherung setzt die globale Sequenz zurück. Ohne
 2. Clients speichern die Epoche zusammen mit dem Cursor. Weicht sie ab, verlangt der Server neu zu
    laden ([04-sync-protokoll.md](04-sync-protokoll.md), Abschnitt 7.5).
 3. Ein Umzug ohne Datenverlust ([16-betrieb.md](16-betrieb.md), Abschnitt 11) behält die Epoche.
+4. `bothy restore finalize` also stores the identity of the restored database in `instance.pg_system_identifier` and `instance.pg_timeline_id` in the same transaction. A server whose current database identity differs from the stored one does not become ready until `bothy restore finalize` has run, because a restore without it would mix two timelines; a move without data loss stores the new identity without a new epoch (R-DM-50; the readiness reason and the operator switch are in [16-betrieb.md](16-betrieb.md), section 8.4).
 
 ### 6.8 I6-Prüfung
 
@@ -3389,6 +3392,7 @@ erDiagram
 | R-DM-40 | `terminal_sessions` verweist mit `(host_session_user_id, host_id, user_id)` auf `host_session_users(id, host_id, user_id)`. | Ein Fremdschlüssel nur auf `id` ließe einen Sitzungsbenutzer eines anderen Rechners oder einer anderen Person zu; der Host-Dienst bände einen neuen Namen dann an die falsche Person (D-W-66). |
 | R-DM-41 | `hosts.reported_session_users` hält die gemeldeten Namen der Sitzungsbenutzer mit den Anzeigenamen ihrer Arbeitsordner. | Der Server ordnet nur Namen zu, die der Rechner kennt, und bietet je Person nur ihre eigenen Arbeitsordner an (Rulings T12 und T13; D-W-62, D-W-63). |
 | R-DM-49 | `auth_sessions` stores "View as person" of a console session in `view_as_user_id` and `view_as_started_at` (console sessions only, both set or both empty); `access.view_as` from a console session sets them in the transaction of its audit entry, `access.view_as.end` or the first request after `authz.view_as_max_duration` clears them with an audit entry of the end. | [07-rechte.md](07-rechte.md) section 9.2 requires state on the console session (target person, start) and operations to start and end it, added to the core contract before PLAN M6-01 builds the console session (D-W-100 extended to M5 and M6). |
+| R-DM-50 | `instance` stores the identity of the database cluster (`pg_system_identifier`, `pg_timeline_id`); `bothy migrate up` fills it while empty, `bothy restore finalize` replaces it after a restore or a move, and a differing current identity keeps the server not ready (section 6.7). | [ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md) leaves the start lock open; a point-in-time restore raises the timeline and a logical restore changes the system identifier, so both are detected without a value outside the database. |
 
 ## 9. Konfigurationswerte dieses Kapitels
 

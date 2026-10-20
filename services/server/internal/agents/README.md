@@ -39,6 +39,13 @@ Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, V
   trigger `agents_kind_check` (an agents row only for a principal of kind `agent`, SQLSTATE
   `23514`). `bothy_app` may read, insert and update, not delete.
 
+- Restore cursors (M7-04): the port `RestoreCursors` (`restore.go`) with `MoveCursorsTo(ctx,
+  headSeq)`, implemented by `app.NewRestoreCursors` over the outgoing port `CursorMoveStore`
+  (`adapters/postgres`, query `MoveAllConsumers`): it sets `agent_consumer_cursors.acked_seq` of every row to the
+  head of the restored log inside the caller's unit of work and refuses to run outside one.
+  `bothy restore finalize` calls it through `internal/wire` (`RestoreCursors`) in the transaction
+  that sets the new sync epoch (docs/spec/03-datenmodell.md 6.7 item 1).
+
 ## Consumers (M2-07)
 
 - Port: `Consumers` (`Take`, `AcceptAck`, `Save`, `Restart`; the gateway reaches

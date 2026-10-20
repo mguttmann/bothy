@@ -310,3 +310,16 @@ func int32Of(n int) (int32, error) {
 	}
 	return int32(n), nil
 }
+
+// MoveAllSubscriptionCursors sets last_delivered_seq of every subscription to headSeq in the unit
+// of work of ctx (app.CursorMoveStore, bothy restore finalize).
+func (r *Repository) MoveAllSubscriptionCursors(ctx context.Context, headSeq int64) (int64, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return q.MoveAllSubscriptionCursors(ctx, headSeq)
+}
+
+// Compile-time check: Repository moves the cursors of bothy restore finalize.
+var _ app.CursorMoveStore = (*Repository)(nil)

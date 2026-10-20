@@ -234,7 +234,8 @@ portability test equal to the second block above and the version of the document
 
 `/healthz` meldet nur, dass der Prozess lebt. `/readyz` meldet bereit, wenn der Start
 abgeschlossen ist, die Datenbank antwortet, die Binärversion zum Schema passt (Abschnitt 10), je
-Zweck ein aktiver Signierschlüssel besteht, kein Shutdown begonnen hat und (ab M3) der
+Zweck ein aktiver Signierschlüssel besteht, kein Shutdown begonnen hat, the database identity
+matches the stored one or the restore was finalized (`restore_not_finalized`, 8.4) und (ab M3) der
 Objektspeicher antwortet; die Namen der Prüfungen stehen in
 [02-architektur.md](02-architektur.md), Abschnitt 15.2. Antworten: `GET` und `HEAD`,
 `Content-Type: application/json`, `Cache-Control: no-store`; Erfolg `200` mit
@@ -742,6 +743,43 @@ alle `agent_consumer_cursors.acked_seq`, `webhook_subscriptions.last_delivered_s
 `event_consumer_cursors.last_seq` auf den neuen `head_seq` und schreibt einen Audit-Eintrag. Ein
 Umzug ohne Datenverlust (Abschnitt 11) ändert die Epoche nicht.
 
+Start lock (R-DM-50, M7-04). `bothy restore finalize` also stores the identity of the restored
+database cluster in `instance.pg_system_identifier` (`system_identifier` of `pg_control_system()`)
+and `instance.pg_timeline_id` (`timeline_id` of `pg_control_checkpoint()`), in the same transaction
+as the epoch, the cursors and the audit entry; any error changes nothing. `bothy migrate up` fills
+both columns only while they are empty (first installation, or an instance migrated before M7-04)
+and never changes `sync_epoch`. Every server role compares the stored identity with the current one
+at start: a point-in-time restore raises the timeline, a logical restore into a fresh cluster
+changes the system identifier, and either mismatch keeps the process running but not ready, with
+the readiness reason `restore_not_finalized` and one log line naming the runbook step, until
+`bothy restore finalize` has run. Such a process serves and processes nothing: it opens no public
+listener and starts no log tail, no River jobs and no worker consumers, so it neither takes writes
+nor delivers events of a mixed timeline; only the internal listener answers. An empty stored identity never blocks. `bothy restore finalize`
+needs no running `api` or `worker`; it refuses (exit `1`) while another session of the role
+`bothy_app` is connected to the database, so a running stack cannot see half a change. It runs as
+the schema owner, like `bothy migrate`: in the Compose stack `docker compose run --rm migrate restore finalize`
+(the image's entrypoint is `bothy`; with `--relocation` the manifest file is mounted into the container,
+[cloud-migration.md](../operations/cloud-migration.md) 3).
+
+Relocation. A relocation without data loss (section 11) also starts on a new timeline or a new
+cluster, so the start lock holds it as well. `bothy restore finalize --relocation <manifest>` takes
+the manifest of the final backup (`backup_manifest.v1`) and compares `event_log.head_seq`,
+`audit.last_seq`, `audit.last_hash` and `sync_epoch` with the restored database; only when all are
+equal does it store the new identity, keeping the epoch and every cursor (audit action
+`instance.restore.finalize_relocation`). Any difference exits `1`, names the field and changes
+nothing; then the operator runs `bothy restore finalize` without the option, and clients reload. A
+major upgrade of PostgreSQL into a new cluster (dump and restore, or `pg_upgrade`) is such a
+relocation: take a backup right before it and finalize with its manifest.
+
+Managed failover. A managed PostgreSQL service with automatic failover promotes a standby, which
+raises the timeline without a restore. Where the provider documents that a failover loses no
+committed transaction (synchronous replication), the operator may set `database.restore_guard =
+off` and rely on R-SY-04; a failover that can lose commits is handled like a restore (not ready
+until `bothy restore finalize` starts a new epoch), because new writes could reuse sequence
+numbers a client already holds. The key changes only the start lock; `bothy restore finalize`
+behaves the same with either value. The comparison runs at start, so a failover while the server
+runs is detected at its next start.
+
 ## 9. Disaster Recovery
 
 Ziele: `dr.rpo_target` (Datenverlust) und `dr.rto_target` (Dauer bis zum Betrieb). Das Runbook
@@ -790,7 +828,10 @@ Ein Umzug ist eine Wiederherstellung auf einem anderen Ziel ohne Datenverlust:
    (05, Abschnitt 2.7) bekommen `503` mit Fehlercode `maintenance` und `Retry-After` (Kapitel 06
    legt Code und Format fest). Clients halten ihr Ausgangsfach. Ausnahmen nennt ADR 0065, Punkt 4:
    Abschluss laufender Läufe, Token-Erneuerung ohne Rotation, Notfall-Widerrufe und Zustellungen.
-4. Abschluss-Sicherung, Restore auf dem Ziel, Manifest vergleichen.
+4. Abschluss-Sicherung, Restore auf dem Ziel, Manifest vergleichen. The target is a new cluster or
+   timeline, so it stays not ready (`restore_not_finalized`, 8.4) until
+   `bothy restore finalize --relocation <manifest of the final backup>` has compared `head_seq`,
+   the audit head and `sync_epoch` and stored the new identity; epoch and cursors stay.
 5. DNS und Identität umstellen: Redirect-URIs bei OIDC, RP-ID der Passkeys (gleiche Domain behält
    die Passkeys), Tailscale-Gerät. Push-Schlüssel und App-Identität bleiben gleich, darum bleiben
    die Push-Registrierungen gültig.
@@ -991,6 +1032,7 @@ Column "Ort": Server = configuration reference of the server; Installationsskrip
 | `database.sslmode` | Server | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
 | `database.sslrootcert` | Server | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
 | `database.max_conns` | Server | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
+| `database.restore_guard` | Server | `on` | `on` or `off`: with `on` a server whose database identity differs from the stored one stays not ready (`restore_not_finalized`) until `bothy restore finalize`; `off` only where a failover loses no committed transaction (8.4, R-DM-50) |
 | `migrate.require_recent_backup` | Server | `true` | `migrate` verlangt eine frische Sicherung |
 | `migrate.recent_backup_max_age` | Server | `24h` | so alt darf diese Sicherung sein |
 | `migrate.lock_timeout` | Server | `5s` | `lock_timeout` je Migrationsschritt |

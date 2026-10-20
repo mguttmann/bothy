@@ -35,7 +35,7 @@ der Überblick.
 | `bothy config check\|print` | Konfiguration prüfen (mit `--secrets` auch jeden Verweis auflösen) und redigiert ausgeben |
 | `bothy import login\|logout` | login of the import tool as a `cli` device through device pairing and logout (22-import-migration.md 10.1); session file and DPoP client: [`cmd/bothy/importtool/bothyapi`](cmd/bothy/importtool/bothyapi/README.md) |
 | `bothy import discord ...` | Import und Lese-Spiegel über die API (22-import-migration.md); Code unter `cmd/bothy/importtool` (D-W-124), Discord-Lese-Client: [`cmd/bothy/importtool/discord`](cmd/bothy/importtool/discord/README.md) |
-| `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche (16-betrieb.md) |
+| `bothy restore finalize [--relocation FILE]` | nach einer Wiederherstellung: neue Sync-Epoche, Cursor auf `head_seq`, gespeicherte Datenbank-Identität; with `--relocation` the manifest of the final backup of a relocation keeps the epoch (16-betrieb.md 8.4, M7-04) |
 | `bothy secrets init\|export` | Geheimnisse anlegen und sichern (16-betrieb.md) |
 | `bothy healthcheck --url` | Gesundheitsprüfung einer Loopback-URL des internen Listeners (16-betrieb.md) |
 | `bothy files rescan` | Dateien erneut prüfen lassen (12-dateien.md) |

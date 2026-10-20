@@ -74,7 +74,8 @@ Nummern erkennt und nur bei einer echten Wiederherstellung wechselt. Normativ in
 - Schlecht, weil die Epoche nur wechselt, wenn `bothy restore finalize` läuft. Startet ein
   Betreiber `api` vor diesem Schritt, gilt bis zum Überholen nur R-SY-04. Das Runbook
   ([backup-restore.md](../operations/backup-restore.md), Abschnitt 5) setzt den Schritt vor den
-  Start; eine technische Sperre fehlt noch (More Information).
+  Start. Since M7-04 the start lock enforces it: a server whose database identity differs from
+  the stored one stays not ready until the command ran (More Information).
 - Schlecht, weil Nachrichten, die ein Client schon bestätigt bekam und aus dem Ausgangsfach
   entfernt hat, mit der alten Zeitlinie verloren sind (Grenze des RPO, backup-restore.md
   Abschnitt 7).
@@ -122,11 +123,19 @@ Nummern erkennt und nur bei einer echten Wiederherstellung wechselt. Normativ in
 
 ## More Information
 
-- Offen: eine Startsperre, die eine nicht abgeschlossene Wiederherstellung erkennt. Kandidat ist der
-  Vergleich von `pg_control_system().system_identifier` und `pg_control_checkpoint().timeline_id`
-  mit Werten, die `bothy restore finalize` speichert (Funktionen:
-  https://www.postgresql.org/docs/18/functions-info.html, abgerufen 2026-10-10 [belegt]). Ob
-  verwaltete Dienste diese Werte der Anwendungsrolle zeigen und wie sich ein Failover auswirkt, ist
-  nicht geprüft [vermutet]; das Bau-Ticket M7-04 klärt es.
+- Closed by M7-04 ([docs/DECISIONS.md](../DECISIONS.md), D-M7-04-1 to D-M7-04-5; R-DM-50): the
+  start lock compares `pg_control_system().system_identifier` and
+  `pg_control_checkpoint().timeline_id` (https://www.postgresql.org/docs/18/functions-info.html,
+  retrieved 2026-10-20 [verified]) with `instance.pg_system_identifier` and
+  `instance.pg_timeline_id`, which `bothy migrate up` fills while empty and
+  `bothy restore finalize` replaces. A mismatch keeps every role not ready with
+  `restore_not_finalized` until the command ran. PostgreSQL 18 grants `EXECUTE` on both functions
+  to `PUBLIC` (no entry in `proacl` of the pinned image, checked 2026-10-20 [verified]), so the
+  application role reads them without a grant. Whether a managed service revokes them is not
+  checked [assumed]. A managed failover raises the timeline; only where the provider documents
+  that it loses no committed transaction may the operator set `database.restore_guard = off`,
+  otherwise a failover is handled like a restore ([16-betrieb.md](../spec/16-betrieb.md) 8.4). A
+  relocation without data loss stores the new identity with
+  `bothy restore finalize --relocation <manifest>` and keeps the epoch.
 - Verwandt: ADR 0009 (Ereignis-Log), ADR 0051 (Worker-Verbraucher), ADR 0052 (Umschlag),
   ADR 0058 (Sicherung).

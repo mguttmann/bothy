@@ -49,6 +49,20 @@ func (q *Queries) GetConsumer(ctx context.Context, arg GetConsumerParams) (int64
 	return acked_seq, err
 }
 
+const moveAllConsumers = `-- name: MoveAllConsumers :execrows
+UPDATE agent_consumer_cursors SET acked_seq = $1, updated_at = now()
+`
+
+// bothy restore finalize (M7-04, 03 6.7 item 1): every consumer of every agent to the head of the
+// restored log, in the caller's transaction, so no adapter catches up events of the old timeline.
+func (q *Queries) MoveAllConsumers(ctx context.Context, headSeq int64) (int64, error) {
+	result, err := q.db.Exec(ctx, moveAllConsumers, headSeq)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const restartConsumer = `-- name: RestartConsumer :execrows
 UPDATE agent_consumer_cursors
 SET acked_seq = $1, updated_at = now()

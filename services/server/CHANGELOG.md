@@ -49,6 +49,20 @@ documented in this file. The format is based on
   `file_thumbnails` of M3-06 (migration `00051`) holds the variants. The keys `file.ticket_ttl`, `file.ticket_key_ref`,
   `file.not_ready_retry_after` (new) and `client.cache_max_age` are now active; the roles `api` and
   `all` do not start without a readable ticket key of at least the length of `file_ticket_key`.
+- `bothy restore finalize` and the start lock (M7-04, R-DM-50, ADR 0059): migration
+  `00052_instance_restore_identity.sql` adds `instance.pg_system_identifier` and
+  `instance.pg_timeline_id`, which `bothy migrate up` fills while empty. `bothy restore finalize`
+  runs as the schema owner, refuses (exit `1`) while a `bothy_app` session is connected, and in
+  one transaction sets a new `sync_epoch`, every `agent_consumer_cursors.acked_seq`,
+  `webhook_subscriptions.last_delivered_seq` and `event_consumer_cursors.last_seq` to `head_seq`,
+  stores the identity of the restored database and records `instance.restore.finalize`. With
+  `--relocation <manifest>` it compares `event_log.head_seq`, the audit head and `sync_epoch` of
+  the manifest of the final backup and, when equal, stores only the identity and keeps epoch and
+  cursors (`instance.restore.finalize_relocation`); a difference exits `1` and names the field. A
+  server whose database identity differs from the stored one stays not ready with
+  `restore_not_finalized`, logs the runbook step and starts no log tail, River jobs, worker
+  consumers or public listener, unless the new key `database.restore_guard` is `off`. agents, apps and sync get the port `RestoreCursors`.
+
 - Scan pass with clamd (M3-04): every completed upload runs through the job `files.scan` (queue
   `files`, inserted in the transaction of `completeUpload`), which reads the stored bytes once,
   checks size and SHA-256 against the declaration, detects the type from the first
