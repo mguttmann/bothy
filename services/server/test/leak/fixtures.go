@@ -73,6 +73,9 @@ var Fixtures = map[string]ParamFixture{
 	// The owner's terminal session on the extras host: neither Alex nor Lotse reads it (05
 	// terminal.read_own: self or owner).
 	"session_id": extraFixture(func(e *Extras) string { return e.SessionID }),
+	// A command of Texter scoped to Marketing/Kampagnen (M2-16): neither Alex nor Lotse sees its
+	// scope target, and neither owns it (05 command.read on kind command).
+	"command_id": extraFixture(func(e *Extras) string { return e.CommandID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -100,6 +103,8 @@ type Extras struct {
 	// M2-44); pairingCode is the code of the host for it.
 	SessionID   string
 	pairingCode string
+	// CommandID is a command of Texter scoped to Marketing/Kampagnen (M2-16).
+	CommandID string
 }
 
 // extrasWebhookHost is the host of the webhook subscription of the Extras; the server must allow it
@@ -128,8 +133,9 @@ func extraFixture(get func(*Extras) string) ParamFixture {
 
 // PrepareExtras creates the Extras of w through the public API as the owner: a disabled
 // trusted-header login driver (createIdentityProvider), a host without assignee (createHost), an
-// app (installApp) and a webhook subscription of the app (createWebhookSubscription) and, as Sam, an upload
-// (createUpload).
+// app (installApp) and a webhook subscription of the app (createWebhookSubscription), as Sam an
+// upload (createUpload) and as Texter a command scoped to Marketing/Kampagnen (registerCommand,
+// M2-16).
 func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	tb.Helper()
 	o := w.Owner
@@ -160,6 +166,9 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	}}, http.StatusCreated))
 	e.FileID = uploadOfSam(tb, w)
 	e.RunID = runOfMarketing(tb, w)
+	e.CommandID = createdID(tb, harness.MustDo(tb, w.Agents["Texter"], harness.Request{Method: http.MethodPost, Path: "/commands", Body: map[string]any{
+		"name": "campaign", "description": "Plan a campaign", "scope_kind": "channel", "scope_id": w.Channels["Marketing/Kampagnen"],
+	}}, http.StatusCreated))
 	extras.Store(w, e)
 	return e
 }
