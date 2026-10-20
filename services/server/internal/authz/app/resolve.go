@@ -391,13 +391,25 @@ func shapeOf(g *authorize.GrantFacts) (domain.GrantShape, domain.Target, error) 
 	return domain.GrantShape{SubjectKind: domain.SubjectKind(g.SubjectKind), TargetKind: tg.Kind, Level: lvl, Caps: caps}, tg, nil
 }
 
-// invokeFacts gathers the facts of the agent.invoke guard.
+// invokeFacts gathers the facts of the agent.invoke guard; inside a structure scope the project
+// facts of the channel are read fresh.
 func (a *Authorizer) invokeFacts(ctx context.Context, s *actingPrincipal, f *authorize.InvokeFacts, res resolved, t time.Time) (*domain.InvokeFacts, error) {
 	ch := res.channel
 	out := &domain.InvokeFacts{
 		AgentID: f.AgentID, TriggerOrigin: f.TriggerOrigin, MentionsAgent: f.MentionsAgent, ActiveRunAgentID: f.ActiveRunAgentID,
 		RequireMention: ch.RequireMention, ThreadRequireMention: ch.ThreadRequireMention, FreeResponse: ch.FreeResponse,
 		AllowMentionedAgents: ch.AllowMentionedAgents, ProjectBound: ch.ProjectBound, ProjectReady: ch.ProjectReady,
+	}
+	if _, scoped := authorize.StructureMemoFrom(ctx); scoped && !ch.ID.IsZero() {
+		// The memo of a structure scope may predate a readiness change, which writes no event
+		// (M2-03 design note 8, 07 SR2): the project facts are read fresh, the path stays memoized.
+		fresh, ok, err := a.structure.Channel(ctx, ch.ID)
+		if err != nil {
+			return nil, sourceError("structure source", err)
+		}
+		if ok {
+			out.ProjectBound, out.ProjectReady = fresh.ProjectBound, fresh.ProjectReady
+		}
 	}
 	if f.AgentID.IsZero() || res.path.Kind != domain.PathChannel {
 		return out, nil

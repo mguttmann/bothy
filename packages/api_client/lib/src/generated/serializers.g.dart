@@ -463,6 +463,7 @@ Serializers _$serializers =
           ..add(ProjectBinding.serializer)
           ..add(ProjectBindingPut.serializer)
           ..add(ProjectReadiness.serializer)
+          ..add(ProjectRunnerConfig.serializer)
           ..add(PublicBranding.serializer)
           ..add(PushEnvironment.serializer)
           ..add(PushPreview.serializer)
@@ -1802,20 +1803,6 @@ Serializers _$serializers =
             () => MapBuilder<String, JsonObject?>(),
           )
           ..addBuilderFactory(
-            const FullType(BuiltMap, const [
-              const FullType(String),
-              const FullType.nullable(JsonObject),
-            ]),
-            () => MapBuilder<String, JsonObject?>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltMap, const [
-              const FullType(String),
-              const FullType.nullable(JsonObject),
-            ]),
-            () => MapBuilder<String, JsonObject?>(),
-          )
-          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(HostProfile)]),
             () => ListBuilder<HostProfile>(),
           )
@@ -1880,6 +1867,10 @@ Serializers _$serializers =
               const FullType.nullable(JsonObject),
             ]),
             () => MapBuilder<String, JsonObject?>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltSet, const [const FullType(String)]),
+            () => SetBuilder<String>(),
           ))
         .build();
 

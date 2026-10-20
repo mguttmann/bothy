@@ -509,6 +509,14 @@ func (stubServer) GetServedChannelConfig(context.Context, rest.GetServedChannelC
 	return nil, nil
 }
 
+func (stubServer) PutProjectBinding(context.Context, rest.PutProjectBindingRequestObject) (rest.PutProjectBindingResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteProjectBinding(context.Context, rest.DeleteProjectBindingRequestObject) (rest.DeleteProjectBindingResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateChannel(context.Context, rest.UpdateChannelRequestObject) (rest.UpdateChannelResponseObject, error) {
 	return nil, nil
 }
@@ -1129,6 +1137,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getTerminalSession":    {"GET /api/v1/terminal/sessions/{session_id}", "terminal.read_own", "rl.read"},
 		"attachTerminalSession": {"POST /api/v1/terminal/sessions/{session_id}/attach", "terminal.attach", "rl.terminal"},
 		"closeTerminalSession":  {"POST /api/v1/terminal/sessions/{session_id}/close", "terminal.close", "rl.write"},
+		// M2-03
+		"putProjectBinding":    {"PUT /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
+		"deleteProjectBinding": {"DELETE /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

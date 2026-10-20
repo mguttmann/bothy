@@ -148,8 +148,9 @@ func (s *Source) Thread(ctx context.Context, id ids.ID) (authz.ThreadFacts, bool
 	return authz.ThreadFacts{ID: th.ID, ChannelID: th.ChannelID, Main: th.Main(), OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy}, true, nil
 }
 
-// facts converts a channel row into the facts of authorize. Project binding comes with M2-03 and
-// dm participation with V3; both are absent here.
+// facts converts a channel row into the facts of authorize: ProjectBound and ProjectReady come
+// from the LEFT JOIN on project_bindings of every channel query (M2-03 design note 8); dm
+// participation comes with V3 and is absent here.
 func facts(c app.ChannelRow) authz.ChannelFacts {
 	ch := c.Channel
 	return authz.ChannelFacts{
@@ -157,6 +158,7 @@ func facts(c app.ChannelRow) authz.ChannelFacts {
 		EffectiveOperatorID: ch.Operator(c.SpaceDefaultOperatorID).EffectiveAgentID,
 		RequireMention:      ch.RequireMention, ThreadRequireMention: ch.ThreadRequireMention, FreeResponse: ch.FreeResponse,
 		AllowMentionedAgents: ch.AllowMentionedAgents, Archived: ch.Archived() || c.SpaceArchived,
+		ProjectBound: c.ProjectBound, ProjectReady: c.ProjectReady,
 	}
 }
 

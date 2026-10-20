@@ -111,6 +111,9 @@ var appPrivileges = map[string][]string{
 	"channel_skill_bindings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"forum_tags":             {"SELECT", "INSERT", "UPDATE"},
 	"threads":                {"SELECT", "INSERT", "UPDATE"},
+	// 03 project_bindings (M2-03): deleteProjectBinding removes the row; a binding has no
+	// tombstone (06 section 7).
+	"project_bindings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 thread_tags (M1-55): setThreadTags replaces the set and deleteForumTag drops the rows of
 	// its tag; a row is never updated.
 	"thread_tags": {"SELECT", "INSERT", "DELETE"},

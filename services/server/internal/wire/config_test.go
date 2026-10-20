@@ -134,6 +134,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"channel.history_backfill_limit_max":     {Kind: config.KindInt, Default: "200", Min: "0", Chapter: "03-datenmodell.md"},
 		"channel.prompt_max_bytes":               {Kind: config.KindInt, Default: "32768", Min: "1", Chapter: "03-datenmodell.md"},
 		"host.name_max_chars":                    {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-datenmodell.md"},
+		"project.binding_text_max_chars":         {Kind: config.KindInt, Default: "512", Min: "1", Max: "600", Chapter: "09-agenten.md"},
 		"host.os_user_max_chars":                 {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
 		"terminal.pairing_code_ttl":              {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.session_token_ttl":             {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "24-terminal.md"},

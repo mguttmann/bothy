@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// ListAppsResponseDefaultHeaders the declared response headers of an HTTP default response for ListApps
+type ListAppsResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type ListAppsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -6753,6 +6758,11 @@ type DeleteProjectBindingResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// DeleteProjectBindingResponse409Headers the declared response headers of an HTTP 409 response for DeleteProjectBinding
+type DeleteProjectBindingResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // DeleteProjectBindingResponse429Headers the declared response headers of an HTTP 429 response for DeleteProjectBinding
 type DeleteProjectBindingResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -6777,6 +6787,8 @@ type DeleteProjectBindingResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
 	ApplicationproblemJSON429 *TooManyRequests
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
@@ -6791,6 +6803,8 @@ type DeleteProjectBindingResponse struct {
 	Headers403 *DeleteProjectBindingResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *DeleteProjectBindingResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *DeleteProjectBindingResponse409Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DeleteProjectBindingResponse429Headers
 	// HeadersDefault the parsed response headers for an HTTP default response
@@ -6815,6 +6829,11 @@ func (r DeleteProjectBindingResponse) GetApplicationproblemJSON403() *Forbidden 
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r DeleteProjectBindingResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteProjectBindingResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
@@ -25958,23 +25977,5 @@ type UnpinMessageResponse401Headers struct {
 
 // UnpinMessageResponse403Headers the declared response headers of an HTTP 403 response for UnpinMessage
 type UnpinMessageResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UnpinMessageResponse404Headers the declared response headers of an HTTP 404 response for UnpinMessage
-type UnpinMessageResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UnpinMessageResponse429Headers the declared response headers of an HTTP 429 response for UnpinMessage
-type UnpinMessageResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// UnpinMessageResponseDefaultHeaders the declared response headers of an HTTP default response for UnpinMessage
-type UnpinMessageResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

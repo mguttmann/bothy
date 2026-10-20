@@ -6350,8 +6350,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/ProjectBindingPut'
+            schema: {$ref: '#/components/schemas/ProjectBindingPut'}
             examples:
               default:
                 value:
@@ -6363,18 +6362,13 @@ paths:
         '200':
           description: OK.
           headers:
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
-            RateLimit:
-              $ref: '#/components/headers/RateLimit'
-            RateLimit-Policy:
-              $ref: '#/components/headers/RateLimit-Policy'
-            ETag:
-              $ref: '#/components/headers/ETag'
+            Correlation-Id: {$ref: '#/components/headers/Correlation-Id'}
+            RateLimit: {$ref: '#/components/headers/RateLimit'}
+            RateLimit-Policy: {$ref: '#/components/headers/RateLimit-Policy'}
+            ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/ProjectBinding'
+              schema: {$ref: '#/components/schemas/ProjectBinding'}
               examples:
                 default:
                   value:
@@ -6384,22 +6378,14 @@ paths:
                     runner_config: {}
                     ready: false
                     version: 3
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '412':
-          $ref: '#/components/responses/PreconditionFailed'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        default:
-          $ref: '#/components/responses/Error'
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        default: {$ref: '#/components/responses/Error'}
     delete:
       operationId: deleteProjectBinding
       summary: Remove the project binding
@@ -6412,24 +6398,16 @@ paths:
         '204':
           description: No content.
           headers:
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
-            RateLimit:
-              $ref: '#/components/headers/RateLimit'
-            RateLimit-Policy:
-              $ref: '#/components/headers/RateLimit-Policy'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        default:
-          $ref: '#/components/responses/Error'
+            Correlation-Id: {$ref: '#/components/headers/Correlation-Id'}
+            RateLimit: {$ref: '#/components/headers/RateLimit'}
+            RateLimit-Policy: {$ref: '#/components/headers/RateLimit-Policy'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
+        default: {$ref: '#/components/responses/Error'}
 
   /channels/{channel_id}/tags:
     get:
@@ -22829,44 +22807,29 @@ components:
       type: object
       required: [workspace_ref, runner_config, ready, version]
       properties:
-        workspace_ref:
-          type: string
-          description: Opaque reference the runner resolves; never a server path.
-          examples: [website]
-        repository_url:
-          type: string
-          description: Display only; the server never fetches this URL.
-          examples: ['https://git.example.com/team/website']
-        default_branch:
-          type: string
-          examples: [main]
-        runner_config:
-          $ref: '#/components/schemas/JsonObject'
-          description: Schema `project_runner_config.v1`. No secrets.
-        ready:
-          type: boolean
-        version:
-          type: integer
-          format: int64
+        workspace_ref: {type: string, description: Opaque reference the runner resolves; never a server path., examples: [website]}
+        repository_url: {type: string, description: Display only; the server never fetches this URL., examples: ['https://git.example.com/team/website']}
+        default_branch: {type: string, examples: [main]}
+        runner_config: {$ref: '#/components/schemas/ProjectRunnerConfig'}
+        ready: {type: boolean}
+        version: {type: integer, format: int64}
     ProjectBindingPut:
       type: object
       additionalProperties: false
       required: [workspace_ref, reason]
       properties:
-        workspace_ref:
-          type: string
-          examples: [website]
-        repository_url:
-          type: string
-          examples: ['https://git.example.com/team/website']
-        default_branch:
-          type: string
-          examples: [main]
-        runner_config:
-          $ref: '#/components/schemas/JsonObject'
-        reason:
-          type: string
-          examples: [Website project moves to this forum]
+        workspace_ref: {type: string, examples: [website]}
+        repository_url: {type: string, examples: ['https://git.example.com/team/website']}
+        default_branch: {type: string, examples: [main]}
+        runner_config: {$ref: '#/components/schemas/ProjectRunnerConfig'}
+        reason: {type: string, minLength: 1, examples: [Website project moves to this forum]}
+    ProjectRunnerConfig:
+      type: object
+      additionalProperties: false
+      description: Schema `project_runner_config.v1`. No secrets.
+      properties:
+        model: {type: string, minLength: 1}
+        allowed_tools: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
     AgentChannelConfig:
       type: object
       description: Configuration an operator agent loads for a channel it serves.

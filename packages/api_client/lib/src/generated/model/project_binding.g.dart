@@ -14,7 +14,7 @@ class _$ProjectBinding extends ProjectBinding {
   @override
   final String? defaultBranch;
   @override
-  final BuiltMap<String, JsonObject?> runnerConfig;
+  final ProjectRunnerConfig runnerConfig;
   @override
   final bool ready;
   @override
@@ -94,10 +94,10 @@ class ProjectBindingBuilder
   set defaultBranch(String? defaultBranch) =>
       _$this._defaultBranch = defaultBranch;
 
-  MapBuilder<String, JsonObject?>? _runnerConfig;
-  MapBuilder<String, JsonObject?> get runnerConfig =>
-      _$this._runnerConfig ??= MapBuilder<String, JsonObject?>();
-  set runnerConfig(MapBuilder<String, JsonObject?>? runnerConfig) =>
+  ProjectRunnerConfigBuilder? _runnerConfig;
+  ProjectRunnerConfigBuilder get runnerConfig =>
+      _$this._runnerConfig ??= ProjectRunnerConfigBuilder();
+  set runnerConfig(ProjectRunnerConfigBuilder? runnerConfig) =>
       _$this._runnerConfig = runnerConfig;
 
   bool? _ready;

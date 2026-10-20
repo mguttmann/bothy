@@ -107,8 +107,9 @@ func (s *Service) activeAgent(ctx context.Context, id ids.ID) (bool, error) {
 // rights change channel.operator.set with the channel as resource, so permission_version is
 // locked first (03 section 6.3), locks the channel, checks If-Match and the archive state again,
 // names the old and the new effective operator as affected, writes the operator columns with a
-// new version, records the audit entry and appends channel.updated; the rights hook verifies I1
-// and writes access.changed.
+// new version, resets the readiness of a bound forum whose effective operator changed (M2-03),
+// records the audit entry and appends channel.updated; the rights hook verifies I1 and writes
+// access.changed.
 func (s *Service) SetChannelOperator(ctx context.Context, a actor.Actor, cmd chat.SetChannelOperatorCmd) (chat.Channel, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -180,6 +181,12 @@ func (s *Service) setChannelOperatorWrite(ctx context.Context, cmd chat.SetChann
 	if err := s.d.Store.SaveChannelOperator(ctx, c.Channel); err != nil {
 		return ChannelRow{}, err
 	}
+	if before != after && c.ProjectBound {
+		// The runner that reported readiness no longer serves the forum (M2-03 design note 7).
+		if err := s.resetReadiness(ctx, []ids.ID{c.Channel.ID}); err != nil {
+			return ChannelRow{}, err
+		}
+	}
 	if err := s.recordChannel(ctx, authorize.ActionChannelOperatorSet, c.Channel.ID,
 		operatorAttrs(resourceChannel, c.Channel.ID, old, want, cmd.Reason)); err != nil {
 		return ChannelRow{}, err
@@ -191,7 +198,8 @@ func (s *Service) setChannelOperatorWrite(ctx context.Context, cmd chat.SetChann
 // second unit locks the space and then the inheriting channels that are not archived in
 // ascending id, names the old and the new default operator as affected, writes the default with
 // a new space version and bumps the version of every inheriting channel, because its effective
-// operator changed (04 "Zustellgarantie" point 3); it appends space.updated and then
+// operator changed (04 "Zustellgarantie" point 3), and resets the readiness of the inheriting
+// bound forums (M2-03); it appends space.updated and then
 // channel.updated per channel in ascending id.
 func (s *Service) SetSpaceOperator(ctx context.Context, a actor.Actor, cmd chat.SetSpaceOperatorCmd) (chat.Space, error) {
 	ctx, err := withCaller(ctx, a)
@@ -264,12 +272,8 @@ func (s *Service) setSpaceOperatorWrite(ctx context.Context, cmd chat.SetSpaceOp
 	if err := s.d.Store.SaveSpaceOperator(ctx, sp); err != nil {
 		return domain.Space{}, err
 	}
-	for i := range inheriting {
-		inheriting[i].Channel.Touch()
-		inheriting[i].SpaceDefaultOperatorID = sp.DefaultOperatorAgentID
-		if err := s.d.Store.TouchChannel(ctx, inheriting[i].Channel); err != nil {
-			return domain.Space{}, err
-		}
+	if err := s.touchInheriting(ctx, inheriting, sp.DefaultOperatorAgentID); err != nil {
+		return domain.Space{}, err
 	}
 	if err := s.record(ctx, authorize.ActionSpaceOperatorSet, sp.ID, operatorAttrs(resourceSpace, sp.ID, old, want, cmd.Reason)); err != nil {
 		return domain.Space{}, err
@@ -283,4 +287,22 @@ func (s *Service) setSpaceOperatorWrite(ctx context.Context, cmd chat.SetSpaceOp
 		}
 	}
 	return sp, nil
+}
+
+// touchInheriting bumps the version of every inheriting channel of a space whose default operator
+// became operator and resets the readiness of the bound forums among them: their effective
+// operator changed, so the readiness came from the old one (M2-03 design note 7).
+func (s *Service) touchInheriting(ctx context.Context, inheriting []ChannelRow, operator ids.ID) error {
+	var bound []ids.ID
+	for i := range inheriting {
+		inheriting[i].Channel.Touch()
+		inheriting[i].SpaceDefaultOperatorID = operator
+		if err := s.d.Store.TouchChannel(ctx, inheriting[i].Channel); err != nil {
+			return err
+		}
+		if inheriting[i].ProjectBound {
+			bound = append(bound, inheriting[i].Channel.ID)
+		}
+	}
+	return s.resetReadiness(ctx, bound)
 }

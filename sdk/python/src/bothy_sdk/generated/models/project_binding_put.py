@@ -8,7 +8,7 @@ from attrs import define as _attrs_define
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.json_object import JsonObject
+    from ..models.project_runner_config import ProjectRunnerConfig
 
 
 T = TypeVar("T", bound="ProjectBindingPut")
@@ -22,14 +22,14 @@ class ProjectBindingPut:
         reason (str):
         repository_url (str | Unset):
         default_branch (str | Unset):
-        runner_config (JsonObject | Unset): Free-form JSON object whose schema is named in the field description.
+        runner_config (ProjectRunnerConfig | Unset): Schema `project_runner_config.v1`. No secrets.
     """
 
     workspace_ref: str
     reason: str
     repository_url: str | Unset = UNSET
     default_branch: str | Unset = UNSET
-    runner_config: JsonObject | Unset = UNSET
+    runner_config: ProjectRunnerConfig | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         workspace_ref = self.workspace_ref
@@ -63,7 +63,7 @@ class ProjectBindingPut:
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
-        from ..models.json_object import JsonObject
+        from ..models.project_runner_config import ProjectRunnerConfig
 
         d = dict(src_dict)
         workspace_ref = d.pop("workspace_ref")
@@ -75,11 +75,11 @@ class ProjectBindingPut:
         default_branch = d.pop("default_branch", UNSET)
 
         _runner_config = d.pop("runner_config", UNSET)
-        runner_config: JsonObject | Unset
+        runner_config: ProjectRunnerConfig | Unset
         if isinstance(_runner_config, Unset):
             runner_config = UNSET
         else:
-            runner_config = JsonObject.from_dict(_runner_config)
+            runner_config = ProjectRunnerConfig.from_dict(_runner_config)
 
         project_binding_put = cls(
             workspace_ref=workspace_ref,

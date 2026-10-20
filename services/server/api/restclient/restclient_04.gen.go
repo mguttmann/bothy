@@ -13,6 +13,24 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// UnpinMessageResponse404Headers the declared response headers of an HTTP 404 response for UnpinMessage
+type UnpinMessageResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UnpinMessageResponse429Headers the declared response headers of an HTTP 429 response for UnpinMessage
+type UnpinMessageResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// UnpinMessageResponseDefaultHeaders the declared response headers of an HTTP default response for UnpinMessage
+type UnpinMessageResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type UnpinMessageResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response

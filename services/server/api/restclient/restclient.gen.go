@@ -11771,8 +11771,8 @@ type ProjectBinding struct {
 	RepositoryUrl *string `json:"repository_url,omitempty"`
 
 	// RunnerConfig Schema `project_runner_config.v1`. No secrets.
-	RunnerConfig JsonObject `json:"runner_config"`
-	Version      int64      `json:"version"`
+	RunnerConfig ProjectRunnerConfig `json:"runner_config"`
+	Version      int64               `json:"version"`
 
 	// WorkspaceRef Opaque reference the runner resolves; never a server path.
 	//
@@ -11791,8 +11791,8 @@ type ProjectBindingPut struct {
 	// RepositoryUrl Examples: https://git.example.com/team/website
 	RepositoryUrl *string `json:"repository_url,omitempty"`
 
-	// RunnerConfig Free-form JSON object whose schema is named in the field description.
-	RunnerConfig *JsonObject `json:"runner_config,omitempty"`
+	// RunnerConfig Schema `project_runner_config.v1`. No secrets.
+	RunnerConfig *ProjectRunnerConfig `json:"runner_config,omitempty"`
 
 	// WorkspaceRef Examples: website
 	WorkspaceRef string `json:"workspace_ref"`
@@ -11803,6 +11803,12 @@ type ProjectReadiness struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
 	Ready     bool `json:"ready"`
+}
+
+// ProjectRunnerConfig Schema `project_runner_config.v1`. No secrets.
+type ProjectRunnerConfig struct {
+	AllowedTools *[]string `json:"allowed_tools,omitempty"`
+	Model        *string   `json:"model,omitempty"`
 }
 
 // PublicBranding defines model for PublicBranding.
@@ -26010,26 +26016,6 @@ func (c *Client) RevokeDevice(ctx context.Context, deviceId DeviceIdPath, params
 // Corresponds with POST /dms (the `CreateDm` operationId).
 func (c *Client) CreateDmWithBody(ctx context.Context, params *CreateDmParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateDmRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateDm Open a direct message channel
-//
-// Returns the existing channel with 200 when the same participants already have one. 403
-// `feature_disabled` when `dm.enabled` is off.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /dms (the `CreateDm` operationId).
-func (c *Client) CreateDm(ctx context.Context, params *CreateDmParams, body CreateDmJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateDmRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}

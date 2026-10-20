@@ -16,6 +16,26 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CreateDm Open a direct message channel
+//
+// Returns the existing channel with 200 when the same participants already have one. 403
+// `feature_disabled` when `dm.enabled` is off.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /dms (the `CreateDm` operationId).
+func (c *Client) CreateDm(ctx context.Context, params *CreateDmParams, body CreateDmJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDmRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListEvents Catch up on events after a sequence
 //
 // Same filtering as the gateway. 410 `resync_required` with `reason` when catch-up is impossible.
@@ -27434,9 +27454,4 @@ type ListAppsResponse429Headers struct {
 	RateLimit       *string
 	RateLimitPolicy *string
 	RetryAfter      *int
-}
-
-// ListAppsResponseDefaultHeaders the declared response headers of an HTTP default response for ListApps
-type ListAppsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }
