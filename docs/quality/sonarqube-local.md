@@ -104,9 +104,9 @@ The scanner (`@sonar/scan`, without a local Java installation) reads
 In the public state (public-switch.md), against the cloud:
 
 ```sh
-SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> \
+SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> SONAR_PROJECT_KEY=<project key> \
   SONAR_TOKEN="<token from the password manager>" make sonar-config        # once
-SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> \
+SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> SONAR_PROJECT_KEY=<project key> \
   SONAR_TOKEN="<token>" make sonar-config-check
 ```
 
