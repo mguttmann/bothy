@@ -42,7 +42,15 @@ reviews:
         configuration keys) and problems that break CI. Do not raise style, wording or
         formatting nits; a rule that a matching path-specific instruction states (for
         example dashes or glossary terms in Markdown) is a repository requirement, not
-        a nit.
+        a nit. Settled repository facts, not findings: lock files, go.sum and rendered
+        SVGs are excluded from review on purpose (path_filters); the default theme is
+        dark (docs/design/tokens.md, modifier `theme`); GIT_DIR, GIT_WORK_TREE,
+        GIT_INDEX_FILE and the other git variables are cleared centrally by the pre-push
+        hook before `make check` (.pre-commit-config.yaml) and by tools/conftest.py, so a
+        test or script need not unset them itself. In tests, descriptive test names and
+        loopback addresses (127.0.0.1, ::1, localhost) or documentation addresses
+        (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24, 2001:db8::/32, example.com,
+        example.org, example.net) are fine and not instance-specific data.
     - path: "**/*.md"
       instructions: >-
         All repository content is English (docs/glossary.md, D-W-94).
@@ -63,7 +71,9 @@ reviews:
       instructions: >-
         Every route and event goes through authorize with an action from
         docs/spec/05-actions.md; no read permission means 404, never 403. SQL only through
-        sqlc queries. The server never reads model provider credentials.
+        sqlc queries: this covers data access queries (reading and writing rows), not
+        LISTEN/NOTIFY or advisory locks, which run on the driver connection directly.
+        The server never reads model provider credentials.
     - path: "tools/**/*.py"
       instructions: >-
         Repository tools: standard library or PyYAML only, a test for every behavior,
@@ -86,5 +96,19 @@ chat:
   auto_reply: true
   art: false
 
+# Learnings from review replies are stored for this repository only; no private knowledge
+# source (Jira, Linear, MCP servers) reaches the reviews of this public repository.
 knowledge_base:
-  opt_out: true
+  opt_out: false
+  learnings:
+    scope: local
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
+  jira:
+    usage: disabled
+  linear:
+    usage: disabled
+  mcp:
+    usage: disabled

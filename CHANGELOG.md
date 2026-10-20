@@ -494,6 +494,11 @@ operated, and the order of the build.
   unpacks them and runs the new target `make sonar-scan` (the scan alone, same quality gate).
   `make sonar` and `make check` still test first. ci.yml also runs on pushes to `main`, so
   SonarQube keeps an analysis of `main` (docs/quality/gates.md).
+- CodeRabbit: the knowledge base stores learnings for this repository (no Jira, Linear or MCP
+  sources), and the review instructions name settled facts that are no findings (`go.sum`
+  excluded on purpose, dark default theme, git variables cleared by the pre-push hook, test
+  names and loopback or documentation addresses in tests); "SQL only through sqlc" covers data
+  access queries, not LISTEN/NOTIFY or advisory locks (CRT-1/3 in docs/DECISIONS.md).
 - Design tokens: series and state roles moved along their scales so that they stay apart under
   the simulation: light `color.viz.series.3` `spruce.600` to `spruce.700`, `.6` `moss.600` to
   `moss.900`, `color.warning.fg` `amber.700` to `amber.800`, `color.danger.fg` `rowan.700` to
