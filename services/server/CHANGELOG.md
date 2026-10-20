@@ -11,6 +11,18 @@ documented in this file. The format is based on
 
 ### Added
 
+- Project binding of forums (M2-03): `putProjectBinding` and `deleteProjectBinding`
+  (`channel.project.bind`, owner with fresh step-up, audit of allow and deny) over the new table
+  `project_bindings` (migration `00047`): an opaque `workspace_ref` unique case-insensitively, a
+  display-only `repository_url`, `default_branch` and the closed `runner_config` of schema
+  `project_runner_config.v1` (`ProjectRunnerConfig`). A PUT replaces the whole binding, an
+  identical PUT is a no-op; every change raises `settings_version` with `channel.settings_changed`
+  and `agent.config_changed` and resets `ready`. `ApplyProjectReadiness` takes the readiness of the
+  serving runner (wired to the heartbeat by M2-20); a change of the effective operator resets it.
+  `agent.invoke` in a bound forum answers `project_not_ready` until the runner reported ready.
+  The behaviour and the served channel configuration carry `project_binding`. Configuration key
+  `project.binding_text_max_chars`. The canary test carries the binding values.
+
 - `bothy import login` and `bothy import logout` (M8-10): the import tool logs in as a `cli`
   device through device pairing (Ed25519 DPoP key, no step-up key), prints the pairing code alone
   on stdout and polls `completePairing` every `import.login_poll_interval` (new tool key) until the
