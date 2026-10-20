@@ -459,6 +459,10 @@ final class FakeWorld {
   /// The members (`GroupMember`) of each group, by group and person ID.
   final Map<String, Map<String, JsonMap>> groupMembers = {};
 
+  /// The grants by ID as the API returns them (`Grant`, brief M4-27); a revoked grant keeps
+  /// its `revoked_at`.
+  final Map<String, JsonMap> grants = {};
+
   /// People whose `enableUser` answers `409 i1_violation` (10 5.4), a switch of the tests.
   final Set<String> i1OnEnable = {};
 

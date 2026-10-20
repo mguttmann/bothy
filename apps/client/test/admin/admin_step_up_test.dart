@@ -62,7 +62,11 @@ void main() {
         adminLocationOf(['admin', 'people', 'x']),
         const AdminLocation(AdminSection.people, id: 'x'),
       );
-      expect(adminLocationOf(['admin', 'grants']), isNull);
+      expect(
+        adminLocationOf(['admin', 'grants', 'channel.x']),
+        const AdminLocation(AdminSection.grants, id: 'channel.x'),
+      );
+      expect(adminLocationOf(['admin', 'agents']), isNull);
       expect(adminLocationOf(['admin', 'devices', 'x']), isNull);
       expect(
         adminPathOf(const AdminLocation(AdminSection.groups, id: 'g')),
@@ -112,6 +116,12 @@ void main() {
     expect(waiting.first.person.displayName, 'Sam');
 
     late AdminGroup group;
+    late AdminGrant grant;
+    final general = AdminTarget(
+      AdminTargetKind.channel,
+      id: fake.seed.general,
+      name: 'general',
+    );
     final code = world.devices[pending]!.verificationCode;
     final samSession = world.sessions.values
         .firstWhere((s) => s.deviceId == other)
@@ -154,6 +164,19 @@ void main() {
       'removeGroupMember': () =>
           admin.removeMember(group.id, sam, purpose: 'removeGroupMember'),
       'deleteGroup': () => admin.deleteGroup(group.id, purpose: 'deleteGroup'),
+      'createGrant': () async => grant = await admin.createGrant(
+        GrantRequest(
+          subjectKind: AdminSubjectKind.user,
+          subjectId: sam,
+          target: general,
+          level: AccessLevel.trigger,
+          reason: 'Release',
+        ),
+        purpose: 'createGrant',
+      ),
+      'revokeGrant': () =>
+          admin.revokeGrant(grant.id, reason: 'Done', purpose: 'revokeGrant'),
+      'viewAsUser': () => admin.viewAs(sam, purpose: 'viewAsUser'),
       'disableUser': () =>
           admin.disablePerson(sam, reason: 'Left', purpose: 'disableUser'),
       'enableUser': () =>

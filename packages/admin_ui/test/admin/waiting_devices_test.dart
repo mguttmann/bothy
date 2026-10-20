@@ -142,7 +142,7 @@ void main() {
     );
 
     expect(find.text('Devices (1 waiting)'), findsOneWidget);
-    expect(find.byKey(const ValueKey('admin.nav.grants')), findsNothing);
+    expect(find.byKey(const ValueKey('admin.nav.grants')), findsOneWidget);
     expect(find.byKey(const ValueKey('admin.nav.agents')), findsNothing);
     await tap(tester, 'admin.nav.devices');
     expect(places, [const AdminLocation(AdminSection.devices)]);

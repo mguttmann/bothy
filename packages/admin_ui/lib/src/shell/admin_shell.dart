@@ -11,6 +11,7 @@ import 'package:l10n/l10n.dart';
 
 import '../data/admin_repository.dart';
 import '../devices/waiting_devices.dart';
+import '../grants/grants_list.dart';
 import '../groups/group_detail.dart';
 import '../groups/groups_list.dart';
 import '../people/people_list.dart';
@@ -22,6 +23,7 @@ String adminSectionLabel(AppLocalizations l, AdminSection section) =>
     switch (section) {
       AdminSection.people => l.adminNavPeople,
       AdminSection.groups => l.adminNavGroups,
+      AdminSection.grants => l.adminNavGrants,
       AdminSection.devices => l.adminNavDevices,
       // Entries without a screen are not listed (AdminSection.listed).
       _ => section.segment,
@@ -126,6 +128,16 @@ class _AdminShellState extends State<AdminShell> {
         repository: r,
         onOpen: (g) =>
             widget.onNavigate(AdminLocation(AdminSection.groups, id: g)),
+        onChanged: changed,
+      ),
+      AdminSection.grants => GrantsList(
+        key: ValueKey('admin.grants.$id'),
+        repository: r,
+        targetKey: id,
+        timeZone: widget.timeZone,
+        clock: widget.clock,
+        onTarget: (key) =>
+            widget.onNavigate(AdminLocation(AdminSection.grants, id: key)),
         onChanged: changed,
       ),
       AdminSection.devices => WaitingDevicesView(

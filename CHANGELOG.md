@@ -68,6 +68,12 @@ operated, and the order of the build.
   drivers. The headless scenarios 16.1 to 16.5 run against `SyncEngine` with its local
   database. `make arch` gains rule 10: a `testing.dart` library is imported only from `test/`
   and `integration_test/` folders.
+- Permission screens of the administration (M4-27): `packages/admin_ui` has the grant wizard of
+  01 5.2 A2 in three steps with the server's plain-language preview (text, effects, I1 and SR8
+  explained, hints such as H1 and a missing expiry, delegation denials with their reason) before
+  the step-up, the grants of a target with revoke (immediate, required reason), "Who has
+  access?" with the source chains of 07 9.1 and "View as person" as a read-only snapshot; the
+  fake server answers the grant operations and the example of 07 9.3, read at run time.
 - Administration of people, groups and devices (M4-26): `packages/admin_ui` has the shell of
   01 5.2 A1 (People, Groups, Devices with the count of waiting devices) and its screens: the
   people list with search and filters, "Add person" with an enrollment code shown once, a

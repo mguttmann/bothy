@@ -14,8 +14,8 @@ enum AdminSection {
   /// Groups and their members.
   groups('groups', hasScreen: true),
 
-  /// Grants (M4-27).
-  grants('grants'),
+  /// Grants per target, with "Who has access?" (M4-27).
+  grants('grants', hasScreen: true),
 
   /// The queue of waiting devices.
   devices('devices', hasScreen: true),
@@ -54,7 +54,8 @@ enum AdminSection {
 }
 
 /// A place in the administration: a [section] and, for a detail, the [id] of its person or
-/// group.
+/// group, or the key of the open target of the grants (`channel.<id>`, `space.<id>`,
+/// `instance`).
 ///
 /// Example: `AdminLocation.parse(['people', id])` is the detail of that person;
 /// `AdminLocation(AdminSection.groups).path` is `/groups`.
@@ -68,8 +69,8 @@ final class AdminLocation {
   /// The section.
   final AdminSection section;
 
-  /// The person (in [AdminSection.people]) or group (in [AdminSection.groups]), or null for
-  /// the list.
+  /// The person (in [AdminSection.people]), group (in [AdminSection.groups]) or target key
+  /// (in [AdminSection.grants]), or null for the list.
   final String? id;
 
   /// Parses the path [segments] below the administration's root; null for a path that names no
