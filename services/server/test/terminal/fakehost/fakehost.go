@@ -19,10 +19,12 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	gosync "sync"
@@ -177,6 +179,33 @@ type Host struct {
 	// session.
 	noise *NoiseKey
 	plain map[ids.ID][][]byte
+	// net is the network of ConnectWith (M2-48); zero dials directly.
+	net Network
+}
+
+// Network is how a Fake-Host reaches a server that is not on 127.0.0.1 directly (M2-48): the
+// Compose stack of the terminal suite behind its TLS front, reached through a mapped port and
+// trusted through a test CA.
+type Network struct {
+	// Dial replaces the dialer of the control and data connections; nil dials directly.
+	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	// TLS is the TLS configuration of both; nil keeps the default.
+	TLS *tls.Config
+}
+
+// client returns the HTTP client of the data connections over n (nil: the default client).
+func (n Network) client() *http.Client {
+	if n.Dial == nil && n.TLS == nil {
+		return nil
+	}
+	tr := http.DefaultTransport.(*http.Transport).Clone() // nosemgrep: bothy-go-egress-only -- test client of the data connection; it dials only the server of the test
+	if n.Dial != nil {
+		tr.DialContext = n.Dial
+	}
+	if n.TLS != nil {
+		tr.TLSClientConfig = n.TLS
+	}
+	return &http.Client{Transport: tr}
 }
 
 // NewKey returns a fresh login key and Noise key pair of a host: the Ed25519 login key and 32
@@ -196,15 +225,22 @@ func NewKey() (hosttest.Key, []byte) {
 // that answers session.open. It fails the test when the login fails.
 func Connect(t testing.TB, baseURL string, id ids.ID, key hosttest.Key, report map[string]any, live ...ids.ID) *Host {
 	t.Helper()
+	return ConnectWith(t, baseURL, Network{}, id, key, report, live...)
+}
+
+// ConnectWith is Connect over the network n: the control connection and every data connection
+// dial through n (M2-48, the manipulated host service of TM-T11 behind the TLS front).
+func ConnectWith(t testing.TB, baseURL string, n Network, id ids.ID, key hosttest.Key, report map[string]any, live ...ids.ID) *Host {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	contract, err := specschema.Default()
 	if err != nil {
 		t.Fatal(err)
 	}
 	h := &Host{t: t, base: baseURL, ID: id, Key: key, contract: contract, scripts: map[ids.ID]Script{}, seenJTI: map[string]bool{},
-		data: map[ids.ID]*DataConn{}, ctx: ctx, cancel: cancel, ended: make(chan struct{}), plain: map[ids.ID][][]byte{}}
+		data: map[ids.ID]*DataConn{}, ctx: ctx, cancel: cancel, ended: make(chan struct{}), plain: map[ids.ID][][]byte{}, net: n}
 	h.cond = gosync.NewCond(&h.mu)
-	h.Control = hosttest.Dial(t, ctx, baseURL)
+	h.Control = hosttest.Dial(t, ctx, baseURL, hosttest.WithTransport(n.Dial, n.TLS))
 	h.addJWKS(h.Control.Hello().Jwks)
 	h.Control.Login(ctx, hosttest.IdentifyParams{HostID: id, Key: key, LiveSessions: live})
 	if err := h.Control.Send(ctx, "report", report); err != nil {
@@ -620,7 +656,7 @@ type DataConn struct {
 // after it are binary. Errors: the dial or the login.
 func (h *Host) DialData(ctx context.Context, session ids.ID) (*DataConn, error) {
 	url := "ws" + strings.TrimPrefix(h.base, "http") + "/api/v1/hosts/sessions/" + session.String() + "/stream"
-	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- test client of the data connection; it dials only the server of the test
+	ws, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPClient: h.net.client(), CompressionMode: websocket.CompressionDisabled}) // nosemgrep: bothy-go-egress-only -- test client of the data connection; it dials only the server of the test
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
