@@ -7,6 +7,24 @@ import (
 	"net/http"
 )
 
+// CreateAgentWebhookSubscriptionResponse409Headers the declared response headers of an HTTP 409 response for CreateAgentWebhookSubscription
+type CreateAgentWebhookSubscriptionResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CreateAgentWebhookSubscriptionResponse429Headers the declared response headers of an HTTP 429 response for CreateAgentWebhookSubscription
+type CreateAgentWebhookSubscriptionResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// CreateAgentWebhookSubscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for CreateAgentWebhookSubscription
+type CreateAgentWebhookSubscriptionResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type CreateAgentWebhookSubscriptionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response

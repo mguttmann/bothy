@@ -11,6 +11,22 @@ documented in this file. The format is based on
 
 ### Added
 
+- Channel export (M3-11): the operation `exportChannel` (`export.channel`, rate-limit class
+  `rl.export`) is enabled and streams the messages of a channel in the range `[from, to)` as
+  `application/x-ndjson`, one `Message` per line: threads ascending by id, the messages of a
+  thread ascending by `thread_seq`, the full `content_md` without `content_truncated` and
+  `my_reactions`, deleted messages as tombstones. A range whose `from` is not before `to` is
+  `400 validation_failed` at `#query/to` before any lookup. It needs `read` and `export` on the
+  channel and a fresh step-up; an unknown and an invisible channel give the same `404`. Exactly
+  one allow entry with `from` and `to` is committed to the audit log before the first byte. There
+  is no snapshot: before every batch the stream checks the credentials, `channel.read` and the
+  visible channels again on a fresh rights memo, and every line passes `message.read`, so a
+  revocation ends the stream. After the first byte an abort, a read error, the deadline or a
+  shutdown ends the response without its final chunk, so a cut export never looks complete; an
+  empty range is `200` with an empty body. The response runs under `http.transfer_timeout`. New
+  port `messaging.Export`, outgoing port `CredentialCheck` and the queries
+  `ListExportThreadIDs` and `ListExportThreadMessages`. 02 section 4.6 is corrected: the export
+  stores no package in `files` (D-M3-11-8).
 - File download with download tickets (M3-05): the operations `downloadFile`, `downloadThumbnail`,
   `createFileTicket` and `getTranscript` are enabled. Bytes leave only through the server after
   `authorize(file.read)` at fetch time and stream from the object storage under

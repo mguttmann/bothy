@@ -317,7 +317,9 @@ Begründungen für Grenzfälle:
   seinen Port.
 - `command.invoke` und `command.autocomplete` gehören zu `runs` (Zustellung an den Agenten mit
   `agent.invoke`), das Register (`command.register`, `command.remove`, `command.read`) zu `agents`.
-- `export.channel` gehört zu `messaging`; das Paket legt `files` ab.
+- `export.channel` belongs to `messaging`, and the export streams NDJSON without storing a
+  package; export packages in `files` belong only to the privacy export of `privacy` (M7-06)
+  (ruling D-M3-11-8 in [docs/DECISIONS.md](../DECISIONS.md)).
 - `client_metrics.submit` gehört zu `stats`: Der Endpunkt nimmt Kennzahlen ohne Inhalte an und gibt
   sie an die Telemetrie weiter ([ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)); er schreibt keine Tabelle.
 - Die Dev-Umgebungs-Aktionen gehören zu `agents`, weil die Umgebung an einen Runner-Agenten

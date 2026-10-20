@@ -352,7 +352,9 @@ func (allowAll) Observe(context.Context, authorize.LogEvent) {}
 // runUnit runs the function of a unit of work without a transaction.
 type runUnit struct{ txn.UnitOfWork }
 
-func (runUnit) Do(ctx context.Context, fn func(context.Context) error, _ ...txn.Option) error { return fn(ctx) }
+func (runUnit) Do(ctx context.Context, fn func(context.Context) error, _ ...txn.Option) error {
+	return fn(ctx)
+}
 
 // stillValid accepts every principal.
 type stillValid struct{}

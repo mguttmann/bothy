@@ -16,6 +16,42 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetDevice Read a device
+//
+// A pending device polls this to learn when it was approved.
+//
+// Corresponds with GET /devices/{device_id} (the `GetDevice` operationId).
+func (c *Client) GetDevice(ctx context.Context, deviceId DeviceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeviceRequest(c.Server, deviceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveDeviceWithBody Approve a pending device
+//
+// The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /devices/{device_id}/approve (the `ApproveDevice` operationId).
+func (c *Client) ApproveDeviceWithBody(ctx context.Context, deviceId DeviceIdPath, params *ApproveDeviceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveDeviceRequestWithBody(c.Server, deviceId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ApproveDevice Approve a pending device
 //
 // The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
@@ -22027,6 +22063,14 @@ type ClientWithResponsesInterface interface {
 	//
 	// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
 	//
+	// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+	// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+	// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+	// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+	// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+	// revocation ends the stream. An export cut after the first byte ends without a complete
+	// response (no final chunk); a range without messages gives `200` with an empty body.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
@@ -27389,23 +27433,5 @@ type CreateAgentWebhookSubscriptionResponse403Headers struct {
 
 // CreateAgentWebhookSubscriptionResponse404Headers the declared response headers of an HTTP 404 response for CreateAgentWebhookSubscription
 type CreateAgentWebhookSubscriptionResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentWebhookSubscriptionResponse409Headers the declared response headers of an HTTP 409 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentWebhookSubscriptionResponse429Headers the declared response headers of an HTTP 429 response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CreateAgentWebhookSubscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for CreateAgentWebhookSubscription
-type CreateAgentWebhookSubscriptionResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }
