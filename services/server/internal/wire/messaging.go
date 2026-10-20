@@ -3,12 +3,14 @@
 package wire
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -60,6 +62,19 @@ type MessagingWrites struct {
 	// Metrics counts the created messages; nil means bothy.message.created of
 	// messaging/adapters/otelmetrics on the global meter provider of platform/otel (M1-68).
 	Metrics messagingapp.Metrics
+	// Credentials checks the principal of a channel export again before every batch (M3-11): the
+	// server passes identity's Authenticator, bound when the session step has run; nil leaves the
+	// export refusing to start (a role or a test without it).
+	Credentials messagingapp.CredentialCheck
+}
+
+// lazyCredentials is the credential check of the export over the Authenticator of the HTTP chain,
+// looked up per call, because the session step that builds it runs after the chat step.
+type lazyCredentials func() actor.Authenticator
+
+// Revalidate implements messagingapp.CredentialCheck.
+func (f lazyCredentials) Revalidate(ctx context.Context, a actor.Actor) error {
+	return f().Revalidate(ctx, a)
 }
 
 // NewMessaging builds the messaging module over pool with the unit of work uow, the Authorizer
@@ -88,12 +103,12 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	svc, err := messagingapp.New(cfg, messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
-		Metrics: w.Metrics,
+		Metrics: w.Metrics, Credentials: w.Credentials,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Messaging{Service: svc, Handlers: messaginghttp.New(svc, svc.Mentions(), svc.Templates(), svc.Reactions(), svc.Pins(), threads)}, nil
+	return &Messaging{Service: svc, Handlers: messaginghttp.New(svc, svc.Mentions(), svc.Templates(), svc.Reactions(), svc.Pins(), svc.Export(), threads, log)}, nil
 }
 
 // fillHandlers sets the nil messaging handler of h to the one m built; a nil m (a role or a test

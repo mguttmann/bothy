@@ -15963,6 +15963,15 @@ type PutChannelBehaviorParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ExportChannelParams defines parameters for ExportChannel.
+type ExportChannelParams struct {
+	// From Start of the range (inclusive).
+	From Timestamp `form:"from" json:"from"`
+
+	// To End of the range (exclusive).
+	To Timestamp `form:"to" json:"to"`
+}
+
 // MoveChannelParams defines parameters for MoveChannel.
 type MoveChannelParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
