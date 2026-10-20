@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -114,3 +115,30 @@ def test_ci_ok_outlasts_the_longest_chain() -> None:
     jobs = _workflow()["jobs"]
     chain = sum(int(jobs[j]["timeout-minutes"]) for j in ("plan", "gates", "sonar"))
     assert int(jobs["ci-ok"]["timeout-minutes"]) > chain
+
+
+def test_pack_step_skips_reports_a_partial_run_did_not_write(tmp_path: Path) -> None:
+    # A pull request that selects only some components writes only their reports; the step
+    # must pack what exists instead of failing on a literal path such as sdk/python/coverage.xml.
+    [step] = [s for s in _steps("gates") if "REPORTS" in s.get("env", {})]
+    work = tmp_path / "repo"
+    (work / "services" / "server").mkdir(parents=True)
+    (work / "services" / "server" / "coverage.out").write_text("mode: set\n", encoding="utf-8")
+    temp = tmp_path / "runner"
+    temp.mkdir()
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "REPORTS": str(step["env"]["REPORTS"]),
+        "RUNNER_TEMP": str(temp),
+    }
+    done = subprocess.run(
+        ["bash", "-e", "-c", str(step["run"])],
+        cwd=work,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    listed = (temp / SONAR_ARTIFACT / "reports.txt").read_text(encoding="utf-8").split()
+    assert listed == ["services/server/coverage.out"]
