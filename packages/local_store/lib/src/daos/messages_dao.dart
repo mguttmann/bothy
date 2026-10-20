@@ -7,6 +7,7 @@ library;
 import 'package:domain/domain.dart';
 import 'package:drift/drift.dart';
 
+import '../cascade.dart';
 import '../database.dart';
 import '../mappers/files.dart';
 import '../mappers/threads_messages.dart';
@@ -250,6 +251,22 @@ final class MessagesDao {
     MessageId messageId, {
     required DateTime deletedAt,
     required ResourceVersion version,
+  }) async =>
+      await tombstoneWithFiles(
+        messageId,
+        deletedAt: deletedAt,
+        version: version,
+      ) !=
+      null;
+
+  /// [tombstone] that also deletes the metadata and file cache rows of the message's files
+  /// that no other message attaches (20 4.7: client caches go with `message.deleted`); returns
+  /// the paths of the deleted cache rows, whose bytes the caller deletes after the commit, or
+  /// null when the tombstone did not apply.
+  Future<List<String>?> tombstoneWithFiles(
+    MessageId messageId, {
+    required DateTime deletedAt,
+    required ResourceVersion version,
   }) => _db.transaction(() async {
     final changed =
         await (_db.update(_db.messages)..where(
@@ -267,8 +284,11 @@ final class MessagesDao {
                 version: Value(version.value),
               ),
             );
-    if (changed == 0) return false;
+    if (changed == 0) return null;
     final id = messageId.value;
+    final attached = [
+      for (final a in await attachmentsOf(messageId)) a.fileId.value,
+    ];
     await (_db.delete(
       _db.reactionsSummary,
     )..where((t) => t.messageId.equals(id))).go();
@@ -287,7 +307,7 @@ final class MessagesDao {
       updates: {_db.searchIndex},
       updateKind: UpdateKind.delete,
     );
-    return true;
+    return deleteOrphanFiles(_db, attached);
   });
 
   /// Stores a mention of the person themselves (15 6.1 `my_mentions`).

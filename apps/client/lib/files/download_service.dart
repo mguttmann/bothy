@@ -108,6 +108,19 @@ final class DownloadService {
     String variant,
     String? name,
   ) async {
+    try {
+      return await _download(fileId, variant, name);
+    } on FileSystemException {
+      // The cache folder cannot be written (a full disk): no bytes, and the caller shows why.
+      return const DownloadFailed('cache_failed');
+    }
+  }
+
+  Future<DownloadResult> _download(
+    FileId fileId,
+    String variant,
+    String? name,
+  ) async {
     final hit = await cache.lookup(fileId, variant);
     if (hit != null) return Downloaded(hit);
     final path = variant == 'original'
@@ -181,14 +194,23 @@ final class DownloadService {
     if (target == null) return const DownloadCancelled();
     final result = await fetch(file.id, name: file.originalName);
     if (result is! Downloaded) return result;
-    return Downloaded(await result.file.copy(target));
+    try {
+      return Downloaded(await result.file.copy(target));
+    } on FileSystemException {
+      // A folder that went away, a locked file, a full disk or a read-only volume.
+      return const DownloadFailed('save_failed');
+    }
   }
 
   /// Fetches [file] and opens it with the system through [opener].
   Future<DownloadResult> open(FileMeta file, FileOpener opener) async {
     final result = await fetch(file.id, name: file.originalName);
     if (result is! Downloaded) return result;
-    if (!await opener.open(result.file.path)) {
+    try {
+      if (!await opener.open(result.file.path)) {
+        return const DownloadFailed('open_failed');
+      }
+    } on Object {
       return const DownloadFailed('open_failed');
     }
     return result;

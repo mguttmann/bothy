@@ -112,6 +112,42 @@ void main() {
     },
   );
 
+  test('an upload completed while the app quit completes again without its '
+      'file', () async {
+    // The app quits while completeUpload is on its way: the server completes the upload, the
+    // executor deletes the copy, but the closed outbox never records the confirmation.
+    h.server.faults.delay(
+      const Duration(milliseconds: 300),
+      operationId: 'completeUpload',
+    );
+    final f = await h.file('voice.m4a', utf8.encode('recorded audio'));
+    final source = await prepareUpload(f.path);
+    final e = await h.outbox.enqueue(
+      UploadOps.request(
+        threadId: thread(),
+        channelId: channel(),
+        source: source,
+        key: 'k1',
+        owned: true,
+      ),
+    );
+    await h.outbox.start();
+    await eventually(
+      'completing',
+      () => h.server.world.files.values.any(
+        (x) => x.json['upload_state'] == 'complete',
+      ),
+    );
+    await h.outbox.close();
+    await eventually('copy deleted', () => !f.existsSync());
+
+    final next = h.reopen();
+    addTearDown(next.close);
+    await next.start();
+    await eventually('confirmed after the restart', () => gone(e.id));
+    expect(h.server.world.files, hasLength(1));
+  });
+
   test(
     'a file that cannot be read fails the entry instead of retrying',
     () async {

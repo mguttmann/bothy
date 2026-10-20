@@ -90,6 +90,20 @@ void main() {
       voice.dispose();
     });
 
+    testWidgets('two starts at once record once', (tester) async {
+      final recorder = FakeRecorder();
+      final voice = VoiceController(
+        recorder: () => recorder,
+        bitRate: 64000,
+        scratch: () async => scratch,
+        onSend: (_) async {},
+      );
+      await tester.runAsync(() => Future.wait([voice.start(), voice.start()]));
+      expect(recorder.calls.where((c) => c == 'start'), hasLength(1));
+      expect(voice.phase, VoicePhase.recording);
+      voice.dispose();
+    });
+
     test('the audio player logs nothing, so no ticket URL reaches a log', () {
       AudioTicketPlayer.silenceLogs();
       expect(AudioLogger.logLevel, AudioLogLevel.none);

@@ -128,6 +128,8 @@ class _ImageViewer extends ConsumerStatefulWidget {
 }
 
 class _ImageViewerState extends ConsumerState<_ImageViewer> {
+  String? _saved;
+
   late final Future<DownloadResult?> _original =
       ref
           .read(downloadServiceProvider)
@@ -174,6 +176,16 @@ class _ImageViewerState extends ConsumerState<_ImageViewer> {
                 },
               ),
             ),
+            if (_saved case final saved?)
+              Padding(
+                padding: const EdgeInsets.only(top: DsSpace.s8),
+                child: Text(
+                  saved,
+                  key: const ValueKey('file.viewer.notice'),
+                  style: dsTextStyle(DsType.caption)
+                      .copyWith(color: colors.textSecondary),
+                ),
+              ),
             const SizedBox(height: DsSpace.s12),
             Wrap(
               alignment: WrapAlignment.end,
@@ -186,7 +198,22 @@ class _ImageViewerState extends ConsumerState<_ImageViewer> {
                   onPressed: () async {
                     final downloads = ref.read(downloadServiceProvider);
                     final picker = ref.read(filePortsProvider).picker;
-                    await downloads?.saveAs(widget.file, picker);
+                    final result = await downloads?.saveAs(widget.file, picker);
+                    if (!mounted || result == null) return;
+                    setState(
+                      () => _saved = switch (result) {
+                        Downloaded() => l.fileSaved(
+                          dsIsolate(widget.file.originalName),
+                        ),
+                        DownloadCancelled() => null,
+                        DownloadDamaged() => l.fileDownloadDamaged,
+                        DownloadNotReady() => l.fileStateChecking,
+                        DownloadBlocked() => l.fileStateBlocked,
+                        DownloadFailed(:final code) => l.fileDownloadFailed(
+                          uploadFailureText(l, code),
+                        ),
+                      },
+                    );
                   },
                 ),
                 DsButton(

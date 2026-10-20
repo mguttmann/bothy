@@ -24,19 +24,28 @@ final Map<String, Applier> messageAppliers = {
 
 /// Stores [b] by the version rule with its author, files, attachments, reactions, components,
 /// the mention of [me] and its search row; a tombstone (`deleted_at`) clears the content and
-/// removes the search row (04 2.2 item 5). Returns whether the message changed.
+/// removes the search row (04 2.2 item 5) and the cached files of the message, whose paths go
+/// to [onErased] for deleting the bytes after the commit (20 4.7). Returns whether the message
+/// changed.
 ///
 /// Runs inside the caller's transaction.
 Future<bool> storeMessage(
   LocalDatabase db,
   MessageBundle b, {
   required PrincipalId? me,
+  void Function(List<String> paths)? onErased,
 }) async {
   final m = b.message;
   final dao = db.messagesDao;
   final deletedAt = m.deletedAt;
   if (deletedAt != null) {
-    if (await dao.tombstone(m.id, deletedAt: deletedAt, version: m.version)) {
+    final erased = await dao.tombstoneWithFiles(
+      m.id,
+      deletedAt: deletedAt,
+      version: m.version,
+    );
+    if (erased != null) {
+      if (erased.isNotEmpty) onErased?.call(erased);
       return true;
     }
     if (await dao.byId(m.id) != null) return false;
@@ -118,7 +127,12 @@ Future<void> _applyMessage(
   final m = b.message;
   final me = sync.me;
   final previous = created ? null : await db.messagesDao.byId(m.id);
-  final applied = await storeMessage(db, b, me: me);
+  final applied = await storeMessage(
+    db,
+    b,
+    me: me,
+    onErased: (paths) => after.steps.add(() => sync.eraser.erase(paths)),
+  );
   if (created) {
     // 15 7.3 item 4: a message that does not continue the loaded range opens a gap; the gap
     // is loaded through REST before the message shows (watchContiguous).
@@ -147,12 +161,16 @@ Future<void> _deleted(ApplyContext c) async {
   final previous = await c.db.messagesDao.byId(id);
   final version = c.resourceVersion;
   if (previous == null || version == null) return;
-  final applied = await c.db.messagesDao.tombstone(
+  final erased = await c.db.messagesDao.tombstoneWithFiles(
     id,
     deletedAt: time(p, 'deleted_at'),
     version: version,
   );
-  if (!applied) return;
+  if (erased == null) return;
+  // 20 4.7: the cached bytes of the message's files go after the commit.
+  if (erased.isNotEmpty) {
+    c.after.steps.add(() => c.sync.eraser.erase(erased));
+  }
   await _count(
     c.sync,
     c.db,

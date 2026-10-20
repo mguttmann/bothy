@@ -235,19 +235,36 @@ class UploadHarness {
       baseUrl: server.baseUri,
     );
     AttachmentMessageOps.wrap(executors, progress);
-    var n = 0;
-    final outbox = Outbox(
-      db: db,
-      executors: executors,
-      config: AppConfig.defaults().withOverrides(fastConfig),
-      ids: Uuid7Generator(
-        nowMillis: () => DateTime.now().millisecondsSinceEpoch,
-        random: (bits) => (n++ * 7919) % (1 << (bits > 30 ? 30 : bits)),
-      ),
-    );
     final folder = await Directory.systemTemp.createTemp('uploads');
-    return UploadHarness._(server, seed, alex, db, outbox, progress, folder);
+    return UploadHarness._(
+      server,
+      seed,
+      alex,
+      db,
+      _outboxOn(db, executors),
+      progress,
+      folder,
+    ).._executors = executors;
   }
+
+  static int _n = 0;
+
+  static Outbox _outboxOn(LocalDatabase db, OutboxExecutors executors) =>
+      Outbox(
+        db: db,
+        executors: executors,
+        config: AppConfig.defaults().withOverrides(fastConfig),
+        ids: Uuid7Generator(
+          nowMillis: () => DateTime.now().millisecondsSinceEpoch,
+          random: (bits) => (_n++ * 7919) % (1 << (bits > 30 ? 30 : bits)),
+        ),
+      );
+
+  late OutboxExecutors _executors;
+
+  /// A new outbox on the same database and executors, as the next start of the app builds
+  /// it; the caller closes it.
+  Outbox reopen() => _outboxOn(db, _executors);
 
   /// The fake.
   final FakeServer server;

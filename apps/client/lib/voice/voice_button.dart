@@ -93,9 +93,19 @@ final class VoiceController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  /// Starts a recording; asks for the microphone first (the system asks the person once).
-  Future<void> start() async {
+  /// Starts a recording; asks for the microphone first (the system asks the person once). A
+  /// second call while one starts (a double click) waits for the first.
+  Future<void> start() => _starting ??= _start().whenComplete(() {
+    _starting = null;
+  });
+
+  Future<void>? _starting;
+
+  Future<void> _start() async {
     if (phase == VoicePhase.recording) return;
+    // Timers of an earlier recording never outlive it.
+    _ticker?.cancel();
+    _stopper?.cancel();
     final recorder = _recorder ??= _newRecorder();
     limitReached = false;
     recorded = null;

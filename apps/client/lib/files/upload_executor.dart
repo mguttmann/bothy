@@ -15,6 +15,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:api_client/api_client.dart' as wire show File;
 import 'package:api_client/api_client.dart' hide File;
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -151,15 +152,6 @@ abstract final class UploadOps {
     final path = p['path']! as String;
     final size = p['size_bytes']! as int;
     final local = File(path);
-    try {
-      if (!local.existsSync() || local.lengthSync() != size) {
-        throw const FileSystemException('changed since it was attached');
-      }
-    } on FileSystemException {
-      // The file changed or went away since it was attached: nothing to resume from. A final
-      // failure, never a retry (a file error is an IOException, which the outbox retries).
-      throw _unreadable;
-    }
     final files = api.getFilesApi();
     progress._begin(key, size);
     final session = (await files.createUpload(
@@ -193,6 +185,18 @@ abstract final class UploadOps {
         for (final part in plan)
           if (!etags.containsKey(part.number)) part,
       ];
+      // The local file matters only while parts are missing: a session the server completed
+      // (the app quit after `completeUpload`, which deleted an owned copy) completes again.
+      try {
+        if (todo.isNotEmpty &&
+            (!local.existsSync() || local.lengthSync() != size)) {
+          throw const FileSystemException('changed since it was attached');
+        }
+      } on FileSystemException {
+        // Nothing to resume from: a final failure, never a retry (a file error is an
+        // IOException, which the outbox would retry).
+        throw _unreadable;
+      }
       final targets = {for (final t in session.parts) t.partNumber: t};
       var next = 0;
       var stopped = false;
@@ -237,21 +241,28 @@ abstract final class UploadOps {
           guarded(),
       ]);
     }
-    final numbers = etags.keys.toList()..sort();
-    final done = await files.completeUpload(
-      fileId: fileId,
-      idempotencyKey: completionKey(ctx.idempotencyKey),
-      uploadComplete: UploadComplete(
-        (b) => b.parts.replace([
-          for (final n in numbers)
-            UploadPartResult(
-              (r) => r
-                ..partNumber = n
-                ..etag = etags[n],
-            ),
-        ]),
-      ),
-    );
+    final Response<wire.File> done;
+    if (state.uploadState == UploadStateUploadStateEnum.complete) {
+      // Completed already (an earlier attempt's answer was lost): the file as it is now. A
+      // second completion would send other parts under the same key (422).
+      done = await files.getFile(fileId: fileId);
+    } else {
+      final numbers = etags.keys.toList()..sort();
+      done = await files.completeUpload(
+        fileId: fileId,
+        idempotencyKey: completionKey(ctx.idempotencyKey),
+        uploadComplete: UploadComplete(
+          (b) => b.parts.replace([
+            for (final n in numbers)
+              UploadPartResult(
+                (r) => r
+                  ..partNumber = n
+                  ..etag = etags[n],
+              ),
+          ]),
+        ),
+      );
+    }
     progress._complete(key, fileId);
     if (p['delete_after'] == true) {
       try {

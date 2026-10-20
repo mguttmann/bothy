@@ -128,6 +128,12 @@ void main() {
     expect(await File('${h.folder.path}/saved.txt').readAsBytes(), bytes);
     picker.saveTo = null;
     expect(await downloads.saveAs(meta, picker), isA<DownloadCancelled>());
+    // A place that cannot be written is a failure, never an exception (red team M4-22).
+    picker.saveTo = '${h.folder.path}/no/such/dir/saved.txt';
+    expect(
+      await downloads.saveAs(meta, picker),
+      isA<DownloadFailed>().having((r) => r.code, 'code', 'save_failed'),
+    );
   });
 
   test('a ticket URL reaches the player and never a log', () async {

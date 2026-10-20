@@ -74,7 +74,12 @@ class _AttachmentTileState extends ConsumerState<AttachmentTile> {
       _busy = true;
       _notice = null;
     });
-    final result = await action(downloads);
+    DownloadResult result;
+    try {
+      result = await action(downloads);
+    } on Object {
+      result = const DownloadFailed('save_failed');
+    }
     if (!mounted) return;
     setState(() {
       _busy = false;
