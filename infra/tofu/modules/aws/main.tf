@@ -1,5 +1,5 @@
-# Bothy on AWS (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a VPC with one
-# public subnet, a security group that admits only the edge port from the internet, one EC2
+# The chat server on AWS (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a
+# VPC with one public subnet, a security group that admits only the edge port from the internet, one EC2
 # host with an elastic address whose user data comes from generic-vm (Docker, the verified
 # release, the setup wizard), and optionally an off-site bucket with Object Lock in compliance
 # mode in another region. PostgreSQL and the files stay in the Compose stack: install.sh has no
@@ -131,7 +131,7 @@ resource "aws_route_table_association" "host" {
 resource "aws_security_group" "host" {
   region      = var.region
   name_prefix = "${local.name}-"
-  description = "Bothy host: only the edge port from the internet, SSH from the operator"
+  description = "Chat server host: only the edge port from the internet, SSH from the operator"
   vpc_id      = aws_vpc.instance.id
   tags        = merge(local.tags, { Name = local.name })
 

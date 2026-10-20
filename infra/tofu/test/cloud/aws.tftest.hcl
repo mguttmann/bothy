@@ -76,7 +76,7 @@ run "edge_port_only_public" {
     error_message = "aws runs PostgreSQL and the files in the stack and keeps the secrets on the host."
   }
   assert {
-    condition     = output.ssh_endpoint == "bothy@${aws_eip.host.public_ip}"
+    condition     = endswith(output.ssh_endpoint, "@${aws_eip.host.public_ip}")
     error_message = "ssh_endpoint names the elastic address of the host."
   }
   assert {

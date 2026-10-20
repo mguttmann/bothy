@@ -114,7 +114,7 @@ variable "telemetry_exporters" {
 }
 
 variable "admin_ssh_public_keys" {
-  description = "Public SSH keys of the maintenance user bothy (cloud-init); at least one, because without a key Hetzner Cloud sets a root password and sends it by e-mail."
+  description = "Public SSH keys of the maintenance user of generic-vm (ssh_user, created by cloud-init); at least one, because without a key Hetzner Cloud sets a root password and sends it by e-mail."
   type        = list(string)
   default     = []
   validation {

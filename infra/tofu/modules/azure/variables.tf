@@ -114,7 +114,7 @@ variable "telemetry_exporters" {
 }
 
 variable "admin_ssh_public_keys" {
-  description = "Public SSH keys of the maintenance user bothy (cloud-init); at least one, because Azure needs a key for the administrator when password login is off."
+  description = "Public SSH keys of the maintenance user of generic-vm (ssh_user, created by cloud-init); at least one, because Azure needs a key for the administrator when password login is off."
   type        = list(string)
   default     = []
   validation {

@@ -1,5 +1,5 @@
-# Bothy on Azure (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a resource
-# group (or an existing one), a virtual network with one subnet, a network security group that
+# The chat server on Azure (brief M7-16, ADR 0012, infra/tofu/README.md "Structure" item 1): a
+# resource group (or an existing one), a virtual network with one subnet, a network security group that
 # admits only the edge port from the internet and denies every other inbound packet, a static
 # public address and one Linux VM whose custom data comes from generic-vm (Docker, the verified
 # release, the setup wizard). PostgreSQL and the files stay in the Compose stack: install.sh has
