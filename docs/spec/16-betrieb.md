@@ -86,6 +86,130 @@ Regeln:
 
 OpenTofu-Module je Ziel beschreibt [infra/tofu/README.md](../../infra/tofu/README.md).
 
+### 3.1 Installation in one command (setup wizard)
+
+Goal 1 applies to strangers without prior knowledge. The tool is the installation script `install.sh`
+(POSIX shell, source `infra/compose/install.sh`), a release artifact of the component `bothy`
+next to the installation bundle ([18-release.md](18-release.md), section 2). It is the
+setup wizard. The manual path from [install-compose.md](../operations/install-compose.md)
+stays equivalent; the script does nothing that the manual path does not also do. The documented
+command names the version of the bundle:
+
+```sh
+curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh | sh
+```
+
+Without a terminal (CI, automation), all answers are available as options after `sh -s --`:
+
+```sh
+curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh \
+  | sh -s -- --yes --public-url https://chat.example.com --edge direct --scan on --storage s3 \
+      --owner-handle alex --owner-name Alex
+```
+
+V1-03 replaces `OWNER`, the release chain replaces the version. No reference to `releases/latest`: in
+the monorepo, the newest release is often a different component.
+
+The portability test (11.1) passes exactly the options after `sh -s --` from the second block;
+only `--storage` changes per run. Where the options are and how the test is called is defined in
+11.1 (interface of `make portability`). The source of the script is a parameter there
+(`PORTABILITY_INSTALL_SOURCE`), because GitHub Releases are shown only to people with read
+permission on the repository ("Anyone with read access to a repository can view and compare releases",
+https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases, retrieved
+2026-10-11) [verified]:
+
+| Value | Source | Invocation |
+|---|---|---|
+| `url` (this is how `portability.yml` runs) | Release URL of the tag without login | the second block, with `OWNER` and version of the tag |
+| `release-download` | `gh release download <tag>` with a token with read permission: `install.sh` and the bundle `bothy-compose-<version>.tar.gz` | `sh install.sh --bundle <bundle>` and the same options |
+
+Steps:
+
+1. **Preflight check.** Docker Engine and Compose in the minimum version (section 3, rule 7),
+   architecture, memory of the Docker VM (note for the profile `scan`, rule 2), target folder
+   (default `./bothy`, option `--dir`) empty or an earlier installation of this script. On
+   an error it aborts before it writes anything.
+2. **Fetch the bundle.** It downloads the installation bundle of exactly its built-in version from its
+   built-in download address (`https://github.com/<repository>/releases/download/v<version>/`, set
+   at release time from the name of the repository, 18 section 2.1 rule 3, not from the source with
+   `OWNER`), checks its SHA-256 against the built-in value and unpacks it. With `--bundle <file>` it
+   takes this file instead of the download; the checksum check stays the same. If `cosign` is in the
+   path, it additionally checks the signature from the same address (18, section 6); otherwise it
+   names the verification command.
+3. **Prompts.** Only with a terminal (input via `/dev/tty`, so that the command works with a pipe):
+   public address (`BOTHY_PUBLIC_URL`), edge `direct` or `tailscale` (then `TS_AUTHKEY`
+   hidden), virus scan (default on if the memory suffices), file storage `fs` (default,
+   volume `files`) or `s3` (profile `s3` with the object storage in the stack, sets
+   `BOTHY_STORAGE_DRIVER=s3`), local observability stack (default off), off-site target
+   (optional), handle and display name of the first owner. Every prompt has an option
+   (`--public-url`, `--edge direct|tailscale`, `--scan on|off`, `--storage fs|s3`,
+   `--observability on|off`, `--offsite`, `--owner-handle`, `--owner-name`) and `--yes` takes
+   the defaults; if a required value (public address, handle and display name of the owner) is
+   missing without a terminal, it aborts instead of guessing.
+4. **Write.** `.env` from `.env.example` of the bundle with the answers, mode `0600`;
+   `secrets/` with mode `0700`. It takes `BOTHY_VERSION` and `BOTHY_REGISTRY` unchanged
+   from the bundle. `BOTHY_VERSION` is the server version, not the script's own version: product and
+   server have separate versions ([18-release.md](18-release.md), section 1). The product release
+   writes both values into the bundle; no bundle with a placeholder is produced there
+   ([18-release.md](18-release.md), section 2.1). No secret in `.env` except the one-time
+   `TS_AUTHKEY` (R-OP-05). `secrets-init` generates all generatable secrets on the first start (5.3).
+5. **Check and start.** `docker compose config --quiet`, then `docker compose up --no-start`
+   (creates networks and containers, starts nothing). With the edge `direct`, it then reads the gateway
+   of the Compose network `default` (network name from `docker compose config --format json`, field
+   `networks.default.name`; `docker network inspect`, field `IPAM.Config[].Gateway`) and writes
+   it as `<gateway>/32` (IPv6 `/128`) into `BOTHY_TRUSTED_PROXIES` of `.env`. Reason: in the profile
+   `direct`, the server sees the gateway as the peer, not the reverse proxy; with the
+   default (loopback only) it rejects every request via the published port (4.3,
+   SEC-TLS-1). Then `docker compose up -d` and `bothy healthcheck` against `/readyz` in the
+   API container (like [install-compose.md](../operations/install-compose.md), section 4),
+   for at most `install.ready_timeout`. Finally it checks the path from outside:
+   `GET /api/v1/instance/discovery` via `127.0.0.1:BOTHY_HTTP_PUBLISH_PORT` (edge `direct`)
+   answers with `200`, otherwise it aborts with a hint to `BOTHY_TRUSTED_PROXIES`.
+6. **First owner.** `bothy setup bootstrap-owner` with handle and display name
+   ([08-identitaet.md](08-identitaet.md), section 4). The script shows the enrollment code once
+   and writes it to no file and no log.
+7. **Finish.** Next steps with command: open the app, enter the server address and enrollment code
+   ([01-produkt.md](01-produkt.md), section 5.6, E1 and E3); escrow secrets
+   (5.4); with an empty off-site target, the warning "local backup only". With the edge `tailscale`, it
+   clears `TS_AUTHKEY` in `.env` as soon as the first login has succeeded.
+
+Rules:
+
+1. A second run in the same folder overwrites neither `.env` nor `secrets/`. Only exception:
+   if `BOTHY_TRUSTED_PROXIES` is still at the default (loopback only) with the edge `direct`, it sets
+   the gateway as in step 5; it leaves any other value as it is. It starts the stack and
+   shows the state; with an owner already set up, step 6 is skipped (the command then aborts anyway
+   without a change, 08 section 4).
+2. The script never calls `sudo` and installs no packages, not even Docker; the preflight check
+   names the way. Reason: a script from the network should change nothing outside its folder.
+3. Hosts: Linux and macOS. On Windows it runs in WSL 2 with Docker Desktop [derived: there
+   is a POSIX shell and the same Docker CLI there; the build ticket verifies it].
+4. Every abort ends with an exit code other than `0` and names the step and the reason on
+   standard error.
+5. Verified by the portability test (11.1): it installs on the fresh runner without a terminal
+   with exactly the documented options (second block above, `--yes` and options; only
+   `--storage` changes per run). The source of the script is a parameter (table above); with
+   `release-download` only `--bundle` is added. ShellCheck checks the script in the gate.
+
+As built (M7-29, [docs/DECISIONS.md](../DECISIONS.md) D-M7-29-1 to D-M7-29-8): the bundle unpacks
+into the target folder with its own layout, so the Compose folder is `<dir>/infra/compose`
+with `.env` and `secrets/` there, and the marker file `<dir>/.bothy-install` names an earlier
+installation of this script (step 1). Further options: `--dir <path>` (default `./bothy`),
+`--bundle <file>`, `--ready-timeout <duration>` (`install.ready_timeout`), `--yes` and
+`--help`. `TS_AUTHKEY` is never an option, because the arguments of a process are visible to
+other users of the host: with a terminal it is a hidden prompt, without one the script reads the
+environment variable `TS_AUTHKEY` and aborts naming it when it is missing. The script removes
+`TS_AUTHKEY` from the environment of every `docker compose` call, because Compose prefers the
+shell environment over `.env`: `.env` is the only source of the key. Exit codes: `0`
+success, `1` a failed step, `2` an invalid option; every message names the step
+(`install.sh: <step>: <reason>`). The signature check of step 2 uses the identity of the release
+workflow of the repository named in the download address; with another address (the trial
+release) or without `cosign` it names the command. The tests are `make install-test` (POSIX shell
+tests with stubs for `docker`, `curl`, `cosign` and `sudo` in a Debian container pinned by
+digest), ShellCheck runs in `make lint`, and `make install-options` holds the options of the
+portability test equal to the second block above and the version of the documented command in
+`README.md` and `install-compose.md` equal to `VERSION`.
+
 ## 4. Netz
 
 ### 4.1 Grundregeln
@@ -643,23 +767,108 @@ Wartungsmodus über `instance.discovery.read` ein `moved_to`, signiert mit dem I
 der Client übernimmt es nur bei gleicher `instance_id` (Frage an Team B, siehe Bericht).
 Anleitung: [cloud-migration.md](../operations/cloud-migration.md).
 
-### 11.1 Portabilitätstest in CI
+### 11.1 Portability test in CI
 
-Ein Test belegt die Portabilität bei jedem Release-Tag und auf Anforderung (`workflow_dispatch`),
-nicht nächtlich: Er braucht gehostete Runner, die in der privaten Phase Kosten verursachen
-([ADR 0039](../adr/0039-runner-strategie-privat-oeffentlich-und-release-ausnahmen.md),
-[ci-budget.md](../quality/ci-budget.md)):
+A test proves portability after every successful release of the product (component
+`bothy`, tag `vX.Y.Z`, also beta) and on request (`workflow_dispatch` with a
+product tag), not nightly: it checks a published release, on fresh
+GitHub-hosted runners
+([ADR 0039](../adr/0039-runner-strategie-privat-oeffentlich-und-release-ausnahmen.md)). `release.yml` calls `portability.yml` only after the
+job `publish`, because only then are `install.sh` and the bundle available under the tag. Server
+tags (`server/v*`) do not start it: there is no `install.sh` under them. A server version is checked
+by the test of the product release that installs it (`BOTHY_VERSION` in the bundle,
+[18-release.md](18-release.md), section 2.1). In both start modes, the job checks out
+the product tag under test, not the state from which the run starts: this way
+`make portability` and `infra/compose/smoke.sh` match the release. Flow:
 
-1. Frischer Linux-Runner (amd64 und arm64), nur Docker; Images per Digest aus der Registry.
-2. `docker compose up` mit `direct,scan` und einmal mit `direct,scan,s3`.
-3. Smoke-Tests über die öffentliche API: Owner per Server-Befehl, Bereich, Kanal, Thread,
-   Nachricht, WebSocket-Empfang, Datei-Upload sauber und mit EICAR-Testdatei, Lauf eines
-   Test-Adapters, Suche, Statusseite.
-4. Sicherung auslösen, Wiederherstellungstest auslösen, alle Prüfungen grün.
-5. Telemetrie über das Overlay `local` empfangen; Datenschutz-Kanarie (Kapitel 17) nicht gefunden.
-6. Ergebnis als Status-Check am Release.
+1. Fresh Linux runner (amd64 and arm64), Docker only. The server images come, as with every
+   installation, by their tag from `BOTHY_REGISTRY` and `BOTHY_VERSION` in the bundle of the tag
+   ([18-release.md](18-release.md), section 2.1), not by digest. `install.sh` pulls and starts in
+   one run (3.1, step 5); that is why the test pulls and checks them itself beforehand. It reads
+   both values from the `.env.example` of the bundle (source `release-download`: from
+   `PORTABILITY_RELEASE_DIR`; source `url`: downloaded from the address at which `install.sh`
+   looks for the bundle, interface rule 3) and pulls every image that the `compose.yaml` of the
+   bundle names with `${BOTHY_VERSION}` (the same list as in [18-release.md](18-release.md),
+   section 2.1, rule 4). Then it checks the signature of each of these digests (`docker image
+   inspect`, field `RepoDigests`) like an instance operator
+   ([release.md](../operations/release.md), section 5; ADR 0036): a digest passes if it can be
+   verified with the public key of the private phase from the repository or keyless with the
+   identity of the release workflow, because a tag from the private phase carries only the key
+   signature even after switching to public
+   ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md), item 5). cosign runs
+   for this as a container with a digest pin (ADR 0041), because the runner brings only Docker.
+   The cosign project names the image: "Signed release images are available at
+   `ghcr.io/sigstore/cosign/cosign`"
+   (https://docs.sigstore.dev/cosign/system_config/installation/, retrieved 2026-10-11)
+   [verified]. Only then does the test call `install.sh` (step 2). Compose pulls an image only if
+   it is missing locally: "Compose pulls the image only if it's not available in the platform
+   cache", the default of `pull_policy` without `build`
+   (https://docs.docker.com/reference/compose-file/services/, retrieved 2026-10-11) [verified],
+   and `compose.yaml` sets neither of the two. So the installation starts the checked images.
+   After the installation the test compares the images with which the containers of this
+   installation run with the checked ones and fails on a difference; this also catches another
+   bundle or a second pull. The result (step 6) names the digests. The
+   job does not log in to the registry; it pulls without login like an instance operator, and a
+   package that is still private makes it fail
+   ([public-switch.md](../quality/public-switch.md) step 21).
+2. Installation with the setup wizard (3.1) without a terminal with the documented
+   options, source of the script `url` (3.1), once with `--storage fs` (profiles `direct,scan`) and once with `--storage s3` (profiles
+   `direct,scan,s3`); afterwards `/readyz` is green and
+   `GET /api/v1/instance/discovery` via the published port answers with `200`, without any
+   further manual step.
+3. Smoke tests via the public API: owner from the setup wizard, space, channel, thread,
+   message, WebSocket reception, file upload clean and with the EICAR test file, run of a
+   test adapter, search, status page.
+4. Trigger a backup, trigger a restore test, all checks green.
+5. Receive telemetry via the overlay `local`; privacy canary (chapter 17) not found.
+6. Result as a status check on the release, with the digests of the checked server images.
 
-Der Test gehört zur Gate-Kette von Team H (ADR 0038, 0039); dieses Kapitel legt den Inhalt fest.
+**Interface of `make portability`.** `portability.yml` passes only these three
+environment variables and no option of `install.sh`. M7-14 builds the interface, M7-29 defines
+the options.
+
+| Variable | Content | Without a value |
+|---|---|---|
+| `PORTABILITY_TAG` | product tag under test (`vX.Y.Z` or `vX.Y.Z-beta.N`) | `make portability` stays the smoke test from M1-73 (`infra/compose/smoke.sh` with the locally built image, without `install.sh`) |
+| `PORTABILITY_INSTALL_SOURCE` | Source of `install.sh` and of the bundle: `url` or `release-download` (table in 3.1) | abort before the test downloads, pulls or installs anything, if `PORTABILITY_TAG` is set |
+| `PORTABILITY_RELEASE_DIR` | Folder with `install.sh` and `bothy-compose-<version>.tar.gz` from `gh release download` | with `release-download` abort before the test pulls or installs anything; with `url` not read |
+
+Rules:
+
+1. With `PORTABILITY_TAG`, `make portability` runs the test from `tests/portability`: from
+   step 1 reading the bundle, pulling and checking the signatures of the images and the comparison
+   after the installation, then the steps 2 to 5 and from step 6 the output of the digests. The
+   runner and the status check are provided by `portability.yml`. An invalid value of one of the
+   three variables aborts before the test downloads, pulls or installs anything, and names the
+   variable.
+2. The options after `sh -s --` are stated exactly once, in `tests/portability/install-options`
+   (M7-29 creates the file, M7-14 reads it). The check from M7-29 (`make install-options`,
+   `tools/ci/install_options_check.py`, part of `make check`) compares them with the second
+   block from 3.1 in order; only `--storage` (the test sets it per run) and `--bundle` may
+   differ.
+3. Source `url`: the test builds the URL of the second block from 3.1 itself, with
+   `GITHUB_REPOSITORY` in place of `OWNER/bothy` and `PORTABILITY_TAG` in place of
+   `v0.0.0`. GitHub sets `GITHUB_REPOSITORY` in every step to "The owner and repository
+   name" (https://docs.github.com/en/actions/reference/workflows-and-actions/variables,
+   retrieved 2026-10-11) [verified]; a run outside GitHub Actions sets it itself. The test does
+   not read the URL from the documentation of the tag. So for the URL of `install.sh` it does not
+   matter whether the tag was created before or after `OWNER` was replaced (V1-03);
+   [public-switch.md](../quality/public-switch.md) step 21 takes the last product tag. The same
+   holds for everything `install.sh` downloads afterwards: the release set the download address
+   of the bundle into `install.sh` at build time and the registry of the images into the bundle,
+   both from the repository in which the release ran ([18-release.md](18-release.md), section
+   2.1, rules 2 and 3). The test downloads the bundle for step 1 from the same address, built from
+   `GITHUB_REPOSITORY` and `PORTABILITY_TAG` like the URL of `install.sh`.
+4. Source `release-download`: `sh install.sh --bundle <bundle>` from `PORTABILITY_RELEASE_DIR`
+   with the same options; `install.sh` checks the checksum as with the download (3.1, step 2).
+5. Logs on failure: if a run fails, the test shows, before it cleans up,
+   `docker compose ps --all` and the end of the logs of all services of exactly this
+   installation, in the folder into which `install.sh` installed and with the project name under
+   which it runs there. Only the test knows folder and project; a later step in `portability.yml`
+   would see the checkout instead of the installation and, after the cleanup, no stack any more.
+   The smoke test without `PORTABILITY_TAG` does the same (`infra/compose/smoke.sh`, M1-73).
+
+The test belongs to the gate chain of team H (ADR 0038, 0039); this chapter defines the content.
 
 ## 12. Statusseite
 
@@ -720,65 +929,69 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 
 ## 14. Konfigurationswerte dieses Kapitels
 
-| Name | Standard | Bedeutung |
-|---|---|---|
-| `instance.environment` | `prod` | `dev`, `staging` oder `prod` (6.1) |
-| `server.role` | `all` | `api`, `worker` oder `all` |
-| `server.listen_addr` | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
-| `server.internal_listen_addr` | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
-| `server.public_url` | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](08-identitaet.md), Abschnitte 7.2 und 7.3) |
-| `server.trusted_proxies` | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
-| `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
-| `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:`; absoluter Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, sonst scheitert `bothy config check` |
-| `secrets.cache_ttl` | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` |
-| `secrets.signing_key_dir` | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
-| `console.assets_dir` | leer | directory of the built web console (`flutter build web` of `apps/console`) that the api process serves under `/console/` ([02-architektur.md](02-architektur.md), 3.1); empty: no console, `404` under `/console/`; the image sets `/usr/share/bothy/console`; a set directory without `index.html` ends the start |
-| `server.tls_cert_ref` | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
-| `server.tls_key_ref` | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
-| `database.host` | `localhost` | Host der Datenbank |
-| `database.port` | `5432` | Port der Datenbank im Netz des Servers |
-| `database.name` | `bothy` | Datenbankname |
-| `database.user` | `bothy_app` | Rolle des Servers |
-| `database.password_ref` | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
-| `database.sslmode` | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
-| `database.sslrootcert` | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
-| `database.max_conns` | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
-| `migrate.require_recent_backup` | `true` | `migrate` verlangt eine frische Sicherung |
-| `migrate.recent_backup_max_age` | `24h` | so alt darf diese Sicherung sein |
-| `migrate.lock_timeout` | `5s` | `lock_timeout` je Migrationsschritt |
-| `migrate.bootstrap_user` | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` |
-| `migrate.bootstrap_password_ref` | `file:<secrets.dir>/db_superuser_password` | dessen Passwort |
-| `migrate.owner_password_ref` | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt |
-| `migrate.app_password_ref` | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
-| `migrate.maint_password_ref` | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
-| `migrate.monitor_password_ref` | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
-| `migrate.backup_password_ref` | `file:<secrets.dir>/db_backup_password` | password for `bothy_backup` (M7-02) |
-| `backup.pg.full_schedule` | `0 2 * * 0` | Plan der Vollsicherung (cron) |
-| `backup.pg.diff_schedule` | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
-| `backup.pg.archive_timeout` | `60s` | spätestens dann wird ein WAL-Segment archiviert |
-| `backup.pg.retention_full` | `4` | behaltene Vollsicherungen in repo2 |
-| `backup.pg.local_retention_full` | `1` | behaltene Vollsicherungen in repo1 |
-| `backup.logical.schedule` | `0 3 * * *` | Plan von `pg_dump` (cron) |
-| `backup.logical.retention` | `30d` | Aufbewahrung der logischen Sicherung |
-| `backup.objects.schedule` | `30 3 * * *` | Plan der Objektsicherung (cron) |
-| `backup.objects.retention` | `90d` | Aufbewahrung der Objekt-Snapshots |
-| `backup.offsite.target` | leer | Off-site-Ziel; leer heißt nur lokal (Warnung in Konsole und Status) |
-| `backup.offsite.region` | `us-east-1` | region of the off-site bucket (signing of S3 requests) |
-| `backup.offsite.use_path_style` | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts |
-| `backup.max_age` | `26h` | ohne erfolgreiche Sicherung länger als das: Alarm |
-| `backup.restore_test.schedule` | `0 5 * * 6` | Plan des Wiederherstellungstests (cron) |
-| `backup.restore_test.sample_files` | `200` | geprüfte Dateien je Test |
-| `backup.restore_test.sample_threads` | `200` | geprüfte Threads je Test |
-| `backup.restore_test.max_age` | `8d` | ohne erfolgreichen Test länger als das: Alarm |
-| `dr.rpo_target` | `5m` | Ziel für den größten Datenverlust |
-| `dr.rto_target` | `4h` | Ziel für die Dauer der Wiederherstellung |
-| `status.check_interval` | `30s` | Abstand der automatischen Prüfungen |
-| `status.degrade_after` | `2m` | so lange Fehler bis `degraded` |
-| `status.incident_after` | `5m` | so lange `major_outage` bis zur automatischen Störung |
-| `status.resolve_after` | `10m` | so lange gesund bis zur automatischen Auflösung |
-| `status.error_ratio_degraded` | `0.05` | Fehleranteil, ab dem eine Prüfung scheitert |
-| `status.error_ratio_outage` | `0.5` | Fehleranteil, ab dem `major_outage` gilt |
-| `status.fanout_lag_degraded` | `5s` | Fan-out-Verzug, ab dem `sync.fanout` scheitert |
+Column "Ort": Server = configuration reference of the server; Installationsskript = option of
+`install.sh` (3.1), not a variable of the server.
+
+| Name | Ort | Standard | Bedeutung |
+|---|---|---|---|
+| `instance.environment` | Server | `prod` | `dev`, `staging` oder `prod` (6.1) |
+| `server.role` | Server | `all` | `api`, `worker` oder `all` |
+| `server.listen_addr` | Server | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
+| `server.internal_listen_addr` | Server | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
+| `server.public_url` | Server | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](08-identitaet.md), Abschnitte 7.2 und 7.3) |
+| `server.trusted_proxies` | Server | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
+| `server.maintenance_mode` | Server | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
+| `secrets.dir` | Server | `/run/bothy/secrets` | Basis der Standardverweise `file:`; absoluter Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, sonst scheitert `bothy config check` |
+| `secrets.cache_ttl` | Server | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` |
+| `secrets.signing_key_dir` | Server | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
+| `console.assets_dir` | Server | leer | directory of the built web console (`flutter build web` of `apps/console`) that the api process serves under `/console/` ([02-architektur.md](02-architektur.md), 3.1); empty: no console, `404` under `/console/`; the image sets `/usr/share/bothy/console`; a set directory without `index.html` ends the start |
+| `server.tls_cert_ref` | Server | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
+| `server.tls_key_ref` | Server | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
+| `database.host` | Server | `localhost` | Host der Datenbank |
+| `database.port` | Server | `5432` | Port der Datenbank im Netz des Servers |
+| `database.name` | Server | `bothy` | Datenbankname |
+| `database.user` | Server | `bothy_app` | Rolle des Servers |
+| `database.password_ref` | Server | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
+| `database.sslmode` | Server | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
+| `database.sslrootcert` | Server | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
+| `database.max_conns` | Server | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
+| `migrate.require_recent_backup` | Server | `true` | `migrate` verlangt eine frische Sicherung |
+| `migrate.recent_backup_max_age` | Server | `24h` | so alt darf diese Sicherung sein |
+| `migrate.lock_timeout` | Server | `5s` | `lock_timeout` je Migrationsschritt |
+| `migrate.bootstrap_user` | Server | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` |
+| `migrate.bootstrap_password_ref` | Server | `file:<secrets.dir>/db_superuser_password` | dessen Passwort |
+| `migrate.owner_password_ref` | Server | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt |
+| `migrate.app_password_ref` | Server | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
+| `migrate.maint_password_ref` | Server | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
+| `migrate.monitor_password_ref` | Server | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
+| `migrate.backup_password_ref` | Server | `file:<secrets.dir>/db_backup_password` | password for `bothy_backup` (M7-02) |
+| `backup.pg.full_schedule` | Server | `0 2 * * 0` | Plan der Vollsicherung (cron) |
+| `backup.pg.diff_schedule` | Server | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
+| `backup.pg.archive_timeout` | Server | `60s` | spätestens dann wird ein WAL-Segment archiviert |
+| `backup.pg.retention_full` | Server | `4` | behaltene Vollsicherungen in repo2 |
+| `backup.pg.local_retention_full` | Server | `1` | behaltene Vollsicherungen in repo1 |
+| `backup.logical.schedule` | Server | `0 3 * * *` | Plan von `pg_dump` (cron) |
+| `backup.logical.retention` | Server | `30d` | Aufbewahrung der logischen Sicherung |
+| `backup.objects.schedule` | Server | `30 3 * * *` | Plan der Objektsicherung (cron) |
+| `backup.objects.retention` | Server | `90d` | Aufbewahrung der Objekt-Snapshots |
+| `backup.offsite.target` | Server | leer | Off-site-Ziel; leer heißt nur lokal (Warnung in Konsole und Status) |
+| `backup.offsite.region` | Server | `us-east-1` | region of the off-site bucket (signing of S3 requests) |
+| `backup.offsite.use_path_style` | Server | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts |
+| `backup.max_age` | Server | `26h` | ohne erfolgreiche Sicherung länger als das: Alarm |
+| `backup.restore_test.schedule` | Server | `0 5 * * 6` | Plan des Wiederherstellungstests (cron) |
+| `backup.restore_test.sample_files` | Server | `200` | geprüfte Dateien je Test |
+| `backup.restore_test.sample_threads` | Server | `200` | geprüfte Threads je Test |
+| `backup.restore_test.max_age` | Server | `8d` | ohne erfolgreichen Test länger als das: Alarm |
+| `dr.rpo_target` | Server | `5m` | Ziel für den größten Datenverlust |
+| `dr.rto_target` | Server | `4h` | Ziel für die Dauer der Wiederherstellung |
+| `status.check_interval` | Server | `30s` | Abstand der automatischen Prüfungen |
+| `status.degrade_after` | Server | `2m` | so lange Fehler bis `degraded` |
+| `status.incident_after` | Server | `5m` | so lange `major_outage` bis zur automatischen Störung |
+| `status.resolve_after` | Server | `10m` | so lange gesund bis zur automatischen Auflösung |
+| `status.error_ratio_degraded` | Server | `0.05` | Fehleranteil, ab dem eine Prüfung scheitert |
+| `status.error_ratio_outage` | Server | `0.5` | Fehleranteil, ab dem `major_outage` gilt |
+| `status.fanout_lag_degraded` | Server | `5s` | Fan-out-Verzug, ab dem `sync.fanout` scheitert |
+| `install.ready_timeout` | Installationsskript | `5m` | how long `install.sh` waits for `/readyz` after `docker compose up -d` (option `--ready-timeout`, 3.1); not a key of the server |
 
 ## 15. Entscheidungen dieses Kapitels
 
@@ -803,3 +1016,4 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | R-OP-17 | DDL im Betrieb nur über `SECURITY DEFINER`-Funktionen von `bothy_owner`; Tabellenrechte je Migration ausdrücklich, keine Standardrechte in `public`. | Die Anwendungsrolle bleibt bei DML; ein fehlendes Recht fällt im Test auf. |
 | R-OP-18 | Signierschlüssel erzeugt der Server in einem eigenen beschreibbaren Verzeichnis ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)). | Rotation ohne Handgriff auf dem Host; alle anderen Geheimnisse bleiben nur lesbar. |
 | R-OP-19 | Hash-Routing über die Sitzungs-ID für beide Strom-Pfade des Terminals als Betriebsanforderung mit mehreren Knoten. | Kein Broker im Server; ein Knoten hält beide Enden einer Sitzung ([24-terminal.md](24-terminal.md), Abschnitt 9). |
+| R-OP-20 | Setup wizard as the POSIX shell script `install.sh` on the host, a release artifact with built-in version, checksum and download address of the bundle (18 2.1); no wizard in the container. | Compose must run on the host; a wizard in the container would need the Docker socket, that is root permissions on the host. The shell exists everywhere Docker runs. |

@@ -681,6 +681,7 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 | `status.error_ratio_degraded` | `BOTHY_STATUS__ERROR_RATIO_DEGRADED` | Server |  | `0.05` | Fehleranteil, ab dem eine Prüfung scheitert | geplant (M7) |
 | `status.error_ratio_outage` | `BOTHY_STATUS__ERROR_RATIO_OUTAGE` | Server |  | `0.5` | Fehleranteil, ab dem `major_outage` gilt | geplant (M7) |
 | `status.fanout_lag_degraded` | `BOTHY_STATUS__FANOUT_LAG_DEGRADED` | Server |  | `5s` | Fan-out-Verzug, ab dem `sync.fanout` scheitert | geplant (M7) |
+| `install.ready_timeout` |  | Installationsskript |  | `5m` | how long `install.sh` waits for `/readyz` after `docker compose up -d` (option `--ready-timeout`, 3.1); not a key of the server |  |
 
 ### 17 Observability
 

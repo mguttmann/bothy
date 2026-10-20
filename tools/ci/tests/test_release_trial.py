@@ -233,3 +233,69 @@ def test_binaries_are_exactly_one_per_platform(tmp_path: Path) -> None:
         f"bothy_{t.version}_linux_amd64",
         f"bothy_{t.version}_linux_arm64",
     ]
+
+
+# ---- the product (the root component, brief M7-29 Design note 3) ----------------------------
+
+
+class GitPassThrough(FakeDocker):
+    """FakeDocker that runs git for real, so the throwaway product repository exists."""
+
+    def __call__(
+        self, cmd: Sequence[str], *, env: dict[str, str] | None = None, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        if list(cmd[:1]) == ["git"]:
+            self.calls.append(list(cmd))
+            return subprocess.run(list(cmd), check=True, capture_output=True, text=True)
+        return super().__call__(cmd, env=env, cwd=cwd)
+
+
+def test_product_builds_against_the_local_registry_and_checks_like_an_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    fake = GitPassThrough(tmp_path)
+    t = trial.Trial(chain.Tools("cosign", "syft", runner=fake), tmp_path, ["linux/amd64"])
+    t.registry = "127.0.0.1:45555"
+    images = [
+        chain.Image("bothy-server", "127.0.0.1:45555/bothy-server", DIGEST),
+        chain.Image("bothy-postgres", "127.0.0.1:45555/bothy-postgres", DIGEST),
+    ]
+    checked: list[list[str]] = []
+    monkeypatch.setattr(
+        trial.product_release, "check_images", lambda docker, target, refs: checked.append(refs)
+    )
+    monkeypatch.setattr(trial, "manifest_digest", lambda registry, name, ref: DIGEST)
+    written = t.product(images)
+    assert [p.name for p in written] == [f"bothy-compose-{t.version}.tar.gz", "install.sh"]
+    assert checked == [
+        [f"bothy-postgres:pg18-{t.version}", f"bothy-server:{t.version}"],
+    ]
+    pulls = [c for c in fake.calls if c[:2] == ["docker", "pull"]]
+    assert [c[-1] for c in pulls] == [
+        f"127.0.0.1:45555/bothy-postgres:pg18-{t.version}",
+        f"127.0.0.1:45555/bothy-server:{t.version}",
+    ]
+    assert fake.ran("docker", "image", "rm")
+
+
+def test_product_check_rejects_another_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    fake = GitPassThrough(tmp_path)
+    t = trial.Trial(chain.Tools("cosign", "syft", runner=fake), tmp_path, ["linux/amd64"])
+    t.registry = "127.0.0.1:45555"
+    images = [
+        chain.Image("bothy-server", "127.0.0.1:45555/bothy-server", DIGEST),
+        chain.Image("bothy-postgres", "127.0.0.1:45555/bothy-postgres", DIGEST),
+    ]
+    monkeypatch.setattr(trial.product_release, "check_images", lambda docker, target, refs: None)
+    monkeypatch.setattr(trial, "manifest_digest", lambda registry, name, ref: "sha256:" + "d" * 64)
+    with pytest.raises(trial.TrialError, match="not the signed digest"):
+        t.product(images)
+
+
+def test_fetch_only_from_loopback() -> None:
+    with pytest.raises(trial.TrialError, match=r"outside 127\.0\.0\.1"):
+        trial._fetch("https://example.com/install.sh")

@@ -6,6 +6,37 @@ Status: Entwurf M0. Anleitung für eine Instanz auf einem Host. Regeln:
 Hinweis: Die Images `bothy-server` und `bothy-postgres` entstehen mit dem ersten Release. Bis
 dahin ist diese Anleitung der Vertrag, den das Release und der Portabilitätstest erfüllen.
 
+## Setup wizard (one command)
+
+The setup wizard `install.sh` does the steps of sections 1 to 4 below in one command and nothing
+else ([16-betrieb.md](../spec/16-betrieb.md), section 3.1): it checks Docker and Compose,
+downloads the bundle of its version from the release and checks its SHA-256 (and its signature
+when `cosign` is installed), writes `infra/compose/.env` (mode `0600`) and `infra/compose/secrets/`
+(mode `0700`) in the target folder (default `./bothy`), sets the gateway of the Compose network in
+`BOTHY_TRUSTED_PROXIES` with the edge `direct` (section 5.1), starts the stack, waits for `/readyz`
+(at most `install.ready_timeout`, option `--ready-timeout`), checks
+`GET /api/v1/instance/discovery` through the published port, creates the first owner and shows
+the enrollment code once. It never calls `sudo` and changes nothing outside its folder; a second
+run in the same folder keeps `.env` and `secrets/`.
+
+```sh
+curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh | sh
+```
+
+Without a terminal, every answer is an option (`--help` lists all of them); `TS_AUTHKEY` for the
+edge `tailscale` comes from the environment, never from an option:
+
+```sh
+curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh \
+  | sh -s -- --yes --public-url https://chat.example.com --edge direct --scan on --storage fs \
+      --owner-handle alex --owner-name Alex
+```
+
+With a bundle that is already downloaded (`gh release download v<version>`), `--bundle
+bothy-compose-<version>.tar.gz` replaces the download; the checksum check stays. After the
+installation the stack runs in `bothy/infra/compose` (`cd bothy/infra/compose && docker compose
+ps`).
+
 ## 1. Voraussetzungen
 
 | Punkt | Anforderung |

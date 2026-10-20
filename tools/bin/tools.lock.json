@@ -350,6 +350,35 @@
         }
       }
     },
+    "shellcheck": {
+      "version": "0.11.0",
+      "repo": "koalaman/shellcheck",
+      "tag": "v{version}",
+      "license": "GPL-3.0-only",
+      "binary": "shellcheck",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "shellcheck-v{version}.darwin.x86_64.tar.xz",
+          "member": "shellcheck-v{version}/shellcheck",
+          "sha256": "3c89db4edcab7cf1c27bff178882e0f6f27f7afdf54e859fa041fca10febe4c6"
+        },
+        "darwin-arm64": {
+          "asset": "shellcheck-v{version}.darwin.aarch64.tar.xz",
+          "member": "shellcheck-v{version}/shellcheck",
+          "sha256": "56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79"
+        },
+        "linux-amd64": {
+          "asset": "shellcheck-v{version}.linux.x86_64.tar.xz",
+          "member": "shellcheck-v{version}/shellcheck",
+          "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+        },
+        "linux-arm64": {
+          "asset": "shellcheck-v{version}.linux.aarch64.tar.xz",
+          "member": "shellcheck-v{version}/shellcheck",
+          "sha256": "12b331c1d2db6b9eb13cfca64306b1b157a86eb69db83023e261eaa7e7c14588"
+        }
+      }
+    },
     "sloth": {
       "version": "0.16.0",
       "repo": "slok/sloth",

@@ -10,11 +10,13 @@ Anleitung: [docs/operations/install-compose.md](../../docs/operations/install-co
 | `compose.yaml` | alle Dienste, Profile, Netze, Volumes |
 | `.env.example` | Vorlage für `.env`; nur Platzhalter und Standardwerte, keine Geheimnisse |
 | `secrets/` | nicht im Repository: vom Owner gelieferte Geheimnisse als Dateien (Katalog in [configuration.md](../../docs/operations/configuration.md) 5) |
+| `install.sh` | source of the setup wizard (POSIX `sh`, [16-betrieb.md](../../docs/spec/16-betrieb.md) 3.1); the release ships it rendered with version, checksum and download address next to the bundle (`make release-build`), not inside it; tests in [test/install/](test/install/README.md) (`make install-test`) |
 | `smoke.sh` | the Compose smoke test (`make portability`, M1-73); test only |
 | `test/` | the test overlay, its variables and the collector overlay `file` of the smoke test; test only, not in the release bundle ([test/README.md](test/README.md)) |
 
 Der Stack bindet außerdem `../otel` (Collector) und `../observability` (Prometheus, Alertmanager,
-Loki, Tempo, Grafana) nur lesend ein.
+Loki, Tempo, Grafana) nur lesend ein. The release bundle therefore contains both folders
+(docs/spec/18-release.md, section 2).
 
 ## Kurzform
 

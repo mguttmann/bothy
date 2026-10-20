@@ -20,7 +20,7 @@ Die Namen, Verzeichnisse und Tag-Präfixe stehen an einer Stelle: `RELEASE_COMPO
 
 | Komponente | Verzeichnis | Tag-Präfix | Artefakte | Kanäle |
 |---|---|---|---|---|
-| `bothy` | Wurzel | keiner (`vX.Y.Z`) | Installationsbündel aus `make release-build`: `infra/compose` ohne `infra/compose/test` (Test-Overlays), `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION` | stable, beta |
+| `bothy` | root | none (`vX.Y.Z`) | installation bundle `bothy-compose-<version>.tar.gz` from `make release-build`: `infra/compose` without `infra/compose/test` (test overlays) and without the source of `install.sh`, the folders `infra/otel` and `infra/observability` that `compose.yaml` mounts relative to itself, `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION`; its `infra/compose/.env.example` contains the pinned server version and the registry (section 2.1); in addition `install.sh` as a separate file with a built-in version, SHA-256 and download address of the bundle (section 2.1, [16-betrieb.md](16-betrieb.md), section 3.1) | stable, beta |
 | `server` | `services/server` | `server/` | Images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), Binärdateien `bothy` | stable, beta |
 | `host` | `services/host` | `host/` | Binärdateien `bothy-host` für macOS (arm64, amd64), Linux (amd64, arm64) und Windows (amd64), je mit Signatur und SBOM; Installationspakete der Dienste ([24-terminal.md](24-terminal.md), [16-betrieb.md](16-betrieb.md) Abschnitt 4.4) | stable, beta |
 | `client` | `apps/client` | `client/` | iOS, Android, macOS, Windows (eine Flutter-Codebasis, B5) | stable, beta |
@@ -64,6 +64,87 @@ Regeln:
    [upgrade.md](../operations/upgrade.md) ist das die vorige Version; ein bewusster Bruch setzt die
    eigene; vor dem ersten Release ist es die aktuelle. `bothy migrate up` schreibt sie nach
    `instance.min_server_version`.
+
+### 2.1 Server version and registry in the product bundle
+
+The bundle of the component `bothy` determines which server images an installation pulls:
+`install.sh` takes `BOTHY_VERSION` and `BOTHY_REGISTRY` unchanged from its
+`infra/compose/.env.example` ([16-betrieb.md](16-betrieb.md), section 3.1, step 4). Compose
+pulls the images by their tag with this version, not by digest; what follows from that is in
+[16-betrieb.md](16-betrieb.md), section 6.1, rule 2. The checked-in template carries
+placeholders (`ghcr.io/OWNER`, `0.0.0-placeholder`), and so does the source of `install.sh`.
+Therefore, for every product release, beta as well as stable:
+
+1. **Server version.** Its only source is the line `BOTHY_VERSION=` in
+   `infra/compose/.env.example` of the tagged commit.
+   `make release-prep COMPONENT=bothy SERVER_VERSION=<version>` writes it in the same commit as
+   `VERSION` (ADR 0060). It writes nothing and names the value if the tag
+   `server/v<version>` does not exist, if without `CHANNEL=beta` (stable product) `<version>`
+   carries a pre-release identifier, or if `SERVER_VERSION` is missing while the line carries the
+   placeholder. The gate `release-pins` (`tools/ci/components.py pins`) checks the committed state
+   in every `make check` and in CI: exactly one line, SemVer without `v` or the placeholder, and
+   no server pre-release in a stable product, which only a product beta (`X.Y.Z-beta.N`) may
+   pin. Before the tag it runs in the pre-push of the
+   branch with the release commit and in the required check `ci-ok` of its pull request; the
+   maintainer sets the tag only after the merge, on the squash commit on `main`
+   ([push-discipline.md](../quality/push-discipline.md)). The push of the tag alone starts no
+   check: its commit is already on `origin` then, and pre-commit runs no pre-push hook for a push
+   without new commits (function `_pre_push_ns` in
+   https://github.com/pre-commit/pre-commit/blob/v4.6.2/pre_commit/commands/hook_impl.py,
+   retrieved 2026-10-11) [verified]. After the push of the tag, the job `gates` of `release.yml`
+   checks again, before the build. `make release-build` takes the value over unchanged.
+2. **Registry.** `make release-build` writes `BOTHY_REGISTRY=ghcr.io/<owner>` into the
+   `.env.example` of the bundle, with `<owner>` in lowercase from `GITHUB_REPOSITORY_OWNER`,
+   like the image name in `release.yml`. GitHub sets this variable in every step to "The
+   repository owner's name"
+   (https://docs.github.com/en/actions/reference/workflows-and-actions/variables, retrieved
+   2026-10-11) [verified]; a run outside GitHub Actions sets it itself. Every other
+   file and line of the bundle is the same as in the commit.
+3. **Download address.** `make release-build` writes `install.sh` as an artifact of its own from
+   `infra/compose/install.sh` and sets three values: the version of the product, the SHA-256 of
+   the bundle and the download address
+   `https://github.com/<repository>/releases/download/v<version>/`, with `<repository>` from
+   `GITHUB_REPOSITORY`. GitHub sets this variable in every step to "The owner and repository
+   name" (source as in rule 2) [verified]; a run outside GitHub Actions sets it itself. From this
+   address `install.sh` downloads the bundle and its signature
+   ([16-betrieb.md](16-betrieb.md), section 3.1, step 2).
+4. **Abort.** `make release-build` writes no bundle and no `install.sh` and names the value if
+   `BOTHY_VERSION` equals `0.0.0-placeholder` or is not a SemVer version without `v`, if a
+   stable product (`VERSION` without a pre-release identifier) pins a server pre-release (second
+   safeguard after `release-prep` and `release-pins`), if `GITHUB_REPOSITORY_OWNER` or
+   `GITHUB_REPOSITORY` is missing, if `BOTHY_REGISTRY` or `install.sh` still contains `OWNER` or a
+   placeholder of the source afterwards or if
+   one of the images that `infra/compose/compose.yaml` names with `${BOTHY_VERSION}` (today
+   `bothy-server:<version>` and `bothy-postgres:pg18-<version>`) is missing under `BOTHY_REGISTRY`.
+   It reads the list of images from `compose.yaml`, not from a list of its own.
+
+Reason: without this step, every installation from the bundle would pull an image that does not
+exist (`ghcr.io/OWNER/bothy-server:0.0.0-placeholder`), including the portability test
+([16-betrieb.md](16-betrieb.md), section 11.1). The server version is in the commit instead of
+being an argument of the build: this way the tag alone determines what the bundle installs, and the
+release commit shows the version for review. A server pre-release in the stable product shows up
+before the tag already (`release-prep`, at the latest `release-pins` in the pull request), because
+a pushed tag cannot be taken back. Registry and download address come from the build because they
+depend on the location of the repository (fork, replacing `OWNER` in V1-03), not on the commit:
+even a tag whose source still names `OWNER` delivers an `install.sh` that finds its bundle. PLAN M7-29
+takes on the build (with tests), M7-10 takes on `make release-prep` itself.
+
+As built (M7-29, [docs/DECISIONS.md](../DECISIONS.md) D-M7-29-2, D-M7-29-3, D-M7-29-5): `make
+release-build VERSION=<v> OUT=<dir>` runs `tools/ci/product_release.py build`. It reads
+`VERSION`, `infra/compose/.env.example`, `compose.yaml` and `install.sh` from the commit `HEAD`,
+not from the working tree; it checks each image with `docker manifest inspect` (the release job
+logs in to `ghcr.io` first); it writes the bundle reproducibly (file order, modes and times of
+the commit, a gzip header without a time) and `install.sh` with mode `0755`, and only after every
+check, so an abort leaves no file. In `install.sh` the three values are the lines
+`BOTHY_INSTALL_VERSION=`, `BOTHY_INSTALL_BUNDLE_SHA256=` and `BOTHY_INSTALL_BASE_URL=`; the
+words `OWNER` and `placeholder` must not occur in the finished script in any case. Trial only
+(D-W-127): `RELEASE_TRIAL_REGISTRY=127.0.0.1:<port>` replaces `ghcr.io/<owner>` and
+`RELEASE_TRIAL_BASE_URL=http://127.0.0.1:<port>/` the download address; both are refused when
+`GITHUB_ACTIONS` is set and for any other host, and the image check then uses
+`docker manifest inspect --insecure`. `make release-trial COMPONENT=bothy` sets them (section 6.2).
+In `release.yml` the job `product-signing` (environment `release`) writes SBOMs, signs bundle,
+`install.sh` and `SHA256SUMS` with `tools/ci/release_chain.py` and verifies them like the server
+files (section 6.1), and `publish` takes that set by artifact id.
 
 ## 3. Semantische Versionierung je Komponente
 
@@ -195,6 +276,17 @@ repository or creates a release, and refuses to run when `GITHUB_ACTIONS` is set
 scan and ScanCode are separate targets and not part of the trial. Not proven by the trial:
 the keyless path and the attestations of the public phase, and a push to `ghcr.io`; both run
 first with the owner's first tag.
+
+`make release-trial COMPONENT=bothy` (M7-29) runs the trial of `server` first and then, against
+the same local registry, the product build of section 2.1 from a throwaway repository with the
+bundle paths of the commit and `BOTHY_VERSION` set to the trial server version, with
+`RELEASE_TRIAL_REGISTRY` and `RELEASE_TRIAL_BASE_URL` pointing at the local registry and a static
+HTTP server on `127.0.0.1`. It then checks what an installation needs: `install.sh` and the bundle
+downloaded from that address, the bundle's SHA-256 equal to the value in `install.sh`, registry
+and server version of the bundle equal to the trial's, every image of the bundle's
+`compose.yaml` present there with the signed digest, and a `docker pull` of each by the Docker
+daemon. A full installation from that result is the local end-to-end run of M7-14
+([16-betrieb.md](16-betrieb.md) 11.1).
 
 ## 7. Server-Images
 
@@ -339,3 +431,4 @@ beta und dann mit derselben Build-Nummer in stable.
 | R-RL-06 | macOS nur als Developer-ID-Ausgabe mit Sparkle, keine zweite TestFlight-Ausgabe. | Eine Ausgabe, kein Sandbox-Zwang, eigener Update-Kanal. |
 | R-RL-07 | Apps werden vorwärts korrigiert, nie zurückgerollt. | Keine Plattform installiert ältere Versionen zuverlässig. |
 | R-RL-08 | Mindest- und empfohlene App-Version je Plattform als Server-Konfiguration. | Der Betreiber steuert Sicherheitsupdates ohne Release des Servers. |
+| R-RL-09 | The product bundle pins the server version in the tagged commit (`BOTHY_VERSION` in `infra/compose/.env.example`, written by `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`, which rejects a server pre-release without `CHANNEL=beta`; gate `release-pins` in the pull request before the tag); `make release-build` sets `BOTHY_REGISTRY` from the owner and the download address in `install.sh` from the name of the repository and aborts on placeholders, on a server pre-release in the stable product and on missing images (2.1). | `install.sh` takes over both values unchanged; without a producer, every installation would pull the placeholder image. Version in the commit so that the tag alone determines the bundle, checked before the tag because a pushed tag stays; registry and download address from the build because they depend on the location of the repository. |
