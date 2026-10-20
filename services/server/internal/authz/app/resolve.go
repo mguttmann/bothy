@@ -72,6 +72,8 @@ func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r author
 		return a.resolveHost(ctx, r.ID)
 	case r.Kind == authorize.ResourceTerminalSession:
 		return a.resolveTerminalSession(ctx, r)
+	case r.Kind == authorize.ResourceCommand:
+		return a.resolveCommand(ctx, r)
 	}
 	return resolved{path: domain.Path{Kind: domain.PathInstance}}, true, nil
 }
@@ -213,6 +215,7 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	if err := a.grantFacts(spec.ID, r, res, &in); err != nil {
 		return domain.Input{}, err
 	}
+	var err error
 	if spec.ID == string(authorize.ActionTokenCreate) {
 		pf, found, err := a.principal.Principal(ctx, r.ID)
 		if err != nil {
@@ -220,14 +223,16 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		}
 		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
 	}
+	if in.Command, err = a.commandFacts(ctx, s, spec, r, res, t); err != nil {
+		return domain.Input{}, err
+	}
+	baseIn.Command = in.Command
 	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
-		var err error
 		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
 			return domain.Input{}, err
 		}
 	}
 	if in.Principal.ActingFor {
-		var err error
 		if in.BaseVisible, _, err = domain.Visible(baseIn); err != nil {
 			return domain.Input{}, err
 		}
@@ -251,7 +256,8 @@ func pendingReason(live domain.Liveness) domain.Reason {
 func (a *Authorizer) kindFacts(ctx context.Context, s *actingPrincipal, req domain.Expr, r authorize.Resource,
 	res resolved, in, base *domain.Input) error {
 	var err error
-	if r.Kind == authorize.ResourceSpace && in.Eff.Level < domain.LevelRead {
+	if (r.Kind == authorize.ResourceSpace || (r.Kind == authorize.ResourceCommand && res.path.Kind == domain.PathSpace)) &&
+		in.Eff.Level < domain.LevelRead {
 		if in.SpaceHasVisibleChannel, base.SpaceHasVisibleChannel, err = a.spaceHasVisibleChannel(ctx, s, res.path.SpaceID); err != nil {
 			return err
 		}
@@ -520,5 +526,8 @@ func (a *Authorizer) checkedAction(ctx context.Context, act authorize.Action, r 
 	if err != nil {
 		return spec, req, preview, err
 	}
-	return spec, req, preview, checkFileFacts(ctx, r)
+	if err := checkFileFacts(ctx, r); err != nil {
+		return spec, req, preview, err
+	}
+	return spec, req, preview, checkCommandFacts(ctx, act, r)
 }

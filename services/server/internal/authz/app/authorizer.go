@@ -574,14 +574,14 @@ func (a *Authorizer) actionFor(act authorize.Action, r authorize.Resource) (doma
 		return domain.ActionSpec{}, domain.Expr{}, nil, err
 	}
 	var preview *domain.PreviewFacts
-	kinds := spec.Resources
+	kinds := domain.ActionResourceKinds(spec)
 	if act == authorize.ActionAccessPreview {
 		ps, preq, err := a.requirement(r.PreviewOf)
 		if err != nil {
 			return domain.ActionSpec{}, domain.Expr{}, nil, err
 		}
 		preview = &domain.PreviewFacts{Action: ps.ID, Spec: ps, Req: preq}
-		kinds = ps.Resources
+		kinds = domain.ActionResourceKinds(ps)
 	}
 	if !slices.Contains(kinds, string(r.Kind)) {
 		return domain.ActionSpec{}, domain.Expr{}, nil, internal(fmt.Sprintf("resource kind %q is not a resource of %s", r.Kind, spec.ID))

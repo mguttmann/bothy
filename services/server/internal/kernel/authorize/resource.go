@@ -42,6 +42,12 @@ type Resource struct {
 	Grant *GrantFacts
 	// Invoke describes the trigger of agent.invoke.
 	Invoke *InvokeFacts
+	// Command describes a slash command (M2-16) for command.read and command.register on kind
+	// command and for command.invoke on the target thread; the owner of a command is OwnerID.
+	// Required in request mode on kind command and for command.invoke, where a missing value is
+	// an internal error; nil only in filter mode for the receive check of command.changed, whose
+	// path is the event scope (ResourceFromEvent).
+	Command *CommandFacts
 	// PreviewOf is the action that access.preview previews.
 	PreviewOf Action
 	// HostID is the path hint of a terminal_session: its host (terminal_sessions.host_id, M2-40).
@@ -196,6 +202,32 @@ type InvokeFacts struct {
 	// thread_require_mention. runs sets it at delivery (M2-08); the acceptance decides on the main
 	// thread itself and leaves it false.
 	NewThread bool
+}
+
+// CommandFacts describes a slash command for command.read, command.register and command.invoke
+// (docs/spec/09-agenten.md section 10, M2-16). Zero values mean "not applicable".
+//
+// Example (one item of listChannelCommands):
+//
+//	r := authorize.Resource{Kind: authorize.ResourceCommand, ID: c.ID, OwnerID: c.OwnerPrincipalID,
+//		Command: &authorize.CommandFacts{OwnerKind: "agent", ScopeKind: "instance", OfferedInChannelID: channelID}}
+type CommandFacts struct {
+	// OwnerKind is the principal kind of the owner: agent or app.
+	OwnerKind string
+	// ScopeKind is instance, space or channel; ScopeSpaceID and ScopeChannelID name the target of
+	// space and channel.
+	ScopeKind                    string
+	ScopeSpaceID, ScopeChannelID ids.ID
+	// OfferedInChannelID is the channel of a command list (listChannelCommands): command.read then
+	// decides whether the command is offered in that channel (09 section 10.3); zero otherwise.
+	OfferedInChannelID ids.ID
+	// RequiredLevel is commands.required_level (write or trigger), for command.invoke.
+	RequiredLevel string
+	// Control is commands.control, for command.invoke.
+	Control bool
+	// ActiveRun reports, for command.invoke, that the target thread has a run in queued, running
+	// or waiting_input (of any agent).
+	ActiveRun bool
 }
 
 // ResourceFromEvent returns the descriptor of a stored event for the check of its receive action

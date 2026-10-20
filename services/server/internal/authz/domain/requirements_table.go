@@ -44,10 +44,13 @@ var requirementGroups = []struct {
 	}},
 	{"trigger und `agent.invoke`", Deferred("M2"), []string{"agent_session.bind", "agent_session.reset"}},
 	{"read", AtLeast(LevelRead), []string{
-		"agent_session.read", "channel.read", "command.read", "cost.read.thread", "gateway.focus",
+		"agent_session.read", "channel.read", "cost.read.thread", "gateway.focus",
 		"message.read", "message.revisions.read", "push.deliver", "run.read", "space.read",
 		"thread.read",
 	}},
+	// command.read by resource kind (M2-16 design note 8 d): read on the channel of a list, and on
+	// a single command its visibility rule decides (owner, scope target, offered in a channel).
+	{"read", ByKind(map[string]Expr{kindChannel: AtLeast(LevelRead), kindCommand: Auth}), []string{"command.read"}},
 	{"public", Public, []string{
 		"auth.login.begin", "auth.login.complete", "console.csp_report", "instance.discovery.read", "status.public.read",
 	}},
@@ -74,7 +77,9 @@ var requirementGroups = []struct {
 	{"agent-self bzw. app-self, Eigentümer des Befehls", Any(AgentSelf, AppSelf), []string{
 		"command.autocomplete.respond",
 	}},
-	{"`required_level` des Befehls und Regeln wie beschrieben", Deferred("M2"), []string{"command.invoke"}},
+	// command.invoke (M2-16): the level of the command, then the guard (app owner internal, model
+	// command during an active run run_active); agent commands add agent.invoke in runs.
+	{"`required_level` des Befehls und Regeln wie beschrieben", CommandLevel, []string{"command.invoke"}},
 	{"agent-self bzw. app-self mit Scope", Any(AgentSelf, AppSelf), []string{
 		"command.register", "command.remove",
 	}},

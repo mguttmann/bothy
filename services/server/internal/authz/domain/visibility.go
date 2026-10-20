@@ -41,7 +41,7 @@ const (
 var channelPathKinds = map[string]bool{
 	kindChannel: true, "thread": true, "message": true, "reaction": true, "pin": true, "run": true,
 	"run_step": true, "component": true, "interaction": true, "agent_session": true, kindFile: true,
-	"incoming_webhook": true, "command": true,
+	"incoming_webhook": true,
 }
 
 // ownedKinds belong to one principal: visible to it, and to an effective owner when the
@@ -90,6 +90,8 @@ func Visible(in Input) (visible bool, reason Reason, err error) {
 		return in.Principal.Kind != KindAnonymous, ReasonNoGrant, nil
 	case ownerOnlyKinds[kind]:
 		return in.Eff.Owner, ReasonNoGrant, nil
+	case kind == kindCommand:
+		return commandVisible(in)
 	}
 	rule, ok := kindRules[kind]
 	if !ok {
