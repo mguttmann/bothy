@@ -15,6 +15,11 @@ ExecStart=/opt/bothy-host/bin/bothy-host run --config /etc/bothy-host/config.yam
 Restart=on-failure
 RestartPreventExitStatus=78
 UMask=0077
+# The folder of the confirmation endpoint (M2-45, 24 6.4): /run/bothy-host-confirm, owned by the
+# service user with mode 0755, so the agent of the person at the machine can reach the socket;
+# the peer check decides who may answer.
+RuntimeDirectory=bothy-host-confirm
+RuntimeDirectoryMode=0755
 
 [Install]
 WantedBy=multi-user.target

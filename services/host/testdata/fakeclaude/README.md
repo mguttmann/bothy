@@ -13,6 +13,15 @@ never calls a model, never reads a login and needs no account.
 - Appends the path of its own executable to the start log set at build time with
   `-ldflags "-X main.startLog=<path>"`; the platform suite reads it to prove which program HD6
   started (TM-T27).
+- With `CLAUDE_CODE_OAUTH_TOKEN` set and no `fake-auth` naming another fixture, `auth status`
+  prints `oauth_token` (M2-45); the value is never read.
+- `login` writes `fake-auth` with `claude.ai` into its configuration folder and, on Linux and
+  Windows, a `.credentials.json` there, where the real agent keeps a subscription login; on macOS
+  the real agent keeps it in the keychain, so no file is written (M2-45).
+- Any other arguments start the interactive mode (M2-45): one JSON line in the start log with the
+  arguments, the working directory, the names of the environment variables, `CLAUDE_CONFIG_DIR`
+  and the SHA-256 of `ANTHROPIC_API_KEY` (never the key), a line on standard output, then an echo
+  of every input line until `exit` or the end of input.
 - A second build named `node` is the interpreter of `#!/usr/bin/env node` scripts and the wrong
   `node` of TM-T27.
 

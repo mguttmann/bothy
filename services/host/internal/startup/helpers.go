@@ -25,7 +25,11 @@ type ChannelHelpers struct {
 	Endpoint func(goos, sessionUser string) string
 }
 
-func (h ChannelHelpers) open(ctx context.Context, user string) (*localchan.Conn, error) {
+// Open dials the channel of the helper of user, checks its peer and its hello and returns the
+// verified channel; M2-45 keeps one open per session user as its session channel. Errors: one
+// wrapping doctor.ErrPeerMismatch for a failed peer check (nothing was sent), any other for a
+// helper that cannot be reached or answers a wrong hello.
+func (h ChannelHelpers) Open(ctx context.Context, user string) (*localchan.Conn, error) {
 	dial, endpoint := h.Dial, h.Endpoint
 	if dial == nil {
 		dial = localchan.DialHelper
@@ -63,7 +67,7 @@ func (h ChannelHelpers) open(ctx context.Context, user string) (*localchan.Conn,
 
 // Check implements doctor.Helpers.
 func (h ChannelHelpers) Check(ctx context.Context, user string, req doctor.Request) (doctor.HelperResult, error) {
-	c, err := h.open(ctx, user)
+	c, err := h.Open(ctx, user)
 	if err != nil {
 		return doctor.HelperResult{}, err
 	}
@@ -77,7 +81,7 @@ func (h ChannelHelpers) Check(ctx context.Context, user string, req doctor.Reque
 
 // Scan implements doctor.Helpers.
 func (h ChannelHelpers) Scan(ctx context.Context, user string, req doctor.Request) (string, error) {
-	c, err := h.open(ctx, user)
+	c, err := h.Open(ctx, user)
 	if err != nil {
 		return "", err
 	}

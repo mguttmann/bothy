@@ -11,6 +11,7 @@ mkdir /Library/Application Support/bothy-host/bin 0755 root
 copy /tmp/download/bothy-host -> /Library/Application Support/bothy-host/bin/bothy-host 0755 root
 run /usr/bin/codesign --force --sign - --options runtime /Library/Application Support/bothy-host/bin/bothy-host
 mkdir /Library/Application Support/bothy-host/run 0755 root
+mkdir /Library/Application Support/bothy-host/confirm 0755 bothy-host
 mkdir /Library/Application Support/bothy-host 0755 root
 write /Library/Application Support/bothy-host/config.yaml 0644 root (134 bytes)
 run /usr/bin/dscl . -create /Groups/bothy-s-alex
