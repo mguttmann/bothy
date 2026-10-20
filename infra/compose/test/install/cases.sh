@@ -494,3 +494,33 @@ test_trial_address_installs() {
 	expect_in "$ERR" "not a GitHub release"
 	expect_in "$OUT" "Enrollment code (shown once): "
 }
+
+test_exported_ts_authkey_does_not_reach_compose() {
+	inst TS_AUTHKEY=tskey-auth-env456 STUB_TS_STATUS_EXIT=1 \
+		sh "$INSTALL" --yes --public-url "$PUBLIC_URL" --edge tailscale --ready-timeout 1s --owner-handle alex --owner-name Alex
+	expect_rc 0
+	expect_env TS_AUTHKEY tskey-auth-env456
+	expect_not_in "$STUB_LOG" "env TS_AUTHKEY="
+}
+
+test_typed_ts_authkey_wins_over_the_environment() {
+	if ! script --version 2>&1 | grep util-linux >/dev/null; then
+		echo "script from util-linux is not available on this host"
+		exit 77
+	fi
+	cmd="cd '$CASE' && env -i PATH='$TEST_PATH' HOME='$CASE' STUB_LOG='$STUB_LOG' STUB_DL_DIR='$WORK/dl'"
+	cmd="$cmd TS_AUTHKEY=tskey-auth-stale STUB_TS_STATUS_EXIT=1 sh '$INSTALL' --ready-timeout 1s; echo \$? >'$CASE/tty.rc'"
+	{
+		printf '%s\n' "$PUBLIC_URL" tailscale tskey-auth-typed789 off fs off '' alex Alex
+		n=0
+		while [ ! -e "$CASE/tty.rc" ] && [ "$n" -lt 120 ]; do
+			sleep 1
+			n=$((n + 1))
+		done
+	} | SHELL=/bin/sh script -qec "$cmd" /dev/null >"$OUT" 2>"$ERR"
+	# shellcheck disable=SC2034 # read by expect_rc of run.sh
+	RC=$(cat "$CASE/tty.rc" 2>/dev/null)
+	expect_rc 0
+	expect_env TS_AUTHKEY tskey-auth-typed789
+	expect_not_in "$STUB_LOG" "env TS_AUTHKEY="
+}
