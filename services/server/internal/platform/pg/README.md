@@ -162,6 +162,19 @@ as the start component `schema`. `SchemaVersion(ctx, q)` reads the version over 
 pool or the transaction of a unit of work; the instance step of `bothy migrate up` reads it inside
 its unit (M1-15).
 
+## Text search check (M3-13)
+
+`CheckTextSearch(ctx, pool, configs)` runs in the start step `schema` of every role directly after
+`CheckSchema` (02 15.1 step 4, docs/DECISIONS.md D-M3-13-6). It answers
+`*TextSearchConfigMissingError{Position}` for the first name of `configs` that is no text search
+configuration visible on the search path (`pg_catalog.pg_ts_config`, `pg_ts_config_is_visible`),
+and `ErrTextSearchCaseFolding` when the `simple` vector of a capital umlaut differs from that of
+its small form, which happens under the character classification `C` ([16-operations.md](../../../../../docs/spec/16-operations.md)
+7.2). Two short queries on one connection; no error carries a configured name. `wire` turns the
+position into `search.languages entry n` or `search.locale_map entry n`.
+`TestCheckTextSearch` creates a database with `LC_CTYPE 'C'` inside the pgtest container and
+drops it again.
+
 ## Telemetry
 
 Spans come from otelpgx on the global tracer provider, only below a recording parent span. Query

@@ -14,8 +14,13 @@ SELECT principal_id FROM mentions WHERE message_id = @message_id ORDER BY princi
 -- name: ListMyMentions :many
 -- One page of the mentions of a principal in visible channels without tombstones, newest first
 -- (brief M1-60 note 2): keyset (mn.created_at DESC, mn.message_id DESC) after the cursor, index
--- mentions_principal_created_idx. The caller asks for one row more than the page.
-SELECT sqlc.embed(m), mn.created_at AS mentioned_at
+-- mentions_principal_created_idx. The caller asks for one row more than the page. The message
+-- columns are listed, so the read carries neither search_language nor search_vector (D-M3-13-10).
+SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id,
+    m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format,
+    m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent,
+    m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at,
+    mn.created_at AS mentioned_at
 FROM mentions mn
 JOIN messages m ON m.id = mn.message_id
 WHERE mn.principal_id = @principal_id

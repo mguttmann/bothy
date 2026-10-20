@@ -72,7 +72,7 @@ func (r *Repository) History(ctx context.Context, q app.HistoryRead) (app.Histor
 // VisibleMessage implements app.Store.
 func (r *Repository) VisibleMessage(ctx context.Context, id ids.ID, visible []ids.ID) (domain.Message, bool, error) {
 	row, err := r.read(ctx).GetVisibleMessage(ctx, sqlcgen.GetVisibleMessageParams{ID: uuid(id), VisibleChannelIds: uuids(visible)})
-	return one(row, err, "reading a message")
+	return one(messageRow(row), err, "reading a message")
 }
 
 // convert maps the generated rows to historyRow.

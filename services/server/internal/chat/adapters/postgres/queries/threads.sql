@@ -2,20 +2,31 @@
 -- Queries on threads (chat module, M1-55; docs/spec/03-data-model.md section 4.5). Only this
 -- module reads and writes the table (03 principle 12). The main thread of a text channel is
 -- inserted by threads_main.sql with its channel (M1-53).
+--
+-- The columns are listed instead of "*": no read carries search_language or the generated
+-- title_search (docs/DECISIONS.md D-M3-13-10), so the rows stay without regconfig and tsvector.
+-- Every INSERT names search_language, the language of the creator (14 3.1, M3-13); the static
+-- test TestThreadInsertsSetSearchLanguage holds it.
 
 -- name: GetThread :one
-SELECT * FROM threads WHERE id = @id;
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE id = @id;
 
 -- name: LockThread :one
 -- The thread locked for a change (03 section 6.3: domain rows before event_seq).
-SELECT * FROM threads WHERE id = @id FOR UPDATE;
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE id = @id FOR UPDATE;
 
 -- name: InsertThread :one
+-- search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
 INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_source, operator_agent_id, created_by, created_at,
-    last_activity_at)
+    last_activity_at, search_language)
 VALUES (@id, @channel_id, 'thread', sqlc.narg(parent_message_id), @title, @title_source, sqlc.narg(operator_agent_id), @created_by,
-    @created_at, @created_at)
-RETURNING *;
+    @created_at, @created_at, sqlc.arg(search_language)::text::regconfig)
+RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version;
 
 -- name: SaveThread :exec
 -- Writes the columns of thread.title.update, thread.close and thread.reopen and the version.
@@ -34,12 +45,16 @@ SET last_message_seq = last_message_seq + 1, last_activity_at = @now, message_co
     closed_at = CASE WHEN @reopen::boolean THEN NULL ELSE closed_at END,
     closed_by = CASE WHEN @reopen::boolean THEN NULL ELSE closed_by END
 WHERE id = @id
-RETURNING *;
+RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version;
 
 -- name: ListThreadsByActivity :many
 -- listChannelThreads sorted by last_activity (brief D6): the threads of kind thread of a
 -- channel, keyset (last_activity_at DESC, id DESC) after the position of the cursor.
-SELECT t.* FROM threads t
+SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
+    t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
+    t.moved_at, t.version
+FROM threads t
 WHERE t.channel_id = @channel_id AND t.kind = 'thread'
   AND (sqlc.narg(state)::text IS NULL OR t.state = sqlc.narg(state)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL
@@ -50,7 +65,10 @@ LIMIT @max_rows;
 
 -- name: ListThreadsByCreated :many
 -- listChannelThreads sorted by created: keyset (created_at DESC, id DESC).
-SELECT t.* FROM threads t
+SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
+    t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
+    t.moved_at, t.version
+FROM threads t
 WHERE t.channel_id = @channel_id AND t.kind = 'thread'
   AND (sqlc.narg(state)::text IS NULL OR t.state = sqlc.narg(state)::text)
   AND (sqlc.narg(tag_id)::uuid IS NULL

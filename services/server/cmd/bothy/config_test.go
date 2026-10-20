@@ -344,6 +344,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"ratelimit.rl.write.per_minute = 120  # default\n" +
 		"ratelimit.sweep_interval = 1m  # default\n" +
 		"retention.audit = 365d  # default\n" +
+		"search.languages = german, english  # default\n" +
+		"search.locale_map = {\"de\":\"german\",\"en\":\"english\"}  # default\n" +
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +
 		"secrets.signing_key_dir = /var/lib/bothy/signing-keys  # default\n" +

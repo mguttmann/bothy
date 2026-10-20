@@ -18,7 +18,7 @@ import (
 
 // TestMessagingMigration_Schema holds messages and mentions against docs/spec/03-data-model.md
 // section 4.6 column by column, with every check, key and index, and with exactly the deviations
-// the migration names: no search columns, no has_attachments and no foreign keys to runs and
+// the migration names: the search columns come with 00035 and 00036 (M3-13), no has_attachments and no foreign keys to runs and
 // import_items yet (M1-56). threads.parent_message_id references messages, deferred.
 func TestMessagingMigration_Schema(t *testing.T) {
 	t.Parallel()
@@ -49,6 +49,9 @@ func TestMessagingMigration_Schema(t *testing.T) {
 		{"deleted_at", tz, true, ""},
 		{"deleted_by", "uuid", true, ""},
 		{"created_at", tz, false, "now()"},
+		// Added by 00035 (M3-13); the vector is a stored generated column without a default.
+		{"search_language", "regconfig", false, "'simple'::regconfig"},
+		{"search_vector", "tsvector", false, ""},
 	}
 	if got := principalColumns(t, conn, "messages"); !reflect.DeepEqual(got, want) {
 		t.Errorf("messages columns:\n got %+v\nwant %+v", got, want)
@@ -81,6 +84,8 @@ func TestMessagingMigration_Schema(t *testing.T) {
 	wantIdx := []string{
 		"CREATE INDEX messages_author_created_idx ON public.messages USING btree (author_principal_id, created_at DESC)",
 		"CREATE INDEX messages_channel_created_idx ON public.messages USING btree (channel_id, created_at DESC)",
+		// Added by 00036 (M3-13).
+		"CREATE INDEX messages_search_vector_idx ON public.messages USING gin (search_vector)",
 		"CREATE INDEX messages_trigger_state_idx ON public.messages USING btree (trigger_state) WHERE (trigger_state = ANY (ARRAY['received'::text, 'queued'::text, 'working'::text]))",
 		"CREATE UNIQUE INDEX messages_author_client_msg_id_key ON public.messages USING btree (author_principal_id, client_msg_id)",
 		"CREATE UNIQUE INDEX messages_pkey ON public.messages USING btree (id)",

@@ -52,7 +52,7 @@ func TestRepositoryOperators(t *testing.T) {
 			}
 		}
 		var err error
-		main, err = e.repo.InsertMainThread(ctx, domain.NewMainThread(ids.New(), inherit.ID, alex, t0))
+		main, err = e.repo.InsertMainThread(ctx, mainThread(inherit.ID, alex))
 		return err
 	}))
 	sp.SetOperator(domain.OperatorAssignment{Mode: domain.OperatorAgent, AgentID: lotse})

@@ -205,10 +205,15 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	if err != nil {
 		return messaging.Created{}, err
 	}
+	lang, err := s.searchLanguage(ctx, a)
+	if err != nil {
+		return messaging.Created{}, err
+	}
 	row, err := s.d.Store.InsertMessage(ctx, domain.Message{
 		ID: ids.New(), ThreadID: info.ID, ChannelID: info.ChannelID, ThreadSeq: seq, AuthorID: a.ID,
 		ClientMsgID: p.clientMsgID, PayloadSHA256: p.hash, Origin: p.origin, Kind: domain.KindText, ContentMD: p.content,
 		ContentFormat: domain.ContentFormat, ReplyToID: p.replyTo, Silent: p.silent, Version: 1, CreatedAt: now,
+		SearchLanguage: lang,
 	})
 	if err != nil {
 		return messaging.Created{}, err
@@ -228,6 +233,17 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 		}
 	}
 	return messaging.Created{Message: m}, s.emitCreated(ctx, info, m, true)
+}
+
+// searchLanguage returns the text search configuration of a message by a (docs/spec/14-search.md
+// 3.1, docs/DECISIONS.md D-M3-13-1): origin human takes the language of the person, origin agent
+// and app the instance language without reading the principal. It reads inside the unit of work
+// of the insert; the value is set once and no later write changes it.
+func (s *Service) searchLanguage(ctx context.Context, a actor.Actor) (string, error) {
+	if a.Kind != actor.KindUser {
+		return s.d.Directory.InstanceSearchLanguage(ctx)
+	}
+	return s.d.Directory.SearchLanguage(ctx, a.ID)
 }
 
 // mentionsFor resolves the mentions of p in the thread of info (the channel path of a thread
@@ -275,6 +291,12 @@ func (s *Service) systemLine(ctx context.Context, a actor.Actor, info chat.Threa
 	seq int64, now time.Time) (*messaging.Message, error) {
 	line := domain.SystemLine(domain.SystemThreadReopened, info.ID, info.ChannelID, a.ID, seq)
 	line.CreatedAt = now
+	// Origin system takes the instance language, whoever caused the line (14 3.1, D-M3-13-1).
+	lang, err := s.d.Directory.InstanceSearchLanguage(ctx)
+	if err != nil {
+		return nil, err
+	}
+	line.SearchLanguage = lang
 	row, err := s.d.Store.InsertMessage(ctx, line)
 	if err != nil {
 		return nil, err

@@ -29,7 +29,16 @@ func (r *Repository) MyMentions(ctx context.Context, q app.MentionQuery) ([]app.
 	}
 	out := make([]app.MentionRow, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, app.MentionRow{Message: toMessage(row.Message), MentionedAt: timeOf(row.MentionedAt)})
+		m := messageRow{
+			ID: row.ID, ThreadID: row.ThreadID, ChannelID: row.ChannelID, ThreadSeq: row.ThreadSeq,
+			AuthorPrincipalID: row.AuthorPrincipalID, ClientMsgID: row.ClientMsgID, ClientPayloadSha256: row.ClientPayloadSha256,
+			Origin: row.Origin, Kind: row.Kind, SystemCode: row.SystemCode, ContentMd: row.ContentMd,
+			ContentFormat: row.ContentFormat, ReplyToMessageID: row.ReplyToMessageID, RunID: row.RunID,
+			TriggerState: row.TriggerState, TriggerStateReason: row.TriggerStateReason, TriggerStateAt: row.TriggerStateAt,
+			Silent: row.Silent, ImportItemID: row.ImportItemID, Version: row.Version, EditedAt: row.EditedAt,
+			DeletedAt: row.DeletedAt, DeletedBy: row.DeletedBy, CreatedAt: row.CreatedAt,
+		}
+		out = append(out, app.MentionRow{Message: toMessage(m), MentionedAt: timeOf(row.MentionedAt)})
 	}
 	return out, nil
 }

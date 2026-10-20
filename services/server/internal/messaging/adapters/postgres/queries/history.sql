@@ -88,5 +88,9 @@ ORDER BY p.thread_seq;
 
 -- name: GetVisibleMessage :one
 -- getMessage: the message @id when its channel is visible (07 section 7.4 rule 1); a foreign and
--- an unknown id both give no row.
-SELECT * FROM messages m WHERE m.id = @id AND m.channel_id = ANY(@visible_channel_ids::uuid[]);
+-- an unknown id both give no row. The columns are listed, so the read carries neither
+-- search_language nor search_vector (D-M3-13-10).
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages m WHERE m.id = @id AND m.channel_id = ANY(@visible_channel_ids::uuid[]);

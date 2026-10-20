@@ -8,8 +8,7 @@ import (
 
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
-	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
-	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -48,15 +47,16 @@ type Messaging struct {
 }
 
 // NewMessaging builds the messaging module over pool with the unit of work uow, the Authorizer
-// az, the appender events, the thread port of chat, the principal directory of identity over
-// pool, the clock (nil means clock.System()) and log (nil means slog.Default()), which with
-// bothy.authz.errors on the global meter provider of platform/otel records a history item that
-// fails message.read (filter_mismatch, M1-57). It opens no connection. Errors: a missing
+// az, the appender events, the thread port of chat, the principal directory dir of identity with
+// the search language configuration (Identity.Directory: mentions, authors and the language of
+// every message, M3-13), the clock (nil means clock.System()) and log (nil means slog.Default()),
+// which with bothy.authz.errors on the global meter provider of platform/otel records a history
+// item that fails message.read (filter_mismatch, M1-57). It opens no connection. Errors: a missing
 // collaborator, a limit the use cases refuse or the counter.
 func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, events eventlog.Appender,
-	threads chat.Threads, clk clock.Clock, log *slog.Logger) (*Messaging, error) {
-	if az == nil || threads == nil {
-		return nil, errors.New("wire: the messaging module needs the Authorizer and the threads of chat")
+	threads chat.Threads, dir identity.Directory, clk clock.Clock, log *slog.Logger) (*Messaging, error) {
+	if az == nil || threads == nil || dir == nil {
+		return nil, errors.New("wire: the messaging module needs the Authorizer, the threads of chat and the directory of identity")
 	}
 	counter, err := authztelemetry.NewErrorCounter(nil)
 	if err != nil {
@@ -64,7 +64,7 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	}
 	svc, err := messagingapp.New(cfg, messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: events, Threads: threads,
-		Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Cursors: messaginghttp.Cursors{}, Errors: counter, Clock: clk, Log: log,
+		Directory: dir, Cursors: messaginghttp.Cursors{}, Errors: counter, Clock: clk, Log: log,
 	})
 	if err != nil {
 		return nil, err

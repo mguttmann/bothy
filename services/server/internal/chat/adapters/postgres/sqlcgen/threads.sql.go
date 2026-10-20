@@ -19,7 +19,8 @@ SET last_message_seq = last_message_seq + 1, last_activity_at = $1, message_coun
     closed_at = CASE WHEN $2::boolean THEN NULL ELSE closed_at END,
     closed_by = CASE WHEN $2::boolean THEN NULL ELSE closed_by END
 WHERE id = $3
-RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id, last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
 `
 
 type AppendToThreadParams struct {
@@ -28,11 +29,32 @@ type AppendToThreadParams struct {
 	ID     pgtype.UUID
 }
 
+type AppendToThreadRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
 // The thread sequence (03 section 6.2): the caller holds the row lock; a rolled back transaction
 // returns the number with it, so there are no gaps. With reopen a closed thread opens again.
-func (q *Queries) AppendToThread(ctx context.Context, arg AppendToThreadParams) (Thread, error) {
+func (q *Queries) AppendToThread(ctx context.Context, arg AppendToThreadParams) (AppendToThreadRow, error) {
 	row := q.db.QueryRow(ctx, appendToThread, arg.Now, arg.Reopen, arg.ID)
-	var i Thread
+	var i AppendToThreadRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChannelID,
@@ -58,16 +80,44 @@ func (q *Queries) AppendToThread(ctx context.Context, arg AppendToThreadParams) 
 
 const getThread = `-- name: GetThread :one
 
-SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id, last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version FROM threads WHERE id = $1
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE id = $1
 `
+
+type GetThreadRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries on threads (chat module, M1-55; docs/spec/03-data-model.md section 4.5). Only this
 // module reads and writes the table (03 principle 12). The main thread of a text channel is
 // inserted by threads_main.sql with its channel (M1-53).
-func (q *Queries) GetThread(ctx context.Context, id pgtype.UUID) (Thread, error) {
+//
+// The columns are listed instead of "*": no read carries search_language or the generated
+// title_search (docs/DECISIONS.md D-M3-13-10), so the rows stay without regconfig and tsvector.
+// Every INSERT names search_language, the language of the creator (14 3.1, M3-13); the static
+// test TestThreadInsertsSetSearchLanguage holds it.
+func (q *Queries) GetThread(ctx context.Context, id pgtype.UUID) (GetThreadRow, error) {
 	row := q.db.QueryRow(ctx, getThread, id)
-	var i Thread
+	var i GetThreadRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChannelID,
@@ -93,10 +143,11 @@ func (q *Queries) GetThread(ctx context.Context, id pgtype.UUID) (Thread, error)
 
 const insertThread = `-- name: InsertThread :one
 INSERT INTO threads (id, channel_id, kind, parent_message_id, title, title_source, operator_agent_id, created_by, created_at,
-    last_activity_at)
+    last_activity_at, search_language)
 VALUES ($1, $2, 'thread', $3, $4, $5, $6, $7,
-    $8, $8)
-RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id, last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+    $8, $8, $9::text::regconfig)
+RETURNING id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
 `
 
 type InsertThreadParams struct {
@@ -108,9 +159,32 @@ type InsertThreadParams struct {
 	OperatorAgentID pgtype.UUID
 	CreatedBy       pgtype.UUID
 	CreatedAt       pgtype.Timestamptz
+	SearchLanguage  string
 }
 
-func (q *Queries) InsertThread(ctx context.Context, arg InsertThreadParams) (Thread, error) {
+type InsertThreadRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
+// search_language goes in as text and is cast here, so pgx needs no codec for regconfig.
+func (q *Queries) InsertThread(ctx context.Context, arg InsertThreadParams) (InsertThreadRow, error) {
 	row := q.db.QueryRow(ctx, insertThread,
 		arg.ID,
 		arg.ChannelID,
@@ -120,8 +194,9 @@ func (q *Queries) InsertThread(ctx context.Context, arg InsertThreadParams) (Thr
 		arg.OperatorAgentID,
 		arg.CreatedBy,
 		arg.CreatedAt,
+		arg.SearchLanguage,
 	)
-	var i Thread
+	var i InsertThreadRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChannelID,
@@ -146,7 +221,10 @@ func (q *Queries) InsertThread(ctx context.Context, arg InsertThreadParams) (Thr
 }
 
 const listThreadsByActivity = `-- name: ListThreadsByActivity :many
-SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by, t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at, t.moved_at, t.version FROM threads t
+SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
+    t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
+    t.moved_at, t.version
+FROM threads t
 WHERE t.channel_id = $1 AND t.kind = 'thread'
   AND ($2::text IS NULL OR t.state = $2::text)
   AND ($3::uuid IS NULL
@@ -166,9 +244,30 @@ type ListThreadsByActivityParams struct {
 	MaxRows   int32
 }
 
+type ListThreadsByActivityRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
 // listChannelThreads sorted by last_activity (brief D6): the threads of kind thread of a
 // channel, keyset (last_activity_at DESC, id DESC) after the position of the cursor.
-func (q *Queries) ListThreadsByActivity(ctx context.Context, arg ListThreadsByActivityParams) ([]Thread, error) {
+func (q *Queries) ListThreadsByActivity(ctx context.Context, arg ListThreadsByActivityParams) ([]ListThreadsByActivityRow, error) {
 	rows, err := q.db.Query(ctx, listThreadsByActivity,
 		arg.ChannelID,
 		arg.State,
@@ -182,9 +281,9 @@ func (q *Queries) ListThreadsByActivity(ctx context.Context, arg ListThreadsByAc
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Thread
+	var items []ListThreadsByActivityRow
 	for rows.Next() {
-		var i Thread
+		var i ListThreadsByActivityRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ChannelID,
@@ -216,7 +315,10 @@ func (q *Queries) ListThreadsByActivity(ctx context.Context, arg ListThreadsByAc
 }
 
 const listThreadsByCreated = `-- name: ListThreadsByCreated :many
-SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by, t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at, t.moved_at, t.version FROM threads t
+SELECT t.id, t.channel_id, t.kind, t.parent_message_id, t.title, t.title_source, t.state, t.closed_at, t.closed_by,
+    t.operator_agent_id, t.last_message_seq, t.unread_floor_seq, t.last_activity_at, t.message_count, t.created_by, t.created_at,
+    t.moved_at, t.version
+FROM threads t
 WHERE t.channel_id = $1 AND t.kind = 'thread'
   AND ($2::text IS NULL OR t.state = $2::text)
   AND ($3::uuid IS NULL
@@ -236,8 +338,29 @@ type ListThreadsByCreatedParams struct {
 	MaxRows   int32
 }
 
+type ListThreadsByCreatedRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
 // listChannelThreads sorted by created: keyset (created_at DESC, id DESC).
-func (q *Queries) ListThreadsByCreated(ctx context.Context, arg ListThreadsByCreatedParams) ([]Thread, error) {
+func (q *Queries) ListThreadsByCreated(ctx context.Context, arg ListThreadsByCreatedParams) ([]ListThreadsByCreatedRow, error) {
 	rows, err := q.db.Query(ctx, listThreadsByCreated,
 		arg.ChannelID,
 		arg.State,
@@ -251,9 +374,9 @@ func (q *Queries) ListThreadsByCreated(ctx context.Context, arg ListThreadsByCre
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Thread
+	var items []ListThreadsByCreatedRow
 	for rows.Next() {
-		var i Thread
+		var i ListThreadsByCreatedRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ChannelID,
@@ -285,13 +408,36 @@ func (q *Queries) ListThreadsByCreated(ctx context.Context, arg ListThreadsByCre
 }
 
 const lockThread = `-- name: LockThread :one
-SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id, last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version FROM threads WHERE id = $1 FOR UPDATE
+SELECT id, channel_id, kind, parent_message_id, title, title_source, state, closed_at, closed_by, operator_agent_id,
+    last_message_seq, unread_floor_seq, last_activity_at, message_count, created_by, created_at, moved_at, version
+FROM threads WHERE id = $1 FOR UPDATE
 `
 
+type LockThreadRow struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
+}
+
 // The thread locked for a change (03 section 6.3: domain rows before event_seq).
-func (q *Queries) LockThread(ctx context.Context, id pgtype.UUID) (Thread, error) {
+func (q *Queries) LockThread(ctx context.Context, id pgtype.UUID) (LockThreadRow, error) {
 	row := q.db.QueryRow(ctx, lockThread, id)
-	var i Thread
+	var i LockThreadRow
 	err := row.Scan(
 		&i.ID,
 		&i.ChannelID,

@@ -2211,6 +2211,30 @@
       "doc": "How long the audit log is kept before it is trimmed with an anchor."
     },
     {
+      "name": "search.languages",
+      "env": "BOTHY_SEARCH__LANGUAGES",
+      "kind": "list(string)",
+      "default": "[\"german\",\"english\"]",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "14-search.md",
+      "doc": "Text search configurations every search query is built with, besides simple."
+    },
+    {
+      "name": "search.locale_map",
+      "env": "BOTHY_SEARCH__LOCALE_MAP",
+      "kind": "map(string)",
+      "default": "{\"de\":\"german\",\"en\":\"english\"}",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "14-search.md",
+      "doc": "Text search configuration of new messages and threads per first language subtag of the author's locale."
+    },
+    {
       "name": "secrets.cache_ttl",
       "env": "BOTHY_SECRETS__CACHE_TTL",
       "kind": "duration",

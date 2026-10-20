@@ -10,8 +10,10 @@ to it: "language choice, weighting, ranking, highlighting". Permissions:
 All limits and targets are named configuration values with a default in section 15. External
 facts refer to the list of sources (section 16). The SQL examples were run on a
 throwaway instance of PostgreSQL 16. The target is PostgreSQL 18 [Q1, verified]; its
-documentation describes the functions used in the same way [Q2, Q3, verified]. A run against
-18 is still pending as a build test.
+documentation describes the functions used in the same way [Q2, Q3, verified]. Since M3-13 the
+language tests of section 12, the examples of 3.3 and 4.2 and the catalog of the generated
+columns run as build tests on PostgreSQL 18 (`pgtest`, `migrations/search_vectors_test.go`,
+`test/integration/search_test.go`); every result matched the PostgreSQL 16 examples.
 
 ## 1. Goals and limits
 
@@ -59,6 +61,17 @@ and not changed afterwards, except by a reindexing (section 8):
 
 Threads get the same rule via the creator (column `threads.search_language`, 03).
 File text gets the language of the instance.
+
+Details (M3-13, docs/DECISIONS.md D-M3-13-1 to D-M3-13-6): the key of the map is the first
+language subtag of the locale (the part before the first `-`, ASCII lower case; `de-AT` uses
+`de`); `simple` is allowed as a map value and is never listed in `search.languages`, because
+every query adds it. Main threads get the language of the creator of the channel. The language
+is computed by `messaging` and `chat` through `identity.Directory` in the unit of work of the
+insert, never comes from a request and is never changed by an edit, a change of `users.locale`
+or of `locale.default`, or a move. Besides the configuration check, the start checks the
+database (`pg.CheckTextSearch`): every configuration of `search.languages` and
+`search.locale_map` must exist, and the database must fold the case of non-ASCII letters
+([16-operations.md](16-operations.md) 7.2).
 
 `search.languages` names all configurations from which queries are built. The server
 does not start if a value from `search.locale_map` is missing there; otherwise queries would never
@@ -147,7 +160,15 @@ $$;
 
 A NULL result means "no term" (4.1). With `'{german,english}'`, `Rechnungen` becomes
 `'rechnung' | 'rechnungen' | 'rechnungen'`; the GIN query uses the index (plan checked).
-The function is created by a platform migration.
+The function is created by a platform migration. Migration `00035_search_vectors.sql` (M3-13) creates it; it belongs
+to `bothy_owner`, runs as the caller, and only `bothy_app` may execute it (`REVOKE ALL ... FROM
+PUBLIC`, D-M3-13-9). On PostgreSQL 18 the examples give the same text as on 16: `the` gives
+`'the' | 'the'` (the English branch holds only a stop word), only punctuation, empty text, white
+space and NULL give NULL, `'{}'` or a NULL array give only the `simple` branch, and `-z` gives
+`!'z' | !'z' | !'z'`. A query of only negations matches nearly every row; it is bounded only by
+`search.max_candidates` and `search.statement_timeout` (M3-14). The text round trip inside the
+function is lossless (fuzz test); the text form of a nested OR has no parentheses, so
+`r::text::tsquery` is the same query with another tree.
 
 Known imprecision: negation (`-word`) applies per subquery. If a text contains the word only in
 another form, the `simple` subquery can still match it. Negation is therefore

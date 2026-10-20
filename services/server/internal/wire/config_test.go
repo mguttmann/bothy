@@ -246,6 +246,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"webhook.allowed_hosts":         {Kind: config.KindStringList, Default: "", Chapter: "03-data-model.md"},
 		"command.max_per_principal":     {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
 		"command.description_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
+
+		// M3-13
+		"search.languages":  {Kind: config.KindStringList, Default: `["german","english"]`, Chapter: "14-search.md"},
+		"search.locale_map": {Kind: config.KindStringMap, Default: `{"de":"german","en":"english"}`, Chapter: "14-search.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{
@@ -873,5 +877,80 @@ func TestIDT24_Argon2BelowFloorStopsStart(t *testing.T) {
 	if problems := load(t, "BOTHY_AUTH__ARGON2ID_MEMORY_KIB=19456", "BOTHY_AUTH__ARGON2ID_ITERATIONS=2",
 		"BOTHY_AUTH__ARGON2ID_PARALLELISM=1"); problems != nil {
 		t.Fatalf("floor values: %v", problems)
+	}
+}
+
+// TestSearchLanguagesCheck holds the check search_languages (D-M3-13-5): unique, unqualified
+// lower-case identifiers, never simple. The problem names the key and the position, never the
+// value.
+func TestSearchLanguagesCheck(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		value, secret string
+		ok            bool
+	}{
+		{value: `["german","english"]`, ok: true},
+		{value: `["english"]`, ok: true},
+		{value: `["german","german"]`, secret: "german"},
+		{value: `["German","english"]`, secret: "German"},
+		{value: `["english","pt-br"]`, secret: "pt-br"},
+		{value: `["9lang"]`, secret: "9lang"},
+		{value: `["german","simple"]`},
+		{value: `["` + strings.Repeat("x", 64) + `"]`, secret: strings.Repeat("x", 64)},
+	} {
+		got := load(t, "BOTHY_SEARCH__LANGUAGES="+c.value, `BOTHY_SEARCH__LOCALE_MAP={}`)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("%s: problems %v, want ok %v", c.value, got, c.ok)
+			continue
+		}
+		for _, p := range got {
+			msg := p.String()
+			if !strings.Contains(msg, "search_languages: search.languages: entry") {
+				t.Errorf("%s: problem %q does not come from search_languages with a position", c.value, msg)
+			}
+			if c.secret != "" && strings.Contains(msg, c.secret) {
+				t.Errorf("%s: problem %q names the value", c.value, msg)
+			}
+		}
+	}
+}
+
+// TestSearchLocaleMapCheck holds the check search_locale_map (D-M3-13-5, 14 3.1): keys are first
+// language subtags in lower-case ASCII, values valid names listed in search.languages or simple.
+func TestSearchLocaleMapCheck(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		value, secret string
+		ok            bool
+	}{
+		{value: `{"de":"german","en":"english"}`, ok: true},
+		{value: `{"de":"german","fr":"simple"}`, ok: true},
+		{value: `{}`, ok: true},
+		{value: `{"de":"german","fr":"french"}`, secret: "french"},
+		{value: `{"de-AT":"german"}`, secret: "de-AT"},
+		{value: `{"DE":"german"}`, secret: "DE"},
+		{value: `{"d":"german"}`},
+		{value: `{"de":"German"}`, secret: "German"},
+		{value: `{"de":""}`},
+	} {
+		got := load(t, "BOTHY_SEARCH__LOCALE_MAP="+c.value)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("%s: problems %v, want ok %v", c.value, got, c.ok)
+			continue
+		}
+		for _, p := range got {
+			msg := p.String()
+			if !strings.Contains(msg, "search_locale_map: search.locale_map: ") || !strings.Contains(msg, "entry ") {
+				t.Errorf("%s: problem %q does not come from search_locale_map with a position", c.value, msg)
+			}
+			if c.secret != "" && strings.Contains(msg, c.secret) {
+				t.Errorf("%s: problem %q names the value", c.value, msg)
+			}
+		}
+	}
+	// A broken search.languages is reported once, by its own check.
+	got := load(t, `BOTHY_SEARCH__LANGUAGES=["german","german"]`)
+	if len(got) != 1 || !strings.Contains(got[0].String(), "search_languages:") {
+		t.Errorf("problems %v, want one of search_languages", got)
 	}
 }

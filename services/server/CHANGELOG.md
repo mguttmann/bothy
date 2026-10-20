@@ -11,6 +11,18 @@ documented in this file. The format is based on
 
 ### Added
 
+- Search vectors (M3-13): migration `00035` adds `messages.search_language`,
+  `messages.search_vector`, `threads.search_language` and `threads.title_search` as `STORED`
+  generated columns with the expressions of 03 section 5 and the platform function
+  `search_tsquery(regconfig[], text)` of 14 4.2 (executable only by `bothy_app`); migration
+  `00036` builds their GIN indexes concurrently. Every new message and thread takes the language
+  of its author or creator through `search.locale_map` (the instance language for agents, apps
+  and system lines), set once at creation and never from a request. New configuration keys
+  `search.languages` and `search.locale_map` with the new kind `map(string)` and the checks
+  `search_languages` and `search_locale_map`; the start stops when a configured text search
+  configuration is missing in the database or the database does not fold the case of non-ASCII
+  letters. Adding the generated columns rewrites `messages` and `threads` once (no release
+  exists yet).
 - Apps (M2-24): the migrations `00030_apps.sql` and `00031_app_installations.sql` (with the trigger
   `apps_principal_kind_check`), the port `apps.Apps` and the operations `listApps`, `installApp`,
   `validateManifest`, `getApp`, `upgradeAppManifest`, `setAppScopes`, `suspendApp`, `resumeApp` and

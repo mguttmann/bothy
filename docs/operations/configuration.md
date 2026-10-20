@@ -46,6 +46,7 @@ one. Error messages never name the checked text.
 | Duration (`duration`) | exactly `(0\|[1-9][0-9]*)(ms\|s\|m\|h\|d)`: a number without sign, fraction or leading zero and exactly one unit, `d` = 24 h. No composition such as `1h30m`; a duration above the largest duration of Go (`time.Duration`, int64 nanoseconds, [time.Duration](https://pkg.go.dev/time#Duration), retrieved 2026-10-12) is an error, so the largest whole number depends on the unit (`106751d`, `2562047h`) | `250ms`, `30d` |
 | List (`list(string)`) | environment and default value: a JSON array of strings if the text starts with `[`, otherwise separated by commas with the whitespace around each element removed; empty text is the empty list; an empty element is an error. File: YAML list of scalars or one scalar in the form of the environment | `a.example.com, b.example.com`, `["x,y"]` |
 | Prefix list (`list(cidr)`) | like `list(string)`; every element is an IPv4 or IPv6 prefix in CIDR form without set host bits (`192.0.2.10/24` is an error) | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
+| Map (`map(string)`) | Environment and default: a JSON object whose values are strings; keys are not empty and occur once; an array, a number, `null` or a nested object as a value is an error. File: a YAML mapping of plain scalars below the key, or a scalar in the environment form. The canonical text is the JSON object with sorted keys (M3-13, D-M3-13-4) | `BOTHY_SEARCH__LOCALE_MAP={"de":"german","en":"english"}` |
 | `listen address` | `host:port`; host empty (`:port` means all interfaces) or an IP literal, IPv6 in brackets, no DNS name; port in decimal from 0 to 65535 without a leading zero | `127.0.0.1:8080`, `[::1]:8081`, `:8080` |
 | `cron` | five fields separated by whitespace, in UTC: minute 0 to 59, hour 0 to 23, day 1 to 31, month 1 to 12, weekday 0 to 6 (0 = Sunday). A field is a comma list of `*`, `*/n`, `a`, `a-b` and `a-b/n` with `a <= b` and a step `n` from 1 to the highest value of the field; numbers without a leading zero, no names, no shortcuts such as `@daily` | `0 2 * * 0`, `*/15 0-6 * * 1-5` |
 | `semver` | SemVer 2.0.0 without a leading `v`, with optional pre-release and build parts | `1.4.0`, `1.4.0-rc.1` |
@@ -571,8 +572,8 @@ Source: [14-search.md](../spec/14-search.md), section 15.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `search.languages` | `BOTHY_SEARCH__LANGUAGES` | Server |  | `["german","english"]` | configurations for query construction (plus always `simple`) | planned (M3) |
-| `search.locale_map` | `BOTHY_SEARCH__LOCALE_MAP` | Server |  | `{"de":"german","en":"english"}` | language tag to text search configuration | planned (M3) |
+| `search.languages` | `BOTHY_SEARCH__LANGUAGES` | Server | list(string) | `["german","english"]` | configurations for query construction (plus always `simple`) | active |
+| `search.locale_map` | `BOTHY_SEARCH__LOCALE_MAP` | Server | map(string) | `{"de":"german","en":"english"}` | language tag to text search configuration | active |
 | `search.query_max_chars` | `BOTHY_SEARCH__QUERY_MAX_CHARS` | Server |  | `256` | length of the input | planned (M3) |
 | `search.max_candidates` | `BOTHY_SEARCH__MAX_CANDIDATES` | Server |  | `2000` | candidates before ranking | planned (M3) |
 | `search.rank_normalization` | `BOTHY_SEARCH__RANK_NORMALIZATION` | Server |  | `1` | normalization for `ts_rank` | planned (M3) |

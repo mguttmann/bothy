@@ -239,6 +239,18 @@ Rulings: docs/DECISIONS.md M1-55. Tests: `domain/thread_test.go`,
 `adapters/httpapi/threads_test.go` (PostgreSQL 18, real authz and chat source, response
 validation) and `migrations/chat_thread_tags_test.go`.
 
+## Search language of threads (M3-13)
+
+`Threads.Create` and the main thread of `createChannel` set `threads.search_language` from the
+creator through `identity.Directory` (`SearchLanguage` for a person, `InstanceSearchLanguage` for
+an agent or app), in the unit of work of the insert ([14-search.md](../../../../docs/spec/14-search.md)
+3.1, docs/DECISIONS.md D-M3-13-1 and D-M3-13-2). The value goes to SQL as text and is cast there;
+`domain.Thread.SearchLanguage` is write-only, and the queries of `threads.sql` and
+`threads_main.sql` list their columns, so no read carries `search_language` or `title_search`
+(D-M3-13-10). A move (M1-62) keeps the language. `TestThreadInsertsSetSearchLanguage`
+(`adapters/postgres`) fails when an `INSERT INTO threads` of `queries/*.sql` does not name
+`search_language`. `wire.NewChat` takes the directory in `ChatWrites.Directory`.
+
 ## Port (root package `internal/chat`)
 
 - Inbound: `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info), `AgentConfig`.

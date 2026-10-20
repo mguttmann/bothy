@@ -33,6 +33,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
@@ -196,6 +197,18 @@ type IdentityWrites struct {
 	// Apps are the installations of app principals (NewAppInstallations, M2-24); createToken and
 	// the authenticator read them. nil means identity.NoAppInstallations: no app is installed.
 	Apps identity.AppInstallations
+	// Search is the language configuration of full-text search (SearchLanguages, M3-13); the
+	// Directory answers the language of new messages and threads with it and with Settings. The
+	// zero Map gives simple for every locale.
+	Search searchlang.Map
+}
+
+// NewSearchDirectory returns the principal directory of identity over pool that answers the text
+// search language of new messages and threads (docs/spec/14-search.md 3.1, M3-13) with langs and
+// locale.default from settings. NewIdentity builds its Directory with it; worlds that build chat
+// and messaging without the identity module pass one to NewChat and NewMessaging.
+func NewSearchDirectory(pool *pg.Pool, langs searchlang.Map, settings instance.Settings) *app.Directory {
+	return app.NewDirectory(identitypg.NewRepository(pool)).WithSearch(langs, settings)
 }
 
 // NewIdentity builds the identity module over pool with the unit of work uow, the Authorizer az,
@@ -259,7 +272,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
 		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
 		Enrollment: enrollment, TrustedHeader: driver, Principals: principals,
-		Directory: app.NewDirectory(repo), PrincipalWrites: writes, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
+		Directory: NewSearchDirectory(pool, w.Search, w.Settings), PrincipalWrites: writes, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
 		repo: repo, uow: uow, az: az, writes: w, pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
 }
