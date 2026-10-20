@@ -841,12 +841,16 @@ Serializers _$serializers =
             () => ListBuilder<BillingMode>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(StatsBackendCost)]),
+            () => ListBuilder<StatsBackendCost>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(BillingMode)]),
             () => ListBuilder<BillingMode>(),
           )
           ..addBuilderFactory(
-            const FullType(BuiltList, const [const FullType(StatsBackendCost)]),
-            () => ListBuilder<StatsBackendCost>(),
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(BillingMode)]),

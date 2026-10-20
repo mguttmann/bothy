@@ -13,14 +13,14 @@ part 'gateway_heartbeat.g.dart';
 ///
 /// Properties:
 /// * [lastSeq]
-/// * [agent] - Agents only; equivalent to `POST /agents/me/heartbeat`.
+/// * [agent] - Agents only; equivalent to `POST /agents/me/heartbeat`. The liveness rules of the op run first (`heartbeat_ack`); then the agent part passes `rl.agent_runtime` and `agent.heartbeat`. Its errors (`forbidden`, `validation_failed`, `rate_limited`, `internal_error`) answer `error` and keep the connection. A heartbeat of an agent without this member changes no presence.
 @BuiltValue()
 abstract class GatewayHeartbeat
     implements Built<GatewayHeartbeat, GatewayHeartbeatBuilder> {
   @BuiltValueField(wireName: r'last_seq')
   int get lastSeq;
 
-  /// Agents only; equivalent to `POST /agents/me/heartbeat`.
+  /// Agents only; equivalent to `POST /agents/me/heartbeat`. The liveness rules of the op run first (`heartbeat_ack`); then the agent part passes `rl.agent_runtime` and `agent.heartbeat`. Its errors (`forbidden`, `validation_failed`, `rate_limited`, `internal_error`) answer `error` and keep the connection. A heartbeat of an agent without this member changes no presence.
   @BuiltValueField(wireName: r'agent')
   Heartbeat? get agent;
 

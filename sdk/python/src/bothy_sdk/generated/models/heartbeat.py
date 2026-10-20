@@ -25,7 +25,8 @@ class Heartbeat:
     """
     Attributes:
         state (HeartbeatState):
-        runtime_version (str | Unset):
+        runtime_version (str | Unset): Version of the agent runtime (column `reported_runtime_version`); the adapter's
+            own version is `details.adapter.version`.
         reported_billing_mode (BillingMode | Unset): Backend policy of an agent. `personal` runs on the subscription of
             exactly one person.
         billing_modes_supported (list[BillingMode] | Unset):
@@ -36,7 +37,9 @@ class Heartbeat:
         rate_limit (AgentRateLimitState | Unset): Rate-limit state of the agent runtime at its provider as reported by
             the adapter (`agent_heartbeat.v1`). Never quotas of an account, keys or subscription names.
         details (JsonObject | Unset): Free-form JSON object whose schema is named in the field description.
-        project_readiness (list[ProjectReadiness] | Unset):
+        project_readiness (list[ProjectReadiness] | Unset): Readiness per bound forum of a runner (M2-03); the channels
+            must be distinct. Applied only when present and different from the last list this server process applied; absent
+            means "unchanged".
     """
 
     state: HeartbeatState
