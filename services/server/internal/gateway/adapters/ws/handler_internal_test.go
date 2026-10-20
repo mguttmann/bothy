@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 )
@@ -179,7 +180,7 @@ func newTestServer(t *testing.T, queueMax int, mod func(*Handler)) *testServer {
 // dial connects a client with the instance origin.
 func (s *testServer) dial(t *testing.T, opts ...wstest.Option) *wstest.Client {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	c, err := wstest.Dial(ctx, s.srv.URL, append([]wstest.Option{wstest.WithOrigin(publicURL)}, opts...)...)
 	if err != nil {
@@ -195,7 +196,7 @@ func TestRegisterBeforeHead(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(t, 16, nil)
 	c := s.dial(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if _, err := c.Identify(ctx, wstest.IdentifyParams{APIToken: agentToken}); err != nil {
 		t.Fatal(err)
@@ -224,7 +225,7 @@ func TestOutboundQueueOverflowCloses4014(t *testing.T) {
 	})
 	t.Cleanup(func() { close(release) })
 	c := s.dial(t, wstest.WithoutHeartbeat())
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if _, err := c.Identify(ctx, wstest.IdentifyParams{APIToken: agentToken}); err != nil {
 		t.Fatal(err)
@@ -263,7 +264,7 @@ func TestTestClientJittersFirstHeartbeat(t *testing.T) {
 	s := newTestServer(t, 16, nil)
 	delays := make(chan time.Duration, 1)
 	c := s.dial(t, wstest.WithRandom(func() float64 { return 0.5 }), wstest.OnFirstHeartbeatDelay(func(d time.Duration) { delays <- d }))
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if _, err := c.Identify(ctx, wstest.IdentifyParams{APIToken: agentToken}); err != nil {
 		t.Fatal(err)
@@ -297,7 +298,7 @@ func TestTransportReachesAuthenticator(t *testing.T) {
 	t.Parallel()
 	s := newTestServer(t, 16, nil)
 	c := s.dial(t, wstest.WithHeader("X-Login", "robin"))
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if _, err := c.Identify(ctx, wstest.IdentifyParams{APIToken: agentToken}); err != nil {
 		t.Fatal(err)
