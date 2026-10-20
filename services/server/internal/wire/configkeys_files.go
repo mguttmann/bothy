@@ -200,7 +200,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: "client.cache_max_age", Kind: config.KindDuration, Default: "30d", Min: "1s",
+			Name: "client.cache_max_age", Kind: config.KindDuration, Default: sessionMaxAgeDefault, Min: "1s",
 			Doc:     "Age after which clients drop unused cache entries; the max-age of an authenticated file download.",
 			Chapter: chapter04,
 		},

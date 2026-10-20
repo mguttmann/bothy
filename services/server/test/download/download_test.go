@@ -85,13 +85,13 @@ func TestDownload(t *testing.T) {
 	t.Run("ContentDispositionSanitizedName", func(t *testing.T) {
 		// 12 6.2 (M3-03) cleans the name at upload: bidi controls and control characters go, a
 		// path keeps only its last element; the response carries the cleaned name in both forms.
-		id := e.ready(t, "../Résumé‮gpj.exe\x01 for Sam.txt", []byte("plain text of Sam"))
+		id := e.ready(t, "../Résumé\u202Egpj.exe\x01 for Sam.txt", []byte("plain text of Sam"))
 		var f struct {
 			OriginalName string `json:"original_name"`
 		}
 		harness.MustDo(t, e.alex, harness.Request{Method: http.MethodGet, Path: "/files/" + id}, http.StatusOK).JSON(t, &f)
 		cd := get(t, e.alex, "/files/"+id+"/content", nil).Header.Get("Content-Disposition")
-		if strings.ContainsAny(f.OriginalName, "‮\x01/") || strings.ContainsAny(cd, "\r\n‮") {
+		if strings.ContainsAny(f.OriginalName, "\u202E\x01/") || strings.ContainsAny(cd, "\r\n\u202E") {
 			t.Fatalf("name %q, disposition %q", f.OriginalName, cd)
 		}
 		fallback, encoded, ok := strings.Cut(strings.TrimPrefix(cd, "attachment; filename=\""), "\"; filename*=UTF-8''")

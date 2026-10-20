@@ -841,6 +841,22 @@ func (stubServer) GetFile(context.Context, rest.GetFileRequestObject) (rest.GetF
 	return nil, nil
 }
 
+func (stubServer) DownloadFile(context.Context, rest.DownloadFileRequestObject) (rest.DownloadFileResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DownloadThumbnail(context.Context, rest.DownloadThumbnailRequestObject) (rest.DownloadThumbnailResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateFileTicket(context.Context, rest.CreateFileTicketRequestObject) (rest.CreateFileTicketResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetTranscript(context.Context, rest.GetTranscriptRequestObject) (rest.GetTranscriptResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SubmitClientMetrics(context.Context, rest.SubmitClientMetricsRequestObject) (rest.SubmitClientMetricsResponseObject, error) {
 	return nil, nil
 }
@@ -853,33 +869,38 @@ func (stubServer) SubmitClientMetrics(context.Context, rest.SubmitClientMetricsR
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
 // records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), the threads
 // (M1-55), sending (M1-56), editing and deleting (M1-58), the preferences (M3-18) and the upload
-// sessions with getFile (M3-03) and the client metrics (M4-31). A handler
+// sessions with getFile (M3-03), the client metrics (M4-31) and the downloads, tickets and
+// transcripts (M3-05). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
 	want := map[string]entry{
-		"getDevice":        {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
-		"createUpload":     {"POST /api/v1/channels/{channel_id}/uploads", "file.upload", "rl.upload"},
-		"uploadPart":       {"PUT /api/v1/uploads/{file_id}/parts/{part_number}", "file.upload", "rl.upload"},
-		"getUpload":        {"GET /api/v1/uploads/{file_id}", "file.upload", "rl.upload"},
-		"completeUpload":   {"POST /api/v1/uploads/{file_id}/complete", "file.upload", "rl.upload"},
-		"abortUpload":      {"DELETE /api/v1/uploads/{file_id}", "file.delete", "rl.write"},
-		"getFile":          {"GET /api/v1/files/{file_id}", "file.read", "rl.read"},
-		"listMyDevices":    {"GET /api/v1/me/devices", "device.list", "rl.read"},
-		"listUserDevices":  {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
-		"listUsers":        {"GET /api/v1/users", "user.read", "rl.read"},
-		"createUser":       {"POST /api/v1/users", "user.create", "rl.admin"},
-		"getUser":          {"GET /api/v1/users/{user_id}", "user.read", "rl.read"},
-		"updateUser":       {"PATCH /api/v1/users/{user_id}", "user.update", "rl.admin"},
-		"enableUser":       {"POST /api/v1/users/{user_id}/enable", "user.enable", "rl.admin"},
-		"listOwners":       {"GET /api/v1/owners", "user.read", "rl.read"},
-		"addOwner":         {"POST /api/v1/owners", "owner.add", "rl.admin"},
-		"revokeOwner":      {"POST /api/v1/owners/{user_id}/revoke", "owner.remove", "rl.admin"},
-		"getMe":            {"GET /api/v1/me", "self.read", "rl.read"},
-		"updateMyProfile":  {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
-		"getJwks":          {"GET /api/v1/instance/jwks", "instance.discovery.read", "rl.public_auth"},
-		"rotateSigningKey": {"POST /api/v1/signing-keys/rotate", "signing_key.rotate", "rl.admin"},
+		"getDevice":         {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
+		"createUpload":      {"POST /api/v1/channels/{channel_id}/uploads", "file.upload", "rl.upload"},
+		"uploadPart":        {"PUT /api/v1/uploads/{file_id}/parts/{part_number}", "file.upload", "rl.upload"},
+		"getUpload":         {"GET /api/v1/uploads/{file_id}", "file.upload", "rl.upload"},
+		"completeUpload":    {"POST /api/v1/uploads/{file_id}/complete", "file.upload", "rl.upload"},
+		"abortUpload":       {"DELETE /api/v1/uploads/{file_id}", "file.delete", "rl.write"},
+		"getFile":           {"GET /api/v1/files/{file_id}", "file.read", "rl.read"},
+		"downloadFile":      {"GET /api/v1/files/{file_id}/content", "file.read", "rl.read"},
+		"downloadThumbnail": {"GET /api/v1/files/{file_id}/thumbnails/{variant}", "file.read", "rl.read"},
+		"createFileTicket":  {"POST /api/v1/files/{file_id}/tickets", "file.read", "rl.read"},
+		"getTranscript":     {"GET /api/v1/files/{file_id}/transcript", "file.read", "rl.read"},
+		"listMyDevices":     {"GET /api/v1/me/devices", "device.list", "rl.read"},
+		"listUserDevices":   {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
+		"listUsers":         {"GET /api/v1/users", "user.read", "rl.read"},
+		"createUser":        {"POST /api/v1/users", "user.create", "rl.admin"},
+		"getUser":           {"GET /api/v1/users/{user_id}", "user.read", "rl.read"},
+		"updateUser":        {"PATCH /api/v1/users/{user_id}", "user.update", "rl.admin"},
+		"enableUser":        {"POST /api/v1/users/{user_id}/enable", "user.enable", "rl.admin"},
+		"listOwners":        {"GET /api/v1/owners", "user.read", "rl.read"},
+		"addOwner":          {"POST /api/v1/owners", "owner.add", "rl.admin"},
+		"revokeOwner":       {"POST /api/v1/owners/{user_id}/revoke", "owner.remove", "rl.admin"},
+		"getMe":             {"GET /api/v1/me", "self.read", "rl.read"},
+		"updateMyProfile":   {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
+		"getJwks":           {"GET /api/v1/instance/jwks", "instance.discovery.read", "rl.public_auth"},
+		"rotateSigningKey":  {"POST /api/v1/signing-keys/rotate", "signing_key.rotate", "rl.admin"},
 		// M1-34
 		"refreshToken":           {"POST /api/v1/auth/token/refresh", "auth.token.refresh", "rl.public_auth"},
 		"logout":                 {"POST /api/v1/auth/logout", "auth.logout", "rl.write"},
@@ -1112,8 +1133,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		if w := want[op.ID]; w.pattern != op.Pattern || op.Action != w.action || op.RateLimitClass != w.class {
 			t.Errorf("operation %+v, want %+v", op, w)
 		}
-		// Only the export streams a body that is not JSON (route class of downloads, M1-50).
-		if op.Download != (op.ID == "exportAuditEvents") {
+		// Only the export and the file downloads stream a body that is not JSON (route class of
+		// downloads, M1-50, M3-05).
+		if op.Download != (op.ID == "exportAuditEvents" || op.ID == "downloadFile" || op.ID == "downloadThumbnail") {
 			t.Errorf("%s: Download = %v", op.ID, op.Download)
 		}
 		if got, ok := routes.ByPattern(op.Pattern); !ok || got.ID != op.ID {
@@ -1139,6 +1161,18 @@ func TestRealTable_Enabled(t *testing.T) {
 }
 
 // TestRealTable_PathsBelowBaseURL holds W6 for every enabled operation.
+// TestOperations_BinaryResponseFlag: the route flag Download marks the operations whose success
+// streams bytes (downloadFile, downloadThumbnail; M3-05), so StageRoute gives them
+// http.transfer_timeout (02 14.2); getTranscript answers JSON and keeps http.request_timeout.
+func TestOperations_BinaryResponseFlag(t *testing.T) {
+	for id, want := range map[string]bool{"downloadFile": true, "downloadThumbnail": true, "getTranscript": false, "createFileTicket": false, "getFile": false} {
+		op, ok := routes.ByID(id)
+		if !ok || op.Download != want {
+			t.Errorf("%s: found %v, Download %v, want %v", id, ok, op.Download, want)
+		}
+	}
+}
+
 func TestRealTable_PathsBelowBaseURL(t *testing.T) {
 	for _, op := range routes.Enabled() {
 		if !strings.HasPrefix(op.Path, routes.BaseURL+"/") || !strings.Contains(op.Pattern, " "+routes.BaseURL+"/") {

@@ -149,12 +149,12 @@ func TestTicket(t *testing.T) {
 		for _, s := range sinks.Spans.GetSpans() {
 			hay.WriteString(s.Name)
 			for _, a := range s.Attributes {
-				hay.WriteString(" " + string(a.Key) + "=" + a.Value.Emit())
+				hay.WriteString(" " + string(a.Key) + "=" + a.Value.String())
 			}
 			for _, ev := range s.Events {
 				hay.WriteString(" " + ev.Name)
 				for _, a := range ev.Attributes {
-					hay.WriteString(" " + string(a.Key) + "=" + a.Value.Emit())
+					hay.WriteString(" " + string(a.Key) + "=" + a.Value.String())
 				}
 			}
 		}

@@ -178,6 +178,7 @@ E = Elevation of Privilege. "Register" verweist auf Abschnitt 6.
 | I | Ortsdaten in Fotos, dauerhafte Links | Metadaten entfernen, keine Objekt-URLs an Clients (SEC-UP-10, 11) | T-UP-01 |
 | D | Dekompressionsbombe, Scanner-Ausfall | Pixelgrenze, eigener Prozess, fail closed (SEC-UP-4 bis 6) | T-UP-01 |
 | E | Schadcode in Parsern | Parser im eigenen Prozess, nur reines Go in M1 | T-UP-01 |
+| I | Ticket URL reaches third parties (Open with, log of a player) | short validity `file.ticket_ttl`, binding to principal and session, `file.read` on every fetch, ticket never in logs | T-AZ-03, T-LG-01 |
 
 ### 5.9 Worker und Jobs
 
