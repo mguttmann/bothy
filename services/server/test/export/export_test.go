@@ -30,12 +30,10 @@ import (
 
 // The limits of the main test server.
 const (
-	pageSize        = 2
-	listContentMax  = 40
-	stepUpMaxAge    = 10 * time.Second
-	idleInTx        = 2 * time.Second
-	bigMessages     = 120
-	bigMessageBytes = 200 * 1024
+	pageSize       = 2
+	listContentMax = 40
+	stepUpMaxAge   = 10 * time.Second
+	idleInTx       = 2 * time.Second
 	// contentMark is in every message text of these tests, so the log check finds any content.
 	contentMark = "ExportContent"
 )
@@ -552,52 +550,37 @@ func TestExportChannel(t *testing.T) {
 	})
 
 	t.Run("NoTransactionBetweenBatches", func(t *testing.T) {
-		// Support/Large: an export far larger than the socket buffers of both ends, so the handler
-		// blocks in its write while the client pauses, between two batches.
-		large, largeMain := e.newChannel(t, "Support", "Large")
-		filler := strings.Repeat("content ", bigMessageBytes/8)
-		for i := range bigMessages {
-			e.post(t, o, largeMain, mark(i, filler), time.Time{})
-		}
-		stepUp(t, alex)
-		ctx, cancel := context.WithTimeout(t.Context(), streamWait)
-		defer cancel()
-		req, resp := e.open(t, ctx, e.callerOf(t, alex), exportPath(large, all0, all1))
-		defer func() { _ = resp.Body.Close() }()
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("status %d", resp.StatusCode)
-		}
-		hold := make(chan struct{})
-		lr := readStreamHold(resp.Body, hold)
-		lr.waitLines(t, 1)
+		// The export of Batches is held between two batches: its message pages of the first two
+		// threads went out and their units of work ended, and it waits for its next thread page
+		// behind the gate (a lock of the test's own owner connection, not of the server's role).
+		g, lr, sent, done := stopAtSecondThreadPage(t, alex)
+		defer done()
 		pause := e.duration(t, "database.idle_in_tx_timeout") + time.Second
 		for end := time.Now().Add(pause); time.Now().Before(end); time.Sleep(100 * time.Millisecond) {
 			var n int
 			if err := e.db.QueryRow(t.Context(), `SELECT count(*) FROM pg_stat_activity WHERE usename = 'bothy_app'
-				AND state IN ('idle in transaction', 'idle in transaction (aborted)') AND state_change < clock_timestamp() - interval '500 milliseconds'`).Scan(&n); err != nil {
+				AND state IN ('idle in transaction', 'idle in transaction (aborted)')`).Scan(&n); err != nil {
 				t.Fatal(err)
 			}
 			if n != 0 {
-				t.Fatalf("%d connections of the server idle in a transaction while the client pauses", n)
+				t.Fatalf("%d connections of the server idle in a transaction between two batches", n)
 			}
 		}
-		// The handler is still in the middle of the stream: the client holds back all but one line.
 		select {
 		case <-lr.done:
 			t.Fatal("the export ended during the pause, so the pause did not fall between two batches")
 		default:
 		}
-		if n := lr.count(); n != 1 {
-			t.Fatalf("%d lines read during the pause, want 1", n)
+		if n := lr.count(); n != len(sent) {
+			t.Fatalf("%d lines during the pause, want the %d of the first two threads", n, len(sent))
 		}
-		close(hold)
+		g.release(t)
 		body, tail, err := lr.finish(t)
 		if !errors.Is(err, io.EOF) || len(tail) != 0 {
 			t.Fatalf("after a pause longer than database.idle_in_tx_timeout the stream ended with %v", err)
 		}
-		r := result{req: req, status: resp.StatusCode, header: resp.Header, body: body}
-		if got := idsOf(lines(t, r)); !slices.Equal(got, e.selection(t, large, all0, all1)) || len(got) != bigMessages {
-			t.Errorf("export of %d lines, want %d", len(got), bigMessages)
+		if got := idsOf(decodeLines(t, body)); !slices.Equal(got, e.selection(t, batches, all0, all1)) {
+			t.Errorf("export after the pause %v, want the whole selection", got)
 		}
 	})
 
