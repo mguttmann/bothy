@@ -182,6 +182,9 @@ type IdentifyFacts struct {
 	ProtocolVersion int
 	// LiveSessions and SessionID report the presence of these members.
 	LiveSessions, SessionID bool
+	// Data marks the identify of a data connection (M2-44): session_id required, live_sessions
+	// absent.
+	Data bool
 	// HostVersion is identify.host_version.
 	HostVersion string
 	// Proof is the verdict of CheckHostProof.
@@ -193,7 +196,8 @@ type IdentifyFacts struct {
 // IdentifyOutcome returns the close code of a login in the order of Design note 3 of M2-43 (24
 // section 3.5), the first match wins; zero lets the login go on: timeout or another op first
 // (4113); a protocol version outside SupportedProtocolVersions (4114) before the proof is looked
-// at; live_sessions absent, session_id present or host_version no SemVer (4002); the proof (4110
+// at; on the control connection live_sessions absent or session_id present, on a data connection
+// (M2-44) session_id absent or live_sessions present, or host_version no SemVer (4002); the proof (4110
 // for an unknown key, 4113 for an invalid one); a host disabled or retired (4111). The decoding
 // errors of a frame (4002) are the codec's.
 func IdentifyOutcome(f IdentifyFacts) CloseCode {
@@ -202,7 +206,7 @@ func IdentifyOutcome(f IdentifyFacts) CloseCode {
 		return CodeHostAuthFailed
 	case !slices.Contains(supportedProtocolVersions, f.ProtocolVersion):
 		return CodeHostVersionUnsupported
-	case !f.LiveSessions || f.SessionID || !ValidHostVersion(f.HostVersion):
+	case f.Data && (f.LiveSessions || !f.SessionID), !f.Data && (!f.LiveSessions || f.SessionID), !ValidHostVersion(f.HostVersion):
 		return CodeDecodeError
 	case f.Proof == ProofUnknownKey:
 		return CodeHostUnpaired

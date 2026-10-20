@@ -118,6 +118,9 @@ type Handlers struct {
 	// Hosts implements listHosts, createHost, getHost, updateHost and setHostState (terminal,
 	// M2-39) and setHostLlmCredentials (M2-40).
 	*terminalhttp.Hosts
+	// TerminalSessions implements openTerminalSession, attachTerminalSession, listTerminalSessions,
+	// getTerminalSession and closeTerminalSession (terminal, M2-44).
+	*terminalhttp.TerminalSessions
 	// Local implements loginWithPassword and setMyLocalCredential (identity, M1-39).
 	*identityhttp.Local
 	// Console implements getConsoleSession, endViewAs, stepUpWithPassword,

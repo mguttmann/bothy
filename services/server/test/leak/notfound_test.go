@@ -52,7 +52,7 @@ func newP4World(t *testing.T) *p4World {
 	maps.Copy(cfg, ExtrasConfig())
 	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: cfg})
 	w := harness.BuildMatrixWorld(t, s)
-	PrepareExtras(t, w)
+	PrepareTerminalSession(t, s.PublicURL, w, PrepareExtras(t, w))
 	return &p4World{w: w, routes: routes, requesters: map[string]*harness.Client{"Alex": w.People["Alex"], "Lotse": w.Agents["Lotse"]}}
 }
 

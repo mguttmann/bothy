@@ -807,7 +807,7 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | `terminal.report_max_entries` | `BOTHY_TERMINAL__REPORT_MAX_ENTRIES` | Server | int | `64` | höchstens so viele Einträge je gemeldeter Liste: Profile, Sitzungsbenutzer, Arbeitsordner eines Sitzungsbenutzers (3.2) | aktiv |
 | `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | duration | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein | aktiv |
 | `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Gültigkeit einer Sitzungs-Marke | aktiv |
-| `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht | geplant (M2) |
+| `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server | duration | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht | aktiv |
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server |  | `15m` | so lange bleibt eine getrennte Sitzung anhängbar | geplant (M2) |
 | `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | duration | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung | aktiv |
 | `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server |  | `30m` | ohne Eingabe des Geräts endet die Sitzung | geplant (M2) |
@@ -815,7 +815,7 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server |  | `12h` | Höchstdauer einer Sitzung | geplant (M2) |
 | `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server |  | `5` | offene Sitzungen je Mensch | geplant (M2) |
 | `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server |  | `10` | offene Sitzungen je Rechner | geplant (M2) |
-| `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server |  | `262144` | Puffer des Relais je Richtung und Sitzung | geplant (M2) |
+| `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | int | `262144` | Puffer des Relais je Richtung und Sitzung | aktiv |
 | `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | duration | `20s` | Abstand der Heartbeats der Steuerverbindung (in `hello` gemeldet) | aktiv |
 | `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | int | `3` | fehlende Heartbeats bis zum Schließen der Steuerverbindung | aktiv |
 | `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | duration | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung | aktiv |

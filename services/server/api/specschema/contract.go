@@ -237,8 +237,9 @@ func (c *Contract) allMessages() map[string]bool {
 	return out
 }
 
-// terminalChannels are the channels of the host service whose frames ValidateChannelFrame checks.
-var terminalChannels = []string{"hostControl", "hostData"}
+// terminalChannels are the terminal channels whose text frames ValidateChannelFrame checks: those of
+// the host service and, since M2-44, the device stream.
+var terminalChannels = []string{"hostControl", "hostData", "terminalStream"}
 
 // readTerminalChannels reads, per terminal channel, the op of every message of its send and
 // receive operations: the message name is the op (asyncapi.yaml components.messages host.*).

@@ -159,6 +159,12 @@ func TestAZP1_HostRoutes(t *testing.T) {
 		"issueHostPairingCode": {"POST /api/v1/hosts/{host_id}/pairing-code", "host.manage", "rl.admin"},
 		"pairHost":             {"POST /api/v1/hosts/pair", "host.pair", "rl.public_auth"},
 		"confirmHost":          {"POST /api/v1/hosts/{host_id}/confirm", "host.manage", "rl.admin"},
+		// The terminal sessions (M2-44, AZ-P1).
+		"openTerminalSession":   {"POST /api/v1/hosts/{host_id}/terminal/sessions", "terminal.open", "rl.terminal"},
+		"listTerminalSessions":  {"GET /api/v1/terminal/sessions", "terminal.read_own", "rl.read"},
+		"getTerminalSession":    {"GET /api/v1/terminal/sessions/{session_id}", "terminal.read_own", "rl.read"},
+		"attachTerminalSession": {"POST /api/v1/terminal/sessions/{session_id}/attach", "terminal.attach", "rl.terminal"},
+		"closeTerminalSession":  {"POST /api/v1/terminal/sessions/{session_id}/close", "terminal.close", "rl.write"},
 	}
 	var hostRoutes int
 	for _, op := range routes.Enabled() {

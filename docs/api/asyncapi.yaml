@@ -290,7 +290,7 @@ channels:
       client_action: text frame after `identify`, invalid JSON or frame over the Noise limit; report the error
     - code: 4004
       name: authentication_failed
-      client_action: renew the token; if that fails, log out
+      client_action: 'renew the token; if that fails, log out (also when `identify` does not arrive within `terminal.open_timeout`)'
     - code: 4008
       name: rate_limited
       client_action: wait for the time given in the close reason
@@ -311,7 +311,7 @@ channels:
       client_action: 'session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a fresh step-up'
     - code: 4102
       name: terminal_host_unavailable
-      client_action: the other side is missing (host offline or no counterpart on this node); the session is `detached`; attach again later
+      client_action: 'the other side is missing (host offline or no counterpart on this node): an opening session ends with `open_failed`, a started one is `detached`; attach again later'
     - code: 4103
       name: terminal_replaced
       client_action: another device attached; do not reconnect on your own
@@ -396,7 +396,7 @@ channels:
   hostData:
     address: /hosts/sessions/{session_id}/stream
     title: Data connection of a host service for one session
-    description: 'Opened by the host service after `session.open`. After `hello` and `identify` (with `session_id`) only binary Noise frames, forwarded unchanged to and from the device stream of the same session.'
+    description: 'Opened by the host service after `session.open`, exactly one data connection per `session.open`. After `hello` and `identify` (with `session_id`) only binary Noise frames, forwarded unchanged to and from the device stream of the same session. The host service refuses a handshake by closing the connection with `4101` (`token_expired`, `token_replayed`) or `4104` (every other detail of 24 section 5.3) and the `close_detail` code as the close reason; the server hands the same code and reason to the device.'
     x-protocol-versions: [1]
     parameters:
       session_id:
@@ -417,7 +417,7 @@ channels:
     x-close-codes:
     - code: 1000
       name: normal
-      client_action: reconnect with backoff
+      client_action: 'no expectation on this node or a paired host side exists: keep the PTY and wait for the next `session.open`'
     - code: 1001
       name: going_away
       client_action: reconnect with backoff
@@ -438,7 +438,7 @@ channels:
       client_action: reconnect at once with a random delay; keep PTYs until `terminal.detach_grace`
     - code: 4014
       name: slow_consumer
-      client_action: relay buffer full; reconnect the data connection
+      client_action: 'relay buffer full: keep the PTY and wait for the next `session.open`'
     - code: 4100
       name: terminal_closed
       client_action: 'data connection only: the session ended; end the PTY'
@@ -2186,7 +2186,7 @@ components:
     host.session.ended:
       name: session.ended
       title: session.ended
-      summary: A session ended on the host (exit, idle, refused handshake).
+      summary: A session ended on the host (exit, idle, refused handshake, refused PTY start, policy).
       payload:
         type: object
         required: [op, d]

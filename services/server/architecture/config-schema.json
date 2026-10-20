@@ -3176,6 +3176,18 @@
       "doc": "Missed heartbeats after which the server closes the control connection with 4009."
     },
     {
+      "name": "terminal.open_timeout",
+      "env": "BOTHY_TERMINAL__OPEN_TIMEOUT",
+      "kind": "duration",
+      "default": "20s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Deadline until both sides are connected in the relay and the opening has started."
+    },
+    {
       "name": "terminal.pairing_code_ttl",
       "env": "BOTHY_TERMINAL__PAIRING_CODE_TTL",
       "kind": "duration",
@@ -3198,6 +3210,18 @@
       "max": "",
       "chapter": "24-terminal.md",
       "doc": "Reattaching from the same device needs no new step-up within this time after the detachment."
+    },
+    {
+      "name": "terminal.relay_buffer_max_bytes",
+      "env": "BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES",
+      "kind": "int",
+      "default": "262144",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Buffer of the relay per direction and session, in bytes of queued messages."
     },
     {
       "name": "terminal.report_label_max_chars",

@@ -99,9 +99,8 @@ def sync_detailed(
      Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with
     `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user
     on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason:
-    no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working
-    directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise
-    handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+    no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake
+    (24, 5 and 6.1). The device then connects to `stream_path`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -138,9 +137,8 @@ def sync(
      Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with
     `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user
     on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason:
-    no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working
-    directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise
-    handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+    no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake
+    (24, 5 and 6.1). The device then connects to `stream_path`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -172,9 +170,8 @@ async def asyncio_detailed(
      Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with
     `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user
     on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason:
-    no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working
-    directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise
-    handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+    no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake
+    (24, 5 and 6.1). The device then connects to `stream_path`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -209,9 +206,8 @@ async def asyncio(
      Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with
     `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user
     on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason:
-    no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working
-    directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise
-    handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+    no_session_user`). Consumes the step-up and returns a one-time session token for the Noise handshake
+    (24, 5 and 6.1). The device then connects to `stream_path`.
 
     Args:
         host_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

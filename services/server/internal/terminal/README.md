@@ -1,6 +1,6 @@
 # Modul `terminal`
 
-Status: Datensätze der Rechner (M2-39), Rechte des Terminals (M2-40), Kopplung (M2-41), control connection of the host services (M2-43). Normativ ist [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); bei Abweichung gilt das Kapitel.
+Status: Datensätze der Rechner (M2-39), Rechte des Terminals (M2-40), Kopplung (M2-41), control connection of the host services (M2-43), terminal sessions, session token and relay (M2-44). Revocation of every kind, idle and maximum duration, session limits and the remaining metrics come with M2-46, several nodes with M2-47. Normativ ist [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
 
@@ -17,7 +17,7 @@ Rechner und Kopplung, Erklärung der LLM-Anmeldung (I6), Sitzungsbenutzer je Per
 
 ## Port (Wurzelpaket `internal/terminal`)
 
-- Eingehend: `Hosts` (M2-39; `SetLlmCredentials` seit M2-40). `Sessions` und `Relay` kommen mit M2-44.
+- Eingehend: `Hosts` (M2-39; `SetLlmCredentials` seit M2-40) and `Sessions` (M2-44: `Open`, `Attach`, `List`, `Get`, `Close`, implemented by `app.Sessions`). The relay is no port for other modules; it lives in `adapters/wsrelay` (02 4.3).
 - Gibt In-Tx-Ereignisse aus: keine.
 - Abonniert In-Tx-Ereignisse: ab M2-46 kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (Sitzungen beenden).
 - Implementiert Quellen-Ports und Querschnitts-Ports: `authz.HostSource` (Zustand, Inhaber, LLM-Erklärung, Server-Host des Rechners), gebunden in `internal/wire` für Authorizer, Rechte-Hook und Freigaben.
@@ -179,3 +179,43 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 ## Kapitel
 
 [02-architektur.md](../../../../docs/spec/02-architektur.md), [24-terminal.md](../../../../docs/spec/24-terminal.md), [07-rechte.md](../../../../docs/spec/07-rechte.md), [ADR 0068](../../../../docs/adr/0068-terminal-ueber-host-dienst-mit-noise-strom-und-invariante-i6.md)
+
+## Built in M2-44
+
+- Port `Sessions` (`sessions.go`) with its DTOs and the redacting `SessionToken` (only `Reveal`
+  hands out the compact JWS, once, in the HTTP adapter).
+- `domain/`: `token.go` (`SessionClaims`, `NewSessionClaims`, `TokenAlg`, `TokenTyp`; the claims of
+  24 5.3, schema test `TestSessionClaims_MatchSpec`), `profile.go` (`ProfileKnown`, D-M2-44-1),
+  `closecodes.go` (the codes of `terminalStream`, `StreamCodeForEnd`, `HostRefusal`), `relay.go`
+  (the pure pairing table `Decide`), `session.go` (`AttachKind`, `RecheckEnd`, the Noise limit and
+  the protocol labels as protocol constants).
+- `app/`: `sessions_open.go`, `sessions_attach.go`, `sessions_read.go`, `sessions_close.go`
+  (the five use cases; open and attach consume the step-up as the first row lock, sign the token
+  inside the unit of work, audit `terminal.open` and `terminal.attach` with `pin_changed` and
+  `foreign_assignee`, recheck after the commit under `authorize.Recheck`, then tell the relay and
+  send `session.open`), `sessions_stream.go` (the decisions of both stream endpoints),
+  `sessions_relay.go` (the callbacks of the relay), `reconcile.go` (the start step), `token.go`
+  (the issuer) and the outgoing ports `TokenSigner`, `StepUps`, `RelayControl`, `Timers` and
+  `Metrics`. The one end path `finish` adds the live counters, writes `closed_by` and
+  `terminal.close` for an end by a person, else `terminal.terminate`.
+- `adapters/wsrelay`: `stream.go` (device stream, Origin check before the upgrade, `hello` with
+  the DPoP nonce, `identify` within `terminal.open_timeout`), `hostdata.go` (data connection on the
+  login function of the control connection), `relay.go` (slots, bounded queues per direction
+  `terminal.relay_buffer_max_bytes`, deadlines, counters, the log tail observer, the stop step),
+  `frames.go` (one binary message is one Noise message of at most 65535 bytes, `FuzzReadFrame`).
+- `adapters/otelmetrics`: `bothy.terminal.relay.unpaired` with `bothy.terminal.side`.
+- Close codes of the device stream: `4002` decoding, text frame or message above the Noise limit;
+  `4004` authentication; `4012` revoked; `4013` shutdown; `4014` slow consumer; `4100` the session
+  ended (reason `close_reason`); `4101` and `4104` the host's refusal; `4102` no counterpart;
+  `4103` another device attached. Data connection: `1000` no expectation or a paired host side,
+  `4100` unknown, foreign or closed session, `4002`, `4013`, `4014`, and the login codes of M2-43.
+- Effects after the commit come from the event log tail: a `terminal_session.changed` with state
+  `closed` closes both sides and sends `session.close` (D-M2-44-7). Start: sessions of the previous
+  process end (`opening`) or detach (`active`); stop: every relay connection closes with `4013`.
+- Actions: `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`,
+  `terminal.close`, `terminal.terminate`. Events: `terminal_session.changed` to the person of the
+  session, with the person as actor for open, attach and close.
+- Tests: `domain` (claims, profile, close codes, the relay table), `app` (rollback, recheck,
+  quick reattach race, redaction, reconcile), `adapters/wsrelay` (`FuzzReadFrame`, shutdown) and
+  `test/integration/terminalsessions` over the full-server harness with the Fake-Host of
+  `test/terminal/fakehost`.
