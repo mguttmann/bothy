@@ -30,7 +30,9 @@ type World struct {
 	Grants map[string]string
 	// Threads maps "Space/Channel" to the thread created there (the forum post for Projekt-A).
 	Threads map[string]string
-	// Messages maps "Space/Channel" to the IDs of the messages of that thread, oldest first.
+	// Messages maps "Space/Channel" to the IDs of the messages the owner wrote in that thread,
+	// oldest first; the live box anchor of the run the first message opened (M2-05) is not among
+	// them.
 	Messages map[string][]string
 }
 
@@ -132,12 +134,17 @@ func BuildMatrixWorld(tb testing.TB, s *Server) *World {
 		postMessage(tb, o, w.Threads[key], "Zweite Nachricht in "+c.name)
 		var msgs struct {
 			Items []struct {
-				ID string `json:"id"`
+				ID   string `json:"id"`
+				Kind string `json:"kind"`
 			} `json:"items"`
 		}
 		MustDo(tb, o, Request{Method: http.MethodGet, Path: "/threads/" + w.Threads[key] + "/messages"}, http.StatusOK).JSON(tb, &msgs)
 		for _, m := range msgs.Items {
-			w.Messages[key] = append(w.Messages[key], m.ID)
+			// The first message of a thread with an operator opens a run (M2-05), whose live box
+			// anchor (kind run) is a message of the agent, not one of the world's messages.
+			if m.Kind != "run" {
+				w.Messages[key] = append(w.Messages[key], m.ID)
+			}
 		}
 	}
 	return w

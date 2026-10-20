@@ -74,11 +74,13 @@ func (s *Service) readRun(ctx context.Context, a actor.Actor, id ids.ID) (RunRow
 	if err != nil {
 		return RunRow{}, err
 	}
+	// The answer of the principal comes first, so a pending device or person gets the same answer
+	// for an unknown and an existing run (07 4.2, AZ-P4).
+	if d.Outcome != authorize.OutcomeAllow && d.Outcome != authorize.OutcomeNotFound {
+		return RunRow{}, d.Err()
+	}
 	if !found || d.Outcome == authorize.OutcomeNotFound {
 		return RunRow{}, invisible()
-	}
-	if err := d.Err(); err != nil {
-		return RunRow{}, err
 	}
 	return row, nil
 }
