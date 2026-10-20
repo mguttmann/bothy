@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Notification levels per space, channel or thread (M3-18): notification_preferences as
--- docs/spec/03-datenmodell.md section 4.10 states it, without deviation. Only the module notify
+-- docs/spec/03-data-model.md section 4.10 states it, without deviation. Only the module notify
 -- writes it; every query names the person (user_id) or the explicit list of people. The target
 -- is polymorphic and has no foreign key (R-DM-16): the application removes the rows when a space
 -- or channel is archived. Retention class: personal_sync.

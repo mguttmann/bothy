@@ -18,7 +18,7 @@ import (
 )
 
 // TestMigrationNotifyTables holds notification_preferences and quiet_hours against
-// docs/spec/03-datenmodell.md section 4.10 column by column, with every key, check and index
+// docs/spec/03-data-model.md section 4.10 column by column, with every key, check and index
 // (M3-18): no foreign key on target_id (R-DM-16), both tables cascade from users, a second up
 // changes nothing and deleting a person removes the person's rows.
 func TestMigrationNotifyTables(t *testing.T) {

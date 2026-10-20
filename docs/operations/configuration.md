@@ -558,7 +558,7 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 | `push.apns.time_sensitive_enabled` | `BOTHY_PUSH__APNS__TIME_SENSITIVE_ENABLED` | Server |  | `false` | `time-sensitive` for `input_needed` | planned (M3) |
 | `push.fcm.project_id` | `BOTHY_PUSH__FCM__PROJECT_ID` | Server |  | empty | Firebase project | planned (M3) |
 | `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server |  | empty | reference to the service account key | planned (M3) |
-| `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server |  | `mentions` | level without any setting | planned (M3) |
+| `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server | enum(all, mentions, mute) | `mentions` | level without any setting | active |
 | `notify.default_preview_mode` | `BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE` | Server |  | `full` | default for `notify.preview_mode` | planned (M3) |
 | `notify.default_input_needed_breaks_quiet_hours` | `BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS` | Server |  | `false` | default for the switch of the same name | planned (M3) |
 | `notify.default_admin_enabled` | `BOTHY_NOTIFY__DEFAULT_ADMIN_ENABLED` | Server |  | `true` | default for `notify.admin_enabled` | planned (M3) |

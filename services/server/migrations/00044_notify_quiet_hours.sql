@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Quiet hours (M3-18): quiet_hours as docs/spec/03-datenmodell.md section 4.10 states it, without
+-- Quiet hours (M3-18): quiet_hours as docs/spec/03-data-model.md section 4.10 states it, without
 -- deviation. Only the module notify writes it; every query names the person (user_id) or the
 -- explicit list of people. Retention class: personal_sync (the rules reveal working hours).
 
