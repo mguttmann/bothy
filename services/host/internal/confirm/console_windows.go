@@ -5,7 +5,6 @@ package confirm
 import (
 	"context"
 	"fmt"
-	"math"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -63,17 +62,11 @@ func sessionString(id uint32, class uintptr) (string, error) {
 	return windows.UTF16PtrToString(buf), nil
 }
 
-// consoleSession reports whether the process pid runs in the active console session; a
-// disconnected or remote session of the same person does not count, because only the person at
-// the screen can answer (Design note 15 a).
-func consoleSession(_ context.Context, pid int) (bool, error) {
-	if pid <= 0 || uint64(pid) > math.MaxUint32 {
-		return false, errNoConsole
-	}
-	var sid uint32
-	if err := windows.ProcessIdToSessionId(uint32(pid), &sid); err != nil {
-		return false, err
-	}
+// consoleSession reports whether peer p runs in the active console session; a disconnected or
+// remote session of the same person does not count, because only the person at the screen can
+// answer (Design note 15 a). The session comes from the token of the pipe client (PeerOf), never
+// from opening the process of the agent, which the service account may not do.
+func consoleSession(_ context.Context, p Peer) (bool, error) {
 	active := windows.WTSGetActiveConsoleSessionId()
-	return active != noConsoleSession && sid == active, nil
+	return active != noConsoleSession && p.Session == active, nil
 }

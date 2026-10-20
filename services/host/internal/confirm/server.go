@@ -19,6 +19,9 @@ type Peer struct {
 	UID string
 	// PID is the process ID of the agent.
 	PID int
+	// Session is the session ID of the token of the agent (Windows, read from the pipe client;
+	// zero on Linux and macOS, which have no such check).
+	Session uint32
 }
 
 // Rule decides which peers may answer (brief M2-45 Design note 15 a): not the service user, not
@@ -35,10 +38,10 @@ type Rule struct {
 	// ConsoleOwner returns the uid or SID of the owner of the active console session
 	// (production: ConsoleOwner).
 	ConsoleOwner func(ctx context.Context) (string, error)
-	// ConsoleSession reports whether the process pid runs in the active console session. Nil
+	// ConsoleSession reports whether peer p runs in the active console session. Nil
 	// skips the check (Linux and macOS, where the console owner decides); on Windows DefaultRule
 	// sets it, because the person at the machine may also have a disconnected remote session.
-	ConsoleSession func(ctx context.Context, pid int) (bool, error)
+	ConsoleSession func(ctx context.Context, p Peer) (bool, error)
 }
 
 // DefaultRule returns the Rule of this platform with the production lookups ConsoleOwner and,
@@ -65,7 +68,7 @@ func (r Rule) Allow(ctx context.Context, p Peer) bool {
 		return false
 	}
 	if r.ConsoleSession != nil {
-		in, err := r.ConsoleSession(ctx, p.PID)
+		in, err := r.ConsoleSession(ctx, p)
 		if err != nil || !in {
 			return false
 		}
@@ -91,8 +94,8 @@ type ServerOptions struct {
 }
 
 // Server is the service side: it accepts agents on the listener, checks every peer with the rule
-// (refused: close without sending and log the code confirm_peer_refused), and asks the accepted
-// agents.
+// at accept and again before every request (refused: close without sending and log the code
+// confirm_peer_refused), and asks the accepted agents.
 type Server struct {
 	o   ServerOptions
 	log *slog.Logger
@@ -107,6 +110,8 @@ type Server struct {
 
 // agentConn is one accepted agent.
 type agentConn struct {
+	// peer is the user of the agent, checked again by Ask at every request.
+	peer Peer
 	c    net.Conn
 	out  chan []byte
 	done chan struct{}
@@ -175,7 +180,7 @@ func (s *Server) admit(ctx context.Context, c net.Conn) {
 		s.refuse(ctx, c)
 		return
 	}
-	a := &agentConn{c: c, out: make(chan []byte, agentQueue), done: make(chan struct{})}
+	a := &agentConn{peer: p, c: c, out: make(chan []byte, agentQueue), done: make(chan struct{})}
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -305,16 +310,15 @@ func (s *Server) Ask(ctx context.Context, r Request, timeout time.Duration) bool
 	id := newID()
 	line := encodeLine(confirmMsg{Op: opConfirm, ID: id, Kind: r.Kind, Profile: r.Profile, SessionUser: r.SessionUser,
 		TimeoutMS: max(1, timeout.Milliseconds())})
-	p := &pending{asked: map[*agentConn]struct{}{}, result: make(chan bool, 1)}
-	s.mu.Lock()
-	for a := range s.agents {
-		p.asked[a] = struct{}{}
-	}
-	asked := keys(p.asked)
+	asked := s.allowed(ctx)
 	if len(asked) == 0 {
-		s.mu.Unlock()
 		return false
 	}
+	p := &pending{asked: map[*agentConn]struct{}{}, result: make(chan bool, 1)}
+	for _, a := range asked {
+		p.asked[a] = struct{}{}
+	}
+	s.mu.Lock()
 	s.pending[id] = p
 	s.mu.Unlock()
 	for _, a := range asked {
@@ -339,6 +343,25 @@ func (s *Server) Ask(ctx context.Context, r Request, timeout time.Duration) bool
 	s.mu.Unlock()
 	cancelAll(rest, id)
 	return false
+}
+
+// allowed returns the connected agents whose peer the rule still accepts, and closes the others:
+// the console owner can change and a user can become a session user while an agent stays
+// connected, so the check at accept alone would let a stale agent answer.
+func (s *Server) allowed(ctx context.Context) []*agentConn {
+	s.mu.Lock()
+	agents := keys(s.agents)
+	s.mu.Unlock()
+	out := make([]*agentConn, 0, len(agents))
+	for _, a := range agents {
+		if s.o.Rule.Allow(ctx, a.peer) {
+			out = append(out, a)
+			continue
+		}
+		s.log.WarnContext(ctx, "confirm_peer_refused")
+		a.close()
+	}
+	return out
 }
 
 func keys(m map[*agentConn]struct{}) []*agentConn {

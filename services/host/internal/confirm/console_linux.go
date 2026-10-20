@@ -24,4 +24,4 @@ func ConsoleOwner(ctx context.Context) (string, error) {
 }
 
 // consoleSession is nil on Linux: the owner of the active seat0 session decides.
-var consoleSession func(context.Context, int) (bool, error)
+var consoleSession func(context.Context, Peer) (bool, error)

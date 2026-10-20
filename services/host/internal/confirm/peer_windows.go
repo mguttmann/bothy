@@ -109,8 +109,26 @@ func (l *pipeListener) Accept() (net.Conn, error) {
 	return &pipeConn{f: os.NewFile(uintptr(h), l.path), h: h}, nil
 }
 
-// connect waits until a client connects to h or the listener closes.
+// connect waits until a client connects to h or the listener closes. A client that connected and
+// left before the wait (ERROR_NO_DATA, or a failed wait result) is dropped with
+// DisconnectNamedPipe and the instance waits again, so a client that comes and goes can never end
+// the listener.
 func (l *pipeListener) connect(h windows.Handle) error {
+	for {
+		err := l.connectOnce(h)
+		if !errors.Is(err, errClientGone) {
+			return err
+		}
+		if err := windows.DisconnectNamedPipe(h); err != nil {
+			return fmt.Errorf("confirm: connect pipe: %w", err)
+		}
+	}
+}
+
+// errClientGone marks a client that left before the connection was complete.
+var errClientGone = errors.New("confirm: pipe client gone")
+
+func (l *pipeListener) connectOnce(h windows.Handle) error {
 	ev, err := windows.CreateEvent(nil, 1, 0, nil)
 	if err != nil {
 		return fmt.Errorf("confirm: connect pipe: %w", err)
@@ -121,6 +139,8 @@ func (l *pipeListener) connect(h windows.Handle) error {
 	switch {
 	case err == nil, errors.Is(err, windows.ERROR_PIPE_CONNECTED):
 		return nil
+	case errors.Is(err, windows.ERROR_NO_DATA):
+		return errClientGone
 	case !errors.Is(err, windows.ERROR_IO_PENDING):
 		return fmt.Errorf("confirm: connect pipe: %w", err)
 	}
@@ -133,7 +153,7 @@ func (l *pipeListener) connect(h windows.Handle) error {
 	}
 	var n uint32
 	if err := windows.GetOverlappedResult(h, &ov, &n, false); err != nil && !errors.Is(err, windows.ERROR_PIPE_CONNECTED) {
-		return fmt.Errorf("confirm: connect pipe: %w", err)
+		return errClientGone
 	}
 	return nil
 }
@@ -201,8 +221,9 @@ func dialEndpoint(ctx context.Context, endpoint string) (net.Conn, error) {
 
 var procImpersonateNamedPipeClient = windows.NewLazySystemDLL("advapi32.dll").NewProc("ImpersonateNamedPipeClient")
 
-// PeerOf returns the user SID of the client of the pipe connection c, read from its token by
-// impersonating it at identification level, and its process ID (GetNamedPipeClientProcessId).
+// PeerOf returns the user SID and the session ID of the client of the pipe connection c, read from
+// its token by impersonating it at identification level, and its process ID
+// (GetNamedPipeClientProcessId).
 func PeerOf(c net.Conn) (Peer, error) {
 	pc, ok := c.(*pipeConn)
 	if !ok || pc == nil {
@@ -212,30 +233,35 @@ func PeerOf(c net.Conn) (Peer, error) {
 	if err := windows.GetNamedPipeClientProcessId(pc.h, &pid); err != nil {
 		return Peer{}, fmt.Errorf("confirm: peer: %w", err)
 	}
-	sid, err := clientSID(pc.h)
+	sid, session, err := clientIdentity(pc.h)
 	if err != nil {
 		return Peer{}, err
 	}
-	return Peer{UID: sid, PID: int(pid)}, nil
+	return Peer{UID: sid, PID: int(pid), Session: session}, nil
 }
 
-// clientSID reads the user SID of the client of pipe h on a locked thread; the process of the
-// client need not be openable. Adapted from clientToken of internal/localchan/pipe_windows.go.
-func clientSID(h windows.Handle) (string, error) {
+// clientIdentity reads the user SID and the session ID of the client of pipe h from its token on
+// a locked thread; the process of the client need not be openable. Adapted from clientToken of
+// internal/localchan/pipe_windows.go.
+func clientIdentity(h windows.Handle) (string, uint32, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	if r, _, err := procImpersonateNamedPipeClient.Call(uintptr(h)); r == 0 {
-		return "", fmt.Errorf("confirm: impersonate: %w", err)
+		return "", 0, fmt.Errorf("confirm: impersonate: %w", err)
 	}
 	defer func() { _ = windows.RevertToSelf() }()
 	var tok windows.Token
 	if err := windows.OpenThreadToken(windows.CurrentThread(), windows.TOKEN_QUERY, true, &tok); err != nil {
-		return "", fmt.Errorf("confirm: client token: %w", err)
+		return "", 0, fmt.Errorf("confirm: client token: %w", err)
 	}
 	defer func() { _ = tok.Close() }()
 	u, err := tok.GetTokenUser()
 	if err != nil {
-		return "", fmt.Errorf("confirm: client token: %w", err)
+		return "", 0, fmt.Errorf("confirm: client token: %w", err)
 	}
-	return u.User.Sid.String(), nil
+	var session, n uint32
+	if err := windows.GetTokenInformation(tok, windows.TokenSessionId, (*byte)(unsafe.Pointer(&session)), 4, &n); err != nil { //nolint:gosec // TokenSessionId is a DWORD
+		return "", 0, fmt.Errorf("confirm: client session: %w", err)
+	}
+	return u.User.Sid.String(), session, nil
 }

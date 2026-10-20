@@ -27,4 +27,4 @@ func ConsoleOwner(context.Context) (string, error) {
 }
 
 // consoleSession is nil on macOS: the owner of /dev/console decides.
-var consoleSession func(context.Context, int) (bool, error)
+var consoleSession func(context.Context, Peer) (bool, error)

@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -147,19 +148,19 @@ func TestConfirmPeerRefused(t *testing.T) {
 			{"no exclusion list", Rule{ServiceUID: uidService, ConsoleOwner: testRule().ConsoleOwner}, robin, false},
 			{"other console session", func() Rule {
 				r := testRule()
-				r.ConsoleSession = func(context.Context, int) (bool, error) { return false, nil }
+				r.ConsoleSession = func(context.Context, Peer) (bool, error) { return false, nil }
 				return r
 			}(), robin, false},
 			{"console session lookup fails", func() Rule {
 				r := testRule()
-				r.ConsoleSession = func(context.Context, int) (bool, error) { return true, errors.New("no session") }
+				r.ConsoleSession = func(context.Context, Peer) (bool, error) { return true, errors.New("no session") }
 				return r
 			}(), robin, false},
 			{"in the console session", func() Rule {
 				r := testRule()
-				r.ConsoleSession = func(_ context.Context, pid int) (bool, error) { return pid == robin.PID, nil }
+				r.ConsoleSession = func(_ context.Context, p Peer) (bool, error) { return p.Session == 3, nil }
 				return r
-			}(), robin, true},
+			}(), Peer{UID: uidRobin, PID: 4242, Session: 3}, true},
 		}
 		for _, c := range cases {
 			if got := c.rule.Allow(ctx, c.peer); got != c.want {
@@ -191,6 +192,30 @@ func TestConfirmPeerRefused(t *testing.T) {
 		if h.s.Ask(ctx, reqOpen, time.Second) {
 			t.Fatal("Ask = true with only refused peers")
 		}
+	})
+
+	t.Run("rule checked again at each request", func(t *testing.T) {
+		var mu sync.Mutex
+		owner := uidRobin
+		rule := testRule()
+		rule.ConsoleOwner = func(context.Context) (string, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			return owner, nil
+		}
+		h := newHarness(t, rule)
+		d := &fixedDialog{allow: true}
+		h.agent(robin, d.dialog, 1)
+		mu.Lock()
+		owner = uidOther // Robin left the console; the agent stays connected
+		mu.Unlock()
+		if h.s.Ask(ctx, reqOpen, time.Second) {
+			t.Fatal("Ask = true from an agent whose user no longer owns the console")
+		}
+		if len(d.requests()) != 0 {
+			t.Fatal("the request reached an agent that the rule refuses now")
+		}
+		h.waitAgents(0)
 	})
 }
 
