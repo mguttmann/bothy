@@ -136,9 +136,15 @@ class TestApp {
   /// The address the app remembers.
   Uri get address => fake.server.baseUri;
 
-  /// Removes the app and stops the fake.
+  /// Removes the app, waits until its services are closed and stops the fake.
+  ///
+  /// Removing the app begins the close of its services without waiting (as when it quits);
+  /// the data folder can only go once the database is closed, so this waits for that one
+  /// close before the fake stops and the folder is deleted.
   Future<void> stop() async {
+    final services = state.services;
     await tester.pumpWidget(const SizedBox());
+    await services?.close();
     await fake.stop();
     tester.view.reset();
   }
@@ -167,9 +173,11 @@ class SecondApp {
     );
   }
 
-  /// Releases the providers and deletes the data folder.
+  /// Releases the providers, waits until its services are closed and deletes the data folder.
   Future<void> stop() async {
+    final services = state.services;
     container.dispose();
+    await services?.close();
     await instance.stopSibling();
   }
 }
