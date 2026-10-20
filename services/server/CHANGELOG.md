@@ -45,8 +45,8 @@ documented in this file. The format is based on
   branding file with the requirement `Public`, which anonymous callers reach only through
   `getBrandingLogo` of M3-10 because `downloadFile` is not public, a `gdpr_export` for nobody), and a principal without a login
   session gets `403 forbidden` `step_up_not_possible` on `createFileTicket`. New port method
-  `identity.Auth.SessionActor` builds the actor of a ticket per fetch. The table `file_thumbnails` of M3-06
-  (migration `00051`) holds the variants. The keys `file.ticket_ttl`, `file.ticket_key_ref`,
+  `identity.Auth.SessionActor` builds the actor of a ticket per fetch. The table
+  `file_thumbnails` of M3-06 (migration `00051`) holds the variants. The keys `file.ticket_ttl`, `file.ticket_key_ref`,
   `file.not_ready_retry_after` (new) and `client.cache_max_age` are now active; the roles `api` and
   `all` do not start without a readable ticket key of at least the length of `file_ticket_key`.
 - Scan pass with clamd (M3-04): every completed upload runs through the job `files.scan` (queue
@@ -92,6 +92,15 @@ documented in this file. The format is based on
 - `bothy migrate up` refuses to apply pending migrations to an existing schema without a
   successful `pg_full`, `pg_diff` or `logical` run younger than `migrate.recent_backup_max_age`,
   as long as `migrate.require_recent_backup` holds; an empty database is exempt (M7-02, R-OP-13).
+- Server values in `hello` of the host service (M2-45): `HostChannelHello` carries the required
+  members `clock_leeway_ms`, `idle_timeout_ms` and `detach_grace_ms` from `auth.clock_leeway`,
+  `terminal.idle_timeout` and `terminal.detach_grace` on the control and every data connection;
+  the host service applies those of a data connection to its session (token leeway, `jti` memory,
+  idle and detach timers). The configuration keys `terminal.idle_timeout` and
+  `terminal.detach_grace` are now read by the server. The `hostData` close code `4013` now tells
+  the host service to keep the PTY detached until `terminal.detach_grace` and wait for the next
+  `session.open`.
+
 - Upload sessions, parts and completion (M3-03): `createUpload`, `uploadPart`, `getUpload`,
   `completeUpload`, `abortUpload` and `getFile` in mode `direct`. The tables `files`,
   `file_upload_sessions` and `file_upload_parts` (with `files.search_vector`) and the validated

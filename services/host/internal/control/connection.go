@@ -249,6 +249,10 @@ func (k *conn) handle(ctx context.Context, f frameOrEnd, ready *bool) (outcome, 
 			}
 		}
 		c.deliver(ctx, startup.Ready{LLMCredentials: b.LLMCredentials}, k)
+		// Ends the session manager could not report on an earlier connection go out now (24 6.2).
+		if r, ok := c.sessions.(Resender); ok {
+			r.Resend(ctx, k)
+		}
 	case *HeartbeatAck:
 		if b.JWKS != nil {
 			c.keys.Set(*b.JWKS)

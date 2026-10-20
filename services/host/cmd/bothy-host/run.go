@@ -15,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/buildinfo"
 	"github.com/OWNER/bothy/services/host/internal/config"
 	"github.com/OWNER/bothy/services/host/internal/control"
+	"github.com/OWNER/bothy/services/host/internal/profiles"
 	"github.com/OWNER/bothy/services/host/internal/startup"
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
@@ -47,10 +48,10 @@ func cmdRun(ctx context.Context, args []string, _, stderr io.Writer) int {
 }
 
 // controlFor returns the control connection of a paired host (M2-43): the client of
-// internal/control over the pairing record and the login key, with RefuseSessions until M2-45
-// binds its session manager. An unpaired host, or one whose state cannot be read, gets
+// internal/control over the pairing record and the login key, with the session manager of M2-45
+// (sessions). An unpaired host, or one whose state cannot be read, gets
 // startup.NoControl, so the stored declaration decides (24 2.2). It never logs a key.
-func controlFor(c *config.Config, st *state.Dir, log *slog.Logger) startup.Control {
+func controlFor(c *config.Config, st *state.Dir, log *slog.Logger, sessions control.Sessions) startup.Control {
 	p, err := st.ReadPairing()
 	if err != nil {
 		return startup.NoControl{}
@@ -67,7 +68,7 @@ func controlFor(c *config.Config, st *state.Dir, log *slog.Logger) startup.Contr
 	}
 	cl, err := control.New(control.Config{ServerURL: p.ServerURL, HostID: p.HostID, AuthKey: keys.AuthPrivate, HostVersion: buildinfo.Version,
 		BackoffBase: c.ReconnectBackoffBase, BackoffCap: c.ReconnectBackoffCap, Log: log, Proxy: http.ProxyFromEnvironment, RootCAs: roots},
-		control.RefuseSessions{})
+		sessions)
 	if err != nil {
 		log.Warn("control connection unavailable")
 		return startup.NoControl{}
@@ -115,10 +116,37 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 		return exitFailed
 	}
 	defer func() { _ = admin.Close() }()
-	d := startup.Deps{Config: c, State: st, Doctor: sys.doctorEnv(c, st), Control: controlFor(c, st, log), Log: log, Admin: admin,
-		AdminUID: adminUID(), OSVersion: sys.osVersion(), Platform: buildinfo.Platform(), HostVersion: buildinfo.Version}
+	denv := sys.doctorEnv(c, st)
+	d := startup.Deps{Config: c, State: st, Doctor: denv, Log: log, Admin: admin, AdminUID: adminUID(), OSVersion: sys.osVersion(),
+		Platform: buildinfo.Platform(), HostVersion: buildinfo.Version, Offered: profiles.Offered}
 	if once {
+		d.Control = startup.NoControl{}
 		return startup.DoctorOnce(ctx, d)
 	}
-	return startup.Run(ctx, d)
+	// The session manager of M2-45 for a paired host; without keys or pairing every session.open
+	// is refused (RefuseSessions).
+	var sessions control.Sessions = control.RefuseSessions{}
+	w, err := newSessions(c, st, log, denv)
+	if err == nil {
+		sessions = w.mgr
+	} else if !errors.Is(err, state.ErrNotPaired) {
+		log.WarnContext(ctx, "terminal sessions unavailable")
+	}
+	d.Control = controlFor(c, st, log, sessions)
+	cl, ok := d.Control.(*control.Client)
+	switch {
+	case w != nil && !ok:
+		w = nil // no control connection: no session.open can arrive
+	case w != nil:
+		w.bind(cl)
+	}
+	svc, code := startup.Start(ctx, d)
+	if svc == nil {
+		return code
+	}
+	if w != nil {
+		w.start(ctx, svc)
+		defer w.mgr.Shutdown()
+	}
+	return svc.Serve(ctx)
 }

@@ -7,11 +7,11 @@ write /etc/bothy-host/config.yaml 0644 root (134 bytes)
 run /usr/sbin/useradd --create-home --user-group --shell /bin/bash bothy-s-alex
 chmod ~bothy-s-alex 0700 bothy-s-alex
 write /etc/systemd/system/bothy-host-helper-bothy-s-alex.socket 0644 root (420 bytes)
-write /etc/systemd/system/bothy-host-helper-bothy-s-alex.service 0644 root (418 bytes)
+write /etc/systemd/system/bothy-host-helper-bothy-s-alex.service 0644 root (714 bytes)
 chmod ~bothy-s-sam 0700 bothy-s-sam
 write /etc/systemd/system/bothy-host-helper-bothy-s-sam.socket 0644 root (417 bytes)
-write /etc/systemd/system/bothy-host-helper-bothy-s-sam.service 0644 root (413 bytes)
-write /etc/systemd/system/bothy-host.service 0644 root (707 bytes)
+write /etc/systemd/system/bothy-host-helper-bothy-s-sam.service 0644 root (709 bytes)
+write /etc/systemd/system/bothy-host.service 0644 root (1002 bytes)
 run /usr/bin/systemctl daemon-reload
 run /usr/bin/systemctl enable --now bothy-host-helper-bothy-s-alex.socket
 run /usr/bin/systemctl enable --now bothy-host-helper-bothy-s-sam.socket

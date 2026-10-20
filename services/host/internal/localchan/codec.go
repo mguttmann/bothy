@@ -15,8 +15,10 @@
 // its check.
 //
 // Codec: a 4-byte big-endian length, one kind byte and the body. Kind 0x00 is a JSON control
-// message {"op", "id", "d"}; kind 0x01 is reserved for the session frames of M2-45 and refused
-// here; any other kind closes the channel. The length counts kind and body and is at most
+// message {"op", "id", "d"}; kind 0x01 carries the frames of a session (M2-45):
+// the 16-byte session ID followed by the bytes of one data frame, read with ReadPacket on a session
+// channel; ReadMessage, which serves the request channels, still refuses it. Any other kind closes
+// the channel. The length counts kind and body and is at most
 // frame.MaxLen plus the kind byte (a protocol constant).
 package localchan
 

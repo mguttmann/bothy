@@ -80,8 +80,13 @@ type HelperResult struct {
 	ReadsState bool     `json:"reads_state"`
 	// Listable are the names of the accounts of ForeignHomes whose home the helper could list.
 	Listable []string `json:"listable"`
-	// PlaceCode is the HD11 code of the places of the session user, empty when they pass.
+	// PlaceCode is the HD11 code of the home and the CLAUDE_CONFIG_DIR of organization of the
+	// session user, empty when they pass.
 	PlaceCode string `json:"place_code"`
+	// WorkdirCodes holds the HD11 code of each working directory of the request, empty when it
+	// passes; the service counts only the directories HD7 keeps (M2-45: a folder HD7 drops,
+	// because two session users list it, is no place of either).
+	WorkdirCodes []string `json:"workdir_codes"`
 	// WorkdirIDs holds the identity of each working directory of the request, empty when the
 	// helper cannot resolve it.
 	WorkdirIDs []string `json:"workdir_ids"`
@@ -123,7 +128,7 @@ func RunHelper(ctx context.Context, env HelperEnv, req Request) HelperResult {
 		}
 	}
 	others := subjects(env.Users, req.Others)
-	res.PlaceCode = checkPlaces(env, req, others)
+	res.PlaceCode, res.WorkdirCodes = checkPlaces(env, req, others)
 	for _, w := range req.Workdirs {
 		id, err := env.Resolver.Identity(w)
 		if err != nil {
@@ -239,23 +244,37 @@ func authStatus(ctx context.Context, env HelperEnv, req Request, configDir strin
 	return *v.AuthMethod == "claude.ai" || *v.AuthMethod == "oauth_token", false
 }
 
-// checkPlaces checks the places of the session user (HD11): home, the CLAUDE_CONFIG_DIR of
-// organization and the working directories.
-func checkPlaces(env HelperEnv, req Request, others []hostos.Subject) string {
+// checkPlaces checks the places of the session user (HD11): home and the CLAUDE_CONFIG_DIR of
+// organization (the first result), and each working directory on its own (the second), so the
+// service can leave out a directory that HD7 drops.
+func checkPlaces(env HelperEnv, req Request, others []hostos.Subject) (string, []string) {
+	codes := make([]string, len(req.Workdirs))
 	if _, err := env.Resolver.Resolve(env.Self.Home); err != nil {
-		return CodeHomeUnresolvable
+		return CodeHomeUnresolvable, codes
 	}
-	places := append([]string{env.Self.Home, env.orgConfigDir()}, req.Workdirs...)
-	for _, p := range places {
-		r, err := env.Resolver.Resolve(p)
-		if err != nil {
-			continue // a missing folder is not offered (HD7); the home was checked above
-		}
-		if !placeOfSessionUserOK(env, r, others) {
-			return CodeSharedLocation
+	code := ""
+	for _, p := range []string{env.Self.Home, env.orgConfigDir()} {
+		if !placeOK(env, p, others) {
+			code = CodeSharedLocation
+			break
 		}
 	}
-	return ""
+	for i, w := range req.Workdirs {
+		if !placeOK(env, w, others) {
+			codes[i] = CodeSharedLocation
+		}
+	}
+	return code, codes
+}
+
+// placeOK applies the rule of a place of a session user to p; a missing folder passes (it is not
+// offered, HD7).
+func placeOK(env HelperEnv, p string, others []hostos.Subject) bool {
+	r, err := env.Resolver.Resolve(p)
+	if err != nil {
+		return true
+	}
+	return placeOfSessionUserOK(env, r, others)
 }
 
 // placeOfSessionUserOK applies the rule of a place of a session user (24 2.2 point 6): the

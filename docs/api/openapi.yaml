@@ -29606,8 +29606,8 @@ components:
           $ref: '#/components/schemas/Uuid'
     HostChannelHello:
       type: object
-      description: First text frame on the control and data connections of a host service.
-      required: [protocol_versions, challenge, server_time, heartbeat_interval_ms, heartbeat_miss_limit, jwks]
+      description: First text frame on the control and data connections of a host service. It carries server values the host service applies; the values of the `hello` of a data connection apply to the session of that connection (24, 5.3, 6.2 and 6.3).
+      required: [protocol_versions, challenge, server_time, heartbeat_interval_ms, heartbeat_miss_limit, clock_leeway_ms, idle_timeout_ms, detach_grace_ms, jwks]
       properties:
         protocol_versions:
           type: array
@@ -29626,6 +29626,21 @@ components:
         heartbeat_miss_limit:
           type: integer
           minimum: 1
+        clock_leeway_ms:
+          type: integer
+          format: int64
+          minimum: 0
+          description: '`auth.clock_leeway` in milliseconds. The host service applies it to the session of this data connection: the tolerance on `exp` of the session token and how long it remembers the `jti` after `exp` (24, 5.3).'
+        idle_timeout_ms:
+          type: integer
+          format: int64
+          minimum: 1
+          description: '`terminal.idle_timeout` in milliseconds. The host service applies it to the idle timer of the session of this data connection (24, 6.3).'
+        detach_grace_ms:
+          type: integer
+          format: int64
+          minimum: 1
+          description: '`terminal.detach_grace` in milliseconds. The host service applies it to the detach timer of the session of this data connection (24, 6.2).'
         jwks:
           $ref: '#/components/schemas/Jwks'
           description: Public keys with purpose `terminal` for checking session tokens.

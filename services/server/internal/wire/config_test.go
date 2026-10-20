@@ -164,6 +164,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"terminal.host_duplicate_probe_timeout":  {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "24-terminal.md"},
 		"terminal.open_timeout":                  {Kind: config.KindDuration, Default: "20s", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.relay_buffer_max_bytes":        {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "24-terminal.md"},
+		"terminal.idle_timeout":                  {Kind: config.KindDuration, Default: "30m", Min: "1s", Chapter: "24-terminal.md"},
+		"terminal.detach_grace":                  {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "24-terminal.md"},
 		"audit.reason_max_chars":                 {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "19-sicherheit.md"},
 		"egress.allowed_hosts":                   {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
 		"egress.timeout":                         {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},

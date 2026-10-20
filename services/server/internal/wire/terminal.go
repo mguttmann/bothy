@@ -196,10 +196,14 @@ func HostConnectRouteBinding() authorize.RouteBinding {
 	return authorize.RouteBinding{OperationID: op.ID, Method: op.Method, Pattern: op.Pattern, Action: op.Action, RateLimitClass: op.RateLimitClass}
 }
 
-// HostControlConfig binds the keys of the control connection (M2-43).
+// HostControlConfig binds the keys of the control connection (M2-43) and the server values of
+// hello the host service applies (M2-45 Design note 2a).
 type HostControlConfig struct {
 	HeartbeatInterval     time.Duration `config:"terminal.host_heartbeat_interval"`
 	HeartbeatMissLimit    int           `config:"terminal.host_heartbeat_miss_limit"`
+	ClockLeeway           time.Duration `config:"auth.clock_leeway"`
+	IdleTimeout           time.Duration `config:"terminal.idle_timeout"`
+	DetachGrace           time.Duration `config:"terminal.detach_grace"`
 	AuthTimeout           time.Duration `config:"terminal.host_auth_timeout"`
 	DuplicateProbeTimeout time.Duration `config:"terminal.host_duplicate_probe_timeout"`
 	MaxFrameBytes         int           `config:"sync.ws_max_frame_bytes"`
@@ -245,6 +249,7 @@ func NewHostControl(cfg HostControlConfig, t *Terminal, publisher eventlog.Ephem
 	links := wsrelay.NewLinks(publisher, log)
 	h, err := wsrelay.NewHandler(wsrelay.Config{
 		HeartbeatInterval: cfg.HeartbeatInterval, HeartbeatMissLimit: cfg.HeartbeatMissLimit, AuthTimeout: cfg.AuthTimeout,
+		ClockLeeway: cfg.ClockLeeway, IdleTimeout: cfg.IdleTimeout, DetachGrace: cfg.DetachGrace,
 		DuplicateProbeTimeout: cfg.DuplicateProbeTimeout, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,
 		OutboundQueueMax: cfg.OutboundQueueMax, WriteTimeout: cfg.WriteTimeout,
 	}, wsrelay.Deps{UseCases: t.Service, Links: links, Schemas: schemas, Clock: clk, Log: log})

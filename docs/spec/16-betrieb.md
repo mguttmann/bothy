@@ -310,6 +310,14 @@ rows `D-M2-42-<n>` of [DECISIONS.md](../DECISIONS.md) give the reasons):
    `bothy-host-helper-<name>.socket` and `.service`), launchd (macOS: `bothy-host` and
    `bothy-host.helper.<name>` in `/Library/LaunchDaemons`), Windows services (`bothy-host` and
    `bothy-host-helper-<name>`). A crash is restarted; a refused start (exit code `78`) is not.
+   M2-45 (D-M2-45-13, D-M2-45-15): the systemd unit of each PTY helper has `Delegate=yes`, so the
+   helper creates one cgroup per session in its own subtree ([24-terminal.md](24-terminal.md),
+   section 6.5). The folder of the local confirmation endpoint (24, 6.4) belongs to the service
+   user: on Linux `/run/bothy-host-confirm` from `RuntimeDirectory=bothy-host-confirm` of
+   `bothy-host.service` (mode `0755`), on macOS `/Library/Application Support/bothy-host/confirm`,
+   created by `install` (mode `0755`); on Windows the host service creates the pipe
+   `\\.\pipe\bothy-host-confirm` itself. The host service opens the endpoint only with
+   `host_service.require_local_confirm = true`.
 3. `bothy-host pair --server <url> --code <code> [--ca-file <pem>]` pairs the host (24, 3.2) with
    the identity of the service user: as an administrator it goes through the running service
    (Windows: the service must run) and restarts it afterwards; it prints the fingerprint in groups
@@ -322,10 +330,22 @@ rows `D-M2-42-<n>` of [DECISIONS.md](../DECISIONS.md) give the reasons):
 5. For the profile `claude` at `organization` the operator puts the API key as the file
    `claude_api_key` with mode `0600` into the state directory
    ([24-terminal.md](24-terminal.md), section 7.4). Never as an environment variable of the
-   service.
+   service. M2-45 (D-M2-45-11): the host service reads `claude_api_key` for each start of the
+   profile `claude` and hands the value only to that start, so a replaced file takes effect at
+   the next start without a restart; a missing or empty file refuses the start with
+   `pty_failed`.
 6. After a refused start the host service stays stopped. The operator fixes the finding that
    `bothy-host doctor` names and runs `bothy-host restart`; the same command makes a changed
    configuration take effect.
+7. Local confirmation (M2-45, D-M2-45-15; [24-terminal.md](24-terminal.md), section 6.4): with
+   `host_service.require_local_confirm = true` the operator creates for the person who sits at
+   the machine an autostart entry that starts `bothy-host confirm-agent` in that person's
+   desktop session: on macOS a LaunchAgent of that user, on Linux an XDG autostart file of that
+   user, on Windows a value under the `Run` key of that user. `install` creates none of them. The
+   person must not be the service user or a current or former session user, because the host
+   service refuses the agent of such a user. Without a running agent every opening and attach
+   ends with `local_confirm_denied`; on Linux the agent needs `/usr/bin/zenity` or
+   `/usr/bin/kdialog`, else it denies.
 
 Windows drive root: `install` asks before it removes the entry `Authenticated Users:(AD)` from the
 root of the system drive and of every drive with a place; `--drive-root-confirm yes|no` answers

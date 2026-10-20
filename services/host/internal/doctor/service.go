@@ -83,6 +83,9 @@ type Env struct {
 	// HelperGrace is added to the bound of every helper call (zero means helperGrace): a helper
 	// that does not answer in time counts as unreachable, so no session user can hold the run.
 	HelperGrace time.Duration
+	// Mode is the mode of the check.run requests (ModeFull when empty); Runner sets ModeLight for
+	// RunLight and RunLightUser.
+	Mode string
 	// InterfaceAddrs and LookupIP serve HD5.
 	InterfaceAddrs func() ([]net.IP, error)
 	LookupIP       func(ctx context.Context, host string) ([]net.IP, error)
@@ -127,14 +130,16 @@ type facts struct {
 
 // run is one service-side run in progress.
 type run struct {
-	env       Env
-	res       *Result
-	facts     facts
-	users     []string // configured session users that passed HD1's per-name rules and exist
-	subjects  []hostos.Subject
-	claudeBin string
-	search    []string
-	former    []string
+	env   Env
+	res   *Result
+	facts facts
+	users []string // configured session users that passed HD1's per-name rules and exist
+	// workdirCodes are the HD11 codes of the working directories per session user, by path.
+	workdirCodes map[string]map[string]string
+	subjects     []hostos.Subject
+	claudeBin    string
+	search       []string
+	former       []string
 }
 
 // RunService runs HD1 to HD11 as the service user in mode (ModeFull or ModeLight), asking each
@@ -156,6 +161,7 @@ func RunService(ctx context.Context, env Env) *Result {
 	results := r.askHelpers(ctx)
 	r.aggregate(results)
 	r.res.facts = r.facts
+	r.res.ClaudeBin, r.res.SearchList = r.claudeBin, slices.Clone(r.search)
 	r.res.evaluate(env.Declaration)
 	return r.res
 }
@@ -600,12 +606,16 @@ type helperAnswer struct {
 
 // Request returns the check.run request for sessionUser.
 func (r *run) request(u string) Request {
+	mode := r.env.Mode
+	if mode == "" {
+		mode = ModeFull
+	}
 	var dirs []string
 	for _, w := range r.env.Config.Workdirs(u) {
 		dirs = append(dirs, w.Path)
 	}
 	return Request{
-		Mode: ModeFull, SessionUser: u, Others: slices.DeleteFunc(slices.Clone(r.users), func(s string) bool { return s == u }),
+		Mode: mode, SessionUser: u, Others: slices.DeleteFunc(slices.Clone(r.users), func(s string) bool { return s == u }),
 		ServiceUser: r.env.ServiceUser, ClaudeBin: r.claudeBin, SearchList: r.search, Declaration: r.env.Declaration,
 		Workdirs: dirs, ForeignHomes: r.foreignHomes(), StateDir: r.env.StateDir, KeyFile: r.env.KeyFile,
 		AuthStatusTimeout: r.env.Config.AuthStatusTimeout, EntryScanTimeout: r.env.Config.EntryScanTimeout,
@@ -684,6 +694,7 @@ func (r *run) aggregate(answers []helperAnswer) {
 	}
 	r.hd9(listable)
 	r.hd7Workdirs(idOf, ids)
+	r.workdirPlaces()
 	r.facts.profiles = r.env.Config.Profiles
 	r.facts.sessionUsers = r.env.Config.SessionUsers
 }
@@ -703,6 +714,28 @@ func (r *run) takeHelper(user string, res HelperResult, listable map[string]bool
 	}
 	if res.PlaceCode != "" {
 		r.add(HD11, Entry{Status: Fail, Code: res.PlaceCode, SessionUser: user})
+	}
+	if r.workdirCodes == nil {
+		r.workdirCodes = map[string]map[string]string{}
+	}
+	codes := map[string]string{}
+	for i, w := range r.env.Config.Workdirs(user) {
+		if i < len(res.WorkdirCodes) && res.WorkdirCodes[i] != "" {
+			codes[w.Path] = res.WorkdirCodes[i]
+		}
+	}
+	r.workdirCodes[user] = codes
+}
+
+// workdirPlaces adds HD11 for the working directories HD7 keeps; a directory HD7 drops is no place
+// of the session user (M2-45, TM-T29 (c)).
+func (r *run) workdirPlaces() {
+	for _, u := range r.env.Config.SessionUsers {
+		for _, w := range r.res.Workdirs[u] {
+			if code := r.workdirCodes[u][w.Path]; code != "" {
+				r.add(HD11, Entry{Status: Fail, Code: code, SessionUser: u})
+			}
+		}
 	}
 }
 

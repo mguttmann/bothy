@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -77,4 +78,20 @@ func asServiceUser(ctx context.Context, uid, gid int, args []string, stdin []byt
 // helperListener returns the socket the service manager passed.
 func helperListener(string, string) (net.Listener, error) {
 	return localchan.ActivatedListener(runtime.GOOS, sys.getenv("LISTEN_PID"), sys.getenv("LISTEN_FDS"))
+}
+
+// profileExtras returns the lines of /etc/shells (a login shell must be listed there, Design note
+// 9 of M2-45); there is no environment block on Linux and macOS.
+func profileExtras() ([]string, []string, error) {
+	b, err := os.ReadFile("/etc/shells")
+	if err != nil {
+		return nil, nil, err
+	}
+	var shells []string
+	for _, l := range strings.Split(string(b), "\n") {
+		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "#") {
+			shells = append(shells, l)
+		}
+	}
+	return shells, nil, nil
 }

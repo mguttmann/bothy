@@ -219,10 +219,20 @@ func DialHelper(ctx context.Context, endpoint string, expect func() (Expect, err
 
 // ServeHelper serves the helper pipe l: a client whose token user is not allowUID is closed.
 func ServeHelper(ctx context.Context, l net.Listener, allowUID string, h Handler) error {
-	return servePipe(ctx, l, func(t windows.Token) bool { return tokenUser(t) == allowUID }, h)
+	return ServeHelperConns(ctx, l, allowUID, func(ctx context.Context, c *Conn) { _ = ServeConn(ctx, c, h) })
+}
+
+// ServeHelperConns is ServeHelper with a function that owns each verified channel until it returns
+// (the session channel of M2-45, whose PTYs end when it breaks); serve must close c.
+func ServeHelperConns(ctx context.Context, l net.Listener, allowUID string, serve func(context.Context, *Conn)) error {
+	return servePipeConns(ctx, l, func(t windows.Token) bool { return tokenUser(t) == allowUID }, serve)
 }
 
 func servePipe(ctx context.Context, l net.Listener, allow func(windows.Token) bool, h Handler) error {
+	return servePipeConns(ctx, l, allow, func(ctx context.Context, c *Conn) { _ = ServeConn(ctx, c, h) })
+}
+
+func servePipeConns(ctx context.Context, l net.Listener, allow func(windows.Token) bool, serve func(context.Context, *Conn)) error {
 	stop := context.AfterFunc(ctx, func() { _ = l.Close() })
 	defer stop()
 	for {
@@ -239,7 +249,7 @@ func servePipe(ctx context.Context, l net.Listener, allow func(windows.Token) bo
 			_ = c.Close()
 			continue
 		}
-		go func() { _ = ServeConn(ctx, NewConn(c, Peer{PID: int(pid)}), h) }()
+		go serve(ctx, NewConn(c, Peer{PID: int(pid)}))
 	}
 }
 

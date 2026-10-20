@@ -10,3 +10,7 @@ User={{.Name}}
 ExecStart={{.Binary}} pty-helper --session-user {{.Name}}
 Restart=on-failure
 UMask=0077
+# Delegate=yes hands the cgroup subtree of this unit to the helper: it moves itself into the leaf
+# helper and creates one cgroup s-<session id> per session, which it ends with cgroup.kill
+# (M2-45, docs/spec/24-terminal.md 6.5). systemd kills the whole subtree when the unit stops.
+Delegate=yes

@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/hostos"
 	"github.com/OWNER/bothy/services/host/internal/install"
 	"github.com/OWNER/bothy/services/host/internal/localchan"
+	"github.com/OWNER/bothy/services/host/internal/profiles"
 )
 
 func isAdmin() bool { return windows.GetCurrentProcessToken().IsElevated() }
@@ -64,4 +65,11 @@ func asServiceUser(context.Context, int, int, []string, []byte, io.Writer, io.Wr
 // the service account only.
 func helperListener(name, serviceSID string) (net.Listener, error) {
 	return localchan.ListenPipe(localchan.HelperEndpoint(hostos.Windows, name), localchan.HelperPipeSDDL(serviceSID))
+}
+
+// profileExtras returns the environment block of the helper's token without inheritance (Design
+// note 8 of M2-45); Windows has no /etc/shells.
+func profileExtras() ([]string, []string, error) {
+	block, err := profiles.TokenEnvironment()
+	return nil, block, err
 }

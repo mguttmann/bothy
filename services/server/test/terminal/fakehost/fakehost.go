@@ -3,7 +3,8 @@
 // Package fakehost is the Fake-Host of the terminal tests (M2-44, PLAN row "Test doubles",
 // component testsupport): Host holds the keys of an active host, runs its control connection over
 // hosttest with a report and a heartbeat loop, and answers every session.open with one data
-// connection run by a script per session (Accept, Refuse, End, Ignore, Stall); Device opens the
+// connection run by a script per session (Accept, Pair, Refuse, End, EndAfterHandshake, Ignore,
+// Stall); Device opens the
 // device stream with an access token and a DPoP proof of a harness client. Both exchange opaque
 // bytes: message 1 of the device is the compact session token (a test framing only), which the
 // relay cannot tell from Noise. Every text frame passes api/specschema.ValidateChannelFrame (G9).
@@ -122,6 +123,11 @@ const (
 	Stall
 	// Pair reads and forwards like Accept but never sends session.started.
 	Pair
+	// EndAfterHandshake runs the close order of the host service after message 2 (M2-45 Design
+	// note 6): it verifies message 1, answers message 2, and on the first device frame sends
+	// session.ended with Reason and Detail on the control connection; it keeps the data connection
+	// open and forwards nothing, so the server closes both sides through its end path.
+	EndAfterHandshake
 )
 
 // Script is the behaviour for one session.
@@ -420,7 +426,7 @@ func (h *Host) run(session ids.ID, s Script) {
 		}
 		_ = h.Send("session.ended", d)
 		return
-	case Accept, Refuse, Stall, Pair:
+	case Accept, Refuse, Stall, Pair, EndAfterHandshake:
 	}
 	dc, err := h.DialData(h.ctx, session)
 	if err != nil {
@@ -436,6 +442,8 @@ func (h *Host) run(session ids.ID, s Script) {
 		_ = dc.ws.Close(websocket.StatusCode(s.Code), s.Detail)
 	case Accept, Pair:
 		h.accept(dc, s.Kind == Accept)
+	case EndAfterHandshake:
+		h.endAfterHandshake(dc, s)
 	case End, Ignore:
 	}
 }
@@ -472,6 +480,34 @@ func (h *Host) accept(dc *DataConn, start bool) {
 			return
 		}
 	}
+}
+
+// endAfterHandshake runs EndAfterHandshake: message 1 verified, message 2 answered, then the
+// first device frame triggers session.ended; the data connection stays open until the server
+// closes it, which CloseCode reports.
+func (h *Host) endAfterHandshake(dc *DataConn, s Script) {
+	tok, err := dc.Recv(h.ctx)
+	if err != nil {
+		return
+	}
+	h.mu.Lock()
+	h.tokens = append(h.tokens, string(tok))
+	h.mu.Unlock()
+	if err := h.VerifyToken(string(tok), dc.Session); err != nil {
+		_ = dc.ws.Close(4104, "token_invalid")
+		return
+	}
+	if err := dc.Send(h.ctx, []byte("message-2")); err != nil {
+		return
+	}
+	if _, err := dc.Recv(h.ctx); err != nil {
+		return
+	}
+	d := map[string]any{"session_id": dc.Session.String(), "close_reason": s.Reason}
+	if s.Detail != "" {
+		d["close_detail"] = s.Detail
+	}
+	_ = h.Send("session.ended", d)
 }
 
 // VerifyToken checks a session token like the host service (24 section 5.3): the signature with a
@@ -522,13 +558,15 @@ func (h *Host) VerifyToken(tok string, session ids.ID) error {
 // DataConn is one data connection of the fake host.
 type DataConn struct {
 	Session ids.ID
-	ws      *websocket.Conn
-	h       *Host
-	done    chan struct{}
-	mu      gosync.Mutex
-	queue   [][]byte
-	cerr    error
-	cond    *gosync.Cond
+	// Hello is the hello of the server on this connection (schema HostChannelHello).
+	Hello rest.HostChannelHello
+	ws    *websocket.Conn
+	h     *Host
+	done  chan struct{}
+	mu    gosync.Mutex
+	queue [][]byte
+	cerr  error
+	cond  *gosync.Cond
 }
 
 // DialData opens the data connection of session: hello, identify with session_id; the frames
@@ -570,7 +608,7 @@ func (h *Host) DialData(ctx context.Context, session ids.ID) (*DataConn, error) 
 	if err := ws.Write(ctx, websocket.MessageText, frame); err != nil {
 		return nil, err
 	}
-	dc := &DataConn{Session: session, ws: ws, h: h, done: make(chan struct{})}
+	dc := &DataConn{Session: session, Hello: env.D, ws: ws, h: h, done: make(chan struct{})}
 	dc.cond = gosync.NewCond(&dc.mu)
 	go dc.read() //nolint:gosec // G118: the reader lives as long as the connection, not as ctx
 	h.mu.Lock()

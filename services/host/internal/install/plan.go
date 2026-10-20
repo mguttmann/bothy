@@ -104,6 +104,8 @@ const (
 const (
 	LinuxProgramDir  = "/opt/bothy-host/bin"
 	DarwinProgramDir = "/Library/Application Support/bothy-host/bin"
+	// DarwinConfirmDir holds the socket of the local confirmation (M2-45, internal/confirm).
+	DarwinConfirmDir = "/Library/Application Support/bothy-host/confirm"
 	SystemdDir       = "/etc/systemd/system"
 	LaunchDaemonsDir = "/Library/LaunchDaemons"
 	// HostAccountWindows is the virtual account of the host service on Windows.
@@ -345,6 +347,8 @@ func darwinInstall(t Target, users []string) ([]Step, error) {
 	}
 	steps = append(steps,
 		Step{Kind: KindMkdir, Path: localchan.DarwinRunDir, Mode: 0o755, Owner: ownerRoot},
+		// The folder of the confirmation endpoint (M2-45, 24 6.4), owned by the service user.
+		Step{Kind: KindMkdir, Path: DarwinConfirmDir, Mode: 0o755, Owner: t.ServiceUser},
 		Step{Kind: KindMkdir, Path: filepath.Dir(t.ConfigPath), Mode: 0o755, Owner: ownerRoot},
 	)
 	steps = append(steps, configStep(t, users)...)

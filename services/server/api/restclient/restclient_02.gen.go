@@ -16,6 +16,23 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ReconcileCostsWithBody Reconcile estimates with invoices
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
+func (c *Client) ReconcileCostsWithBody(ctx context.Context, params *ReconcileCostsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReconcileCostsRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ReconcileCosts Reconcile estimates with invoices
 //
 // Takes a body of the `application/json` content type.
@@ -27372,19 +27389,4 @@ func (r SetAgentToolClassResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r SetAgentToolClassResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON412() *PreconditionFailed {
-	return r.ApplicationproblemJSON412
-}
-
-// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON428() *PreconditionRequired {
-	return r.ApplicationproblemJSON428
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r SetAgentToolClassResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
 }
