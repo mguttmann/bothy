@@ -1542,6 +1542,7 @@ paths:
       security: []
       x-authz-action: console.csp_report
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: telemetry
       requestBody:
         required: true
         content:

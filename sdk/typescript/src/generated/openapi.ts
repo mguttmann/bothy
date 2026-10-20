@@ -505,6 +505,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/csp-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept a CSP violation report of the web console
+         * @description Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+         */
+        post: operations["submitCspReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -5411,6 +5431,12 @@ export interface components {
             currency: string;
             /** @description True until the amount was reconciled with the provider invoice. */
             is_estimate: boolean;
+        };
+        /** @description Reports of the Reporting API (https://www.w3.org/TR/reporting-1/); each item is a report object whose `body` is a CSP violation report (https://www.w3.org/TR/CSP3/#reporting). The server reads only `type`, `body.effectiveDirective`, `body.blockedURL` and `body.disposition`. */
+        CspReportList: components["schemas"]["JsonObject"][];
+        /** @description Legacy report of the `report-uri` directive (CSP Level 2). The server reads only `effective-directive` (else `violated-directive`), `blocked-uri` and `disposition` of `csp-report`. */
+        CspReportLegacy: {
+            "csp-report": components["schemas"]["JsonObject"];
         };
         /** @description Free-form JSON object whose schema is named in the field description. */
         JsonObject: {
@@ -11562,6 +11588,37 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            default: components["responses"]["Error"];
+        };
+    };
+    submitCspReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/reports+json": components["schemas"]["CspReportList"];
+                "application/csp-report": components["schemas"]["CspReportLegacy"];
+            };
+        };
+        responses: {
+            /** @description Report accepted (also when it names nothing the server logs). */
+            204: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };
     };

@@ -171,6 +171,7 @@ Serializers _$serializers =
           ..add(CostSeries.serializer)
           ..add(CredentialHolderSet.serializer)
           ..add(CredentialOverview.serializer)
+          ..add(CspReportLegacy.serializer)
           ..add(Device.serializer)
           ..add(DeviceApprove.serializer)
           ..add(DeviceKeyRegistration.serializer)
@@ -1639,6 +1640,13 @@ Serializers _$serializers =
               const FullType(double),
             ]),
             () => MapBuilder<String, double>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject),
+            ]),
+            () => MapBuilder<String, JsonObject?>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltMap, const [

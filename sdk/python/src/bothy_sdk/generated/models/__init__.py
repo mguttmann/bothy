@@ -178,6 +178,7 @@ from .create_step_up_challenge_x_console_request import (
 )
 from .credential_holder_set import CredentialHolderSet
 from .credential_overview import CredentialOverview
+from .csp_report_legacy import CspReportLegacy
 from .delete_notification_preference_target_kind import (
     DeleteNotificationPreferenceTargetKind,
 )
@@ -914,6 +915,7 @@ __all__ = (
     "CreateStepUpChallengeXConsoleRequest",
     "CredentialHolderSet",
     "CredentialOverview",
+    "CspReportLegacy",
     "DeleteNotificationPreferenceTargetKind",
     "Device",
     "DeviceApprove",
