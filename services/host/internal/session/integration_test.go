@@ -6,14 +6,19 @@ package session
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/host/internal/config"
 	"github.com/OWNER/bothy/services/host/internal/doctor"
 	"github.com/OWNER/bothy/services/host/internal/frame"
+	"github.com/OWNER/bothy/services/host/internal/profiles"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
+	"github.com/OWNER/bothy/services/host/internal/state"
 )
 
 const (
@@ -497,4 +502,164 @@ func TestSessionCloseDuringOpening(t *testing.T) {
 	if r.startCount() != 0 || r.mgr.Active() != 0 || r.note.startedCount(sessA) != 0 {
 		t.Errorf("PTYs %d active %d started %d", r.startCount(), r.mgr.Active(), r.note.startedCount(sessA))
 	}
+}
+
+// fakeClaudeScript stands in for host_service.claude_bin: auth status reports no login; any other
+// start prints its working directory, the names of its environment, its CLAUDE_CONFIG_DIR and the
+// length of ANTHROPIC_API_KEY (never the key), then waits for input.
+const fakeClaudeScript = `#!/bin/sh
+if [ "$1" = auth ]; then echo '{"loggedIn":false,"authMethod":"none"}'; exit 1; fi
+echo "cwd=$(pwd)"
+echo "names=$(env | cut -d= -f1 | sort | tr '\n' ' ')"
+echo "config=$CLAUDE_CONFIG_DIR"
+echo "keylen=${#ANTHROPIC_API_KEY}"
+echo "lc=$LC_CANARY"
+echo "DO""NE"
+read line
+echo "got=$line"
+`
+
+// TestClaudeOrganizationAndNoContent starts the profile claude with organization in the working
+// directory of wdi and proves that no content, token, key, environment value, path or command line
+// reaches a log line, a session.ended or a close reason (TestNoContentInLogsAndReports).
+func TestClaudeOrganizationAndNoContent(t *testing.T) {
+	r := newRig(t)
+	bin := filepath.Join(filepath.Dir(r.home), "bin")
+	wd := filepath.Join(r.home, "project")
+	for _, d := range []string{bin, wd} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	claude := filepath.Join(bin, "claude")
+	if err := os.WriteFile(claude, []byte(fakeClaudeScript), 0o700); err != nil { //nolint:gosec // the fake program must be executable
+		t.Fatal(err)
+	}
+	wdReal, _ := filepath.EvalSymlinks(wd)
+	claudeReal, _ := filepath.EvalSymlinks(claude)
+	res := shellResult(r.osu)
+	res.Profiles = append(res.Profiles, doctor.Profile{Name: "claude", DisplayName: "Claude", Kind: config.KindClaude})
+	res.Workdirs[r.osu] = []doctor.Workdir{{DisplayName: "Project", Path: wdReal}}
+	res.ClaudeBin, res.SearchList = claudeReal, []string{filepath.Dir(claudeReal), "/usr/bin", "/bin"}
+	r.runner.set(res)
+	r.checkRun(doctor.Request{Mode: doctor.ModeLight, SessionUser: r.osu, ClaudeBin: claudeReal, SearchList: res.SearchList,
+		Declaration: state.DeclOrganization, Workdirs: []string{wdReal}, AuthStatusTimeout: 10 * time.Second})
+	dev, dc := r.openWdi(sessA, "claude", 0)
+	out := r.readUntil(dc, dev, "DONE")
+	var text strings.Builder
+	for _, f := range out {
+		text.Write(f.Data)
+	}
+	got := text.String()
+	for _, want := range []string{"cwd=" + wdReal, "config=" + filepath.Join(r.home, ".config", "bothy-host", "claude"), "keylen=22", "lc=" + envCanary} {
+		if !strings.Contains(got, want) {
+			t.Errorf("claude start lacks %d bytes of expected output", len(want))
+		}
+	}
+	m := regexp.MustCompile(`names=([^\r\n]*)`).FindStringSubmatch(got)
+	if m == nil {
+		t.Fatal("no environment names")
+	}
+	for _, name := range []string{"ANTHROPIC_API_KEY", "CLAUDE_CONFIG_DIR", "TERM", "HOME", "PATH"} {
+		if !strings.Contains(" "+m[1], " "+name+" ") {
+			t.Errorf("environment lacks %s", name)
+		}
+	}
+	for _, name := range []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN", "AWS_SECRET_ACCESS_KEY"} {
+		if strings.Contains(m[1], name) {
+			t.Errorf("environment holds %s", name)
+		}
+	}
+	r.send(dc, dev, frame.Data([]byte("CANARY-5c1e\n")))
+	r.readUntil(dc, dev, "got=CANARY-5c1e")
+	r.send(dc, dev, frame.Close())
+	e := r.note.waitEnded(t, sessA)
+	if e.CloseReason != ReasonClientClosed {
+		t.Errorf("ended %+v", e)
+	}
+	// A refused handshake with a token in its close reason would leak; check a refusal too.
+	r.sessionOpen(sessB, "shell", 20*time.Second)
+	dcB := r.srv.Data(r.ctx, sessB, 1)
+	devB := r.device(sessB)
+	c := r.claims(sessB, "shell", AttOpen, devB)
+	c["aud"] = otherID
+	tok := r.signer.Sign(c)
+	m1, _ := devB.Message1(tok)
+	_ = dcB.SendBinary(r.ctx, m1)
+	_, reason := r.closedWith(dcB)
+	ended, _ := json.Marshal(r.note.ended)
+	all := r.logs.String() + string(ended) + reason
+	for _, canary := range []string{"CANARY-5c1e", "EXAMPLE-API-KEY-CANARY", envCanary, tok, c["jti"].(string), wdReal, r.home, claudeReal, "names="} {
+		if strings.Contains(all, canary) {
+			t.Errorf("a canary of %d bytes reached a log, report or close reason", len(canary))
+		}
+	}
+}
+
+// TestDeclarationAndValues: the values of the hello of a data connection set the leeway of its
+// token check, and a new declaration of a later ready changes the offer for new openings while a
+// running session continues.
+func TestDeclarationAndValues(t *testing.T) {
+	v := sessiontest.DefaultValues
+	v.ClockLeewayMs = 0
+	r := newRig(t, withValues(v))
+	expiredBy := func(id string, d time.Duration) (int, string) {
+		r.sessionOpen(id, "shell", 20*time.Second)
+		dc := r.srv.Data(r.ctx, id, 1)
+		dev := r.device(id)
+		c := r.claims(id, "shell", AttOpen, dev)
+		c["exp"] = time.Now().Add(-d).Unix()
+		m1, _ := dev.Message1(r.signer.Sign(c))
+		_ = dc.SendBinary(r.ctx, m1)
+		if !stillOpen(dc, 300*time.Millisecond) {
+			return r.closedWith(dc)
+		}
+		dc.Close(CodeClosed, "")
+		return 0, ""
+	}
+	if code, reason := expiredBy(sessiontest.NewID(), 2*time.Second); code != CodeTokenStale || reason != DetailTokenExpired {
+		t.Errorf("leeway 0: %d %q", code, reason)
+	}
+	r.values.ClockLeewayMs = (time.Minute).Milliseconds()
+	if code, _ := expiredBy(sessiontest.NewID(), 2*time.Second); code != 0 {
+		t.Errorf("leeway of a minute refused with %d", code)
+	}
+	// A running session continues when the declaration changes; new openings use the new offer.
+	res := shellResult(r.osu)
+	res.Profiles = append(res.Profiles, doctor.Profile{Name: "claude", DisplayName: "Claude", Kind: config.KindClaude})
+	res.Workdirs[r.osu] = []doctor.Workdir{{DisplayName: "Project", Path: r.home}}
+	res.ClaudeBin = "/bin/sh"
+	r.runner.set(res)
+	_, dc := r.open(sessA, "shell")
+	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
+	if !hasProfile(profiles.Offered(res), "claude") {
+		t.Fatal("organization with claude_bin offers claude")
+	}
+	none := res.WithDeclaration(state.DeclNone)
+	r.runner.set(none)
+	if hasProfile(profiles.Offered(none), "claude") {
+		t.Error("none offers claude")
+	}
+	if !stillOpen(dc, 300*time.Millisecond) || r.mgr.Active() != 1 {
+		t.Error("the running session ended with the new declaration")
+	}
+	r.sessionOpen(sessB, "claude", 20*time.Second)
+	dcB := r.srv.Data(r.ctx, sessB, 1)
+	devB := r.device(sessB)
+	c := r.claims(sessB, "claude", AttOpen, devB)
+	c["wdi"] = 0
+	m1, _ := devB.Message1(r.signer.Sign(c))
+	_ = dcB.SendBinary(r.ctx, m1)
+	if code, reason := r.closedWith(dcB); code != CodeHandshakeFail || reason != DetailProfileUnknown {
+		t.Errorf("claude after none: %d %q", code, reason)
+	}
+}
+
+func hasProfile(ps []doctor.Profile, name string) bool {
+	for _, p := range ps {
+		if p.Name == name {
+			return true
+		}
+	}
+	return false
 }

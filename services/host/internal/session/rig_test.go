@@ -47,6 +47,10 @@ import (
 // temporary home and the file that counts the PTYs as the next arguments.
 const helperMarker = "bothy-session-test-helper"
 
+// envCanary is a value of the helper's environment that reaches the PTY through the allow list
+// (LC_*) and must never reach a log, a report or a close reason.
+const envCanary = "ENV-CANARY-7f3a"
+
 func TestMain(m *testing.M) {
 	if len(os.Args) == 5 && os.Args[1] == helperMarker {
 		os.Exit(runHelper(os.Args[2], os.Args[3], os.Args[4]))
@@ -94,7 +98,7 @@ func runHelper(sock, home, starts string) int {
 	login := helper.LoginEnv(r, self)
 	env := doctor.HelperEnv{GOOS: currentGOOS(), Self: self, Users: users, Security: sec, Resolver: hostos.OSResolver{}, Files: hostos.OSLister{},
 		Probe: probe, Runner: r, Clock: clock.Real(), LoginEnv: login, MkdirPrivate: helper.MkdirPrivate}
-	penv := profiles.Env{GOOS: env.GOOS, Self: self, Environ: []string{"PATH=/usr/bin:/bin", "LANG=C"}, Resolver: hostos.OSResolver{}, Security: sec,
+	penv := profiles.Env{GOOS: env.GOOS, Self: self, Environ: []string{"PATH=/usr/bin:/bin", "LANG=C", "LC_CANARY=" + envCanary}, Resolver: hostos.OSResolver{}, Security: sec,
 		Shells: []string{"/bin/sh"}, LoginEnv: login}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -319,7 +323,10 @@ func newRig(t *testing.T, opts ...rigOption) *rig {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	t.Cleanup(cancel)
-	dir, err := os.MkdirTemp("", "bst")
+	// The home of the helper lies under /tmp, not under the temporary folder of the test user: the
+	// checks of HD11 walk the chain files (.claude, .git) of every folder above a place, and a
+	// folder above a temporary folder inside a real home could hold a large real .claude.
+	dir, err := os.MkdirTemp("/tmp", "bst")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,6 +424,16 @@ func (r *rig) startHelper() {
 }
 
 // startCount returns the number of PTYs the helper started.
+func (r *rig) checkRun(req doctor.Request) {
+	r.t.Helper()
+	pid := r.helper.Process.Pid
+	ch := startup.ChannelHelpers{GOOS: currentGOOS(), Users: platformUsers(), Services: pidService(func() int { return pid }),
+		Endpoint: func(string, string) string { return r.sock }}
+	if _, err := ch.Check(r.ctx, r.osu, req); err != nil {
+		r.t.Fatalf("check.run: %v", err)
+	}
+}
+
 func (r *rig) startCount() int {
 	b, _ := os.ReadFile(r.starts)
 	return strings.Count(string(b), "\n")
@@ -464,6 +481,21 @@ func (r *rig) open(id, prf string) (*sessiontest.Device, *sessiontest.Conn) {
 	dc := r.srv.Data(r.ctx, id, r.srv.DataCount(id)+1)
 	dev := r.device(id)
 	if err := r.handshake(dc, dev, r.signer.Sign(r.claims(id, prf, AttOpen, dev))); err != nil {
+		r.t.Fatalf("handshake: %v", err)
+	}
+	r.send(dc, dev, frame.Start(120, 40))
+	return dev, dc
+}
+
+// openWdi runs a full opening of the profile claude with the working directory index wdi.
+func (r *rig) openWdi(id, prf string, wdi int) (*sessiontest.Device, *sessiontest.Conn) {
+	r.t.Helper()
+	r.sessionOpen(id, prf, 20*time.Second)
+	dc := r.srv.Data(r.ctx, id, r.srv.DataCount(id)+1)
+	dev := r.device(id)
+	c := r.claims(id, prf, AttOpen, dev)
+	c["wdi"] = wdi
+	if err := r.handshake(dc, dev, r.signer.Sign(c)); err != nil {
 		r.t.Fatalf("handshake: %v", err)
 	}
 	r.send(dc, dev, frame.Start(120, 40))
