@@ -67,8 +67,9 @@ func newFixture() *fixture {
 	return &fixture{signer: sessiontest.NewSigner("terminal-key-1"), v: &Verifier{JTI: NewJTIMemory(), Bindings: NewBindings(st)}, store: st, live: map[string]Live{}}
 }
 
-func (f *fixture) claims(prf, att string) map[string]any {
-	return sessiontest.Claims(hostID, sessID, alexSub, alexOSU, prf, cek, att, now, 30*time.Second)
+// claims returns valid claims of an opening of the profile shell.
+func (f *fixture) claims() map[string]any {
+	return sessiontest.Claims(hostID, sessID, alexSub, alexOSU, "shell", cek, AttOpen, now, 30*time.Second)
 }
 
 func (f *fixture) check(tok string) Check {
@@ -190,7 +191,7 @@ func TestVerifyOrder(t *testing.T) {
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
 			f := newFixture()
-			c := r.mutate(f, f.claims("shell", AttOpen))
+			c := r.mutate(f, f.claims())
 			if got := f.verify(c); got != r.want {
 				t.Errorf("detail %q, want %q (token %s)", got, r.want, h(c.Token))
 			}
@@ -200,7 +201,7 @@ func TestVerifyOrder(t *testing.T) {
 
 func TestVerifyJTIRememberedBeforeLaterSteps(t *testing.T) {
 	f := newFixture()
-	c := f.claims("shell", AttOpen)
+	c := f.claims()
 	c["osu"] = "bothy-s-robin"
 	tok := f.signer.Sign(c)
 	if d := f.verify(f.check(tok)); d != DetailSessionUserUnknown {
@@ -213,7 +214,7 @@ func TestVerifyJTIRememberedBeforeLaterSteps(t *testing.T) {
 
 func TestBindingStaysWhenALaterStepFails(t *testing.T) {
 	f := newFixture()
-	c := f.claims("shell", AttOpen)
+	c := f.claims()
 	c["wdi"] = 0 // step 12 fails after the binding
 	if d := f.verify(f.check(f.signer.Sign(c))); d != DetailProfileUnknown {
 		t.Fatalf("detail %q", d)
@@ -305,7 +306,7 @@ func TestBindingConcurrentFirstUse(t *testing.T) {
 
 func FuzzVerifySessionToken(f *testing.F) {
 	fx := newFixture()
-	valid := fx.signer.Sign(fx.claims("shell", AttOpen))
+	valid := fx.signer.Sign(fx.claims())
 	f.Add(valid)
 	f.Add(strings.Replace(valid, ".", "..", 1))
 	f.Add("e30.e30.")

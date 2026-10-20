@@ -13,7 +13,6 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/OWNER/bothy/services/host/internal/control"
-	"github.com/OWNER/bothy/services/host/internal/noise"
 )
 
 // sendQueue bounds the encrypted messages waiting for the writer of one data connection; a device
@@ -83,25 +82,25 @@ func dialData(ctx context.Context, hc *http.Client, url string, d identifyData, 
 		return nil, err
 	}
 	dc := &dataConn{ws: ws, hello: h, in: make(chan []byte, 16), out: make(chan []byte, sendQueue), done: make(chan struct{}), code: -1}
-	go dc.read()
-	go dc.write()
+	// The connection lives beyond the dial: its goroutines run until it ends, not until ctx ends.
+	lctx := context.WithoutCancel(ctx)
+	go dc.read(lctx)
+	go dc.write(lctx)
 	return dc, nil
 }
 
 // leeway, idle and detach are the server values of the hello of this connection.
-func (dc *dataConn) leeway() time.Duration {
-	return time.Duration(dc.hello.ClockLeewayMs) * time.Millisecond
-}
-func (dc *dataConn) idle() time.Duration { return time.Duration(dc.hello.IdleTimeoutMs) * time.Millisecond }
-func (dc *dataConn) detach() time.Duration {
-	return time.Duration(dc.hello.DetachGraceMs) * time.Millisecond
-}
+func (dc *dataConn) leeway() time.Duration { return ms(dc.hello.ClockLeewayMs) }
+func (dc *dataConn) idle() time.Duration   { return ms(dc.hello.IdleTimeoutMs) }
+func (dc *dataConn) detach() time.Duration { return ms(dc.hello.DetachGraceMs) }
+
+func ms(n int64) time.Duration { return time.Duration(n) * time.Millisecond }
 
 // read queues the binary messages until the connection ends; a text frame ends it like the relay.
-func (dc *dataConn) read() {
+func (dc *dataConn) read(ctx context.Context) {
 	defer close(dc.in)
 	for {
-		typ, b, err := dc.ws.Read(context.Background())
+		typ, b, err := dc.ws.Read(ctx)
 		if err != nil {
 			code, reason := -1, ""
 			var ce websocket.CloseError
@@ -125,11 +124,11 @@ func (dc *dataConn) read() {
 }
 
 // write sends the queued messages in order.
-func (dc *dataConn) write() {
+func (dc *dataConn) write(ctx context.Context) {
 	for {
 		select {
 		case m := <-dc.out:
-			if err := dc.ws.Write(context.Background(), websocket.MessageBinary, m); err != nil {
+			if err := dc.ws.Write(ctx, websocket.MessageBinary, m); err != nil {
 				dc.close(CodeNormal, "")
 				return
 			}
@@ -159,16 +158,6 @@ func (dc *dataConn) send(m []byte) {
 	}
 }
 
-// next returns the next binary message, or false when the connection ended or the timer fired.
-func (dc *dataConn) next(deadline <-chan time.Time) ([]byte, bool) {
-	select {
-	case m, ok := <-dc.in:
-		return m, ok
-	case <-deadline:
-		return nil, false
-	}
-}
-
 // close closes the connection with code and reason once (this side ends it); the queued messages
 // before it are not waited for.
 func (dc *dataConn) close(code int, reason string) {
@@ -191,6 +180,3 @@ func (dc *dataConn) closeCode() int {
 	defer dc.mu.Unlock()
 	return dc.code
 }
-
-// encryptFrame encrypts frame bytes with t.
-func encryptFrame(t *noise.Transport, f []byte) ([]byte, error) { return t.Encrypt(f) }

@@ -12,6 +12,7 @@ vendors:
   v-sys:   { in: [golang.org/x/sys/**] }
   v-yaml:  { in: [go.yaml.in/yaml/v3] }
   v-websocket: { in: [github.com/coder/websocket, github.com/coder/websocket/**] }
+  v-pty:   { in: [github.com/creack/pty] }
 components:
   cmd:         { in: cmd/** }
   noise:       { in: internal/noise }
@@ -32,6 +33,11 @@ components:
   pairing:     { in: internal/pairing }
   control:     { in: internal/control }
   controltest: { in: internal/control/controltest }
+  session:     { in: internal/session }
+  sessiontest: { in: internal/session/sessiontest }
+  pty:         { in: internal/pty }
+  profiles:    { in: internal/profiles }
+  confirm:     { in: internal/confirm }
   platformtest: { in: test/** }
   testdata:    { in: testdata/** }
 # M2-42 and M2-43: cmd may use every internal package; doctor, install, helper, startup and pairing use
@@ -46,7 +52,7 @@ deps:
   hostostest: { mayDependOn: [hostos] }
   localchan:  { mayDependOn: [frame], canUse: [v-sys] }
   doctor:     { mayDependOn: [clock, config, hostos, state] }
-  helper:     { mayDependOn: [doctor, hostos, localchan], canUse: [v-sys] }
+  helper:     { mayDependOn: [config, doctor, frame, hostos, localchan, noise, profiles, pty, state], canUse: [v-sys] }
   install:    { mayDependOn: [config, hostos, localchan], canUse: [v-sys] }
   startup:    { mayDependOn: [config, doctor, hostos, localchan, pairing, state] }
   pairing:    { mayDependOn: [doctor, fingerprint, noise, state] }
@@ -54,3 +60,11 @@ deps:
   # touches the local channel of the PTY helpers.
   control:    { mayDependOn: [clock, doctor, startup], canUse: [v-websocket] }
   controltest: { canUse: [v-websocket] }
+  # M2-45: the session manager is the only user of the data connection (websocket) besides the
+  # control client; pty alone uses creack/pty; profiles and confirm reach the system through
+  # golang.org/x/sys only.
+  session:     { mayDependOn: [clock, config, control, doctor, frame, localchan, noise, state], canUse: [v-websocket] }
+  sessiontest: { mayDependOn: [frame, noise], canUse: [v-websocket] }
+  pty:         { canUse: [v-pty, v-sys] }
+  profiles:    { mayDependOn: [config, doctor, hostos, state], canUse: [v-sys] }
+  confirm:     { mayDependOn: [hostos], canUse: [v-sys] }

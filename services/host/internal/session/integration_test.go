@@ -6,6 +6,7 @@ package session
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ const (
 
 func TestOpenShellHappyPath(t *testing.T) {
 	r := newRig(t)
-	dev, dc := r.open(sessA, "shell", nil)
+	dev, dc := r.open(sessA, "shell")
 	if dc.Identify["session_id"] != sessA || dc.Identify["host_id"] != hostID || dc.Identify["proof"] == "" {
 		t.Errorf("identify %v", dc.Identify["session_id"])
 	}
@@ -30,7 +31,7 @@ func TestOpenShellHappyPath(t *testing.T) {
 	if err := json.Unmarshal(dev.Payload2, &p2); err != nil || p2.V != 1 || p2.HostVersion != "1.2.3" || p2.Profile != "shell" {
 		t.Errorf("payload of message 2: %+v", p2)
 	}
-	r.note.wait(t, "session.started", func() bool { return len(r.note.started) == 1 })
+	r.note.wait(t, "session.started", func() bool { return r.note.startedCount(sessA) == 1 })
 	r.send(dc, dev, frame.Data([]byte("stty size; echo o''k\n")))
 	r.readUntil(dc, dev, "40 120")
 	r.readUntil(dc, dev, "ok")
@@ -52,7 +53,7 @@ func TestOpenShellHappyPath(t *testing.T) {
 
 func TestOpenCommandProfile(t *testing.T) {
 	r := newRig(t)
-	dev, dc := r.open(sessA, "echo", nil)
+	dev, dc := r.open(sessA, "echo")
 	r.readUntil(dc, dev, "command-ran")
 	var exit *frame.Frame
 	for exit == nil {
@@ -89,7 +90,7 @@ func TestTMT03Replay(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.send(dc, dev, frame.Start(80, 24))
-	r.note.wait(t, "session.started", func() bool { return len(r.note.started) == 1 })
+	r.note.wait(t, "session.started", func() bool { return r.note.startedCount(sessA) == 1 })
 	// A second session.open for the same session and the recorded message 1 on the new connection.
 	r.sessionOpen(sessA, "shell", 20*time.Second)
 	dc2 := r.srv.Data(r.ctx, sessA, 2)
@@ -203,8 +204,8 @@ func TestTMT05NoStart(t *testing.T) {
 func TestSessionEndedLeavesCloseToServer(t *testing.T) {
 	r := newRig(t)
 	// process_exited: the server closes with 4100, the host reports nothing more.
-	dev, dc := r.open(sessA, "shell", nil)
-	r.note.wait(t, "started", func() bool { return len(r.note.started) == 1 })
+	dev, dc := r.open(sessA, "shell")
+	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
 	r.send(dc, dev, frame.Data([]byte("exit 3\n")))
 	e := r.note.waitEnded(t, sessA)
 	if e.CloseReason != ReasonProcessExited || e.ExitCode == nil || *e.ExitCode != 3 {
@@ -268,7 +269,7 @@ func TestConfirmDisabled(t *testing.T) {
 	if r.mgr.d.Confirm != nil {
 		t.Fatal("confirmation wired although host_service.require_local_confirm is false")
 	}
-	r.open(sessA, "shell", nil)
+	r.open(sessA, "shell")
 	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
 }
 
@@ -288,7 +289,7 @@ func TestStreamFaultEndsSession(t *testing.T) {
 	}
 	for i, fault := range faults {
 		id := sessiontest.NewID()
-		dev, dc := r.open(id, "shell", nil)
+		dev, dc := r.open(id, "shell")
 		r.note.wait(t, "started", func() bool { return r.note.startedCount(id) == 1 })
 		r.send(dc, dev, frame.Data([]byte("echo $$\n")))
 		fault(dc, dev)
@@ -303,7 +304,7 @@ func TestStreamFaultEndsSession(t *testing.T) {
 
 func TestAttachReplay(t *testing.T) {
 	r := newRig(t)
-	dev, dc := r.open(sessA, "shell", nil)
+	dev, dc := r.open(sessA, "shell")
 	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
 	r.send(dc, dev, frame.Data([]byte("echo before-detach\n")))
 	r.readUntil(dc, dev, "before-detach\r\n")
@@ -373,16 +374,19 @@ func TestSessionCloseAndDataClose(t *testing.T) {
 	r := newRig(t)
 	for _, viaClose := range []bool{true, false} {
 		id := sessiontest.NewID()
-		dev, dc := r.open(id, "shell", nil)
+		dev, dc := r.open(id, "shell")
 		r.note.wait(t, "started", func() bool { return r.note.startedCount(id) == 1 })
-		r.send(dc, dev, frame.Data([]byte("(sleep 1000 & echo bg=$!) ; echo started\n")))
-		out := r.readUntil(dc, dev, "started")
+		r.send(dc, dev, frame.Data([]byte("set +H 2>/dev/null; sleep 1000 & echo b''g=$! ; echo ST''ARTED\n")))
+		out := r.readUntil(dc, dev, "STARTED")
 		var all strings.Builder
 		for _, f := range out {
 			all.Write(f.Data)
 		}
-		_, rest, _ := strings.Cut(all.String(), "bg=")
-		pid := atoi(strings.Fields(rest)[0])
+		m := regexp.MustCompile(`bg=(\d+)`).FindStringSubmatch(all.String())
+		if m == nil {
+			t.Fatal("no PID of the background process")
+		}
+		pid := atoi(m[1])
 		if !pidAlive(pid) {
 			t.Fatal("background process missing")
 		}
@@ -410,7 +414,7 @@ func TestSessionCloseAndDataClose(t *testing.T) {
 		func(dc *sessiontest.Conn) { dc.Drop() },
 	} {
 		id := sessiontest.NewID()
-		_, dc := r.open(id, "shell", nil)
+		_, dc := r.open(id, "shell")
 		r.note.wait(t, "started", func() bool { return r.note.startedCount(id) == 1 })
 		end(dc)
 		waitFor(t, "detached", func() bool {
@@ -436,7 +440,7 @@ func TestSessionCloseAndDataClose(t *testing.T) {
 
 func TestHelperUntrustedEndsSessions(t *testing.T) {
 	r := newRig(t)
-	r.open(sessA, "shell", nil)
+	r.open(sessA, "shell")
 	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
 	// The local channel reports peer_mismatch in operation (HD10): the runs see it too.
 	res := shellResult(r.osu)
@@ -451,7 +455,7 @@ func TestHelperUntrustedEndsSessions(t *testing.T) {
 	if e.CloseReason != ReasonHostPolicyViolation || e.CloseDetail != DetailHelperUntrusted {
 		t.Errorf("running session: %+v", e)
 	}
-	r.open(sessB, "shell", nil)
+	r.open(sessB, "shell")
 	e = r.note.waitEnded(t, sessB)
 	if e.CloseReason != ReasonOpenFailed || e.CloseDetail != DetailHelperUntrusted {
 		t.Errorf("opening: %+v", e)
@@ -466,7 +470,7 @@ func TestHelperUntrustedEndsSessions(t *testing.T) {
 func TestPeerMismatchOnDial(t *testing.T) {
 	r := newRig(t)
 	r.peerBad.Store(true)
-	r.open(sessA, "shell", nil)
+	r.open(sessA, "shell")
 	e := r.note.waitEnded(t, sessA)
 	if e.CloseReason != ReasonOpenFailed || e.CloseDetail != DetailHelperUntrusted || r.startCount() != 0 {
 		t.Errorf("opening: %+v, PTYs %d", e, r.startCount())

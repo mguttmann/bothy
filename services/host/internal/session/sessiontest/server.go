@@ -173,7 +173,7 @@ func (s *Server) serveData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Identify = env.D
-	go c.read()
+	go c.read() //nolint:gosec // G118: the reader lives as long as the connection, not as the request
 	s.mu.Lock()
 	s.data[id] = append(s.data[id], c)
 	s.cond.Broadcast()

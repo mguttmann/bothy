@@ -29,6 +29,51 @@ type Runner interface {
 	Last() *doctor.Result
 }
 
+// LazyRunner is a Runner whose doctor runner is set later: the runner of the host service exists
+// only after startup.Start, while the manager must exist before the control connection. Before
+// Set every run gives no result, which refuses every session. It is safe for concurrent use.
+type LazyRunner struct {
+	mu sync.Mutex
+	r  Runner
+}
+
+// Set sets the runner.
+func (l *LazyRunner) Set(r Runner) {
+	l.mu.Lock()
+	l.r = r
+	l.mu.Unlock()
+}
+
+func (l *LazyRunner) get() Runner {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.r
+}
+
+// RunLight implements Runner.
+func (l *LazyRunner) RunLight(ctx context.Context) *doctor.Result {
+	if r := l.get(); r != nil {
+		return r.RunLight(ctx)
+	}
+	return nil
+}
+
+// RunLightUser implements Runner.
+func (l *LazyRunner) RunLightUser(ctx context.Context, u string) *doctor.Result {
+	if r := l.get(); r != nil {
+		return r.RunLightUser(ctx, u)
+	}
+	return nil
+}
+
+// Last implements Runner.
+func (l *LazyRunner) Last() *doctor.Result {
+	if r := l.get(); r != nil {
+		return r.Last()
+	}
+	return nil
+}
+
 // Policy is what a result allows (Design note 11 of M2-45). Host is the close_detail that refuses
 // every new session ("" admits); Ends tells that Host also ends every running session. Users maps a
 // session user to the detail that refuses and ends only its sessions.

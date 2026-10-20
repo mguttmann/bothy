@@ -139,6 +139,8 @@ func (s *session) run(dc *dataConn, tr *noise.Transport) {
 			s.link.resize(s.id, f.Cols, f.Rows)
 		case frame.TypeClose:
 			s.end(endSpec{reason: ReasonClientClosed, dc: dc, window: s.window})
+		case frame.TypeStart, frame.TypeExit, frame.TypeReplayBegin, frame.TypeReplayEnd:
+			// start was handled above; the others never come from the device (frame.Decode).
 		}
 	}
 	<-dc.done

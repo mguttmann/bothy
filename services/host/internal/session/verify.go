@@ -83,6 +83,18 @@ type Verifier struct {
 // unbound), (12) wdi exactly for claude with att open and inside the list of osu, (13) own on the
 // server host. Step 0, message 1 itself, runs before Verify (handshake_failed).
 func (v *Verifier) Verify(c Check) (Claims, string) {
+	cl, detail := v.verifyToken(c)
+	if detail != "" {
+		return Claims{}, detail
+	}
+	if detail := v.verifyAccess(c, cl); detail != "" {
+		return Claims{}, detail
+	}
+	return cl, ""
+}
+
+// verifyToken runs steps 1 to 7: the token itself and its binding to this handshake.
+func (v *Verifier) verifyToken(c Check) (Claims, string) {
 	h, cl, err := ParseToken(c.Token, c.Keys)
 	switch {
 	case err != nil, h.Typ != TokenType, cl.Aud != c.HostID, cl.Sid != c.SessionID:
@@ -94,35 +106,35 @@ func (v *Verifier) Verify(c Check) (Claims, string) {
 	case cl.Cek != c.Cek:
 		return Claims{}, DetailTokenInvalid
 	}
+	return cl, ""
+}
+
+// verifyAccess runs steps 8 to 13: the session, the profile, the session user and the server host.
+func (v *Verifier) verifyAccess(c Check, cl Claims) string {
 	live, isLive := c.Live(cl.Sid)
-	switch cl.Att {
-	case AttOpen:
-		if isLive {
-			return Claims{}, DetailTokenInvalid
-		}
-	case AttAttach:
-		if !isLive || live.Sub != cl.Sub || live.Osu != cl.Osu || live.Prf != cl.Prf {
-			return Claims{}, DetailTokenInvalid
-		}
+	switch {
+	case cl.Att == AttOpen && isLive:
+		return DetailTokenInvalid
+	case cl.Att == AttAttach && (!isLive || live.Sub != cl.Sub || live.Osu != cl.Osu || live.Prf != cl.Prf):
+		return DetailTokenInvalid
 	}
 	i := slices.IndexFunc(c.Offered, func(p OfferedProfile) bool { return p.Name == cl.Prf })
-	if i < 0 {
-		return Claims{}, DetailProfileUnknown
-	}
-	if !slices.Contains(c.SessionUsers, cl.Osu) {
-		return Claims{}, DetailSessionUserUnknown
-	}
-	if !v.Bindings.Bind(cl.Osu, cl.Sub) {
-		return Claims{}, DetailSessionUserMismatch
+	switch {
+	case i < 0:
+		return DetailProfileUnknown
+	case !slices.Contains(c.SessionUsers, cl.Osu):
+		return DetailSessionUserUnknown
+	case !v.Bindings.Bind(cl.Osu, cl.Sub):
+		return DetailSessionUserMismatch
 	}
 	wantWdi := c.Offered[i].Kind == kindClaude && cl.Att == AttOpen
 	if wantWdi != (cl.Wdi != nil) || (cl.Wdi != nil && *cl.Wdi >= c.Workdirs(cl.Osu)) {
-		return Claims{}, DetailProfileUnknown
+		return DetailProfileUnknown
 	}
 	if c.ServerHost && !cl.Own {
-		return Claims{}, DetailServerHostOwnerOnly
+		return DetailServerHostOwnerOnly
 	}
-	return cl, ""
+	return ""
 }
 
 // kindClaude is the kind of the profile claude (config.KindClaude).

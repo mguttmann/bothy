@@ -190,7 +190,7 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 		}
 		res = m.d.Result()
 	}
-	if m.d.Confirm != nil && !m.d.Confirm.Ask(ctx, confirmOpen, cl.Prf, cl.Osu, m.d.Config.LocalConfirmTimeout) {
+	if m.d.Confirm != nil && !m.d.Confirm(ctx, confirmOpen, cl.Prf, cl.Osu, m.d.Config.LocalConfirmTimeout) {
 		h.failOpening(ctx, cl, DetailLocalConfirmDenied)
 		return
 	}
@@ -243,7 +243,7 @@ func (h *handshake) attach(ctx context.Context, cl Claims, tr *noise.Transport) 
 		return
 	}
 	snap := s.beginAttach()
-	if m.d.Confirm != nil && !m.d.Confirm.Ask(ctx, confirmAttach, cl.Prf, cl.Osu, m.d.Config.LocalConfirmTimeout) {
+	if m.d.Confirm != nil && !m.d.Confirm(ctx, confirmAttach, cl.Prf, cl.Osu, m.d.Config.LocalConfirmTimeout) {
 		// The person at the machine refused access to this session: it ends.
 		s.end(endSpec{reason: ReasonOpenFailed, detail: DetailLocalConfirmDenied, dc: h.dc, window: h.window})
 		return

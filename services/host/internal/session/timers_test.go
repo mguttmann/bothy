@@ -25,7 +25,7 @@ func TestIdleTimeout(t *testing.T) {
 	v := sessiontest.DefaultValues
 	v.IdleTimeoutMs, v.DetachGraceMs = (10 * time.Minute).Milliseconds(), (60 * time.Minute).Milliseconds()
 	r := newRig(t, withClock(clk), withValues(v))
-	dev, dc := r.open(sessA, "shell", nil)
+	dev, dc := r.open(sessA, "shell")
 	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
 	advance(t, clk, 9*time.Minute)
 	// Only data and resize reset the timer; output of the host does not.
@@ -58,7 +58,7 @@ func TestDetachGrace(t *testing.T) {
 	v := sessiontest.DefaultValues
 	v.IdleTimeoutMs, v.DetachGraceMs = (60 * time.Minute).Milliseconds(), (10 * time.Minute).Milliseconds()
 	r := newRig(t, withClock(clk), withValues(v))
-	_, dc := r.open(sessA, "shell", nil)
+	_, dc := r.open(sessA, "shell")
 	r.note.wait(t, "started", func() bool { return r.note.startedCount(sessA) == 1 })
 	detached := func() bool {
 		s, ok := r.mgr.liveOf(sessA)

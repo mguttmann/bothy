@@ -42,17 +42,14 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
 
-// The helper of the integration tests is this test binary run again as a subprocess of the same
-// user (Design note 17): TestMain serves the local channel when the variable names a socket.
-const (
-	envHelperSocket = "BOTHY_SESSIONTEST_HELPER"
-	envHelperHome   = "BOTHY_SESSIONTEST_HOME"
-	envHelperStarts = "BOTHY_SESSIONTEST_STARTS"
-)
+// helperMarker as the first argument makes the test binary the helper of the integration tests:
+// this binary run again as a subprocess of the same user (Design note 17) with the socket, the
+// temporary home and the file that counts the PTYs as the next arguments.
+const helperMarker = "bothy-session-test-helper"
 
 func TestMain(m *testing.M) {
-	if sock := os.Getenv(envHelperSocket); sock != "" {
-		os.Exit(runHelper(sock))
+	if len(os.Args) == 5 && os.Args[1] == helperMarker {
+		os.Exit(runHelper(os.Args[2], os.Args[3], os.Args[4]))
 	}
 	os.Exit(m.Run())
 }
@@ -77,12 +74,11 @@ func (c countingStarter) Start(spec pty.StartSpec) (pty.Process, error) {
 
 // runHelper is the helper subprocess: the production helper.Serve with the session user being the
 // current user, /bin/sh as its login shell and a temporary home.
-func runHelper(sock string) int {
+func runHelper(sock, home, starts string) int {
 	me, err := user.Current()
 	if err != nil {
 		return 1
 	}
-	home := os.Getenv(envHelperHome)
 	self := hostos.Account{Name: me.Username, ID: me.Uid, Home: home, Shell: "/bin/sh"}
 	r := hostos.ExecRunner{}
 	users, sec, probe := hostos.Platform(r)
@@ -108,7 +104,7 @@ func runHelper(sock string) int {
 		cancel()
 	}()
 	err = helper.Serve(ctx, helper.Options{Listener: l, ServiceUID: me.Uid, Env: env,
-		Session: &helper.SessionEnv{Check: env, Profiles: penv, PTY: countingStarter{s: sup, file: os.Getenv(envHelperStarts)}}})
+		Session: &helper.SessionEnv{Check: env, Profiles: penv, PTY: countingStarter{s: sup, file: starts}}})
 	if err != nil {
 		return 1
 	}
@@ -120,21 +116,15 @@ type recorder struct {
 	mu      sync.Mutex
 	started []string
 	ended   []control.SessionEnded
-	cond    *sync.Cond
 	down    atomic.Bool
 }
 
-func newRecorder() *recorder {
-	r := &recorder{}
-	r.cond = sync.NewCond(&r.mu)
-	return r
-}
+func newRecorder() *recorder { return &recorder{} }
 
 func (r *recorder) Started(_ context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.started = append(r.started, id)
-	r.cond.Broadcast()
 	return nil
 }
 
@@ -145,31 +135,24 @@ func (r *recorder) Ended(_ context.Context, e control.SessionEnded) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.ended = append(r.ended, e)
-	r.cond.Broadcast()
 	return nil
 }
 
-// wait waits until cond holds or the timeout passes.
+// wait polls cond (which takes the lock itself) until it holds or the timeout passes.
 func (r *recorder) wait(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
-	stop := time.AfterFunc(time.Until(deadline), func() {
-		r.mu.Lock()
-		r.cond.Broadcast()
-		r.mu.Unlock()
-	})
-	defer stop.Stop()
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	for !cond() {
 		if time.Now().After(deadline) {
-			t.Fatalf("timeout waiting for %s (started %d, ended %d)", what, len(r.started), len(r.ended))
+			t.Fatalf("timeout waiting for %s (ended %d)", what, r.endedCount())
 		}
-		r.cond.Wait()
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
 func (r *recorder) endedOf(id string) (control.SessionEnded, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	for _, e := range r.ended {
 		if e.SessionID == id {
 			return e, true
@@ -371,13 +354,15 @@ func newRig(t *testing.T, opts ...rigOption) *rig {
 		return pid
 	}), Endpoint: func(string, string) string { return r.sock }}
 	deps := Deps{HostID: hostID, NoiseKey: r.key, AuthKey: r.auth, HostVersion: "1.2.3",
-		HTTP:    func() *http.Client { return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: r.srv.Pool, MinVersion: tls.VersionTLS12}}} },
+		HTTP: func() *http.Client {
+			return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: r.srv.Pool, MinVersion: tls.VersionTLS12}}}
+		},
 		DataURL: func(p string) (string, error) { return "wss" + strings.TrimPrefix(r.srv.URL, "https") + p, nil },
 		Config:  r.cfg, Bindings: r.store, APIKey: func() ([]byte, error) { return []byte("EXAMPLE-API-KEY-CANARY"), nil },
 		Gate: r.gate, Result: r.runner.Last, Offered: profiles.Offered, ServerHost: func() bool { return false },
 		Dial: ch.Open, Clock: r.clk, Log: slog.New(slog.NewJSONHandler(r.logs, nil))}
 	if r.confirm != nil {
-		deps.Confirm = r.confirm
+		deps.Confirm = r.confirm.Ask
 	}
 	r.mgr = New(deps)
 	t.Cleanup(r.mgr.Shutdown)
@@ -401,8 +386,8 @@ func (r *rig) startHelper() {
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	cmd := exec.Command(exe, "-test.run=^$") //nolint:gosec // the test binary itself
-	cmd.Env = []string{envHelperSocket + "=" + r.sock, envHelperHome + "=" + r.home, envHelperStarts + "=" + r.starts, "PATH=/usr/bin:/bin"}
+	cmd := exec.CommandContext(context.WithoutCancel(r.ctx), exe, helperMarker, r.sock, r.home, r.starts) //nolint:gosec // the test binary itself
+	cmd.Env = []string{"PATH=/usr/bin:/bin"}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		r.t.Fatal(err)
@@ -473,16 +458,12 @@ func (r *rig) device(id string) *sessiontest.Device {
 }
 
 // open runs a full opening of id with prf: session.open, message 1 and 2, start.
-func (r *rig) open(id, prf string, mutate func(map[string]any)) (*sessiontest.Device, *sessiontest.Conn) {
+func (r *rig) open(id, prf string) (*sessiontest.Device, *sessiontest.Conn) {
 	r.t.Helper()
 	r.sessionOpen(id, prf, 20*time.Second)
 	dc := r.srv.Data(r.ctx, id, r.srv.DataCount(id)+1)
 	dev := r.device(id)
-	c := r.claims(id, prf, AttOpen, dev)
-	if mutate != nil {
-		mutate(c)
-	}
-	if err := r.handshake(dc, dev, r.signer.Sign(c)); err != nil {
+	if err := r.handshake(dc, dev, r.signer.Sign(r.claims(id, prf, AttOpen, dev))); err != nil {
 		r.t.Fatalf("handshake: %v", err)
 	}
 	r.send(dc, dev, frame.Start(120, 40))
@@ -564,7 +545,6 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 	t.Fatalf("timeout waiting for %s", what)
 }
-
 
 func controlClose(id, reason string) control.SessionClose {
 	return control.SessionClose{SessionID: id, CloseReason: reason}

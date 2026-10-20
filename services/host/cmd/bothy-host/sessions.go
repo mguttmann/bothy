@@ -22,38 +22,6 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
 
-// lateRunner is the doctor runner of the gate: the runner of the started service, which exists only
-// after startup.Start; before it every run gives no result, which refuses every session.
-type lateRunner struct{ svc func() *startup.Service }
-
-func (l lateRunner) RunLight(ctx context.Context) *doctor.Result {
-	if s := l.svc(); s != nil {
-		return s.Runner().RunLight(ctx)
-	}
-	return nil
-}
-
-func (l lateRunner) RunLightUser(ctx context.Context, u string) *doctor.Result {
-	if s := l.svc(); s != nil {
-		return s.Runner().RunLightUser(ctx, u)
-	}
-	return nil
-}
-
-func (l lateRunner) Last() *doctor.Result {
-	if s := l.svc(); s != nil {
-		return s.Runner().Last()
-	}
-	return nil
-}
-
-// confirmAsk adapts confirm.Server to session.Confirmer.
-type confirmAsk struct{ s *confirm.Server }
-
-func (c confirmAsk) Ask(ctx context.Context, kind, profile, osu string, timeout time.Duration) bool {
-	return c.s.Ask(ctx, confirm.Request{Kind: kind, Profile: profile, SessionUser: osu}, timeout)
-}
-
 // sessionWiring holds the session manager of run with the parts it needs after the start.
 type sessionWiring struct {
 	mgr     *session.Manager
@@ -61,6 +29,7 @@ type sessionWiring struct {
 	confirm *confirm.Server
 	svc     *startup.Service
 	cl      *control.Client
+	runner  *session.LazyRunner
 }
 
 // newSessions builds the session manager of a paired host (M2-45) over the control client cl; the
@@ -79,8 +48,8 @@ func newSessions(c *config.Config, st *state.Dir, log *slog.Logger, doctorEnv do
 	if err != nil {
 		return nil, err
 	}
-	w := &sessionWiring{}
-	w.gate = session.NewGate(lateRunner{svc: func() *startup.Service { return w.svc }}, clock.Real(), c.CredentialCheckInterval,
+	w := &sessionWiring{runner: &session.LazyRunner{}}
+	w.gate = session.NewGate(w.runner, clock.Real(), c.CredentialCheckInterval,
 		func(ctx context.Context, res *doctor.Result) {
 			if w.svc != nil {
 				w.svc.Publish(ctx, res)
@@ -91,14 +60,9 @@ func newSessions(c *config.Config, st *state.Dir, log *slog.Logger, doctorEnv do
 		HTTP:    func() *http.Client { return w.cl.HTTPClient() },
 		DataURL: func(path string) (string, error) { return w.cl.DataURL(path) },
 		Config:  c, Bindings: st,
-		APIKey: func() ([]byte, error) { return os.ReadFile(st.File(state.ClaudeAPIKeyFile)) }, //nolint:gosec // the key file of the state directory
-		Gate:   w.gate,
-		Result: func() *doctor.Result {
-			if w.svc == nil {
-				return nil
-			}
-			return w.svc.Runner().Last()
-		},
+		APIKey:  func() ([]byte, error) { return os.ReadFile(st.File(state.ClaudeAPIKeyFile)) },
+		Gate:    w.gate,
+		Result:  w.runner.Last,
 		Offered: profiles.Offered,
 		ServerHost: func() bool {
 			res := w.gate.Last()
@@ -111,7 +75,9 @@ func newSessions(c *config.Config, st *state.Dir, log *slog.Logger, doctorEnv do
 			return nil, err
 		}
 		w.confirm = srv
-		d.Confirm = confirmAsk{s: srv}
+		d.Confirm = func(ctx context.Context, kind, profile, osu string, timeout time.Duration) bool {
+			return srv.Ask(ctx, confirm.Request{Kind: kind, Profile: profile, SessionUser: osu}, timeout)
+		}
 	}
 	w.mgr = session.New(d)
 	return w, nil
@@ -145,13 +111,14 @@ func newConfirmServer(env doctor.Env, st *state.Dir, log *slog.Logger) (*confirm
 		return ids
 	}
 	return confirm.NewServer(confirm.ServerOptions{Listener: l, Log: log, PeerOf: confirm.PeerOf,
-		Rule: confirm.Rule{ServiceUID: svc.ID, Excluded: excluded, ConsoleOwner: confirm.ConsoleOwner}}), nil
+		Rule: confirm.DefaultRule(svc.ID, excluded)}), nil
 }
 
 // start binds the started service and runs the periodic checks and the confirmation endpoint
 // until ctx ends.
 func (w *sessionWiring) start(ctx context.Context, svc *startup.Service) {
 	w.svc = svc
+	w.runner.Set(svc.Runner())
 	go w.gate.Loop(ctx)
 	if w.confirm != nil {
 		go func() { _ = w.confirm.Serve(ctx) }()

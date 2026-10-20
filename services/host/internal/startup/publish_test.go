@@ -15,7 +15,9 @@ func TestPublishOnChange(t *testing.T) {
 	x := newWorld(t)
 	x.pair()
 	d := x.deps()
-	d.Offered = func(*doctor.Result) []doctor.Profile { return []doctor.Profile{{Name: "only", DisplayName: "Only", Kind: "shell"}} }
+	d.Offered = func(*doctor.Result) []doctor.Profile {
+		return []doctor.Profile{{Name: "only", DisplayName: "Only", Kind: "shell"}}
+	}
 	s, code := Start(context.Background(), d)
 	if s == nil {
 		t.Fatalf("start refused %d", code)

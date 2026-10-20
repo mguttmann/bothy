@@ -5,8 +5,6 @@ package session
 import (
 	"context"
 	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -35,11 +33,10 @@ const (
 	ReasonHostPolicyViolation = "host_policy_violation"
 )
 
-// Confirmer asks the person at the machine (internal/confirm.Server.Ask); nil when
-// host_service.require_local_confirm is false.
-type Confirmer interface {
-	Ask(ctx context.Context, kind, profile, sessionUser string, timeout time.Duration) bool
-}
+// Confirmer asks the person at the machine (internal/confirm.Server.Ask) whether a PTY may start
+// (kind open) or an attach may replay (kind attach); nil when host_service.require_local_confirm is
+// false.
+type Confirmer func(ctx context.Context, kind, profile, sessionUser string, timeout time.Duration) bool
 
 // Deps are the parts of the manager; cmd/bothy-host wires them in run.
 type Deps struct {
@@ -215,7 +212,10 @@ func (m *Manager) Resend(ctx context.Context, n control.Notifier) {
 func (m *Manager) Shutdown() {
 	m.mu.Lock()
 	m.closed = true
-	links := m.links
+	links := make([]*helperLink, 0, len(m.links))
+	for _, l := range m.links {
+		links = append(links, l)
+	}
 	m.mu.Unlock()
 	m.EndAll(context.Background())
 	m.cancel()
@@ -346,12 +346,6 @@ type payload2 struct {
 	V           int    `json:"v"`
 	HostVersion string `json:"host_version"`
 	Profile     string `json:"profile"`
-}
-
-// hashPrefix returns a short SHA-256 prefix of s for logs (never the value itself).
-func hashPrefix(s string) string {
-	sum := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(sum[:6])
 }
 
 // serve runs one data connection from the dial to the end of the handshake, then hands it to the

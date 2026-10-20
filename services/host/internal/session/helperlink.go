@@ -5,7 +5,6 @@ package session
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -17,9 +16,6 @@ import (
 // M2-42 (startup.ChannelHelpers.Open). An error wrapping doctor.ErrPeerMismatch is a failed peer
 // check in operation (HD10).
 type Dialer func(ctx context.Context, sessionUser string) (*localchan.Conn, error)
-
-// errLinkBroken is a session channel that ended; the helper has ended its PTYs (D-W-90).
-var errLinkBroken = errors.New("session: the channel to the helper broke")
 
 // startAnswer is the answer of the helper to one pty.start: "" for pty.started, else the detail
 // of pty.failed.
@@ -46,7 +42,8 @@ func newHelperLink(m *Manager, user string, c *localchan.Conn) *helperLink {
 	return l
 }
 
-// read dispatches the packets of the helper until the channel ends.
+// read dispatches the packets of the helper until the channel ends or carries something a
+// helper never sends.
 func (l *helperLink) read() {
 	defer l.fail()
 	for {
@@ -58,33 +55,41 @@ func (l *helperLink) read() {
 			l.m.fromHelper(p.SessionID, p.Frame)
 			continue
 		}
-		switch p.Msg.Op {
-		case localchan.OpPTYStarted:
-			var b localchan.PTYStarted
-			if json.Unmarshal(p.Msg.D, &b) != nil {
-				return
-			}
-			l.answer(b.SessionID, startAnswer{})
-		case localchan.OpPTYFailed:
-			var b localchan.PTYFailed
-			if json.Unmarshal(p.Msg.D, &b) != nil {
-				return
-			}
-			if b.CloseDetail != DetailSharedLocation {
-				b.CloseDetail = DetailPTYFailed
-			}
-			l.answer(b.SessionID, startAnswer{detail: b.CloseDetail})
-		case localchan.OpPTYExited:
-			var b localchan.PTYExited
-			if json.Unmarshal(p.Msg.D, &b) != nil {
-				return
-			}
-			l.m.exited(b.SessionID, b.ExitCode)
-		default:
-			// Any other op on a session channel is a broken helper: close the channel.
+		if !l.handle(p.Msg) {
 			return
 		}
 	}
+}
+
+// handle reacts to one control message of the helper; false closes the channel.
+func (l *helperLink) handle(m localchan.Message) bool {
+	switch m.Op {
+	case localchan.OpPTYStarted:
+		var b localchan.PTYStarted
+		if json.Unmarshal(m.D, &b) != nil {
+			return false
+		}
+		l.answer(b.SessionID, startAnswer{})
+	case localchan.OpPTYFailed:
+		var b localchan.PTYFailed
+		if json.Unmarshal(m.D, &b) != nil {
+			return false
+		}
+		if b.CloseDetail != DetailSharedLocation {
+			b.CloseDetail = DetailPTYFailed
+		}
+		l.answer(b.SessionID, startAnswer{detail: b.CloseDetail})
+	case localchan.OpPTYExited:
+		var b localchan.PTYExited
+		if json.Unmarshal(m.D, &b) != nil {
+			return false
+		}
+		l.m.exited(b.SessionID, b.ExitCode)
+	default:
+		// Any other op on a session channel is a broken helper: close the channel.
+		return false
+	}
+	return true
 }
 
 func (l *helperLink) answer(id string, a startAnswer) {
