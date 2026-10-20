@@ -101,6 +101,11 @@ final class TerminalController extends ChangeNotifier {
   SimpleKeyPair? _ephemeral;
   int _cols = 80;
   int _rows = 24;
+  // The ownership token (D-M4-35-17). An opening, an attach and the stream loop it starts
+  // own the generation they began with; End, Detach, a revocation, a block and dispose start
+  // a new one. Only the owner of the current generation may change the state, the stream,
+  // the pump or the key, so a flow that resumes after an await never overwrites what the
+  // person or the server decided meanwhile.
   int _generation = 0;
   bool _busy = false;
   bool _disposed = false;
@@ -132,32 +137,36 @@ final class TerminalController extends ChangeNotifier {
     required int cols,
     required int rows,
   }) async {
-    if (_busy || _state.sessionId != null) return;
+    if (_busy || _state.sessionId != null || _disposed) return;
     _busy = true;
+    final epoch = _supersede();
     try {
       _cols = cols;
       _rows = rows;
-      _set(const TerminalTabState(phase: TerminalPhase.preparing));
-      final checked = await _prepare(host.value);
-      _alive();
-      if (checked == null) return _set(TerminalTabState.initial);
+      _set(epoch, const TerminalTabState(phase: TerminalPhase.preparing));
+      final checked = await _prepare(epoch, host.value);
+      if (checked == null) return _set(epoch, TerminalTabState.initial);
       final h = checked.host;
-      final choice = await _prompts.confirmOpen(
-        h,
-        OpenChoice(profile: profile, workdirIndex: workdirIndex),
+      final choice = await _owned(
+        epoch,
+        _prompts.confirmOpen(
+          h,
+          OpenChoice(profile: profile, workdirIndex: workdirIndex),
+        ),
       );
-      _alive();
-      if (choice == null) return _set(TerminalTabState.initial);
+      if (choice == null) return _set(epoch, TerminalTabState.initial);
       _set(
+        epoch,
         _state.copyWith(
           phase: TerminalPhase.connecting,
           profile: choice.profile,
         ),
       );
-      final hash = await _freshKeyHash();
-      _alive();
-      await _stepUp(purposeText: _prompts.stepUpPurpose(h, StepUpPurpose.open));
-      _alive();
+      final hash = await _freshKeyHash(epoch);
+      await _owned(
+        epoch,
+        _stepUp(purposeText: _prompts.stepUpPurpose(h, StepUpPurpose.open)),
+      );
       final grant = await _api.openSession(
         h.id,
         TerminalSessionOpen(
@@ -170,14 +179,14 @@ final class TerminalController extends ChangeNotifier {
             ..pinChanged = checked.pinChanged ? true : null,
         ),
       );
-      if (_disposed) {
+      if (!_owns(epoch)) {
         // The tab closed while the server opened the session: nobody could reach it any
         // more, so it is closed right away.
-        _dropKey();
         await _closeQuietly(grant.session.id);
         return;
       }
       _set(
+        epoch,
         _state.copyWith(
           sessionId: grant.session.id,
           openedAt: grant.session.openedAt,
@@ -185,14 +194,16 @@ final class TerminalController extends ChangeNotifier {
         ),
       );
       _watchHost(h.id);
-      if (!await _grantMatches(grant, h)) return;
-      await _connect(grant, h, checked, opening: true);
+      if (!await _grantMatches(epoch, grant, h)) return;
+      await _connect(epoch, grant, h, checked, opening: true);
+    } on _Superseded {
+      // Whoever ended the flow owns the tab now and has already cleaned up.
     } on StepUpCancelled {
-      _dropKey();
-      _set(TerminalTabState.initial);
+      if (_owns(epoch)) _dropKey();
+      _set(epoch, TerminalTabState.initial);
     } on Object catch (e) {
-      _dropKey();
-      _failed(e);
+      if (_owns(epoch)) _dropKey();
+      _failed(epoch, e);
     } finally {
       _busy = false;
     }
@@ -205,19 +216,21 @@ final class TerminalController extends ChangeNotifier {
   Future<void> attach() async {
     final sessionId = _state.sessionId;
     final host = _host;
-    if (_busy || sessionId == null || host == null) return;
+    if (_busy || sessionId == null || host == null || _disposed) return;
     if (_state.phase != TerminalPhase.detached) return;
     _busy = true;
     final before = _state;
+    final epoch = _supersede();
     try {
-      _set(_state.copyWith(phase: TerminalPhase.preparing, clearCauses: true));
-      final checked = await _prepare(host.id);
-      _attaching();
-      if (checked == null) return _set(before);
+      _set(
+        epoch,
+        _state.copyWith(phase: TerminalPhase.preparing, clearCauses: true),
+      );
+      final checked = await _prepare(epoch, host.id);
+      if (checked == null) return _set(epoch, before);
       final h = checked.host;
-      _set(_state.copyWith(phase: TerminalPhase.connecting));
-      final hash = await _freshKeyHash();
-      _attaching();
+      _set(epoch, _state.copyWith(phase: TerminalPhase.connecting));
+      final hash = await _freshKeyHash(epoch);
       final request = TerminalSessionAttach(
         (b) => b
           ..cols = _cols
@@ -227,33 +240,34 @@ final class TerminalController extends ChangeNotifier {
       );
       final purpose = _prompts.stepUpPurpose(h, StepUpPurpose.attach);
       if (before.detachCause == DetachCause.tokenStale) {
-        await _stepUp(purposeText: purpose);
-        _attaching();
+        await _owned(epoch, _stepUp(purposeText: purpose));
       }
       TerminalSessionGrant grant;
       try {
-        grant = await _api.attachSession(sessionId, request);
+        grant = await _owned(epoch, _api.attachSession(sessionId, request));
+      } on _Superseded {
+        rethrow;
       } on Object catch (e) {
         if (_problemOf(e)?.code != 'step_up_required') rethrow;
         // The server decides whether a step-up is needed (24 6.2); one retry after it.
-        await _stepUp(purposeText: purpose);
-        _attaching();
-        grant = await _api.attachSession(sessionId, request);
+        await _owned(epoch, _stepUp(purposeText: purpose));
+        grant = await _owned(epoch, _api.attachSession(sessionId, request));
       }
       // A closed tab leaves an attached session detached, as "Detach" would.
-      _attaching();
-      if (!await _grantMatches(grant, h)) return;
-      await _connect(grant, h, checked, opening: false);
-    } on StepUpCancelled {
-      _dropKey();
-      if (_stillAttaching) _set(before);
-    } on Object catch (e) {
-      _dropKey();
+      if (!await _grantMatches(epoch, grant, h)) return;
+      await _connect(epoch, grant, h, checked, opening: false);
+    } on _Superseded {
       // "End", a revocation or a closed tab during the attach win; nothing is overwritten.
-      if (_stillAttaching) {
-        final problem = _problemOf(e);
-        _set(before.copyWith(problemCode: problem?.code ?? 'attach_failed'));
-      }
+    } on StepUpCancelled {
+      if (_owns(epoch)) _dropKey();
+      _set(epoch, before);
+    } on Object catch (e) {
+      if (_owns(epoch)) _dropKey();
+      final problem = _problemOf(e);
+      _set(
+        epoch,
+        before.copyWith(problemCode: problem?.code ?? 'attach_failed'),
+      );
     } finally {
       _busy = false;
     }
@@ -265,7 +279,9 @@ final class TerminalController extends ChangeNotifier {
         _state.phase != TerminalPhase.exited) {
       return;
     }
+    final epoch = _supersede();
     _set(
+      epoch,
       _state.copyWith(
         phase: TerminalPhase.detached,
         detachCause: DetachCause.person,
@@ -278,12 +294,12 @@ final class TerminalController extends ChangeNotifier {
   /// Ends the session: sends `close` on a live stream, then `closeTerminalSession`.
   Future<void> end() async {
     final sessionId = _state.sessionId;
-    if (sessionId == null) return;
-    final pump = _pump;
-    if (pump != null && _state.phase == TerminalPhase.connected) {
-      await pump.sendFrame(const CloseFrame());
-    }
-    _set(_state.copyWith(phase: TerminalPhase.ended, replaying: false));
+    if (sessionId == null || _disposed) return;
+    final pump = _state.phase == TerminalPhase.connected ? _pump : null;
+    // End takes the tab first, so no flow that resumes later can overwrite it.
+    final epoch = _supersede();
+    _set(epoch, _state.copyWith(phase: TerminalPhase.ended, replaying: false));
+    if (pump != null) await pump.sendFrame(const CloseFrame());
     await _closeStream();
     try {
       await _api.closeSession(sessionId);
@@ -324,7 +340,7 @@ final class TerminalController extends ChangeNotifier {
     // The stream loop and pending requests check the generation and the flag, so nothing
     // notifies after this point.
     _disposed = true;
-    _generation++;
+    _supersede();
     unawaited(_hostChanges?.cancel());
     unawaited(_channel?.close());
     _dropKey();
@@ -334,39 +350,50 @@ final class TerminalController extends ChangeNotifier {
 
   // ---- steps ---------------------------------------------------------------------------
 
-  Future<_Checked?> _prepare(String hostId) async {
-    final h = await _api.getHost(hostId);
+  Future<_Checked?> _prepare(int epoch, String hostId) async {
+    final h = await _owned(epoch, _api.getHost(hostId));
     _host = h;
-    if (!_disposed) notifyListeners();
+    notifyListeners();
     final key = h.noisePublicKey;
     final fingerprint = h.keyFingerprint;
     if (key == null || fingerprint == null) {
       throw const ApiProblem(status: 409, code: 'host_unavailable');
     }
-    final pin = await _pins.read(h.id);
+    final pin = await _owned(epoch, _pins.read(h.id));
     final check = checkPin(pin, key, fingerprint);
     var pinChanged = false;
     if (check is PinChanged) {
-      if (!await _prompts.confirmKeyChange(h, check)) return null;
+      if (!await _owned(epoch, _prompts.confirmKeyChange(h, check))) {
+        return null;
+      }
       pinChanged = true;
     }
     final assignee = h.assignedUserId;
     if (assignee != null && assignee != _selfUserId) {
       // 24 8.4: the warning comes before the step-up; no step-up without the confirmation.
-      if (!await _prompts.confirmForeignHost(h)) return null;
+      if (!await _owned(epoch, _prompts.confirmForeignHost(h))) return null;
     }
     return _Checked(h, writePin: check is! PinMatches, pinChanged: pinChanged);
   }
 
-  Future<String> _freshKeyHash() async {
+  Future<String> _freshKeyHash(int epoch) async {
     _dropKey();
     final pair = await _newEphemeralKey();
+    if (!_owns(epoch)) {
+      // Nobody can use the key any more; it never becomes the tab's key.
+      pair.destroy();
+      throw const _Superseded();
+    }
     _ephemeral = pair;
-    final public = await pair.extractPublicKey();
+    final public = await _owned(epoch, pair.extractPublicKey());
     return ephemeralKeyHash(public.bytes);
   }
 
-  Future<bool> _grantMatches(TerminalSessionGrant grant, Host checked) async {
+  Future<bool> _grantMatches(
+    int epoch,
+    TerminalSessionGrant grant,
+    Host checked,
+  ) async {
     if (sameNoiseKey(grant.noisePublicKey, checked.noisePublicKey!) &&
         grant.keyGeneration == checked.keyGeneration) {
       return true;
@@ -374,6 +401,7 @@ final class TerminalController extends ChangeNotifier {
     // 15 23.2 item 3: a different key than the checked one aborts and closes the session.
     _dropKey();
     _set(
+      epoch,
       _state.copyWith(
         phase: TerminalPhase.blocked,
         blockCause: BlockCause.keyMismatch,
@@ -389,38 +417,35 @@ final class TerminalController extends ChangeNotifier {
   }
 
   Future<void> _connect(
+    int epoch,
     TerminalSessionGrant grant,
     Host host,
     _Checked checked, {
     required bool opening,
   }) async {
-    if (_disposed) throw const _Disposed();
-    final generation = ++_generation;
+    _check(epoch);
     final TerminalChannel channel;
     try {
       channel = await _transport.connect(grant.streamPath);
     } on Object {
+      // A connect that fails after End or a revocation changes nothing (red team N2).
+      if (!_owns(epoch)) return;
       _dropKey();
       return _set(
+        epoch,
         _state.copyWith(
           phase: TerminalPhase.detached,
           detachCause: DetachCause.connectionLost,
         ),
       );
     }
-    if (_disposed) {
-      _dropKey();
+    if (!_owns(epoch)) {
       await channel.close();
-      if (opening) await _closeQuietly(grant.session.id);
-      return;
-    }
-    if (generation != _generation || _state.phase != TerminalPhase.connecting) {
-      _dropKey();
-      await channel.close();
+      if (_disposed && opening) await _closeQuietly(grant.session.id);
       return;
     }
     _channel = channel;
-    unawaited(_run(channel, generation, grant, host, checked));
+    unawaited(_run(channel, epoch, grant, host, checked));
   }
 
   Future<void> _run(
@@ -435,7 +460,7 @@ final class TerminalController extends ChangeNotifier {
     BlockCause? failure;
     try {
       await for (final message in channel.messages) {
-        if (generation != _generation) break;
+        if (!_owns(generation)) break;
         switch (stage) {
           case _Stage.hello:
             if (message is! String) {
@@ -453,21 +478,31 @@ final class TerminalController extends ChangeNotifier {
               failure = BlockCause.protocolError;
               break;
             }
-            final identify = await _transport.identify(hello);
+            final identify = await _owned(
+              generation,
+              _transport.identify(hello),
+            );
             channel.sendText(jsonEncode({'op': 'identify', 'd': identify}));
             final key = _ephemeral;
             if (key == null) {
               failure = BlockCause.handshakeFailed;
               break;
             }
-            initiator = await NkInitiator.start(
-              hostStaticPublicKey: decodeNoiseKey(grant.noisePublicKey)!,
-              sessionId: uuidToBytes(grant.session.id),
-              hostId: uuidToBytes(host.id),
-              ephemeral: key,
+            final started = await _owned(
+              generation,
+              NkInitiator.start(
+                hostStaticPublicKey: decodeNoiseKey(grant.noisePublicKey)!,
+                sessionId: uuidToBytes(grant.session.id),
+                hostId: uuidToBytes(host.id),
+                ephemeral: key,
+              ),
             );
+            initiator = started;
             channel.sendBinary(
-              await initiator.writeMessage1(utf8.encode(grant.sessionToken)),
+              await _owned(
+                generation,
+                started.writeMessage1(utf8.encode(grant.sessionToken)),
+              ),
             );
             stage = _Stage.message2;
           case _Stage.message2:
@@ -475,7 +510,10 @@ final class TerminalController extends ChangeNotifier {
               failure = BlockCause.protocolError;
               break;
             }
-            final result = await initiator!.readMessage2(message);
+            final result = await _owned(
+              generation,
+              initiator!.readMessage2(message),
+            );
             initiator = null;
             // R-CL-15: the private part is not needed after message 2.
             _dropKey();
@@ -484,18 +522,19 @@ final class TerminalController extends ChangeNotifier {
               transport: result.transport,
               send: channel.sendBinary,
               scheduleTick: _scheduleTick,
-              // Only the current pump may block the tab; a stopped one is silent (red team
-              // M4-35: a stale resize tick after detach blocked the tab as tampering).
+              // Only the current pump of the owner may block the tab; a stopped one is
+              // silent (red team M4-35: a stale resize tick after detach blocked the tab).
               onError: (_) {
-                if (identical(_pump, pump)) {
+                if (identical(_pump, pump) && _owns(generation)) {
                   _blockAndClose(channel, BlockCause.handshakeFailed);
                 }
               },
             );
             _pump = pump;
-            await pump.sendFrame(StartFrame(_cols, _rows));
+            await _owned(generation, pump.sendFrame(StartFrame(_cols, _rows)));
             stage = _Stage.frames;
             _set(
+              generation,
               _state.copyWith(
                 phase: TerminalPhase.connected,
                 clearCauses: true,
@@ -503,13 +542,16 @@ final class TerminalController extends ChangeNotifier {
               ),
             );
             if (checked.writePin) {
-              await _pins.write(
-                HostKeyPin(
-                  hostId: host.id,
-                  noisePublicKey: grant.noisePublicKey,
-                  keyGeneration: grant.keyGeneration,
-                  fingerprint: grant.keyFingerprint,
-                  firstSeen: _clock.now(),
+              await _owned(
+                generation,
+                _pins.write(
+                  HostKeyPin(
+                    hostId: host.id,
+                    noisePublicKey: grant.noisePublicKey,
+                    keyGeneration: grant.keyGeneration,
+                    fingerprint: grant.keyFingerprint,
+                    firstSeen: _clock.now(),
+                  ),
                 ),
               );
             }
@@ -518,23 +560,28 @@ final class TerminalController extends ChangeNotifier {
               failure = BlockCause.protocolError;
               break;
             }
-            _onFrame(await _pump!.receive(message));
+            _onFrame(
+              generation,
+              await _owned(generation, _pump!.receive(message)),
+            );
         }
         if (failure != null) break;
       }
     } on Object {
       // A Noise or frame error is tampering (24 5.3, 5.4): hard warning, no retry. The error
-      // object is dropped on purpose; it may hold bytes of the stream.
+      // object is dropped on purpose; it may hold bytes of the stream. A superseded loop
+      // ends below without touching anything.
       failure = BlockCause.handshakeFailed;
     }
-    // An older stream loop must not touch the key of a newer attach.
-    if (generation != _generation) return;
+    // Whoever superseded this loop closed its stream and owns the key, the pump and the state.
+    if (!_owns(generation)) return;
     _dropKey();
     _stopPump();
     _channel = null;
     if (failure != null) {
       await channel.close();
       return _set(
+        generation,
         _state.copyWith(
           phase: TerminalPhase.blocked,
           blockCause: failure,
@@ -542,10 +589,10 @@ final class TerminalController extends ChangeNotifier {
         ),
       );
     }
-    _afterClose(channel.closeCode, channel.closeReason);
+    _afterClose(generation, channel.closeCode, channel.closeReason);
   }
 
-  void _onFrame(TerminalFrame frame) {
+  void _onFrame(int epoch, TerminalFrame frame) {
     switch (frame) {
       case DataFrame(:final bytes):
         final replay = _replay;
@@ -555,22 +602,25 @@ final class TerminalController extends ChangeNotifier {
           _screen.write(bytes);
         }
       case ExitFrame(:final code):
-        _set(_state.copyWith(phase: TerminalPhase.exited, exitCode: code));
+        _set(
+          epoch,
+          _state.copyWith(phase: TerminalPhase.exited, exitCode: code),
+        );
       case ReplayBeginFrame():
         _replay = BytesBuilder(copy: false);
-        _set(_state.copyWith(replaying: true));
+        _set(epoch, _state.copyWith(replaying: true));
       case ReplayEndFrame():
         final replay = _replay;
         _replay = null;
         if (replay != null) _screen.replaceWith(replay.takeBytes());
-        _set(_state.copyWith(replaying: false));
+        _set(epoch, _state.copyWith(replaying: false));
       case StartFrame() || ResizeFrame() || CloseFrame():
         // decodeFrame refuses device frames from the host; unreachable.
         break;
     }
   }
 
-  void _afterClose(int? code, String? reason) {
+  void _afterClose(int epoch, int? code, String? reason) {
     final phase = _state.phase;
     if (phase == TerminalPhase.ended ||
         phase == TerminalPhase.blocked ||
@@ -581,6 +631,7 @@ final class TerminalController extends ChangeNotifier {
     final reaction = closeReactionFor(code, reason);
     _replay = null;
     _set(
+      epoch,
       _state.copyWith(
         phase: reaction.phase,
         detachCause: reaction.detachCause,
@@ -592,15 +643,19 @@ final class TerminalController extends ChangeNotifier {
   }
 
   void _blockAndClose(TerminalChannel channel, BlockCause cause) {
-    _generation++;
+    final epoch = _supersede();
     _stopPump();
+    _dropKey();
     _channel = null;
-    _set(_state.copyWith(phase: TerminalPhase.blocked, blockCause: cause));
+    _set(
+      epoch,
+      _state.copyWith(phase: TerminalPhase.blocked, blockCause: cause),
+    );
     unawaited(channel.close());
   }
 
+  // Closes the stream of the tab; the caller has superseded the running flow before.
   Future<void> _closeStream() async {
-    _generation++;
     _stopPump();
     _replay = null;
     _dropKey();
@@ -622,7 +677,9 @@ final class TerminalController extends ChangeNotifier {
           StreamCloseCode.terminalClosed,
           change.closeReason,
         );
+        final epoch = _supersede();
         _set(
+          epoch,
           _state.copyWith(
             phase: reaction.phase,
             blockCause: reaction.blockCause,
@@ -639,9 +696,10 @@ final class TerminalController extends ChangeNotifier {
     input(utf8.encode(transform == null ? data : transform(data)));
   }
 
-  void _failed(Object error) {
+  void _failed(int epoch, Object error) {
     final problem = _problemOf(error);
     _set(
+      epoch,
       _state.copyWith(
         phase: _state.sessionId == null
             ? TerminalPhase.failed
@@ -654,19 +712,23 @@ final class TerminalController extends ChangeNotifier {
     );
   }
 
-  // Throws when the tab was disposed during an await, so open and attach stop there.
-  void _alive() {
-    if (_disposed) throw const _Disposed();
+  // ---- ownership (D-M4-35-17) -----------------------------------------------------------
+
+  /// Starts a new generation: every flow of an older one stops at its next step.
+  int _supersede() => ++_generation;
+
+  /// Whether a flow of [epoch] still owns the tab.
+  bool _owns(int epoch) => !_disposed && epoch == _generation;
+
+  void _check(int epoch) {
+    if (!_owns(epoch)) throw const _Superseded();
   }
 
-  bool get _stillAttaching =>
-      !_disposed &&
-      (_state.phase == TerminalPhase.preparing ||
-          _state.phase == TerminalPhase.connecting);
-
-  // Throws when the tab was disposed, ended or blocked while an attach awaited.
-  void _attaching() {
-    if (!_stillAttaching) throw const _Disposed();
+  /// Awaits [step] of a flow of [epoch] and stops the flow when it lost the tab meanwhile.
+  Future<T> _owned<T>(int epoch, Future<T> step) async {
+    final value = await step;
+    _check(epoch);
+    return value;
   }
 
   Future<void> _closeQuietly(String sessionId) async {
@@ -688,8 +750,9 @@ final class TerminalController extends ChangeNotifier {
     if (key != null && !key.hasBeenDestroyed) key.destroy();
   }
 
-  void _set(TerminalTabState next) {
-    if (_disposed) return;
+  /// The only writer of the state: a flow that lost the tab changes nothing.
+  void _set(int epoch, TerminalTabState next) {
+    if (!_owns(epoch)) return;
     _state = next;
     notifyListeners();
   }
@@ -717,9 +780,9 @@ final class TerminalController extends ChangeNotifier {
 
 enum _Stage { hello, message2, frames }
 
-/// Ends an opening or attaching after the controller was disposed.
-final class _Disposed implements Exception {
-  const _Disposed();
+/// Stops a flow that lost the tab to End, Detach, a revocation, a block or dispose.
+final class _Superseded implements Exception {
+  const _Superseded();
 }
 
 final class _Checked {

@@ -80,13 +80,24 @@ final class FakeHost {
   /// Every frame the device sent after the handshake, in order, over all streams.
   final List<TerminalFrame> frames = [];
 
+  /// For every entry of [frames], the value of [deviceMessages] when the device sent it.
+  final List<int> frameSentAt = [];
+
+  /// The number of messages the device has put on any stream so far (counted when sent, not
+  /// when the host has read them).
+  int deviceMessages = 0;
+
   /// The payloads of message 1 that did not match the expected token.
   final List<String> rejectedTokens = [];
 
   _FakeStream? _current;
+  final List<_FakeStream> _streams = [];
 
   /// The number of streams that connected so far.
   int connections = 0;
+
+  /// The number of streams that neither side has closed yet.
+  int get openStreams => _streams.where((s) => !s.closed).length;
 
   /// Expects [token] as the payload of message 1 on the stream of [sessionId].
   void expectToken(String sessionId, String token) =>
@@ -140,6 +151,7 @@ final class FakeHost {
     final sessionId = _sessionOf(streamPath);
     final stream = _FakeStream(this, sessionId);
     _current = stream;
+    _streams.add(stream);
     if (sendHello) {
       scheduleMicrotask(
         () => stream.toDevice(
@@ -167,7 +179,7 @@ final class FakeHost {
       }
       return;
     }
-    final bytes = message as Uint8List;
+    final (sentAt, bytes) = message as (int, Uint8List);
     if (s.transport == null) {
       await _handshake(s, bytes);
       return;
@@ -176,6 +188,7 @@ final class FakeHost {
       frames.add(
         decodeFrame(await s.transport!.decrypt(bytes), FrameSender.device),
       );
+      frameSentAt.add(sentAt);
     } on Object {
       s.closeFromServer(4104, null);
     }
@@ -257,7 +270,7 @@ final class _FakeStream implements TerminalChannel {
   void sendBinary(Uint8List bytes) {
     // Like the sink of a closed WebSocket, a send after close throws.
     if (closed) throw StateError('stream closed');
-    _enqueue(Uint8List.fromList(bytes));
+    _enqueue((++host.deviceMessages, Uint8List.fromList(bytes)));
   }
 
   void _enqueue(Object message) {
