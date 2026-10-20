@@ -176,7 +176,7 @@ func joinFields(list ...error) error {
 		if out == nil {
 			out = errs.New(errs.CodeValidationFailed, e.Detail)
 		}
-		out.WithFields(e.Fields...)
+		out = out.WithFields(e.Fields...)
 	}
 	if out == nil {
 		return nil

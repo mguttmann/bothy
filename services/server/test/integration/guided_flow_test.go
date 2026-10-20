@@ -155,7 +155,7 @@ func guidedActions(t *testing.T) []string {
 	t.Helper()
 	var text []byte
 	for _, name := range []string{"05-aktionen.md", "05-actions.md"} {
-		b, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "spec", name))
+		b, err := os.ReadFile(filepath.Clean(filepath.Join("..", "..", "..", "..", "docs", "spec", name)))
 		if err == nil {
 			text = b
 			break
@@ -531,7 +531,7 @@ func TestResolveI1_AlreadyOrganizationIsNoChange(t *testing.T) {
 func TestResolveI1_ReasonRules(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
-	reasons := map[string]string{"blank": "   ", "bidi": `bad‮`, "too long": strings.Repeat("a", reasonMaxChars+1)}
+	reasons := map[string]string{"blank": "   ", "bidi": `bad\u202e`, "too long": strings.Repeat("a", reasonMaxChars+1)}
 	wantField := func(r *httpservertest.Response, pointer string) {
 		t.Helper()
 		p := w.want(r, http.StatusBadRequest, "validation_failed")

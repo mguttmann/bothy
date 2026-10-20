@@ -33,11 +33,10 @@ func (noRights) AddAffected(context.Context, ...ids.ID) error { return nil }
 // empty switch; startAgents calls bindGuidedFlow, so every started graph has the real switch.
 func TestWiringUsesRealAgentPolicySwitch(t *testing.T) {
 	t.Parallel()
-	resolver, err := authzapp.NewResolver(authzapp.ResolverDeps{Authorizer: authorize.Authorizer(nil), Policies: noPolicies{}, Rights: noRights{}, ReasonMaxChars: 10})
-	if err == nil {
+	if _, err := authzapp.NewResolver(authzapp.ResolverDeps{Policies: noPolicies{}, Rights: noRights{}, ReasonMaxChars: 10}); err == nil {
 		t.Fatal("a resolver without an Authorizer must be refused")
 	}
-	resolver, err = authzapp.NewResolver(authzapp.ResolverDeps{Authorizer: allowNothing{}, Policies: noPolicies{}, Rights: noRights{}, ReasonMaxChars: 10})
+	resolver, err := authzapp.NewResolver(authzapp.ResolverDeps{Authorizer: allowNothing{}, Policies: noPolicies{}, Rights: noRights{}, ReasonMaxChars: 10})
 	if err != nil {
 		t.Fatal(err)
 	}

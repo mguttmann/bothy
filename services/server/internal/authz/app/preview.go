@@ -222,6 +222,15 @@ type previewer struct {
 	resolve *authz.ResolveI1
 }
 
+// switchLines are the agents of the switch lines of the text with their names (M2-21).
+func switchLines(list []previewSwitch, name func(ids.ID) string) []previewtext.Switch {
+	var out []previewtext.Switch
+	for _, sw := range list {
+		out = append(out, previewtext.Switch{Agent: name(sw.agent), OrganizationReady: sw.organizationReady})
+	}
+	return out
+}
+
 // previewSwitch is one agent the previewed request switches from personal (M2-21 design note 9).
 type previewSwitch struct {
 	agent ids.ID
@@ -826,9 +835,7 @@ func (p *previewer) textInput(ctx context.Context, facts previewFacts) (previewt
 	for _, op := range facts.toolClass {
 		in.ToolClass = append(in.ToolClass, name(op))
 	}
-	for _, sw := range facts.switches {
-		in.Switches = append(in.Switches, previewtext.Switch{Agent: name(sw.agent), OrganizationReady: sw.organizationReady})
-	}
+	in.Switches = switchLines(facts.switches, name)
 	if err := p.horizonNames(ctx, facts.horizon, name, &in); err != nil {
 		return in, err
 	}
