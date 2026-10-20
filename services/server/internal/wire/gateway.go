@@ -16,7 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	gatewaymetrics "github.com/OWNER/bothy/services/server/internal/gateway/adapters/otelmetrics"
-	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/passdelivery"
+	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/rundelivery"
 	gatewayws "github.com/OWNER/bothy/services/server/internal/gateway/adapters/ws"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -30,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 )
@@ -120,6 +121,10 @@ type GatewayDeps struct {
 	Consumers agents.Consumers
 	// Presence takes the member agent of the op heartbeat (M2-20); nil leaves it without effect.
 	Presence agents.Presence
+	// Invocations is the port runs.Delivery (M2-08), which the consumer engine calls before every
+	// invocation-bearing event on the WebSocket and in the REST poll; nil refuses such events
+	// with an error (fail closed).
+	Invocations runs.Delivery
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
 	Log   *slog.Logger
@@ -247,7 +252,7 @@ func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub) (*
 		MaxInflight: cfg.MaxInflightEvents, AckTimeout: cfg.AckTimeout, PersistInterval: cfg.AckPersistInterval,
 		IdleWindow: cfg.ResumeWindow, PageSize: cfg.CatchUpPageSize, CursorEvery: cfg.CursorAdvanceEvery,
 		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap,
-	}, gatewayapp.ConsumerDeps{Consumers: d.Consumers, CatchUp: d.Reads.CatchUp, Position: hub, Hook: passdelivery.Hook{},
+	}, gatewayapp.ConsumerDeps{Consumers: d.Consumers, CatchUp: d.Reads.CatchUp, Position: hub, Hook: rundelivery.Hook{Delivery: d.Invocations},
 		Epoch: epochSource{d.Instance}, Clock: d.Clock, Log: orDiscard(d.Log)})
 	if err != nil {
 		return nil, err

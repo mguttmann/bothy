@@ -769,7 +769,9 @@ zurück, erscheinen sie wieder.
    des Verbrauchers.
 2. **Zustellung.** Bei jeder Zustellung von `agent.invocation` prüft der Server unmittelbar
    davor `authorize(trigger_principal, agent.invoke, thread)` mit den aktuellen Rechten, die
-   Backend-Richtlinie (I2) und die Schutzregeln SR2 und SR3. Scheitert die Prüfung, stellt er
+   Backend-Richtlinie (I2) und die Schutzregeln SR2 und SR3; `trigger_principal` is the
+   triggering person without session, device and token ([05-aktionen.md](05-aktionen.md),
+   section 5, "Check without a request", R-AZ-29). Scheitert die Prüfung, stellt er
    nicht zu, setzt den Lauf auf `failed` mit Grund, setzt `trigger_state = failed` mit
    `trigger_state_reason` und schreibt einen Audit-Eintrag (fail closed). Besteht sie, erzeugt
    er eine frische Aufruf-Marke (JWS, EdDSA, Claims in [05-aktionen.md](05-aktionen.md),

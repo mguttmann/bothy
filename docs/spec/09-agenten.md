@@ -157,7 +157,9 @@ Für eine neue Nachricht M eines Prinzipals P im Thread T des Kanals C gilt in d
 7. `authorize(P, agent.invoke, {Ziel, Kandidat, M})` nach 05 Abschnitt 5 (Rechte, Agent aktiv,
    I2, Projekt bereit). Bei `allow`: Lauf `queued`, Live-Box-Anker, Ereignis `agent.invocation`,
    `trigger_state = received`. Bei Ablehnung: M bleibt gespeichert, `trigger_state = failed` mit
-   Grund.
+   Grund. The first successful delivery of `agent.invocation` moves `trigger_state` to `queued`;
+   a denial immediately before the delivery fails the run and sets `trigger_state = failed` with
+   the reason of 5.2 (04 section 15.3 step 2, M2-08).
 
 Order of the check and the auto thread (D-M2-05-2): with `auto_thread` in the main thread the check
 of point 7 names the thread of M, not the new thread, so the mention rule of point 3 and the guard
@@ -252,7 +254,9 @@ und Gäste erlaubt sind; diese Kanäle zählt I1 nicht zu seinen Zielen
 ### 3.7 Auto-Thread aus einer Kanal-Nachricht
 
 Der neue Thread T' bekommt `parent_message_id = M`, `operator_agent_id` = wirksamer Bediener von
-C, `title = ''` und `title_source = 'auto'`. Bis ein Titel gesetzt ist, zeigt der Client die erste
+C, `title = ''` und `title_source = 'auto'`. T' is written only after the `allow` of 3.4 point 7, so
+a denial creates no empty thread; the check before every delivery decides T' with the main-thread
+mention rule of the channel ("for new threads", 05 section 5 point 3; M2-08). Bis ein Titel gesetzt ist, zeigt der Client die erste
 Zeile von M. M bleibt im Hauptverlauf und trägt den `trigger_state`; Lauf, Live-Box-Anker,
 Antworten und Sitzung gehören zu T'.
 
@@ -751,11 +755,11 @@ stateDiagram-v2
 | Grund | Zustand | Gesetzt von | Bedeutung |
 |---|---|---|---|
 | `user_cancelled` | `cancelled` | Server | Mensch hat gestoppt |
-| `access_revoked` | `cancelled` | Server | Auslöser verlor `trigger` (04 Abschnitt 8.3) |
+| `access_revoked` | `cancelled`; `failed` on denial before delivery | Server | Auslöser verlor `trigger` (04 Abschnitt 8.3); at delivery every denial of `agent.invoke` without its own code below (AZ-M51) |
 | `cancel_timeout` | `cancelled` | Server | Adapter meldete den Abbruch nicht in `agent.cancel_grace` |
-| `agent_disabled` | `cancelled` | Server | Agent gesperrt |
+| `agent_disabled` | `cancelled`; `failed` on denial before delivery | Server | Agent gesperrt |
 | `billing_mode_personal_not_holder` | `failed` | Server | I2 bei Zustellung |
-| `channel_read_only` | `cancelled` | Server | Channel became read-only or archived (04 section 8.3) |
+| `channel_read_only` | `cancelled`; `failed` on denial before delivery | Server | Channel became read-only or archived (04 section 8.3) |
 | `billing_mode_mismatch` | `failed` | Adapter oder Server | I3 |
 | `tool_class_owner_only` | `failed` | Server | SR2 at delivery or at `run.token.renew` |
 | `tool_class_mismatch` | `failed` | Adapter or Server | actual tool class higher than the `tool_class` of the token (SR2) |
@@ -767,7 +771,7 @@ stateDiagram-v2
 | `runtime_error` | `failed` | Adapter | Laufzeit meldet einen Fehler; Details im letzten Schritt |
 | `adapter_error` | `failed` | Adapter | Fehler im Adapter selbst |
 | `runtime_not_authenticated` | `failed` | Adapter | Laufzeit hat keine gültige Anmeldung |
-| `user_disabled` | `cancelled` | Server | The triggering person was disabled (`user.disable`, 02 section 4.3) |
+| `user_disabled` | `cancelled`; `failed` on denial before delivery | Server | The triggering person was disabled (`user.disable`, 02 section 4.3): `cancelled` on revocation, `failed` at delivery |
 
 The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
 unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the original code as the detail `original_reason` of a server
@@ -880,7 +884,11 @@ keine Emoji ([01-produkt.md](01-produkt.md)).
 ## 7. Nachträge während eines Laufs
 
 Eine Nachricht, die nach 3.4 den Agenten des aktiven Laufs auslösen würde, wird ein Nachtrag
-(`run.followup.create`, 3.4 Punkt 6; 05 Abschnitt 5 Punkt 7 spricht von "der Auslösung"). Eine
+(`run.followup.create`, 3.4 Punkt 6; 05 Abschnitt 5 Punkt 7 spricht von "der Auslösung").
+`agent.followup` passes `agent.invoke` for the author of the follow-up immediately before every
+delivery; a denial sends nothing and sets the follow-up message to `trigger_state = failed` with the
+reason, but leaves the run unchanged, because the run's own trigger was checked for its own
+invocation and another person's follow-up must not end it (M2-08). Eine
 Nachricht ohne Auslösung (kein `trigger`, Erwähnungsregel nicht erfüllt) bleibt eine normale
 Nachricht und erreicht den Agenten nur als Kontext des nächsten Laufs. Grund: Ein Kanal mit
 Erwähnungspflicht soll Gespräche zwischen Menschen nicht in einen laufenden Turn schieben.
