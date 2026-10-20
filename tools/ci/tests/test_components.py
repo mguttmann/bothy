@@ -226,3 +226,210 @@ def test_cli_pins(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     bad = _bundle_repo(tmp_path / "bad", "1.0.0", "BOTHY_VERSION=2.0.0-beta.3")
     assert components.main(["pins", "--repo", str(bad)]) == 1
     assert "2.0.0-beta.3" in capsys.readouterr().err
+
+
+# --- the CI jobs a change needs (ci_plan) ------------------------------------------------
+
+TESTS_SERVER = {"test-server"}
+POSTGRES = {"postgres-image-amd64", "postgres-image-arm64"}
+DESKTOP = {"apps-macos", "apps-windows"}
+ANDROID = {"apps-android-26", "apps-android-36"}
+PLATFORM = DESKTOP | ANDROID
+EVERY_JOB = set(components.CONDITIONAL_JOBS)
+
+
+@pytest.mark.parametrize(
+    ("files", "expected"),
+    [
+        # Server code inside the build context of bothy-postgres runs the image jobs.
+        (["services/server/internal/chat/x.go"], TESTS_SERVER | POSTGRES),
+        (["services/server/cmd/bothy-backupd/main.go"], TESTS_SERVER | POSTGRES),
+        (["services/server/images/bothy-postgres/Dockerfile"], TESTS_SERVER | POSTGRES),
+        (["services/server/images/bothy-postgres/entrypoint.sh"], TESTS_SERVER | POSTGRES),
+        (["services/server/test/postgresimage/postgresimage_test.go"], TESTS_SERVER | POSTGRES),
+        (["services/server/migrations/00099_x.sql"], TESTS_SERVER | POSTGRES),
+        (["services/server/go.mod"], TESTS_SERVER | POSTGRES),
+        (["services/server/VERSION"], TESTS_SERVER | POSTGRES),
+        # Server code outside it does not.
+        (["services/server/api/rest/handler.go"], TESTS_SERVER),
+        (["services/server/cmd/bothy/main.go"], TESTS_SERVER),
+        (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER),
+        (["services/host/internal/noise/noise.go"], TESTS_SERVER),
+        (["docs/spec/actions.yaml"], TESTS_SERVER),
+        # Members of the Dart workspace (with their native code) and its root files run the
+        # platform jobs; inputs of generated Dart files that are committed under packages/ do not.
+        (["apps/client/lib/main.dart"], {"test-apps"} | PLATFORM),
+        (["packages/device_key/darwin/Sources/core.swift"], {"test-apps"} | PLATFORM),
+        (["packages/device_key/android/core/src/main/x.kt"], {"test-apps"} | PLATFORM),
+        (["packages/device_key/windows/core/core.cpp"], {"test-apps"} | PLATFORM),
+        (["apps/client/platform-tests.json"], {"test-apps"} | PLATFORM),
+        (["pubspec.yaml"], {"test-apps"} | PLATFORM),
+        (["pubspec.lock"], {"test-apps"} | PLATFORM),
+        (["analysis_options.yaml"], {"test-apps"}),
+        (["design/tokens/color.json"], {"test-apps"}),
+        (["tools/arch-check/rules.yaml"], {"test-apps"}),
+        (["services/host/testdata/noise/recordings/go.json"], {"test-apps", "test-server"}),
+        (["tools/observability/sli_bounds.py"], {"test-apps", "test-server"}),
+        # SDKs and plugins.
+        (["sdk/python/src/x.py"], {"test-sdk-plugins"}),
+        (["sdk/typescript/src/x.ts"], {"test-sdk-plugins"}),
+        (["plugins/hermes-adapter/x.py"], {"test-sdk-plugins"}),
+        (["plugins/hermes-adapter/pyproject.toml"], {"test-sdk-plugins"}),
+        # Documentation needs no conditional job; test (tools) runs on every change.
+        (["docs/spec/07-permissions.md"], set()),
+        (["README.md", "infra/compose/compose.yaml"], set()),
+        (["services/server/internal/x.go", "docs/DECISIONS.md"], TESTS_SERVER | POSTGRES),
+        # Shared inputs run every job: the API contract, the Makefile, tools, workflows, root
+        # files outside the component map, and an empty or unknown diff.
+        (["docs/api/openapi.yaml"], EVERY_JOB),
+        (["Makefile"], EVERY_JOB),
+        (["tools/ci/components.py"], EVERY_JOB),
+        (["tools/uv.lock"], EVERY_JOB),
+        ([".github/workflows/ci.yml"], EVERY_JOB),
+        (["sonar-project.properties"], EVERY_JOB),
+        (["some-new-top-level.toml"], EVERY_JOB),
+        ([], EVERY_JOB),
+    ],
+)
+def test_ci_plan_selects_the_jobs_a_change_needs(files: list[str], expected: set[str]) -> None:
+    assert set(components.ci_plan(files=files, public=True).jobs) == expected
+
+
+def test_ci_plan_keeps_the_components_of_the_map() -> None:
+    assert components.ci_plan(files=["services/host/x.go"], public=True).components == ["server"]
+    assert components.ci_plan(files=["docs/x.md"], public=True).components == []
+    assert components.ci_plan(files=["Makefile"], public=True).components == ["all"]
+    assert components.ci_plan(files=[], public=True).components == ["all"]
+
+
+def test_every_conditional_job_is_triggered_by_a_change_of_its_component() -> None:
+    triggered: set[str] = set()
+    for example in (
+        "services/server/internal/x.go",
+        "apps/client/lib/main.dart",
+        "sdk/python/src/x.py",
+    ):
+        triggered |= set(components.ci_plan(files=[example], public=True).jobs)
+    assert triggered == EVERY_JOB
+
+
+def test_ci_plan_leaves_android_out_while_the_repository_is_private() -> None:
+    private = set(components.ci_plan(files=["apps/client/lib/main.dart"], public=False).jobs)
+    assert private == {"test-apps"} | DESKTOP
+    assert set(components.ci_plan(files=["Makefile"], public=False).jobs) == EVERY_JOB - ANDROID
+
+
+@pytest.mark.parametrize(
+    ("selected", "expected"),
+    [
+        # A push to main, a manual run and the release gate of the product: every job.
+        ("all", EVERY_JOB),
+        # The release gate of one component (release.yml): its jobs.
+        ("server", TESTS_SERVER | POSTGRES),
+        ("apps", {"test-apps"} | PLATFORM),
+        ("plugins", {"test-sdk-plugins"}),
+        ("sdk-python", {"test-sdk-plugins"}),
+    ],
+)
+def test_ci_plan_without_a_diff_follows_the_components(selected: str, expected: set[str]) -> None:
+    plan = components.ci_plan(selected=selected.split(), public=True)
+    assert set(plan.jobs) == expected
+    assert plan.components == selected.split()
+
+
+def test_ci_plan_rejects_an_unknown_component() -> None:
+    with pytest.raises(ValueError, match="unknown component 'nope'"):
+        components.ci_plan(selected=["nope"], public=True)
+
+
+def test_ci_plan_needs_exactly_one_source() -> None:
+    with pytest.raises(ValueError, match="files or selected"):
+        components.ci_plan(public=True)
+    with pytest.raises(ValueError, match="files or selected"):
+        components.ci_plan(files=[], selected=["all"], public=True)
+
+
+def test_cli_ci_plan(capsys: pytest.CaptureFixture[str]) -> None:
+    files = ["services/host/x.go"]
+    assert components.main(["ci-plan", "--files", *files, "--public", "true"]) == 0
+    assert capsys.readouterr().out == "components=server\njobs=test-server\n"
+    assert components.main(["ci-plan", "--files", "docs/x.md", "--public", "false"]) == 0
+    assert capsys.readouterr().out == "components=none\njobs=none\n"
+    assert components.main(["ci-plan", "--components", "all", "--public", "false"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("components=all\njobs=")
+    assert "apps-android-26" not in out
+
+
+def test_cli_ci_plan_writes_none_when_no_conditional_job_runs(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The value is never empty, so that ci-ok can tell a missing plan from an empty one.
+    monkeypatch.setattr(components, "CONDITIONAL_JOBS", ())
+    assert components.main(["ci-plan", "--files", "docs/x.md", "--public", "true"]) == 0
+    assert capsys.readouterr().out.endswith("jobs=none\n")
+
+
+def test_cli_ci_plan_from_a_diff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import subprocess
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(tmp_path), *args], check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    identity = ("-c", "user.name=Alex", "-c", "user.email=alex@example.com")
+    git("init", "-q", "-b", "main")
+    git(*identity, "commit", "-q", "--allow-empty", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    (tmp_path / "sdk" / "python").mkdir(parents=True)
+    (tmp_path / "sdk" / "python" / "x.py").write_text("x = 1\n")
+    git("add", ".")
+    git(*identity, "commit", "-q", "-m", "x")
+    head = git("rev-parse", "HEAD")
+    monkeypatch.chdir(tmp_path)
+    assert components.main(["ci-plan", "--base", base, "--head", head, "--public", "true"]) == 0
+    assert capsys.readouterr().out == "components=sdk-python\njobs=test-sdk-plugins\n"
+
+
+def test_component_source_files() -> None:
+    assert components.is_component_source("services/server/internal/x.go")
+    assert components.is_component_source("packages/device_key/darwin/x.swift")
+    assert not components.is_component_source("services/server/go.mod")
+    assert not components.is_component_source("tools/ci/components.py")
+    assert not components.is_component_source("docs/x.md")
+
+
+def test_the_tools_tests_are_no_conditional_job() -> None:
+    """Tools tests also cross build component sources (release builds), so they always run."""
+    assert "test-tools" not in components.CONDITIONAL_JOBS
+
+
+def test_a_renamed_file_counts_with_its_old_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import subprocess
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(tmp_path), *args], check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    identity = ("-c", "user.name=Alex", "-c", "user.email=alex@example.com")
+    git("init", "-q", "-b", "main")
+    old = tmp_path / "services" / "server" / "internal" / "x.go"
+    old.parent.mkdir(parents=True)
+    old.write_text("package x\n\nfunc X() int { return 1 }\n")
+    git("add", ".")
+    git(*identity, "commit", "-q", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    (tmp_path / "services" / "server" / "api").mkdir(parents=True)
+    git("mv", "services/server/internal/x.go", "services/server/api/x.go")
+    git(*identity, "commit", "-q", "-m", "move")
+    head = git("rev-parse", "HEAD")
+    monkeypatch.chdir(tmp_path)
+    assert components.main(["ci-plan", "--base", base, "--head", head, "--public", "true"]) == 0
+    # The image lost a file of its build context, so the image jobs run.
+    assert "postgres-image-amd64" in capsys.readouterr().out

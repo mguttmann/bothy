@@ -56,7 +56,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
-      components: ${{ steps.plan.outputs.components }}
+      components: ${{ steps.jobs.outputs.components }}
+      jobs: ${{ steps.jobs.outputs.jobs }}
       private_checks: ${{ steps.plan.outputs.private_checks }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -66,28 +67,39 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
-      # private_checks=false (fork pull request, or a dependency bot's run, which GitHub
-      # gives no secrets): generic deny rules instead of the private list, sonar skipped,
-      # with a notice on the run (tools/ci/pr_mode.py, D-DEPS-3).
-      - id: plan
-        name: Select components and the checks that need secrets
+      # The components and the conditional jobs this change needs (tools/ci/components.py
+      # ci-plan, docs/quality/gates.md "Jobs a change needs"): a pull request by its diff, a push
+      # to main and a manual run everything, a release the components of its tag. ci-ok runs the
+      # same step on the same commit and accepts a skipped job only when the plan left it out
+      # (tools/ci/tests/test_ci_ok.py keeps both steps equal).
+      - id: jobs
+        name: Select the components and jobs this change needs
         env:
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          INPUT_COMPONENTS: ${{ inputs.components }}
+          PUBLIC: ${{ github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public') }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$BASE_SHA" --head "$HEAD_SHA" --public "$PUBLIC")
+          else
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --components "${INPUT_COMPONENTS:-all}" --public "$PUBLIC")
+          fi
+          echo "$plan"
+          echo "$plan" >> "$GITHUB_OUTPUT"
+      # private_checks=false (fork pull request, or a dependency bot's run, which GitHub
+      # gives no secrets): generic deny rules instead of the private list, sonar skipped,
+      # with a notice on the run (tools/ci/pr_mode.py, D-DEPS-3).
+      - id: plan
+        name: Select the checks that need secrets
+        env:
+          EVENT: ${{ github.event_name }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPO: ${{ github.repository }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
           ACTOR: ${{ github.actor }}
-          INPUT_COMPONENTS: ${{ inputs.components }}
         run: |
-          if [ "$EVENT" = pull_request ]; then
-            components=$(uv run --no-project --python 3.14 tools/ci/components.py changed --base "$BASE_SHA" --head "$HEAD_SHA")
-          else
-            components="${INPUT_COMPONENTS:-all}"
-          fi
-          echo "components=$components" >> "$GITHUB_OUTPUT"
-          echo "components: $components"
           uv run --no-project --python 3.14 tools/ci/pr_mode.py --event "$EVENT" --repo "$REPO" \
             --head-repo "$HEAD_REPO" --author "$AUTHOR" --actor "$ACTOR" \
             --github-output "$GITHUB_OUTPUT" --summary "$GITHUB_STEP_SUMMARY"
@@ -271,7 +283,8 @@ jobs:
           COMPONENTS: ${{ needs.plan.outputs.components }}
         run: make gitleaks semgrep trivy osv licenses COMPONENTS="$COMPONENTS"
 
-  # The tests of the Python tools and their coverage: no component selected.
+  # The tests of the Python tools and their coverage: no component selected. On every change:
+  # some also build component sources for other platforms (the release builds).
   test-tools:
     name: test (tools)
     needs: plan
@@ -336,7 +349,7 @@ jobs:
   test-server:
     name: test (server)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-server ')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -432,7 +445,7 @@ jobs:
   test-apps:
     name: test (apps)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-apps ')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -528,7 +541,7 @@ jobs:
   test-sdk-plugins:
     name: test (SDKs and plugins)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-python ') || contains(format(' {0} ', needs.plan.outputs.components), ' sdk-typescript ') || contains(format(' {0} ', needs.plan.outputs.components), ' plugins ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-sdk-plugins ')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -751,13 +764,14 @@ jobs:
 
   # bothy-postgres built natively on each architecture and proven with its two-container test
   # (brief M7-01, 18 "Server images" rule 2): no QEMU, because no build step runs on the target
-  # platform and each runner tests its own. Only when the component server changed. Two jobs
+  # platform and each runner tests its own. Only when the change touches what the image is built
+  # and tested from (tools/ci/components.py POSTGRES_IMAGE_PREFIXES) or a shared input. Two jobs
   # with fixed names instead of a matrix, so that tools/ci/ci_ok.py can require them by name
   # (a skipped matrix job has no expanded name).
   postgres-image-amd64:
     name: postgres-image (amd64)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' postgres-image-amd64 ')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -780,7 +794,7 @@ jobs:
   postgres-image-arm64:
     name: postgres-image (arm64)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' server ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' postgres-image-arm64 ')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     steps:
@@ -802,13 +816,14 @@ jobs:
 
   # Platform tests of the apps (make apps-platform, docs/DECISIONS.md D-M4-01-7): native code
   # and desktop integration tests need macOS and Windows (ADR 0039), Android code an emulator
-  # (apps-android-*, D-M5-01-5), the pure gates run on Linux. Only when the apps component is
-  # selected (Android only in the public phase); ci-ok (tools/ci/ci_ok.py) requires each job to
-  # pass or be skipped.
+  # (apps-android-*, D-M5-01-5), the pure gates run on Linux. Only when the change touches a
+  # member of the Dart workspace, its root manifest or lock file (tools/ci/components.py
+  # PLATFORM_PREFIXES) or a shared input, Android only in the public phase; ci-ok
+  # (tools/ci/ci_ok.py) accepts a skip only when the plan left the job out.
   apps-macos:
     name: apps (macOS)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-macos ')
     runs-on: macos-15
     timeout-minutes: 45
     permissions:
@@ -832,7 +847,7 @@ jobs:
   apps-windows:
     name: apps (Windows)
     needs: plan
-    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-windows ')
     runs-on: windows-2025
     timeout-minutes: 45
     permissions:
@@ -856,7 +871,7 @@ jobs:
   apps-android-26:
     name: apps (Android API 26)
     needs: plan
-    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-android-26 ')
     # The instrumented tests of the Android code on an emulator (brief M5-01, Design note 5): the
     # minimum API level of 15 2 and the current stable one, x86_64 Google APIs images without
     # the Play Store. Emulators have no StrongBox, so that test reports a skip. One job per level
@@ -894,7 +909,7 @@ jobs:
   apps-android-36:
     name: apps (Android API 36)
     needs: plan
-    if: (github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')) && (needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps '))
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' apps-android-36 ')
     # The instrumented tests of the Android code on an emulator (brief M5-01, Design note 5): the
     # minimum API level of 15 2 and the current stable one, x86_64 Google APIs images without
     # the Play Store. Emulators have no StrongBox, so that test reports a skip.
@@ -943,11 +958,34 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # The components and the conditional jobs this change needs (tools/ci/components.py
+      # ci-plan, docs/quality/gates.md "Jobs a change needs"): a pull request by its diff, a push
+      # to main and a manual run everything, a release the components of its tag. ci-ok runs the
+      # same step on the same commit and accepts a skipped job only when the plan left it out
+      # (tools/ci/tests/test_ci_ok.py keeps both steps equal).
+      - id: jobs
+        name: Select the components and jobs this change needs
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          INPUT_COMPONENTS: ${{ inputs.components }}
+          PUBLIC: ${{ github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public') }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --base "$BASE_SHA" --head "$HEAD_SHA" --public "$PUBLIC")
+          else
+            plan=$(uv run --no-project --python 3.14 tools/ci/components.py ci-plan --components "${INPUT_COMPONENTS:-all}" --public "$PUBLIC")
+          fi
+          echo "$plan"
+          echo "$plan" >> "$GITHUB_OUTPUT"
       - name: All required jobs passed
         env:
           GH_TOKEN: ${{ github.token }}
+          CI_JOBS: ${{ steps.jobs.outputs.jobs }}
         run: uv run --no-project --python 3.14 tools/ci/ci_ok.py

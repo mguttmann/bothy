@@ -42,12 +42,9 @@ import components
 # The ref the pushed diff is measured against; a pull request compares with main as well.
 BASE_REF = "origin/main"
 ZERO_SHA = "0" * 40
-# Source files of a component: a push of only these leaves the tools gates out, except the few
-# tools tests that read component sources (TOOLS_SOURCE_TESTS in the Makefile), which `make test`
-# runs then. Manifests, lock files, configuration, test data and docs of a component are not on
-# the list, because tools tests read some of them (go.mod, Dockerfile, .golangci.yml).
-COMPONENT_DIRS = ("services/", "apps/", "packages/", "sdk/", "plugins/")
-SOURCE_SUFFIXES = (".go", ".dart", ".ts", ".tsx", ".kt", ".swift", ".py")
+# A push of component source files alone (components.is_component_source) leaves the tools gates
+# out, except the few tools tests that read component sources (TOOLS_SOURCE_TESTS in the
+# Makefile), which `make test` runs then. CI runs the job test (tools) on every change.
 # git exports these to hooks; make and the tools it starts must see the repository as CI does
 # (docs/DECISIONS.md D-M4-05-6).
 HOOK_VARIABLES = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX")
@@ -76,18 +73,13 @@ class Plan:
         return args
 
 
-def is_component_source(path: str) -> bool:
-    """Return whether path is a source file of a component that no tools test reads."""
-    return path.startswith(COMPONENT_DIRS) and path.endswith(SOURCE_SUFFIXES)
-
-
 def plan(files: list[str]) -> Plan:
     """Return the plan for the changed files of a push."""
     selected = components.changed(files)
     if selected == ["all"]:
         shared = next((f for f in files if components.changed([f]) == ["all"]), "a shared input")
         return Plan(full=True, reason=f"{shared} is a shared input")
-    areas = ["tools"] if any(not is_component_source(f) for f in files) else []
+    areas = ["tools"] if any(not components.is_component_source(f) for f in files) else []
     reason = "components " + components.format_for_make(selected)
     return Plan(full=False, reason=reason, components=selected, areas=areas)
 

@@ -83,7 +83,7 @@ its own, never together with another branch in one `git push`.
 | Rule | Setting | Reason |
 |---|---|---|
 | Require a pull request before merging | on; allowed merge method squash only | no direct pushes, one commit per feature |
-| Require status checks to pass | `ci-ok` | one check combines all jobs; skipped component jobs do not block |
+| Require status checks to pass | `ci-ok` | one check combines all jobs; a job the plan does not need may be skipped (gates.md, "Jobs a change needs") |
 | Require linear history | on | readable history, simple bisects |
 | Require signed commits | on | provenance of every commit on `main` |
 | Block force pushes | on | history stays immutable |
