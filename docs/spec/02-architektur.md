@@ -204,7 +204,7 @@ tieferer Module, die das Modul implementiert.
 | `importer` | `Imports` (Quellen, Stapel über `import.apply`) | | | |
 | `privacy` | `Requests` | | | sammelt alle kernel `personaldata.Participant` |
 | `status` | `Status`, `BackupRuns` (für `bothy-backupd`) | | `agents.AgentDisabled` | |
-| `terminal` | `Hosts` (Verwaltung, Kopplung, Erklärung), `Sessions` (Öffnen, Anhängen, Schließen, Liste), `Relay` (Strom- und Host-Verbindungen, nur im Adapter `wsrelay`) | | kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (Sitzungen beenden) | `authz.HostSource` (Zustand, Inhaber, LLM-Erklärung, Server-Host des Rechners) |
+| `terminal` | `Hosts` (Verwaltung, Kopplung, Erklärung), `Sessions` (Öffnen, Anhängen, Schließen, Liste), `Relay` (Strom- und Host-Verbindungen, nur im Adapter `wsrelay`) | | kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (Sitzungen beenden; M2-46: `app.Subscribers`, bound in the terminal step of `internal/wire`, D-M2-46-16) | `authz.HostSource` (Zustand, Inhaber, LLM-Erklärung, Server-Host des Rechners) |
 
 ### 4.4 Erlaubte Abhängigkeiten
 
@@ -1063,7 +1063,7 @@ Grund: Jeder andere Job schriebe Zustand, der auf dem Ziel fehlen würde.
 | `status.probe` | `status` | periodisch | `maintenance` | 16 |
 | `retention.<klasse>` | besitzendes Modul | periodisch je Aufbewahrungsklasse | `maintenance` | 20 |
 | `stats.retention` | `stats` | periodisch: Tages-Partitionen von `stats_minutes` im Voraus anlegen, Partitionen älter als `retention.stats_minutes` abhängen; ersetzt für die Klasse `stats` den allgemeinen `retention.<klasse>`, weil die Tabelle partitioniert ist | `maintenance` | 25 |
-| `terminal.sweep` | `terminal` | periodisch alle `terminal.sweep_interval`: abgelaufene Kopplungs-Codes verwerfen (`pairing_expires_at`); Sitzungen beenden, die `terminal.detach_grace`, `terminal.max_session_duration` oder `terminal.idle_timeout` plus `terminal.idle_grace` überschritten haben (`terminal.terminate`). Rückfall für die Prüfung im Relais, falls ein Knoten ausfiel | `maintenance` | 24 |
+| `terminal.sweep` | `terminal` | periodisch alle `terminal.sweep_interval` und einmal beim Start des worker (roles `worker` and `all`); M2-46 (D-M2-46-8, D-M2-46-9): no actor (system); it reads every session that is not `closed` with the state of its host and ends each in its own unit of work (host row, then session row, the verdict decided again on the locked rows) through the one end function of the module (`terminal.terminate`) with the first match in this order: host not `active` (`host_disabled`, `host_retired`, `host_rekeyed`); login session revoked or past `expires_at` (`session_revoked`); `opening` past the last grant plus `terminal.open_timeout` (`open_failed` with `open_timeout`; the last grant is the UUIDv7 time of `token_jti`), except on a host reporting `require_local_confirm`; `terminal.max_session_duration` after `opened_at` (`max_duration`); `terminal.detach_grace` after `detached_at` (`detach_expired`); the latest of the stored `last_input_at`, `started_at` and `opened_at` plus `terminal.idle_timeout` plus `terminal.idle_grace` (`idle_timeout`). Rückfall für die Prüfung im Relais, falls ein Knoten ausfiel. An expired pairing code is not discarded: 03 `hosts` requires `pairing_code_hash` while `state = 'pairing'`, so the code stays stored until the next code or the retirement and is rejected at redemption (`pairing_expires_at`, 24 3.2) | `maintenance` | 24 |
 
 ### 12.4 Regeln für Jobs
 

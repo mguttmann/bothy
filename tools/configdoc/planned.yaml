@@ -81,8 +81,6 @@ rules:
     etappe: M2
   - match: telemetry.dashboard_url  # M6-06
     etappe: M6
-  - match: "terminal."  # M2-40 to M2-46
-    etappe: M2
   - match: "voice."  # M3-09
     etappe: M3
   - match: "webhook_in."  # M2-27

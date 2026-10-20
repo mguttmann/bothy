@@ -109,10 +109,10 @@ Abschnitt 10.4).
 
 | Name | Typ | Einheit | Attribute | Quelle | Prometheus |
 |---|---|---|---|---|---|
-| `bothy.terminal.sessions.active` | UpDownCounter | `{session}` | `bothy.terminal.state` (`opening`, `active`, `detached`) | api | `bothy_terminal_sessions_active` |
-| `bothy.terminal.sessions.closed` | Zähler | `{session}` | `bothy.reason` (Codes aus 24, Abschnitt 10.3) | api | `bothy_terminal_sessions_closed_total` |
+| `bothy.terminal.sessions.active` | UpDownCounter | `{session}` | `bothy.terminal.state` (`opening`, `active`, `detached`) | api: the relay of each api process counts the sessions it holds with at least one connection (device stream or host data connection), in the state of the last committed `terminal_session.changed`, and stops counting at release; the sum over the api processes counts sessions with a connection on some node, a session without any connection (host offline, device gone) is not counted (M2-46, D-M2-46-13) | `bothy_terminal_sessions_active` |
+| `bothy.terminal.sessions.closed` | Zähler | `{session}` | `bothy.reason` (Codes aus 24, Abschnitt 10.3) | api, worker: +1 per ended session after the commit of the end, in the process that committed it (a request, a subscriber, the relay or the job `terminal.sweep`); a rolled back end counts nothing (M2-46) | `bothy_terminal_sessions_closed_total` |
 | `bothy.terminal.relay.unpaired` | Zähler | `{connection}` | `bothy.terminal.side` (`client`, `host`) | api: eine Seite fand innerhalb von `terminal.open_timeout` keine Gegenseite (24, Abschnitt 9) | `bothy_terminal_relay_unpaired_total` |
-| `bothy.terminal.hosts.connected` | UpDownCounter | `{host}` | keine | api | `bothy_terminal_hosts_connected` |
+| `bothy.terminal.hosts.connected` | UpDownCounter | `{host}` | keine | api: each api process counts its control connections that are usable for sessions (+1 when one becomes usable, -1 when it stops being usable); the sum over the api processes counts connected hosts (M2-46) | `bothy_terminal_hosts_connected` |
 
 ### 4.3b Eigene Messung und Live-Statistik
 
