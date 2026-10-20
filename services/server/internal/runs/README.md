@@ -158,7 +158,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Ereignisse und WebSocket-Ops
 
-- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 `agent.invocation` (the builder of `agent.followup`, `domain.FollowupPayload`, is ready for M2-11); the others come with their tickets.
+- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 also `agent.invocation`; the others come with their tickets.
 - Kurzlebig: `run.updated`, `command.autocomplete_requested`.
 - WebSocket-Ops (Client an Server): `run.update`, `command.autocomplete_result`.
 
