@@ -188,34 +188,25 @@ func (v *ReferenceVerifier) Check(ctx context.Context, token string, e Reference
 	if err != nil {
 		return ReferenceClaims{}, err
 	}
-	if c.Iss != v.o.Issuer.String() || c.Aud != v.o.AgentID.String() {
-		return ReferenceClaims{}, fmt.Errorf("%w: iss or aud", ErrRefInvalid)
+	if err := v.checkClaims(c, e); err != nil {
+		return ReferenceClaims{}, err
 	}
-	for _, m := range []struct {
-		want ids.ID
-		got  string
-	}{{e.RunID, c.RunID}, {e.ThreadID, c.ThreadID}, {e.MessageID, c.MessageID}, {e.InteractionID, c.InteractionID}, {e.CommandID, c.CommandID}} {
-		if !m.want.IsZero() && m.got != m.want.String() {
-			return ReferenceClaims{}, fmt.Errorf("%w: run, thread or triggering object differs from the event", ErrRefInvalid)
-		}
+	if err := v.checkTimeAndReplay(c); err != nil {
+		return ReferenceClaims{}, err
 	}
-	if e.ActualBillingMode != "" && (e.ActualBillingMode == "unknown" || e.ActualBillingMode != c.BillingMode) {
-		return ReferenceClaims{}, ErrRefBillingModeMismatch
-	}
-	if e.ActualToolClass != "" {
-		actual, ok := toolClassRank(e.ActualToolClass)
-		claim, _ := toolClassRank(c.ToolClass)
-		if !ok || actual > claim {
-			return ReferenceClaims{}, ErrRefToolClassMismatch
-		}
-	}
+	return c, nil
+}
+
+// checkTimeAndReplay applies point 5 (iat, then the expiry) and point 7 (the jti store), and
+// remembers the jti of a token that passes until exp plus the leeway.
+func (v *ReferenceVerifier) checkTimeAndReplay(c ReferenceClaims) error {
 	now := v.o.Clock.Now()
 	if time.Unix(c.Iat, 0).After(now.Add(v.o.Leeway)) || c.Exp <= c.Iat {
-		return ReferenceClaims{}, fmt.Errorf("%w: iat in the future or exp not after iat", ErrRefInvalid)
+		return fmt.Errorf("%w: iat in the future or exp not after iat", ErrRefInvalid)
 	}
 	end := time.Unix(c.Exp, 0).Add(v.o.Leeway)
 	if !now.Before(end) {
-		return ReferenceClaims{}, ErrRefExpired
+		return ErrRefExpired
 	}
 	for jti, until := range v.seen {
 		if !now.Before(until) {
@@ -223,10 +214,37 @@ func (v *ReferenceVerifier) Check(ctx context.Context, token string, e Reference
 		}
 	}
 	if _, ok := v.seen[c.Jti]; ok {
-		return ReferenceClaims{}, ErrRefReplay
+		return ErrRefReplay
 	}
 	v.seen[c.Jti] = end
-	return c, nil
+	return nil
+}
+
+// checkClaims applies points 4 (iss, aud), 6 (run, thread, triggering object), 8 (billing mode)
+// and 10 (tool class) in this order.
+func (v *ReferenceVerifier) checkClaims(c ReferenceClaims, e ReferenceExpectation) error {
+	if c.Iss != v.o.Issuer.String() || c.Aud != v.o.AgentID.String() {
+		return fmt.Errorf("%w: iss or aud", ErrRefInvalid)
+	}
+	for _, m := range []struct {
+		want ids.ID
+		got  string
+	}{{e.RunID, c.RunID}, {e.ThreadID, c.ThreadID}, {e.MessageID, c.MessageID}, {e.InteractionID, c.InteractionID}, {e.CommandID, c.CommandID}} {
+		if !m.want.IsZero() && m.got != m.want.String() {
+			return fmt.Errorf("%w: run, thread or triggering object differs from the event", ErrRefInvalid)
+		}
+	}
+	if e.ActualBillingMode != "" && (e.ActualBillingMode == "unknown" || e.ActualBillingMode != c.BillingMode) {
+		return ErrRefBillingModeMismatch
+	}
+	if e.ActualToolClass != "" {
+		actual, ok := toolClassRank(e.ActualToolClass)
+		claim, _ := toolClassRank(c.ToolClass)
+		if !ok || actual > claim {
+			return ErrRefToolClassMismatch
+		}
+	}
+	return nil
 }
 
 // decodeStrict decodes base64url without padding and refuses non-canonical trailing bits.
@@ -413,7 +431,7 @@ func (v *ReferenceVerifier) fetch(ctx context.Context) error {
 	}
 	req.Header.Set("Accept", "application/jwk-set+json")
 	v.fetches++
-	resp, err := v.o.Client.Do(req) //nolint:gosec // G704: the caller's client and URL; a test verifier against its own server
+	resp, err := v.o.Client.Do(req)
 	if err != nil {
 		return err
 	}
