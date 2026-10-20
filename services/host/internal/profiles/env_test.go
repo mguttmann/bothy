@@ -426,6 +426,23 @@ func TestEnvClaudePersonal(t *testing.T) {
 		t.Error("a key with personal")
 	}
 	sameEnv(t, hostos.Windows, s.Env, windowsBlock())
+
+	// A REG_EXPAND_SZ value of the hive arrives unexpanded; it is expanded with the token's block.
+	we = windowsEnv()
+	we.LoginEnv = probe(`%UserProfile%\.claude`)
+	s, err = ClaudePersonal(context.Background(), we, winRepo, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(s.Args, PersonalCommand("powershell", winHome+`\.claude`, true)) {
+		t.Errorf("expanded args %q", s.Args)
+	}
+	for _, v := range []string{`%NOT_SET%\.claude`, `%USERPROFILE`} {
+		we.LoginEnv = probe(v)
+		if _, err := ClaudePersonal(context.Background(), we, winRepo, time.Second); detailOf(err) != DetailSharedLocation {
+			t.Errorf("%s: %v", v, err)
+		}
+	}
 }
 
 func TestCleanPath(t *testing.T) {

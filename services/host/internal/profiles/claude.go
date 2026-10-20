@@ -87,6 +87,10 @@ func ClaudePersonal(ctx context.Context, e Env, workdir string, probeTimeout tim
 	if err != nil {
 		return Spec{}, err
 	}
+	if e.GOOS == hostos.Windows {
+		// The probe reads the user's hive, where a REG_EXPAND_SZ value is stored unexpanded.
+		dir = expandWindows(dir, e.EnvBlock)
+	}
 	if err := personalConfigDir(e, dir); err != nil {
 		return Spec{}, err
 	}
@@ -98,6 +102,42 @@ func ClaudePersonal(ctx context.Context, e Env, workdir string, probeTimeout tim
 	sh.Env = baseEnv(e)
 	sh.Dir = workdir
 	return sh, nil
+}
+
+// expandWindows replaces every %NAME% in s with the value of NAME in block, the environment
+// block of the token, as Windows expands a REG_EXPAND_SZ value when it builds that block. A name
+// the block does not hold and a lone % stay as written, like ExpandEnvironmentStrings does.
+func expandWindows(s string, block []string) string {
+	var b strings.Builder
+	for {
+		i := strings.IndexByte(s, '%')
+		if i < 0 {
+			break
+		}
+		j := strings.IndexByte(s[i+1:], '%')
+		if j < 0 {
+			break
+		}
+		name := s[i+1 : i+1+j]
+		v, ok := "", false
+		for _, kv := range block {
+			if k, val, found := strings.Cut(kv, "="); found && name != "" && strings.EqualFold(k, name) {
+				v, ok = val, true
+				break
+			}
+		}
+		if !ok {
+			// Keep the first % literal and continue at the second, which may open a known name.
+			b.WriteString(s[:i+1+j])
+			s = s[i+1+j:]
+			continue
+		}
+		b.WriteString(s[:i])
+		b.WriteString(v)
+		s = s[i+2+j:]
+	}
+	b.WriteString(s)
+	return b.String()
 }
 
 // probeConfigDir runs e.LoginEnv and returns its CLAUDE_CONFIG_DIR. The probe gets the timeout
