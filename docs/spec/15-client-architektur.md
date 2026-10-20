@@ -949,7 +949,8 @@ Ports von `terminal_ui`, umgesetzt je App:
   (`TerminalMarksPainter`): the cursor cell opaque in `color.terminal.cursor` with its character
   in `color.terminal.cursor-text`, a selected cell opaque in `color.terminal.selection-bg` with
   its character in `color.terminal.fg`, and without the focus a frame in
-  `color.terminal.cursor` (D-M4-35-18). A pasted text
+  `color.terminal.cursor` (D-M4-35-18). Text that the soft keyboard inserts at once with a
+  line break or a control character takes the path of a paste (D-M4-35-19). A pasted text
   loses ESC and the other controls except tab and line breaks before it is shown and sent, and
   a link target is only printable ASCII; the confirmation shows its host first.
 - xterm state found by M4-35 (2026-10-20; sources in [24-terminal.md](24-terminal.md),

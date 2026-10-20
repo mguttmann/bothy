@@ -149,7 +149,7 @@ final class TerminalController extends ChangeNotifier {
       final h = checked.host;
       final choice = await _owned(
         epoch,
-        _prompts.confirmOpen(
+        () => _prompts.confirmOpen(
           h,
           OpenChoice(profile: profile, workdirIndex: workdirIndex),
         ),
@@ -165,7 +165,8 @@ final class TerminalController extends ChangeNotifier {
       final hash = await _freshKeyHash(epoch);
       await _owned(
         epoch,
-        _stepUp(purposeText: _prompts.stepUpPurpose(h, StepUpPurpose.open)),
+        () =>
+            _stepUp(purposeText: _prompts.stepUpPurpose(h, StepUpPurpose.open)),
       );
       final grant = await _api.openSession(
         h.id,
@@ -240,18 +241,24 @@ final class TerminalController extends ChangeNotifier {
       );
       final purpose = _prompts.stepUpPurpose(h, StepUpPurpose.attach);
       if (before.detachCause == DetachCause.tokenStale) {
-        await _owned(epoch, _stepUp(purposeText: purpose));
+        await _owned(epoch, () => _stepUp(purposeText: purpose));
       }
       TerminalSessionGrant grant;
       try {
-        grant = await _owned(epoch, _api.attachSession(sessionId, request));
+        grant = await _owned(
+          epoch,
+          () => _api.attachSession(sessionId, request),
+        );
       } on _Superseded {
         rethrow;
       } on Object catch (e) {
         if (_problemOf(e)?.code != 'step_up_required') rethrow;
         // The server decides whether a step-up is needed (24 6.2); one retry after it.
-        await _owned(epoch, _stepUp(purposeText: purpose));
-        grant = await _owned(epoch, _api.attachSession(sessionId, request));
+        await _owned(epoch, () => _stepUp(purposeText: purpose));
+        grant = await _owned(
+          epoch,
+          () => _api.attachSession(sessionId, request),
+        );
       }
       // A closed tab leaves an attached session detached, as "Detach" would.
       if (!await _grantMatches(epoch, grant, h)) return;
@@ -351,7 +358,7 @@ final class TerminalController extends ChangeNotifier {
   // ---- steps ---------------------------------------------------------------------------
 
   Future<_Checked?> _prepare(int epoch, String hostId) async {
-    final h = await _owned(epoch, _api.getHost(hostId));
+    final h = await _owned(epoch, () => _api.getHost(hostId));
     _host = h;
     notifyListeners();
     final key = h.noisePublicKey;
@@ -359,11 +366,11 @@ final class TerminalController extends ChangeNotifier {
     if (key == null || fingerprint == null) {
       throw const ApiProblem(status: 409, code: 'host_unavailable');
     }
-    final pin = await _owned(epoch, _pins.read(h.id));
+    final pin = await _owned(epoch, () => _pins.read(h.id));
     final check = checkPin(pin, key, fingerprint);
     var pinChanged = false;
     if (check is PinChanged) {
-      if (!await _owned(epoch, _prompts.confirmKeyChange(h, check))) {
+      if (!await _owned(epoch, () => _prompts.confirmKeyChange(h, check))) {
         return null;
       }
       pinChanged = true;
@@ -371,7 +378,9 @@ final class TerminalController extends ChangeNotifier {
     final assignee = h.assignedUserId;
     if (assignee != null && assignee != _selfUserId) {
       // 24 8.4: the warning comes before the step-up; no step-up without the confirmation.
-      if (!await _owned(epoch, _prompts.confirmForeignHost(h))) return null;
+      if (!await _owned(epoch, () => _prompts.confirmForeignHost(h))) {
+        return null;
+      }
     }
     return _Checked(h, writePin: check is! PinMatches, pinChanged: pinChanged);
   }
@@ -385,7 +394,7 @@ final class TerminalController extends ChangeNotifier {
       throw const _Superseded();
     }
     _ephemeral = pair;
-    final public = await _owned(epoch, pair.extractPublicKey());
+    final public = await _owned(epoch, () => pair.extractPublicKey());
     return ephemeralKeyHash(public.bytes);
   }
 
@@ -480,7 +489,7 @@ final class TerminalController extends ChangeNotifier {
             }
             final identify = await _owned(
               generation,
-              _transport.identify(hello),
+              () => _transport.identify(hello),
             );
             channel.sendText(jsonEncode({'op': 'identify', 'd': identify}));
             final key = _ephemeral;
@@ -490,7 +499,7 @@ final class TerminalController extends ChangeNotifier {
             }
             final started = await _owned(
               generation,
-              NkInitiator.start(
+              () => NkInitiator.start(
                 hostStaticPublicKey: decodeNoiseKey(grant.noisePublicKey)!,
                 sessionId: uuidToBytes(grant.session.id),
                 hostId: uuidToBytes(host.id),
@@ -501,7 +510,7 @@ final class TerminalController extends ChangeNotifier {
             channel.sendBinary(
               await _owned(
                 generation,
-                started.writeMessage1(utf8.encode(grant.sessionToken)),
+                () => started.writeMessage1(utf8.encode(grant.sessionToken)),
               ),
             );
             stage = _Stage.message2;
@@ -512,7 +521,7 @@ final class TerminalController extends ChangeNotifier {
             }
             final result = await _owned(
               generation,
-              initiator!.readMessage2(message),
+              () => initiator!.readMessage2(message),
             );
             initiator = null;
             // R-CL-15: the private part is not needed after message 2.
@@ -531,7 +540,10 @@ final class TerminalController extends ChangeNotifier {
               },
             );
             _pump = pump;
-            await _owned(generation, pump.sendFrame(StartFrame(_cols, _rows)));
+            await _owned(
+              generation,
+              () => pump.sendFrame(StartFrame(_cols, _rows)),
+            );
             stage = _Stage.frames;
             _set(
               generation,
@@ -544,7 +556,7 @@ final class TerminalController extends ChangeNotifier {
             if (checked.writePin) {
               await _owned(
                 generation,
-                _pins.write(
+                () => _pins.write(
                   HostKeyPin(
                     hostId: host.id,
                     noisePublicKey: grant.noisePublicKey,
@@ -562,7 +574,7 @@ final class TerminalController extends ChangeNotifier {
             }
             _onFrame(
               generation,
-              await _owned(generation, _pump!.receive(message)),
+              await _owned(generation, () => _pump!.receive(message)),
             );
         }
         if (failure != null) break;
@@ -724,9 +736,22 @@ final class TerminalController extends ChangeNotifier {
     if (!_owns(epoch)) throw const _Superseded();
   }
 
-  /// Awaits [step] of a flow of [epoch] and stops the flow when it lost the tab meanwhile.
-  Future<T> _owned<T>(int epoch, Future<T> step) async {
-    final value = await step;
+  /// Runs [step] of a flow of [epoch] only while the flow owns the tab, and stops the flow
+  /// when it lost the tab meanwhile,
+  /// whether the step answered or failed (a late `step_up_required` after End must not ask
+  /// for a step-up, red team round 3).
+  Future<T> _owned<T>(int epoch, Future<T> Function() step) async {
+    // The step starts only while the flow owns the tab (no step-up prompt after dispose).
+    _check(epoch);
+    final T value;
+    try {
+      value = await step();
+    } on _Superseded {
+      rethrow;
+    } on Object {
+      _check(epoch);
+      rethrow;
+    }
     _check(epoch);
     return value;
   }

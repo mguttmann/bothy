@@ -98,7 +98,25 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
   TerminalController get _c => widget.controller;
 
   @override
+  void initState() {
+    super.initState();
+    _c.screen.onTextInsert = _insert;
+  }
+
+  @override
+  void didUpdateWidget(TerminalScreenView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      if (oldWidget.controller.screen.onTextInsert == _insert) {
+        oldWidget.controller.screen.onTextInsert = null;
+      }
+      _c.screen.onTextInsert = _insert;
+    }
+  }
+
+  @override
   void dispose() {
+    if (_c.screen.onTextInsert == _insert) _c.screen.onTextInsert = null;
     _watched?.removeListener(_terminalChanged.fire);
     _terminalChanged.dispose();
     _selection.dispose();
@@ -267,9 +285,18 @@ class _TerminalScreenViewState extends State<TerminalScreenView> {
         ? await read()
         : (await Clipboard.getData(Clipboard.kTextPlain))?.text;
     if (text == null || text.isEmpty || !mounted) return;
+    await _guardedPaste(text);
+  }
+
+  // The paste guard of 15 23.4 for the clipboard and for text the soft keyboard inserts.
+  Future<void> _guardedPaste(String text) async {
     final clean = sanitizePaste(text);
     if (clean.isEmpty || !await confirmPaste(context, clean)) return;
-    _c.screen.paste(clean);
+    if (mounted) _c.screen.paste(clean);
+  }
+
+  void _insert(String text) {
+    if (mounted) unawaited(_guardedPaste(text));
   }
 }
 

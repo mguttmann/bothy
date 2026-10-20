@@ -115,6 +115,10 @@ final class TerminalMarksPainter extends CustomPainter {
     if (range != null) {
       for (final segment in range.toSegments()) {
         if (segment.line < 0 || segment.line >= lines.length) continue;
+        // Only the visible rows, as xterm paints (a selection over the whole scrollback
+        // would lay out every selected cell on each frame, red team round 3).
+        final top = g.offsetOf(CellOffset(0, segment.line)).dy;
+        if (top + g.cellSize.height <= 0 || top >= size.height) continue;
         final start = segment.start ?? 0;
         final end = segment.end ?? terminal.viewWidth;
         final line = lines[segment.line];
@@ -217,10 +221,10 @@ final class TerminalMarksPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(TerminalMarksPainter old) =>
-      old.terminal != terminal ||
-      old.colors != colors ||
-      old.textStyle != textStyle ||
-      old.textScaler != textScaler ||
-      old.devicePixelRatio != devicePixelRatio;
+  bool shouldRepaint(TerminalMarksPainter oldDelegate) =>
+      oldDelegate.terminal != terminal ||
+      oldDelegate.colors != colors ||
+      oldDelegate.textStyle != textStyle ||
+      oldDelegate.textScaler != textScaler ||
+      oldDelegate.devicePixelRatio != devicePixelRatio;
 }

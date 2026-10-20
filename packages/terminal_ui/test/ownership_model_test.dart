@@ -12,6 +12,7 @@
 // 3. Every ephemeral key is destroyed.
 // 4. After the action the host receives no frame but `close`.
 // 5. A disposed tab notifies nobody.
+// 6. After the action no step-up prompt appears.
 //
 // The red team repros of M4-35 (N2: End or a revocation while the stream connects and the
 // connect fails; N3: End or a revocation during message 2) are cases of this matrix and are
@@ -31,7 +32,7 @@ enum _Flow { open, attach }
 
 enum _Action { end, detach, revoke, dispose }
 
-enum _Outcome { normal, connectFails, corruptMessage2 }
+enum _Outcome { normal, connectFails, corruptMessage2, attachNeedsStepUp }
 
 final class _SyncEvents implements HostEvents {
   final StreamController<HostChange> changes = StreamController.broadcast(
@@ -51,6 +52,7 @@ final class _Run {
   TerminalTabState? afterAction;
   // FakeHost.deviceMessages when the action fired.
   int framesAtAction = 0;
+  int stepUpsAtAction = 0;
   int notifiedAfterDispose = 0;
   bool disposed = false;
 }
@@ -79,6 +81,8 @@ Future<_Run> _prepare(_Flow flow, _Outcome outcome) async {
       h.transport.connectError = StateError('upgrade refused');
     case _Outcome.corruptMessage2:
       h.host.handshake = FakeHostHandshake.corruptMessage2;
+    case _Outcome.attachNeedsStepUp:
+      h.api.attachErrors.add(stepUpRequired);
   }
   return _Run(h, events, keys);
 }
@@ -86,6 +90,7 @@ Future<_Run> _prepare(_Flow flow, _Outcome outcome) async {
 void _act(_Run r, _Action action) {
   final c = r.h.controller;
   r.framesAtAction = r.h.host.deviceMessages;
+  r.stepUpsAtAction = r.h.stepUps.length;
   switch (action) {
     case _Action.end:
       unawaited(c.end());
@@ -153,6 +158,8 @@ void _checkInvariants(_Run r, String label) {
     final finalByAction = r.disposed || _isFinal(r.afterAction!);
     if (finalByAction) {
       expect(late.where((f) => f is! CloseFrame), isEmpty, reason: why);
+      // 6. No step-up prompt after the flow lost the tab (red team round 3).
+      expect(h.stepUps.length, r.stepUpsAtAction, reason: why);
     }
   }
   if (r.disposed) {
@@ -184,6 +191,7 @@ bool _isFinal(TerminalTabState s) =>
 void main() {
   for (final flow in _Flow.values) {
     for (final outcome in _Outcome.values) {
+      if (flow == _Flow.open && outcome == _Outcome.attachNeedsStepUp) continue;
       test(
         'model: ${flow.name}, ${outcome.name}, every action after every microtask',
         () async {

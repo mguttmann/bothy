@@ -82,7 +82,7 @@ final class TerminalScreen extends ChangeNotifier {
   final int _scrollbackLines;
   final void Function(String data) _onInput;
   final EscapeFilter _filter = EscapeFilter();
-  late Terminal _terminal;
+  late _GuardedTerminal _terminal;
   final List<TerminalLink> _links = [];
   TerminalLink? _openLink;
   ByteConversionSink? _decoder;
@@ -90,6 +90,12 @@ final class TerminalScreen extends ChangeNotifier {
 
   /// Receives the size in cells whenever the view resizes the terminal.
   void Function(int cols, int rows)? onResize;
+
+  /// Receives text that the platform text input inserts at once (the clipboard of a soft
+  /// keyboard, a suggestion) when it holds a line break or a control character; the view
+  /// runs it through the paste guard of 15 23.4 (red team round 3). Without a handler such
+  /// text is dropped. Single characters and plain text go straight to the host.
+  void Function(String text)? onTextInsert;
 
   /// The current terminal model; a replay replaces it ([replaceWith]).
   Terminal get terminal => _terminal;
@@ -167,9 +173,10 @@ final class TerminalScreen extends ChangeNotifier {
   /// it), without ESC and the other C0 controls except tab, line feed and carriage return:
   /// they could end the bracketed paste early or run a line without the confirmation of
   /// 15 23.4 (red team M4-35).
-  void paste(String text) => _terminal.paste(sanitizePaste(text));
+  void paste(String text) => _terminal.pasteChecked(sanitizePaste(text));
 
-  Terminal _newTerminal() => Terminal(
+  _GuardedTerminal _newTerminal() => _GuardedTerminal(
+    onInsert: (text) => onTextInsert?.call(text),
     maxLines: _scrollbackLines,
     // The second layer of 24 11.2: title, icon and private OSC handlers stay unset, so even
     // a sequence the filter missed changes nothing and answers nothing; xterm has no
@@ -231,4 +238,42 @@ final class TerminalScreen extends ChangeNotifier {
       // the error, which may quote output, goes nowhere (R-CL-17).
     }
   }
+}
+
+/// xterm's terminal with the text input behind the paste guard: the text input of the
+/// platform (`TerminalView`'s text edit) calls [textInput] with whatever the soft keyboard
+/// commits, so a multi-character text with a line break or a control goes to [_onInsert]
+/// instead of the host. [pasteChecked] is the path of a confirmed, sanitized paste.
+final class _GuardedTerminal extends Terminal {
+  _GuardedTerminal({
+    required this._onInsert,
+    super.maxLines,
+    super.onOutput,
+    super.onResize,
+  });
+
+  final void Function(String text) _onInsert;
+  bool _checked = false;
+
+  /// Pastes [text] that already went through the guard.
+  void pasteChecked(String text) {
+    _checked = true;
+    try {
+      paste(text);
+    } finally {
+      _checked = false;
+    }
+  }
+
+  @override
+  void textInput(String text) {
+    if (_checked || !_needsGuard(text)) return super.textInput(text);
+    _onInsert(text);
+  }
+
+  static bool _needsGuard(String text) =>
+      text.runes.length > 1 &&
+      (text.contains('\n') ||
+          text.contains('\r') ||
+          sanitizePaste(text) != text);
 }
