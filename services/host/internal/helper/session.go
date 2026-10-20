@@ -171,7 +171,9 @@ func (sc *sessionChannel) control(ctx context.Context, m localchan.Message) bool
 		}()
 	case localchan.OpPTYStart:
 		var req localchan.PTYStart
-		if json.Unmarshal(m.D, &req) != nil {
+		err := json.Unmarshal(m.D, &req)
+		clear(m.D) // the raw op may hold the API key of this start
+		if err != nil {
 			return false
 		}
 		go sc.start(ctx, req)

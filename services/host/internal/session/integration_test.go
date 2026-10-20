@@ -476,3 +476,25 @@ func TestPeerMismatchOnDial(t *testing.T) {
 		t.Errorf("opening: %+v, PTYs %d", e, r.startCount())
 	}
 }
+
+// TestSessionCloseDuringOpening: a session.close that arrives while the opening waits for the
+// local confirmation starts no PTY afterwards.
+func TestSessionCloseDuringOpening(t *testing.T) {
+	fc := &fakeConfirm{allow: true, delay: 700 * time.Millisecond}
+	r := newRig(t, withConfirm(fc))
+	r.cfg.LocalConfirmTimeout = 3 * time.Second
+	_, dc := r.open(sessA, "shell")
+	waitFor(t, "the confirmation asked", func() bool {
+		fc.mu.Lock()
+		defer fc.mu.Unlock()
+		return len(fc.asked) == 1
+	})
+	r.mgr.Close(r.ctx, controlClose(sessA, "access_revoked"))
+	if code, _ := r.closedWith(dc); code != CodeNormal {
+		t.Errorf("data connection closed with %d", code)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if r.startCount() != 0 || r.mgr.Active() != 0 || r.note.startedCount(sessA) != 0 {
+		t.Errorf("PTYs %d active %d started %d", r.startCount(), r.mgr.Active(), r.note.startedCount(sessA))
+	}
+}

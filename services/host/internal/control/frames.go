@@ -43,12 +43,6 @@ type Hello struct {
 	IdleTimeoutMs       int64  `json:"idle_timeout_ms"`
 	DetachGraceMs       int64  `json:"detach_grace_ms"`
 	JWKS                JWKS   `json:"jwks"`
-	// ClockLeewayMs, IdleTimeoutMs and DetachGraceMs are auth.clock_leeway, terminal.idle_timeout
-	// and terminal.detach_grace; the host service applies those of the data connection that
-	// carries a handshake to that session (M2-45 Design note 2a).
-	ClockLeewayMs int64 `json:"clock_leeway_ms"`
-	IdleTimeoutMs int64 `json:"idle_timeout_ms"`
-	DetachGraceMs int64 `json:"detach_grace_ms"`
 }
 
 // ReadyFrame is ready (schema HostReady).

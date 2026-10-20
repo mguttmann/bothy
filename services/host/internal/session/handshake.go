@@ -205,6 +205,12 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 		h.failOpening(ctx, cl, d)
 		return
 	}
+	if m.wasReported(cl.Sid) {
+		// session.close arrived during the gate or the confirmation: no PTY.
+		h.dc.close(CodeNormal, "")
+		m.dropConn(cl.Sid, h.dc)
+		return
+	}
 	s := m.newSession(cl, l, h.sidb, h.dc, tr, h.window)
 	if d := l.start(ctx, req); d != "" {
 		m.forget(s)
@@ -212,6 +218,10 @@ func (h *handshake) open(ctx context.Context, cl Claims, tr *noise.Transport, ki
 		return
 	}
 	req.APIKey = ""
+	if m.wasReported(cl.Sid) {
+		s.end(endSpec{reason: ReasonClientClosed, silent: true})
+		return
+	}
 	m.d.Log.LogAttrs(ctx, slog.LevelInfo, msgStarted, slog.String(attrSession, cl.Sid), slog.String(attrProfile, cl.Prf), slog.String(attrUser, cl.Osu))
 	m.started(ctx, cl.Sid)
 	s.run(h.dc, tr)

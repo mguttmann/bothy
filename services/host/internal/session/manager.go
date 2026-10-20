@@ -176,6 +176,8 @@ func (m *Manager) Open(_ context.Context, o control.SessionOpen, n control.Notif
 // an opening; no session.ended, the server closed the session already.
 func (m *Manager) Close(_ context.Context, c control.SessionClose) {
 	m.mu.Lock()
+	// An opening that is still in the gate or the confirmation must not start its PTY afterwards.
+	m.reported[c.SessionID] = struct{}{}
 	s := m.sessions[c.SessionID]
 	dc := m.conns[c.SessionID]
 	delete(m.conns, c.SessionID)
@@ -427,6 +429,9 @@ func trimSpace(b []byte) []byte {
 
 // startRequest builds pty.start for claims and the offered profile kind.
 func (m *Manager) startRequest(cl Claims, kind string, res *doctor.Result, cols, rows uint16) (localchan.PTYStart, string) {
+	if res == nil {
+		return localchan.PTYStart{}, DetailPTYFailed
+	}
 	req := localchan.PTYStart{SessionID: cl.Sid, Profile: cl.Prf, Kind: kind, Declaration: res.Declaration, Cols: cols, Rows: rows}
 	switch kind {
 	case config.KindCommand:
