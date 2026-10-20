@@ -29,7 +29,7 @@ import (
 
 // The limits of the command world: low enough to reach in a test, never the defaults.
 const (
-	cmdMaxPerPrincipal = 4
+	cmdMaxPerPrincipal = 8
 	cmdPayloadMax      = 8192
 )
 
@@ -265,11 +265,19 @@ func (w *cmdWorld) mustInvoke(p gwPerson, ch channel, id string, body map[string
 	return inv
 }
 
-// thread creates a thread of a message of the Owner in the main thread of ch and returns it.
+// thread creates a thread from a new message of the Owner in the main thread of ch and returns it.
 func (w *cmdWorld) thread(ch channel) string {
 	w.t.Helper()
-	code, b := w.rest(w.base, w.owner, http.MethodPost, "/api/v1/channels/"+ch.id+"/threads", map[string]any{
-		"title": "Case", "message": map[string]any{"client_msg_id": ids.New().String(), "content_md": "a case"}})
+	code, b := w.rest(w.base, w.owner, http.MethodPost, "/api/v1/threads/"+ch.thread+"/messages",
+		map[string]any{"client_msg_id": ids.New().String(), "content_md": "a case"})
+	if code != http.StatusCreated && code != http.StatusOK {
+		w.t.Fatalf("createMessage = %d %s", code, b)
+	}
+	var m struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(b, &m)
+	code, b = w.rest(w.base, w.owner, http.MethodPost, "/api/v1/channels/"+ch.id+"/threads", map[string]any{"parent_message_id": m.ID})
 	if code != http.StatusCreated && code != http.StatusOK {
 		w.t.Fatalf("createThread = %d %s", code, b)
 	}
@@ -277,13 +285,9 @@ func (w *cmdWorld) thread(ch channel) string {
 		Thread struct {
 			ID string `json:"id"`
 		} `json:"thread"`
-		ID string `json:"id"`
 	}
 	_ = json.Unmarshal(b, &out)
-	if out.Thread.ID != "" {
-		return out.Thread.ID
-	}
-	return out.ID
+	return out.Thread.ID
 }
 
 // TestSlashCommands is the integration suite of M2-16 against a started api process: the command
@@ -471,6 +475,210 @@ func TestSlashCommands(t *testing.T) {
 		code, b = w.register(tx, def("t6", "scope_kind", "channel", "scope_id", w.allgemein.id))
 		wantProblem(t, code, b, http.StatusForbidden, "forbidden", "level_insufficient", "", "")
 		w.mustRegister(tx, def("t7"))
+	})
+
+	t.Run("TestUpdateCommand", func(t *testing.T) {
+		c := w.mustRegister(w.lotse, def("upd"))
+		path := "/api/v1/commands/" + c.ID
+		put := func(a consumerAgent, p string, body map[string]any, ifMatch string) (int, []byte, http.Header) {
+			h := map[string]string{}
+			if ifMatch != "" {
+				h["If-Match"] = ifMatch
+			}
+			return w.do(send{agent: &a, method: http.MethodPut, path: p, body: body, headers: h})
+		}
+		code, b, _ := put(w.lotse, path, def("upd", "description", "New text"), "")
+		wantProblem(t, code, b, http.StatusPreconditionRequired, "precondition_required", "", "", "")
+		code, b, _ = put(w.lotse, path, def("upd", "description", "New text"), `"7"`)
+		wantProblem(t, code, b, http.StatusPreconditionFailed, "version_conflict", "", "", "")
+		if !strings.Contains(string(b), `"current"`) {
+			t.Fatalf("412 without current: %s", b)
+		}
+		code, b, h := put(w.lotse, path, def("upd", "description", "New text"), `"1"`)
+		var got commandBody
+		_ = json.Unmarshal(b, &got)
+		if code != http.StatusOK || got.Version != 2 || h.Get("ETag") != `"2"` {
+			t.Fatalf("update = %d %s etag %s", code, b, h.Get("ETag"))
+		}
+		if w.changed(c.ID, "updated") != 1 || w.audits("command.register", c.ID, "allow") != 2 {
+			t.Fatal("event or audit of the update")
+		}
+		code, b, _ = put(w.lotse, path, def("upd", "description", "New text"), `"2"`)
+		if _ = json.Unmarshal(b, &got); code != http.StatusOK || got.Version != 2 || w.changed(c.ID, "updated") != 1 ||
+			w.audits("command.register", c.ID, "allow") != 2 {
+			t.Fatalf("identical update = %d %s", code, b)
+		}
+		code, b, _ = put(w.texter, path, def("upd"), `"2"`)
+		wantProblem(t, code, b, http.StatusForbidden, "forbidden", "not_self", "", "")
+		allg := w.mustRegister(w.lotse, def("upd2", "scope_kind", "channel", "scope_id", w.allgemein.id))
+		code, hidden, hh := put(w.texter, "/api/v1/commands/"+allg.ID, def("upd2", "scope_kind", "channel", "scope_id", w.kampagnen.id), `"1"`)
+		ucode, unknown, uh := put(w.texter, "/api/v1/commands/"+ids.New().String(), def("upd2", "scope_kind", "channel", "scope_id",
+			w.kampagnen.id), `"1"`)
+		if code != http.StatusNotFound || ucode != code || !sameProblem(hidden, unknown) || hh.Get("ETag") != uh.Get("ETag") {
+			t.Fatalf("hidden %d %s, unknown %d %s", code, hidden, ucode, unknown)
+		}
+		code, hidden, _ = put(w.texter, "/api/v1/commands/"+allg.ID, def("upd2"), `"1"`)
+		if code != http.StatusNotFound || !sameProblem(hidden, unknown) {
+			t.Fatalf("hidden without scope %d %s", code, hidden)
+		}
+		tx := w.agent()
+		g := w.agentGrant(tx, w.eskalation, "write")
+		esk := w.mustRegister(tx, def("mine", "scope_kind", "channel", "scope_id", w.eskalation.id))
+		w.must(w.owner, http.MethodPost, "/api/v1/grants/"+g+"/revoke", map[string]any{"reason": "moved"})
+		if code, b, _ := put(tx, "/api/v1/commands/"+esk.ID, def("mine"), `"1"`); code != http.StatusOK {
+			t.Fatalf("move to instance after revoke = %d %s", code, b)
+		}
+		w.removeAll(w.lotse)
+	})
+
+	t.Run("TestRemoveCommand", func(t *testing.T) {
+		c := w.mustRegister(w.lotse, def("rm"))
+		path := "/api/v1/commands/" + c.ID
+		inv := w.mustInvoke(w.sam, w.allgemein, c.ID, map[string]any{"thread_id": w.thread(w.allgemein)})
+		if code, b, _ := w.do(send{agent: &w.lotse, method: http.MethodDelete, path: path}); code != http.StatusNoContent {
+			t.Fatalf("remove = %d %s", code, b)
+		}
+		if n := w.count(`SELECT count(*) FROM commands WHERE id = $1 AND removed_at IS NOT NULL AND version = 2`, c.ID); n != 1 {
+			t.Fatal("not removed")
+		}
+		if w.changed(c.ID, "removed") != 1 || w.audits("command.remove", c.ID, "allow") != 1 {
+			t.Fatal("event or audit of the removal")
+		}
+		if code, _, _ := w.do(send{agent: &w.lotse, method: http.MethodDelete, path: path}); code != http.StatusNoContent ||
+			w.changed(c.ID, "removed") != 1 || w.audits("command.remove", c.ID, "allow") != 1 {
+			t.Fatalf("second remove = %d", code)
+		}
+		if code, _, _ := w.do(send{agent: &w.lotse, method: http.MethodGet, path: path}); code != http.StatusNotFound {
+			t.Fatalf("get after remove = %d", code)
+		}
+		if n := w.count(`SELECT count(*) FROM runs WHERE id = $1 AND triggering_command_id = $2`, inv.RunID, c.ID); n != 1 {
+			t.Fatal("the run lost triggering_command_id")
+		}
+		allg := w.mustRegister(w.lotse, def("rm2", "scope_kind", "channel", "scope_id", w.allgemein.id))
+		code, hidden, _ := w.do(send{agent: &w.texter, method: http.MethodDelete, path: "/api/v1/commands/" + allg.ID})
+		_, unknown, _ := w.do(send{agent: &w.texter, method: http.MethodDelete, path: "/api/v1/commands/" + ids.New().String()})
+		if code != http.StatusNotFound || !sameProblem(hidden, unknown) {
+			t.Fatalf("hidden %d %s", code, hidden)
+		}
+		inst := w.mustRegister(w.lotse, def("rm3"))
+		code, b, _ := w.do(send{agent: &w.texter, method: http.MethodDelete, path: "/api/v1/commands/" + inst.ID})
+		wantProblem(t, code, b, http.StatusForbidden, "forbidden", "not_self", "", "")
+		w.removeAll(w.lotse)
+	})
+
+	t.Run("TestGetCommand_Visibility", func(t *testing.T) {
+		inst := w.mustRegister(w.lotse, def("vis1"))
+		allg := w.mustRegister(w.lotse, def("vis2", "scope_kind", "channel", "scope_id", w.allgemein.id))
+		kamp := w.mustRegister(w.texter, def("vis3", "scope_kind", "channel", "scope_id", w.kampagnen.id))
+		code, _, h := w.do(send{agent: &w.lotse, method: http.MethodGet, path: "/api/v1/commands/" + allg.ID})
+		if code != http.StatusOK || h.Get("ETag") != `"1"` {
+			t.Fatalf("owner get = %d %s", code, h.Get("ETag"))
+		}
+		for _, id := range []string{inst.ID, allg.ID} {
+			if code, b, _ := w.do(send{person: &w.sam, method: http.MethodGet, path: "/api/v1/commands/" + id}); code != http.StatusOK {
+				t.Fatalf("sam get = %d %s", code, b)
+			}
+		}
+		code, hidden, hh := w.do(send{person: &w.sam, method: http.MethodGet, path: "/api/v1/commands/" + kamp.ID})
+		ucode, unknown, uh := w.do(send{person: &w.sam, method: http.MethodGet, path: "/api/v1/commands/" + ids.New().String()})
+		if code != http.StatusNotFound || ucode != code || !sameProblem(hidden, unknown) || hh.Get("Content-Type") != uh.Get("Content-Type") {
+			t.Fatalf("hidden %d %s unknown %d %s", code, hidden, ucode, unknown)
+		}
+		w.removeAll(w.lotse)
+		w.removeAll(w.texter)
+	})
+
+	t.Run("TestCommandChanged_Delivery", func(t *testing.T) {
+		var after int64
+		_ = w.queryRow(context.Background(), `SELECT coalesce(max(seq), 0) FROM event_log`).Scan(&after)
+		inst := w.mustRegister(w.lotse, def("ev1"))
+		sup := w.mustRegister(w.lotse, def("ev2", "scope_kind", "space", "scope_id", w.space))
+		events := func(code int, b []byte) string {
+			if code != http.StatusOK {
+				t.Fatalf("listEvents = %d %s", code, b)
+			}
+			return string(b)
+		}
+		q := "/api/v1/events?after=" + strconv.FormatInt(after, 10)
+		sam := events(w.rest(w.base, w.sam, http.MethodGet, q, nil))
+		if !strings.Contains(sam, inst.ID) || !strings.Contains(sam, sup.ID) {
+			t.Fatalf("sam misses command.changed: %s", sam)
+		}
+		out := events(w.rest(w.base, w.outsider, http.MethodGet, q, nil))
+		if !strings.Contains(out, inst.ID) || strings.Contains(out, sup.ID) {
+			t.Fatalf("outsider: %s", out)
+		}
+		lot := events(w.call(w.base, w.lotse, http.MethodGet, q, nil))
+		if !strings.Contains(lot, inst.ID) || !strings.Contains(lot, sup.ID) {
+			t.Fatalf("lotse: %s", lot)
+		}
+		w.removeAll(w.lotse)
+	})
+
+	t.Run("TestListChannelCommands_Rule10_3", func(t *testing.T) {
+		list := func(p gwPerson, ch channel) []commandBody {
+			code, b, _ := w.do(send{person: &p, method: http.MethodGet, path: "/api/v1/channels/" + ch.id + "/commands"})
+			if code != http.StatusOK {
+				t.Fatalf("list = %d %s", code, b)
+			}
+			var out struct {
+				Items []commandBody `json:"items"`
+			}
+			_ = json.Unmarshal(b, &out)
+			return out.Items
+		}
+		names := func(items []commandBody) []string {
+			var out []string
+			for _, c := range items {
+				out = append(out, c.Name+"@"+c.Owner[len(c.Owner)-4:]+"/"+c.ScopeKind)
+			}
+			return out
+		}
+		guest := w.agent()
+		l, tx := w.lotse.id.String(), guest.id.String()
+		w.mustRegister(w.lotse, def("l-inst"))
+		w.mustRegister(w.lotse, def("l-space", "scope_kind", "space", "scope_id", w.space))
+		w.mustRegister(w.lotse, def("l-allg", "scope_kind", "channel", "scope_id", w.allgemein.id))
+		w.mustRegister(w.lotse, def("l-esk", "scope_kind", "channel", "scope_id", w.eskalation.id))
+		w.mustRegister(w.lotse, def("deploy"))
+		dep := w.mustRegister(w.lotse, def("deploy", "scope_kind", "channel", "scope_id", w.allgemein.id))
+		w.mustRegister(w.lotse, def("shared"))
+		w.mustRegister(guest, def("shared"))
+		w.mustRegister(w.texter, def("shared"))
+		want := []string{"deploy@" + l[len(l)-4:] + "/channel", "l-allg@" + l[len(l)-4:] + "/channel", "l-inst@" + l[len(l)-4:] + "/instance",
+			"l-space@" + l[len(l)-4:] + "/space", "shared@" + l[len(l)-4:] + "/instance"}
+		got := list(w.sam, w.allgemein)
+		if !slices.Equal(names(got), want) || got[0].ID != dep.ID {
+			t.Fatalf("list %v, want %v", names(got), want)
+		}
+		w.sql(`UPDATE channels SET allow_mentioned_agents = true WHERE id = $1`, w.allgemein.id)
+		defer w.sql(`UPDATE channels SET allow_mentioned_agents = false WHERE id = $1`, w.allgemein.id)
+		if got := names(list(w.sam, w.allgemein)); !slices.Equal(got, want) {
+			t.Fatalf("a guest without write appears: %v", got)
+		}
+		w.agentGrant(guest, w.allgemein, "write")
+		withGuest := append(slices.Clone(want), "shared@"+tx[len(tx)-4:]+"/instance")
+		if got := names(list(w.sam, w.allgemein)); !slices.Equal(got, withGuest) {
+			t.Fatalf("list with guest %v, want %v", got, withGuest)
+		}
+		asst := w.agent()
+		w.agentGrant(asst, w.allgemein, "write")
+		w.mustRegister(asst, def("personal"))
+		w.sql(`UPDATE agents SET billing_mode = 'personal', credential_holder_id = $1 WHERE principal_id = $2`, w.owner.user.String(), asst.id.String())
+		if got := names(list(w.sam, w.allgemein)); !slices.Equal(got, withGuest) {
+			t.Fatalf("a personal agent appears as guest: %v", got)
+		}
+		w.must(w.owner, http.MethodPost, "/api/v1/agents/"+tx+"/disable", map[string]any{"reason": "test"})
+		if got := names(list(w.sam, w.allgemein)); !slices.Equal(got, want) {
+			t.Fatalf("a disabled owner appears: %v", got)
+		}
+		code, hidden, _ := w.do(send{person: &w.outsider, method: http.MethodGet, path: "/api/v1/channels/" + w.allgemein.id + "/commands"})
+		_, unknown, _ := w.do(send{person: &w.outsider, method: http.MethodGet, path: "/api/v1/channels/" + ids.New().String() + "/commands"})
+		if code != http.StatusNotFound || !sameProblem(hidden, unknown) {
+			t.Fatalf("outsider %d %s", code, hidden)
+		}
+		w.removeAll(w.lotse)
+		w.removeAll(w.texter)
 	})
 
 	t.Run("TestRegisterCommand_HumansRefused", func(t *testing.T) {
