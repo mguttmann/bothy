@@ -240,6 +240,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"client.recommended_version.ios =   # default\n" +
 		"client.recommended_version.macos =   # default\n" +
 		"client.recommended_version.windows =   # default\n" +
+		"cluster.mode = single  # default\n" +
 		"command.description_max_chars = 100  # default\n" +
 		"command.max_per_principal = 100  # default\n" +
 		"console.assets_dir =   # default\n" +
