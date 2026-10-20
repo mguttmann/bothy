@@ -11,6 +11,22 @@ documented in this file. The format is based on
 
 ### Added
 
+- Terminal across several api nodes (M2-47): with `cluster.mode = multi` (new key, `single` or
+  `multi`) the terminal module sends its signals over `NOTIFY ephemeral` in the committing
+  transaction, only with a kind and IDs (`terminal.session_open`, `terminal.host_close`,
+  `terminal.host_present`, `terminal.host_gone`, `terminal.session_paired`), and every api process
+  holds one `LISTEN ephemeral` connection (component `terminal_ephemeral`, soft dependency, reconnect
+  every `database.listen_reconnect_backoff_cap`, then a reconciliation against the host states).
+  Every node expects a session it is told about, so the node the edge hashes the session to pairs
+  both sides; only the node of the control connection sends `session.open`. A host transition or
+  re-pairing closes the host's control connections on every node; ends of sessions still reach every
+  node through the event log tail. A presence view answers "host connected" across nodes; a second
+  control connection on another node is probed by the node of the older one, and a new connection
+  gets no `session.open` during its probation. Each side of the relay has its own timer of
+  `terminal.open_timeout`: a lone side closes with `4102` (now also on the host data connection) and
+  counts `bothy.terminal.relay.unpaired`; an opening then ends `open_failed` once, by
+  compare-and-swap, and a detached session stays detached. With `cluster.mode = single` nothing of
+  this runs and no `NOTIFY` is sent.
 - Terminal sessions and relay (M2-44): `openTerminalSession`, `attachTerminalSession`,
   `listTerminalSessions`, `getTerminalSession` and `closeTerminalSession` are enabled. An opening
   runs `authorize` with SR10 to SR12, the fresh step-up (consumed in the same transaction), the

@@ -152,14 +152,29 @@ Rand und Proxy:
 1. Der Rand leitet WebSocket-Upgrades für `/api/v1/terminal/sessions/{session_id}/stream`,
    `/api/v1/hosts/connect` und `/api/v1/hosts/sessions/{session_id}/stream` weiter, mit einer
    Leerlauf-Frist über `terminal.host_heartbeat_interval` (sonst schneidet der Proxy ruhige
-   Terminals ab).
+   Terminals ab). M2-47 (D-M2-47-9): the idle timeout on both stream paths is at least
+   `terminal.idle_timeout` plus `terminal.idle_grace`, the longest silence of a session the server
+   keeps (24, 6.3), and on the control connection `/api/v1/hosts/connect` at least
+   `terminal.host_heartbeat_interval` times `terminal.host_heartbeat_miss_limit`, which is also
+   above `sync.heartbeat_interval` of the gateway; so the edge never cuts a session before the
+   server would end it.
 2. Mit `cluster.mode = multi` leitet der Rand beide Strom-Pfade derselben Sitzung per Hash über die
    Sitzungs-ID auf denselben api-Knoten (konsistentes Hashing über das Pfadsegment
    `{session_id}`). Beide Pfade haben die Sitzungs-ID an derselben Stelle nach dem festen Präfix, damit
    eine Regel beide trifft. Ohne diese Regel scheitert jede zweite Sitzung sichtbar mit `4102`
-   (Ruling T6, TM-T15). Mit einem Knoten ist nichts zu tun.
+   (Ruling T6, TM-T15). Mit einem Knoten ist nichts zu tun. M2-47 (D-M2-47-9, D-M2-47-10): the
+   example is the Compose overlay `infra/compose/compose.multi-node.yaml` with the edge
+   `infra/compose/edge/nginx.conf` (nginx, consistent hashing over the `{session_id}` segment for
+   both stream paths; REST, `/api/v1/gateway` and `/api/v1/hosts/connect` may land on any node).
 3. Der Rand puffert diese Verbindungen nicht und schreibt keine Inhalte in Logs (Zugriffslog nur mit
    Routen-Muster, [19-sicherheit.md](19-sicherheit.md), SEC-LOG-*).
+4. Conditions of the overlay with several api nodes (M2-47, D-M2-47-10): it runs only with the
+   profile `direct`, because `tailscale serve` has no hash rule (the profile `tailscale` runs one
+   api node); the operator's TLS edge stays in front of the example edge, so the server sees the
+   address of the example edge, which appends the address it sees (the gateway of the network),
+   and `BOTHY_TRUSTED_PROXIES` names the subnet of the network `<project>_default`, not only its
+   gateway (4.3); both api nodes share the key store of the signing keys (ADR 0066); the api nodes
+   publish no port, only the example edge publishes, on `127.0.0.1` of the host (4.1 rule 1).
 
 Installation of the host service on a host (M2-42; [24-terminal.md](24-terminal.md) 2.2; the
 rows `D-M2-42-<n>` of [DECISIONS.md](../DECISIONS.md) give the reasons):

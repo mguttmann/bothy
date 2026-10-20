@@ -20,6 +20,15 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Compose overlay with two api nodes (M2-47): `infra/compose/compose.multi-node.yaml` adds a
+  second api node (`api-2`, same image, hardening and shared key store), sets
+  `BOTHY_CLUSTER__MODE=multi` for both api nodes and the worker, removes the api ports and puts the
+  example edge `infra/compose/edge/nginx.conf` in front (nginx in the unprivileged image, version in
+  `BOTHY_NGINX_VERSION`): both terminal stream paths of a session go by consistent hashing over the
+  session ID to one node, REST, the gateway and the control connection of the host service to any
+  node, no access log, no buffering of the streams, idle timeouts named after the terminal keys,
+  published only on `127.0.0.1`. Only with the profile `direct`; the operator's TLS edge stays in
+  front.
 - Desktop thread view (M4-20): the history column shows a thread or the main history of a text
   channel from the local database with grouping, origin badges, safe Markdown, "Show more",
   tombstones and system lines, loads older pages and fills gaps, focuses the visible threads and

@@ -311,7 +311,7 @@ channels:
       client_action: 'session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a fresh step-up'
     - code: 4102
       name: terminal_host_unavailable
-      client_action: 'the other side is missing (host offline or no counterpart on this node): an opening session ends with `open_failed`, a started one is `detached`; attach again later'
+      client_action: 'the other side is missing (host offline or no counterpart on this node within `terminal.open_timeout`): an opening session ended `open_failed` (open again); a detached session stays `detached` (attach again later)'
     - code: 4103
       name: terminal_replaced
       client_action: another device attached; do not reconnect on your own
@@ -442,6 +442,9 @@ channels:
     - code: 4100
       name: terminal_closed
       client_action: 'data connection only: the session ended; end the PTY'
+    - code: 4102
+      name: terminal_host_unavailable
+      client_action: 'no counterpart on this node within `terminal.open_timeout`; do not reopen this data connection, wait for the next `session.open`'
     - code: 4110
       name: host_unpaired
       client_action: keys unknown or replaced by a re-pairing; stop and run `bothy-host pair` again

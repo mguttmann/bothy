@@ -965,6 +965,18 @@ im Modus `multi` aktiv, weil jedes `NOTIFY` beim Commit eine instanzweite Sperre
 und ein Knoten ihn nicht braucht (03, Abschnitt 6.6). `notification.created` und
 `command.autocomplete_requested` gehen denselben Weg mit IDs.
 
+Terminal signals (M2-47, D-M2-47-3, D-M2-47-4; [24-terminal.md](24-terminal.md), section 9). The
+module `terminal` sends its own internal signals on the channel `ephemeral`: `terminal.session_open`
+(host and session ID), `terminal.host_close` (host ID), `terminal.host_present` and
+`terminal.host_gone` (host and connection ID) and `terminal.session_paired` (host and session ID).
+They are no event types of 05, so the table above has no rows for them. With one node a use case
+hands its signal to the local handler after the commit; with several nodes it stages
+`NOTIFY ephemeral` in its transaction (presence and pairing go out in their own statement), and
+every node, the sender included, receives it. The end of a terminal session goes through the log
+tail (11.2), not through these signals. The module `terminal` holds its own `LISTEN ephemeral`
+connection per api process until M7-17 shares one per process; the namespaced kinds (prefix
+`terminal.`) allow that.
+
 ### 11.7 Kosten der Serialisierung
 
 Alle Transaktionen mit dauerhaften Ereignissen serialisieren sich am Ende an `event_seq` (04, 3.2).
@@ -1214,6 +1226,7 @@ Idempotenz die Wiederholung des Clients.
 |---|---|---|
 | PostgreSQL | api meldet nicht bereit, Anfragen `503`; Gateway hält Verbindungen, liefert nichts; worker pausiert; Rückkehr ohne Eingriff | fail closed |
 | `LISTEN`-Verbindung | Neuaufbau mit Backoff, Poll überbrückt; kein Verlust (lückenlose `seq`) | weich |
+| `LISTEN` connection of the terminal (M2-47, `cluster.mode = multi`) | reconnect at once, then every `database.listen_reconnect_backoff_cap`; after `LISTEN` succeeded again a reconciliation of the node's connections against the host states; ends of sessions still arrive through the log tail; no readiness check (24, section 9) | weich |
 | Objektspeicher | Upload und Download `503`; Nachrichten ohne Dateien laufen weiter | teilweise |
 | clamd | Scan-Jobs wiederholen; Dateien bleiben `pending` und werden nicht ausgeliefert | fail closed |
 | Push-Dienste | Jobs wiederholen; Nachrichtenpfad unberührt | weich |
@@ -1362,6 +1375,7 @@ Mehrere Knoten im Detail (Stufe 2):
 - Rate-Limits: Eimer im Prozess. Bei `n` Knoten gilt bis zu `n`-fach; der Betreiber teilt die Werte
   oder setzt Affinität am Proxy. Grund: kein gemeinsamer Zähler-Dienst.
 - Präsenz und Tippen: über `NOTIFY ephemeral` (Abschnitt 11.6).
+- Terminal: [24-terminal.md](24-terminal.md), section 9 (M2-47).
 
 Ein Modul wird erst abgespalten, wenn alle drei Bedingungen gelten:
 
