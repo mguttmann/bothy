@@ -134,7 +134,7 @@ documented in this file. The format is based on
   web device without keys and without tokens. The cookie is a second credential kind of the
   authenticator; a request with the cookie and `Authorization` is `400`. ConsoleGuard of the HTTP
   chain requires `X-Console-Request: 1` and the own `Origin` on every cookie request except `GET`,
-  `HEAD`, `OPTIONS` (`403 csrf_check_failed`); the gateway refuses a cookie upgrade without the
+  `HEAD`, `OPTIONS` (`403 forbidden` with reason `csrf_check_failed`); the gateway refuses a cookie upgrade without the
   own `Origin`. Before the first step-up a console session reaches only its own profile. New
   operations `getConsoleSession`, `endViewAs` (`access.view_as.end`), `stepUpWithPassword`,
   `beginStepUpOidcReauth` and `completeStepUpOidcReauth`; every console step-up rotates the
