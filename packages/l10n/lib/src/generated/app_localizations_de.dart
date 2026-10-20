@@ -4336,4 +4336,41 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get adminGuidedDoneClose => 'Schließen';
+
+  @override
+  String get adminPersonViewAs => 'Als diese Person ansehen';
+
+  @override
+  String adminViewAsRemaining(String time) {
+    return 'noch $time';
+  }
+
+  @override
+  String get adminViewAsEnd => 'Ansicht beenden';
+
+  @override
+  String adminViewAsSidebarOf(String name) {
+    return 'Seitenleiste, wie $name sie sieht';
+  }
+
+  @override
+  String adminViewAsNotVisible(String name, String names) {
+    return 'Nicht sichtbar für $name: $names';
+  }
+
+  @override
+  String get adminViewAsStructureOnly =>
+      'Die Konsole zeigt nur Aufbau und Zugriff, nie den Inhalt eines Kanals.';
+
+  @override
+  String get adminViewAsStructureLater =>
+      'Der Aufbau erscheint beim Start einer Ansicht. Beende diese Ansicht und starte sie neu, um ihn zu sehen.';
+
+  @override
+  String get consoleStepUpPasskeyNext =>
+      'Als Nächstes fragt dein Browser nach deinem Passkey.';
+
+  @override
+  String get consoleStepUpOidcAction =>
+      'Diese Änderung braucht eine neue Anmeldung bei deinem Anmeldedienst. Bestätige dort und mache die Änderung danach noch einmal.';
 }
