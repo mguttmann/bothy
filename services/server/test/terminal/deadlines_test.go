@@ -49,7 +49,7 @@ func dlStopTo(w *world, at time.Time) {
 	if d < 0 {
 		w.t.Fatalf("the clock is past %s already (%s)", at, w.clk.Now())
 	}
-	w.clk.Advance(d)
+	w.jump(d)
 }
 
 // dlEcho sends m from the device and waits for the echo of the Accept script; it returns len(m).
@@ -295,7 +295,7 @@ func TestTMT11_DetachGraceWithoutHost(t *testing.T) {
 }
 
 // TestTMT11_SweepCatchesDeadNode (TM-T11, 02 section 12.3, Design note 8 a and b): the relay of the
-// process is "dead": the tests move the clock with w.clk.Advance, so no relay deadline runs, and
+// process is "dead": the tests move the clock with w.jump, so no relay deadline runs, and
 // only the handler of terminal.sweep can end a session. Each row ends one session with the reason
 // of its rule (in the order of note 8) and runs the handler a second time, which changes nothing
 // more; the other rows show what stays open.
@@ -311,7 +311,7 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 		other := w.start(w.sam, w.r2, w.h2)
 		w.exec(`UPDATE hosts SET state = 'disabled', disabled_at = $2, disabled_reason = 'owner' WHERE id = $1`, w.r1, w.clk.Now())
 		w.sweep()
-		w.assertEnded(l, domain.CloseHostDisabled)
+		w.assertEndedHostLeft(l, domain.CloseHostDisabled)
 		if got := w.state(other.id.String()); got != "active" {
 			t.Fatalf("the session on r2: %s", got)
 		}
@@ -351,7 +351,7 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 		if n := dlSweepEnded(w); n != 0 || w.state(g.Session.ID) != "opening" {
 			t.Fatalf("one tick before the open deadline: %d ended, %s", n, w.state(g.Session.ID))
 		}
-		w.clk.Advance(tick)
+		w.jump(tick)
 		w.sweep()
 		dlEndedRow(w, id, w.h1, data, "closed:open_failed:open_timeout", domain.CloseOpenFailed)
 		dlSweepAgain(w, id)
@@ -385,7 +385,7 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 		if n := dlSweepEnded(w); n != 0 || w.state(l.id.String()) != "detached" {
 			t.Fatalf("one tick before the detach grace: %d ended, %s", n, w.state(l.id.String()))
 		}
-		w.clk.Advance(tick)
+		w.jump(tick)
 		w.sweep()
 		dlEndedRow(w, l.id, w.h1, nil, "closed:detach_expired", domain.CloseDetachExpired)
 		dlSweepAgain(w, l.id)
@@ -410,7 +410,7 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 		if n := dlSweepEnded(w); n != 0 || w.state(l.id.String()) != "active" {
 			t.Fatalf("one tick before the stored idle deadline: %d ended, %s", n, w.state(l.id.String()))
 		}
-		w.clk.Advance(tick)
+		w.jump(tick)
 		w.sweep()
 		w.assertEnded(l, domain.CloseIdleTimeout)
 		dlSweepAgain(w, l.id)
@@ -461,7 +461,7 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 		opened := dlTime(w, id, "opened_at")
 		// The jump stays within auth.dpop_proof_max_age, so the proofs of the attach (signed with
 		// the real clock) are still fresh on the fake one.
-		w.clk.Advance(openTimeout / 4)
+		w.jump(openTimeout / 4)
 		if r := w.attach(w.alex, g.Session.ID, true); r.Status != http.StatusOK {
 			t.Fatalf("attach to the opening: %d %s", r.Status, r.Body)
 		}
@@ -479,7 +479,7 @@ func TestTMT11_SweepCatchesDeadNode(t *testing.T) {
 		if n := dlSweepEnded(w); n != 0 || w.state(g.Session.ID) != "opening" {
 			t.Fatalf("past opened_at but before the new grant plus terminal.open_timeout: %d ended, %s", n, w.state(g.Session.ID))
 		}
-		w.clk.Advance(tick)
+		w.jump(tick)
 		w.sweep()
 		dlEndedRow(w, id, w.h1, nil, "closed:open_failed:open_timeout", domain.CloseOpenFailed)
 		dlSweepAgain(w, id)

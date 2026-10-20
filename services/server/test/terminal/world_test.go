@@ -127,6 +127,8 @@ type world struct {
 	timers  *fakehost.ClockTimers
 	metrics *sessionMetrics
 	logs    *syncBuffer
+	// nodeTimers are the schedulers of the further processes on clk (revStartNode).
+	nodeTimers []*fakehost.ClockTimers
 
 	robin, alex, sam *harness.Client
 	// alex2 is a second device and login session of Alex.
@@ -240,13 +242,34 @@ func (w *world) expirySweep() {
 // due. auth.clock_leeway and auth.dpop_proof_max_age are wide in testConfig, so the clients' proofs
 // still pass after a jump of the fake clock ahead of the real clock.
 func (w *world) syncClock() {
+	w.thawNodes()
 	if d := time.Now().UTC().Truncate(time.Millisecond).Sub(w.clk.Now()); d > 0 {
 		w.timers.Advance(d)
 	}
 }
 
 // advance moves the fake clock by d and runs every deadline it reaches.
-func (w *world) advance(d time.Duration) { w.timers.Advance(d) }
+func (w *world) advance(d time.Duration) {
+	w.thawNodes()
+	w.timers.Advance(d)
+}
+
+// jump moves the fake clock by d without running a relay deadline of any process (a dead relay):
+// also a deadline a relay arms after the jump, from a row its log tail delivers late, waits for
+// the next advance (fakehost.ClockTimers.Jump and Freeze).
+func (w *world) jump(d time.Duration) {
+	for _, n := range w.nodeTimers {
+		n.Freeze()
+	}
+	w.timers.Jump(d)
+}
+
+// thawNodes ends the freeze of jump for the schedulers of the further processes.
+func (w *world) thawNodes() {
+	for _, n := range w.nodeTimers {
+		n.Thaw()
+	}
+}
 
 // users is a report of session users.
 func users(names ...string) []any {
@@ -552,11 +575,41 @@ func (w *world) closeCode(what string, got func(context.Context) (int, string), 
 // closed with 4100 and the reason, one session.close at the Fake-Host and the metric raised.
 func (w *world) assertEnded(l live, reason domain.CloseReason) {
 	w.t.Helper()
+	w.assertEndedHost(l, reason, false)
+}
+
+// assertEndedHostLeft is assertEnded for a session whose host left active behind the module's
+// back: the host gets session.close with the reason, or its control connection ends first when a
+// heartbeat saw the host state before the end reached the control link (D-M2-46-20).
+func (w *world) assertEndedHostLeft(l live, reason domain.CloseReason) {
+	w.t.Helper()
+	w.assertEndedHost(l, reason, true)
+}
+
+// assertEndedHost checks the end of l; hostLeft accepts the end of the control connection
+// instead of session.close.
+func (w *world) assertEndedHost(l live, reason domain.CloseReason, hostLeft bool) {
+	w.t.Helper()
 	w.waitState(l.id.String(), "closed:"+string(reason))
 	w.closeCode("device stream", l.dev.CloseCode, 4100, string(reason))
 	w.closeCode("data connection", l.data.CloseCode, 4100, string(reason))
-	got, err := l.host.WaitClose(w.ctx(), l.id)
-	if err != nil || got != string(reason) {
+	if hostLeft {
+		closed := func() (string, bool) {
+			for _, c := range l.host.Closes() {
+				if ids.ID(c.SessionId) == l.id {
+					return string(c.CloseReason), true
+				}
+			}
+			return "", false
+		}
+		w.eventually("session.close or the end of the control connection", func() bool {
+			_, ok := closed()
+			return ok || l.host.ControlEnded()
+		})
+		if got, ok := closed(); ok && got != string(reason) {
+			w.t.Fatalf("session.close at the host: %q, want %s", got, reason)
+		}
+	} else if got, err := l.host.WaitClose(w.ctx(), l.id); err != nil || got != string(reason) {
 		w.t.Fatalf("session.close at the host: %q %v, want %s", got, err, reason)
 	}
 	if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'terminal.terminate' AND resource_id = $1`, l.id); n != 1 {

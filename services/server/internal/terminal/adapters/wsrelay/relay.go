@@ -165,13 +165,15 @@ type slot struct {
 	// times are the times of the row of the last grant, kept current from the log tail; lastDev
 	// is the last binary message from the device seen by this node, never cleared (M2-46 Design
 	// note 7). limitStop and limitGen are the timer of the limits; persisted the last write of the
-	// progress; counted the state this slot counts in bothy.terminal.sessions.active ("" none).
-	times     domain.SessionTimes
-	lastDev   time.Time
-	limitStop func() bool
-	limitGen  int
-	persisted time.Time
-	counted   string
+	// progress; storedInput the last input time written; counted the state this slot counts in
+	// bothy.terminal.sessions.active ("" none).
+	times       domain.SessionTimes
+	lastDev     time.Time
+	limitStop   func() bool
+	limitGen    int
+	persisted   time.Time
+	storedInput time.Time
+	counted     string
 	// held marks a slot that held a side on this node since its grant: only such a node runs the
 	// limits (Design note 7: "one set per session the process holds a side of"). With several
 	// nodes every node expects the session, but only the node of the pairing sees the device's
@@ -823,19 +825,25 @@ func (r *Relay) forward(sd *side, msg []byte) {
 }
 
 // persistDue returns the write of the progress of s when terminal.idle_grace passed since the last
-// one and there is something to write (M2-46 Design note 7 d, domain.PersistDue): the counts since
-// the last write are added once and last_input_at moves forward, without an event and without a
-// new version; a failed write gives the counts back to the slot. r.mu is held.
+// one and there is something to write (M2-46 Design note 7 d, domain.PersistDue), and also when
+// unwritten input is a full idle grace newer than the last input written, so an output-only write
+// never holds input back and the stored last_input_at lags the true one by less than the grace:
+// the counts since the last write are added once and last_input_at moves forward, without an
+// event and without a new version; a failed write gives the counts back to the slot. r.mu is held.
 func (r *Relay) persistDue(s *slot) effects {
 	if r.cfg.Windows.Idle <= 0 || (s.in == 0 && s.out == 0 && s.lastInput.IsZero()) {
 		return nil
 	}
-	now := r.clk.Now()
-	if !domain.PersistDue(s.persisted, now, r.cfg.Windows.IdleGrace) {
+	now, grace := r.clk.Now(), r.cfg.Windows.IdleGrace
+	inputDue := !s.lastInput.IsZero() && s.lastInput.Sub(s.storedInput) >= grace
+	if !inputDue && !domain.PersistDue(s.persisted, now, grace) {
 		return nil
 	}
 	s.persisted = now
 	id, c := s.id, s.take()
+	if !c.LastInput.IsZero() {
+		s.storedInput = c.LastInput
+	}
 	return effects{func(ctx context.Context) {
 		go func() {
 			if err := r.uc.RelayCounters(ctx, id, c); err != nil {
@@ -855,6 +863,9 @@ func (r *Relay) giveBack(id ids.ID, c app.Counts) {
 		s.out += c.Out
 		if c.LastInput.After(s.lastInput) {
 			s.lastInput = c.LastInput
+		}
+		if !c.LastInput.IsZero() && s.storedInput.Equal(c.LastInput) {
+			s.storedInput = time.Time{}
 		}
 	}
 }

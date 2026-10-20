@@ -333,6 +333,7 @@ type revNode struct {
 func (w *world) revStartNode(role wire.Role) *revNode {
 	w.t.Helper()
 	n := &revNode{timers: fakehost.NewClockTimers(w.clk), metrics: newSessionMetrics(), logs: &syncBuffer{}}
+	w.nodeTimers = append(w.nodeTimers, n.timers)
 	n.s = harness.StartNode(w.t, w.s, harness.Options{Config: testConfig(revOptions().cfg), Clock: w.clk, TerminalTimers: n.timers,
 		EgressDenyAll: true, LogWriter: n.logs, Role: role, TerminalSessionMetrics: n.metrics,
 		JobModules: func(m *wire.JobModules) { n.jobsMu.Lock(); n.jobs = m; n.jobsMu.Unlock() }})
@@ -431,7 +432,7 @@ func TestTMT10_CloseReachesOtherProcess(t *testing.T) {
 
 	w.grant("user", w.alex.PrincipalID, r3.String(), "")
 	l2 := w.revStartOn(b, alexB, r3, h3)
-	w.clk.Advance(maxDuration)
+	w.jump(maxDuration)
 	res, err := worker.jobModules(t).TerminalSweep.Sweep(w.ctx())
 	if err != nil {
 		t.Fatalf("terminal.sweep in the worker: %v", err)
@@ -537,7 +538,7 @@ func TestAuditTerminate_ExactlyOnce(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t, revOptions())
 		l := w.start(w.alex, w.r1, w.h1)
-		w.clk.Advance(maxDuration)
+		w.jump(maxDuration)
 		// The step-up of revokeGrant is fresh on the advanced clock, so the request races the sweep
 		// directly.
 		if err := w.robin.StepUp(t.Context()); err != nil {

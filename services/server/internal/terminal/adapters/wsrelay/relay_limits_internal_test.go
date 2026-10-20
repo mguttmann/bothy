@@ -309,3 +309,46 @@ func TestRelayLimits_EndsOnce(t *testing.T) {
 		time.Sleep(2 * time.Millisecond)
 	}
 }
+
+// TestRelayLimits_InputAfterOutputOnlyWriteIsStored (red team M2-46, M1): a progress write that
+// carries only host output must not hold back the next device input; otherwise the stored
+// last_input_at lags the true one by more than terminal.idle_grace and terminal.sweep ends a
+// live session early (Design note 7 d, D-M2-46-7).
+func TestRelayLimits_InputAfterOutputOnlyWriteIsStored(t *testing.T) {
+	t.Parallel()
+	r, uc, timers := limitRelay(t)
+	t0 := timers.Clock.Now()
+	id := ids.New()
+	r.Expect(app.Expectation{SessionID: id, HostID: ids.New(), DeviceID: ids.New(), Deadline: t0.Add(farDeadline), Started: true,
+		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}})
+	r.mu.Lock()
+	dev, hst := r.newSide(domain.SideClient, id, nil), r.newSide(domain.SideHost, id, nil)
+	r.slots[id].dev, r.slots[id].hst, r.slots[id].paired = dev, hst, true
+	r.hold(r.slots[id])
+	r.mu.Unlock()
+	r.forward(dev, []byte("handshake-1"))
+	r.forward(hst, []byte("handshake-2"))
+	// The host prints for a while without input: output-only writes, the last one just now.
+	for range 25 {
+		r.forward(hst, []byte("out"))
+		timers.Advance(time.Second)
+	}
+	r.forward(hst, []byte("out"))
+	timers.Advance(time.Second)
+	typed := timers.Clock.Now()
+	r.forward(dev, []byte("k"))
+	// Then silence: nothing else would carry the input to the store.
+	time.Sleep(50 * time.Millisecond) // the writes run in their own goroutines
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	var stored time.Time
+	for _, c := range uc.written {
+		if c.LastInput.After(stored) {
+			stored = c.LastInput
+		}
+	}
+	if typed.Sub(stored) >= limitWindows.IdleGrace {
+		t.Fatalf("stored last_input_at %v lags the input at %v by %v, want less than the idle grace %v",
+			stored.Sub(t0), typed.Sub(t0), typed.Sub(stored), limitWindows.IdleGrace)
+	}
+}
