@@ -8,6 +8,10 @@
 #
 # The package set is reproducible: the APT sources point at one timestamp of snapshot.debian.org
 # (20261015T000000Z); Check-Valid-Until is off because the Release files of a snapshot expire.
+# strace, gdb, python3-minimal and netcat-openbsd serve the platform suite of the host service
+# (services/host/test/platform, run by e2e/hostplatform): the system call trace of TM-T25, the
+# attach attempt and the impostor on the helper endpoint of TM-T26, and the connect attempt on the
+# admin endpoint. Without them those checks fail or prove nothing.
 FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 ARG SNAPSHOT=20261015T000000Z
@@ -17,6 +21,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && apt-get update -qq \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
        systemd systemd-sysv dbus sudo cron procps acl iproute2 ca-certificates passwd util-linux \
+       strace gdb python3-minimal netcat-openbsd \
     && rm -rf /var/lib/apt/lists/* \
     && systemctl mask getty@tty1.service console-getty.service systemd-firstboot.service systemd-modules-load.service \
     && install -d -m 1777 /var/tmp/termsuite-markers \

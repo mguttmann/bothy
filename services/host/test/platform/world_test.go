@@ -90,7 +90,6 @@ func newWorld(t *testing.T, decl, extra string, users ...string) *world {
 	t.Cleanup(cancel)
 	w := &world{t: t, ctx: ctx, srv: sessiontest.NewHostServer(t, sessiontest.HostOptions{Code: pairingCode, Declaration: decl})}
 	installed(t, extra, users...)
-	applyPendingOwners(t)
 	ca := filepath.Join(t.TempDir(), "server-ca.pem")
 	if err := os.WriteFile(ca, w.srv.CAPEM(), 0o600); err != nil {
 		t.Fatal(err)
