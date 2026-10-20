@@ -39,8 +39,13 @@ type Route struct {
 // handler: the variant of downloadThumbnail (M3-05). A and B of a pair carry the same value.
 var FixedParams = map[string]string{"variant": "small"}
 
-// Build returns the path of r with every parameter of values replaced, and every parameter of
-// FixedParams.
+// FixedQueries are the required query parameters of an operation, so a route reaches its handler
+// instead of the 400 of the request validation: the range of exportChannel (M3-11). A and B of a
+// pair carry the same query.
+var FixedQueries = map[string]string{"exportChannel": "from=2026-01-01T00:00:00.000Z&to=2026-01-02T00:00:00.000Z"}
+
+// Build returns the path of r with every parameter of values replaced, every parameter of
+// FixedParams, and the query of FixedQueries for the operation of r.
 func (r Route) Build(values map[string]string) string {
 	p := r.Path
 	for name, v := range values {
@@ -48,6 +53,9 @@ func (r Route) Build(values map[string]string) string {
 	}
 	for name, v := range FixedParams {
 		p = strings.ReplaceAll(p, "{"+name+"}", v)
+	}
+	if q, ok := FixedQueries[r.OperationID]; ok {
+		p += "?" + q
 	}
 	return p
 }
