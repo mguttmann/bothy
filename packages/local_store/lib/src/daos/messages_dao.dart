@@ -91,7 +91,8 @@ final class MessagesDao {
     required int limit,
   }) => _db
       .customSelect(
-        'SELECT 1',
+        // Its own statement text: drift shares streams of equal SQL (see `watchThread`).
+        'SELECT 1 AS contiguous_watch',
         readsFrom: {_db.messages, _db.loadedRangesTable, _db.threads},
       )
       .watch()
@@ -220,6 +221,20 @@ final class MessagesDao {
             ..where((t) => t.messageId.equals(messageId.value))
             ..orderBy([(t) => OrderingTerm(expression: t.emoji)]))
           .map(reactionFromRow)
+          .watch();
+
+  /// The pinned messages of [threadId] in ascending `thread_seq`, on every change (the
+  /// section "Pinned" of the session column, 01 5.1 D1).
+  Stream<List<Message>> watchPinned(ThreadId threadId) =>
+      (_db.select(_db.messages)
+            ..where(
+              (t) =>
+                  t.threadId.equals(threadId.value) &
+                  t.pinned.equals(true) &
+                  t.deletedAt.isNull(),
+            )
+            ..orderBy([(t) => OrderingTerm(expression: t.threadSeq)]))
+          .map(messageFromRow)
           .watch();
 
   /// Sets the absolute pin state of `pin.*` (04 9 item 3) without touching `version`.

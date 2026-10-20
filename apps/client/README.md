@@ -1,6 +1,6 @@
 # apps/client
 
-Status: desktop app shell (M4-18): macOS and Windows builds, the composition root, the router,
+Status: desktop app shell (M4-18), sidebar and post list (M4-19), thread view (M4-20): macOS and Windows builds, the composition root, the router,
 the onboarding screens E1 to E7 and the empty column frames of the main view, which M4-19 to
 M4-25 fill. Settings (M4-25): the sections of 01 5.1 D8 under `/settings/<section>`, with the
 device and session views of `admin_ui`. Administration (M4-26): the `AdminShell` of `admin_ui`
@@ -44,7 +44,10 @@ and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flut
 | `lib/app/layout/` | the desktop shell, the four columns and their stored widths |
 | `lib/sidebar/` | the sidebar column (M4-19): head, space tree, channel rows, foot, personal order, `SidebarNavigation` for M4-24 |
 | `lib/forum/` | the post list of a forum (M4-19): head with filters, rows, Done section, "New post" dialog, paging |
-| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`) |
+| `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
+| `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
+| `lib/session_column/` | the frame of the session column with the section "Pinned" (M4-20) |
+| `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`) |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
@@ -111,3 +114,19 @@ Counters per channel come from the sync engine and the stored read states. A for
 pages through `listChannelThreads`, writes new posts as `createThread` through the outbox, and
 keeps the collapse state of its "Done (n)" section per device in `forum_view_states` (01 6.1;
 docs/DECISIONS.md D-M4-19-1 to D-M4-19-7).
+
+## Thread view, composer and message actions
+
+The history column (`lib/thread/`) reads the contiguous window of a thread from the local
+database and puts the outbox entries of the thread after the last confirmed message; a gap shows a
+loading row until the engine filled it (04 4), scrolling to the top loads older pages, and
+`/t/<thread>?m=<message>` loads the range down to the message and highlights it. The visible
+threads form the gateway focus, and the newest message in view marks the thread read through
+the outbox. The composer (`lib/composer/`) sends with the limit of the instance, writes the draft
+as one coalesced outbox entry, takes another device's draft only while the person does not type
+(04 14) and offers mention suggestions from the stored people and agents and the templates. The
+message actions (hover bar, right click, menu key or Shift+F10) and the header buttons are shown
+by the level and capabilities the server reported for the channel, never by grants; every write
+goes through the outbox (docs/DECISIONS.md D-M4-20-1 to D-M4-20-8). Rendering loads and runs
+nothing from a message (SEC-T13). The session column (`lib/session_column/`) has its frame with
+the pinned messages; the agent session and the files follow (M4-21, M4-22).

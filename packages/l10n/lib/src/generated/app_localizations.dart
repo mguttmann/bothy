@@ -5796,6 +5796,372 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hosts'**
   String get adminTargetsHosts;
+
+  /// Header of a thread or channel without an operator (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'No agent answers here'**
+  String get threadNoOperator;
+
+  /// Header of a thread naming its operator agent (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Operator: {name}'**
+  String threadOperator(String name);
+
+  /// Small mark after a thread title that the server set automatically (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'automatic'**
+  String get threadTitleAutomatic;
+
+  /// Header button that marks the thread done (01 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get threadDone;
+
+  /// Header button that opens a done thread again (01 section 6.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get threadReopen;
+
+  /// Header button that opens the dialog to move the thread (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get threadMove;
+
+  /// Header button that shows the pinned messages of the thread in the session column (01 section 5.1 D1).
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get threadPin;
+
+  /// Header button that shows or hides the session column (01 section 5.1 D1).
+  ///
+  /// In en, this message translates to:
+  /// **'Column'**
+  String get threadColumn;
+
+  /// Header button and dialog title to change the thread title (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Edit title'**
+  String get threadEditTitle;
+
+  /// Label of the title field of the title dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get threadTitleLabel;
+
+  /// Save button of the title dialog, the inline editor and the template dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get threadSave;
+
+  /// Cancel button of the dialogs and the inline editor of the thread view.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get threadCancel;
+
+  /// Line under a message of the main history that started a thread; opens it (01 section 5.1 D2).
+  ///
+  /// In en, this message translates to:
+  /// **'Thread: {title}, {count, plural, =1{1 reply} other{{count} replies}}'**
+  String threadStarter(String title, int count);
+
+  /// Row at the top of the history while older messages or a gap load (04 section 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Loading earlier messages'**
+  String get threadLoadingOlder;
+
+  /// Row at the end of the history while a gap before newer messages loads (04 section 4).
+  ///
+  /// In en, this message translates to:
+  /// **'Loading missing messages'**
+  String get threadLoadingNewer;
+
+  /// History of a thread without messages.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages yet'**
+  String get threadEmpty;
+
+  /// Text that replaces an open thread or channel whose access was removed (01 section 6.6).
+  ///
+  /// In en, this message translates to:
+  /// **'No access anymore'**
+  String get threadNoAccess;
+
+  /// Heading above the waiting messages kept as text after the access was removed (01 section 6.6).
+  ///
+  /// In en, this message translates to:
+  /// **'Messages that were not sent, to copy:'**
+  String get threadNoAccessWaiting;
+
+  /// Action of a message in the main history of a text channel (01 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Start thread'**
+  String get messageActionStartThread;
+
+  /// Action of a pinned message (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get messageActionUnpin;
+
+  /// Action of an edited message (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'View versions'**
+  String get messageActionVersions;
+
+  /// Action of a message and confirm button of the delete dialog (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get messageActionDelete;
+
+  /// Action of a message; moves the read position before it (04 section 14).
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as unread'**
+  String get messageActionMarkUnread;
+
+  /// Action of a message that copies its text.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy text'**
+  String get messageActionCopyText;
+
+  /// Action of a message that copies its link.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get messageActionCopyLink;
+
+  /// Screen reader label of the action menu of a message.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions of the message'**
+  String get messageMenuLabel;
+
+  /// Title of the confirmation before a message is deleted (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message?'**
+  String get messageDeleteTitle;
+
+  /// Text of the confirmation before a message is deleted (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'The message is replaced by \"Message deleted\" for everyone.'**
+  String get messageDeleteBody;
+
+  /// Title of the dialog with the earlier versions of a message (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Versions'**
+  String get messageVersionsTitle;
+
+  /// Heading of the current text in the versions dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Current version'**
+  String get messageVersionsCurrent;
+
+  /// Heading of an earlier version in the versions dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {number}'**
+  String messageVersionsRevision(int number);
+
+  /// Versions dialog of a message without earlier versions.
+  ///
+  /// In en, this message translates to:
+  /// **'No earlier versions'**
+  String get messageVersionsEmpty;
+
+  /// Versions dialog after the request failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The versions could not be loaded: {reason}'**
+  String messageVersionsFailed(String reason);
+
+  /// Title of the dialog after an edit met a newer version (04 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'The message was changed elsewhere'**
+  String get messageConflictTitle;
+
+  /// Heading of the local text in the conflict dialog (04 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Your version'**
+  String get messageConflictMine;
+
+  /// Heading of the server text in the conflict dialog (04 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Current version'**
+  String get messageConflictTheirs;
+
+  /// Button of the conflict dialog: send the local text on the current version (04 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Keep mine'**
+  String get messageConflictKeepMine;
+
+  /// Button of the conflict dialog: keep the server text and drop the local edit (04 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Take theirs'**
+  String get messageConflictTakeTheirs;
+
+  /// Label of the inline editor of a message.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit message'**
+  String get messageEditLabel;
+
+  /// Title of the reaction picker (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'React'**
+  String get messageReactionTitle;
+
+  /// Label of the field of the reaction picker that takes any Unicode character (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Any character'**
+  String get messageReactionInput;
+
+  /// Button of the reaction picker that adds the typed character.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get messageReactionAdd;
+
+  /// Short note after text or a link was copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get messageCopied;
+
+  /// Row of a write of the thread that the server refused for good (04 section 13.2 item 5).
+  ///
+  /// In en, this message translates to:
+  /// **'Not saved: {reason}'**
+  String outboxFailedAction(String reason);
+
+  /// Button of a refused edit that opens both versions (04 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get outboxCompare;
+
+  /// Button of a refused edit of a deleted message that copies its text (04 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get outboxCopy;
+
+  /// Reason why a message is not sent; the limit comes from the instance (D-W-115).
+  ///
+  /// In en, this message translates to:
+  /// **'The message is too long: at most {limit} bytes'**
+  String composerTooLong(int limit);
+
+  /// Note after a draft write reported overwrote_newer (04 section 14).
+  ///
+  /// In en, this message translates to:
+  /// **'This draft replaced a newer version from another device'**
+  String get composerDraftOverwritten;
+
+  /// Line above the input while a reply is prepared.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply to {name}'**
+  String composerReplyTo(String name);
+
+  /// Button that drops the prepared reply.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel reply'**
+  String get composerCancelReply;
+
+  /// Button that opens the templates menu of the input (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get composerTemplates;
+
+  /// Group of the personal templates in the templates menu (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Your templates'**
+  String get composerTemplatesPersonal;
+
+  /// Group of the channel templates in the templates menu (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Templates of this channel'**
+  String get composerTemplatesChannel;
+
+  /// Templates menu without templates.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates'**
+  String get composerTemplatesEmpty;
+
+  /// Entry of the templates menu that saves the current text as a personal template (01 section 3.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Save as template'**
+  String get composerTemplatesSave;
+
+  /// Label of the name field when saving a template.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get composerTemplatesName;
+
+  /// Section of the session column with the pinned messages of the thread (01 section 5.1 D1).
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned ({count})'**
+  String sessionPinned(int count);
+
+  /// Section "Pinned" of the session column without pinned messages.
+  ///
+  /// In en, this message translates to:
+  /// **'No pinned messages'**
+  String get sessionPinnedEmpty;
+
+  /// Session column while no thread is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a thread to see its session'**
+  String get sessionNoThread;
+
+  /// Move dialog without a valid target (01 section 6.7).
+  ///
+  /// In en, this message translates to:
+  /// **'No channel with the same operator'**
+  String get threadMoveNoTarget;
+
+  /// Label of the reason field of the move dialog (ThreadMove.reason).
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get threadMoveReason;
 }
 
 class _AppLocalizationsDelegate

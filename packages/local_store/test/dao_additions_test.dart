@@ -87,4 +87,17 @@ void main() {
     expect([for (final r in inside) r.emoji], ['a', 'b']);
     expect(inside.first.me, isTrue);
   });
+
+  test('watchPinned lists the pinned messages of a thread in order', () async {
+    final dao = db.messagesDao;
+    for (final seq in [1, 2, 3]) {
+      await dao.upsertIfNewer(message(1, seq));
+    }
+    await dao.upsertIfNewer(message(2, 1));
+    await dao.applyPin(messageId(1, 3), pinned: true);
+    await dao.applyPin(messageId(1, 1), pinned: true);
+    await dao.applyPin(messageId(2, 1), pinned: true);
+    final pinned = await dao.watchPinned(threadId(1)).first;
+    expect([for (final m in pinned) m.threadSeq.value], [1, 3]);
+  });
 }

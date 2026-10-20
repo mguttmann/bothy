@@ -2,7 +2,8 @@
 
 /// The main view of the desktop after the login: the connection banner and the four column
 /// frames that M4-19 to M4-25 fill (docs/spec/01-product.md 5.1, 6.6, 6.7); M4-19 fills the
-/// sidebar and the post list of a forum.
+/// sidebar and the post list of a forum, M4-20 the history and the frame of the session
+/// column.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -13,15 +14,16 @@ import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../../forum/post_list_column.dart';
+import '../../session_column/session_column.dart';
 import '../../settings/settings_providers.dart';
 import '../../sidebar/providers.dart';
 import '../../sidebar/sidebar_column.dart';
+import '../../thread/history_area.dart';
+import '../../thread/providers.dart';
 import '../providers/ports.dart';
 import '../providers/session.dart';
 import '../providers/settings.dart';
-import '../providers/target.dart';
 import '../router.dart';
-import '../target_resolver.dart';
 import 'column_layout.dart';
 import 'column_widths.dart';
 
@@ -59,6 +61,18 @@ class DesktopShell extends ConsumerWidget {
             ? ref.watch(lastRouteSelectionProvider)
             : const RouteSelection());
     final forum = selection.forum;
+    // D2: with a thread of a text channel open the session column is collapsed until the
+    // person shows it.
+    final textChannel =
+        selection.kind == ChannelKind.text && selection.thread != null;
+    final shown = ref.watch(sessionColumnShownProvider);
+    final channelOfRoute = selection.channel == null
+        ? null
+        : ref
+              .watch(storedChannelOfRouteProvider(selection.channel!.value))
+              .value;
+    // The session of the open thread, else of the main history a channel route shows.
+    final sessionThread = selection.thread ?? channelOfRoute?.mainThreadId;
     final banner = switch (phase) {
       ConnectionPhase.updateRequired => DsBanner(
         key: const ValueKey('shell.updateRequired'),
@@ -90,6 +104,7 @@ class DesktopShell extends ConsumerWidget {
                   .toDouble(),
               stackShowsHistory: parsed is ThreadLocation,
               showPostList: forum != null,
+              showSession: textChannel ? shown.textThread : shown.forum,
               onWidthsChanged: (next) {
                 final settings = ref.read(settingsRepositoryProvider);
                 if (settings != null) ColumnWidthsWriter(settings).save(next);
@@ -102,33 +117,11 @@ class DesktopShell extends ConsumerWidget {
                       channelId: forum,
                       selectedThread: selection.thread,
                     ),
-              history: _TargetView(location: location),
-              session: const SizedBox.expand(),
+              history: HistoryArea(location: location),
+              session: SessionColumn(threadId: sessionThread),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// The history column's placeholder for the target: empty while it is visible or loading,
-/// "Not found or no access" when it is not (M4-20 shows the thread here).
-class _TargetView extends ConsumerWidget {
-  const _TargetView({required this.location});
-
-  final Uri location;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(targetStatusProvider(location.toString())).value;
-    if (status != TargetStatus.notFound) return const SizedBox.expand();
-    return Center(
-      child: Text(
-        AppLocalizations.of(context).accessNotFoundOrNoAccess,
-        key: const ValueKey('target.notFound'),
-        style: dsTextStyle(DsType.body)
-            .copyWith(color: context.dsColors.textSecondary),
       ),
     );
   }

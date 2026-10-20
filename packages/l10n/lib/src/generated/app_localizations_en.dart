@@ -3551,4 +3551,211 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get adminTargetsHosts => 'Hosts';
+
+  @override
+  String get threadNoOperator => 'No agent answers here';
+
+  @override
+  String threadOperator(String name) {
+    return 'Operator: $name';
+  }
+
+  @override
+  String get threadTitleAutomatic => 'automatic';
+
+  @override
+  String get threadDone => 'Done';
+
+  @override
+  String get threadReopen => 'Reopen';
+
+  @override
+  String get threadMove => 'Move';
+
+  @override
+  String get threadPin => 'Pin';
+
+  @override
+  String get threadColumn => 'Column';
+
+  @override
+  String get threadEditTitle => 'Edit title';
+
+  @override
+  String get threadTitleLabel => 'Title';
+
+  @override
+  String get threadSave => 'Save';
+
+  @override
+  String get threadCancel => 'Cancel';
+
+  @override
+  String threadStarter(String title, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count replies',
+      one: '1 reply',
+    );
+    return 'Thread: $title, $_temp0';
+  }
+
+  @override
+  String get threadLoadingOlder => 'Loading earlier messages';
+
+  @override
+  String get threadLoadingNewer => 'Loading missing messages';
+
+  @override
+  String get threadEmpty => 'No messages yet';
+
+  @override
+  String get threadNoAccess => 'No access anymore';
+
+  @override
+  String get threadNoAccessWaiting => 'Messages that were not sent, to copy:';
+
+  @override
+  String get messageActionStartThread => 'Start thread';
+
+  @override
+  String get messageActionUnpin => 'Unpin';
+
+  @override
+  String get messageActionVersions => 'View versions';
+
+  @override
+  String get messageActionDelete => 'Delete';
+
+  @override
+  String get messageActionMarkUnread => 'Mark as unread';
+
+  @override
+  String get messageActionCopyText => 'Copy text';
+
+  @override
+  String get messageActionCopyLink => 'Copy link';
+
+  @override
+  String get messageMenuLabel => 'Actions of the message';
+
+  @override
+  String get messageDeleteTitle => 'Delete message?';
+
+  @override
+  String get messageDeleteBody =>
+      'The message is replaced by \"Message deleted\" for everyone.';
+
+  @override
+  String get messageVersionsTitle => 'Versions';
+
+  @override
+  String get messageVersionsCurrent => 'Current version';
+
+  @override
+  String messageVersionsRevision(int number) {
+    return 'Version $number';
+  }
+
+  @override
+  String get messageVersionsEmpty => 'No earlier versions';
+
+  @override
+  String messageVersionsFailed(String reason) {
+    return 'The versions could not be loaded: $reason';
+  }
+
+  @override
+  String get messageConflictTitle => 'The message was changed elsewhere';
+
+  @override
+  String get messageConflictMine => 'Your version';
+
+  @override
+  String get messageConflictTheirs => 'Current version';
+
+  @override
+  String get messageConflictKeepMine => 'Keep mine';
+
+  @override
+  String get messageConflictTakeTheirs => 'Take theirs';
+
+  @override
+  String get messageEditLabel => 'Edit message';
+
+  @override
+  String get messageReactionTitle => 'React';
+
+  @override
+  String get messageReactionInput => 'Any character';
+
+  @override
+  String get messageReactionAdd => 'Add';
+
+  @override
+  String get messageCopied => 'Copied';
+
+  @override
+  String outboxFailedAction(String reason) {
+    return 'Not saved: $reason';
+  }
+
+  @override
+  String get outboxCompare => 'Compare';
+
+  @override
+  String get outboxCopy => 'Copy';
+
+  @override
+  String composerTooLong(int limit) {
+    return 'The message is too long: at most $limit bytes';
+  }
+
+  @override
+  String get composerDraftOverwritten =>
+      'This draft replaced a newer version from another device';
+
+  @override
+  String composerReplyTo(String name) {
+    return 'Reply to $name';
+  }
+
+  @override
+  String get composerCancelReply => 'Cancel reply';
+
+  @override
+  String get composerTemplates => 'Templates';
+
+  @override
+  String get composerTemplatesPersonal => 'Your templates';
+
+  @override
+  String get composerTemplatesChannel => 'Templates of this channel';
+
+  @override
+  String get composerTemplatesEmpty => 'No templates';
+
+  @override
+  String get composerTemplatesSave => 'Save as template';
+
+  @override
+  String get composerTemplatesName => 'Name';
+
+  @override
+  String sessionPinned(int count) {
+    return 'Pinned ($count)';
+  }
+
+  @override
+  String get sessionPinnedEmpty => 'No pinned messages';
+
+  @override
+  String get sessionNoThread => 'Open a thread to see its session';
+
+  @override
+  String get threadMoveNoTarget => 'No channel with the same operator';
+
+  @override
+  String get threadMoveReason => 'Reason';
 }

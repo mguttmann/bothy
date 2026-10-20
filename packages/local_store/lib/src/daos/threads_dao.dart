@@ -56,14 +56,23 @@ final class ThreadsDao {
   }
 
   /// The thread [id], emitted on every change of the thread or its tags.
+  ///
+  /// Each trigger statement has its own text: drift shares streams of equal SQL, and the
+  /// first stream's tables would decide for all of them.
   Stream<Thread?> watchThread(ThreadId id) => _db
-      .customSelect('SELECT 1', readsFrom: {_db.threads, _db.threadTags})
+      .customSelect(
+        'SELECT 1 AS thread_watch',
+        readsFrom: {_db.threads, _db.threadTags},
+      )
       .watch()
       .asyncMap((_) => byId(id));
 
   /// The threads of [channelId], latest activity first (post list, 03 `threads`).
   Stream<List<Thread>> watchForChannel(ChannelId channelId) => _db
-      .customSelect('SELECT 1', readsFrom: {_db.threads, _db.threadTags})
+      .customSelect(
+        'SELECT 1 AS channel_threads_watch',
+        readsFrom: {_db.threads, _db.threadTags},
+      )
       .watch()
       .asyncMap((_) async {
         final rows =

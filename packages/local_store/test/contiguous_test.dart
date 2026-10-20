@@ -110,4 +110,65 @@ void main() {
       );
     },
   );
+
+  test('watchContiguous emits again when a range is loaded later', () async {
+    final dao = db.messagesDao;
+    await db.threadsDao.upsertIfNewer(thread(1, lastSeq: 3));
+    for (final seq in [1, 3]) {
+      await dao.upsertIfNewer(message(1, seq));
+    }
+    await dao.addLoadedRange(
+      threadId(1),
+      const ThreadSeq(1),
+      const ThreadSeq(1),
+    );
+    final seen = <List<int>>[];
+    final sub = dao
+        .watchContiguous(threadId(1), limit: 50)
+        .listen((w) => seen.add(seqs(w)));
+    await pumpEventQueue();
+    await dao.upsertIfNewer(message(1, 2));
+    await dao.addLoadedRange(
+      threadId(1),
+      const ThreadSeq(2),
+      const ThreadSeq(3),
+    );
+    await pumpEventQueue();
+    await sub.cancel();
+    expect(seen.first, [1]);
+    expect(seen.last, [1, 2, 3]);
+  });
+
+  test('watchContiguous keeps its own tables while the thread list of the channel is watched', () async {
+    final dao = db.messagesDao;
+    await db.threadsDao.upsertIfNewer(thread(1, lastSeq: 3));
+    for (final seq in [1, 3]) {
+      await dao.upsertIfNewer(message(1, seq));
+    }
+    await dao.addLoadedRange(
+      threadId(1),
+      const ThreadSeq(1),
+      const ThreadSeq(1),
+    );
+    // Both trigger queries were the same SQL text, which drift shares as one stream: the
+    // list's tables then decided when the window was read again.
+    final list = db.threadsDao
+        .watchForChannel(thread(1).channelId)
+        .listen((_) {});
+    final seen = <List<int>>[];
+    final sub = dao
+        .watchContiguous(threadId(1), limit: 50)
+        .listen((w) => seen.add(seqs(w)));
+    await pumpEventQueue();
+    await dao.upsertIfNewer(message(1, 2));
+    await dao.addLoadedRange(
+      threadId(1),
+      const ThreadSeq(2),
+      const ThreadSeq(3),
+    );
+    await pumpEventQueue();
+    await sub.cancel();
+    await list.cancel();
+    expect(seen.last, [1, 2, 3]);
+  });
 }

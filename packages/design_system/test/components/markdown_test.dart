@@ -283,4 +283,50 @@ void main() {
     }
     expect(allText(tester), contains('deep'));
   });
+
+  testWidgets('a mention token is styled only for a handle the caller names', (
+    tester,
+  ) async {
+    await pumpDs(
+      tester,
+      DsMarkdown(
+        '@sam and @Robin, not alex@example.com nor `@sam`',
+        onOpenLink: opened.add,
+        mentionHandles: const {'sam', 'robin'},
+      ),
+    );
+    final styled = <String>[];
+    void visit(InlineSpan span) {
+      if (span is TextSpan) {
+        if (span.text != null &&
+            span.style?.fontWeight == FontWeight.w600 &&
+            span.text!.startsWith('@')) {
+          styled.add(span.text!);
+        }
+        span.children?.forEach(visit);
+      }
+    }
+
+    for (final t in tester.widgetList<RichText>(find.byType(RichText))) {
+      visit(t.text);
+    }
+    expect(styled, ['@sam', '@Robin']);
+    expect(allText(tester), contains('alex@example.com'));
+  });
+
+  testWidgets('without handles no token is styled', (tester) async {
+    await pumpDs(tester, md('@sam hello'));
+    var styled = false;
+    void visit(InlineSpan span) {
+      if (span is TextSpan) {
+        if (span.text == '@sam') styled = true;
+        span.children?.forEach(visit);
+      }
+    }
+
+    for (final t in tester.widgetList<RichText>(find.byType(RichText))) {
+      visit(t.text);
+    }
+    expect(styled, isFalse);
+  });
 }

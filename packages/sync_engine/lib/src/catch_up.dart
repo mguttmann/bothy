@@ -205,6 +205,69 @@ final class CatchUpListener implements SessionListener {
     return page.nextCursor;
   }
 
+  /// Loads the page of [threadId] before [before] (`listThreadMessages` `before_seq`, at most
+  /// [limit] messages, null: the server's page size) and stores it with its loaded range, so
+  /// it joins the window that `MessagesDao.watchContiguous` shows (brief M4-20 Design note 1:
+  /// paging up). Returns whether older messages exist. Nothing is stored for a removed
+  /// thread or channel, nor after a wipe. Throws what the read throws.
+  Future<bool> loadOlderMessages(
+    ThreadId threadId, {
+    required ThreadSeq before,
+    int? limit,
+  }) async {
+    if (_wiped) return false;
+    final page = await _sync.fetcher.threadPage(
+      threadId,
+      before: before,
+      limit: limit,
+    );
+    if (page.messages.isEmpty) return false;
+    await _storeLoaded(
+      threadId,
+      page.messages,
+      page.messages.first.message.threadSeq,
+      ThreadSeq(before.value - 1),
+    );
+    return page.hasMoreBefore;
+  }
+
+  /// Loads the messages of [threadId] from [from] to [to] (`Fetcher.range`) and marks the
+  /// range as loaded, so a jump to a message older than the window shows it in order
+  /// (brief M4-20 Design note 1, `/t/{thread_id}?m={message_id}`). The same removal and wipe
+  /// rules as [loadOlderMessages] apply. Throws what the read throws.
+  Future<void> loadMessageRange(
+    ThreadId threadId,
+    ThreadSeq from,
+    ThreadSeq to,
+  ) async {
+    if (_wiped || to < from) return;
+    final bundles = await _sync.fetcher.range(threadId, from, to);
+    await _storeLoaded(threadId, bundles, from, to);
+  }
+
+  /// Stores [bundles] of [threadId] and adds [from] to [to] to its loaded ranges in one
+  /// transaction; a removal during the read wins (04 8.3).
+  Future<void> _storeLoaded(
+    ThreadId threadId,
+    List<MessageBundle> bundles,
+    ThreadSeq from,
+    ThreadSeq to,
+  ) async {
+    await _db.transaction(() async {
+      if (_wiped || _sync.removedTargets.contains(threadId.value)) return;
+      final thread = await _db.threadsDao.byId(threadId);
+      if (thread == null ||
+          !await _sync.holdsContent(_db, thread.channelId, threadId)) {
+        return;
+      }
+      for (final b in bundles) {
+        if (b.message.threadId != threadId) continue;
+        await storeMessage(_db, b, me: _sync.me);
+      }
+      await _db.messagesDao.addLoadedRange(threadId, from, to);
+    });
+  }
+
   /// Whether the database was wiped after a revocation; nothing is applied any more.
   bool get wiped => _wiped;
 
