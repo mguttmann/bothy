@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of the console E2E test (brief M6-03, SEC-T05). TEST ONLY: never use it for an
+# installation; make release-build leaves infra/compose/test out of the release bundle.
+# tools/console-e2e/console_e2e.py combines it with infra/compose/compose.yaml, the smoke overlay
+# compose.smoke.yaml and the variables of test/smoke.env and test/console-e2e.env. The server
+# image is the release image of make image; nothing here changes it.
+#
+# Topology (docs/DECISIONS.md D-M6-03-7): the TLS sidecar tls, the seed job console-seed and the
+# browsers console-browser all share the network namespace of api. The browsers open
+# https://localhost:8443, the sidecar forwards to 127.0.0.1:8080, so the server sees loopback
+# (SEC-TLS-1) and its trusted proxies stay at the loopback default. No port is published on the
+# host. Containers on the Compose network (the host service of M6-18) use the name api, which the
+# certificate also names.
+
+services:
+
+  api:
+    environment:
+      # The relying party of the passkeys is the origin the browsers see (08 2.5).
+      BOTHY_AUTH__WEBAUTHN_RP_ID: localhost
+      BOTHY_AUTH__WEBAUTHN_ORIGINS: ${BOTHY_PUBLIC_URL:?set in test/console-e2e.env}
+
+  # TLS sidecar with the per-run certificate of the test CA (Caddyfile next to this file).
+  tls:
+    profiles: [console-e2e]
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    network_mode: service:api
+    user: ${E2E_UID_GID:?set by console_e2e.py}
+    read_only: true
+    cap_drop: [ALL]
+    # The caddy binary of the image carries the file capability cap_net_bind_service; exec fails
+    # without it in the bounding set. Port 8443 needs no privilege.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      XDG_CONFIG_HOME: /tmp/config
+      XDG_DATA_HOME: /tmp/data
+    tmpfs: [/tmp]
+    command: ["caddy", "run", "--config", "/etc/caddy-e2e/Caddyfile", "--adapter", "caddyfile"]
+    volumes:
+      - ./test/console-e2e/Caddyfile:/etc/caddy-e2e/Caddyfile:ro
+      - ${E2E_CERTS:?set by console_e2e.py}:/certs:ro
+
+  # Seed: the owner of smoke.sh's bootstrap gets a password with TOTP for the console form.
+  console-seed:
+    profiles: [console-e2e]
+    image: bothy-smoke:${SMOKE_RUN_ID:?set by console_e2e.py}
+    pull_policy: never
+    network_mode: service:api
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      - SMOKE_PUBLIC_URL=${BOTHY_PUBLIC_URL}
+    command: ["seed", "--out", "/out"]
+    volumes:
+      - ${SMOKE_OUT:?set by console_e2e.py}:/out
+
+  # The headless browsers: the Playwright image of the version in tools/uv.lock, by digest, which
+  # carries the browsers but not the Python package; the build adds playwright and its
+  # dependencies with the hashes of tools/uv.lock (console_e2e.py writes requirements.txt).
+  console-browser:
+    profiles: [console-e2e]
+    build:
+      context: ${E2E_BROWSER_CONTEXT:?set by console_e2e.py}
+      dockerfile_inline: |
+        FROM mcr.microsoft.com/playwright/python:v1.64.0-noble@sha256:684df257a1fa0ef3fa288239819984008f560e8f8db5b635ee9e2a50cbcd2e23
+        COPY requirements.txt /tmp/e2e-requirements.txt
+        RUN pip install --no-cache-dir --break-system-packages --no-deps --require-hashes -r /tmp/e2e-requirements.txt \
+            && rm /tmp/e2e-requirements.txt
+    image: bothy-console-browser:${SMOKE_RUN_ID:?set by console_e2e.py}
+    pull_policy: never
+    network_mode: service:api
+    user: ${E2E_UID_GID:?set by console_e2e.py}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    shm_size: 1gb
+    tmpfs: [/tmp]
+    environment:
+      HOME: /tmp
+      E2E_ORIGIN: ${BOTHY_PUBLIC_URL}
+      E2E_SPKI: ${E2E_SPKI:?set by console_e2e.py}
+      E2E_BROWSERS: ${E2E_BROWSERS:-chromium,firefox,webkit}
+    command: ["python3", "/e2e/console_headless.py"]
+    volumes:
+      - ../../tools/console-e2e/headless:/e2e:ro
+      - ${SMOKE_OUT:?set by console_e2e.py}:/out

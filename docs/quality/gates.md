@@ -148,13 +148,14 @@ apps-platform`). The variable `PERF_HOST` (default `uname -s`) names the host sy
 
 ## Not in `make check`
 
-Two targets check the whole system and run only at their occasion, never in `make check`, `gates`
-or the pre-push hook:
+Three targets check the whole system and run only at their occasion, never in `make check`,
+`gates` or the pre-push hook:
 
 | Target | What it checks | When |
 |---|---|---|
 | `perf` | load tests of the performance targets of 02 and the chaos tests of the event path, on `perf.reference_profile` (section above, ADR 0063) | end of a milestone, release, tickets that touch a performance target (PLAN P-07) |
 | `portability` | the whole stack from images on a fresh machine plus the smoke test (`infra/compose/smoke.sh`) | release workflow |
+| `console-e2e` | SEC-T05: the web console of the server image under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (`tools/console-e2e`, M6-03) | CI job `console-e2e` of `ci.yml` on every change of `apps` or `server`, feeding `ci-ok` |
 
 ## Migrationen
 
