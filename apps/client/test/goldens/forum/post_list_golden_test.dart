@@ -21,6 +21,20 @@ import '../../support/structure.dart';
 /// The size of the post list column in a cell.
 const Size column = Size(380, 860);
 
+/// The width of a cell: wider than the longest scenario label of alchemist, so the matrix has
+/// a whole number of pixels on every host (docs/DECISIONS.md D-M4-07-10).
+const double cellWidth = 460;
+
+/// [child] at the top left of a cell of [cellWidth].
+Widget cell(Widget child) => SizedBox(
+  width: cellWidth,
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [child],
+  ),
+);
+
 const int day = 24 * 60;
 
 final Channel forum = channel(1, name: 'ideas', kind: ChannelKind.forum);
@@ -93,24 +107,26 @@ void main() {
         densities: DsDensityMode.values,
         textScales: const [1.0, 2.0],
         locales: const [Locale('de'), Locale('en')],
-        builder: () => SizedBox.fromSize(
-          size: column,
-          child: PostListView(
-            forum: forum,
-            filter: const PostListFilter(),
-            model: model(),
-            tags: tags,
-            names: {robin: 'Robin'},
-            now: t0,
-            doneCollapsed: false,
-            morePages: false,
-            selectedThread: threadId(6),
-            onNewPost: () {},
-            onView: (_) {},
-            onTags: (_) {},
-            onSort: (_) {},
-            onToggleDone: (_) {},
-            onOpenPost: (_) {},
+        builder: () => cell(
+          SizedBox.fromSize(
+            size: column,
+            child: PostListView(
+              forum: forum,
+              filter: const PostListFilter(),
+              model: model(),
+              tags: tags,
+              names: {robin: 'Robin'},
+              now: t0,
+              doneCollapsed: false,
+              morePages: false,
+              selectedThread: threadId(6),
+              onNewPost: () {},
+              onView: (_) {},
+              onTags: (_) {},
+              onSort: (_) {},
+              onToggleDone: (_) {},
+              onOpenPost: (_) {},
+            ),
           ),
         ),
       ),

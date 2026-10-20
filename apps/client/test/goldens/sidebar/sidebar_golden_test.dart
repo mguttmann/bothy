@@ -19,6 +19,20 @@ import '../../support/structure.dart';
 /// The size of the sidebar column in a cell.
 const Size column = Size(280, 720);
 
+/// The width of a cell: wider than the longest scenario label of alchemist, so the matrix has
+/// a whole number of pixels on every host (docs/DECISIONS.md D-M4-07-10).
+const double cellWidth = 460;
+
+/// [child] at the top left of a cell of [cellWidth].
+Widget cell(Widget child) => SizedBox(
+  width: cellWidth,
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [child],
+  ),
+);
+
 UserSpaceState state(int n, {bool collapsed = false}) => UserSpaceState(
   spaceId: spaceId(n),
   collapsed: collapsed,
@@ -86,21 +100,23 @@ void main() {
         densities: DsDensityMode.values,
         textScales: const [1.0, 2.0],
         locales: const [Locale('de'), Locale('en')],
-        builder: () => Builder(
-          builder: (context) => ColoredBox(
-            color: context.dsColors.surfaceSidebar,
-            child: SizedBox.fromSize(
-              size: column,
-              child: SidebarView(
-                productName: 'Team Chat',
-                nodes: nodes(),
-                ownName: 'Alex',
-                selectedChannel: channelId(6),
-                onToggle: (_, _) {},
-                onMove: (_, _) {},
-                onOpenChannel: (_) {},
-                onSettings: () {},
-                onLogout: () {},
+        builder: () => cell(
+          Builder(
+            builder: (context) => ColoredBox(
+              color: context.dsColors.surfaceSidebar,
+              child: SizedBox.fromSize(
+                size: column,
+                child: SidebarView(
+                  productName: 'Team Chat',
+                  nodes: nodes(),
+                  ownName: 'Alex',
+                  selectedChannel: channelId(6),
+                  onToggle: (_, _) {},
+                  onMove: (_, _) {},
+                  onOpenChannel: (_) {},
+                  onSettings: () {},
+                  onLogout: () {},
+                ),
               ),
             ),
           ),
