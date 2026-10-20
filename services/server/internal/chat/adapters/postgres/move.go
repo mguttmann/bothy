@@ -44,7 +44,7 @@ func (r *Repository) MoveThread(ctx context.Context, id, channel ids.ID, at time
 	if err != nil {
 		return domain.Thread{}, mapError(err, "moving a thread")
 	}
-	return toThread(row), nil
+	return toThread(threadRow(row)), nil
 }
 
 // DeleteThreadTags implements app.Store.
