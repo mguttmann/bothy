@@ -181,16 +181,21 @@ def test_unpack_step_reads_one_or_several_artifacts(tmp_path: Path, single: bool
     steps = _steps("sonar")
     [unpack] = [s for s in steps if "coverage.tar" in str(s.get("run", ""))]
     source = tmp_path / "source"
-    (source / "services" / "server").mkdir(parents=True)
-    (source / "services" / "server" / "coverage.out").write_text("mode: set\n", encoding="utf-8")
+    reports = {"server": "services/server/coverage.out", "apps": "packages/a/coverage/lcov.info"}
+    parts = ["server"] if single else ["server", "apps"]
     temp = tmp_path / "runner"
-    folder = temp / SONAR_ARTIFACT if single else temp / SONAR_ARTIFACT / f"{SONAR_ARTIFACT}-server"
-    folder.mkdir(parents=True)
-    subprocess.run(  # nosec B603 B607 - a fixed tar call on test files
-        ["tar", "-cf", str(folder / "coverage.tar"), "services/server/coverage.out"],
-        cwd=source,
-        check=True,
-    )
+    for part in parts:
+        (source / reports[part]).parent.mkdir(parents=True, exist_ok=True)
+        (source / reports[part]).write_text(part, encoding="utf-8")
+        folder = temp / SONAR_ARTIFACT
+        if not single:
+            folder = folder / f"{SONAR_ARTIFACT}-{part}"
+        folder.mkdir(parents=True, exist_ok=True)
+        subprocess.run(  # nosec B603 B607 - a fixed tar call on test files
+            ["tar", "-cf", str(folder / "coverage.tar"), reports[part]],
+            cwd=source,
+            check=True,
+        )
     work = tmp_path / "repo"
     work.mkdir()
     done = subprocess.run(  # nosec B603 B607 - the workflow's own step with a fixed environment
@@ -202,4 +207,5 @@ def test_unpack_step_reads_one_or_several_artifacts(tmp_path: Path, single: bool
         check=False,
     )
     assert done.returncode == 0, done.stderr
-    assert (work / "services" / "server" / "coverage.out").is_file()
+    for part in parts:
+        assert (work / reports[part]).read_text(encoding="utf-8") == part
