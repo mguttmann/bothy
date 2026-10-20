@@ -485,7 +485,9 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 // acting loads the acting principal at the current rights version (principalOf), after the
 // check of the re-check marker (checkRecheck).
 func (a *Authorizer) acting(ctx context.Context, p authorize.Principal, action string, t time.Time) (*actingPrincipal, domain.Decision, error) {
-	if err := checkRecheck(p, authorize.Action(action)); err != nil {
+	// An unknown action parses to the zero value, which the marker refuses as well.
+	act, _ := authorize.ParseAction(action)
+	if err := checkRecheck(p, act); err != nil {
 		return nil, domain.Decision{}, err
 	}
 	v, err := a.version(ctx)
