@@ -45,6 +45,30 @@ type ApiToken struct {
 	RevokedBy   pgtype.UUID
 }
 
+type App struct {
+	PrincipalID     pgtype.UUID
+	Slug            string
+	Manifest        []byte
+	ManifestVersion string
+	ManifestSha256  []byte
+	Publisher       string
+	HomepageUrl     pgtype.Text
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type AppInstallation struct {
+	ID                 pgtype.UUID
+	AppID              pgtype.UUID
+	GrantedScopes      []string
+	EventSubscriptions []string
+	State              string
+	InstalledBy        pgtype.UUID
+	InstalledAt        pgtype.Timestamptz
+	UninstalledAt      pgtype.Timestamptz
+	UninstalledBy      pgtype.UUID
+}
+
 type AuditCheckpoint struct {
 	Seq                    int64
 	Hash                   []byte
