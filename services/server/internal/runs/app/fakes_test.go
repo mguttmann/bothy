@@ -66,7 +66,9 @@ func (r *repo) Run(_ context.Context, id ids.ID) (app.RunRow, bool, error) {
 	return app.RunRow{}, false, nil
 }
 
-func (r *repo) LockRun(ctx context.Context, id ids.ID) (app.RunRow, bool, error) { return r.Run(ctx, id) }
+func (r *repo) LockRun(ctx context.Context, id ids.ID) (app.RunRow, bool, error) {
+	return r.Run(ctx, id)
+}
 
 func (r *repo) RecordDelivery(_ context.Context, w app.DeliveryWrite) (app.RunRow, error) {
 	r.mu.Lock()
