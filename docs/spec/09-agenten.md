@@ -47,8 +47,10 @@ Eine Fähigkeit ist wirksam, wenn der Owner sie erlaubt **und** der Adapter sie 
 pflegt die Erlaubnis in `agents.operator_config` (Schema `agent_operator_config.v1`); der Adapter
 meldet sein Können im Heartbeat (`agent_heartbeat.v1`, Abschnitt 4.8). Grund: Der Owner soll eine
 Fähigkeit abschalten können, aber nie eine einschalten, die der Adapter nicht hat.
+The heartbeat reports the capabilities in `details.capabilities` (section 4.8), with exactly the
+keys of the column "Meldung" below; any other key is refused.
 
-| Fähigkeit | Erlaubnis (`operator_config`) | Meldung (Heartbeat `capabilities`) | Wirkung |
+| Fähigkeit | Erlaubnis (`operator_config`) | Meldung (Heartbeat `details.capabilities`) | Wirkung |
 |---|---|---|---|
 | Nachträge | `supports_followups` | `followups: steer` oder `queue` | Abschnitt 7 |
 | Komponenten | `supports_components` | `components: true` | Abschnitt 11; sonst nur Text |
@@ -476,30 +478,120 @@ verwerfen sie.
 Der Adapter sendet den Heartbeat über das Gateway oder per REST. Schema `agent_heartbeat.v1`
 (Inhalt von `agents.reported_details`, 03):
 
-| Feld | Inhalt |
+The two transports are `sendHeartbeat` (`POST /api/v1/agents/me/heartbeat`) and the member `agent`
+of the gateway op `heartbeat`; both carry the JSON object of the openapi schema `Heartbeat`, go
+through the same decoder and have the same effect (action `agent.heartbeat`, `agent-self`,
+rate-limit class `rl.agent_runtime`, exempt from `Idempotency-Key`). The body carries no agent id:
+an agent reports only for itself; people and apps get `403 forbidden` with reason
+`subject_kind_not_allowed`. The server answers `HeartbeatAck` with the presence after the heartbeat
+(`AgentRuntimeStatus`) and `interval_ms`, which is `sync.heartbeat_interval`. A gateway heartbeat
+of an agent without the member `agent` keeps the connection alive and changes no presence, because
+presence needs the state report. Errors of the member `agent` answer `error {op: "heartbeat",
+code}` and keep the connection.
+
+Top-level members (openapi `Heartbeat`, closed; an unknown member is `400 validation_failed`):
+
+| Member | Content |
 |---|---|
-| `state` | `online` oder `degraded`; `offline` leitet der Server nach `agent.presence_timeout` ab |
-| `degraded_reasons` | Codes, z. B. `runtime_unreachable`, `busy_mode_invalid`, `billing_evidence_unknown` |
-| `adapter` | `name`, `version` |
-| `runtime` | `name`, `version` (z. B. Laufzeit-Version), nie Pfade |
-| `protocol_version` | Gateway-Protokoll |
-| `reported_billing_mode` | `personal` oder `organization`; fehlt bei Adaptern, die je Lauf dem Soll folgen (17.8, 18.3; kein JSON-`null`, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)) |
-| `billing_modes_supported` | Liste der Modi, die der Adapter belegen kann |
-| `billing_evidence` | `provider`, `key_type` (`api_key`, `oauth`, `cloud`, `none`, `unknown`), `method`; nie ein Wert, nie ein Präfix |
-| `capabilities` | Abschnitt 2.2 |
-| `reported_tool_class` | tatsächlich geladene Werkzeugklasse, Abschnitt 2.4 |
-| `active_runs` | IDs der Läufe in `running` oder `waiting_input`, die der Adapter gerade hält |
-| `rate_limit` | optional: Zustand der Rate-Limits der Laufzeit beim Anbieter: `state` (`ok`, `near_limit`, `limited`, `unknown`) und `resets_at`, wenn bekannt; nur Zustand und Zeit, nie Kontingente eines Kontos, Schlüssel oder Abo-Namen. Anzeige in der Backend-Ansicht ([25-visualisierung.md](25-visualisierung.md), Abschnitt 6.2) |
-| `projects` | nur Runner: `workspace_ref`, `ready`, `reason` (setzt `project_bindings.ready`) |
+| `state` | required: `online` or `degraded`; `offline` and `unknown` are derived by the server (below) |
+| `runtime_version` | version of the agent runtime, stored in `agents.reported_runtime_version`; version form |
+| `reported_billing_mode` | `personal` or `organization`, the mode of the runtime configuration; absent for adapters that follow the configured mode per run (17.8, 18.3; no JSON `null`, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)) |
+| `billing_modes_supported` | distinct modes the adapter can prove |
+| `billing_evidence` | `provider` (code), `key_type` (required: `api_key`, `oauth`, `cloud`, `none`, `unknown`), `method` (code); never a key value, never a prefix |
+| `reported_tool_class` | the tool class the runtime actually loaded, section 2.4 |
+| `rate_limit` | not accepted yet: field error `not_enabled` at `/rate_limit` until M6-14 builds it (state of the provider's rate limits: `state` `ok`, `near_limit`, `limited` or `unknown`, and `resets_at` when known; display in the backend view of [25-visualisierung.md](25-visualisierung.md), section 6.2) |
+| `details` | closed object, keys below |
+| `project_readiness` | runners only: list of `{channel_id, ready}`, one entry per bound forum, distinct `channel_id` values (sets `project_bindings.ready`, M2-03) |
+
+Keys of `details` (closed; any other key, also inside `capabilities`, `adapter` and `runtime`, is
+an unknown member):
+
+| Key | Content |
+|---|---|
+| `capabilities` | object, section 2.2: `followups` (`steer` or `queue`), `components`, `voice_input`, `title`, `files_out` (booleans) |
+| `active_runs` | distinct ids (UUID, R-DM-01) of the runs in `running` or `waiting_input` the adapter holds |
+| `degraded_reasons` | distinct codes, for example `runtime_unreachable`, `busy_mode_invalid`, `billing_evidence_unknown` |
+| `adapter` | `name` (required, name form), `version` (optional, version form): the adapter's own version ([18-release.md](18-release.md) section 9 point 5) |
+| `runtime` | `name` (required, name form); its version is the top-level `runtime_version`; never paths |
+| `protocol_version` | integer, at least 1: gateway protocol |
+
+Forms (the server checks them itself on both transports, SEC-IN-1): names `^[a-z0-9][a-z0-9._-]*$`,
+versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes (`billing_evidence.provider`,
+`billing_evidence.method`, each entry of `degraded_reasons`) `^[a-z0-9][a-z0-9_.:-]*$`, the code
+form of SEC-AUD-5, so `method` enters the audit details unchanged. Lists carry no duplicates; a
+channel listed twice in `project_readiness` is one field error at `/project_readiness`. Lengths are
+bounded by `http.max_json_body_bytes`. Reason: the heartbeat carries no secrets, contents or paths,
+and these forms make path separators, whitespace, control and bidi characters and most key formats
+unrepresentable. A violation answers one `validation_failed` with every field error and its JSON
+pointer.
+
+Full state: every heartbeat replaces the whole reported state. An absent optional member means
+"not reported": `reported_billing_mode` and `reported_tool_class` become NULL, and the key is left
+out of `reported_details`. Exception: `project_readiness` is applied only when present and
+different from the last list this server process applied for the agent, in its own transaction
+before the rest of the heartbeat; absent means "unchanged". `reported_details` holds exactly
+`capabilities`, `billing_modes_supported`, `billing_evidence`, `active_runs` (run ids as strings),
+`degraded_reasons`, `adapter`, `runtime` and `protocol_version`, never `null`.
+
+Storage: a change of `reported_billing_mode` or `reported_tool_class` against the stored value,
+also from or to "not reported" and the first report ever, is stored at once with the whole
+reported state and audited in the same transaction (action `agent.heartbeat`, decision `allow`,
+details `billing_mode_old`, `billing_mode_new`, `tool_class_old`, `tool_class_new` for the changed
+column, each only when the value exists, and `key_type` and `method` of `billing_evidence`; one
+entry per heartbeat). The row lock lets exactly one server process audit a given change. The other
+fields are stored at most once per `agent.heartbeat_persist_interval`, with a monotone write that
+never overwrites a newer stored heartbeat. A heartbeat changes neither `agents.version` nor a
+`permission_version`, sends no `agent.updated` and writes no `event_log` row; a new
+`reported_tool_class` counts for `authorize` from its commit on and can only raise the effective
+class (section 2.4).
+
+Presence (the server derives it; people have no presence, R-PR-02):
+
+| State | When |
+|---|---|
+| `unknown` | no heartbeat ever |
+| `online`, `degraded` | the `state` of the latest heartbeat |
+| `offline` | at and after the last heartbeat plus `agent.presence_timeout`, without a newer heartbeat (the boundary is inclusive) |
+
+When `state` or `reported_billing_mode` differ from the pair last published for the agent, the
+server sends the ephemeral event `agent.presence_changed {agent_id, state, reported_billing_mode}`
+to every principal with `agent.read`, never before `catchup.complete`. The last reported mode stays
+in the payload while `offline` and is left out when not reported. The snapshot (`getSnapshot`,
+`ready`) and the agent card (`getAgent`, `listAgents`) show the same presence.
+
+Start rule: a server process in the role `api` or `all` loads at start the agents stored as
+`online` or `degraded`. An agent whose stored `last_heartbeat_at` is missing or older than
+`agent.presence_timeout` plus `agent.heartbeat_persist_interval` is `offline` at once (the stored
+value lags the real last heartbeat by at most the persist interval); the others keep their stored
+state until the start plus `agent.presence_timeout`, which gives adapters time to reconnect after
+`4013`. At shutdown the server stores the presence without an event: a restart is not an agent
+going offline.
 
 Der Server vergleicht bei jedem Heartbeat:
 
 - `active_runs` mit seinen Läufen `running` und `waiting_input` dieses Agenten. Fehlt ein Lauf in
   `active_runs` länger als `agent.presence_timeout`, setzt der Server ihn auf `failed` mit Grund
   `interrupted` (5.5).
-- `reported_billing_mode` und `billing_modes_supported` mit dem Soll; eine Abweichung erzeugt
-  eine Warnung an der Agenten-Karte ([10-backend-richtlinie.md](10-backend-richtlinie.md)
-  Abschnitt 8).
+- The reported with the configured values, while the state is `online` or `degraded`. A difference
+  of the billing mode is one of three kinds: (a) `reported_billing_mode` is present and unequal to
+  `billing_mode`; (b) `reported_billing_mode` is absent, `billing_modes_supported` is reported and
+  `billing_mode` is not in it; (c) `billing_evidence.key_type` is `unknown`, which counts as unequal
+  to every configured mode ([10-backend-richtlinie.md](10-backend-richtlinie.md) section 7).
+  `billing_mode_matches` is false only when a reported mode exists and differs.
+
+The agent card carries the warnings as codes of `AgentRuntimeStatus.warnings`, only while the
+state is `online` or `degraded` ([10-backend-richtlinie.md](10-backend-richtlinie.md) section 8):
+
+| Code | Holds when |
+|---|---|
+| `billing_mode_mismatch` | kind (a) has held for longer than `billing.mismatch_alert_after` |
+| `billing_mode_unsupported` | kind (b) holds, at once |
+| `billing_evidence_unknown` | kind (c) holds, at once |
+| `tool_class_mismatch` | `reported_tool_class` is present and unequal to `tool_class` (section 2.4), at once |
+
+A warning disappears with the heartbeat that ends its cause. The server takes no action on runs:
+the heartbeat is evidence for display, warning, audit and alarm and never a permission; the binding
+checks are in the adapter (I3) and at `run.start` (BR-06).
 
 ### 4.9 Reihenfolge im Adapter: erst Zusage, dann Laufzeit
 
@@ -1348,9 +1440,10 @@ Gemessen in M2-32 gegen Hermes Agent `v2026.9.24`, Commit `f97608f178d1`, aufgez
 - Ein Projekt ist ein Forum mit Projektbindung (`project_bindings`). `workspace_ref` ist ein
   undurchsichtiger Name; der Runner löst ihn in einen Ordner unter `runner.projects_root` auf. Ein
   Pfad außerhalb dieses Ordners wird abgelehnt, auch über symbolische Links.
-- Bereitschaft: Der Runner meldet je `workspace_ref` im Heartbeat `ready` (Ordner vorhanden,
-  Git-Arbeitsbaum, Rechte passen). Der Server setzt `project_bindings.ready`; ohne `ready` lehnt
-  `agent.invoke` mit `project_not_ready` ab.
+- Bereitschaft: The runner reports `ready` per bound forum in the heartbeat member
+  `project_readiness` (`channel_id`, `ready`; section 4.8): folder present, Git work tree, rights
+  fit. Der Server setzt `project_bindings.ready`; ohne `ready` lehnt `agent.invoke` mit
+  `project_not_ready` ab.
 - Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
   `ProjectRunnerConfig`, M2-03): a closed JSON object (unknown members are rejected) with the
   optional members `model` (string, not empty, not starting with `-`; the runner passes it as

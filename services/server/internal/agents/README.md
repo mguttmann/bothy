@@ -1,6 +1,6 @@
 # Modul `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat (M2-20), commands, agent sessions and dev environments follow with the tickets of the etappe.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); commands, agent sessions and dev environments follow with the tickets of the etappe.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -11,7 +11,7 @@ Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, V
 
 - `internal/agents` (`agents.go`): the port. `Agents` (M1-51) with `List`, `Get`, `Create`,
   `Update`, `Disable`, `Enable`, `SetBillingMode`, `SetBillingModeAll`, `SetCredentialHolder` and
-  `SetToolClass`; the DTOs `Agent`, `Presence`, `AgentPage`, `Page`, `Precondition` (the parsed
+  `SetToolClass`; the DTOs `Agent` (its field `Presence` is a `PresenceStatus`), `AgentPage`, `Page`, `Precondition` (the parsed
   If-Match) and one command per body; the in-transaction event `AgentDisabled{AgentID}`;
   `Register` declares the durable event `agent.updated`.
 - `domain/`: the record `Agent` of 03 section 4.4 (every change bumps `Version`), the backend
@@ -66,6 +66,97 @@ Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, V
 - Configuration keys: `agent.ack_timeout`, `agent.ack_persist_interval`,
   `agent.max_inflight_events` (bound by the gateway engine).
 - Rulings: docs/DECISIONS.md M2-07.
+
+## Presence and heartbeat (M2-20)
+
+- Port (`presence.go`): `Presence` with `Heartbeat(ctx, body)` (the JSON object of schema
+  `Heartbeat`, the REST body of `sendHeartbeat` or the member `agent` of the gateway op
+  `heartbeat`, so both transports share one decoder; the actor comes from the context) and
+  `Statuses(ctx, agentIDs)` (tracked agents from memory, the others from their row; it does not
+  authorize, callers pass only agents the actor may read). DTOs `PresenceStatus` (schema
+  `AgentRuntimeStatus`; empty values mean "not reported") and `BillingEvidence`, the state
+  constants (`unknown`, `online`, `degraded`, `offline`) and the warning codes
+  (`billing_mode_mismatch`, `billing_mode_unsupported`, `billing_evidence_unknown`,
+  `tool_class_mismatch`). `PresenceStatus` replaces the earlier struct `Presence`, whose name is
+  now the port.
+- `domain/heartbeat.go`: `DecodeHeartbeat`, the only mapping of the wire form `agent_heartbeat.v1`
+  (09 section 4.8): closed top-level members and `details` keys, the forms of names, versions and
+  codes, no duplicates, `protocol_version` at least 1, `rate_limit` refused with `not_enabled`
+  until M6-14; it checks the openapi patterns itself, so both transports refuse the same bodies.
+  `ReportedChange(stored, next)` decides a change of the reported mode or class and builds the
+  audit details (`billing_mode_old`, `billing_mode_new`, `tool_class_old`, `tool_class_new`,
+  `key_type`, `method` from `next.Evidence`); `Report.StoredDetails` and `ReportFromStore` are the
+  form of `agents.reported_details`.
+- `domain/presence.go`: `StateAt` (offline at and after last heartbeat plus
+  `agent.presence_timeout`), `StartRule`, `Assess` with the difference kinds (a) reported mode
+  unequal, (b) configured mode not supported, (c) `key_type` unknown, and `Warnings`
+  (`billing_mode_mismatch` only after `billing.mismatch_alert_after`, the others at once, nothing
+  while `offline` or `unknown`).
+- `app/presence.go`: `Tracker`, the process-wide presence in the roles `api` and `all`: one entry
+  per agent with its lock, the last report, the state, a deadline timer, the last published pair
+  and the start times of a difference. Timers run on the port `app.Timers` (`RealTimers` over
+  `time.AfterFunc`, a fake in tests); the publisher (`kernel/eventlog.EphemeralPublisher`, the
+  hub) and the readiness port of `chat` are bound late (`BindPublisher`, `BindReadiness`).
+  `NewTracker` refuses `agent.presence_timeout` not above `sync.heartbeat_interval`.
+- `app/heartbeat.go`: the use case `Heartbeat`: `authorize` `agent.heartbeat` on the actor's own
+  agent (people and apps: `forbidden` `subject_kind_not_allowed`), decode (one
+  `validation_failed` with every field error), under the entry lock read `GetPresenceRow` on every
+  heartbeat (a configured value changed in another process counts at once), project readiness
+  only when the list changed since this process applied it (`ApplyProjectReadiness` of `chat` in
+  its own unit of work), then the change path, the entry update, the reassessment, the re-armed
+  deadline and the event. The rate limit `rl.agent_runtime` runs before, in the chain or the
+  gateway.
+- State rules: `unknown` before the first heartbeat, `online` or `degraded` from the latest one,
+  `offline` once the deadline (last heartbeat plus `agent.presence_timeout`, inclusive) fires
+  without a newer heartbeat. Only principals of kind agent have presence.
+- Persistence: a change of `reported_billing_mode` or `reported_tool_class` (also from or to "not
+  reported", also the first report) runs one unit of work: `LockPresenceRow`, compare again,
+  `WriteReportedChange` (mode and class at once with the whole reported state and
+  `last_heartbeat_at` from the clock) and the audit entry `agent.heartbeat` `allow` in the same
+  transaction; equal after the lock writes nothing. Only this path writes the two audited
+  columns. Every other heartbeat marks the entry dirty; the flush loop (`app/presence_flush.go`)
+  writes the dirty entries at most once per `agent.heartbeat_persist_interval`, ascending agent
+  id, in one unit of work, with the monotone `PersistHeartbeat` (`last_heartbeat_at IS NULL OR
+  last_heartbeat_at <= $hb`), so a fresher heartbeat stored by another process is never
+  overwritten. No `agents.version`, no `agent.updated`, no `permission_version`, no
+  `access.changed`, no `event_log` row, no `NOTIFY`.
+- Start (`Tracker.Start`, a component of the start sequence): `ListLivePresence` loads the agents
+  stored `online` or `degraded`; a missing `last_heartbeat_at` or one older than
+  `agent.presence_timeout` plus `agent.heartbeat_persist_interval` is `offline` at once (stored by
+  the first flush), the others keep their state until the start plus `agent.presence_timeout`.
+  Agents whose principal is not active are loaded inactive (no metric series, their deadline
+  runs). Agents not loaded get an entry with their first heartbeat.
+- Shutdown (`Tracker.Stop`, stop step `agent_presence` in the phase of the connections after the
+  gateway's step): stops the timers and the flush loop without publishing and flushes every dirty
+  entry within the rest of `shutdown.total_timeout`; a restart is not an agent going offline.
+- Events: the ephemeral `agent.presence_changed {agent_id, state, reported_billing_mode}` when
+  state or reported mode differ from the last published pair (initially the stored values), empty
+  scope, receive action `agent.read`, actor the agent for a heartbeat and none for the timer; the
+  last reported mode stays while `offline`. A publish error is logged and never fails the
+  heartbeat.
+- Configured values changed: after the commit of `SetBillingMode`, `SetBillingModeAll`,
+  `SetToolClass`, `Disable` and `Enable` the service calls `Tracker.Changed`, which reads
+  `GetPresenceRows` for the tracked agents and reassesses; `Disable` makes the entry inactive (no
+  series, the deadline keeps running), `Enable` active again. No event: `agent.updated` is
+  already written. `getAgent` and `listAgents` show the tracker's presence.
+- Metrics: `Tracker.Samples()` (memory only, never blocking) feeds the observable gauges of
+  `adapters/otelmetrics` over the registry specs: `bothy.agent.heartbeat.age` per active tracked
+  agent with a known heartbeat and `bothy.agent.billing_mode.mismatch_age` per active tracked
+  agent (seconds since a difference of any kind began, 0 without one); the alarm
+  `BothyBillingModeMismatch` reads the second.
+- `adapters/postgres/queries/presence.sql`: `GetPresenceRow`, `LockPresenceRow` (`FOR UPDATE`),
+  `GetPresenceRows`, `ListLivePresence`, `WriteReportedChange`, `PersistHeartbeat`; a transaction
+  of the heartbeat locks at most one `agents` row and no row of another module (03 section 6.3).
+- `adapters/httpapi/heartbeat.go`: `SendHeartbeat` (`POST /agents/me/heartbeat`) encodes the
+  checked body again and hands it to `Presence.Heartbeat`; it answers `HeartbeatAck` with
+  `interval_ms` = `sync.heartbeat_interval`.
+- Configuration keys: `agent.presence_timeout`, `agent.heartbeat_persist_interval`,
+  `billing.mismatch_alert_after`, `sync.heartbeat_interval` (`app.PresenceConfig`).
+- Tests: `domain/heartbeat_test.go` and `domain/presence_test.go` (decoder, forms, change,
+  boundary, start rule, assessment, fuzz seed corpus), `app/presence_test.go` (the tracker over
+  fakes and the fake timers), `adapters/otelmetrics/presence_test.go` (the gauges with an
+  in-process reader).
+- Rulings: docs/DECISIONS.md M2-20.
 
 ## The use cases (M1-51)
 
@@ -131,7 +222,7 @@ If-Match, tokens, visibility, badge) and `migrations/agents_test.go`.
 
 ## Port (Wurzelpaket `internal/agents`)
 
-- Eingehend: `Agents` (Verwaltung, Richtlinie, Werkzeugklasse; M1-51), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe).
+- Eingehend: `Agents` (Verwaltung, Richtlinie, Werkzeugklasse; M1-51), `Presence` (heartbeat and presence; M2-20), `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe).
 - Gibt In-Tx-Ereignisse aus: `AgentDisabled`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung; M1-51), kernel `personaldata.Participant`.
@@ -163,7 +254,6 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Hinweise für den Bau
 
-- Heartbeat-Zustand lebt im Speicher und wird höchstens je `agent.heartbeat_persist_interval` gespeichert (03, 4.4).
 - `acked_seq` wird spätestens je `agent.ack_persist_interval` gespeichert (04, 15.2); bei mehreren Knoten mit Fencing (02, Abschnitt 16).
 - Umbinden einer Agenten-Sitzung ist ein Compare-and-swap auf `agent_sessions.version`.
 

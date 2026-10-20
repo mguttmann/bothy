@@ -1360,7 +1360,7 @@ class AgentRuntimeApi {
   }
 
   /// Report state and actual billing mode
-  ///
+  /// The adapter reports the whole state of its runtime (&#x60;agent_heartbeat.v1&#x60;, 09 section 4.8); the member &#x60;agent&#x60; of the gateway op &#x60;heartbeat&#x60; has the same effect. Only an agent may call it (&#x60;agent-self&#x60;); the body carries no agent id. The last heartbeat wins: an absent optional member means \&quot;not reported\&quot;, except &#x60;project_readiness&#x60;, which is applied only when present and changed since the last list this server process applied (&#x60;ApplyProjectReadiness&#x60; of M2-03, in its own transaction).  The server validates every member and the closed keys of &#x60;details&#x60; itself, also the patterns of names, versions and codes; a violation answers &#x60;400 validation_failed&#x60; with every field error, &#x60;rate_limit&#x60; answers &#x60;errors[].code&#x60; &#x60;not_enabled&#x60; until it is built. A change of &#x60;reported_billing_mode&#x60; or &#x60;reported_tool_class&#x60;, also from or to \&quot;not reported\&quot;, is stored at once and audited with action &#x60;agent.heartbeat&#x60;; the other fields are stored at most once per &#x60;agent.heartbeat_persist_interval&#x60;. The presence becomes &#x60;offline&#x60; once &#x60;agent.presence_timeout&#x60; passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of &#x60;AgentRuntimeStatus.warnings&#x60;; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). &#x60;interval_ms&#x60; is &#x60;sync.heartbeat_interval&#x60;.
   ///
   /// Parameters:
   /// * [heartbeat]
