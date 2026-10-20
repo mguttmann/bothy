@@ -14,7 +14,8 @@ Usage (token only from the environment variable SONAR_TOKEN, never printed):
 
 `main-branch` names the project's main branch `main` (api/project_branches/rename) when it
 carries another name, such as the `master` a new SonarQube Cloud project starts with; until
-then the server takes an analysis of `main` for a short-lived branch and fails it.
+then the server takes an analysis of `main` for a short-lived branch and fails it. A
+short-lived branch `main` those analyses left is deleted before the rename.
 
 Languages the server does not know (Dart and Swift on the Community Build) are skipped
 and listed; the Cloud check covers them.
@@ -388,6 +389,10 @@ def ensure_main_branch(client: Client, name: str) -> str | None:
         raise SonarError(f"project '{project}' has no main branch")
     if current == name:
         return None
+    # While the main branch had another name, the analyses of `name` left a short-lived branch
+    # of that name, and the rename refuses a name in use; that branch goes first.
+    if any(b["name"] == name and not b.get("isMain") for b in branches):
+        client.post("api/project_branches/delete", project=project, branch=name)
     client.post("api/project_branches/rename", project=project, name=name)
     return str(current)
 
