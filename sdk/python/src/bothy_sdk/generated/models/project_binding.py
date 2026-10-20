@@ -9,7 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.json_object import JsonObject
+    from ..models.project_runner_config import ProjectRunnerConfig
 
 
 T = TypeVar("T", bound="ProjectBinding")
@@ -20,7 +20,7 @@ class ProjectBinding:
     """
     Attributes:
         workspace_ref (str): Opaque reference the runner resolves; never a server path.
-        runner_config (JsonObject): Free-form JSON object whose schema is named in the field description.
+        runner_config (ProjectRunnerConfig): Schema `project_runner_config.v1`. No secrets.
         ready (bool):
         version (int):
         repository_url (str | Unset): Display only; the server never fetches this URL.
@@ -28,7 +28,7 @@ class ProjectBinding:
     """
 
     workspace_ref: str
-    runner_config: JsonObject
+    runner_config: ProjectRunnerConfig
     ready: bool
     version: int
     repository_url: str | Unset = UNSET
@@ -67,12 +67,12 @@ class ProjectBinding:
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
-        from ..models.json_object import JsonObject
+        from ..models.project_runner_config import ProjectRunnerConfig
 
         d = dict(src_dict)
         workspace_ref = d.pop("workspace_ref")
 
-        runner_config = JsonObject.from_dict(d.pop("runner_config"))
+        runner_config = ProjectRunnerConfig.from_dict(d.pop("runner_config"))
 
         ready = d.pop("ready")
 

@@ -383,6 +383,7 @@ import 'package:api_client/src/generated/model/profile_update.dart';
 import 'package:api_client/src/generated/model/project_binding.dart';
 import 'package:api_client/src/generated/model/project_binding_put.dart';
 import 'package:api_client/src/generated/model/project_readiness.dart';
+import 'package:api_client/src/generated/model/project_runner_config.dart';
 import 'package:api_client/src/generated/model/public_branding.dart';
 import 'package:api_client/src/generated/model/push_environment.dart';
 import 'package:api_client/src/generated/model/push_preview.dart';
@@ -955,6 +956,7 @@ part 'serializers.g.dart';
   ProjectBinding,
   ProjectBindingPut,
   ProjectReadiness,
+  ProjectRunnerConfig,
   PublicBranding,
   PushEnvironment,
   PushPreview,
@@ -1486,6 +1488,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltMap, [FullType(String), FullType(double)]),
             () => MapBuilder<String, double>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltSet, [FullType(String)]),
+            () => SetBuilder<String>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AccessTarget)]),

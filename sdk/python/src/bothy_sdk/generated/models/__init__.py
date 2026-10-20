@@ -471,6 +471,7 @@ from .profile_update import ProfileUpdate
 from .project_binding import ProjectBinding
 from .project_binding_put import ProjectBindingPut
 from .project_readiness import ProjectReadiness
+from .project_runner_config import ProjectRunnerConfig
 from .public_branding import PublicBranding
 from .push_environment import PushEnvironment
 from .push_preview import PushPreview
@@ -1199,6 +1200,7 @@ __all__ = (
     "ProjectBinding",
     "ProjectBindingPut",
     "ProjectReadiness",
+    "ProjectRunnerConfig",
     "PublicBranding",
     "PushEnvironment",
     "PushPreview",

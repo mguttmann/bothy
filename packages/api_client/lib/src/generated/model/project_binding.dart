@@ -3,8 +3,7 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:built_collection/built_collection.dart';
-import 'package:built_value/json_object.dart';
+import 'package:api_client/src/generated/model/project_runner_config.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -16,7 +15,7 @@ part 'project_binding.g.dart';
 /// * [workspaceRef] - Opaque reference the runner resolves; never a server path.
 /// * [repositoryUrl] - Display only; the server never fetches this URL.
 /// * [defaultBranch]
-/// * [runnerConfig] - Schema `project_runner_config.v1`. No secrets.
+/// * [runnerConfig]
 /// * [ready]
 /// * [version]
 @BuiltValue()
@@ -33,9 +32,8 @@ abstract class ProjectBinding
   @BuiltValueField(wireName: r'default_branch')
   String? get defaultBranch;
 
-  /// Schema `project_runner_config.v1`. No secrets.
   @BuiltValueField(wireName: r'runner_config')
-  BuiltMap<String, JsonObject?> get runnerConfig;
+  ProjectRunnerConfig get runnerConfig;
 
   @BuiltValueField(wireName: r'ready')
   bool get ready;
@@ -91,10 +89,7 @@ class _$ProjectBindingSerializer
     yield r'runner_config';
     yield serializers.serialize(
       object.runnerConfig,
-      specifiedType: const FullType(BuiltMap, [
-        FullType(String),
-        FullType.nullable(JsonObject),
-      ]),
+      specifiedType: const FullType(ProjectRunnerConfig),
     );
     yield r'ready';
     yield serializers.serialize(
@@ -159,11 +154,8 @@ class _$ProjectBindingSerializer
         case r'runner_config':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(BuiltMap, [
-              FullType(String),
-              FullType.nullable(JsonObject),
-            ]),
-          ) as BuiltMap<String, JsonObject?>;
+            specifiedType: const FullType(ProjectRunnerConfig),
+          ) as ProjectRunnerConfig;
           result.runnerConfig.replace(valueDes);
           break;
         case r'ready':
