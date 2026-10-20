@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
-	"slices"
 	"strings"
 	"time"
 
@@ -62,10 +60,12 @@ const (
 	attrChecks = "checks"
 )
 
-// uncomparedTable is the table whose count is never compared with the manifest: bothy-backupd
-// writes it itself, also while a backup runs (other kinds, the next run), so the copy and the
-// manifest differ by design.
-const uncomparedTable = "backup_runs"
+// countedTables are the tables whose row counts check 2 compares with the manifest at equal
+// heads: every row of them carries the number of its log, so equal heads mean equal counts in an
+// undamaged copy. Other tables change without an event or audit row (sessions, tokens, cleanup
+// jobs, backup_runs itself) while a backup runs, so their counts are not compared
+// (docs/DECISIONS.md D-M7-03-3).
+var countedTables = []string{"audit_events", "event_log"}
 
 // errRestoreNotConfigured reports a service built without Scratch.
 var errRestoreNotConfigured = errors.New("status: the restore test needs a scratch area and the audit verifier")
@@ -326,7 +326,7 @@ func (t *restoreRun) restore() (ScratchDB, domain.Manifest, domain.CheckResult) 
 // manifest was read after the backup step (docs/DECISIONS.md D-M7-02-6), so the copy may lag it
 // but never lead it: its event_log head and audit head are not above those of the manifest, and
 // at the same audit head the hash is the same. When both heads are equal no write reached the
-// event or audit log in between, and every count except that of backup_runs must be equal
+// event or audit log in between, and the counts of countedTables must be equal
 // (docs/DECISIONS.md D-M7-03-3).
 func (t *restoreRun) checkManifest(db ScratchDB, m domain.Manifest) domain.CheckResult {
 	f, err := db.Facts(t.ctx)
@@ -351,7 +351,7 @@ func (t *restoreRun) checkManifest(db ScratchDB, m domain.Manifest) domain.Check
 }
 
 // compareTables returns the reason when the tables of the copy and of the manifest differ, or,
-// with counts, when a row count other than that of backup_runs differs; "" when they agree.
+// with counts, when the row count of one of countedTables differs; "" when they agree.
 func compareTables(copyCounts, manifestCounts map[string]int64, counts bool) string {
 	for table := range manifestCounts {
 		if _, ok := copyCounts[table]; !ok {
@@ -366,8 +366,8 @@ func compareTables(copyCounts, manifestCounts map[string]int64, counts bool) str
 	if !counts {
 		return ""
 	}
-	for _, table := range slices.Sorted(maps.Keys(manifestCounts)) {
-		if table != uncomparedTable && copyCounts[table] != manifestCounts[table] {
+	for _, table := range countedTables {
+		if copyCounts[table] != manifestCounts[table] {
 			return reasonRowCounts
 		}
 	}
