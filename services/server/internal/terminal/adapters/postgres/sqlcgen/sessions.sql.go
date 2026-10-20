@@ -83,35 +83,6 @@ func (q *Queries) AttachTerminalSession(ctx context.Context, arg AttachTerminalS
 	return result.RowsAffected(), nil
 }
 
-const closeTerminalSessionByPerson = `-- name: CloseTerminalSessionByPerson :execrows
-UPDATE terminal_sessions
-SET state = 'closed', closed_at = $1, close_reason = $2, closed_by = $3, detached_at = NULL,
-    version = version + 1
-WHERE id = $4 AND state <> 'closed'
-`
-
-type CloseTerminalSessionByPersonParams struct {
-	ClosedAt    pgtype.Timestamptz
-	CloseReason pgtype.Text
-	ClosedBy    pgtype.UUID
-	ID          pgtype.UUID
-}
-
-// Closes a session a person ended (closeTerminalSession): close_reason, closed_by, no detail,
-// detached_at cleared, version raised.
-func (q *Queries) CloseTerminalSessionByPerson(ctx context.Context, arg CloseTerminalSessionByPersonParams) (int64, error) {
-	result, err := q.db.Exec(ctx, closeTerminalSessionByPerson,
-		arg.ClosedAt,
-		arg.CloseReason,
-		arg.ClosedBy,
-		arg.ID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getTerminalSession = `-- name: GetTerminalSession :one
 SELECT id, host_id, user_id, host_session_user_id, opened_by_device_id, device_id, auth_session_id, profile, state, token_jti, key_generation, opened_at, started_at, detached_at, last_input_at, closed_at, closed_by, close_reason, close_detail, exit_code, bytes_in, bytes_out, version FROM terminal_sessions WHERE id = $1
 `
@@ -170,7 +141,7 @@ type InsertTerminalSessionParams struct {
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// Queries of the terminal sessions of M2-44: opening, attach, reads, close by a person, the
+// Queries of the terminal sessions of M2-44: opening, attach, reads, the
 // counters of the relay and the reconciliation at the start.
 // A new session in opening (24 section 6.1 step 3): the person's own session user, the device and
 // login session of the grant, the jti of its token and the key generation of the host.

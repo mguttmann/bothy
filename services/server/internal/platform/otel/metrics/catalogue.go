@@ -37,6 +37,7 @@ const (
 	keyBackupKind    = "bothy.backup.kind"
 	keyVolume        = "bothy.volume"
 	unitConnection   = "{connection}"
+	unitSession      = "{session}"
 )
 
 // Closed literal sets shared by several instruments.
@@ -334,6 +335,29 @@ var (
 		Description: "Relay connections whose counterpart did not arrive before terminal.open_timeout.",
 		Attrs:       []Attr{{Key: "bothy.terminal.side", Values: []string{"client", "host"}}},
 	}
+	// TerminalSessionsActive is bothy.terminal.sessions.active (4.3a, M2-46): the sessions the
+	// relay of this api process holds, by state.
+	TerminalSessionsActive = Spec{
+		Name: "bothy.terminal.sessions.active", Kind: KindUpDownCounter, Unit: unitSession,
+		Description: "Terminal sessions the relay of this process holds.",
+		Attrs:       []Attr{{Key: "bothy.terminal.state", Values: []string{"opening", "active", "detached"}}},
+	}
+	// TerminalSessionsClosed is bothy.terminal.sessions.closed (4.3a, M2-46): ended sessions by
+	// close reason (the closed list of 24-terminal.md section 10.3), counted after the commit by
+	// the process that committed the end.
+	TerminalSessionsClosed = Spec{
+		Name: "bothy.terminal.sessions.closed", Kind: KindCounter, Unit: unitSession,
+		Description: "Ended terminal sessions by close reason.",
+		Attrs: []Attr{{Key: keyReason, Values: []string{"client_closed", "closed_by_owner", "process_exited", "idle_timeout",
+			"max_duration", "detach_expired", "access_revoked", "i6_violation", "host_disabled", "host_retired", "host_rekeyed",
+			"host_restarted", "user_disabled", "device_revoked", "session_revoked", "logout", "open_failed", "host_policy_violation"}}},
+	}
+	// TerminalHostsConnected is bothy.terminal.hosts.connected (4.3a, M2-46): the control
+	// connections of this api process that are usable for sessions.
+	TerminalHostsConnected = Spec{
+		Name: "bothy.terminal.hosts.connected", Kind: KindUpDownCounter, Unit: "{host}",
+		Description: "Control connections of host services in this process that are usable for sessions.",
+	}
 	// SecretsRefreshFailures is bothy.secrets.refresh.failures (4.6, M1-09).
 	SecretsRefreshFailures = Spec{
 		Name: "bothy.secrets.refresh.failures", Kind: KindCounter, Unit: "{refresh}",
@@ -355,6 +379,6 @@ func All() []Spec {
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		StorageVolumeFree, StorageVolumeSize,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
-		ClientMetricsDiscarded, TerminalRelayUnpaired,
+		ClientMetricsDiscarded, TerminalRelayUnpaired, TerminalSessionsActive, TerminalSessionsClosed, TerminalHostsConnected,
 	}, Client()...)
 }

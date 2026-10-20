@@ -23,7 +23,7 @@ func (s *Service) Reconcile(ctx context.Context) error {
 		err := s.lockForRelay(ctx, id, func(ctx context.Context, ses domain.Session) error {
 			switch ses.State {
 			case domain.SessionOpening:
-				return s.endSession(ctx, ses, domain.HostSessionEnd{Reason: domain.CloseOpenFailed, Detail: domain.DetailOpenTimeout}, true)
+				return s.endSession(ctx, ses, domain.End{Reason: domain.CloseOpenFailed, Detail: domain.DetailOpenTimeout, Source: domain.EndByServer})
 			case domain.SessionActive:
 				return s.detach(ctx, ses, s.d.Clock.Now())
 			}

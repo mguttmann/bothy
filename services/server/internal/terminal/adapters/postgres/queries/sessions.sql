@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Queries of the terminal sessions of M2-44: opening, attach, reads, close by a person, the
+-- Queries of the terminal sessions of M2-44: opening, attach, reads, the
 -- counters of the relay and the reconciliation at the start.
 
 -- name: InsertTerminalSession :exec
@@ -34,14 +34,6 @@ SET bytes_in = bytes_in + @bytes_in, bytes_out = bytes_out + @bytes_out,
     last_input_at = CASE WHEN sqlc.narg(last_input_at)::timestamptz IS NULL THEN last_input_at
         ELSE greatest(coalesce(last_input_at, sqlc.narg(last_input_at)::timestamptz), sqlc.narg(last_input_at)::timestamptz) END
 WHERE id = @id;
-
--- name: CloseTerminalSessionByPerson :execrows
--- Closes a session a person ended (closeTerminalSession): close_reason, closed_by, no detail,
--- detached_at cleared, version raised.
-UPDATE terminal_sessions
-SET state = 'closed', closed_at = @closed_at, close_reason = @close_reason, closed_by = @closed_by, detached_at = NULL,
-    version = version + 1
-WHERE id = @id AND state <> 'closed';
 
 -- name: ListTerminalSessions :many
 -- One page of sessions in descending id after the keyset position: those of one person (zero

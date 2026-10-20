@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -120,23 +119,6 @@ func (r *Repository) DetachSession(ctx context.Context, id ids.ID, at time.Time)
 	}
 	n, err := q.DetachSession(ctx, sqlcgen.DetachSessionParams{ID: uuid(id), DetachedAt: optionalTime(at)})
 	return oneRow(n, err, "detaching a session")
-}
-
-// CloseSessionReported implements app.Store.
-func (r *Repository) CloseSessionReported(ctx context.Context, id ids.ID, end domain.HostSessionEnd, at time.Time) error {
-	q, err := r.write(ctx)
-	if err != nil {
-		return err
-	}
-	code := pgtype.Int4{}
-	if end.ExitCode != nil {
-		code = pgtype.Int4{Int32: int32(min(max(*end.ExitCode, math.MinInt32), math.MaxInt32)), Valid: true}
-	}
-	n, err := q.CloseSessionReported(ctx, sqlcgen.CloseSessionReportedParams{
-		ID: uuid(id), ClosedAt: optionalTime(at), CloseReason: optionalText(string(end.Reason)), CloseDetail: optionalText(string(end.Detail)),
-		ExitCode: code,
-	})
-	return oneRow(n, err, "closing a session the host ended")
 }
 
 // sessions converts rows of terminal_sessions.

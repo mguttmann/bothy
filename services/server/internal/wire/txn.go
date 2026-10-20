@@ -19,6 +19,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
+	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 )
 
 // Modules holds the module objects of a process role whose hooks and subscribers the txn
@@ -44,6 +46,10 @@ type Modules struct {
 	// MessagingSubscribers are the in-transaction subscribers of messaging (ThreadMoved moves
 	// messages.channel_id, M1-62); required.
 	MessagingSubscribers *messagingapp.Subscribers
+	// TerminalSubscribers are the in-transaction subscribers of terminal (AccessChanged,
+	// DeviceRevoked and SessionEnded end terminal sessions, M2-46); required. The terminal step
+	// binds the use cases (Subscribers.Bind).
+	TerminalSubscribers *terminalapp.Subscribers
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
@@ -52,8 +58,21 @@ type Modules struct {
 func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
 	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
 		SyncSubscribers: newSyncSubscribers(pool), NotifySubscribers: newNotifySubscribers(pool),
-		MessagingSubscribers: newMessagingSubscribers(pool)}
+		MessagingSubscribers: newMessagingSubscribers(pool), TerminalSubscribers: newTerminalSubscribers(pool)}
 }
+
+// newTerminalSubscribers returns the unbound subscribers of terminal over pool (nil: none read, the
+// golden test). It opens no connection.
+func newTerminalSubscribers(pool *pg.Pool) *terminalapp.Subscribers {
+	if pool == nil {
+		return terminalapp.NewSubscribers(nil)
+	}
+	return terminalapp.NewSubscribers(terminalpg.NewRepository(pool))
+}
+
+// errNoTerminalSubscribers reports Modules without the subscribers of terminal: a revocation would
+// leave terminal sessions open (24 section 8.3).
+var errNoTerminalSubscribers = errors.New("wire: the txn registry needs the subscribers of terminal (Modules.TerminalSubscribers)")
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
 // all) builds its registry here, so the golden file shows the one list of all roles. The error
@@ -101,9 +120,9 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // spans, the rights hooks of phases 1 and 3.1, the sync hook of phase 3.2 and the audit hook of
 // phase 3.3, the subscription messaging.MessagePosted -> sync (drafts with clear_draft, M1-61),
 // chat.ThreadMoved -> messaging, then -> sync (the copies of channel_id, M1-62) and
-// chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18).
-// authorize.AccessChanged, published by authz, has no production subscriber in M1 (runs
-// subscribes in M2, 02 section 4.3).
+// chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18), and
+// kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (the end of
+// terminal sessions at every revocation, M2-46).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -148,7 +167,19 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
 	}
-	return txn.Subscribe(reg, m.NotifySubscribers.OnSpaceArchived)
+	if err := txn.Subscribe(reg, m.NotifySubscribers.OnSpaceArchived); err != nil {
+		return err
+	}
+	if m.TerminalSubscribers == nil {
+		return errNoTerminalSubscribers
+	}
+	if err := txn.Subscribe(reg, m.TerminalSubscribers.OnAccessChanged); err != nil {
+		return err
+	}
+	if err := txn.Subscribe(reg, m.TerminalSubscribers.OnDeviceRevoked); err != nil {
+		return err
+	}
+	return txn.Subscribe(reg, m.TerminalSubscribers.OnSessionEnded)
 }
 
 // UnitConfig binds the configuration of the unit of work (database.tx_retry_max and the three

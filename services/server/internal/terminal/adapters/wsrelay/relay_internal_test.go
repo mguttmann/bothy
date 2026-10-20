@@ -26,6 +26,8 @@ type fakeRelayUC struct {
 	calls []string
 	// state is the session state RelaySessionState answers ("" means opening).
 	state string
+	// progress are the counts of every RelayEnd (M2-46).
+	progress []domain.Progress
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -45,6 +47,13 @@ func (f *fakeRelayUC) RelayCounters(_ context.Context, _ ids.ID, c app.Counts) e
 	return nil
 }
 func (f *fakeRelayUC) RelayUnpaired(_ context.Context, s domain.Side) { f.add("unpaired:" + string(s)) }
+func (f *fakeRelayUC) RelayEnd(_ context.Context, _ ids.ID, r domain.CloseReason, p domain.Progress) error {
+	f.add("end:" + string(r))
+	f.mu.Lock()
+	f.progress = append(f.progress, p)
+	f.mu.Unlock()
+	return nil
+}
 func (f *fakeRelayUC) RelaySessionState(context.Context, ids.ID) (string, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -818,15 +818,15 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server | duration | `15m` | so lange bleibt eine getrennte Sitzung anhängbar | aktiv |
 | `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | duration | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung | aktiv |
 | `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server | duration | `30m` | ohne Eingabe des Geräts endet die Sitzung | aktiv |
-| `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server |  | `2m` | Zuschlag, nach dem der Server selbst wegen Leerlaufs beendet | geplant (M2) |
-| `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server |  | `12h` | Höchstdauer einer Sitzung | geplant (M2) |
-| `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server |  | `5` | offene Sitzungen je Mensch | geplant (M2) |
-| `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server |  | `10` | offene Sitzungen je Rechner | geplant (M2) |
+| `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server | duration | `2m` | Zuschlag, nach dem der Server selbst wegen Leerlaufs beendet | aktiv |
+| `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server | duration | `12h` | Höchstdauer einer Sitzung | aktiv |
+| `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server | int | `5` | offene Sitzungen je Mensch | aktiv |
+| `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server | int | `10` | offene Sitzungen je Rechner | aktiv |
 | `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | int | `262144` | Puffer des Relais je Richtung und Sitzung | aktiv |
 | `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | duration | `20s` | Abstand der Heartbeats der Steuerverbindung (in `hello` gemeldet) | aktiv |
 | `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | int | `3` | fehlende Heartbeats bis zum Schließen der Steuerverbindung | aktiv |
 | `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | duration | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung | aktiv |
-| `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server |  | `30s` | Abstand des Jobs `terminal.sweep` ([02-architektur.md](../spec/02-architektur.md), Abschnitt 12.3) | geplant (M2) |
+| `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server | duration | `30s` | Abstand des Jobs `terminal.sweep` ([02-architektur.md](../spec/02-architektur.md), Abschnitt 12.3) | aktiv |
 | `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server | duration | `5s` | so lange wartet der Server auf die Antwort der älteren Steuerverbindung (3.4) | aktiv |
 | `host_service.state_dir` |  | Host-Dienst |  | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | Zustandsordner mit den Schlüsseln des Rechners, den Bindungen der Sitzungsbenutzer an Personen und bei `organization` dem API-Schlüssel des Profils `claude`; also the pairing record and the last declaration from `ready`, both without secrets (D-M2-42-4); nie eine Abo-Anmeldung (7.4) |  |
 | `host_service.session_users` |  | Host-Dienst |  | leer | Sitzungsbenutzer dieses Rechners, je Person einer; je Eintrag ein PTY-Helfer; nie der Dienstbenutzer; leer heißt: HD1 nicht bestanden; gelesen nur beim Start, geändert mit `bothy-host session-user add` und `remove`, die den Host-Dienst dafür neu starten (2.2) |  |

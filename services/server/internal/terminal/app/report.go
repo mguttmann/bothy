@@ -106,7 +106,7 @@ func (s *Service) ApplySessionUserReport(ctx context.Context, hostID ids.ID, rep
 		if r.Revoked || !slices.Contains(vanished, r.OSUser) {
 			continue
 		}
-		list, err := s.endSessions(ctx, SessionSelector{HostID: h.ID, UserID: r.UserID}, domain.CloseAccessRevoked)
+		list, err := s.endSessions(ctx, SessionSelector{HostID: h.ID, UserID: r.UserID}, domain.ServerEnd(domain.CloseAccessRevoked))
 		if err != nil {
 			return ReportOutcome{}, err
 		}

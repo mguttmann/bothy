@@ -151,7 +151,7 @@ func newCtlWith(t *testing.T, cfg wire.HostControlConfig) *ctl {
 	for _, h := range []ids.ID{c.h1, c.h2} {
 		c.setKey(h, c.key(h))
 	}
-	hc, err := wire.NewHostControl(cfg, w.Terminal, c.pub, c.keys, w.Clk, slog.New(w.Logs))
+	hc, err := wire.NewHostControl(cfg, w.Terminal, c.pub, c.keys, w.Clk, slog.New(w.Logs), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

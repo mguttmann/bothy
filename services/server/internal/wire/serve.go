@@ -147,6 +147,14 @@ type Deps struct {
 	// TerminalModule receives the use cases of the terminal module once they are built (M2-47): a
 	// test commits an end in a worker process through them. nil in production.
 	TerminalModule func(*terminalapp.Service)
+	// JobModules receives the use cases of the jobs before the registry is built (M2-46): a test
+	// runs a job handler directly (authz.expiry_sweep, terminal.sweep) instead of waiting for its
+	// period. nil in production.
+	JobModules func(*JobModules)
+	// TerminalSessionMetrics replaces the session instruments of M2-46 (sessions.closed,
+	// sessions.active, hosts.connected), so a test counts them per process. nil creates the
+	// OpenTelemetry adapter.
+	TerminalSessionMetrics terminalapp.SessionMetrics
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -948,6 +956,11 @@ func (s *server) startTerminal(context.Context) error {
 	}
 	sig, local := terminalSignals(s.plan, pool, s.deps.TerminalSignals)
 	tm.Service.BindSignals(sig)
+	if err := tm.bindSessionMetrics(s.deps.TerminalSessionMetrics); err != nil {
+		return err
+	}
+	// The subscribers of the txn registry end sessions from now on (M2-46).
+	a.TerminalSubscribers().Bind(tm.Service)
 	if s.deps.TerminalModule != nil {
 		s.deps.TerminalModule(tm.Service)
 	}
@@ -1235,13 +1248,13 @@ func (s *server) mountAPI(cat *authzapp.Catalog, log *slog.Logger) error {
 	if err := s.mountGateway(mux, chain, limiter, log); err != nil {
 		return err
 	}
-	return s.mountHostControl(mux, chain, log)
+	return s.mountHostControl(mux, chain, limiter, log)
 }
 
 // mountHostControl builds the control connection of the host services (M2-43) over the terminal
 // module, the ephemeral publisher of the gateway and the signing keys, mounts GET
 // /api/v1/hosts/connect on mux and registers its stop step.
-func (s *server) mountHostControl(mux Mux, chain *httpserver.Chain, log *slog.Logger) error {
+func (s *server) mountHostControl(mux Mux, chain *httpserver.Chain, limiter *ratelimit.Limiter, log *slog.Logger) error {
 	cfg, err := HostControlConfigFrom(s.values)
 	if err != nil {
 		return err
@@ -1252,13 +1265,13 @@ func (s *server) mountHostControl(mux Mux, chain *httpserver.Chain, log *slog.Lo
 	if tm == nil || gw == nil || keys == nil {
 		return errors.New("wire: the control connection needs the terminal module, the gateway and the signing keys")
 	}
-	hc, err := NewHostControl(cfg, tm, gw.Publisher, keys.Keys, s.deps.Clock, log)
+	hc, err := NewHostControl(cfg, tm, gw.Publisher, keys.Keys, s.deps.Clock, log, terminalLimiter{l: limiter})
 	if err != nil {
 		return err
 	}
 	hc.Mount(mux, chain)
 	s.runner.OnStop(hc.StopConnections())
-	return s.mountTerminalStreams(mux, chain, tm, hc, log)
+	return s.mountTerminalStreams(mux, chain, tm, hc, limiter, log)
 }
 
 // mountTerminalStreams builds the relay and the two stream routes of the terminal sessions
@@ -1266,7 +1279,8 @@ func (s *server) mountHostControl(mux Mux, chain *httpserver.Chain, log *slog.Lo
 // signing keys, builds the hub of the signals across nodes (M2-47), reconciles the sessions of the
 // previous process (Design note 14, only with cluster.mode single), mounts both routes on mux and
 // registers the stop step of the relay.
-func (s *server) mountTerminalStreams(mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, log *slog.Logger) error {
+func (s *server) mountTerminalStreams(mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, limiter *ratelimit.Limiter,
+	log *slog.Logger) error {
 	cfg, err := TerminalStreamsConfigFrom(s.values)
 	if err != nil {
 		return err
@@ -1278,7 +1292,8 @@ func (s *server) mountTerminalStreams(mux Mux, chain *httpserver.Chain, tm *Term
 		return errors.New("wire: the terminal streams need identity's authenticator and nonces and the signing keys")
 	}
 	ts, err := NewTerminalStreams(cfg, tm, hc, TerminalStreamsDeps{Authenticator: id.Authenticator, Nonces: id.DPoP, Signer: keys.Keys,
-		Timers: s.deps.TerminalTimers, Metrics: s.deps.TerminalMetrics, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi})
+		Timers: s.deps.TerminalTimers, Metrics: s.deps.TerminalMetrics, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi,
+		Limiter: terminalLimiter{l: limiter}})
 	if err != nil {
 		return err
 	}
@@ -1502,7 +1517,17 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	reg, err := NewJobRegistry(&JobModules{
+	sweepCfg, err := TerminalSweepConfigFrom(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	tm := s.terminal
+	s.mu.Unlock()
+	if tm == nil {
+		return errors.New("wire: the jobs step needs the terminal step")
+	}
+	mods := &JobModules{
 		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
 		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
 		Expiry: expiry, ExpiryInterval: expiryCfg.Interval,
@@ -1512,7 +1537,12 @@ func (s *server) startJobs(ctx context.Context) error {
 		Deliveries:  ap.Webhooks,
 		FilesScan:   files.ScanRunner(),
 		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
-	})
+		TerminalSweep: tm.Service, TerminalSweepInterval: sweepCfg.Interval,
+	}
+	if s.deps.JobModules != nil {
+		s.deps.JobModules(mods)
+	}
+	reg, err := NewJobRegistry(mods)
 	if err != nil {
 		return err
 	}

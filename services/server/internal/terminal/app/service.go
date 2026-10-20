@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"sync/atomic"
 	"time"
@@ -57,6 +58,18 @@ type Config struct {
 	// StatementTimeout is database.statement_timeout: the bound of every read of a signal handler
 	// (M2-47); zero means no bound of its own.
 	StatementTimeout time.Duration `config:"database.statement_timeout"`
+	// IdleTimeout, IdleGrace, MaxSessionDuration and DetachGrace are terminal.idle_timeout,
+	// terminal.idle_grace, terminal.max_session_duration and terminal.detach_grace: the limits of
+	// 24 section 6.3 that terminal.sweep checks (M2-46); a sweep with a window that is not positive
+	// fails closed.
+	IdleTimeout        time.Duration `config:"terminal.idle_timeout"`
+	IdleGrace          time.Duration `config:"terminal.idle_grace"`
+	MaxSessionDuration time.Duration `config:"terminal.max_session_duration"`
+	DetachGrace        time.Duration `config:"terminal.detach_grace"`
+	// TxRetryMax is database.tx_retry_max: how often an opening starts again when the counts of
+	// the session limits moved between the decision and the locked unit of work (M2-46 Design
+	// note 9).
+	TxRetryMax int `config:"database.tx_retry_max"`
 }
 
 // Deps are the collaborators of the host use cases.
@@ -92,6 +105,9 @@ type Deps struct {
 	StepUps StepUps
 	// Signer signs the session tokens (M2-44); nil until BindSigner, which fails both closed.
 	Signer TokenSigner
+	// AuthSessions tells terminal.sweep which login sessions ended (identity.Auth.EndedSessions,
+	// M2-46); nil fails the sweep closed.
+	AuthSessions AuthSessions
 	// BeforeOpenCommit is a test seam: when set, Open calls it inside its unit of work after the
 	// insert, so a test can commit a revocation between the decision and the commit
 	// (TestOpen_RevocationRaceRecheck). nil in production.
@@ -112,6 +128,11 @@ type Service struct {
 	signer atomic.Pointer[signerHolder]
 	// metrics records the instruments of the relay (BindMetrics); NoMetrics until bound.
 	metrics atomic.Pointer[metricsHolder]
+	// sessionMetricsP records the session instruments of M2-46 (BindSessionMetrics).
+	sessionMetricsP atomic.Pointer[sessionMetricsHolder]
+	// idgen gives the token jti of every grant on the clock of the use cases, so terminal.sweep
+	// reads the time of the last grant from the UUIDv7 (M2-46 Design note 8 a).
+	idgen *ids.Generator
 	// signals carry the effects after a commit to every node (BindSignals, M2-47).
 	signals atomic.Pointer[signalsHolder]
 	// notes keep the working directory index of a grant for the handler of this node (M2-47).
@@ -242,7 +263,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
-	s := &Service{cfg: cfg, d: d}
+	s := &Service{cfg: cfg, d: d, idgen: ids.NewGenerator(d.Clock, rand.Reader)}
 	// One node until internal/wire binds the signals of cluster.mode: the use cases themselves
 	// handle what they commit (M2-47 Design note 4).
 	local := NewLocalSignals()

@@ -32,6 +32,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 )
 
 // AuditConfig binds the audit.* and privacy.audit_ip_* keys of v into the configuration of the
@@ -244,6 +245,10 @@ func (a *Audit) SyncSubscribers() *syncapp.Subscribers { return a.modules.SyncSu
 // NotifySubscribers returns the in-transaction subscribers of notify of the registry of the unit
 // of work; the chat step binds their appender and the chat paths (M3-18).
 func (a *Audit) NotifySubscribers() *notifyapp.Subscribers { return a.modules.NotifySubscribers }
+
+// TerminalSubscribers returns the subscribers of terminal in the txn registry of the process
+// (M2-46): the terminal step binds the use cases.
+func (a *Audit) TerminalSubscribers() *terminalapp.Subscribers { return a.modules.TerminalSubscribers }
 
 // Recorder returns the recorder; it implements auditing.Recorder.
 func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }
