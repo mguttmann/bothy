@@ -924,7 +924,7 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
   person (and, for `trusted_header`, still bound to the header login). The actor has
   `ClientComponent = console`, no key binding and the stored view.
 - CSRF: the chain's ConsoleGuard (`platform/httpserver`) requires `X-Console-Request: 1` and the own
-  `Origin` on every cookie request except `GET`, `HEAD`, `OPTIONS` (`403 csrf_check_failed`); the
+  `Origin` on every cookie request except `GET`, `HEAD`, `OPTIONS` (`403 forbidden` with reason `csrf_check_failed`); the
   gateway refuses an upgrade with the cookie and no or a foreign `Origin`.
 - Gate before the first step-up: only `self.read`, `auth.step_up`, `auth.logout`, the discovery and
   the public login actions pass (`consolesession.PassesGate`); everything else is
