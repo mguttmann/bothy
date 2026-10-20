@@ -425,7 +425,7 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50}, pool, uow, az, hook, writes, id, w.Clock, log)
+	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 20, PageSizeMax: 50, ReasonMaxChars: 200}, pool, uow, az, hook, writes, id, w.Clock, log)
 	if err != nil {
 		w.t.Fatal(err)
 	}
