@@ -397,6 +397,20 @@ var (
 		Description: "Relay connections whose counterpart did not arrive before terminal.open_timeout.",
 		Attrs:       []Attr{{Key: "bothy.terminal.side", Values: []string{"client", "host"}}},
 	}
+	// AgentInvocationDenied is bothy.agent.invocation.denied (4.3, M2-08): one per denial of
+	// agent.invoke immediately before a delivery to an agent (I2), with the run reason the denial
+	// maps to (09 5.2; the adapter test holds the values equal to the runs domain).
+	AgentInvocationDenied = Spec{
+		Name: "bothy.agent.invocation.denied", Kind: KindCounter, Unit: "{invocation}",
+		Description: "Denials of agent.invoke immediately before a delivery to an agent.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: keyReason, Values: []string{
+				"billing_mode_personal_not_holder", "tool_class_owner_only", "project_not_ready", "channel_read_only",
+				"user_disabled", "agent_disabled", "access_revoked",
+			}},
+		},
+	}
 	// SecretsRefreshFailures is bothy.secrets.refresh.failures (4.6, M1-09).
 	SecretsRefreshFailures = Spec{
 		Name: "bothy.secrets.refresh.failures", Kind: KindCounter, Unit: "{refresh}",
@@ -414,7 +428,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
-		RunActive, RunStartLatency, RunDuration, RunFinished,
+		RunActive, RunStartLatency, RunDuration, RunFinished, AgentInvocationDenied,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		StorageVolumeFree, StorageVolumeSize,

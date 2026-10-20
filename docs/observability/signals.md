@@ -96,7 +96,7 @@ must not consume the error budget of `bothy-sync/reconnect`.
 | `bothy.agent.consumer.lag` | Gauge | `{event}` | `bothy.agent.handle` | api: `head_seq - acked_seq`, maximum over consumers | `bothy_agent_consumer_lag` |
 | `bothy.agent.heartbeat.age` | Gauge | `s` | `bothy.agent.handle` | api | `bothy_agent_heartbeat_age_seconds` |
 | `bothy.agent.billing_mode.mismatch_age` | Gauge | `s` | `bothy.agent.handle` | api: seconds since the start of a mismatch between configured and reported mode according to the heartbeat (10, 8); 0 without a mismatch | `bothy_agent_billing_mode_mismatch_age_seconds` |
-| `bothy.agent.invocation.denied` | Counter | `{invocation}` | `bothy.agent.handle`, `bothy.reason` | api: rejection before delivery (I2) | `bothy_agent_invocation_denied_total` |
+| `bothy.agent.invocation.denied` | Counter | `{invocation}` | `bothy.agent.handle`, `bothy.reason` (`billing_mode_personal_not_holder`, `tool_class_owner_only`, `project_not_ready`, `channel_read_only`, `user_disabled`, `agent_disabled`, `access_revoked`) | api: rejection before delivery (I2) | `bothy_agent_invocation_denied_total` |
 | `bothy.agent.billing_mode_mismatch` | Counter | `{run}` | `bothy.agent.handle` | api: I3 | `bothy_agent_billing_mode_mismatch_total` |
 
 Tool names never appear on metrics (open set); the statistics of the tool calls come from
