@@ -65,7 +65,9 @@ kein Batch-Löschen, keine Versionierung, keine Bucket-Richtlinien. Details:
   Since M7-22 the rule allows exactly one more package, the object store sink of the audit
   checkpoints `internal/audit/adapters/s3sink`, with its own narrow interface (`PutObject`,
   `GetObject`, `ListObjectVersions`, `GetObjectLockConfiguration`); depguard rule
-  `aws-sdk-only-in-s3-driver` and `TestS3SDKOnlyInAdapter` name both packages.
+  `aws-sdk-only-in-s3-driver` and `TestS3SDKOnlyInAdapter` name both packages. Since M7-02 the
+  object mirror of the backup service `internal/status/adapters/s3mirror` is the third, with a
+  client of only list, head, get and put and no delete (docs/DECISIONS.md D-M7-02-5).
 - Ein Eigenschaftstest prüft, dass kein Objektschlüssel Kanal-IDs, Bereichs-IDs oder Namen
   enthält.
   The property test is `TestObjectKeysCarryNoContext` in

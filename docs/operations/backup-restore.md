@@ -255,5 +255,6 @@ versions after the Object Lock period:
    bucket's version listing shows when the rule has run.
 4. Remove the temporary copy of the key afterwards.
 
-The object mirror of the driver `s3` (below `<prefix>/objects/`) keeps deleted objects; the owner
-removes them with the lifecycle rule of section 2 or by hand with the same key.
+The object mirror of the driver `s3` (below `<prefix>/objects/`) keeps objects deleted from the
+file bucket as current versions; the owner deletes them by hand with the same key, and the rule of
+section 2 removes the old versions `NoncurrentDays` later.

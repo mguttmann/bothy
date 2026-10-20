@@ -3,8 +3,8 @@
 // Package s3mirror is the object backup of the driver s3 (brief M7-02 design note 5): a mirror
 // of the file bucket into the off-site bucket below <prefix>/objects/ that copies every object
 // the destination lacks and never deletes or overwrites. Objects deleted from the file bucket
-// stay in the destination until the owner's off-site expiry. It implements the S3Mirror step of
-// app.Executor (adapters/executor delegates to it).
+// stay in the destination until the owner deletes them by hand (backup-restore.md 9). It
+// implements the S3Mirror step of app.Executor (adapters/executor delegates to it).
 //
 // The client holds only the four calls a mirror needs (list, head, get, put); it has no delete.
 // Every error is the *app.ExecError s3_mirror_failed (or canceled), without keys, endpoint or
