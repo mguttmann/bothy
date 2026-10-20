@@ -508,7 +508,8 @@ func TestOffsiteEmptyWarns(t *testing.T) {
 }
 
 // TestPrime holds the start of bothy-backupd: the last success of each metric kind (physical
-// from pg_full and pg_diff, logical, objects) is read from backup_runs into the metrics.
+// from pg_full and pg_diff, logical, objects) and of the restore test is read from backup_runs
+// into the metrics.
 func TestPrime(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t, nil)
@@ -527,8 +528,9 @@ func TestPrime(t *testing.T) {
 	if err := e.svc.Prime(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := e.runs.lastCalls; len(got) != 3 || !slices.Equal(got[0], []status.BackupKind{status.BackupPGFull, status.BackupPGDiff}) ||
-		!slices.Equal(got[1], []status.BackupKind{status.BackupLogical}) || !slices.Equal(got[2], []status.BackupKind{status.BackupObjects}) {
+	if got := e.runs.lastCalls; len(got) != 4 || !slices.Equal(got[0], []status.BackupKind{status.BackupPGFull, status.BackupPGDiff}) ||
+		!slices.Equal(got[1], []status.BackupKind{status.BackupLogical}) || !slices.Equal(got[2], []status.BackupKind{status.BackupObjects}) ||
+		!slices.Equal(got[3], []status.BackupKind{status.BackupRestoreTest}) {
 		t.Errorf("LastSuccess calls %v", got)
 	}
 	if len(e.m.last) != 2 || !e.m.last[domain.KindPGFull].Equal(physical) || !e.m.last[domain.KindLogical].Equal(logical) {

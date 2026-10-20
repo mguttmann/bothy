@@ -197,6 +197,7 @@ type fakeRow struct {
 	finished time.Time
 	size     int64
 	manifest []byte
+	checks   []byte
 	code     string
 }
 
@@ -251,6 +252,7 @@ func (r *fakeRuns) Finish(ctx context.Context, run status.FinishedRun) error {
 		row.finished = r.clk.Now()
 		row.size = run.SizeBytes
 		row.manifest = run.Manifest
+		row.checks = run.Checks
 		row.code = run.Error
 		r.states[run.ID] = append(r.states[run.ID], row.state)
 		return nil
@@ -273,6 +275,22 @@ func (r *fakeRuns) LastSuccess(_ context.Context, kinds ...status.BackupKind) (t
 		}
 	}
 	return last, found, nil
+}
+
+func (r *fakeRuns) LatestSucceeded(_ context.Context, kinds ...status.BackupKind) (status.BackupRun, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.lastErr != nil {
+		return status.BackupRun{}, false, r.lastErr
+	}
+	var out status.BackupRun
+	found := false
+	for _, row := range r.rows {
+		if row.state == "succeeded" && slices.Contains(kinds, row.kind) && (!found || !row.started.Before(out.StartedAt)) {
+			out, found = status.BackupRun{ID: row.id, Kind: row.kind, StartedAt: row.started, Manifest: row.manifest}, true
+		}
+	}
+	return out, found, nil
 }
 
 // snapshot returns copies of the rows.
@@ -302,6 +320,7 @@ type fakeMetrics struct {
 	last     map[domain.Kind]time.Time
 	wal      []time.Time
 	volumes  map[string]app.VolumeUsage
+	failed   [][]domain.CheckName
 }
 
 func newFakeMetrics() *fakeMetrics {
@@ -330,4 +349,10 @@ func (m *fakeMetrics) Volume(_ context.Context, volume string, usage app.VolumeU
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.volumes[volume] = usage
+}
+
+func (m *fakeMetrics) RestoreChecksFailed(_ context.Context, checks []domain.CheckName) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failed = append(m.failed, slices.Clone(checks))
 }

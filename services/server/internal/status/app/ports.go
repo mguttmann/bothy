@@ -154,7 +154,8 @@ type ManifestFacts struct {
 // docs/observability/signals.md 4.6; adapters/otelmetrics implements it.
 type Metrics interface {
 	// RunFinished records one finished run: duration and size of the last run of its kind and,
-	// when it succeeded, its finish time as the last success.
+	// when it succeeded, its finish time as the last success. For domain.KindRestoreTest it
+	// records the duration and the last success of the restore test and no size.
 	RunFinished(ctx context.Context, kind domain.Kind, succeeded bool, duration time.Duration, sizeBytes int64, finishedAt time.Time)
 	// LastSuccess records the last success of kind read from backup_runs at start.
 	LastSuccess(ctx context.Context, kind domain.Kind, at time.Time)
@@ -163,4 +164,8 @@ type Metrics interface {
 	// Volume records the free and total bytes of a volume: pgdata, files, pgbackrest-repo or
 	// backup-scratch.
 	Volume(ctx context.Context, volume string, usage VolumeUsage)
+	// RestoreChecksFailed adds one to bothy.backup.restore_test.failures per failed check of a
+	// restore test, with bothy.reason set to the check name (alerting.md). RunFinished and
+	// LastSuccess with domain.KindRestoreTest record its duration and its last success.
+	RestoreChecksFailed(ctx context.Context, checks []domain.CheckName)
 }
