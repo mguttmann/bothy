@@ -18,6 +18,7 @@ import (
 // The trigger kinds of 03 runs.trigger_kind that Open accepts.
 const (
 	triggerKindMessage = "message"
+	triggerKindCommand = "command"
 )
 
 // The step of a replaced adapter reason (ruling D-M2-05-8, 09 5.2).
@@ -32,10 +33,25 @@ type OpenCmd struct {
 	// ThreadID is the target thread; AgentID the agent; TriggeredBy the person who triggered;
 	// TriggeringMessageID the message whose trigger_state follows the run (zero for none).
 	ThreadID, AgentID, TriggeredBy, TriggeringMessageID ids.ID
-	// TriggerKind is message (command and interaction come with M2-16 and M2-15).
+	// TriggeringCommandID is the command of a command run (M2-16); zero otherwise.
+	TriggeringCommandID ids.ID
+	// TriggerKind is message or command (interaction comes with M2-15): message needs no command,
+	// command needs TriggeringCommandID and no message.
 	TriggerKind string
 	// BillingModeExpected is the agent's billing mode now (ruling D-M2-05-5).
 	BillingModeExpected string
+}
+
+// openTrigger reports a trigger Open accepts: kind message without a command, or kind command with
+// its command and without a message (03 runs, the check on the triggering_* columns).
+func openTrigger(cmd OpenCmd) bool {
+	switch cmd.TriggerKind {
+	case triggerKindMessage:
+		return cmd.TriggeringCommandID.IsZero()
+	case triggerKindCommand:
+		return !cmd.TriggeringCommandID.IsZero() && cmd.TriggeringMessageID.IsZero()
+	}
+	return false
 }
 
 // ActiveRunExistsError is the error of Open when the thread already has an active run (R-DM-14):
@@ -99,13 +115,13 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 	if err := needUnit(ctx, "Open"); err != nil {
 		return runs.RunSummary{}, err
 	}
-	if cmd.TriggerKind != triggerKindMessage || cmd.ThreadID.IsZero() || cmd.AgentID.IsZero() || cmd.TriggeredBy.IsZero() {
-		return runs.RunSummary{}, errs.New(errs.CodeInternalError, "runs: Open needs a thread, an agent, a person and the trigger kind message")
+	if !openTrigger(cmd) || cmd.ThreadID.IsZero() || cmd.AgentID.IsZero() || cmd.TriggeredBy.IsZero() {
+		return runs.RunSummary{}, errs.New(errs.CodeInternalError, "runs: Open needs a thread, an agent, a person and a trigger of kind message or command")
 	}
 	row, inserted, err := s.d.Repo.InsertRun(ctx, NewRun{
 		ID: ids.New(), ThreadID: cmd.ThreadID, AgentID: cmd.AgentID, TriggeredBy: cmd.TriggeredBy, TriggerKind: cmd.TriggerKind,
-		TriggeringMessageID: cmd.TriggeringMessageID, BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(),
-		QueuedAt: s.now(),
+		TriggeringMessageID: cmd.TriggeringMessageID, TriggeringCommandID: cmd.TriggeringCommandID,
+		BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
 	})
 	if err != nil {
 		return runs.RunSummary{}, err

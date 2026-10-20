@@ -9,6 +9,137 @@ import (
 	"net/http"
 )
 
+type SetMyLocalCredentialResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LocalCredentialResult
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SetMyLocalCredentialResponse200Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *SetMyLocalCredentialResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SetMyLocalCredentialResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *SetMyLocalCredentialResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *SetMyLocalCredentialResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *SetMyLocalCredentialResponse409Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SetMyLocalCredentialResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *SetMyLocalCredentialResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetMyLocalCredentialResponse) GetJSON200() *LocalCredentialResult {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetMyLocalCredentialResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetMyLocalCredentialResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetMyLocalCredentialResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetMyLocalCredentialResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SetMyLocalCredentialResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r SetMyLocalCredentialResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetMyLocalCredentialResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetMyLocalCredentialResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetMyLocalCredentialResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetMyLocalCredentialResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetMyLocalCredentialResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMyMentionsResponse200Headers the declared response headers of an HTTP 200 response for ListMyMentions
+type ListMyMentionsResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// ListMyMentionsResponse400Headers the declared response headers of an HTTP 400 response for ListMyMentions
+type ListMyMentionsResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ListMyMentionsResponse401Headers the declared response headers of an HTTP 401 response for ListMyMentions
+type ListMyMentionsResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// ListMyMentionsResponse403Headers the declared response headers of an HTTP 403 response for ListMyMentions
+type ListMyMentionsResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // ListMyMentionsResponse429Headers the declared response headers of an HTTP 429 response for ListMyMentions
 type ListMyMentionsResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -19985,6 +20116,12 @@ func (c *ClientWithResponses) PutChannelBehaviorWithResponse(ctx context.Context
 
 // ListChannelCommandsWithResponse List commands usable in a channel
 //
+// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+// channel lists nothing.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
@@ -20563,6 +20700,10 @@ func (c *ClientWithResponses) AnswerAutocompleteWithResponse(ctx context.Context
 
 // RegisterCommandWithBodyWithResponse Register a command
 //
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /commands (the `RegisterCommand` operationId).
@@ -20575,6 +20716,10 @@ func (c *ClientWithResponses) RegisterCommandWithBodyWithResponse(ctx context.Co
 }
 
 // RegisterCommandWithResponse Register a command
+//
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -20615,6 +20760,10 @@ func (c *ClientWithResponses) GetCommandWithResponse(ctx context.Context, comman
 
 // UpdateCommandWithBodyWithResponse Replace a command definition
 //
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
@@ -20627,6 +20776,10 @@ func (c *ClientWithResponses) UpdateCommandWithBodyWithResponse(ctx context.Cont
 }
 
 // UpdateCommandWithResponse Replace a command definition
+//
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23914,127 +24067,4 @@ func (c *ClientWithResponses) UpdateSpaceWithBodyWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseUpdateSpaceResponse(rsp)
-}
-
-// UpdateSpaceWithResponse Change name, icon or color
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /spaces/{space_id} (the `UpdateSpace` operationId).
-func (c *ClientWithResponses) UpdateSpaceWithResponse(ctx context.Context, spaceId SpaceIdPath, params *UpdateSpaceParams, body UpdateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSpaceResponse, error) {
-	rsp, err := c.UpdateSpace(ctx, spaceId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateSpaceResponse(rsp)
-}
-
-// ExplainSpaceAccessWithResponse Who has access to a space
-//
-// Every principal with access and the chain of sources (direct, group, inherited, operator, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /spaces/{space_id}/access (the `ExplainSpaceAccess` operationId).
-func (c *ClientWithResponses) ExplainSpaceAccessWithResponse(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*ExplainSpaceAccessResponse, error) {
-	rsp, err := c.ExplainSpaceAccess(ctx, spaceId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseExplainSpaceAccessResponse(rsp)
-}
-
-// ArchiveSpaceWithBodyWithResponse Archive a space
-//
-// Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /spaces/{space_id}/archive (the `ArchiveSpace` operationId).
-func (c *ClientWithResponses) ArchiveSpaceWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, params *ArchiveSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ArchiveSpaceResponse, error) {
-	rsp, err := c.ArchiveSpaceWithBody(ctx, spaceId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseArchiveSpaceResponse(rsp)
-}
-
-// ArchiveSpaceWithResponse Archive a space
-//
-// Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /spaces/{space_id}/archive (the `ArchiveSpace` operationId).
-func (c *ClientWithResponses) ArchiveSpaceWithResponse(ctx context.Context, spaceId SpaceIdPath, params *ArchiveSpaceParams, body ArchiveSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*ArchiveSpaceResponse, error) {
-	rsp, err := c.ArchiveSpace(ctx, spaceId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseArchiveSpaceResponse(rsp)
-}
-
-// ListSpaceChannelsWithResponse List visible channels of a space
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /spaces/{space_id}/channels (the `ListSpaceChannels` operationId).
-func (c *ClientWithResponses) ListSpaceChannelsWithResponse(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*ListSpaceChannelsResponse, error) {
-	rsp, err := c.ListSpaceChannels(ctx, spaceId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListSpaceChannelsResponse(rsp)
-}
-
-// CreateChannelWithBodyWithResponse Create a channel
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /spaces/{space_id}/channels (the `CreateChannel` operationId).
-func (c *ClientWithResponses) CreateChannelWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, params *CreateChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateChannelResponse, error) {
-	rsp, err := c.CreateChannelWithBody(ctx, spaceId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateChannelResponse(rsp)
-}
-
-// CreateChannelWithResponse Create a channel
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /spaces/{space_id}/channels (the `CreateChannel` operationId).
-func (c *ClientWithResponses) CreateChannelWithResponse(ctx context.Context, spaceId SpaceIdPath, params *CreateChannelParams, body CreateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateChannelResponse, error) {
-	rsp, err := c.CreateChannel(ctx, spaceId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateChannelResponse(rsp)
-}
-
-// MoveSpaceWithBodyWithResponse Change the global position of a space
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /spaces/{space_id}/move (the `MoveSpace` operationId).
-func (c *ClientWithResponses) MoveSpaceWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, params *MoveSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveSpaceResponse, error) {
-	rsp, err := c.MoveSpaceWithBody(ctx, spaceId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseMoveSpaceResponse(rsp)
-}
-
-// MoveSpaceWithResponse Change the global position of a space
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /spaces/{space_id}/move (the `MoveSpace` operationId).
-func (c *ClientWithResponses) MoveSpaceWithResponse(ctx context.Context, spaceId SpaceIdPath, params *MoveSpaceParams, body MoveSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveSpaceResponse, error) {
-	rsp, err := c.MoveSpace(ctx, spaceId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseMoveSpaceResponse(rsp)
 }

@@ -1014,6 +1014,9 @@ func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy 
 	if err != nil {
 		return nil, err
 	}
+	if err := s.bindCommands(pool, a, az, sy, c, ag, rn); err != nil {
+		return nil, err
+	}
 	if err := a.RunsAcceptor().Bind(rn.Service); err != nil {
 		return nil, err
 	}
@@ -1023,6 +1026,26 @@ func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy 
 		}
 	}
 	return rn, nil
+}
+
+// bindCommands builds the command register of agents over chat and binds it to the command
+// execution of runs (M2-16).
+func (s *server) bindCommands(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, ag *Agents, rn *Runs) error {
+	cfg, err := CommandsConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	id := s.identity
+	s.mu.Unlock()
+	if id == nil || id.Principals == nil {
+		return errors.New("wire: the command register needs the identity module")
+	}
+	if err := ag.BindCommands(cfg, pool, CommandDeps{UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Events: sy.Appender(),
+		Principals: id.Principals, Channels: c.Service}); err != nil {
+		return err
+	}
+	return rn.Service.BindCommands(ag.Commands)
 }
 
 // startNotify builds the notify module (M3-18) in the chat step over the chat service, the
@@ -1194,6 +1217,9 @@ func (s *server) handlers() Handlers {
 	}
 	if h.Agents == nil && s.agents != nil {
 		h.Agents = s.agents.Handlers
+	}
+	if h.Commands == nil && s.agents != nil {
+		h.Commands = s.agents.CommandHandlers
 	}
 	if s.chat != nil {
 		s.chat.fillHandlers(&h)

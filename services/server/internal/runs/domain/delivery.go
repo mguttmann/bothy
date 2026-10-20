@@ -175,6 +175,9 @@ type DeliveryFacts struct {
 	BillingMode, ToolClass string
 	// PermissionVersion is the version the check pinned.
 	PermissionVersion int64
+	// Control marks the delivery of command.invoked of a control command, whose grant may lack a
+	// run (R-AZ-25, M2-16 design note 13 c).
+	Control bool
 }
 
 // DeliveryGrant returns the grant of the token of an allowed delivery: trigger_kind per event type
@@ -185,7 +188,7 @@ func DeliveryGrant(f DeliveryFacts) (InvocationGrant, error) {
 	g := InvocationGrant{
 		AgentID: f.AgentID, TriggeredBy: f.TriggeredBy, RunID: f.RunID, ThreadID: f.ThreadID, ChannelID: f.ChannelID,
 		SpaceID: f.SpaceID, Level: LevelTrigger, BillingMode: f.BillingMode, ToolClass: f.ToolClass,
-		PermissionVersion: f.PermissionVersion,
+		PermissionVersion: f.PermissionVersion, Control: f.Control,
 	}
 	switch f.EventType {
 	case EventAgentInvocation:
@@ -224,46 +227,77 @@ type PrincipalRefPayload struct {
 	AvatarFileID string `json:"avatar_file_id,omitzero"`
 }
 
-// InvocationPayloadInput are the members of AgentInvocationPayload of a message trigger (M2-08
-// design note 14); agent_session comes with M2-12.
+// InvocationPayloadInput are the members of AgentInvocationPayload (M2-08 design note 14) of a
+// message trigger, and with TriggerKind command of a command run (M2-16 design note 12 c);
+// agent_session comes with M2-12.
 type InvocationPayloadInput struct {
-	RunID, ThreadID, ChannelID, SpaceID, MessageID ids.ID
-	// TriggeredBy is the author as the messaging port returns it.
+	RunID, ThreadID, ChannelID, SpaceID ids.ID
+	// MessageID is the triggering message of trigger kind message; zero for command.
+	MessageID ids.ID
+	// TriggeredBy is the triggering person as PrincipalRef.
 	TriggeredBy PrincipalRefPayload
 	// BillingMode is the configured mode at the acceptance.
 	BillingMode string
 	// SettingsVersion is channels.settings_version; 0 omits the member.
 	SettingsVersion int64
+	// TriggerKind is message ("" means message) or command.
+	TriggerKind string
+	// CommandInvocationID, CommandID, CommandName and Options are set exactly for command: the
+	// invocation_id of the answer, the command and the parsed options in definition order.
+	CommandInvocationID, CommandID ids.ID
+	CommandName                    string
+	Options                        []OptionValue
 }
 
 // invocationPayload is AgentInvocationPayload in schema order.
 type invocationPayload struct {
-	RunID           string              `json:"run_id"`
-	ThreadID        string              `json:"thread_id"`
-	ChannelID       string              `json:"channel_id"`
-	SpaceID         string              `json:"space_id,omitzero"`
-	TriggerKind     string              `json:"trigger_kind"`
-	MessageID       string              `json:"message_id"`
-	TriggeredBy     PrincipalRefPayload `json:"triggered_by"`
-	BillingMode     string              `json:"billing_mode"`
-	SettingsVersion int64               `json:"settings_version,omitzero"`
+	RunID               string                `json:"run_id"`
+	ThreadID            string                `json:"thread_id"`
+	ChannelID           string                `json:"channel_id"`
+	SpaceID             string                `json:"space_id,omitzero"`
+	TriggerKind         string                `json:"trigger_kind"`
+	MessageID           string                `json:"message_id,omitzero"`
+	CommandInvocationID string                `json:"command_invocation_id,omitzero"`
+	CommandID           string                `json:"command_id,omitzero"`
+	CommandName         string                `json:"command_name,omitzero"`
+	Options             *[]optionValuePayload `json:"options,omitempty"`
+	TriggeredBy         PrincipalRefPayload   `json:"triggered_by"`
+	BillingMode         string                `json:"billing_mode"`
+	SettingsVersion     int64                 `json:"settings_version,omitzero"`
 }
 
 // errPayload reports a payload input with a zero ID or an empty required member.
 var errPayload = errors.New("runs: incomplete event payload")
 
-// InvocationPayload encodes the payload of agent.invocation for a message trigger: IDs, the
-// trigger kind message, the author, the billing mode and the settings version, never content, a
-// prompt, skills or a project binding (04 2.2 rules 1 and 4), and no JSON null (ADR 0053). Errors:
-// a zero ID or an empty author or billing mode.
+// InvocationPayload encodes the payload of agent.invocation: IDs, the trigger kind, the triggering
+// person, the billing mode and the settings version, for a message trigger the message, for a
+// command run the invocation, the command and its parsed options, never content, a prompt, skills
+// or a project binding (04 2.2 rules 1 and 4), and no JSON null (ADR 0053). Errors: a zero ID, an
+// empty person or billing mode, or the members of the other trigger kind.
 func InvocationPayload(in InvocationPayloadInput) ([]byte, error) {
-	if in.RunID.IsZero() || in.ThreadID.IsZero() || in.ChannelID.IsZero() || in.MessageID.IsZero() || in.TriggeredBy.ID == "" ||
+	if in.RunID.IsZero() || in.ThreadID.IsZero() || in.ChannelID.IsZero() || in.TriggeredBy.ID == "" ||
 		in.TriggeredBy.Kind == "" || in.BillingMode == "" {
 		return nil, errPayload
 	}
 	p := invocationPayload{
-		RunID: in.RunID.String(), ThreadID: in.ThreadID.String(), ChannelID: in.ChannelID.String(), TriggerKind: string(TriggerMessage),
-		MessageID: in.MessageID.String(), TriggeredBy: in.TriggeredBy, BillingMode: in.BillingMode, SettingsVersion: in.SettingsVersion,
+		RunID: in.RunID.String(), ThreadID: in.ThreadID.String(), ChannelID: in.ChannelID.String(),
+		TriggeredBy: in.TriggeredBy, BillingMode: in.BillingMode, SettingsVersion: in.SettingsVersion,
+	}
+	switch TriggerKind(in.TriggerKind) {
+	case "", TriggerMessage:
+		if in.MessageID.IsZero() || !in.CommandID.IsZero() || !in.CommandInvocationID.IsZero() || in.CommandName != "" || in.Options != nil {
+			return nil, errPayload
+		}
+		p.TriggerKind, p.MessageID = string(TriggerMessage), in.MessageID.String()
+	case TriggerCommand:
+		if !in.MessageID.IsZero() || in.CommandID.IsZero() || in.CommandInvocationID.IsZero() || in.CommandName == "" {
+			return nil, errPayload
+		}
+		opts := optionPayloads(in.Options)
+		p.TriggerKind, p.CommandInvocationID, p.CommandID, p.CommandName, p.Options = string(TriggerCommand),
+			in.CommandInvocationID.String(), in.CommandID.String(), in.CommandName, &opts
+	default:
+		return nil, errPayload
 	}
 	if !in.SpaceID.IsZero() {
 		p.SpaceID = in.SpaceID.String()

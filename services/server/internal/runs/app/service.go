@@ -34,6 +34,9 @@ type Config struct {
 	// QueuedMaxAge is run.queued_max_age: a run still queued that long fails with
 	// agent_unavailable, by the job runs.queued_expiry or at the next delivery (09 5.5, M2-08).
 	QueuedMaxAge time.Duration `config:"run.queued_max_age"`
+	// EventPayloadMaxBytes is sync.event_payload_max_bytes: option values whose command.invoked or
+	// agent.invocation would not fit are refused with /options too_large (M2-16 design note 10 i).
+	EventPayloadMaxBytes int `config:"sync.event_payload_max_bytes"`
 }
 
 // check refuses limits below 1 and a default page above the largest.
@@ -47,6 +50,9 @@ func (c Config) check() error {
 	if c.QueuedMaxAge <= 0 {
 		return errors.New("runs: run.queued_max_age must be positive")
 	}
+	if c.EventPayloadMaxBytes < 1 {
+		return errors.New("runs: sync.event_payload_max_bytes must be at least 1")
+	}
 	return nil
 }
 
@@ -57,6 +63,8 @@ type MessageWriter interface {
 	CreateRunAnchor(ctx context.Context, cmd messaging.RunAnchorCmd) (messaging.AnchorRef, error)
 	// TriggerMessageOf reads the trigger facts of a message without content (M2-08).
 	TriggerMessageOf(ctx context.Context, messageID ids.ID) (messaging.TriggerMessage, error)
+	// PrincipalRefs renders principals as PrincipalRef: the invoker of a command (M2-16).
+	PrincipalRefs(ctx context.Context, principalIDs []ids.ID) (map[ids.ID]messaging.PrincipalRef, error)
 }
 
 // ExpiryScheduler inserts the job runs.queued_expiry of a run in the unit of work of ctx, to run
@@ -65,10 +73,12 @@ type ExpiryScheduler interface {
 	ScheduleQueuedExpiry(ctx context.Context, runID ids.ID, at time.Time) error
 }
 
-// ThreadPort is the part of chat.Threads runs uses: the routing data of one or many threads and
-// the auto thread of 09 section 3.7.
+// ThreadPort is the part of chat.Threads runs uses: the routing data of one or many threads, the
+// auto thread of 09 section 3.7 and the thread row lock that serializes a model command with the
+// message acceptance (M2-16).
 type ThreadPort interface {
 	Info(ctx context.Context, threadID ids.ID) (chat.ThreadInfo, error)
+	LockForMessageChange(ctx context.Context, threadID ids.ID) error
 	Locate(ctx context.Context, threadIDs []ids.ID) ([]chat.ThreadInfo, error)
 	Create(ctx context.Context, a actor.Actor, cmd chat.CreateThreadCmd) (chat.Thread, error)
 }
@@ -136,6 +146,8 @@ type Service struct {
 	d   Deps
 	// tokens is the issuer of the delivery tokens, bound in the signing keys step (BindTokens).
 	tokens atomic.Pointer[tokenBox]
+	// commands is the command register of agents (M2-16), bound in the chat step (BindCommands).
+	commands atomic.Pointer[commandBox]
 }
 
 // Compile-time check: Service is the incoming port.

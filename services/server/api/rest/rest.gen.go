@@ -183,6 +183,12 @@ type ServerInterface interface {
 	// PutChannelBehavior Change prompt, skills and mention rules
 	// (PUT /channels/{channel_id}/behavior)
 	PutChannelBehavior(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params PutChannelBehaviorParams)
+	// ListChannelCommands List commands usable in a channel
+	// (GET /channels/{channel_id}/commands)
+	ListChannelCommands(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// InvokeCommand Run a command
+	// (POST /channels/{channel_id}/commands/{command_id}/invoke)
+	InvokeCommand(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, commandId CommandIdPath, params InvokeCommandParams)
 	// DeleteChannelDraft Delete the draft of a new forum post
 	// (DELETE /channels/{channel_id}/draft)
 	DeleteChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -240,6 +246,18 @@ type ServerInterface interface {
 	// SubmitClientMetrics Submit anonymous client measurements
 	// (POST /client-metrics)
 	SubmitClientMetrics(w http.ResponseWriter, r *http.Request)
+	// RegisterCommand Register a command
+	// (POST /commands)
+	RegisterCommand(w http.ResponseWriter, r *http.Request, params RegisterCommandParams)
+	// RemoveCommand Remove a command
+	// (DELETE /commands/{command_id})
+	RemoveCommand(w http.ResponseWriter, r *http.Request, commandId CommandIdPath)
+	// GetCommand Read a command
+	// (GET /commands/{command_id})
+	GetCommand(w http.ResponseWriter, r *http.Request, commandId CommandIdPath)
+	// UpdateCommand Replace a command definition
+	// (PUT /commands/{command_id})
+	UpdateCommand(w http.ResponseWriter, r *http.Request, commandId CommandIdPath, params UpdateCommandParams)
 	// GetConsoleSession Read the console session
 	// (GET /console/session)
 	GetConsoleSession(w http.ResponseWriter, r *http.Request)
@@ -2932,6 +2950,91 @@ func (siw *ServerInterfaceWrapper) PutChannelBehavior(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// ListChannelCommands operation middleware
+func (siw *ServerInterfaceWrapper) ListChannelCommands(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListChannelCommands(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InvokeCommand operation middleware
+func (siw *ServerInterfaceWrapper) InvokeCommand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "command_id" -------------
+	var commandId CommandIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "command_id", r.PathValue("command_id"), &commandId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "command_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params InvokeCommandParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InvokeCommand(w, r, channelId, commandId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteChannelDraft operation middleware
 func (siw *ServerInterfaceWrapper) DeleteChannelDraft(w http.ResponseWriter, r *http.Request) {
 
@@ -3744,6 +3847,153 @@ func (siw *ServerInterfaceWrapper) SubmitClientMetrics(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SubmitClientMetrics(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegisterCommand operation middleware
+func (siw *ServerInterfaceWrapper) RegisterCommand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegisterCommandParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterCommand(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveCommand operation middleware
+func (siw *ServerInterfaceWrapper) RemoveCommand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "command_id" -------------
+	var commandId CommandIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "command_id", r.PathValue("command_id"), &commandId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "command_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveCommand(w, r, commandId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCommand operation middleware
+func (siw *ServerInterfaceWrapper) GetCommand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "command_id" -------------
+	var commandId CommandIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "command_id", r.PathValue("command_id"), &commandId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "command_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCommand(w, r, commandId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCommand operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCommand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "command_id" -------------
+	var commandId CommandIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "command_id", r.PathValue("command_id"), &commandId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "command_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateCommandParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCommand(w, r, commandId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9933,6 +10183,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs", wrapper.ListActiveRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}/steps", wrapper.ListRunSteps)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/commands", wrapper.ListChannelCommands)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/commands", wrapper.RegisterCommand)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/commands/{command_id}", wrapper.RemoveCommand)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commands/{command_id}", wrapper.GetCommand)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/commands/{command_id}", wrapper.UpdateCommand)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/commands/{command_id}/invoke", wrapper.InvokeCommand)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/apps", wrapper.ListApps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps", wrapper.InstallApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/app-manifests/validate", wrapper.ValidateManifest)
@@ -10309,6 +10565,12 @@ type StrictServerInterface interface {
 	// PutChannelBehavior Change prompt, skills and mention rules
 	// (PUT /channels/{channel_id}/behavior)
 	PutChannelBehavior(ctx context.Context, request PutChannelBehaviorRequestObject) (PutChannelBehaviorResponseObject, error)
+	// ListChannelCommands List commands usable in a channel
+	// (GET /channels/{channel_id}/commands)
+	ListChannelCommands(ctx context.Context, request ListChannelCommandsRequestObject) (ListChannelCommandsResponseObject, error)
+	// InvokeCommand Run a command
+	// (POST /channels/{channel_id}/commands/{command_id}/invoke)
+	InvokeCommand(ctx context.Context, request InvokeCommandRequestObject) (InvokeCommandResponseObject, error)
 	// DeleteChannelDraft Delete the draft of a new forum post
 	// (DELETE /channels/{channel_id}/draft)
 	DeleteChannelDraft(ctx context.Context, request DeleteChannelDraftRequestObject) (DeleteChannelDraftResponseObject, error)
@@ -10366,6 +10628,18 @@ type StrictServerInterface interface {
 	// SubmitClientMetrics Submit anonymous client measurements
 	// (POST /client-metrics)
 	SubmitClientMetrics(ctx context.Context, request SubmitClientMetricsRequestObject) (SubmitClientMetricsResponseObject, error)
+	// RegisterCommand Register a command
+	// (POST /commands)
+	RegisterCommand(ctx context.Context, request RegisterCommandRequestObject) (RegisterCommandResponseObject, error)
+	// RemoveCommand Remove a command
+	// (DELETE /commands/{command_id})
+	RemoveCommand(ctx context.Context, request RemoveCommandRequestObject) (RemoveCommandResponseObject, error)
+	// GetCommand Read a command
+	// (GET /commands/{command_id})
+	GetCommand(ctx context.Context, request GetCommandRequestObject) (GetCommandResponseObject, error)
+	// UpdateCommand Replace a command definition
+	// (PUT /commands/{command_id})
+	UpdateCommand(ctx context.Context, request UpdateCommandRequestObject) (UpdateCommandResponseObject, error)
 	// GetConsoleSession Read the console session
 	// (GET /console/session)
 	GetConsoleSession(ctx context.Context, request GetConsoleSessionRequestObject) (GetConsoleSessionResponseObject, error)
@@ -12552,6 +12826,67 @@ func (sh *strictHandler) PutChannelBehavior(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// ListChannelCommands operation middleware
+func (sh *strictHandler) ListChannelCommands(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request ListChannelCommandsRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListChannelCommands(ctx, request.(ListChannelCommandsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListChannelCommands")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListChannelCommandsResponseObject); ok {
+		if err := validResponse.VisitListChannelCommandsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InvokeCommand operation middleware
+func (sh *strictHandler) InvokeCommand(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, commandId CommandIdPath, params InvokeCommandParams) {
+	var request InvokeCommandRequestObject
+
+	request.ChannelId = channelId
+	request.CommandId = commandId
+	request.Params = params
+
+	var body InvokeCommandJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.InvokeCommand(ctx, request.(InvokeCommandRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InvokeCommand")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InvokeCommandResponseObject); ok {
+		if err := validResponse.VisitInvokeCommandResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteChannelDraft operation middleware
 func (sh *strictHandler) DeleteChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
 	var request DeleteChannelDraftRequestObject
@@ -13135,6 +13470,125 @@ func (sh *strictHandler) SubmitClientMetrics(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SubmitClientMetricsResponseObject); ok {
 		if err := validResponse.VisitSubmitClientMetricsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegisterCommand operation middleware
+func (sh *strictHandler) RegisterCommand(w http.ResponseWriter, r *http.Request, params RegisterCommandParams) {
+	var request RegisterCommandRequestObject
+
+	request.Params = params
+
+	var body RegisterCommandJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterCommand(ctx, request.(RegisterCommandRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterCommand")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterCommandResponseObject); ok {
+		if err := validResponse.VisitRegisterCommandResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveCommand operation middleware
+func (sh *strictHandler) RemoveCommand(w http.ResponseWriter, r *http.Request, commandId CommandIdPath) {
+	var request RemoveCommandRequestObject
+
+	request.CommandId = commandId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveCommand(ctx, request.(RemoveCommandRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveCommand")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveCommandResponseObject); ok {
+		if err := validResponse.VisitRemoveCommandResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCommand operation middleware
+func (sh *strictHandler) GetCommand(w http.ResponseWriter, r *http.Request, commandId CommandIdPath) {
+	var request GetCommandRequestObject
+
+	request.CommandId = commandId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCommand(ctx, request.(GetCommandRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCommand")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCommandResponseObject); ok {
+		if err := validResponse.VisitGetCommandResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCommand operation middleware
+func (sh *strictHandler) UpdateCommand(w http.ResponseWriter, r *http.Request, commandId CommandIdPath, params UpdateCommandParams) {
+	var request UpdateCommandRequestObject
+
+	request.CommandId = commandId
+	request.Params = params
+
+	var body UpdateCommandJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCommand(ctx, request.(UpdateCommandRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCommand")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCommandResponseObject); ok {
+		if err := validResponse.VisitUpdateCommandResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
