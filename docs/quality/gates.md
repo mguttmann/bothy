@@ -67,7 +67,8 @@ change. Most tools (`catalog`, `configdoc`, `denylist`, `doccheck`, `docs`, `ops
 `scancode`, `sonarqube`, `testing`, `api-checks`, `tools/README.md`) are read only by
 repository-wide gates and the tools tests, so they need no conditional job. Some files select a
 component: `tools/api-checks/breaking.py` (`make api-breaking` runs for `server`),
-`tools/sonarqube/compose.yaml` (a test of the server reads its image pin) and
+`tools/sonarqube/compose.yaml` (a test of the server reads its image pin),
+`tools/contract/` (`make contract-test` runs G7 in the job `test (server)`) and
 `tools/design-tokens/` (`apps` like `design/`, and `server`, whose designkeys generator and tests
 read `design/build/tokens.resolved.json`, which also selects `server`). Shared stay the folders every gate depends on
 (`SHARED_TOOL_FOLDERS`: `tools/bin/`, `tools/ci/` with the component map, `tools/hooks/`,
