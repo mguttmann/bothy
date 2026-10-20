@@ -258,7 +258,7 @@ func TestTelemetry_ExportFailureDoesNotAffectRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 		defer cancel()
 		_ = tel.Shutdown(ctx)
 	})
@@ -270,7 +270,7 @@ func TestTelemetry_ExportFailureDoesNotAffectRequest(t *testing.T) {
 			t.Fatalf("with failing exporters %d %q, without telemetry %d %q", got.Code, got.Body.String(), plain.Code, plain.Body.String())
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	if err := tel.ForceFlush(ctx); err == nil {
 		t.Error("ForceFlush succeeded; the exporters were meant to fail")
