@@ -66,5 +66,8 @@ deps:
   session:     { mayDependOn: [clock, config, control, doctor, frame, localchan, noise, state], canUse: [v-websocket] }
   sessiontest: { mayDependOn: [fingerprint, frame, noise], canUse: [v-websocket] }
   pty:         { canUse: [v-pty, v-sys] }
+  # M2-48: test/** (platform, and noisedevice, the Noise sidecar of the terminal suite's device)
+  # may use every component and vendor; no production component names it (02 6).
+  platformtest: { anyProjectDeps: true, anyVendorDeps: true }
   profiles:    { mayDependOn: [config, doctor, hostos, state], canUse: [v-sys] }
   confirm:     { mayDependOn: [hostos], canUse: [v-sys] }
