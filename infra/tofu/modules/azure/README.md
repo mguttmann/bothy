@@ -44,8 +44,9 @@ environment); the module never receives them.
 
 No Application Gateway: the Compose stack publishes on `127.0.0.1` only, so the TLS proxy of the
 edge runs on the host, as with `generic-vm`. `tailscale` and `private` publish no port. A change
-of the custom data does not replace the VM (a new setup goes over SSH with `generic-vm`). No
-managed identity: the host needs no Azure API (Key Vault comes with the driver `azkv`).
+of the custom data, of the first SSH key or of `image_sku` does not replace the VM (a new setup
+goes over SSH with `generic-vm`). No managed identity: the host needs no Azure API (Key Vault
+comes with the driver `azkv`).
 
 ## Off-site
 

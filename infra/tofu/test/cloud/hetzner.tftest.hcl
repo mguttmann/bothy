@@ -25,9 +25,36 @@ variables {
   release_repository    = "alex/bothy"
   owner_handle          = "alex"
   owner_name            = "Alex Example"
-  admin_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK alex.com"]
+  admin_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK admin@chat.example.com"]
   location              = "nbg1"
   server_type           = "cx22"
+}
+
+run "existing_keys_are_not_uploaded" {
+  # First run of the file: the later runs share its state, and ignore_changes keeps the keys of
+  # a server once created.
+  command = apply
+
+  module {
+    source = "../../modules/hetzner"
+  }
+
+  variables {
+    existing_ssh_keys = ["bothy-operator"]
+  }
+
+  assert {
+    condition     = length(hcloud_ssh_key.admin) == 0
+    error_message = "With existing_ssh_keys the module uploads no key (Hetzner Cloud refuses a key twice in a project)."
+  }
+  assert {
+    condition     = length(hcloud_server.host.ssh_keys) == 1 && contains(hcloud_server.host.ssh_keys, "bothy-operator")
+    error_message = "The server gets the existing keys."
+  }
+  assert {
+    condition     = strcontains(module.host.user_data, "AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK")
+    error_message = "cloud-init still gives the maintenance user the keys of admin_ssh_public_keys."
+  }
 }
 
 run "edge_port_only_public" {

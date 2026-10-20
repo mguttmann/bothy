@@ -40,7 +40,7 @@ variables {
   release_repository    = "alex/bothy"
   owner_handle          = "alex"
   owner_name            = "Alex Example"
-  admin_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK alex.com"]
+  admin_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK admin@chat.example.com"]
   location              = "westeurope"
   vm_size               = "Standard_B2s"
 }

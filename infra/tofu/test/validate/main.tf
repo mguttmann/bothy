@@ -72,7 +72,7 @@ locals {
     release_repository = "alex/bothy"
     owner_handle       = "alex"
     owner_name         = "Alex"
-    admin_keys         = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK alex.com"]
+    admin_keys         = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK admin@chat.example.com"]
     ssh_allowed_cidrs  = ["198.51.100.0/24"]
   }
 }
