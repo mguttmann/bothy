@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
@@ -149,15 +150,18 @@ func (a *Authorizer) Authorize(ctx context.Context, p authorize.Principal, act a
 		d = authorize.Decision{}
 	}
 	authorize.RecordCheck(ctx, authorize.Check{Action: string(act), Kind: authorize.CheckAuthorize, Allowed: err == nil && d.Allowed()})
-	a.audit(ctx, act, string(r.Kind), r.ID, d, err)
+	a.audit(ctx, act, string(r.Kind), r.ID, r.Token, d, err)
 	if err == nil && !authorize.IsFilter(ctx) {
 		a.metrics.Decision(ctx, act, d.Outcome)
 	}
 	return d, err
 }
 
-// audit hands a denial or an error to the recorder; allows and filter mode write nothing.
-func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind string, id ids.ID, d authorize.Decision, failure error) {
+// audit hands a denial or an error to the recorder; allows and filter mode write nothing. A denial
+// on the invocation token or the mode guard of run.start carries the codes of tok as details
+// (denialDetails, M2-09).
+func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind string, id ids.ID, tok *authorize.TokenFacts,
+	d authorize.Decision, failure error) {
 	if authorize.IsFilter(ctx) || (failure == nil && d.Allowed()) {
 		return
 	}
@@ -171,6 +175,7 @@ func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind strin
 		err = a.recorder.RecordDetached(ctx, e)
 	} else {
 		e.Decision, e.Reason = auditing.DecisionDeny, auditing.Reason(d.Reason)
+		e.Attrs = denialDetails(d, tok)
 		err = a.recorder.RecordDenial(ctx, e)
 	}
 	if err != nil {
@@ -179,9 +184,64 @@ func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind strin
 	}
 }
 
+// denialDetails are the details of a denial on the invocation token or the mode guard of run.start
+// (brief M2-09 design note 2c and 2d, 10 section 14): token_verdict for invocation_token_invalid;
+// billing_mode_expected, billing_mode_used and the evidence codes billing_evidence_provider,
+// billing_evidence_key_type and billing_evidence_method for billing_mode_mismatch; tool_class (the
+// claim) and tool_class_used for tool_class_mismatch. Every value is a code; an empty value or one
+// that is no code is left out, so the denial itself is never lost. nil for every other denial.
+func denialDetails(d authorize.Decision, tok *authorize.TokenFacts) auditing.Attrs {
+	attrs := auditing.Attrs{}
+	put := func(key, v string) {
+		if auditCode(v) {
+			attrs[key] = auditing.Code(v)
+		}
+	}
+	switch d.Reason {
+	case authorize.Reason(domain.ReasonInvocationTokenInvalid):
+		put("token_verdict", d.Detail)
+	case authorize.Reason(domain.ReasonBillingModeMismatch):
+		if tok != nil {
+			put("billing_mode_expected", tok.BillingModeExpected)
+			put("billing_mode_used", tok.BillingModeUsed)
+			put("billing_evidence_provider", tok.BillingProvider)
+			put("billing_evidence_key_type", tok.BillingKeyType)
+			put("billing_evidence_method", tok.BillingMethod)
+		}
+	case authorize.Reason(domain.ReasonToolClassMismatch):
+		if tok != nil {
+			put("tool_class", tok.ToolClassClaim)
+			put("tool_class_used", tok.ToolClassUsed)
+		}
+	}
+	if len(attrs) == 0 {
+		return nil
+	}
+	return attrs
+}
+
+// maxAuditCode is the longest code of an audit detail (audit_details.v1, SEC-AUD-5).
+const maxAuditCode = 64
+
+// auditCode reports whether s is a code of SEC-AUD-5: ^[a-z0-9][a-z0-9_.:-]*$, at most
+// maxAuditCode bytes.
+func auditCode(s string) bool {
+	if s == "" || len(s) > maxAuditCode {
+		return false
+	}
+	for i, c := range []byte(s) {
+		lower := c >= 'a' && c <= 'z' || c >= '0' && c <= '9'
+		if !lower && (i == 0 || !strings.ContainsRune("_.:-", rune(c))) {
+			return false
+		}
+	}
+	return true
+}
+
 // outcome converts a domain decision.
 func outcome(d domain.Decision) authorize.Decision {
-	return authorize.Decision{Outcome: authorize.Outcome(d.Outcome), Reason: authorize.Reason(d.Reason), QuickReattach: d.QuickReattach}
+	return authorize.Decision{Outcome: authorize.Outcome(d.Outcome), Reason: authorize.Reason(d.Reason), QuickReattach: d.QuickReattach,
+		Detail: d.Detail}
 }
 
 // internal returns an internal error for a programming error of the caller.
