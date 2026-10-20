@@ -2,7 +2,7 @@
 # test files beside it (`tofu test`, run by `make tofu-check`) call each module with mocked
 # providers, so no plan or apply ever reaches a provider account and no credential is needed
 # (docs/DECISIONS.md D-M7-16-1). The providers are required here so that `tofu init` installs
-# them from the pinned offline mirror (tools/ci/tofu_providers.py) and checks them against the
+# them from the pinned offline mirror (tools/bin/tofu_providers.py) and checks them against the
 # lock file of this root.
 
 terraform {

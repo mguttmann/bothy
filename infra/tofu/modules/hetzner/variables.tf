@@ -127,6 +127,16 @@ variable "admin_ssh_public_keys" {
   }
 }
 
+variable "existing_ssh_keys" {
+  description = "Names or IDs of SSH keys that already exist in the Hetzner Cloud project (for example a second instance with the same operator key, or a key uploaded in the Console). Empty: the module uploads every key of admin_ssh_public_keys. Set: the module uploads none and gives the server these keys, because Hetzner Cloud refuses a public key that the project already holds."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for k in var.existing_ssh_keys : trimspace(k) != ""])
+    error_message = "existing_ssh_keys: names or IDs, none empty."
+  }
+}
+
 variable "tags" {
   description = "Additional tags or labels for every resource of the module."
   type        = map(string)

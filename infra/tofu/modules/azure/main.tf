@@ -181,8 +181,10 @@ resource "azurerm_linux_virtual_machine" "host" {
   }
 
   lifecycle {
-    # The setup runs once at the first boot; new custom data must not replace the VM with its
-    # data. A new setup goes over SSH (generic-vm provision_over_ssh).
-    ignore_changes = [custom_data]
+    # The setup runs once at the first boot; new custom data, a rotated first key or another
+    # image SKU force a new VM in azurerm and must not replace it with its OS disk and data.
+    # cloud-init and the SSH delivery of generic-vm keep the keys of the maintenance user; a new
+    # setup goes over SSH (generic-vm provision_over_ssh).
+    ignore_changes = [custom_data, admin_ssh_key, source_image_reference]
   }
 }

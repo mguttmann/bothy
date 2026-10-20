@@ -51,7 +51,7 @@ SETUP_INPUTS = {
 # Inputs every cloud module has for its network.
 CLOUD_INPUTS = {"ssh_allowed_cidrs"}
 TARGET_INPUTS = {
-    "hetzner": {"location", "server_type", "image"},
+    "hetzner": {"location", "server_type", "image", "existing_ssh_keys"},
     "aws": {
         "region",
         "instance_type",
@@ -179,6 +179,28 @@ def test_every_module_calls_generic_vm(module: str) -> None:
     assert 'source = "../generic-vm"' in body
     for name in SHARED_INPUTS | SETUP_INPUTS:
         assert re.search(rf"^\s+{name}\s+= ", body, re.M), f"{module}: {name} is not passed on"
+
+
+# Arguments of the host that force a new host with its disk: a change of the setup inputs
+# (user data, keys, image) must not replace it (docs/DECISIONS.md D-M7-16-6).
+HOST_KEEPS = {
+    "hetzner": ("hcloud_server.host", {"user_data", "ssh_keys", "image"}),
+    "aws": ("aws_instance.host", {"ami", "user_data_base64"}),
+    "azure": (
+        "azurerm_linux_virtual_machine.host",
+        {"custom_data", "admin_ssh_key", "source_image_reference"},
+    ),
+}
+
+
+@pytest.mark.parametrize("module", CLOUD)
+def test_setup_inputs_do_not_replace_the_host(module: str) -> None:
+    key, keep = HOST_KEEPS[module]
+    body = blocks(module, "resource")[key]
+    m = re.search(r"ignore_changes\s+= \[([^\]]*)\]", body)
+    assert m, f"{module}: {key} has no ignore_changes"
+    ignored = {name.strip() for name in m.group(1).split(",") if name.strip()}
+    assert keep <= ignored, f"{module}: {key} is replaced by {sorted(keep - ignored)}"
 
 
 # ---- requirement 14: only the edge port is public ------------------------------------------

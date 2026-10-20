@@ -72,11 +72,13 @@ resource "hcloud_firewall" "host" {
   }
 }
 
-# One key per entry of admin_ssh_public_keys. With at least one key Hetzner Cloud sets no root
-# password (and sends none by e-mail); cloud-init of generic-vm creates its maintenance user with the
-# same keys.
+# One key per entry of admin_ssh_public_keys, unless existing_ssh_keys names keys already in the
+# project: Hetzner Cloud refuses a public key that the project holds once (uniqueness_error), so a
+# second instance or a key uploaded in the Console uses the existing keys. With at least one key
+# Hetzner Cloud sets no root password (and sends none by e-mail); cloud-init of generic-vm
+# creates its maintenance user with the keys of admin_ssh_public_keys in both cases.
 resource "hcloud_ssh_key" "admin" {
-  count = length(var.admin_ssh_public_keys)
+  count = length(var.existing_ssh_keys) == 0 ? length(var.admin_ssh_public_keys) : 0
 
   name       = "${local.name}-${count.index}"
   public_key = var.admin_ssh_public_keys[count.index]
@@ -88,7 +90,7 @@ resource "hcloud_server" "host" {
   server_type  = var.server_type
   image        = var.image
   location     = var.location
-  ssh_keys     = hcloud_ssh_key.admin[*].id
+  ssh_keys     = length(var.existing_ssh_keys) == 0 ? hcloud_ssh_key.admin[*].id : var.existing_ssh_keys
   firewall_ids = [hcloud_firewall.host.id]
   user_data    = module.host.user_data
   labels       = local.labels
