@@ -44,6 +44,8 @@ vendors:
     in: [github.com/rivo/uniseg]
   v-webauthn:
     in: [github.com/go-webauthn/webauthn, github.com/go-webauthn/webauthn/**]
+  v-websocket:
+    in: [github.com/coder/websocket, github.com/coder/websocket/**]
   v-xcrypto:
     in: [golang.org/x/crypto/argon2]
   v-xtext:
@@ -470,6 +472,7 @@ deps:
     mayDependOn: [gateway-app, gateway, gateway-domain, kernel-ports, chat, agents, runs, sync, stats]
   gateway-adapters:
     mayDependOn: [gateway-adapters, gateway, gateway-app, gateway-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, chat, agents, runs, sync, stats]
+    canUse: [v-websocket, v-otel]
   testsupport:
     anyProjectDeps: true
     anyVendorDeps: true

@@ -27236,6 +27236,7 @@ components:
           description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayClientInfo:
       type: object
+      additionalProperties: false
       required: [platform, version]
       properties:
         platform:
@@ -27245,6 +27246,7 @@ components:
           examples: [1.4.0]
     GatewayIdentify:
       type: object
+      additionalProperties: false
       description: |
         People send `access_token`, `dpop`, `device_id`; agents and apps send `api_token`, `consumer`
         and `dpop` when the token is DPoP-bound.
@@ -27303,6 +27305,7 @@ components:
           description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayResume:
       type: object
+      additionalProperties: false
       required: [gateway_session_id, cursor]
       properties:
         gateway_session_id:
@@ -27332,6 +27335,7 @@ components:
           description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayHeartbeat:
       type: object
+      additionalProperties: false
       required: [last_seq]
       properties:
         last_seq:
@@ -27348,6 +27352,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     GatewayReauth:
       type: object
+      additionalProperties: false
       required: [access_token, dpop]
       properties:
         access_token:
@@ -27364,6 +27369,7 @@ components:
           type: string
     GatewayFocus:
       type: object
+      additionalProperties: false
       required: [thread_ids]
       properties:
         thread_ids:
@@ -27376,12 +27382,14 @@ components:
           description: True when the window is open but unused; live-box patches continue, but the person does not count as watching (13, 4.4).
     GatewayTyping:
       type: object
+      additionalProperties: false
       required: [thread_id]
       properties:
         thread_id:
           $ref: '#/components/schemas/Uuid'
     GatewayAck:
       type: object
+      additionalProperties: false
       required: [seq]
       properties:
         seq:
@@ -27389,6 +27397,7 @@ components:
           format: int64
     GatewayRunUpdate:
       type: object
+      additionalProperties: false
       required: [run_id, base_version, ops]
       properties:
         run_id:
@@ -27405,6 +27414,7 @@ components:
           description: Client reference echoed in `error` frames for this op.
     GatewayAutocompleteResult:
       type: object
+      additionalProperties: false
       description: Answer of the command owner to `command.autocomplete_requested` (action `command.autocomplete.respond`).
       required: [request_id, choices]
       properties:
@@ -27846,12 +27856,14 @@ components:
             $ref: '#/components/schemas/StatsBackendAgent'
     GatewayStatsSubscribe:
       type: object
+      additionalProperties: false
       description: Subscribe to `stats.live`; without `space_id` the instance (owner). Replaces an earlier subscription of the connection.
       properties:
         space_id:
           $ref: '#/components/schemas/Uuid'
     GatewayStatsUnsubscribe:
       type: object
+      additionalProperties: false
       description: End the `stats.live` subscription of the connection.
     StatsLiveEvent:
       description: Ephemeral event `stats.live` (no `seq`, at most once), only to connections with a subscription.

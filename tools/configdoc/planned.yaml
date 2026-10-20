@@ -51,8 +51,6 @@ rules:
     milestone: M7
   - match: "file."  # M3-01 to M3-08
     milestone: M3
-  - match: "gateway."  # M1-64
-    milestone: M1
   - match: "interaction."  # M2-15
     milestone: M2
   - match: migrate.recent_backup_max_age  # M7-02

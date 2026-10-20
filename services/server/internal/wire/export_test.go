@@ -7,6 +7,9 @@ package wire
 // seconds under -race and host load, and the readiness waits of the serve tests (30 s each) must
 // not pay it (docs/DECISIONS.md M1-31/18, the class of M1-33/18).
 func WarmEnabledValidator() error {
+	if _, err := frameValidator(); err != nil {
+		return err
+	}
 	_, err := enabledValidator()
 	return err
 }

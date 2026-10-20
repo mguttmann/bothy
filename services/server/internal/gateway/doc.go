@@ -2,5 +2,6 @@
 
 // Package gateway is the port of the gateway module: the WebSocket endpoint, gateway sessions, the
 // hub, focus, typing, relaying ephemeral events and agent connections; it owns no tables. Other
-// modules import only this package (docs/spec/02-architecture.md, "Layers within a module").
+// modules import only this package (docs/spec/02-architecture.md, "Layers within a module"); it
+// holds Register, the client ops the gateway accepts.
 package gateway

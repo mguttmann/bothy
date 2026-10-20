@@ -44,6 +44,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
@@ -1099,34 +1100,68 @@ func (s *server) mountRoutes(context.Context) error {
 	}
 	var mount func() error
 	if s.api() {
-		mount = func() error {
-			chain, err := NewChain(s.chainCfg, s.authenticator(), log)
-			if err != nil {
-				return err
-			}
-			limiter, err := InstallRateLimits(chain, s.values, routes.Enabled(), s.deps.Clock)
-			if err != nil {
-				return err
-			}
-			s.runner.OnStop(startSweeper(limiter))
-			s.mu.Lock()
-			sy := s.sync
-			s.mu.Unlock()
-			if err := InstallIdempotency(chain, sy, s.syncCfg); err != nil {
-				return err
-			}
-			s.mu.Lock()
-			mux, pool, a := s.publicMux(), s.pool, s.audit
-			s.chain = chain
-			s.mu.Unlock()
-			if a == nil {
-				return errors.New("wire: the setup gate needs the unit of work of the audit step")
-			}
-			InstallSetupGate(chain, mux, instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()))
-			return MountRoutes(s.role, mux, s.handlers(), cat, chain, log)
-		}
+		mount = func() error { return s.mountAPI(cat, log) }
 	}
-	return startRoutes(RouteBindings(routes.Enabled()), BuildRegistry(s.deps.Registrations), cat, log, mount)
+	return startRoutes(append(RouteBindings(routes.Enabled()), GatewayRouteBinding()), BuildRegistry(s.deps.Registrations), cat, log, mount)
+}
+
+// mountAPI is the mount part of mountRoutes for api and all: the chain, the rate limiter with its
+// sweeper, the Idempotency-Key stage, the setup gate, the REST routes and the gateway.
+func (s *server) mountAPI(cat *authzapp.Catalog, log *slog.Logger) error {
+	chain, err := NewChain(s.chainCfg, s.authenticator(), log)
+	if err != nil {
+		return err
+	}
+	limiter, err := InstallRateLimits(chain, s.values, routes.Enabled(), s.deps.Clock)
+	if err != nil {
+		return err
+	}
+	s.runner.OnStop(startSweeper(limiter))
+	s.mu.Lock()
+	sy := s.sync
+	s.mu.Unlock()
+	if err := InstallIdempotency(chain, sy, s.syncCfg); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	mux, pool, a := s.publicMux(), s.pool, s.audit
+	s.chain = chain
+	s.mu.Unlock()
+	if a == nil {
+		return errors.New("wire: the setup gate needs the unit of work of the audit step")
+	}
+	InstallSetupGate(chain, mux, instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()))
+	if err := MountRoutes(s.role, mux, s.handlers(), cat, chain, log); err != nil {
+		return err
+	}
+	return s.mountGateway(mux, chain, limiter, log)
+}
+
+// mountGateway builds the WebSocket gateway (M1-64) over identity's Authenticator and DPoP
+// nonces, the Authorizer, the limiter of the chain (class rl.gateway_connect), catch-up and
+// snapshot of sync and the instance row, mounts GET /api/v1/gateway on mux and starts the sweeper
+// of the gateway sessions with its stop step.
+func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelimit.Limiter, log *slog.Logger) error {
+	cfg, err := GatewayConfigFrom(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	id, az, reads, pool, a := s.identity, s.authorizer, s.syncReads, s.pool, s.audit
+	s.mu.Unlock()
+	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil {
+		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot and the unit of work")
+	}
+	gw, err := NewGateway(cfg, GatewayDeps{
+		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
+		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Clock: s.deps.Clock, Log: log,
+	})
+	if err != nil {
+		return err
+	}
+	gw.Mount(mux, chain)
+	s.runner.OnStop(gw.StartSweeper())
+	return nil
 }
 
 // NewChain builds the HTTP chain of the public listener for the enabled operations: the validator

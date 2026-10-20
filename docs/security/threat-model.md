@@ -144,6 +144,8 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | T | Replay of `identify` | DPoP with a server nonce from `hello` (04, R-SY-01) | T-TK-01 |
 | I | Delivery after access removal | permissions at delivery time, `access.changed` in log order (07, 8.2) | T-AZ-03 |
 | D | Slow consumer | outbound buffer limit, `4014` (04) | T-DS-01 |
+| D | Connections held open without `identify` until `sync.identify_timeout`, oversized or malformed frames | Close `4003` after `sync.identify_timeout`; the upgrade reads no database; frames above `sync.ws_max_frame_bytes` and frames failing the JSON guard or the schema close with `4002` before any use case runs (M1-64) | T-DS-01 |
+| D | Draining the `rl.gateway_connect` bucket of a foreign device | The bucket counts only after the credentials of `identify` or `resume` are verified, keyed by the verified device or token (05, M1-64) | T-DS-01 |
 | E | Focus on foreign threads | `gateway.focus` checks per thread (05) | T-AZ-01 |
 
 ### 5.6 authz and identity

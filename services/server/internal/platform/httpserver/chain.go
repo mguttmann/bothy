@@ -253,8 +253,12 @@ func (c *Chain) Order() []string {
 }
 
 // Wrap returns h with the per-route stages around it, for the operation op. Mount the result at
-// op.Pattern on the mux that Public serves.
+// op.Pattern on the mux that Public serves. An operation with AuthorizedInBand gets no per-route
+// stage: only the operation in the context (the gateway upgrade, M1-64).
 func (c *Chain) Wrap(op Operation, h http.Handler) http.Handler {
+	if op.AuthorizedInBand {
+		return c.enter("handler", inBand(op, h))
+	}
 	c.mu.Lock()
 	c.sealed = true
 	stages := make(map[Stage]func(http.Handler) http.Handler, len(c.stages))
@@ -270,6 +274,14 @@ func (c *Chain) Wrap(op Operation, h http.Handler) http.Handler {
 		next = c.enter(s.String(), next)
 	}
 	return c.enter(StageRoute.String(), c.routeStage(op, next))
+}
+
+// inBand is the wrapper of an operation with AuthorizedInBand: it puts the operation into the
+// context, which the per-route stage does for every other route, and nothing else.
+func inBand(op Operation, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.ServeHTTP(w, r.WithContext(withOperation(r.Context(), op)))
+	})
 }
 
 // enter wraps next so the test trace sees the stage; without a trace it returns next unchanged.
