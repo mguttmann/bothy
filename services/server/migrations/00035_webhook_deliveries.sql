@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Delivery attempts of the outgoing webhooks (M2-26): webhook_deliveries exactly as
--- docs/spec/03-datenmodell.md section 4.11 states it. One row per event and subscription, created
+-- docs/spec/03-data-model.md section 4.11 states it. One row per event and subscription, created
 -- by the worker consumer webhooks; last_error is a code of a closed list, never a response body
 -- (docs/api/webhooks.md section 4). Retention class: transient (03 section 3); retention deletes
 -- only finished rows (succeeded, failed, dead), never pending ones (M7-05).

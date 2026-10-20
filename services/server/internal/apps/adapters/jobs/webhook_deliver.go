@@ -2,7 +2,7 @@
 
 // Package jobs is the adapter of the apps module to platform/jobs (M2-26): the job
 // apps.webhook_deliver on the queue delivery, which runs one delivery attempt of a subscription
-// (docs/spec/02-architektur.md "Job-Katalog"), and the DeliveryScheduler of the use cases over
+// (docs/spec/02-architecture.md "Job-Katalog"), and the DeliveryScheduler of the use cases over
 // jobs.Inserter.InsertTx.
 //
 // Example:

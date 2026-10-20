@@ -74,7 +74,7 @@
       "name": "non-ascii and escapes",
       "webhook_id": "0192f4a0-7b1c-757c-87c8-267db4b2c89f",
       "timestamp": 1760346003,
-      "body": "{\"payload\":{\"content_md\":\"Grüße \\\"Alex\\\" \\\\ Robin 😀 ünïcödé\\n\"}}",
+      "body": "{\"payload\":{\"content_md\":\"Café \\\"Alex\\\" \\\\ Robin 😀 naïve 日本\\n\"}}",
       "ed25519_seed_base64": [
         "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU="
       ],
@@ -84,7 +84,7 @@
       "hmac_secrets": [
         "whsec_EXAMPLEvect1"
       ],
-      "signature_header": "v1a,3k/fKsYWGfMEf9dcNB5Abi6ZIVTNJc0jkbt9f2kBihurW58hSQqcxLIqTTgx9otqcJLwrsGWhvg+QEnGissrCQ== v1,0h4GjtUGTI2oOrTPOr2zAOOQR2eEYGHO9i8DomcdPPA="
+      "signature_header": "v1a,7Pjw8urceUNpWXDYBZCNbZ1T3OvTUuguv5dOM0kPEm3+n2yeHVesAnwVw+nVnNM8Z0cbl8UlKhj/BKCUO5ACCg== v1,zhiN2h/IQtsUjHA9FNVMBUKdwK0QpCxVxAYna+n/FTo="
     },
     {
       "name": "truncated payload",

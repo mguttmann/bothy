@@ -119,7 +119,7 @@ func TestWriteWebhookTestVectors(t *testing.T) {
 		{Name: "two v1a signers", Body: `{"id":"` + id + `","type":"instance.updated"}`, Ed25519SeedBase64: []string{seed(2), seed(3)}},
 		{Name: "two hmac generations", Body: `{"id":"` + id + `","type":"thread.created"}`,
 			Ed25519SeedBase64: []string{seed(4)}, HMACSecrets: []string{s2, s1}},
-		{Name: "non-ascii and escapes", Body: `{"payload":{"content_md":"Grüße \"Alex\" \\ Robin 😀 ünïcödé\n"}}`,
+		{Name: "non-ascii and escapes", Body: `{"payload":{"content_md":"Café \"Alex\" \\ Robin 😀 naïve 日本\n"}}`,
 			Ed25519SeedBase64: []string{seed(5)}, HMACSecrets: []string{s1}},
 		{Name: "truncated payload", Body: `{"id":"` + id + `","truncated":true,"payload":{}}`,
 			Ed25519SeedBase64: []string{seed(6)}, HMACSecrets: []string{s2}},

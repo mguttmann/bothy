@@ -12,7 +12,7 @@ import (
 )
 
 // TestWebhookTablesMatchDataModel holds webhook_subscriptions and webhook_deliveries against
-// docs/spec/03-datenmodell.md section 4.11 column by column, with the checks, the foreign keys
+// docs/spec/03-data-model.md section 4.11 column by column, with the checks, the foreign keys
 // with their actions, the unique key and the indexes, and the behaviour of the checks for
 // bothy_app (M2-26 requirement 11).
 func TestWebhookTablesMatchDataModel(t *testing.T) {

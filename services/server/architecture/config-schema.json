@@ -2881,7 +2881,7 @@
       "min": "",
       "max": "",
       "chapter": "03-data-model.md",
-      "doc": "Hosts an app manifest may name in its delivery addresses and outgoing webhooks may reach; exact host names, compared without regard to case."
+      "doc": "Targets an app manifest may name in its delivery addresses and outgoing webhooks may reach: entries host[:port], the host compared without regard to case, without a port only 443."
     },
     {
       "name": "webhook.delivery_timeout",
@@ -2904,7 +2904,7 @@
       "enum": [],
       "min": "",
       "max": "",
-      "chapter": "11-erweiterungen.md",
+      "chapter": "11-extensions.md",
       "doc": "Secret reference of the master key from which the HMAC secrets of the subscriptions are derived."
     },
     {
@@ -2916,7 +2916,7 @@
       "enum": [],
       "min": "1",
       "max": "",
-      "chapter": "03-datenmodell.md",
+      "chapter": "03-data-model.md",
       "doc": "Failures in a row after which a subscription is disabled."
     },
     {
@@ -2928,7 +2928,7 @@
       "enum": [],
       "min": "1",
       "max": "",
-      "chapter": "11-erweiterungen.md",
+      "chapter": "11-extensions.md",
       "doc": "Open deliveries per subscription; reaching it pauses the subscription."
     },
     {
@@ -2940,7 +2940,7 @@
       "enum": [],
       "min": "1ms",
       "max": "",
-      "chapter": "03-datenmodell.md",
+      "chapter": "03-data-model.md",
       "doc": "Base of the backoff between delivery attempts."
     },
     {
@@ -2952,7 +2952,7 @@
       "enum": [],
       "min": "1ms",
       "max": "",
-      "chapter": "03-datenmodell.md",
+      "chapter": "03-data-model.md",
       "doc": "Largest backoff between delivery attempts."
     },
     {
@@ -2964,7 +2964,7 @@
       "enum": [],
       "min": "1ms",
       "max": "",
-      "chapter": "11-erweiterungen.md",
+      "chapter": "11-extensions.md",
       "doc": "Time after which a failing delivery is dead and its subscription disabled."
     },
     {
@@ -2976,7 +2976,7 @@
       "enum": [],
       "min": "1ms",
       "max": "",
-      "chapter": "11-erweiterungen.md",
+      "chapter": "11-extensions.md",
       "doc": "How long the server signs with the old and the new HMAC generation after a rotation."
     }
   ]

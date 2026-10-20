@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Outgoing webhook subscriptions of the apps module (M2-26): webhook_subscriptions exactly as
--- docs/spec/03-datenmodell.md section 4.11 states it. A subscription belongs to an app
+-- docs/spec/03-data-model.md section 4.11 states it. A subscription belongs to an app
 -- installation or to an agent (the agent transport comes with a later ticket; the column and its
 -- check exist already). The v1 secret is never stored: it is derived from the master key, the id
 -- and hmac_generation (03 Grundsatz 9, docs/api/webhooks.md section 2.1). Retention class: config

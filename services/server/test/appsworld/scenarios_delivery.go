@@ -137,7 +137,7 @@ func ScenarioWebhookDeliveryG10(t *testing.T) {
 	sub := SubscriptionID(created)
 	secret := created["hmac_secret"].(string)
 	w.StartWorker()
-	msg := esk(w, "Grüße an \"Robin\"")
+	msg := esk(w, "Café con \"Robin\"")
 	w.Round()
 	waitFor(t, 30*time.Second, "the delivery", func() bool {
 		d := w.Deliveries(sub)
@@ -166,7 +166,7 @@ func ScenarioWebhookDeliveryG10(t *testing.T) {
 	var epoch string
 	w.Scalar(&epoch, `SELECT sync_epoch::text FROM instance`)
 	if env["id"] != msg.ID.String() || env["type"] != "message.created" || int64(env["seq"].(float64)) != msg.Seq || env["sync_epoch"] != epoch ||
-		env["payload"].(map[string]any)["message"].(map[string]any)["content_md"] != "Grüße an \"Robin\"" {
+		env["payload"].(map[string]any)["message"].(map[string]any)["content_md"] != "Café con \"Robin\"" {
 		t.Fatalf("envelope %s", req.Body)
 	}
 	// v1 with the reference library and the secret of the create response.

@@ -12,9 +12,9 @@ const (
 )
 
 // webhookConfigKeys returns the keys the outgoing webhooks read first (M2-26 design note 15): the
-// failure limit and the backoff of docs/spec/03-datenmodell.md section 9, the delivery quota, the
+// failure limit and the backoff of docs/spec/03-data-model.md section 9, the delivery quota, the
 // retry deadline, the rotation overlap and the master key reference of
-// docs/spec/11-erweiterungen.md section 16. webhook.delivery_timeout is registered with the
+// docs/spec/11-extensions.md section 16. webhook.delivery_timeout is registered with the
 // signing keys (M1-32) and webhook.allowed_hosts with the apps (M2-24); webhook.receiver_tolerance
 // is a value of the receiver and no server key (D-W-23).
 func webhookConfigKeys() []config.Key {

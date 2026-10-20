@@ -606,7 +606,7 @@ var publishedOrder = map[instance.KeyState]int{instance.KeyActive: 0, instance.K
 
 // authorizeDiscovery authorizes the public action instance.discovery.read for the principal of ctx
 // (anonymous when there is none), so the proof of the check holds for the public key routes (02
-// "Nachweis der Prüfung").
+// "Proof of the check").
 func (k *Keys) authorizeDiscovery(ctx context.Context) error {
 	a, ok := actor.FromContext(ctx)
 	if !ok {

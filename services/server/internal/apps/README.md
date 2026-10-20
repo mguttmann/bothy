@@ -118,7 +118,7 @@ M2-26 added the deliveries and subscriptions (below).
 
 ## Outgoing webhooks (M2-26)
 
-Normative: [docs/api/webhooks.md](../../../../docs/api/webhooks.md), [11-erweiterungen.md](../../../../docs/spec/11-erweiterungen.md)
+Normative: [docs/api/webhooks.md](../../../../docs/api/webhooks.md), [11-extensions.md](../../../../docs/spec/11-extensions.md)
 sections 6 and 7, ADR 0016 and 0051. Rulings: `docs/DECISIONS.md` D-M2-26-1 to D-M2-26-20.
 
 - **Subscriptions** (`webhook_subscriptions`, retention class `config`): created, changed, paused,

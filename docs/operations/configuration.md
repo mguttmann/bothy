@@ -249,9 +249,9 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | expiry of a component without its own value | planned (M2) |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server |  | `5` | after that, a push registration is deactivated | planned (M3) |
 | `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | empty | allowed target hosts for outgoing webhooks | active |
-| `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server |  | `20` | after that, a subscription is deactivated | planned (M2) |
-| `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server |  | `10s` | base of the backoff | planned (M2) |
-| `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server |  | `1h` | largest interval | planned (M2) |
+| `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | int | `20` | after that, a subscription is deactivated | active |
+| `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server | duration | `10s` | base of the backoff | active |
+| `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server | duration | `1h` | largest interval | active |
 | `sync.event_log_partition_size` | `BOTHY_SYNC__EVENT_LOG_PARTITION_SIZE` | Server | int | `1000000` | sequence numbers per partition | active |
 
 ### 04 Event and sync protocol
@@ -468,9 +468,10 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 | `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server | int | `65536` | size of a manifest | active |
 | `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server |  | `3s` | deadline for synchronous responses through `interactions_url` | planned (M2) |
 | `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | duration | `15s` | timeout of a delivery | active |
-| `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server |  | `10000` | open deliveries per subscription, above that `paused` | planned (M2) |
-| `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server |  | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) | planned (M2) |
-| `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server |  | `24h` | how long the server signs with the old and the new HMAC generation | planned (M2) |
+| `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server | int | `10000` | open deliveries per subscription, above that `paused` | active |
+| `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server | duration | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) | active |
+| `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server | duration | `24h` | how long the server signs with the old and the new HMAC generation | active |
+| `webhook.hmac_master_key_ref` | `BOTHY_WEBHOOK__HMAC_MASTER_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/webhook_hmac_master_key` | reference to the master key from which the HMAC secrets of the subscriptions are derived ([webhooks.md](../api/webhooks.md), section 2.1) | active |
 | `webhook.receiver_tolerance` |  | Receiver |  | `5m` | recommendation, not a server value: tolerance for `webhook-timestamp` at the receiver and default of the check function of the SDKs |  |
 | `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server |  | `1048576` | size of an incoming body | planned (M2) |
 | `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server |  | `native, alertmanager` | enabled incoming formats | planned (M2) |
@@ -888,6 +889,7 @@ into which `secrets-init` copies the file.
 | `telemetry_pseudonym_key` | generated, at least 32 bytes | server, collector | `telemetry.pseudonym_key_ref`, `hmac_key` of the allowlist |
 | `audit_ip_kek` | generated, 32 bytes | server | `privacy.audit_ip_kek_ref`: encrypts the IP keys in `audit_ip_keys` |
 | `file_ticket_key` | generated, 32 bytes | server | `file.ticket_key_ref`: HMAC of the file tickets ([12-files.md](../spec/12-files.md) 9.2) |
+| `webhook_hmac_master_key` | generated, 32 bytes | server | `webhook.hmac_master_key_ref`: master key of the derived webhook secrets ([webhooks.md](../api/webhooks.md) 2.1) |
 | `pgbackrest_cipher_pass` | generated | backup | encryption of the pgBackRest repositories |
 | `pgbackrest_tls/` | generated (own CA) | postgres, backup | mutual TLS between the database and the repository host: `ca.crt`, `postgres.crt` and `postgres.key`, `backup.crt` and `backup.key` (ECDSA P-256, valid for `stack.PGBackRestTLSValidity`; the CA key is not kept) |
 | `restic_password` | generated | backup | encryption of the restic repository |
@@ -919,7 +921,7 @@ form of `s3_access_key` and `s3_secret_key` (profile s3, M3). Until then, `bothy
 reports these entries as `pending` as long as neither the store nor the source holds them; meanwhile
 `s3_*` count as supplied. Passwords are generated as 32 random bytes in base64url without
 padding (43 characters) and keys (`token_pepper`, `totp_key`, `telemetry_pseudonym_key`,
-`audit_ip_kek`, `file_ticket_key`) as 32 random bytes in lower-case hex (64 characters); users
+`audit_ip_kek`, `file_ticket_key`, `webhook_hmac_master_key`) as 32 random bytes in lower-case hex (64 characters); users
 that need the raw key bytes decode the hex text.
 
 `pgbackrest_tls/` (M7-01) is generated as a directory: a self-signed CA that may sign only leaf

@@ -283,7 +283,7 @@ type InsertSubscriptionParams struct {
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries on webhook_subscriptions and webhook_deliveries (apps module, M2-26,
-// docs/spec/03-datenmodell.md section 4.11). Lock order (03 section 6.3): the installation, then
+// docs/spec/03-data-model.md section 4.11). Lock order (03 section 6.3): the installation, then
 // the subscription row, then its delivery rows.
 func (q *Queries) InsertSubscription(ctx context.Context, arg InsertSubscriptionParams) (WebhookSubscription, error) {
 	row := q.db.QueryRow(ctx, insertSubscription,
