@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 
@@ -220,5 +221,40 @@ func TestAppSubscribableMatchesContract(t *testing.T) {
 	}
 	if domain.AppSubscribable("agent.invocation") || domain.AppSubscribable("") {
 		t.Fatal("agent-only or empty type subscribable")
+	}
+}
+
+func TestAllowedHostEdgesAndHostOf(t *testing.T) {
+	t.Parallel()
+	for _, bad := range []string{"[::1", "[::1]x", "hooks.example.com:abc", "a..b", "ex*ample.com", "[fe80::1%eth0]", "[]"} {
+		if _, err := domain.ParseAllowedHosts([]string{bad}); err == nil {
+			t.Errorf("ParseAllowedHosts(%q) accepted", bad)
+		}
+	}
+	if domain.EventOwnerPause.Cause() != "" || domain.EventOwnerResume.Cause() != "" {
+		t.Fatal("an owner event has a cause")
+	}
+	for raw, want := range map[string]string{
+		"https://Hooks.Example.COM./x?q=1": "hooks.example.com",
+		"https://[::ffff:192.0.2.1]:8443/": "192.0.2.1",
+		"https://[fe80::1%25en0]/":         "",
+		"https://exa mple.com/":            "",
+		"%zz":                              "",
+	} {
+		if got := domain.HostOf(raw); got != want {
+			t.Errorf("HostOf(%q) = %q, want %q", raw, got, want)
+		}
+	}
+	codes := domain.LastErrorCodes()
+	if len(codes) != 11 || codes[0] != domain.LastErrorTimeout || codes[10] != domain.LastErrorEventExpired {
+		t.Fatalf("LastErrorCodes() = %v", codes)
+	}
+	codes[0] = "changed"
+	if domain.LastErrorCodes()[0] != domain.LastErrorTimeout {
+		t.Fatal("LastErrorCodes shares its slice")
+	}
+	half := func(n int64) int64 { return n / 2 }
+	if domain.Backoff(time.Second, time.Hour, 0, half) != domain.Backoff(time.Second, time.Hour, 1, half) {
+		t.Fatal("Backoff counts zero failed attempts as more than one")
 	}
 }
