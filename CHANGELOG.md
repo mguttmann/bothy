@@ -658,6 +658,10 @@ operated, and the order of the build.
 
 ### Security
 
+- Development tools and the Python SDK: `certifi` 2026.7.22 to 2026.10.19 in `tools/uv.lock` and
+  `sdk/python/uv.lock`, the fixed release of
+  [GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2), which failed the gate
+  `osv`.
 - Development tools: `katex` (pulled in by mermaid-cli) is pinned through `overrides` to
   0.18.10, which has the fix for
   [GHSA-238p-pmpm-9mq7](https://github.com/advisories/GHSA-238p-pmpm-9mq7); mermaid still

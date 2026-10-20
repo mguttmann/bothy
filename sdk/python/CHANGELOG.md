@@ -9,6 +9,11 @@ documented in this file. The format is based on
 
 ## [Unreleased]
 
+### Security
+
+- The locked `certifi` (through `httpx`) is 2026.10.19, the fixed release of
+  [GHSA-6q48-6c7w-9gw2](https://github.com/advisories/GHSA-6q48-6c7w-9gw2).
+
 ### Added
 
 - Generated models of the personal event `gdpr.request_due` (R-AZ-35).
