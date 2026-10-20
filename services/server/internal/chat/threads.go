@@ -208,6 +208,15 @@ type Threads interface {
 	//
 	//	info, err := threads.InfoForShare(ctx, threadID) // inside uow.Do
 	InfoForShare(ctx context.Context, threadID ids.ID) (ThreadInfo, error)
+	// Locate returns the routing data of the known threads among threadIDs in one statement
+	// (id = ANY($1)), ascending by id; an unknown id is absent (M2-05: "Running now" resolves the
+	// threads of a batch of active runs). It does not authorize: the caller keeps only threads
+	// whose channel is in its Authorizer.Scope and authorizes per item. Errors: the database error.
+	//
+	// Example:
+	//
+	//	infos, err := threads.Locate(ctx, []ids.ID{t1, t2})
+	Locate(ctx context.Context, threadIDs []ids.ID) ([]ThreadInfo, error)
 	// Counters returns the counters of the threads in channelIDs whose last_message_seq is above
 	// unread_floor_seq, ascending by thread (M1-63, the unread counters of the snapshot of sync);
 	// other threads have nothing unread for anybody. It does not authorize: the caller passes

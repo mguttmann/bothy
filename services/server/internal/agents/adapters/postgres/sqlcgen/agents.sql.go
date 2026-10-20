@@ -43,6 +43,48 @@ func (q *Queries) GetAgent(ctx context.Context, principalID pgtype.UUID) (Agent,
 	return i, err
 }
 
+const getAgents = `-- name: GetAgents :many
+SELECT principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, billing_mode_changed_at, billing_mode_changed_by, tool_class, reported_tool_class, reported_runtime_state, reported_billing_mode, reported_runtime_version, reported_details, last_heartbeat_at, version FROM agents WHERE principal_id = ANY ($1::uuid[]) ORDER BY principal_id
+`
+
+// The records of a list without a lock, ascending by id: the run facts of runs (M2-05).
+func (q *Queries) GetAgents(ctx context.Context, ids []pgtype.UUID) ([]Agent, error) {
+	rows, err := q.db.Query(ctx, getAgents, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Agent
+	for rows.Next() {
+		var i Agent
+		if err := rows.Scan(
+			&i.PrincipalID,
+			&i.AdapterKind,
+			&i.Description,
+			&i.OperatorConfig,
+			&i.BillingMode,
+			&i.CredentialHolderID,
+			&i.BillingModeChangedAt,
+			&i.BillingModeChangedBy,
+			&i.ToolClass,
+			&i.ReportedToolClass,
+			&i.ReportedRuntimeState,
+			&i.ReportedBillingMode,
+			&i.ReportedRuntimeVersion,
+			&i.ReportedDetails,
+			&i.LastHeartbeatAt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertAgent = `-- name: InsertAgent :exec
 INSERT INTO agents (principal_id, adapter_kind, description, operator_config, billing_mode, credential_holder_id, tool_class, version)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

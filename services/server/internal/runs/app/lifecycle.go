@@ -1,0 +1,322 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
+	"github.com/OWNER/bothy/services/server/internal/runs"
+	"github.com/OWNER/bothy/services/server/internal/runs/domain"
+)
+
+// The trigger kinds of 03 runs.trigger_kind that Open accepts.
+const (
+	triggerKindMessage = "message"
+)
+
+// The step of a replaced adapter reason (ruling D-M2-05-8, 09 5.2).
+const (
+	stepKindStatus        = "status"
+	stepNameAdapterReason = "adapter_reason"
+	stepStatusFailed      = "failed"
+)
+
+// OpenCmd is the input of Open: a new run in queued.
+type OpenCmd struct {
+	// ThreadID is the target thread; AgentID the agent; TriggeredBy the person who triggered;
+	// TriggeringMessageID the message whose trigger_state follows the run (zero for none).
+	ThreadID, AgentID, TriggeredBy, TriggeringMessageID ids.ID
+	// TriggerKind is message (command and interaction come with M2-16 and M2-15).
+	TriggerKind string
+	// BillingModeExpected is the agent's billing mode now (ruling D-M2-05-5).
+	BillingModeExpected string
+}
+
+// ActiveRunExistsError is the error of Open when the thread already has an active run (R-DM-14):
+// nothing was written. Active is that run.
+type ActiveRunExistsError struct {
+	Active runs.RunSummary
+}
+
+// Error implements error.
+func (e *ActiveRunExistsError) Error() string { return "runs: the thread has an active run" }
+
+// Unwrap gives the conflict error the HTTP chain renders, should it ever reach a response.
+func (e *ActiveRunExistsError) Unwrap() error {
+	return errs.New(errs.CodeConflict, "the thread has an active run")
+}
+
+// ConcurrentChangeError is the error of Transition when the run is no longer in the expected state
+// and version: another unit changed it first (RK-18). Current is the run now. Its default mapping
+// is 409 invalid_state_transition; M2-09 maps a lost start race to already_started or to the
+// replay of the same token.
+type ConcurrentChangeError struct {
+	Current runs.RunSummary
+}
+
+// Error implements error.
+func (e *ConcurrentChangeError) Error() string { return "runs: the run changed concurrently" }
+
+// Unwrap gives the default mapping 409 invalid_state_transition.
+func (e *ConcurrentChangeError) Unwrap() error {
+	return errs.New(errs.CodeInvalidStateTransition, "the run is no longer in the expected state")
+}
+
+// TransitionCmd is the input of Transition: the compare-and-swap of 03 runs.
+type TransitionCmd struct {
+	RunID ids.ID
+	// From and Version are the state and version the caller read.
+	From    domain.State
+	Version int64
+	// To is the new state; Reason the reason of failed and cancelled (09 5.2).
+	To     domain.State
+	Reason string
+	// SetBy is the setter of the reason: the server, or the adapter (only for failed until M2-09
+	// defines the rule for an adapter's cancelled).
+	SetBy domain.Setter
+}
+
+// Open writes a new run in queued in the caller's unit of work (brief note 5): the run row (ON
+// CONFLICT on the active run of the thread DO NOTHING), the live box anchor in the run's thread,
+// run.state_changed and, with a triggering message, trigger_state received. The lock order is
+// runs before messages; the caller (the acceptance) holds the thread row of the message.
+//
+// Errors: *ActiveRunExistsError when the thread has an active run (nothing written); internal
+// outside a unit of work or for an unknown trigger kind; the errors of the collaborators.
+//
+// Example:
+//
+//	sum, err := svc.Open(ctx, app.OpenCmd{ThreadID: t, AgentID: lotse, TriggeredBy: alex, TriggeringMessageID: m,
+//		TriggerKind: "message", BillingModeExpected: "organization"})
+func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error) {
+	if err := needUnit(ctx, "Open"); err != nil {
+		return runs.RunSummary{}, err
+	}
+	if cmd.TriggerKind != triggerKindMessage || cmd.ThreadID.IsZero() || cmd.AgentID.IsZero() || cmd.TriggeredBy.IsZero() {
+		return runs.RunSummary{}, errs.New(errs.CodeInternalError, "runs: Open needs a thread, an agent, a person and the trigger kind message")
+	}
+	row, inserted, err := s.d.Repo.InsertRun(ctx, NewRun{
+		ID: ids.New(), ThreadID: cmd.ThreadID, AgentID: cmd.AgentID, TriggeredBy: cmd.TriggeredBy, TriggerKind: cmd.TriggerKind,
+		TriggeringMessageID: cmd.TriggeringMessageID, BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(),
+		QueuedAt: s.now(),
+	})
+	if err != nil {
+		return runs.RunSummary{}, err
+	}
+	if !inserted {
+		return runs.RunSummary{}, s.activeExists(ctx, cmd.ThreadID)
+	}
+	if _, err := s.d.Messages.CreateRunAnchor(ctx, messaging.RunAnchorCmd{ThreadID: row.ThreadID, RunID: row.ID, AgentID: row.AgentID}); err != nil {
+		return runs.RunSummary{}, err
+	}
+	info, err := s.d.Threads.Info(ctx, row.ThreadID)
+	if err != nil {
+		return runs.RunSummary{}, err
+	}
+	sum := summary(row, info.ChannelID, 0)
+	change := domain.TriggerOnOpen()
+	trigger := domain.TriggerStateNone
+	if !row.TriggeringMessageID.IsZero() {
+		trigger = change.State
+	}
+	if err := s.emitStateChanged(ctx, info.SpaceID, sum, row.TriggeringMessageID, trigger); err != nil {
+		return runs.RunSummary{}, err
+	}
+	if trigger != domain.TriggerStateNone {
+		if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: row.TriggeringMessageID, State: string(change.State)}); err != nil {
+			return runs.RunSummary{}, err
+		}
+	}
+	return sum, nil
+}
+
+// activeExists returns the ActiveRunExistsError of a thread whose insert met the partial unique
+// index: the active run is read in a new statement, which sees the committed winner.
+func (s *Service) activeExists(ctx context.Context, threadID ids.ID) error {
+	active, found, err := s.d.Repo.ActiveRunOfThread(ctx, threadID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		// The winner ended between the two statements; the caller may decide again.
+		return errs.New(errs.CodeConflict, "runs: the active run of the thread changed concurrently")
+	}
+	sum, err := s.summarize(ctx, active)
+	if err != nil {
+		return err
+	}
+	return &ActiveRunExistsError{Active: sum}
+}
+
+// summarize returns the summary of one row with the channel of its thread now and its steps.
+func (s *Service) summarize(ctx context.Context, r RunRow) (runs.RunSummary, error) {
+	info, err := s.d.Threads.Info(ctx, r.ThreadID)
+	if err != nil {
+		return runs.RunSummary{}, err
+	}
+	counts, err := s.d.Repo.StepCounts(ctx, []ids.ID{r.ID})
+	if err != nil {
+		return runs.RunSummary{}, err
+	}
+	return summary(r, info.ChannelID, counts[r.ID]), nil
+}
+
+// Transition changes the state of a run in the caller's unit of work (brief note 5): the pair must
+// be one of 03 runs, the reason one of 09 5.2 for its setter, then one compare-and-swap UPDATE on
+// state and version, the status step of a replaced adapter reason, run.state_changed and the
+// trigger_state of the triggering message as 09 6 maps it. The metrics are recorded after the
+// commit of the outermost unit (txn.AfterCommit), so a vetoed unit records nothing.
+//
+// Errors: 409 invalid_state_transition for a pair 03 does not allow (nothing written);
+// domain.ErrReasonRequired for an adapter failed without a reason; not_found for an unknown run;
+// *ConcurrentChangeError when state or version no longer match; internal outside a unit of work or
+// for a reason that does not fit the state or its setter.
+//
+// Example:
+//
+//	t, err := svc.Transition(ctx, app.TransitionCmd{RunID: id, From: domain.StateQueued, Version: 1,
+//		To: domain.StateRunning, SetBy: domain.SetterAdapter})
+func (s *Service) Transition(ctx context.Context, cmd TransitionCmd) (Transitioned, error) {
+	if err := needUnit(ctx, "Transition"); err != nil {
+		return Transitioned{}, err
+	}
+	if !domain.CanTransition(cmd.From, cmd.To) {
+		return Transitioned{}, errs.New(errs.CodeInvalidStateTransition, fmt.Sprintf("a run cannot go from %s to %s", cmd.From, cmd.To))
+	}
+	reason, original, err := s.reasonOf(cmd)
+	if err != nil {
+		return Transitioned{}, err
+	}
+	at := s.now()
+	row, changed, err := s.d.Repo.TransitionRun(ctx, TransitionWrite{
+		ID: cmd.RunID, From: cmd.From, Version: cmd.Version, To: cmd.To, Reason: reason, At: at,
+	})
+	if err != nil {
+		return Transitioned{}, err
+	}
+	if !changed {
+		return Transitioned{}, s.lostSwap(ctx, cmd.RunID)
+	}
+	if original != "" {
+		detail, err := encode(domain.OriginalReasonDetail(original, s.cfg.StepDetailMaxBytes))
+		if err != nil {
+			return Transitioned{}, err
+		}
+		if _, err := s.d.Repo.AppendStep(ctx, StepRow{
+			ID: ids.New(), RunID: row.ID, Kind: stepKindStatus, Name: stepNameAdapterReason, Status: stepStatusFailed,
+			Detail: detail, StartedAt: at, FinishedAt: at,
+		}); err != nil {
+			return Transitioned{}, err
+		}
+	}
+	return s.afterTransition(ctx, cmd.From, row)
+}
+
+// reasonOf validates the reason of cmd for its setter and returns the stored reason and, for a
+// replaced adapter reason, the original code.
+func (s *Service) reasonOf(cmd TransitionCmd) (reason, original string, err error) {
+	switch {
+	case cmd.SetBy == domain.SetterServer:
+		return cmd.Reason, "", domain.ValidateServerReason(cmd.To, cmd.Reason)
+	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateFailed:
+		return domain.NormalizeAdapterReason(cmd.Reason)
+	case cmd.SetBy == domain.SetterAdapter && cmd.Reason == "" && !cmd.To.Ended():
+		// running and waiting_input carry no reason (09 5.2).
+		return "", "", nil
+	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCompleted && cmd.Reason == "":
+		return "", "", nil
+	}
+	return "", "", errs.New(errs.CodeInternalError, "runs: no reason rule for this setter and state")
+}
+
+// lostSwap tells a missing run from a concurrent change after a compare-and-swap without effect.
+func (s *Service) lostSwap(ctx context.Context, id ids.ID) error {
+	cur, found, err := s.d.Repo.Run(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return invisible()
+	}
+	sum, err := s.summarize(ctx, cur)
+	if err != nil {
+		return err
+	}
+	return &ConcurrentChangeError{Current: sum}
+}
+
+// afterTransition appends run.state_changed and the trigger state of the changed row, registers the
+// metrics for after the commit and returns the result.
+func (s *Service) afterTransition(ctx context.Context, from domain.State, row RunRow) (Transitioned, error) {
+	info, err := s.d.Threads.Info(ctx, row.ThreadID)
+	if err != nil {
+		return Transitioned{}, err
+	}
+	counts, err := s.d.Repo.StepCounts(ctx, []ids.ID{row.ID})
+	if err != nil {
+		return Transitioned{}, err
+	}
+	sum := summary(row, info.ChannelID, counts[row.ID])
+	change, ok := domain.TriggerOnTransition(from, row.State, row.StateReason)
+	trigger := domain.TriggerStateNone
+	if ok && !row.TriggeringMessageID.IsZero() {
+		trigger = change.State
+	}
+	if err := s.emitStateChanged(ctx, info.SpaceID, sum, row.TriggeringMessageID, trigger); err != nil {
+		return Transitioned{}, err
+	}
+	if trigger != domain.TriggerStateNone {
+		if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{
+			MessageID: row.TriggeringMessageID, State: string(change.State), Reason: change.Reason,
+		}); err != nil {
+			return Transitioned{}, err
+		}
+	}
+	t := Transitioned{Run: sum, From: from, To: row.State, Started: !row.StartedAt.IsZero()}
+	if from == domain.StateQueued {
+		t.QueuedFor = durationBetween(row.QueuedAt, s.changedAt(row))
+	}
+	if row.State.Ended() && t.Started {
+		t.Ran = durationBetween(row.StartedAt, row.FinishedAt)
+	}
+	if t.AgentHandle, err = s.handleOf(ctx, row.AgentID); err != nil {
+		return Transitioned{}, err
+	}
+	metrics := s.d.Metrics
+	txn.AfterCommit(ctx, func() { metrics.RunTransitioned(context.WithoutCancel(ctx), t) })
+	return t, nil
+}
+
+// changedAt is the time the row left queued: started_at for a start, finished_at for an end.
+func (s *Service) changedAt(row RunRow) time.Time {
+	if row.State == domain.StateRunning && !row.StartedAt.IsZero() {
+		return row.StartedAt
+	}
+	if !row.FinishedAt.IsZero() {
+		return row.FinishedAt
+	}
+	return s.now()
+}
+
+// durationBetween returns b - a, never negative.
+func durationBetween(a, b time.Time) time.Duration {
+	if a.IsZero() || b.IsZero() || b.Before(a) {
+		return 0
+	}
+	return b.Sub(a)
+}
+
+// handleOf returns the handle of the agent for bothy.agent.handle; "" when it is unknown.
+func (s *Service) handleOf(ctx context.Context, agentID ids.ID) (string, error) {
+	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{agentID})
+	if err != nil {
+		return "", err
+	}
+	return facts[agentID].Handle, nil
+}

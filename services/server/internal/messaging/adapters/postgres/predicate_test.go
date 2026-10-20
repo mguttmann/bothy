@@ -22,6 +22,9 @@ var visiblePredicateAllowlist = map[string]string{
 		"or written itself, and authorized with message.read or message.create",
 	"MoveThreadMessages": "the copy messages.channel_id of thread.move (M1-62): writes only the rows of the thread that chat " +
 		"locked and authorized with thread.move in the same unit of work; returns no row content",
+	"SetTriggerState": "the trigger state of runs (M2-05, 09 section 6): runs calls it without a reader for a message it " +
+		"accepted or whose run it changed in the same unit of work; it returns the row only to append message.updated, " +
+		"whose receive action message.read sync checks per reader",
 	// The template statements of M1-60 (INT-W22/5): personal templates belong to no channel, and the
 	// writes follow the locked visible read GetVisibleTemplate.
 	"ListPersonalTemplates": "the personal templates of the caller (owner_user_id), which belong to no channel; " +

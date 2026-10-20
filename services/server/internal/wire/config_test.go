@@ -330,6 +330,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agent.ack_timeout":          {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
 		"agent.ack_persist_interval": {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "04-sync-protokoll.md"},
 		"agent.max_inflight_events":  {Kind: config.KindInt, Default: "100", Min: "1", Max: "2147483647", Chapter: "04-sync-protokoll.md"},
+		"run.step_detail_max_bytes":  {Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: "03-datenmodell.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protokoll.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protokoll.md"},

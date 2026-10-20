@@ -146,7 +146,7 @@ func idList(list []rest.Uuid) []ids.ID {
 }
 
 // MessageREST converts a message (schema Message): empty values become absent members, never
-// null (ADR 0053); attachments and components are empty until their tickets (M3-07, M2-15). The
+// null (ADR 0053), run_id and the trigger state included (M2-05); attachments and components are empty until their tickets (M3-07, M2-15). The
 // reaction summary, my_reactions (always present in REST, possibly empty) and pinned come from
 // the message (M1-59).
 func MessageREST(m messaging.Message) rest.Message {
@@ -161,7 +161,8 @@ func MessageREST(m messaging.Message) rest.Message {
 			DisplayName: m.Author.DisplayName, AvatarFileId: optionalID(m.Author.AvatarFileID),
 		},
 		ClientMsgId: rest.Uuid(m.ClientMsgID), Origin: rest.MessageOrigin(m.Origin), Kind: rest.MessageKind(m.Kind),
-		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageId: optionalID(m.ReplyToID), Silent: m.Silent,
+		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageId: optionalID(m.ReplyToID), RunId: optionalID(m.RunID),
+		TriggerStateAt: optionalTime(m.TriggerStateAt), Silent: m.Silent,
 		Attachments: []rest.Attachment{}, MentionIds: mentions, Reactions: reactionsREST(m.Reactions), Components: []rest.Component{},
 		MyReactions: myReactions(m.MyReactions), Pinned: m.Pinned,
 		Version: m.Version, EditedAt: optionalTime(m.EditedAt), DeletedAt: optionalTime(m.DeletedAt),
@@ -170,6 +171,14 @@ func MessageREST(m messaging.Message) rest.Message {
 	if m.SystemCode != "" {
 		c := rest.MessageSystemCode(m.SystemCode)
 		out.SystemCode = &c
+	}
+	if m.TriggerState != "" {
+		st := rest.TriggerState(m.TriggerState)
+		out.TriggerState = &st
+	}
+	if m.TriggerStateReason != "" {
+		r := m.TriggerStateReason
+		out.TriggerStateReason = &r
 	}
 	if m.ContentTruncated {
 		cut := true

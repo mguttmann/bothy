@@ -67,6 +67,16 @@ Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, V
   `agent.max_inflight_events` (bound by the gateway engine).
 - Rulings: docs/DECISIONS.md M2-07.
 
+## Run facts (M2-05)
+
+- Port: `Facts` with `RunFacts(ctx, agentIDs)` and the DTO `RunFacts` (handle, status, billing
+  mode, credential holder exactly for personal, target tool class) for the trigger decision and
+  the run metrics of runs. It never authorizes and never opens a unit of work: it reads in the
+  ambient transaction of ctx.
+- `app/facts.go`: `Service` implements it (compile-time check `var _ agents.Facts`), with one
+  read of the records (`Store.Agents`, query `GetAgents`, `principal_id = ANY` ascending, no
+  lock) and one `identity.Directory.Principals` call; people, apps and unknown ids are absent.
+
 ## The use cases (M1-51)
 
 | Operation | Action | Rights change | Without effect |
@@ -122,7 +132,7 @@ Rulings: docs/DECISIONS.md M1-51.
 ### Tests
 
 `domain/domain_test.go` (operator config, policy transitions, tool class, presence),
-`app/service_test.go` (the use cases on the fake-source harness of authz, AZ-M22 with Assistent
+`app/facts_test.go` (`TestRunFacts`), `app/service_test.go` (the use cases on the fake-source harness of authz, AZ-M22 with Assistent
 serving Research and Notizen), `adapters/postgres/repository_test.go`,
 `adapters/authzsource/source_test.go` (`TestAgentPolicySourceContract` against the authz fake and
 this source), `adapters/httpapi/*_test.go` over PostgreSQL 18 with the full chain and response
@@ -131,7 +141,7 @@ If-Match, tokens, visibility, badge) and `migrations/agents_test.go`.
 
 ## Port (Wurzelpaket `internal/agents`)
 
-- Eingehend: `Agents` (Verwaltung, Richtlinie, Werkzeugklasse; M1-51), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe).
+- Eingehend: `Agents` (Verwaltung, Richtlinie, Werkzeugklasse; M1-51), `Facts` (run facts of runs; M2-05), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe).
 - Gibt In-Tx-Ereignisse aus: `AgentDisabled`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung; M1-51), kernel `personaldata.Participant`.

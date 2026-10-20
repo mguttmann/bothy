@@ -71,6 +71,9 @@ var Fixtures = map[string]ParamFixture{
 	// The owner's terminal session on the extras host: neither Alex nor Lotse reads it (05
 	// terminal.read_own: self or owner).
 	"session_id": extraFixture(func(e *Extras) string { return e.SessionID }),
+	// The run of Texter in the thread of Marketing/Kampagnen that the first message of the world
+	// opened (M2-05): neither requester reads Marketing (05 run.read).
+	"run_id": extraFixture(func(e *Extras) string { return e.RunID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -94,6 +97,8 @@ type Extras struct {
 	// M2-44); pairingCode is the code of the host for it.
 	SessionID   string
 	pairingCode string
+	// RunID is the run of Texter in Marketing/Kampagnen (M2-05).
+	RunID string
 }
 
 // ExtrasConfig are the Options.Config entries PrepareExtras needs: the host of the webhook
@@ -153,8 +158,26 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	host.JSON(tb, &code)
 	e.pairingCode = code.PairingCode
 	e.FileID = uploadOfSam(tb, w)
+	e.RunID = runOfMarketing(tb, w)
 	extras.Store(w, e)
 	return e
+}
+
+// runOfMarketing returns the run the first message of the world opened in the thread of
+// Marketing/Kampagnen (listThreadRuns as the owner).
+func runOfMarketing(tb testing.TB, w *harness.World) string {
+	tb.Helper()
+	var page struct {
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+	}
+	harness.MustDo(tb, w.Owner, harness.Request{Method: http.MethodGet, Path: "/threads/" + w.Threads["Marketing/Kampagnen"] + "/runs"},
+		http.StatusOK).JSON(tb, &page)
+	if len(page.Items) == 0 {
+		tb.Fatal("leak: the thread of Marketing/Kampagnen has no run")
+	}
+	return page.Items[0].ID
 }
 
 // uploadOfSam announces an upload of Sam in Marketing/Kampagnen (G-2 gives Sam trigger and upload

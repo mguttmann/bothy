@@ -132,6 +132,22 @@ func (r *Repository) ThreadCounters(ctx context.Context, channels []ids.ID) ([]c
 	return out, nil
 }
 
+// LocateThreads implements app.Store in one statement (M2-05); outside a unit of work it reads on
+// the pool.
+func (r *Repository) LocateThreads(ctx context.Context, threads []ids.ID) ([]chat.ThreadInfo, error) {
+	rows, err := r.read(ctx).LocateThreads(ctx, uuids(threads))
+	if err != nil {
+		return nil, mapError(err, "locating threads")
+	}
+	out := make([]chat.ThreadInfo, len(rows))
+	for i, row := range rows {
+		out[i] = chat.ThreadInfo{ID: idOf(row.ID), ChannelID: idOf(row.ChannelID), SpaceID: idOf(row.SpaceID), ChannelKind: row.ChannelKind,
+			Kind: row.Kind, State: row.State, OperatorAgentID: idOf(row.OperatorAgentID), CreatedBy: idOf(row.CreatedBy), Version: row.Version,
+			ChannelArchived: row.ChannelArchived, LastMessageSeq: row.LastMessageSeq, UnreadFloorSeq: row.UnreadFloorSeq}
+	}
+	return out, nil
+}
+
 // ListThreads implements app.Store.
 func (r *Repository) ListThreads(ctx context.Context, tq app.ThreadQuery) ([]domain.Thread, error) {
 	if tq.Limit < 1 || tq.Limit > math.MaxInt32 {

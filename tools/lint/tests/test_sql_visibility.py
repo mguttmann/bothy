@@ -106,6 +106,27 @@ def test_az_p12_exception_passes(tmp_path: Path) -> None:
     assert sv.check(repo) == []
 
 
+def test_az_p12_thread_scope_exception_passes(tmp_path: Path) -> None:
+    # thread_scope (D-M2-05-9): the active-run lists read rows of tables without channel_id,
+    # resolve their threads through the chat port and keep only threads in Scope.
+    exc = [
+        {"query": "messaging.GetMessage", "category": "thread_scope", "reason": "active runs"},
+        {"query": "messaging.LockMessage", "category": "after_authorize", "reason": "lock"},
+    ]
+    repo = make_repo(tmp_path, {"messaging": ["exception.sql"]}, exc)
+    assert "thread_scope" in sv.CATEGORIES
+    assert sv.check(repo) == []
+
+
+def test_az_p12_unknown_category_near_thread_scope_fails(tmp_path: Path) -> None:
+    exc = [
+        {"query": "messaging.GetMessage", "category": "thread-scope", "reason": "x"},
+        {"query": "messaging.LockMessage", "category": "thread_scope", "reason": "y"},
+    ]
+    repo = make_repo(tmp_path, {"messaging": ["exception.sql"]}, exc)
+    assert rules(sv.check(repo)) == [("messaging.GetMessage", "unknown-category")]
+
+
 def test_az_p12_exception_without_reason_fails(tmp_path: Path) -> None:
     exc = [
         {"query": "messaging.GetMessage", "category": "after_authorize", "reason": " "},
