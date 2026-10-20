@@ -13,11 +13,13 @@ import (
 
 // Register declares what the agents module emits and accepts (M1-25, docs/spec/05-aktionen.md
 // sections 6 and 7): the durable event agent.updated (M1-51), the ephemeral event
-// agent.presence_changed (M2-20) and the client op ack of agent consumers (M2-07). internal/wire
-// lists it in moduleRegistrations.
+// agent.presence_changed (M2-20), the durable event command.changed of the command register
+// (M2-16) and the client op ack of agent consumers (M2-07). internal/wire lists it in
+// moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("agents", authorize.EventAgentUpdated)
 	r.Event("agents", authorize.EventAgentPresenceChanged)
+	r.Event("agents", authorize.EventCommandChanged)
 	r.Op("agents", authorize.OpAck)
 }
 

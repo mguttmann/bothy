@@ -365,4 +365,13 @@ type Messages interface {
 	//
 	//	m, err := msgs.TriggerMessageOf(ctx, run.TriggeringMessageID)
 	TriggerMessageOf(ctx context.Context, messageID ids.ID) (TriggerMessage, error)
+	// PrincipalRefs returns the public views (schema PrincipalRef) of the known principals among
+	// principalIDs, whatever their status; an unknown id is absent (M2-16: runs renders the
+	// invoker of a command, invoked_by and triggered_by, and may not use identity, 02 section
+	// 4.4). It never authorizes: the caller shows only principals it already decided about.
+	//
+	// Example:
+	//
+	//	refs, err := msgs.PrincipalRefs(ctx, []ids.ID{alex})
+	PrincipalRefs(ctx context.Context, principalIDs []ids.ID) (map[ids.ID]PrincipalRef, error)
 }

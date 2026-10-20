@@ -91,6 +91,9 @@ type TriggerChannel struct {
 	// SettingsVersion is channels.settings_version, the member settings_version of
 	// AgentInvocationPayload (M2-08).
 	SettingsVersion int64
+	// MainThreadID is the main thread of a text or dm channel; zero for a forum (M2-16: a command
+	// without thread_id goes to the main thread).
+	MainThreadID ids.ID
 }
 
 // TriggerFacts is the incoming port of the channel facts of the trigger decision (M2-05). It never
