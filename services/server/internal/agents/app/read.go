@@ -102,7 +102,7 @@ func (s *Service) page(ctx context.Context, visible []domain.Agent, limit int) (
 		if !ok {
 			return agents.AgentPage{}, errs.New(errs.CodeInternalError, "agents: a record without its principal")
 		}
-		out.Items = append(out.Items, s.agentView(rec, pv))
+		out.Items = append(out.Items, s.agentView(ctx, rec, pv))
 	}
 	return out, nil
 }

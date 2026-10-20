@@ -1533,6 +1533,11 @@ documented in this file. The format is based on
 
 ### Fixed
 
+- A heartbeat that stores a changed reported mode and a switch to `organization` (per agent, for
+  all agents or in the guided flow of M2-21) for the same agent no longer wait on each other until a
+  lock timeout: inside a unit of work the presence read of the tracker uses the stored row while a
+  heartbeat holds the entry lock (docs/DECISIONS.md D-M2-21-10).
+
 - `instance` registers the event type `instance.updated` it emits, so the start check and gate G9
   see it (M1-67).
 

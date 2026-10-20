@@ -357,7 +357,7 @@ func (t *Tracker) Statuses(ctx context.Context, agentIDs []ids.ID) ([]agents.Pre
 	found := make(map[ids.ID]agents.PresenceStatus, len(agentIDs))
 	var rest []ids.ID
 	for _, id := range agentIDs {
-		if st, ok := t.memory(id, now); ok {
+		if st, ok := t.memory(ctx, id, now); ok {
 			found[id] = st
 			continue
 		}
@@ -379,13 +379,23 @@ func (t *Tracker) Statuses(ctx context.Context, agentIDs []ids.ID) ([]agents.Pre
 	return out, nil
 }
 
-// memory returns the status of the loaded entry of id.
-func (t *Tracker) memory(id ids.ID, now time.Time) (agents.PresenceStatus, bool) {
+// memory returns the status of the loaded entry of id. Inside a unit of work it does not wait for
+// the entry lock and reports false while another goroutine holds it: a heartbeat holds the entry
+// lock while it waits for the agents row lock, and the unit may hold that row (a switch or the
+// guided flow of M2-21), so waiting here would make both wait until a lock timeout. The caller
+// then uses the stored row.
+func (t *Tracker) memory(ctx context.Context, id ids.ID, now time.Time) (agents.PresenceStatus, bool) {
 	e := t.tracked(id)
 	if e == nil {
 		return agents.PresenceStatus{}, false
 	}
-	e.mu.Lock()
+	if txn.InUnit(ctx) {
+		if !e.mu.TryLock() {
+			return agents.PresenceStatus{}, false
+		}
+	} else {
+		e.mu.Lock()
+	}
 	defer e.mu.Unlock()
 	if !e.loaded {
 		return agents.PresenceStatus{}, false
@@ -405,9 +415,9 @@ func storedStatus(row domain.PresenceRow, now time.Time, alertAfter time.Duratio
 
 // recordStatus is the presence of the record rec for getAgent and listAgents: the entry from
 // memory when this process tracks the agent, otherwise the stored columns of rec.
-func (t *Tracker) recordStatus(rec domain.Agent) agents.PresenceStatus {
+func (t *Tracker) recordStatus(ctx context.Context, rec domain.Agent) agents.PresenceStatus {
 	now := t.d.Clock.Now()
-	if st, ok := t.memory(rec.ID, now); ok {
+	if st, ok := t.memory(ctx, rec.ID, now); ok {
 		return st
 	}
 	return recordPresence(rec, now, t.cfg.MismatchAlertAfter)

@@ -88,11 +88,15 @@ func (ft *fakeTimers) advance(d time.Duration) {
 
 // fakeStore is the presence store over rows in memory with counters of the writes.
 type fakeStore struct {
-	mu       gosync.Mutex
-	rows     map[ids.ID]domain.PresenceRow
-	lockRow  map[ids.ID]domain.PresenceRow // returned by LockPresenceRow instead of rows when set
-	changes  []app.PresenceWrite
-	persists []app.PresenceWrite
+	mu      gosync.Mutex
+	rows    map[ids.ID]domain.PresenceRow
+	lockRow map[ids.ID]domain.PresenceRow // returned by LockPresenceRow instead of rows when set
+	// lockWait, when set, makes LockPresenceRow close lockEntered and wait for lockWait, as a row
+	// lock held by another transaction would.
+	lockWait    chan struct{}
+	lockEntered chan struct{}
+	changes     []app.PresenceWrite
+	persists    []app.PresenceWrite
 }
 
 func newFakeStore() *fakeStore {
@@ -107,6 +111,13 @@ func (s *fakeStore) GetPresenceRow(_ context.Context, id ids.ID) (domain.Presenc
 }
 
 func (s *fakeStore) LockPresenceRow(_ context.Context, id ids.ID) (domain.PresenceRow, bool, error) {
+	s.mu.Lock()
+	wait, entered := s.lockWait, s.lockEntered
+	s.mu.Unlock()
+	if wait != nil {
+		close(entered)
+		<-wait
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r, ok := s.lockRow[id]; ok {
@@ -600,5 +611,49 @@ func TestPresenceStartRule(t *testing.T) {
 	w.store.mu.Unlock()
 	if stored != domain.RuntimeOffline {
 		t.Fatalf("the old agent is stored %s after the first flush", stored)
+	}
+}
+
+// TestPresenceReadInUnitDoesNotWaitForHeartbeat: a heartbeat that stores a changed reported mode
+// holds the entry lock while it waits for the agents row lock; a unit of work that holds that row
+// (a switch of M1-51 or the guided flow of M2-21) and reads the presence for agent.updated or the
+// I1 check must not wait for the entry lock, or the two wait on each other until a lock timeout
+// (red team of M2-21). Inside a unit the read falls back to the stored row.
+func TestPresenceReadInUnitDoesNotWaitForHeartbeat(t *testing.T) {
+	w := newTracker(t)
+	w.beat(`{"state":"online","reported_billing_mode":"organization"}`)
+	wait, entered := make(chan struct{}), make(chan struct{})
+	w.store.mu.Lock()
+	w.store.lockWait, w.store.lockEntered = wait, entered
+	w.store.mu.Unlock()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		w.beat(`{"state":"online","reported_billing_mode":"personal"}`)
+	}()
+	<-entered
+	u, setPhase := txn.NewUnit(txn.NewRegistry(), txn.Options{})
+	setPhase(txn.PhaseWork)
+	read := make(chan []agents.PresenceStatus, 1)
+	go func() {
+		st, err := w.tr.Statuses(txn.WithUnit(context.Background(), u), []ids.ID{w.agent.ID})
+		if err != nil {
+			t.Errorf("statuses: %v", err)
+		}
+		read <- st
+	}()
+	select {
+	case st := <-read:
+		if len(st) != 1 || st[0].AgentID != w.agent.ID {
+			t.Errorf("statuses in a unit = %+v", st)
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("a presence read inside a unit of work waits for the entry lock of a running heartbeat")
+	}
+	close(wait)
+	<-done
+	select {
+	case <-read:
+	case <-time.After(5 * time.Second):
 	}
 }
