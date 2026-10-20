@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	syncmod "github.com/OWNER/bothy/services/server/internal/sync"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	mw "github.com/OWNER/bothy/services/server/test/messagingworld"
@@ -328,8 +329,7 @@ func TestSeq_04_16_1_SendOnline(t *testing.T) {
 	t.Parallel()
 	w := mw.New(t, subscribe)
 	_, _, main := w.TextChannel()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	conn, err := w.Owner.Acquire(ctx)
 	if err != nil {
 		t.Fatal(err)
