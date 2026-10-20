@@ -23,8 +23,8 @@ documented in this file. The format is based on
   configuration is missing in the database or the database does not fold the case of non-ASCII
   letters. Adding the generated columns rewrites `messages` and `threads` once (no release
   exists yet).
-- Outgoing webhooks (M2-26): migrations `00034_webhook_subscriptions.sql` and
-  `00035_webhook_deliveries.sql`; the port `apps.Webhooks` with the operations
+- Outgoing webhooks (M2-26): migrations `00037_webhook_subscriptions.sql` and
+  `00038_webhook_deliveries.sql`; the port `apps.Webhooks` with the operations
   `createWebhookSubscription`, `updateWebhookSubscription`, `deleteWebhookSubscription`,
   `listWebhookSubscriptions`, `listWebhookDeliveries` and `redeliverWebhook`, and `getWebhookKeys`
   (public keys of the purpose `webhook_out` as `whpk_`). The worker consumer `webhooks` creates one
