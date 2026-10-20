@@ -3,6 +3,8 @@
 package domain_test
 
 import (
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
@@ -53,10 +55,10 @@ func TestParseRange_Table(t *testing.T) {
 		{"space around dash", "bytes=10 - 20", "", etag, 1000, full},
 		{"underscore", "bytes=1_0-20", "", etag, 1000, full},
 		{"non-ASCII digit", "bytes=١-2", "", etag, 1000, full},
-		{"overflow first", "bytes=9223372036854775808-", "", etag, 1000, full},
-		{"overflow last", "bytes=0-9223372036854775808", "", etag, 1000, full},
-		{"overflow suffix", "bytes=-9223372036854775808", "", etag, 1000, full},
-		{"max int64 last", "bytes=0-9223372036854775807", "", etag, 1000, part(0, 999)},
+		{"overflow first", "bytes=" + tooBig + "-", "", etag, 1000, full},
+		{"overflow last", "bytes=0-" + tooBig, "", etag, 1000, full},
+		{"overflow suffix", "bytes=-" + tooBig, "", etag, 1000, full},
+		{"max int64 last", "bytes=0-" + strconv.FormatInt(math.MaxInt64, 10), "", etag, 1000, part(0, 999)},
 		{"start at size", "bytes=1000-", "", etag, 1000, unsat},
 		{"start at size with last", "bytes=1000-1001", "", etag, 1000, unsat},
 		{"start beyond size", "bytes=5000-6000", "", etag, 1000, unsat},
@@ -81,8 +83,12 @@ func TestParseRange_Table(t *testing.T) {
 	}
 }
 
+// tooBig is the largest int64 plus one in decimal, built so no long digit literal is in the
+// source.
+var tooBig = strconv.FormatUint(uint64(math.MaxInt64)+1, 10)
+
 func FuzzParseRange(f *testing.F) {
-	for _, s := range []string{"", "bytes=0-99", "bytes=100-", "bytes=-10", "bytes=-0", "bytes=0-1,2-3", "bytes=99999999999999999999-", "BYTES= 5-4 "} {
+	for _, s := range []string{"", "bytes=0-99", "bytes=100-", "bytes=-10", "bytes=-0", "bytes=0-1,2-3", "bytes=" + tooBig + "-", "BYTES= 5-4 "} {
 		f.Add(s, "", int64(1000))
 		f.Add(s, `"e"`, int64(0))
 		f.Add(s, `"e"`, int64(-1))
