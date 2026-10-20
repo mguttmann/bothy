@@ -217,8 +217,8 @@ func TestCatalogue_RegistryMatchesSignalsDoc(t *testing.T) {
 }
 
 // TestCatalogue_M1InstrumentSet: the registry holds exactly the instruments this build records
-// (brief M1-68 "Instruments", plus the gauges of M2-01 already on the base and
-// bothy.file.upload.size of M3-03).
+// (brief M1-68 "Instruments", plus the gauges of M2-01 already on the base,
+// bothy.file.upload.size of M3-03 and the relay counter of M2-44).
 func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
@@ -227,7 +227,7 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.event.fanout.lag", "bothy.file.upload.size", "bothy.gateway.catchup.duration", "bothy.gateway.close", "bothy.gateway.connect.duration",
 		"bothy.gateway.connections.active", "bothy.gateway.outbound.dropped", "bothy.gateway.resync", "bothy.job.duration",
 		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected", "bothy.secrets.refresh.failures",
-		"bothy.telemetry.dropped", "db.client.operation.duration", "http.server.request.duration",
+		"bothy.telemetry.dropped", "bothy.terminal.relay.unpaired", "db.client.operation.duration", "http.server.request.duration",
 	}
 	var got []string
 	for _, s := range All() {

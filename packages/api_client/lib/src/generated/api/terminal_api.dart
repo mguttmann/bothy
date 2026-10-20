@@ -26,7 +26,7 @@ class TerminalApi {
   const TerminalApi(this._dio, this._serializers);
 
   /// Attach to an own session again
-  /// For a session in state &#x60;opening&#x60;, &#x60;active&#x60; or &#x60;detached&#x60;. Needs a fresh step-up, except from the same device in the same login session within &#x60;terminal.quick_reattach_window&#x60; after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with &#x60;4103&#x60; (24, 6.2).
+  /// For a session in state &#x60;opening&#x60;, &#x60;active&#x60; or &#x60;detached&#x60;. Needs a fresh step-up, except from the same device in the same login session within &#x60;terminal.quick_reattach_window&#x60; after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with &#x60;4103&#x60; (24, 6.2). An attach to an &#x60;opening&#x60; session restarts the opening (&#x60;att &#x3D; open&#x60;, new deadline).
   ///
   /// Parameters:
   /// * [sessionId]
@@ -463,7 +463,7 @@ class TerminalApi {
   }
 
   /// Open a terminal session
-  /// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with &#x60;userVerification &#x3D; required&#x60;), the &#x60;terminal&#x60; right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 &#x60;terminal_denied&#x60; with &#x60;reason: no_session_user&#x60;). With a &#x60;claude&#x60; profile &#x60;workdir_index&#x60; must point into the caller&#39;s own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to &#x60;stream_path&#x60;.
+  /// Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with &#x60;userVerification &#x3D; required&#x60;), the &#x60;terminal&#x60; right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 &#x60;terminal_denied&#x60; with &#x60;reason: no_session_user&#x60;). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to &#x60;stream_path&#x60;.
   ///
   /// Parameters:
   /// * [hostId]

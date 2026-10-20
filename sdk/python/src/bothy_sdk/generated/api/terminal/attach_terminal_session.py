@@ -99,7 +99,8 @@ def sync_detailed(
      For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the
     same device in the same login session within `terminal.quick_reattach_window` after the disconnect.
     Returns a new session token; older tokens become worthless. A connection of another device is closed
-    with `4103` (24, 6.2).
+    with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new
+    deadline).
 
     Args:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -136,7 +137,8 @@ def sync(
      For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the
     same device in the same login session within `terminal.quick_reattach_window` after the disconnect.
     Returns a new session token; older tokens become worthless. A connection of another device is closed
-    with `4103` (24, 6.2).
+    with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new
+    deadline).
 
     Args:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -168,7 +170,8 @@ async def asyncio_detailed(
      For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the
     same device in the same login session within `terminal.quick_reattach_window` after the disconnect.
     Returns a new session token; older tokens become worthless. A connection of another device is closed
-    with `4103` (24, 6.2).
+    with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new
+    deadline).
 
     Args:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -203,7 +206,8 @@ async def asyncio(
      For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the
     same device in the same login session within `terminal.quick_reattach_window` after the disconnect.
     Returns a new session token; older tokens become worthless. A connection of another device is closed
-    with `4103` (24, 6.2).
+    with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new
+    deadline).
 
     Args:
         session_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -8,7 +8,7 @@ import 'package:built_value/serializer.dart';
 
 part 'terminal_stream_identify.g.dart';
 
-/// Native apps send an access token with DPoP proof (`htm = GET`, `htu` = HTTPS form of the stream URL, `nonce` from `hello`, `ath`). The web console sends neither: its stream authenticates with the console session cookie of the upgrade request and the same-origin check of the upgrade (docs/spec/08-identitaet.md section 7.5, docs/spec/15-client-architektur.md section 23.2); the server rejects an identify without token from any other session. Only the device of the current session token passes (`terminal.stream`).
+/// Native apps send an access token with DPoP proof (`htm = GET`, `htu` = HTTPS form of the stream URL, `nonce` from `hello`, `ath`). The web console sends neither: its stream authenticates with the console session cookie of the upgrade request and the same-origin check of the upgrade (08 7.5, 15 23.2); the server rejects an identify without token from any other session. Only the device of the current session token passes (`terminal.stream`).
 ///
 /// Properties:
 /// * [protocolVersion]

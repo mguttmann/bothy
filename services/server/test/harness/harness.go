@@ -53,6 +53,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets/stack"
+	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -108,6 +109,12 @@ type Options struct {
 	// enrollment of the owner and of NewUser, refreshes, Adopt) and the API token of NewAgent
 	// (refresh empty), so the canary test registers them as secrets.
 	TokenObserver func(access, refresh string)
+	// TerminalTimers drive the deadlines of the terminal relay (wire.Deps.TerminalTimers, M2-44);
+	// nil means the real timers.
+	TerminalTimers terminalapp.Timers
+	// TerminalBeforeOpenCommit runs inside the unit of work of every terminal opening before its
+	// commit (wire.Deps.TerminalBeforeOpenCommit, M2-44); nil runs nothing.
+	TerminalBeforeOpenCommit func()
 }
 
 // Server is a running harness server.
@@ -239,6 +246,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	sigs := make(chan os.Signal, 2)
 	deps := wire.Deps{
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
+		TerminalTimers: opts.TerminalTimers, TerminalBeforeOpenCommit: opts.TerminalBeforeOpenCommit,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

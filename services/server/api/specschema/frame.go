@@ -86,8 +86,8 @@ func (c *Contract) ValidateClientFrame(raw []byte) error {
 	return c.validate(op, key, frame)
 }
 
-// ValidateChannelFrame checks one text frame of a terminal channel (M2-43): channel is hostControl
-// or hostData, fromServer the direction (true: sent by the server). The rules of every frame
+// ValidateChannelFrame checks one text frame of a terminal channel (M2-43): channel is hostControl,
+// hostData or terminalStream (M2-44), fromServer the direction (true: sent by the server). The rules of every frame
 // apply (size up to sync.ws_max_frame_bytes, one JSON object {op, d}, no null, integers at most
 // 2^53 - 1), then the op must be a message of the channel in that direction and the frame must
 // pass its strict schema. Errors: a *FrameError, or a schema error wrapped with the op.

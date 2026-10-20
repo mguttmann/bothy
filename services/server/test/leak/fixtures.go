@@ -3,11 +3,15 @@
 package leak
 
 import (
+	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/test/harness"
+	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
 
 // ParamFixture returns, for a path parameter, the ID of an existing resource the requester has no
@@ -64,6 +68,9 @@ var Fixtures = map[string]ParamFixture{
 	// A file Sam uploads into Marketing/Kampagnen: before attachment only its uploader reads it
 	// (05 file.read, M3-03), and its upload session only its principal (getUpload).
 	"file_id": extraFixture(func(e *Extras) string { return e.FileID }),
+	// The owner's terminal session on the extras host: neither Alex nor Lotse reads it (05
+	// terminal.read_own: self or owner).
+	"session_id": extraFixture(func(e *Extras) string { return e.SessionID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -83,6 +90,10 @@ func isHuman(w *harness.World, r *harness.Client) bool {
 // upload of Sam (05 file.read: only the uploader reads an unattached file, M3-03).
 type Extras struct {
 	ProviderID, AppID, SubscriptionID, HostID, FileID string
+	// SessionID is a terminal session of the owner on the extras host (PrepareTerminalSession,
+	// M2-44); pairingCode is the code of the host for it.
+	SessionID   string
+	pairingCode string
 }
 
 // ExtrasConfig are the Options.Config entries PrepareExtras needs: the host of the webhook
@@ -132,9 +143,15 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	e.SubscriptionID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/apps/" + e.AppID + "/webhooks", Body: map[string]any{
 		"url": "https://" + extrasHookHost + "/bothy", "event_types": []string{"message.created"},
 	}}, http.StatusCreated))
-	e.HostID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/hosts", Body: map[string]any{
+	host := harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/hosts", Body: map[string]any{
 		"name": "build-host", "reason": "leak test",
-	}}, http.StatusCreated))
+	}}, http.StatusCreated)
+	e.HostID = createdID(tb, host)
+	var code struct {
+		PairingCode string `json:"pairing_code"`
+	}
+	host.JSON(tb, &code)
+	e.pairingCode = code.PairingCode
 	e.FileID = uploadOfSam(tb, w)
 	extras.Store(w, e)
 	return e
@@ -157,6 +174,47 @@ func uploadOfSam(tb testing.TB, w *harness.World) string {
 	return body.FileID
 }
 
+// PrepareTerminalSession pairs and confirms the extras host through the public API with the
+// owner's session user, connects a Fake-Host of test/terminal/fakehost to the server at publicURL
+// and opens a shell of the owner there (M2-44), whose id becomes Extras.SessionID. The Fake-Host
+// stays connected until the end of the test.
+func PrepareTerminalSession(tb testing.TB, publicURL string, w *harness.World, e *Extras) {
+	tb.Helper()
+	o := w.Owner
+	key, noise := fakehost.NewKey()
+	var jwk map[string]any
+	if err := json.Unmarshal(key.JWK(), &jwk); err != nil {
+		tb.Fatal(err)
+	}
+	profiles := []any{map[string]any{"name": "shell", "display_name": "Shell", "kind": "shell"}}
+	users := []any{map[string]any{"os_user": "bothy-s-owner", "workdirs": []string{}}}
+	var paired struct {
+		KeyFingerprint string `json:"key_fingerprint"`
+	}
+	harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/hosts/pair", Body: map[string]any{"pairing_code": e.pairingCode,
+		"noise_public_key": fakehost.B64(noise), "auth_public_jwk": jwk, "platform": "linux", "host_version": "1.0.0", "profiles": profiles,
+		"session_users": users}}, http.StatusCreated).JSON(tb, &paired)
+	got := harness.MustDo(tb, o, harness.Request{Method: http.MethodGet, Path: "/hosts/" + e.HostID}, http.StatusOK)
+	harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/hosts/" + e.HostID + "/confirm",
+		Header: http.Header{"If-Match": []string{got.Header.Get("ETag")}},
+		Body: map[string]any{"fingerprint_prefix": strings.ReplaceAll(paired.KeyFingerprint, "-", "")[:8], "llm_credentials": "organization",
+			"declared_server_host": false, "session_users": []any{map[string]any{"user_id": o.PrincipalID, "os_user": "bothy-s-owner"}},
+			"reason": "leak test"}}, http.StatusOK)
+	var doctor []any
+	for _, c := range []string{"hd1_user", "hd2_groups", "hd3_sudo", "hd4_state_dir", "hd5_server_host", "hd6_llm_login",
+		"hd7_profiles", "hd8_separation", "hd9_foreign_homes", "hd10_helper_integrity", "hd11_shared_locations"} {
+		doctor = append(doctor, map[string]any{"check": c, "ok": true})
+	}
+	fakehost.Connect(tb, publicURL, ids.MustParse(e.HostID), key, map[string]any{"profiles": profiles, "session_users": users,
+		"doctor": doctor, "is_server_host": false, "require_local_confirm": false})
+	if err := o.StepUp(tb.Context()); err != nil {
+		tb.Fatal(err)
+	}
+	e.SessionID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/hosts/" + e.HostID + "/terminal/sessions",
+		Body: map[string]any{"profile": "shell", "cols": 80, "rows": 24, "client_ephemeral_key_hash": fakehost.B64(make([]byte, 32))}},
+		http.StatusCreated))
+}
+
 // createdID returns the member id (or host_id) of a creation response, or the id of its member
 // app, subscription, host or provider when the body nests it.
 func createdID(tb testing.TB, r harness.Response) string {
@@ -168,7 +226,7 @@ func createdID(tb testing.TB, r harness.Response) string {
 			return id
 		}
 	}
-	for _, k := range []string{"app", "subscription", "host", "provider"} {
+	for _, k := range []string{"app", "subscription", "host", "provider", "session"} {
 		if m, ok := body[k].(map[string]any); ok {
 			if id, ok := m["id"].(string); ok && id != "" {
 				return id
