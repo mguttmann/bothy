@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestTelemetrySinks: with Options.Telemetry the server exports its request spans, OTLP log
@@ -27,7 +28,7 @@ func TestTelemetrySinks(t *testing.T) {
 		},
 		Config: map[string]string{"telemetry.traces.sampler_ratio": "1.0", "telemetry.logs.exporter": "both", "telemetry.logs.level": "debug"}})
 	MustDo(t, s.Owner, Request{Method: http.MethodGet, Path: "/me"}, http.StatusOK)
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), testkit.Patience)
 	defer cancel()
 	if err := s.FlushTelemetry(ctx); err != nil {
 		t.Fatal(err)
