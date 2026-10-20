@@ -10,7 +10,8 @@ its `make test` (every report path of `sonar-project.properties`) into the artif
 scans, with the same quality gate and `sonar.qualitygate.wait=true`. When a test job fails,
 `sonar` is skipped and `ci-ok` fails through that job. ci.yml also runs on every
 push to `main`, so SonarQube keeps an analysis of `main` (its overall state and the reference for
-new code); a running analysis of `main` is never cancelled by the next merge, the newest
+new code; on `main` only with the repository variable `SONAR_MAIN_ANALYSIS`, sonarqube-local.md
+section 6); a running analysis of `main` is never cancelled by the next merge, the newest
 push waits for it; a push event only comes from this repository's own branch, so fork code never runs
 with the secrets (fork pull requests keep the rules of push-discipline.md). Thresholds appear as names; their default values appear only in
 chapter 23, section 11.

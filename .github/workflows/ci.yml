@@ -686,11 +686,14 @@ jobs:
     name: sonar
     # Scans the coverage reports of the test jobs instead of running the tests again. A test job
     # of a component the plan left out is skipped; a failed or cancelled one skips the scan,
-    # which ci-ok already fails.
+    # which ci-ok already fails. On main only with the repository variable SONAR_MAIN_ANALYSIS:
+    # until the main branch of the SonarQube Cloud project is named `main`, the server takes
+    # `main` for a short-lived branch and fails its analysis (docs/quality/sonarqube-local.md).
     needs: [plan, test-server, test-apps, test-sdk-plugins]
     if: >-
       always() && needs.plan.result == 'success' && needs.plan.outputs.private_checks == 'true'
       && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+      && (github.ref != 'refs/heads/main' || vars.SONAR_MAIN_ANALYSIS == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

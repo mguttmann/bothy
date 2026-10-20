@@ -497,6 +497,9 @@ operated, and the order of the build.
 
 ### Changed
 
+- CI: the job `sonar` analyses `main` only once the repository variable `SONAR_MAIN_ANALYSIS`
+  is `true`, because SonarQube Cloud fails the analysis of `main` until the main branch of the
+  project is named `main` (docs/quality/sonarqube-local.md, section 6).
 - CI: `make gates` runs in seven parallel jobs (static gates, docs and contracts, security and
   supply chain, and the tests of the tools, the server, the apps and the SDKs and plugins) with
   every toolchain and its caches; together they run exactly the targets of `make gates`, `ci-ok`
