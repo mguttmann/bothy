@@ -1,13 +1,14 @@
 # Gates
 
 `make check` runs all gates in a fixed order and stops at the first failure.
-CI runs the same targets: job `gates` calls `make gates`, job `denylist` calls
-`make denylist`, job `sonar` calls `make sonar-scan`; `check` is exactly `gates denylist sonar`
-(chapter 23, R-QA-01). `make sonar` is `make test` followed by `make sonar-scan`. In CI the tests
-run once per run: job `gates` packs the coverage reports of its `make test` (every report path of
-`sonar-project.properties`) into the artifact `sonar-coverage`, and job `sonar` waits for `gates`,
-unpacks them and only scans, with the same quality gate and `sonar.qualitygate.wait=true`. When
-`gates` fails, `sonar` is skipped and `ci-ok` fails through `gates`. ci.yml also runs on every
+CI runs the same targets: the jobs of section "CI jobs" run `make gates` in parallel parts, job
+`denylist` calls `make denylist`, job `sonar` calls `make sonar-scan`; `check` is exactly
+`gates denylist sonar` (chapter 23, R-QA-01). `make sonar` is `make test` followed by
+`make sonar-scan`. In CI the tests run once per run: each test job packs the coverage reports of
+its `make test` (every report path of `sonar-project.properties`) into the artifact
+`sonar-coverage-<part>`, and job `sonar` waits for the test jobs, unpacks every artifact and only
+scans, with the same quality gate and `sonar.qualitygate.wait=true`. When a test job fails,
+`sonar` is skipped and `ci-ok` fails through that job. ci.yml also runs on every
 push to `main`, so SonarQube keeps an analysis of `main` (its overall state and the reference for
 new code); a running analysis of `main` is never cancelled by the next merge, the newest
 push waits for it; a push event only comes from this repository's own branch, so fork code never runs
@@ -15,6 +16,28 @@ with the secrets (fork pull requests keep the rules of push-discipline.md). Thre
 chapter 23, section 11.
 
 ![Flow from commit to release](pipeline.svg)
+
+## CI jobs
+
+`make gates` runs in seven jobs at the same time, each with every toolchain, the Go, npm, uv and
+pub caches and the cache of the pinned binaries; together they run every target of `make gates`
+once for the components of the plan, the tests split by component
+(`tools/ci/tests/test_ci_parallel_gates.py`). `ci-ok` requires each of them (`tools/ci/ci_ok.py`).
+
+| Job | Make targets | Runs |
+|---|---|---|
+| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins` | always |
+| `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
+| `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses` | always |
+| `test (tools)` | `test coverage` with no component (the Python tools) | always |
+| `test (server)` | `test coverage COMPONENTS=server AREAS=none` | when the plan selects `server` |
+| `test (apps)` | `test coverage COMPONENTS=apps AREAS=none` (Dart and JVM) | when the plan selects `apps` |
+| `test (SDKs and plugins)` | `test coverage` for the planned `sdk-python`, `sdk-typescript`, `plugins` with `AREAS=none` | when the plan selects one of them |
+
+A component test job the plan leaves out is skipped, and `ci-ok` accepts that, as the single job
+skipped the component's tests before. `AREAS=none` leaves the tools suite to `test (tools)`; only
+the three tools tests that read component sources (`TOOLS_SOURCE_TESTS`) run in each test job as
+well.
 
 Source of the diagram: `docs/quality/pipeline.mmd`.
 

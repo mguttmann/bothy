@@ -22,6 +22,12 @@ RELEASE = REPO / ".github" / "workflows" / "release.yml"
 GREEN = {
     "plan": "success",
     "gates": "success",
+    "gates (docs and contracts)": "success",
+    "gates (security and supply chain)": "success",
+    "test (tools)": "success",
+    "test (server)": "success",
+    "test (apps)": "success",
+    "test (SDKs and plugins)": "success",
     "denylist (private list)": "success",
     "denylist (generic rules, fork)": "skipped",
     "sonar": "success",
@@ -166,6 +172,25 @@ def _load(path: Path) -> dict[Any, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(data, dict)
     return data
+
+
+@pytest.mark.parametrize(
+    ("job", "skipped_ok"),
+    [
+        ("gates", False),
+        ("gates (docs and contracts)", False),
+        ("gates (security and supply chain)", False),
+        ("test (tools)", False),
+        ("test (server)", True),
+        ("test (apps)", True),
+        ("test (SDKs and plugins)", True),
+    ],
+)
+def test_the_parallel_gate_jobs(job: str, skipped_ok: bool) -> None:
+    """Every part of `make gates` must pass; a component's test job may be skipped by the plan."""
+    assert ci_ok.evaluate(jobs({**GREEN, job: "failure"}), "runner-9")[0] == "fail"
+    skipped = ci_ok.evaluate(jobs({**GREEN, job: "skipped"}), "runner-9")[0]
+    assert skipped == ("pass" if skipped_ok else "fail")
 
 
 def test_required_names_are_the_other_jobs_of_ci_yml() -> None:

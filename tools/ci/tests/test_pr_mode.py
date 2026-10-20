@@ -157,9 +157,14 @@ def test_plan_step_gets_author_and_actor_from_the_event() -> None:
     ],
 )
 def test_secret_jobs_follow_the_decision(job: str, condition: str) -> None:
+    if job == "sonar":
+        # sonar runs after the test jobs, of which the plan may skip some (always()), and only
+        # with the secrets: the decision is one of its conditions.
+        assert condition in _jobs()[job]["if"]
+        return
     assert _jobs()[job]["if"] == condition
 
 
 def test_gates_get_the_pull_request_author_from_the_event() -> None:
-    [step] = [s for s in _jobs()["gates"]["steps"] if s.get("name") == "make gates"]
+    [step] = [s for s in _jobs()["gates"]["steps"] if "commitlint" in str(s.get("run", ""))]
     assert step["env"]["PR_AUTHOR"] == "${{ github.event.pull_request.user.login }}"
