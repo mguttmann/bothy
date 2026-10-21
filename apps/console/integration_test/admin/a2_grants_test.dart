@@ -49,12 +49,17 @@ void main() {
     await grantsAt($, 'channel.${campaigns.id}');
     await wizardFor($, seed.sam);
     await tapKey($, 'level.trigger');
-    // The golden names the last day of 2026; later the date moves on, the text stays.
-    final now = DateTime.now();
-    final day = now.isBefore(DateTime(2026, 12, 31))
-        ? '2026-12-31'
-        : dayFromToday(30);
-    await typeKey($, 'wizard.until', day);
+    // The golden names 2026-12-31; a later run takes a day 30 days ahead, the text stays.
+    final today = DateTime.now();
+    final last = today.isBefore(DateTime(2026, 12, 1))
+        ? DateTime(2026, 12, 31)
+        : DateTime(today.year, today.month, today.day + 30);
+    String two(int v) => v.toString().padLeft(2, '0');
+    await typeKey(
+      $,
+      'wizard.until',
+      '${last.year}-${two(last.month)}-${two(last.day)}',
+    );
     await typeKey($, 'wizard.reason', 'Campaign work');
     // The preview of the final request: the server's text names the agent of the hint.
     await waitFor(
@@ -66,19 +71,20 @@ void main() {
       ),
     );
     final text = _previewText($);
-    // ignore: avoid_print
-    print(
-      'PATROL_LOG {"type":"e2e","message":"preview text: ${text.replaceAll('"', "'").replaceAll('\n', ' / ')}"}',
-    );
-    if (day == '2026-12-31') {
-      expect(
-        text == _golden['en'] || text == _golden['de'],
-        isTrue,
-        reason: 'preview text was:\n$text',
-      );
-    } else {
-      expect(text, contains('Texter'));
-    }
+    // The wizard sends the typed last day as an end at the start of the next day (M4-27), and
+    // the server's text names the day of that end (docs/DECISIONS.md D-M6-04-7).
+    final end = DateTime(last.year, last.month, last.day + 1);
+    final expected = {
+      _golden['en']!.replaceFirst(
+        '2026-12-31',
+        '${end.year}-${two(end.month)}-${two(end.day)}',
+      ),
+      _golden['de']!.replaceFirst(
+        '31.12.2026',
+        '${two(end.day)}.${two(end.month)}.${end.year}',
+      ),
+    };
+    expect(expected.contains(text), isTrue, reason: 'preview text was:\n$text');
     await tapKey($, 'wizard.confirm');
     await waitGone($, byKey('wizard'));
     await waitFor($, find.textContaining('Sam'));
