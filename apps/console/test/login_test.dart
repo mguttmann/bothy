@@ -275,6 +275,35 @@ void main() {
       expect(find.text('Statistics'), findsOneWidget);
     });
 
+    // Brief M6-04 Design note 2 (red team): the OIDC re-login of an action step-up returns to a
+    // console that already had its first step-up; the callback must still complete it.
+    testWidgets('/step-up/callback completes the re-login of an action step-up', (
+      tester,
+    ) async {
+      final b = TestBrowser();
+      final key = oidcFlowKey(OidcFlowKind.stepUp, _attempt);
+      b.flows.write(key, 'verifier-3');
+      b.server.routes['GET /api/v1/console/session'] = (_) =>
+          Answer(200, consoleSession(stepUp: true, methods: ['oidc_reauth']));
+      b.server.routes['POST /api/v1/auth/step-up/oidc/complete'] = (_) =>
+          const Answer(200, stepUpResult);
+      final c = await pumpConsole(
+        tester,
+        b,
+        location:
+            '/step-up/callback?challenge_id=$_challenge&login_code=lc_3&login_attempt_id=$_attempt',
+      );
+      final complete = b.server
+          .to('POST', '/api/v1/auth/step-up/oidc/complete')
+          .single;
+      expect(complete.body, {
+        'login_code': 'lc_3',
+        'client_verifier': 'verifier-3',
+      });
+      expect(b.flows.read(key), isNull);
+      expect(c.state, isA<ConsoleSignedIn>());
+    });
+
     testWidgets('an error on /step-up/callback deletes the entry', (
       tester,
     ) async {

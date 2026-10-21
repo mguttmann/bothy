@@ -510,7 +510,9 @@ class ConsoleController extends ChangeNotifier {
 
   Future<void> _completeStepUpOidc(Map<String, String> query) async {
     final verifier = _takeVerifier(OidcFlowKind.stepUp, query);
-    if (_state is! ConsoleNeedsStepUp) return;
+    // Also a signed-in console: the OIDC re-login of an action step-up (M6-04) returns to a
+    // session that had its first step-up already.
+    if (_state is! ConsoleNeedsStepUp && _state is! ConsoleSignedIn) return;
     final code = query['login_code'];
     if (query['error'] != null || verifier == null || code == null) {
       _notify(ConsoleNotice.stepUpFailed);
@@ -622,8 +624,9 @@ class ConsoleController extends ChangeNotifier {
   void _set(ConsoleState state) {
     // E7 ends the session: the next login in this tab starts at the first page, not at a place
     // of the person who logged out (brief M6-04, D-M6-04-3).
-    if (state is ConsoleLoggedOut)
+    if (state is ConsoleLoggedOut) {
       _route = ConsoleRoute.ofPage(ConsolePage.live);
+    }
     _state = state;
     notice = null;
     notifyListeners();
