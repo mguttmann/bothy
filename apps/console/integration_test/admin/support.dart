@@ -170,10 +170,26 @@ Future<void> waitGone(
   throw _failure('timed out waiting until $finder is gone; ${screenText()}');
 }
 
-/// Waits for [finder], scrolls it into view and taps its last match (the open menu item of a
-/// dropdown is the last one).
+/// Whether the widget of [e] takes a tap: a button with an `onPressed` handler (a list that is
+/// still loading shows its buttons disabled).
+bool _enabled(Element e) => switch (e.widget) {
+  final ButtonStyleButton b => b.onPressed != null,
+  final IconButton b => b.onPressed != null,
+  final ListTile t => t.enabled,
+  _ => true,
+};
+
+/// Waits for [finder] to find an enabled widget, scrolls it into view and taps its last match
+/// (the open menu item of a dropdown is the last one).
 Future<void> tapOn(PatrolIntegrationTester $, Finder finder) async {
+  final end = DateTime.now().add(const Duration(seconds: 60));
   await waitFor($, finder);
+  while (!_enabled(finder.evaluate().last)) {
+    if (!DateTime.now().isBefore(end)) {
+      throw _failure('$finder stays disabled; ${screenText()}');
+    }
+    await waitFor($, finder);
+  }
   await $.tester.ensureVisible(finder.last);
   await $.tester.pump();
   await $.tester.tap(finder.last);
