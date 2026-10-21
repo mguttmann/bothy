@@ -30,6 +30,11 @@ const (
 	detailUnexpectedBody = "This operation takes no request body."
 )
 
+// headerInvocationToken carries the invocation token of the run an agent acts in (07 guard rule
+// SR9, brief M2-14 design note 1). Like Authorization it is a credential: StageAuthenticate hands
+// its values to the Authenticator and nothing writes it to a log, a span or a problem body.
+const headerInvocationToken = "Invocation-Token"
+
 // corsStage is StageCORS. By default no Access-Control-* header is sent (SEC-CORS-1). Operations
 // with the action instance.discovery.read answer with Access-Control-Allow-Origin: * and never
 // with credentials (SEC-CORS-2). A request whose Origin equals an entry of
@@ -78,8 +83,8 @@ func (c *Chain) Preflight(path string, methods []string) http.Handler {
 func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 
 // authenticateStage is StageAuthenticate: the Authenticator gets the method, the htu built from
-// server.public_url and the escaped path (never from the Host header), Authorization, DPoP and the
-// client IP; the TCP peer, the header and the route's action go into the context as
+// server.public_url and the escaped path (never from the Host header), Authorization, DPoP, every
+// value of Invocation-Token (SR9, M2-14) and the client IP; the TCP peer, the header and the route's action go into the context as
 // reqmeta.Transport (M1-43), and the console cookie (M6-01). Without credentials it returns the
 // anonymous actor; a request the cookie authenticated then passes ConsoleGuard (consoleGuard). Its error becomes the problem
 // (after the failed-credentials hook, when one is set). A request with credentials passes the precheck
@@ -98,6 +103,9 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 			DPoPProofs:    r.Header.Values(headerDPoP),
 			ClientIP:      ip,
 			ConsoleCookie: consoleCookie(r),
+			// Every value in order: more than one is invalid, which only the Authenticator decides
+			// (brief M2-14 design note 2 c).
+			InvocationTokens: r.Header.Values(headerInvocationToken),
 		}
 		// The DPoP facts go to the handlers of the login and refresh endpoints, and the
 		// Authenticator and the use cases set DPoP-Nonce without the response writer (M1-34).
