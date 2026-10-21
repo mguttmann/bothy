@@ -64,6 +64,55 @@ func (q *Queries) LockRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 	return i, err
 }
 
+const lockRunShared = `-- name: LockRunShared :one
+SELECT id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms FROM runs WHERE id = $1 FOR SHARE
+`
+
+// The share lock of the run of a new card (M2-15 design note 6 b): a concurrent end of the run
+// either commits first (the card sees the ended run) or waits for the card's commit and then sees
+// its components when it disables them.
+func (q *Queries) LockRunShared(ctx context.Context, id pgtype.UUID) (Run, error) {
+	row := q.db.QueryRow(ctx, lockRunShared, id)
+	var i Run
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.AgentID,
+		&i.AgentSessionID,
+		&i.TriggerKind,
+		&i.TriggeringMessageID,
+		&i.TriggeringCommandID,
+		&i.TriggeringInteractionID,
+		&i.TriggeredBy,
+		&i.State,
+		&i.StateReason,
+		&i.Version,
+		&i.BillingModeExpected,
+		&i.BillingModeUsed,
+		&i.BillingEvidence,
+		&i.InvocationJti,
+		&i.StartedJti,
+		&i.RenewedFromJti,
+		&i.DevEnvironmentID,
+		&i.Model,
+		&i.StatusLine,
+		&i.LastTextExcerpt,
+		&i.Plan,
+		&i.Metrics,
+		&i.CostMicros,
+		&i.Currency,
+		&i.CostIsEstimate,
+		&i.Summary,
+		&i.StallWarnedAt,
+		&i.QueuedAt,
+		&i.InvocationHeldUntil,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.DurationMs,
+	)
+	return i, err
+}
+
 const recordDelivery = `-- name: RecordDelivery :one
 UPDATE runs
 SET invocation_jti = CASE WHEN $1::boolean THEN $2::uuid ELSE invocation_jti END,

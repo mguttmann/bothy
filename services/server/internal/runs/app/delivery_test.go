@@ -279,13 +279,13 @@ func TestPrepare_TerminalRunSkipped(t *testing.T) {
 	}
 }
 
-// TestPrepare_UnregisteredResolverFailsClosed: interaction.created and command.invoked are not sent
-// before M2-15 and M2-16; a type that bears no invocation is an internal error, so are a run of
-// another agent and an unknown run.
+// TestPrepare_UnregisteredResolverFailsClosed: command.invoked is not sent before M2-16 (M2-15
+// registered the resolver of interaction.created); a type that bears no invocation is an internal
+// error, so are a run of another agent and an unknown run.
 func TestPrepare_UnregisteredResolverFailsClosed(t *testing.T) {
 	t.Parallel()
 	w := newDeliveryWorld(t)
-	for _, typ := range []string{domain.EventInteractionCreated, domain.EventCommandInvoked} {
+	for _, typ := range []string{domain.EventCommandInvoked} {
 		if out := w.prepare(w.input(typ)); out.Send {
 			t.Fatalf("%s sent", typ)
 		}

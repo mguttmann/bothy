@@ -547,6 +547,19 @@ type InstanceSetting struct {
 	UpdatedAt pgtype.Timestamptz
 }
 
+type Interaction struct {
+	ID                  pgtype.UUID
+	ComponentID         pgtype.UUID
+	MessageID           pgtype.UUID
+	PrincipalID         pgtype.UUID
+	ClientInteractionID pgtype.UUID
+	Values              []byte
+	State               string
+	Response            []byte
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
 type LocalCredential struct {
 	IdentityID           pgtype.UUID
 	PasswordHash         string
@@ -594,6 +607,24 @@ type Message struct {
 	CreatedAt           pgtype.Timestamptz
 	SearchLanguage      interface{}
 	SearchVector        interface{}
+}
+
+type MessageComponent struct {
+	ID                 pgtype.UUID
+	MessageID          pgtype.UUID
+	CustomID           string
+	Type               string
+	Definition         []byte
+	Position           int16
+	SingleUse          bool
+	RequiredCapability pgtype.Text
+	RestrictedTo       string
+	RunID              pgtype.UUID
+	State              string
+	ExpiresAt          pgtype.Timestamptz
+	UsedBy             pgtype.UUID
+	UsedAt             pgtype.Timestamptz
+	Version            int64
 }
 
 type MessageRevision struct {

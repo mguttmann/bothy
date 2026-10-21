@@ -7,6 +7,24 @@ import (
 	"net/http"
 )
 
+// GetServedChannelConfigResponse404Headers the declared response headers of an HTTP 404 response for GetServedChannelConfig
+type GetServedChannelConfigResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// GetServedChannelConfigResponse429Headers the declared response headers of an HTTP 429 response for GetServedChannelConfig
+type GetServedChannelConfigResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// GetServedChannelConfigResponseDefaultHeaders the declared response headers of an HTTP default response for GetServedChannelConfig
+type GetServedChannelConfigResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type GetServedChannelConfigResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12116,6 +12134,11 @@ type UpdateComponentResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// UpdateComponentResponse409Headers the declared response headers of an HTTP 409 response for UpdateComponent
+type UpdateComponentResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // UpdateComponentResponse412Headers the declared response headers of an HTTP 412 response for UpdateComponent
 type UpdateComponentResponse412Headers struct {
 	CorrelationId *CorrelationId
@@ -12157,6 +12180,8 @@ type UpdateComponentResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
 	ApplicationproblemJSON412 *PreconditionFailed
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
@@ -12177,6 +12202,8 @@ type UpdateComponentResponse struct {
 	Headers403 *UpdateComponentResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *UpdateComponentResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *UpdateComponentResponse409Headers
 	// Headers412 the parsed response headers for an HTTP 412 response
 	Headers412 *UpdateComponentResponse412Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
@@ -12212,6 +12239,11 @@ func (r UpdateComponentResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r UpdateComponentResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateComponentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
@@ -23875,6 +23907,11 @@ type RespondToInteractionResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// RespondToInteractionResponse409Headers the declared response headers of an HTTP 409 response for RespondToInteraction
+type RespondToInteractionResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // RespondToInteractionResponse422Headers the declared response headers of an HTTP 422 response for RespondToInteraction
 type RespondToInteractionResponse422Headers struct {
 	CorrelationId *CorrelationId
@@ -23906,6 +23943,8 @@ type RespondToInteractionResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *UnprocessableEntity
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
@@ -23922,6 +23961,8 @@ type RespondToInteractionResponse struct {
 	Headers403 *RespondToInteractionResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *RespondToInteractionResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *RespondToInteractionResponse409Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
 	Headers422 *RespondToInteractionResponse422Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -23953,6 +23994,11 @@ func (r RespondToInteractionResponse) GetApplicationproblemJSON403() *Forbidden 
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r RespondToInteractionResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RespondToInteractionResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -25867,63 +25913,4 @@ func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSON404() *No
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r DeleteNotificationPreferenceResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteNotificationPreferenceResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteNotificationPreferenceResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DeleteNotificationPreferenceResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// PutNotificationPreferenceResponse200Headers the declared response headers of an HTTP 200 response for PutNotificationPreference
-type PutNotificationPreferenceResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// PutNotificationPreferenceResponse400Headers the declared response headers of an HTTP 400 response for PutNotificationPreference
-type PutNotificationPreferenceResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PutNotificationPreferenceResponse401Headers the declared response headers of an HTTP 401 response for PutNotificationPreference
-type PutNotificationPreferenceResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// PutNotificationPreferenceResponse403Headers the declared response headers of an HTTP 403 response for PutNotificationPreference
-type PutNotificationPreferenceResponse403Headers struct {
-	CorrelationId *CorrelationId
 }

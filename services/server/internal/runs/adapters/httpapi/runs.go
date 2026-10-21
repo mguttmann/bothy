@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the runs module as part of rest.StrictServerInterface
-// (M2-05): getRun, listThreadRuns, listRunSteps and listActiveRuns of docs/api/openapi.yaml. The
+// (M2-05): getRun, listThreadRuns, listRunSteps and listActiveRuns of docs/api/openapi.yaml, the
+// lifecycle of M2-09 and createInteraction, respondToInteraction and updateComponent (M2-15). The
 // use cases authorize; the handlers only convert, set the ETag of getRun and pass errors to the
 // problem writer of the chain unchanged. Cursors is the codec of platform/httpserver for the use
 // cases.
@@ -27,11 +28,19 @@ import (
 
 // Runs implements the REST operations of runs.
 type Runs struct {
-	runs runs.Runs
+	runs         runs.Runs
+	interactions runs.Interactions
 }
 
-// New returns the handlers over the read port of runs.
-func New(r runs.Runs) *Runs { return &Runs{runs: r} }
+// Ports are the incoming ports of runs the handlers call: the runs (M2-05, M2-09) and the
+// components and interactions (M2-15).
+type Ports interface {
+	runs.Runs
+	runs.Interactions
+}
+
+// New returns the handlers over the ports of runs.
+func New(p Ports) *Runs { return &Runs{runs: p, interactions: p} }
 
 // Cursors is the codec of the list cursors (platform/httpserver), the outgoing port app.Cursors.
 type Cursors struct{}

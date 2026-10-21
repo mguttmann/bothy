@@ -7673,7 +7673,7 @@ type Component struct {
 	// CustomId Examples: approve-refund
 	CustomId string `json:"custom_id"`
 
-	// Definition Schema `component.v1` (label, style, options, form fields).
+	// Definition Schema `component.v1` (09, 11.1) as stored, with the defaults applied (button `style`, select `min_values` and `max_values`, field `required`).
 	Definition JsonObject `json:"definition"`
 
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -7711,7 +7711,7 @@ type ComponentCreate struct {
 	// CustomId Examples: approve-refund
 	CustomId string `json:"custom_id"`
 
-	// Definition Free-form JSON object whose schema is named in the field description.
+	// Definition Schema `component.v1` (09, 11.1), a closed member set per type; `400 validation_failed` with one entry per finding below `/components/<index>/definition` and the codes `required`, `invalid` or `limit_reached`.
 	Definition JsonObject `json:"definition"`
 
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -7734,7 +7734,7 @@ type ComponentType string
 
 // ComponentUpdate defines model for ComponentUpdate.
 type ComponentUpdate struct {
-	// Definition Free-form JSON object whose schema is named in the field description.
+	// Definition A new `component.v1` object for the type of the component (09, 11.1); it may change in every state. Type, `custom_id`, `single_use`, `required_capability`, `restricted_to` and `run_id` cannot change.
 	Definition *JsonObject           `json:"definition,omitempty"`
 	State      *ComponentUpdateState `json:"state,omitempty"`
 }
@@ -10593,7 +10593,7 @@ type InteractionCreate struct {
 	// ClientInteractionId UUIDv7 (RFC 9562), lowercase canonical form.
 	ClientInteractionId Uuid `json:"client_interaction_id"`
 
-	// Values Selected options or form values, validated against the component definition.
+	// Values Selected options or form values, validated against the component definition (09, 11.1); absent means `{}`. Button: `{}`. Select: `{"selected": [<option value>, ...]}` with between `min_values` and `max_values` distinct option values. Form: an object keyed by field `name` (`text` and `textarea` strings, `number` a finite number, `boolean` a boolean, `choice` one of `choices`). A finding gives `400 validation_failed` with code `interaction_values_invalid` and its pointer; values whose `interaction.created` would exceed `sync.event_payload_max_bytes` give `too_long` on `/values`.
 	Values *JsonObject `json:"values,omitempty"`
 }
 
@@ -10916,7 +10916,7 @@ type MessageCreate struct {
 	// ClientMsgId UUIDv7 created by the client before the first attempt; unique per author forever.
 	ClientMsgId Uuid `json:"client_msg_id"`
 
-	// Components Agents and apps only; requires `kind = card`.
+	// Components Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1).
 	Components *[]ComponentCreate `json:"components,omitempty"`
 
 	// ContentMd Examples: @support-agent the invoice export fails since this morning.
@@ -10929,7 +10929,7 @@ type MessageCreate struct {
 	// ReplyToMessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	ReplyToMessageId *Uuid `json:"reply_to_message_id,omitempty"`
 
-	// RunId Agents only; the run this answer belongs to.
+	// RunId Agents only, and only with `kind = card`, which binds its components to this run (`Component.run_id`); it must be an active run of the author in the same thread, else `400 validation_failed` with code `invalid` on `/run_id` (09, 11.4). Every other kind gives `not_enabled` until answers in a run are built (M2-19). `Message.run_id` stays absent for a card.
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent *bool `json:"silent,omitempty"`
 }
@@ -25424,43 +25424,6 @@ func (c *Client) ListChannelCommands(ctx context.Context, channelId ChannelIdPat
 // Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
 func (c *Client) AutocompleteCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAutocompleteCommandRequestWithBody(c.Server, channelId, commandId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AutocompleteCommand Get suggestions for an option
-//
-// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
-func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// InvokeCommandWithBody Run a command
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
-func (c *Client) InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewInvokeCommandRequestWithBody(c.Server, channelId, commandId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

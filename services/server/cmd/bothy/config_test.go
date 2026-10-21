@@ -290,6 +290,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"cluster.mode = single  # default\n" +
 		"command.description_max_chars = 100  # default\n" +
 		"command.max_per_principal = 100  # default\n" +
+		"component.custom_id_max_chars = 100  # default\n" +
+		"component.default_ttl = 1d  # default\n" +
+		"component.form_max_fields = 10  # default\n" +
+		"component.max_per_message = 25  # default\n" +
 		"console.assets_dir =   # default\n" +
 		"console.csp_report_max_records = 20  # default\n" +
 		"consumer.batch_size = 500  # default\n" +

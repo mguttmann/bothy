@@ -685,6 +685,18 @@ func (stubServer) CancelRun(context.Context, rest.CancelRunRequestObject) (rest.
 	return nil, nil
 }
 
+func (stubServer) CreateInteraction(context.Context, rest.CreateInteractionRequestObject) (rest.CreateInteractionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RespondToInteraction(context.Context, rest.RespondToInteractionRequestObject) (rest.RespondToInteractionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateComponent(context.Context, rest.UpdateComponentRequestObject) (rest.UpdateComponentResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListActiveRuns(context.Context, rest.ListActiveRunsRequestObject) (rest.ListActiveRunsResponseObject, error) {
 	return nil, nil
 }
@@ -1184,6 +1196,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"awaitRunInput":        {"POST /api/v1/runs/{run_id}/await-input", "run.finish", "rl.agent_runtime"},
 		"finishRun":            {"POST /api/v1/runs/{run_id}/finish", "run.finish", "rl.agent_runtime"},
 		"cancelRun":            {"POST /api/v1/runs/{run_id}/cancel", "run.cancel", "rl.trigger"},
+		// M2-15
+		"createInteraction":    {"POST /api/v1/components/{component_id}/interactions", "interaction.create", "rl.interaction"},
+		"respondToInteraction": {"POST /api/v1/interactions/{interaction_id}/respond", "interaction.respond", "rl.agent_runtime"},
+		"updateComponent":      {"PATCH /api/v1/components/{component_id}", "component.update", "rl.write"},
 		// M1-58
 		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
 		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},

@@ -16,6 +16,43 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// AutocompleteCommand Get suggestions for an option
+//
+// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+// no choices when the owner does not answer in time.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InvokeCommandWithBody Run a command
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
+func (c *Client) InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvokeCommandRequestWithBody(c.Server, channelId, commandId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // InvokeCommand Run a command
 //
 // Takes a body of the `application/json` content type.
@@ -26805,23 +26842,5 @@ type GetServedChannelConfigResponse401Headers struct {
 
 // GetServedChannelConfigResponse403Headers the declared response headers of an HTTP 403 response for GetServedChannelConfig
 type GetServedChannelConfigResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse404Headers the declared response headers of an HTTP 404 response for GetServedChannelConfig
-type GetServedChannelConfigResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse429Headers the declared response headers of an HTTP 429 response for GetServedChannelConfig
-type GetServedChannelConfigResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// GetServedChannelConfigResponseDefaultHeaders the declared response headers of an HTTP default response for GetServedChannelConfig
-type GetServedChannelConfigResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

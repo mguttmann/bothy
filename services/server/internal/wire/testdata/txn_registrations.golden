@@ -12,3 +12,4 @@ subscribe messaging.MessagePosted -> runs github.com/OWNER/bothy/services/server
 subscribe chat.ChannelArchived -> apps github.com/OWNER/bothy/services/server/internal/apps/app.(*ArchiveSubscriber).OnChannelArchived-fm
 subscribe kernel.AccessChanged -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAccessChanged-fm
 subscribe agents.AgentDisabled -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAgentDisabled-fm
+subscribe messaging.MessageDeleted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessageDeleted-fm
