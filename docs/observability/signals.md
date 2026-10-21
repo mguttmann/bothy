@@ -97,7 +97,7 @@ dürfen das Fehlerbudget von `bothy-sync/reconnect` nicht verbrauchen.
 | `bothy.agent.consumer.lag` | Gauge | `{event}` | `bothy.agent.handle` | api: `head_seq - acked_seq`, Maximum über Verbraucher | `bothy_agent_consumer_lag` |
 | `bothy.agent.heartbeat.age` | Gauge | `s` | `bothy.agent.handle` | api | `bothy_agent_heartbeat_age_seconds` |
 | `bothy.agent.billing_mode.mismatch_age` | Gauge | `s` | `bothy.agent.handle` | api: seconds since the start of a mismatch between configured and reported mode according to the heartbeat (10, 8); 0 without a mismatch | `bothy_agent_billing_mode_mismatch_age_seconds` |
-| `bothy.agent.invocation.denied` | Zähler | `{invocation}` | `bothy.agent.handle`, `bothy.reason` | api: Ablehnung vor Zustellung (I2) | `bothy_agent_invocation_denied_total` |
+| `bothy.agent.invocation.denied` | Zähler | `{invocation}` | `bothy.agent.handle`, `bothy.reason` (`billing_mode_personal_not_holder`, `tool_class_owner_only`, `project_not_ready`, `channel_read_only`, `user_disabled`, `agent_disabled`, `access_revoked`) | api: Ablehnung vor Zustellung (I2) | `bothy_agent_invocation_denied_total` |
 | `bothy.agent.billing_mode_mismatch` | Zähler | `{run}` | `bothy.agent.handle` | api: I3 | `bothy_agent_billing_mode_mismatch_total` |
 
 Werkzeugnamen stehen nie an Metriken (offene Menge); die Statistik der Werkzeugaufrufe kommt aus

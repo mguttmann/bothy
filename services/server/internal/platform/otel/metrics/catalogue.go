@@ -428,6 +428,20 @@ var (
 			{Key: keyReason, Values: runReasons, Optional: true},
 		},
 	}
+	// AgentInvocationDenied is bothy.agent.invocation.denied (4.3, M2-08): one per denial of
+	// agent.invoke immediately before a delivery to an agent (I2), with the run reason the denial
+	// maps to (09 5.2; the adapter test holds the values equal to the runs domain).
+	AgentInvocationDenied = Spec{
+		Name: "bothy.agent.invocation.denied", Kind: KindCounter, Unit: "{invocation}",
+		Description: "Denials of agent.invoke immediately before a delivery to an agent.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: keyReason, Values: []string{
+				"billing_mode_personal_not_holder", "tool_class_owner_only", "project_not_ready", "channel_read_only",
+				"user_disabled", "agent_disabled", "access_revoked",
+			}},
+		},
+	}
 	// TerminalRelayUnpaired is bothy.terminal.relay.unpaired (4.3a, M2-44): a side of the relay
 	// that found no counterpart before terminal.open_timeout, once per connection.
 	TerminalRelayUnpaired = Spec{
@@ -452,7 +466,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
-		RunActive, RunStartLatency, RunDuration, RunFinished,
+		RunActive, RunStartLatency, RunDuration, RunFinished, AgentInvocationDenied,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,

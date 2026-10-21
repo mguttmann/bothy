@@ -172,7 +172,7 @@ func (s *CatchUpService) PageEvents(ctx context.Context, in sync.PageInput) (syn
 	var last int64
 	for _, ev := range rows {
 		last = ev.Seq
-		ok, _, err := admit(fctx, s.d.Authorizer, a, ev)
+		ok, _, err := admit(fctx, s.d.Authorizer, a, ev, in.AgentConsumer)
 		if err != nil {
 			return sync.EventPage{}, err
 		}
@@ -191,7 +191,7 @@ func (s *CatchUpService) PageEvents(ctx context.Context, in sync.PageInput) (syn
 // instead of its events; any other answer of that check leaves the event admitted.
 func (s *CatchUpService) Admit(ctx context.Context, a actor.Actor, ev sync.Event) (bool, error) {
 	fctx := authorize.Filter(ctx)
-	ok, d, err := admit(fctx, s.d.Authorizer, a, ev)
+	ok, d, err := admit(fctx, s.d.Authorizer, a, ev, false)
 	if err != nil {
 		return false, err
 	}
@@ -211,8 +211,8 @@ func (s *CatchUpService) Admit(ctx context.Context, a actor.Actor, ev sync.Event
 // allows that action (docs/DECISIONS.md D-M2-02-7); any other event only when authorize allows its
 // receive action on the event's resource at delivery time, with the decision of authorize (zero
 // for a personal event with self). ctx is in filter
-// mode, so a refusal writes no audit entry.
-func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.Event) (bool, authorize.Decision, error) {
+// mode, so a refusal writes no audit entry. agentConsumer is PageInput.AgentConsumer.
+func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.Event, agentConsumer bool) (bool, authorize.Decision, error) {
 	if !ev.AudiencePrincipalID.IsZero() {
 		if ev.AudiencePrincipalID != a.ID {
 			return false, authorize.Decision{}, nil
@@ -229,6 +229,11 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 		return false, authorize.Decision{}, nil
 	}
 	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID, ev.AudiencePrincipalID)
+	if agentConsumer {
+		// The audience is matched above; for the consumer engine, which runs runs.Delivery before
+		// every invocation-bearing event, a receive action on the agent itself decides on it (M2-08).
+		r.Event.AudienceID = ev.AudiencePrincipalID
+	}
 	d, err := az.Authorize(ctx, a, act, r)
 	if err != nil {
 		return false, authorize.Decision{}, err

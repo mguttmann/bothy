@@ -260,6 +260,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected", "bothy.secrets.refresh.failures",
 		// M2-05: the run instruments of 4.3.
 		"bothy.run.active", "bothy.run.duration", "bothy.run.finished", "bothy.run.start.latency",
+		// M2-08: the denial counter of the delivery check.
+		"bothy.agent.invocation.denied",
 		"bothy.storage.volume.free", "bothy.storage.volume.size",
 		"bothy.telemetry.dropped", "bothy.terminal.relay.unpaired", "db.client.operation.duration", "http.server.request.duration",
 		// M4-31: the app metrics of 4.6a and the discard counter of their endpoint.
