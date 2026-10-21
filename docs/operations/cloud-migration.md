@@ -16,6 +16,11 @@ so tokens, devices and invocation tokens stay valid.
 
 1. Provision the target with OpenTofu ([infra/tofu/README.md](../../infra/tofu/README.md)), same
    `BOTHY_VERSION` as the old instance.
+   On a VM target the module `generic-vm` sets up the host and runs the setup wizard; its input
+   `bothy_version` is the product release whose bundle pins that server version
+   ([infra/tofu/modules/generic-vm/README.md](../../infra/tofu/modules/generic-vm/README.md)).
+   The wizard generates fresh secrets on the target; step 2 replaces them with the bundle of the
+   old instance before the first start of the restored data.
 2. Load the secrets bundle. Push keys and app identity stay the same; push registrations
    of the devices therefore stay valid.
 3. Trial run: restore the latest backup of the old instance on the target

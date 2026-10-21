@@ -619,17 +619,20 @@ install-options: ## Options of the portability test equal 16 3.1; documented ins
 	$(UVRUN) python tools/ci/install_options_check.py check
 
 # OpenTofu modules (brief M7-15, infra/tofu/README.md): format, then init and validate of the root
-# that calls all four modules and of the test root of generic-vm. The modules need no provider,
-# so init is offline; its data directory is a temporary one, so nothing lands in the tree.
+# that calls all four modules and of the test root of generic-vm. As in ops-check, the only
+# provider source is an empty local mirror, so init never downloads (the modules need no
+# provider today; one that does fails here until it has a pinned offline path,
+# docs/DECISIONS.md D-M7-15-3). Data directory and CLI configuration are temporary.
 TOFU_ROOTS := infra/tofu/test/validate infra/tofu/test/generic-vm
-tofu-check: ## OpenTofu: fmt -check, init -backend=false and validate of the roots that call every module
+tofu-check: ## OpenTofu: fmt -check, offline init -backend=false and validate of the roots that call every module
 	@tofu=$(call tool,tofu) || exit 1; \
 	"$$tofu" fmt -check -recursive -diff infra/tofu || exit 1; \
+	tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT; mkdir "$$tmp/mirror"; \
+	printf 'provider_installation {\n  filesystem_mirror {\n    path = "%s"\n  }\n}\n' "$$tmp/mirror" >"$$tmp/offline.tfrc"; \
 	for root in $(TOFU_ROOTS); do \
-	  data=$$(mktemp -d) || exit 1; \
-	  TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" init -backend=false -input=false -no-color >/dev/null && \
-	  TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" validate -no-color; rc=$$?; \
-	  rm -rf "$$data"; [ "$$rc" = 0 ] || exit 1; \
+	  data="$$tmp/data-$$(basename "$$root")"; \
+	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" init -backend=false -input=false -no-color >/dev/null || exit 1; \
+	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" validate -no-color || exit 1; \
 	done
 
 # The local VM test of generic-vm (brief M7-15 Design note 2): the product trial on this host, a

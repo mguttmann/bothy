@@ -91,8 +91,17 @@ put_file() {
 	return 0
 }
 
+# apt_get runs apt-get without prompts. On the first boot of a cloud image unattended-upgrades
+# often holds the package locks; DPkg::Lock::Timeout covers the dpkg lock only, so a failed run
+# is retried for up to ten minutes.
 apt_get() {
-	DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 -q -y "$@"
+	ag_try=0
+	until DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 -q -y "$@"; do
+		ag_try=$((ag_try + 1))
+		[ "$ag_try" -lt 30 ] || return 1
+		say "apt-get $1 failed; retrying in 20 s ($ag_try of 30)"
+		sleep 20
+	done
 }
 
 # ---- steps -----------------------------------------------------------------------------------
