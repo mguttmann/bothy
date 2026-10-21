@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
+	gatewaymetrics "github.com/OWNER/bothy/services/server/internal/gateway/adapters/otelmetrics"
 	gatewayws "github.com/OWNER/bothy/services/server/internal/gateway/adapters/ws"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -111,6 +112,9 @@ type GatewayDeps struct {
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
 	Log   *slog.Logger
+	// Metrics records the gateway and delivery metrics; nil means gateway/adapters/otelmetrics
+	// on the global meter provider of platform/otel (M1-68).
+	Metrics gatewayapp.Metrics
 }
 
 // InstanceLoader loads the instance row (instance.State), the source of the sync epoch.
@@ -151,7 +155,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		return nil, errors.New("wire: the gateway needs the authenticator, the authorizer, the nonces, the limiter, catch-up and snapshot, " +
 			"the instance and the threads of chat")
 	}
-	hub, err := newHub(cfg, &d)
+	hub, err := newMeasuredHub(cfg, &d)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +188,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Authenticator: d.Authenticator, Authorizer: d.Authorizer, Nonces: d.Nonces, Limiter: connectLimiter{l: d.Limiter},
 		Snapshot: d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
-		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher,
+		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
 	})
 	if err != nil {
 		return nil, err
@@ -201,11 +205,32 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	h, err := gatewayws.NewHandler(gatewayws.Config{
 		PublicURL: cfg.PublicURL, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,
 		OutboundQueueMax: cfg.OutboundQueueMax, WriteTimeout: cfg.WriteTimeout,
-	}, gatewayws.Deps{Gateway: gw, Snapshot: synchttp.SnapshotREST, Clock: d.Clock, Log: orDiscard(d.Log)})
+	}, gatewayws.Deps{Gateway: gw, Snapshot: synchttp.SnapshotREST, Clock: d.Clock, Log: orDiscard(d.Log), Metrics: d.Metrics})
 	if err != nil {
 		return nil, err
 	}
 	return &Gateway{App: gw, Handler: h, Hub: hub, Publisher: publisher}, nil
+}
+
+// newMeasuredHub sets the gateway metrics of d (adapters/otelmetrics on the global meter
+// provider when d brings none) and builds the hub (newHub) with bothy.event.fanout.lag over it;
+// the registration of the gauge lives as long as the process (M1-68).
+func newMeasuredHub(cfg GatewayConfig, d *GatewayDeps) (*gatewayapp.Hub, error) {
+	if d.Metrics == nil {
+		m, err := gatewaymetrics.New(nil)
+		if err != nil {
+			return nil, err
+		}
+		d.Metrics = m
+	}
+	hub, err := newHub(cfg, d)
+	if err != nil || hub == nil {
+		return hub, err
+	}
+	if _, err := gatewaymetrics.RegisterFanoutLag(nil, hub.FanoutLag); err != nil {
+		return nil, err
+	}
+	return hub, nil
 }
 
 // newHub builds the hub of M1-65 and makes it the delivery of d when d brings none; otherwise it
@@ -218,7 +243,7 @@ func newHub(cfg GatewayConfig, d *GatewayDeps) (*gatewayapp.Hub, error) {
 		QueueMax: cfg.OutboundQueueMax, PageSize: cfg.CatchUpPageSize, CursorEvery: cfg.CursorAdvanceEvery,
 		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap, PayloadMax: cfg.PayloadMax,
 	}, gatewayapp.HubDeps{Authenticator: d.Authenticator, Authorizer: d.Authorizer, CatchUp: d.Reads.CatchUp, Log: orDiscard(d.Log),
-		Clock: d.Clock})
+		Clock: d.Clock, Metrics: d.Metrics})
 	if err != nil {
 		return nil, err
 	}
@@ -281,8 +306,14 @@ func (g *Gateway) StopConnections() lifecycle.StopStep {
 // without an event (the revocation of an API token) that commits between that read and the commit
 // of the event is not in the event's version; the version read here is, because the batch was
 // read after its events committed (M1-65/14). A failed read only skips that step.
+//
+// Before the batch reaches the hub, the hub learns that the tail knows its events (Hub.Known), the
+// start of bothy.event.fanout.lag.
 func DeliverySink(az authorize.Authorizer, hub *gatewayapp.Hub, versions instance.Versions) sync.Sink {
 	return func(ctx context.Context, batch []sync.Event) error {
+		if hub != nil && len(batch) > 0 {
+			hub.Known(batch[len(batch)-1].Seq)
+		}
 		if len(batch) > 0 && versions != nil {
 			if pv, err := versions.PermissionVersion(ctx); err == nil {
 				az.Observe(ctx, authorize.LogEvent{Seq: batch[0].Seq, PermissionVersion: pv})

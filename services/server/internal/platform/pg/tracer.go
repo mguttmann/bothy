@@ -24,14 +24,14 @@ var (
 
 // newTracer returns the tracer of a connection: otelpgx without query parameters (the option
 // WithIncludeQueryParameters stays off), so spans carry db.query.text with placeholders only
-// (docs/observability/signals.md "Spans"), wrapped in redactingTracer. The operation name is
-// added to the metric db.client.operation.duration, as the metric catalogue lists it.
+// (docs/observability/signals.md "Spans"), wrapped in redactingTracer. The metrics of otelpgx are
+// dropped by the view of the metric registry; the wrapper records db.client.operation.duration
+// itself with the closed db.operation.name and db.collection.name (metrics.go).
 func newTracer() *redactingTracer {
 	return &redactingTracer{Tracer: otelpgx.NewTracer(
 		otelpgx.WithTracerProvider(tracerProvider()),
 		otelpgx.WithMeterProvider(meterProvider()),
-		otelpgx.WithMetricOperationName(otelpgx.SQLOperationName),
-	)}
+	), query: newQueryMetric(meterProvider())}
 }
 
 // redactingTracer passes every event to otelpgx but removes password literals from the statement
@@ -42,6 +42,8 @@ func newTracer() *redactingTracer {
 // log. Connect and acquire errors carry no statement data and pass unchanged.
 type redactingTracer struct {
 	*otelpgx.Tracer
+	// query records db.client.operation.duration; nil records nothing.
+	query *queryMetric
 }
 
 // errStatementFailed replaces an error of a statement that is not a PostgreSQL error (an encode
@@ -76,10 +78,11 @@ func redactStatement(sql string) string {
 	return passwordLiteral.ReplaceAllString(sql, "${1}'[redacted]'")
 }
 
-// TraceQueryStart starts the query span with password literals redacted.
+// TraceQueryStart starts the query span with password literals redacted and the clock of
+// db.client.operation.duration.
 func (t *redactingTracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
 	data.SQL = redactStatement(data.SQL)
-	return t.Tracer.TraceQueryStart(ctx, conn, data)
+	return t.query.start(t.Tracer.TraceQueryStart(ctx, conn, data), data.SQL)
 }
 
 // TracePrepareStart starts the prepare span with password literals redacted.
@@ -88,10 +91,12 @@ func (t *redactingTracer) TracePrepareStart(ctx context.Context, conn *pgx.Conn,
 	return t.Tracer.TracePrepareStart(ctx, conn, data)
 }
 
-// TraceQueryEnd ends the query span with the error redacted.
+// TraceQueryEnd ends the query span with the error redacted and records the query in
+// db.client.operation.duration.
 func (t *redactingTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
 	data.Err = redactStatementError(data.Err)
 	t.Tracer.TraceQueryEnd(ctx, conn, data)
+	t.query.end(ctx)
 }
 
 // TraceBatchQuery records one query of a batch with its error redacted.

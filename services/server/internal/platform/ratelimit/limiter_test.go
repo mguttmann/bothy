@@ -14,12 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics/metricstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
@@ -405,12 +402,14 @@ func TestConcurrent_NoOverAdmission(t *testing.T) {
 	}
 }
 
-func TestMetric_RejectedCounter(t *testing.T) {
-	t.Parallel()
-	reader := sdkmetric.NewManualReader()
-	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+// TestRateLimitMetrics_Rejected: every refused request counts once in bothy.ratelimit.rejected
+// with its class from the generated catalogue as the only attribute; allowed requests count
+// nothing.
+func TestRateLimitMetrics_Rejected(t *testing.T) {
+	metricstest.Strict(t)
+	mp, reader := metricstest.Provider(t)
 	l, err := ratelimit.New(config(map[ratelimit.Class]ratelimit.Limits{"rl.write": {PerMinute: 60, Burst: 1}}),
-		clock.NewFake(t0), mp.Meter("test"))
+		clock.NewFake(t0), mp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,30 +417,13 @@ func TestMetric_RejectedCounter(t *testing.T) {
 	allow(t, l, "rl.write", keyA)
 	allow(t, l, "rl.write", keyA)
 	allow(t, l, "rl.read", keyA)
-	var rm metricdata.ResourceMetrics
-	if err := reader.Collect(context.Background(), &rm); err != nil {
-		t.Fatal(err)
+	m := metricstest.Find(t, reader, "bothy.ratelimit.rejected")
+	if m.Unit != "{request}" {
+		t.Errorf("unit %q", m.Unit)
 	}
-	got := map[string]int64{}
-	for _, sm := range rm.ScopeMetrics {
-		for _, m := range sm.Metrics {
-			if m.Name != "bothy.ratelimit.rejected" {
-				continue
-			}
-			if m.Unit != "{request}" {
-				t.Errorf("unit %q", m.Unit)
-			}
-			for _, dp := range m.Data.(metricdata.Sum[int64]).DataPoints {
-				v, _ := dp.Attributes.Value(attribute.Key("bothy.ratelimit.class"))
-				if dp.Attributes.Len() != 1 {
-					t.Errorf("attributes %v", dp.Attributes.ToSlice())
-				}
-				got[v.AsString()] += dp.Value
-			}
-		}
-	}
-	if len(got) != 1 || got["rl.write"] != 2 {
-		t.Fatalf("bothy.ratelimit.rejected = %v, want rl.write: 2", got)
+	pts := metricstest.Points(m)
+	if len(pts) != 1 || len(pts[0].Attrs) != 1 || pts[0].Attrs["bothy.ratelimit.class"] != "rl.write" || pts[0].Value != 2 {
+		t.Fatalf("bothy.ratelimit.rejected = %+v, want rl.write: 2", pts)
 	}
 }
 

@@ -34,6 +34,11 @@ type Entry struct {
 	SpaceID, ChannelID ids.ID
 	// OccurredAt is the time of the event.
 	OccurredAt time.Time
+	// Live marks a dispatch of live delivery (phase live, durable or ephemeral): the writer
+	// measures bothy.delivery.duration for these entries only, not for catch-up and its flush.
+	Live bool
+	// Ephemeral marks a dispatch of an ephemeral event.
+	Ephemeral bool
 }
 
 // Targets is a set of removed targets of access.changed: spaces and channels, and the seq of

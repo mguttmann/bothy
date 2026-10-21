@@ -70,6 +70,9 @@ type Deps struct {
 	Log *slog.Logger
 	// Tracer is the tracer provider of the span gateway.connect; nil means the global one.
 	Tracer trace.TracerProvider
+	// Metrics records the frames discarded at a 4014 close and the delivery duration of live
+	// frames (M1-68); nil records nothing.
+	Metrics app.Metrics
 }
 
 // Handler is the HTTP handler of GET /api/v1/gateway (04 section 6, 19 SEC-CORS-3): it checks
@@ -105,6 +108,9 @@ func NewHandler(cfg Config, d Deps) (*Handler, error) {
 	}
 	if d.Tracer == nil {
 		d.Tracer = otel.GetTracerProvider()
+	}
+	if d.Metrics == nil {
+		d.Metrics = app.NopMetrics{}
 	}
 	return &Handler{cfg: cfg, d: d, origin: u}, nil
 }
@@ -179,6 +185,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // run serves one connection and ends the span with its outcome.
 func (h *Handler) run(ctx context.Context, ws *websocket.Conn, span trace.Span) {
 	conn := newConn(ws, h.cfg.OutboundQueueMax, h.d.Snapshot, h.d.Log)
+	conn.metrics, conn.clock = h.d.Metrics, h.d.Clock
 	conn.beforeWrite = h.beforeWrite
 	var wg gosync.WaitGroup
 	wg.Add(1)
@@ -239,6 +246,7 @@ func (h *Handler) read(ctx context.Context, c *app.Connection, conn *wsConn, pok
 	for !c.Closing() {
 		typ, rd, err := conn.ws.Reader(ctx)
 		if err != nil {
+			peerClosed(c, err)
 			return
 		}
 		if typ != websocket.MessageText {
@@ -267,6 +275,14 @@ func (h *Handler) read(ctx context.Context, c *app.Connection, conn *wsConn, pok
 	// After the close the reader stops: the close handshake of coder/websocket reads until the
 	// peer's close frame itself, and a frame left half read (binary or too large) must not be
 	// parsed as the next one.
+}
+
+// peerClosed hands the code of a client's close frame that ended the reader (err) to the
+// connection, for bothy.gateway.close.
+func peerClosed(c *app.Connection, err error) {
+	if code := websocket.CloseStatus(err); code != -1 {
+		c.PeerClosed(int(code))
+	}
 }
 
 // deadlines is the deadline goroutine: it ticks the gateway at the instant the connection asks

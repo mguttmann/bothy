@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+version: "prometheus/v1"
+service: "fixture"
+slos:
+  - name: "latency"
+    objective: 99.0
+    sli:
+      events:
+        error_query: >-
+          sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server"}[{{.window}}]))
+          -
+          sum(rate(http_server_request_duration_seconds_bucket{job="bothy/bothy-server",le="0.5"}[{{.window}}]))
+        total_query: sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server"}[{{.window}}]))

@@ -1,0 +1,35 @@
+{
+  "title": "Fixture",
+  "templating": {"list": [{"name": "env", "query": {"query": "label_values(target_info, deployment_environment_name)"}}]},
+  "panels": [
+    {
+      "title": "Latency",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\"}[$__rate_interval])))"},
+        {"refId": "B", "expr": "sum(rate(http_server_request_duration_seconds_bucket{le=\"0.5\"}[${__range}])) / sum(rate(http_server_request_duration_seconds_count[$__range]))"}
+      ]
+    },
+    {
+      "title": "Row",
+      "type": "row",
+      "panels": [
+        {
+          "title": "Closes",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "sum by (bothy_close_code) (rate(bothy_gateway_close_total{instance=~\".+\"}[5m])) and on (job) up"}]
+        },
+        {
+          "title": "Processes",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "targets": [{"refId": "A", "expr": "count by (service_name) (target_info) + max(bothy_event_fanout_lag_seconds) * 0 + max(slo:sli_error:ratio_rate5m)"}]
+        }
+      ]
+    },
+    {
+      "title": "Logs",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"refId": "A", "expr": "{service_name=\"bothy-server\"} | severity_number >= 17"}]
+    }
+  ]
+}

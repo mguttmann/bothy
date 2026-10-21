@@ -15,9 +15,6 @@ import (
 	"strconv"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
-
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
@@ -211,7 +208,7 @@ func (rw *routeWriter) finish() {
 // notChecked replaces a success without proof by 500 internal_error, counts it in
 // bothy.authz.errors and logs it with the route and the action (02 9.3, alarm BothyAuthzError).
 func (rw *routeWriter) notChecked(ctx context.Context) {
-	rw.c.authzErrors.Add(ctx, 1, metric.WithAttributes(attribute.String(attr.Reason, errs.CauseAuthzNotChecked)))
+	rw.c.authzErrors.Add(ctx, 1, errs.CauseAuthzNotChecked)
 	rw.c.log.LogAttrs(ctx, slog.LevelError, LogAuthzNotChecked,
 		slog.String(attr.HTTPRoute, rw.op.Path),
 		slog.String(attr.Action, rw.op.Action),

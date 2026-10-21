@@ -109,6 +109,8 @@ type Deps struct {
 	Log *slog.Logger
 	// Clock gives the creation times; nil means clock.System().
 	Clock clock.Clock
+	// Metrics counts the created messages (bothy.message.created); nil counts nothing.
+	Metrics Metrics
 }
 
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06
@@ -160,6 +162,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()
+	}
+	if d.Metrics == nil {
+		d.Metrics = noMetrics{}
 	}
 	return &Service{cfg: cfg, d: d}, nil
 }

@@ -30,11 +30,14 @@ type jobsKeys struct {
 	Maintenance     int           `config:"jobs.queue.maintenance.max_workers"`
 	Privacy         int           `config:"jobs.queue.privacy.max_workers"`
 	SoftStopTimeout time.Duration `config:"shutdown.jobs_soft_timeout"`
+	// StatementTimeout bounds the count query of bothy.job.queue (M1-68).
+	StatementTimeout time.Duration `config:"database.statement_timeout"`
 }
 
 // JobsConfig binds the configuration of the job runtime from v: jobs.schema, the parallelism of
-// the five queues (jobs.queue.<queue>.max_workers) and shutdown.jobs_soft_timeout. The logger is
-// left to the caller. The error names the key whose binding failed, never a value.
+// the five queues (jobs.queue.<queue>.max_workers), shutdown.jobs_soft_timeout and
+// database.statement_timeout (the bound of the count query of bothy.job.queue). The logger and
+// the meter provider (nil: the global one) are left to the caller. The error names the key whose binding failed, never a value.
 func JobsConfig(v *config.Values) (jobs.Config, error) {
 	var k jobsKeys
 	if err := config.Bind(v, &k); err != nil {
@@ -46,7 +49,8 @@ func JobsConfig(v *config.Values) (jobs.Config, error) {
 			jobs.QueueDefault: k.Default, jobs.QueueFiles: k.Files, jobs.QueueDelivery: k.Delivery,
 			jobs.QueueMaintenance: k.Maintenance, jobs.QueuePrivacy: k.Privacy,
 		},
-		SoftStopTimeout: k.SoftStopTimeout,
+		SoftStopTimeout:  k.SoftStopTimeout,
+		StatementTimeout: k.StatementTimeout,
 	}, nil
 }
 

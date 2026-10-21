@@ -32,7 +32,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # test helpers import it (docs/DECISIONS.md PL/8).
   testkit: {depends_on: [], vendors: []}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
-  pg: {depends_on: [secrets, testkit], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
+  # otel: the declarations of the metric registry for db.client.operation.duration and
+  # bothy.db.pool.connections (M1-68).
+  pg: {depends_on: [secrets, testkit, otel], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
   # River only here (R-AR-09); jobstest (internal/platform/jobs/jobstest) prepares pgtest
   # databases for the job runtime; only tests import it.
   jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}
@@ -81,7 +83,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance]
-    adapter_vendors: [otel, pgx]   # adapters/telemetry counts bothy.authz.errors (M1-25); sqlc code and the repository (M1-27)
+    adapter_vendors: [otel, pgx]   # adapters/telemetry counts bothy.authz.errors (M1-25), adapters/otelmetrics bothy.authz.decisions (M1-68); sqlc code and the repository (M1-27)
   identity:
     tables: [principals, users, owners, identity_providers, user_identities, local_credentials,
              enrollment_codes, auth_login_flows, auth_challenges, device_pairings,
@@ -155,8 +157,9 @@ modules:
     ws_ops: []
     depends_on: [identity, chat, files]
     # sqlc code and the repository (M1-56); UAX #29 grapheme clusters and NFC of the reaction
-    # symbol rule, only in adapters/unicode (M1-59).
-    adapter_vendors: [pgx, xtext, uniseg]
+    # symbol rule, only in adapters/unicode (M1-59); adapters/otelmetrics counts
+    # bothy.message.created (M1-68).
+    adapter_vendors: [pgx, xtext, uniseg, otel]
   status:
     tables: [status_components, status_incidents, status_incident_updates,
              status_incident_components, backup_runs]

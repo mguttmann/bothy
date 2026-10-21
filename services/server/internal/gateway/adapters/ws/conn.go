@@ -13,6 +13,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 )
 
 // Errors of Send; the gateway ignores them, the connection is ending.
@@ -45,12 +46,16 @@ type wsConn struct {
 	app *app.Connection
 	// beforeWrite is a test hook of the writer; nil in production.
 	beforeWrite func()
+	// metrics records the frames dropped at a 4014 close and the delivery duration of live
+	// frames; clock is the time of the latter. newConn sets no-op and system defaults.
+	metrics app.Metrics
+	clock   clock.Clock
 }
 
 // newConn returns the connection over ws with a queue of queueMax frames.
 func newConn(ws *websocket.Conn, queueMax int, snapshot SnapshotEncoder, log *slog.Logger) *wsConn {
 	return &wsConn{ws: ws, snapshot: snapshot, log: log, queue: domain.NewQueue(queueMax), done: make(chan struct{}),
-		ready: make(chan struct{}, 1), space: make(chan struct{})}
+		ready: make(chan struct{}, 1), space: make(chan struct{}), metrics: app.NopMetrics{}, clock: clock.System()}
 }
 
 // bind sets the gateway's connection of w.
@@ -121,6 +126,8 @@ func (w *wsConn) Send(f any) error {
 		if w.isDone() {
 			return errClosing
 		}
+		// The frame that did not fit is discarded with the queue.
+		w.metrics.Dropped(context.Background(), app.ReasonSlowConsumer, 1)
 		w.closeApp(domain.CloseSlowConsumer)
 		return errOverflow
 	}
@@ -158,23 +165,26 @@ func (w *wsConn) Purge(t domain.Targets) {
 	}
 }
 
-// pop returns the oldest queued frame.
-func (w *wsConn) pop() ([]byte, bool) {
+// pop returns the oldest queued entry.
+func (w *wsConn) pop() (domain.Entry, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	e, ok := w.queue.Pop()
 	if ok {
 		w.freed()
 	}
-	return e.Frame, ok
+	return e, ok
 }
 
 // Close implements app.Conn: the first call stops the writer and starts the close handshake with
-// code and reason in its own goroutine; later calls do nothing.
+// code and reason in its own goroutine; later calls do nothing. The frames still queued at a 4014
+// close count in bothy.gateway.outbound.dropped (reason slow_consumer).
 func (w *wsConn) Close(code domain.CloseCode, reason string) {
 	w.closing.Do(func() {
 		close(w.done)
-		w.dropQueue()
+		if n := w.dropQueue(); n > 0 && code == domain.CloseSlowConsumer {
+			w.metrics.Dropped(context.Background(), app.ReasonSlowConsumer, n)
+		}
 		w.closed.Add(1)
 		go func() {
 			defer w.closed.Done()
@@ -192,19 +202,21 @@ func (w *wsConn) abort() {
 	})
 }
 
-// dropQueue drops every queued frame of a closing connection.
-func (w *wsConn) dropQueue() {
+// dropQueue drops every queued frame of a closing connection and returns how many there were.
+func (w *wsConn) dropQueue() int {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	n := w.queue.Len()
 	w.queue.Clear()
 	w.freed()
+	return n
 }
 
 // write is the writer goroutine: it writes the queued frames in order, each with the deadline
 // gateway.write_timeout, until the connection closes or a write fails.
 func (w *wsConn) write(timeout time.Duration) {
 	for {
-		b, ok := w.pop()
+		e, ok := w.pop()
 		if !ok {
 			select {
 			case <-w.done:
@@ -213,10 +225,31 @@ func (w *wsConn) write(timeout time.Duration) {
 			}
 			continue
 		}
-		if !w.writeOne(b, timeout) {
+		if !w.writeOne(e.Frame, timeout) {
 			return
 		}
+		if e.Live {
+			w.delivered(e)
+		}
 	}
+}
+
+// delivered records bothy.delivery.duration of the live frame e just written: occurred_at to now,
+// with the durability of the event and the kind of the receiver.
+func (w *wsConn) delivered(e domain.Entry) {
+	w.mu.Lock()
+	c := w.app
+	w.mu.Unlock()
+	kind := ""
+	if c != nil {
+		_, _, k := c.Result()
+		kind = string(k)
+	}
+	durability := app.DurabilityDurable
+	if e.Ephemeral {
+		durability = app.DurabilityEphemeral
+	}
+	w.metrics.Delivered(context.Background(), w.clock.Now().Sub(e.OccurredAt), durability, kind)
 }
 
 // writeOne writes one frame and reports whether the writer goes on. A missed deadline ends the
@@ -235,6 +268,8 @@ func (w *wsConn) writeOne(b []byte, timeout time.Duration) bool {
 	defer cancel()
 	if err := w.ws.Write(ctx, websocket.MessageText, b); err != nil {
 		if ctx.Err() != nil {
+			// The frame that missed gateway.write_timeout is discarded with the queue.
+			w.metrics.Dropped(context.Background(), app.ReasonSlowConsumer, 1)
 			w.closeApp(domain.CloseSlowConsumer)
 		}
 		w.abort()

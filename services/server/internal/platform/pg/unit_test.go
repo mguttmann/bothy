@@ -5,6 +5,7 @@ package pg_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -729,5 +730,55 @@ func TestUnitOfWork_RegistrationsNameTheOwningModule(t *testing.T) {
 	// A closure of platform/pg has no owning module.
 	if err := reg.SetHook(txn.PhaseAudit, func(context.Context) error { return nil }); err == nil {
 		t.Error("a hook of platform/pg was accepted")
+	}
+}
+
+// TestUnitOfWork_AfterCommitRunsOnlyAfterCommit: functions registered with txn.AfterCommit run
+// once after the commit of the outermost unit, nested registrations included; a rolled-back
+// attempt (an error, or a retried deadlock) runs none of its registrations.
+func TestUnitOfWork_AfterCommitRunsOnlyAfterCommit(t *testing.T) {
+	t.Parallel()
+	e := newUnitEnv(t)
+	uow := e.uow(txn.NewRegistry())
+	var ran []string
+	var attempts atomic.Int32
+	err := uow.Do(context.Background(), func(ctx context.Context) error {
+		n := attempts.Add(1)
+		if !txn.AfterCommit(ctx, func() { ran = append(ran, fmt.Sprintf("outer %d", n)) }) {
+			t.Error("AfterCommit inside a unit reported false")
+		}
+		if err := uow.Do(ctx, func(ctx context.Context) error {
+			txn.AfterCommit(ctx, func() { ran = append(ran, fmt.Sprintf("nested %d", n)) })
+			return nil
+		}); err != nil {
+			return err
+		}
+		if n == 1 {
+			return &pgconn.PgError{Code: "40P01", Message: "simulated"}
+		}
+		if len(ran) != 0 {
+			t.Errorf("ran %v before the commit", ran)
+		}
+		return insert(ctx, 31, "x")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"outer 2", "nested 2"}; !slices.Equal(ran, want) {
+		t.Errorf("ran %v, want %v", ran, want)
+	}
+	ran = nil
+	boom := errors.New("veto")
+	if err := uow.Do(context.Background(), func(ctx context.Context) error {
+		txn.AfterCommit(ctx, func() { ran = append(ran, "rolled back") })
+		return boom
+	}); !errors.Is(err, boom) {
+		t.Fatalf("Do = %v", err)
+	}
+	if len(ran) != 0 {
+		t.Errorf("a rolled-back unit ran %v", ran)
+	}
+	if txn.AfterCommit(context.Background(), func() {}) {
+		t.Error("AfterCommit outside a unit reported true")
 	}
 }

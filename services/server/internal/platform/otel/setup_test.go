@@ -6,12 +6,16 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
@@ -217,5 +221,58 @@ func TestErrorHandlerConstantAndRateLimited(t *testing.T) {
 		if rec["msg"] != msgExportError || rec[attr.ErrorType] != "*errors.errorString" {
 			t.Errorf("line = %v", rec)
 		}
+	}
+}
+
+// failingMetricExporter fails every export.
+type failingMetricExporter struct{}
+
+func (failingMetricExporter) Temporality(sdkmetric.InstrumentKind) metricdata.Temporality {
+	return metricdata.CumulativeTemporality
+}
+func (failingMetricExporter) Aggregation(k sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+	return sdkmetric.DefaultAggregationSelector(k)
+}
+func (failingMetricExporter) Export(context.Context, *metricdata.ResourceMetrics) error {
+	return errExport
+}
+func (failingMetricExporter) ForceFlush(context.Context) error { return nil }
+func (failingMetricExporter) Shutdown(context.Context) error   { return nil }
+
+// TestTelemetry_ExportFailureDoesNotAffectRequest: with exporters of every signal failing, a
+// request through Middleware answers the same status and body as without telemetry (17 rule 4).
+func TestTelemetry_ExportFailureDoesNotAffectRequest(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		RecordRoute(r, "/api/v1/things")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("created"))
+	})
+	plain := httptest.NewRecorder()
+	handler.ServeHTTP(plain, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/things", nil))
+
+	tel, err := setup(context.Background(), testConfig(), Deps{
+		Secrets: testSecrets(t, testKey), Stdout: &syncBuffer{}, Env: []string{"OTEL_METRICS_EXPORTER=none"},
+	}, setupOptions{spanExporter: failingSpanExporter{}, logExporter: failingLogExporter{},
+		metricReader: sdkmetric.NewPeriodicReader(failingMetricExporter{}, sdkmetric.WithInterval(time.Millisecond))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+		defer cancel()
+		_ = tel.Shutdown(ctx)
+	})
+	h := Middleware(handler)
+	for range 20 {
+		got := httptest.NewRecorder()
+		h.ServeHTTP(got, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/things", nil))
+		if got.Code != plain.Code || got.Body.String() != plain.Body.String() {
+			t.Fatalf("with failing exporters %d %q, without telemetry %d %q", got.Code, got.Body.String(), plain.Code, plain.Body.String())
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+	defer cancel()
+	if err := tel.ForceFlush(ctx); err == nil {
+		t.Error("ForceFlush succeeded; the exporters were meant to fail")
 	}
 }
