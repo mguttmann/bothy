@@ -47,7 +47,7 @@ build tickets (M7-16).
    locally and in the backend (https://opentofu.org/docs/language/state/encryption/, retrieved
    2026-10-10) [verified]; the root module of every instance turns this on.
 3. Ports as in the Compose stack: only the edge is public; database and storage only in the
-   private network. `generic-vm` renders an nftables table that admits SSH and, with
+   private network. `generic-vm` renders an nftables table that admits the sshd port and, with
    `edge_mode = reverse_proxy`, port 443 only; the stack publishes on `127.0.0.1`.
 4. Provider versions are pinned (`required_providers`); Renovate keeps them current.
    `generic-vm` needs no provider (built-in features of OpenTofu only).

@@ -106,6 +106,12 @@ variable "ssh_port" {
   default     = 22
 }
 
+variable "sshd_port" {
+  description = "Port sshd listens on, on the host (null: ssh_port)."
+  type        = number
+  default     = null
+}
+
 variable "provision_over_ssh" {
   description = "Deliver the setup over SSH instead of cloud-init only."
   type        = bool
@@ -128,6 +134,7 @@ module "vm" {
   admin_ssh_public_keys = var.admin_ssh_public_keys
   ssh_host              = var.ssh_host
   ssh_port              = var.ssh_port
+  sshd_port             = var.sshd_port
   provision_over_ssh    = var.provision_over_ssh
   release_repository    = var.release_repository
   release_base_url      = var.release_base_url

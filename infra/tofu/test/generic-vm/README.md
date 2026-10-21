@@ -35,7 +35,10 @@
    `secrets/` without contents, the Docker packages, the firewall table, the containers with
    their IDs and start times), the same setup over SSH (`provision_over_ssh = true`, key in a
    throwaway `ssh-agent`), the snapshot again (must be equal) and a plan without changes.
-7. The setup with `bad-sum` and `bad-sig` in another stack directory: both stop in the step
+7. Under the pseudo terminal of an SSH session (as `remote-exec` runs the delivery), a probe
+   sees `/dev/tty`, and the same probe through the function `detached` of the setup does not:
+   `install.sh` cannot print the enrollment code past the filter of its output.
+8. The setup with `bad-sum` and `bad-sig` in another stack directory: both stop in the step
    `verify` with exit code 1, the directory is never created, and the snapshot stays equal.
 
 Everything runs in a `mktemp -d` directory, which is removed at the end with the VM disk; QEMU,

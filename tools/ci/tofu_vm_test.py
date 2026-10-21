@@ -359,7 +359,7 @@ class VM:
         ]  # fmt: skip
 
     def run(
-        self, script: str, *, check: bool = True, timeout: float = STEP_TIMEOUT_S
+        self, script: str, *, check: bool = True, timeout: float = STEP_TIMEOUT_S, tty: bool = False
     ) -> subprocess.CompletedProcess[str]:
         """Run a shell script as root in the VM.
 
@@ -373,7 +373,7 @@ class VM:
             ' rc=$?; rm -f "$s"; exit $rc'
         )
         proc = subprocess.run(  # nosec B603
-            ["ssh", *self.ssh_args(), f"{SSH_USER}@127.0.0.1", remote],
+            ["ssh", *self.ssh_args(), *(["-tt"] if tty else []), f"{SSH_USER}@127.0.0.1", remote],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -638,6 +638,8 @@ def step_trial(ctx: Context, stack: ExitStack, www: Path) -> None:
         "admin_ssh_public_keys": [key.with_suffix(".pub").read_text(encoding="utf-8").strip()],
         "ssh_host": "127.0.0.1",
         "ssh_port": ctx.vm.port,
+        # The forwarded port is not the port of sshd inside the VM, which the firewall admits.
+        "sshd_port": 22,
     }
 
 
@@ -734,6 +736,25 @@ def step_second_delivery(ctx: Context, tofu: Tofu) -> str:
     return before
 
 
+TTY_PROBE = "sh -c 'if (: </dev/tty) 2>/dev/null; then echo TTY; else echo NOTTY; fi'"
+
+
+def step_no_terminal(ctx: Context) -> None:
+    """Under the pseudo terminal of an SSH session (as remote-exec runs the delivery), the
+    function `detached` of the setup leaves install.sh without a terminal, so the enrollment
+    code cannot reach /dev/tty (D-M7-15-4); without it the probe sees the terminal."""
+    vm = ctx.need_vm()
+    script = (
+        "eval \"$(sed -n '/^detached() {/,/^}/p' /usr/local/lib/bothy/bothy-setup)\"\n"
+        f"echo plain=$({TTY_PROBE})\n"
+        f"echo detached=$(detached {TTY_PROBE})\n"
+    )
+    out = vm.run(script, tty=True).stdout
+    if "plain=TTY" not in out or "detached=NOTTY" not in out:
+        raise VMTestError(f"the terminal probe did not show the detachment: {out.strip()}")
+    ctx.report.step("no terminal: under an SSH PTY install.sh runs without /dev/tty")
+
+
 def step_negative(ctx: Context, before: str) -> None:
     """A wrong checksum and a wrong signature stop the setup before anything is unpacked."""
     vm = ctx.need_vm()
@@ -770,6 +791,7 @@ def run(args: argparse.Namespace) -> int:
             step_boot(ctx, tofu, www)
             step_smoke(ctx)
             before = step_second_delivery(ctx, tofu)
+            step_no_terminal(ctx)
             step_negative(ctx, before)
             vm = ctx.need_vm()
             vm.run("poweroff", check=False, timeout=30)

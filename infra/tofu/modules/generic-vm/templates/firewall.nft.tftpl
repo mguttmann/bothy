@@ -18,7 +18,7 @@ table inet bothy_edge {
 		meta l4proto { icmp, ipv6-icmp } accept
 		# DHCP and DHCPv6 replies of the address lease.
 		udp dport { 68, 546 } accept
-		tcp dport 22 accept
+		tcp dport ${ssh_port} accept
 %{ if edge_port != "" ~}
 		tcp dport ${edge_port} accept
 %{ endif ~}

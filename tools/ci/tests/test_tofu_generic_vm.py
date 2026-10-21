@@ -298,3 +298,26 @@ def test_ssh_delivery_plans_one_provisioner(tofu: str, data_dir: Path, tmp_path:
     _, plan_json = plan(tofu, data_dir, tmp_path)
     changes = json.loads(plan_json).get("resource_changes", [])
     assert not [c for c in changes if c["type"] == "terraform_data"]
+
+
+@pytest.mark.parametrize(
+    ("values", "port"),
+    [({"ssh_port": 2222}, "2222"), ({"ssh_port": 40022, "sshd_port": 22}, "22"), ({}, "22")],
+)
+def test_firewall_admits_the_sshd_port_of_the_host(
+    tofu: str, data_dir: Path, tmp_path: Path, values: dict[str, Any], port: str
+) -> None:
+    outputs, _ = plan(tofu, data_dir, tmp_path, edge_mode="private", **values)
+    ports = re.findall(r"tcp dport (\d+) accept", files(outputs["user_data"])[FIREWALL])
+    assert ports == [port]
+
+
+def test_install_sh_runs_without_a_controlling_terminal(
+    tofu: str, data_dir: Path, tmp_path: Path
+) -> None:
+    # The SSH delivery runs under a PTY; with a terminal install.sh prints the enrollment code to
+    # /dev/tty, past the filter of standard output (D-M7-15-4). The VM test proves the effect.
+    outputs, _ = plan(tofu, data_dir, tmp_path)
+    script = files(outputs["user_data"])[SETUP]
+    assert re.search(r"^detached\(\) \{\n\tsetsid -w \"\$@\" </dev/null\n\}$", script, re.M)
+    assert 'detached runuser -u bothy -- /bin/sh "$work/install.sh"' in script
