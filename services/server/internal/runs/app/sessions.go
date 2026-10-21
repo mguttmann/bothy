@@ -50,6 +50,12 @@ func (s *Service) invocationSession(ctx context.Context, sum runs.RunSummary, op
 	if err != nil {
 		return domain.SessionDecision{}, errs.Wrap(errs.CodeInternalError, err, "runs: the agent_session of agent.invocation")
 	}
+	// The run records the row it is invoked with, so its start keeps it even when a reset or a
+	// bind ends it while the run is queued (09 9.4, design note 8 h); "used" counts only started
+	// runs (SessionUsed), so recording it here changes no mode.
+	if err := s.d.Repo.SetRunSession(ctx, sum.ID, got.Row.ID); err != nil {
+		return domain.SessionDecision{}, err
+	}
 	return domain.DecideSession(true, &domain.SessionRow{JSON: raw, Started: got.Row.Started, Used: used}), nil
 }
 
@@ -68,9 +74,9 @@ func (s *Service) attachOnStart(ctx context.Context, row RunRow, cmd runs.StartR
 		ref = *cmd.ExternalSessionRef
 	}
 	id, err := s.d.Sessions.AttachOnStart(ctx, agents.AttachOnStartCmd{
-		ThreadID: row.ThreadID, RunID: row.ID, AgentID: row.AgentID, ExternalSessionRef: ref, Model: cmd.Model,
+		ThreadID: row.ThreadID, RunID: row.ID, AgentID: row.AgentID, SessionID: row.AgentSessionID, ExternalSessionRef: ref, Model: cmd.Model,
 	})
-	if err != nil || id.IsZero() {
+	if err != nil || id.IsZero() || id == row.AgentSessionID {
 		return err
 	}
 	return s.d.Repo.SetRunSession(ctx, row.ID, id)

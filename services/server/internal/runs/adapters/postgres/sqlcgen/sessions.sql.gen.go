@@ -64,7 +64,8 @@ func (q *Queries) LockActiveRunOfThread(ctx context.Context, threadID pgtype.UUI
 
 const sessionUsed = `-- name: SessionUsed :one
 SELECT EXISTS (
-    SELECT 1 FROM runs WHERE thread_id = $1 AND agent_session_id = $2
+    SELECT 1 FROM runs
+    WHERE thread_id = $1 AND agent_session_id = $2 AND started_at IS NOT NULL
 ) AS used
 `
 
@@ -73,9 +74,11 @@ type SessionUsedParams struct {
 	SessionID pgtype.UUID
 }
 
-// Whether some run of the thread already used the session row (resume rather than bind, 09 9.1).
-// A row belongs to one thread, and only runs of that thread attach it, so the thread prefix of
-// runs_thread_queued_idx serves the lookup.
+// Whether some run of the thread already used the session row (resume rather than bind, 09 9.1):
+// a run that started with it. The acceptance records the row a run is invoked with before the run
+// starts, so a queued run that never started has not used it. A row belongs to one thread, and
+// only runs of that thread attach it, so the thread prefix of runs_thread_queued_idx serves the
+// lookup.
 func (q *Queries) SessionUsed(ctx context.Context, arg SessionUsedParams) (bool, error) {
 	row := q.db.QueryRow(ctx, sessionUsed, arg.ThreadID, arg.SessionID)
 	var used bool

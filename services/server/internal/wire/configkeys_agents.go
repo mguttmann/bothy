@@ -31,7 +31,7 @@ func agentsConfigKeys() []config.Key {
 		// B-tree entry limit of 8 kB pages for every configured value, so an over-long reference is
 		// a field error (too_long), never a database error and a 500 (docs/DECISIONS.md D-M2-12-9).
 		{Name: "agent.session_ref_max_bytes", Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: chapter09,
-			Doc: "Longest external_session_ref in bytes; the maximum keeps an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL B-tree entry limit."},
+			Doc: "Longest external_session_ref and model of an agent session in bytes; the maximum keeps an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL B-tree entry limit."},
 	}
 }
 

@@ -100,9 +100,13 @@ type InvocationSession struct {
 }
 
 // AttachOnStartCmd is the input of Sessions.AttachOnStart: the run that starts (queued ->
-// running), its agent and the reference and model of run.start ("" when absent).
+// running), its agent, the row it was invoked with (runs.agent_session_id, zero for none) and the
+// reference and model of run.start ("" when absent).
 type AttachOnStartCmd struct {
-	ThreadID, RunID, AgentID  ids.ID
+	ThreadID, RunID, AgentID ids.ID
+	// SessionID is the session row the invocation named (runs records it at the acceptance);
+	// zero when the run was invoked without a row (session_mode new).
+	SessionID                 ids.ID
 	ExternalSessionRef, Model string
 }
 
@@ -136,9 +140,10 @@ type Sessions interface {
 	//
 	//	s, err := sessions.ForInvocation(ctx, agents.InvocationSessionQuery{ThreadID: t, AgentID: op, TriggeredBy: alex})
 	ForInvocation(ctx context.Context, q InvocationSessionQuery) (InvocationSession, error)
-	// AttachOnStart returns the session row a starting operator run attaches to, creating it from
-	// the reference of run.start when needed (M2-12 design note 10); zero for a guest run and for a
-	// start without reference and without a current row. It never changes an existing row.
+	// AttachOnStart returns the session row a starting operator run attaches to (M2-12 design note
+	// 10): the row it was invoked with when it has one, otherwise the row created from the
+	// reference of run.start; zero for a guest run and for a start without row and reference. It
+	// never changes an existing row.
 	// Errors: validation_failed with pointer /external_session_ref for an invalid reference.
 	AttachOnStart(ctx context.Context, cmd AttachOnStartCmd) (sessionID ids.ID, err error)
 }

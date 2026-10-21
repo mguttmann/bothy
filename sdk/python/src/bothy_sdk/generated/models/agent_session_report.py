@@ -17,7 +17,7 @@ class AgentSessionReport:
     Attributes:
         external_session_ref (str): The reference the runtime actually uses; a different one replaces the stored
             reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
-        model (str | Unset):
+        model (str | Unset): The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
         started (bool | Unset): `true` once the runtime confirmed the external session (09, 9.1); `started` only moves
             forward, `false` never resets it.
         bind_failed (AgentSessionReportBindFailed | Unset): The bound session no longer exists in the runtime and the

@@ -13,7 +13,7 @@ part 'agent_session_report.g.dart';
 ///
 /// Properties:
 /// * [externalSessionRef] - The reference the runtime actually uses; a different one replaces the stored reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
-/// * [model]
+/// * [model] - The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
 /// * [started] - `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it.
 /// * [bindFailed] - The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
 @BuiltValue()
@@ -23,6 +23,7 @@ abstract class AgentSessionReport
   @BuiltValueField(wireName: r'external_session_ref')
   String get externalSessionRef;
 
+  /// The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
   @BuiltValueField(wireName: r'model')
   String? get model;
 

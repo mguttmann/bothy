@@ -12,11 +12,14 @@
 UPDATE runs SET agent_session_id = sqlc.arg(session_id) WHERE id = sqlc.arg(id);
 
 -- name: SessionUsed :one
--- Whether some run of the thread already used the session row (resume rather than bind, 09 9.1).
--- A row belongs to one thread, and only runs of that thread attach it, so the thread prefix of
--- runs_thread_queued_idx serves the lookup.
+-- Whether some run of the thread already used the session row (resume rather than bind, 09 9.1):
+-- a run that started with it. The acceptance records the row a run is invoked with before the run
+-- starts, so a queued run that never started has not used it. A row belongs to one thread, and
+-- only runs of that thread attach it, so the thread prefix of runs_thread_queued_idx serves the
+-- lookup.
 SELECT EXISTS (
-    SELECT 1 FROM runs WHERE thread_id = sqlc.arg(thread_id) AND agent_session_id = sqlc.arg(session_id)
+    SELECT 1 FROM runs
+    WHERE thread_id = sqlc.arg(thread_id) AND agent_session_id = sqlc.arg(session_id) AND started_at IS NOT NULL
 ) AS used;
 
 -- name: LockActiveRunOfThread :one

@@ -1093,17 +1093,28 @@ func TestSessionsAttachOnStart(t *testing.T) {
 		_, err := attach(e, agents.AttachOnStartCmd{ThreadID: ids.New(), AgentID: e.lotse.ID})
 		wantCode(t, err, errs.CodeNotFound)
 	})
-	t.Run("current row of the agent", func(t *testing.T) {
+	t.Run("the row the run was invoked with", func(t *testing.T) {
 		t.Parallel()
 		e := newSessEnv(t)
 		cur := e.row(e.thread, e.lotse.ID, "sess-a", true, false, 0)
 		for _, cmd := range []agents.AttachOnStartCmd{cmdOf(e, "sess-other", "model-small"), cmdOf(e, "", "")} {
+			cmd.SessionID = cur.ID
 			got, err := attach(e, cmd)
 			if err != nil || got != cur.ID {
 				t.Fatalf("AttachOnStart = %s, %v", got, err)
 			}
 		}
 		e.wantNothingChanged([]agents.Session{cur})
+	})
+	t.Run("a row bound while the run was queued", func(t *testing.T) {
+		t.Parallel()
+		e := newSessEnv(t)
+		bound := e.row(e.thread, e.lotse.ID, "sess-b", true, true, 0)
+		got, err := attach(e, cmdOf(e, "", ""))
+		if err != nil || !got.IsZero() {
+			t.Fatalf("AttachOnStart = %s, %v; a run invoked without a row must not take the bound row", got, err)
+		}
+		e.wantNothingChanged([]agents.Session{bound})
 	})
 	t.Run("no reference and no row", func(t *testing.T) {
 		t.Parallel()

@@ -107,7 +107,7 @@
       "min": "1",
       "max": "2048",
       "chapter": "09-agenten.md",
-      "doc": "Longest external_session_ref in bytes; the maximum keeps an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL B-tree entry limit."
+      "doc": "Longest external_session_ref and model of an agent session in bytes; the maximum keeps an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL B-tree entry limit."
     },
     {
       "name": "api.cors_allowed_origins",

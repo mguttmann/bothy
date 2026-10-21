@@ -35,7 +35,7 @@ func isCode(err error, code errs.Code) bool {
 
 // TestSetRunSessionAndSessionUsed (M2-12 design notes 9 and 10): SetRunSession writes only
 // runs.agent_session_id (no version change), the run reads it back, and SessionUsed tells a row a
-// run of the thread used from one no run used. An unknown run is not_found; outside a unit of
+// run of the thread started with from one no started run used. An unknown run is not_found; outside a unit of
 // work the write is internal.
 func TestSetRunSessionAndSessionUsed(t *testing.T) {
 	t.Parallel()
@@ -51,6 +51,18 @@ func TestSetRunSessionAndSessionUsed(t *testing.T) {
 			t.Errorf("run after SetRunSession: %+v", row)
 		}
 		got = row.State
+		// A queued run that never started has not used its row (the acceptance records it).
+		u, err := e.repo.SessionUsed(ctx, w.thread, used)
+		if err == nil && u {
+			t.Errorf("SessionUsed of the row of a queued run = true, want false")
+		}
+		return err
+	})
+	if got != domain.StateQueued {
+		t.Fatalf("state %s", got)
+	}
+	e.exec(t, `UPDATE runs SET state = 'running', started_at = now(), version = version + 1 WHERE id = $1`, run.ID.String())
+	e.do(t, func(ctx context.Context) error {
 		for id, want := range map[ids.ID]bool{used: true, unused: false} {
 			u, err := e.repo.SessionUsed(ctx, w.thread, id)
 			if err != nil {
@@ -60,11 +72,8 @@ func TestSetRunSessionAndSessionUsed(t *testing.T) {
 				t.Errorf("SessionUsed(%s) = %v, want %v", id, u, want)
 			}
 		}
-		return err
+		return nil
 	})
-	if got != domain.StateQueued {
-		t.Fatalf("state %s", got)
-	}
 	err := e.uow.Do(context.Background(), func(ctx context.Context) error { return e.repo.SetRunSession(ctx, ids.New(), used) })
 	if !isCode(err, errs.CodeNotFound) {
 		t.Fatalf("unknown run: %v", err)

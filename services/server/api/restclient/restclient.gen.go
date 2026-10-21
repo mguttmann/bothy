@@ -6374,7 +6374,9 @@ type AgentSessionReport struct {
 	// Examples: sess-7f3a
 	ExternalSessionRef string `json:"external_session_ref"`
 
-	// Model Examples: model-large
+	// Model The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
+	//
+	// Examples: model-large
 	Model *string `json:"model,omitempty"`
 
 	// Started `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it.

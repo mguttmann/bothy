@@ -218,15 +218,24 @@ func CheckExternalSessionRef(ref string, maxBytes int) error {
 }
 
 // CheckModel validates a reported model (report, run.start): the pattern of default_model of
-// agent_operator_config.v1 (09 section 2.2). "" is an absent model and passes. Errors:
-// validation_failed on /model with code pattern.
+// agent_operator_config.v1 (09 section 2.2) and at most maxBytes bytes
+// (agent.session_ref_max_bytes): the model is shown in the session column and carried in every
+// agent.invocation of the thread, so an unbounded one would push those events past
+// sync.event_payload_max_bytes. "" is an absent model and passes. Errors: validation_failed on
+// /model with code pattern or too_long.
 //
 // Example:
 //
-//	err := domain.CheckModel("model-large")
-func CheckModel(model string) error {
-	if model != "" && !modelPattern.MatchString(model) {
+//	err := domain.CheckModel("model-large", cfg.SessionRefMaxBytes)
+func CheckModel(model string, maxBytes int) error {
+	if model == "" {
+		return nil
+	}
+	if !modelPattern.MatchString(model) {
 		return fieldError(PointerModel, FieldPattern, "the model is not a model name")
+	}
+	if len(model) > maxBytes {
+		return fieldError(PointerModel, FieldTooLong, "the model is longer than agent.session_ref_max_bytes")
 	}
 	return nil
 }

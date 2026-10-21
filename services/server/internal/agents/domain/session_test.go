@@ -184,18 +184,25 @@ func TestValidateExternalSessionRef(t *testing.T) {
 }
 
 func TestValidateModel(t *testing.T) {
-	for _, ok := range []string{"", "model-large", "vendor/model:1.5@latest"} {
-		if err := domain.CheckModel(ok); err != nil {
+	const limit = 24
+	for _, ok := range []string{"", "model-large", "vendor/model:1.5@latest", strings.Repeat("m", limit)} {
+		if err := domain.CheckModel(ok, limit); err != nil {
 			t.Fatalf("CheckModel(%q) = %v, want nil", ok, err)
 		}
 	}
 	for _, bad := range []string{"model large", "model\n", "modell-ü"} {
-		pointer, code := fieldCode(t, domain.CheckModel(bad))
+		pointer, code := fieldCode(t, domain.CheckModel(bad, limit))
 		if pointer != domain.PointerModel || code != "pattern" {
 			t.Fatalf("CheckModel(%q) field = %s %s, want /model pattern", bad, pointer, code)
 		}
 	}
-	pointer, code := fieldCode(t, domain.CheckBindFailed("gone"))
+	// The model is shown in the session column and carried in every agent.invocation of the
+	// thread, so it is bounded like the reference (agent.session_ref_max_bytes).
+	pointer, code := fieldCode(t, domain.CheckModel(strings.Repeat("m", limit+1), limit))
+	if pointer != domain.PointerModel || code != "too_long" {
+		t.Fatalf("a model above the limit gave %s %s, want /model too_long", pointer, code)
+	}
+	pointer, code = fieldCode(t, domain.CheckBindFailed("gone"))
 	if pointer != domain.PointerBindFailed || code != "invalid" {
 		t.Fatalf("CheckBindFailed field = %s %s", pointer, code)
 	}

@@ -977,20 +977,23 @@ Referenz (Runner: wieder `--session-id` mit derselben UUID).
 In the payload of `agent.invocation` (4.4) `session.mode` is the member `session_mode` and the
 session row is `agent_session`; `new` without a row has no `agent_session`. The mode follows from
 the row: no row gives `new`; a row with `started = false` gives `new` with the row; a started row
-that a run already used gives `resume`; a started row that no run used gives `bind`.
+that a started run already used gives `resume`; a started row that no started run used gives
+`bind`. The invocation records its row in `runs.agent_session_id` of the new run, so the run keeps
+the row it was invoked with.
 
 Attach at `run.start` (`queued -> running`; `waiting_input -> running` keeps the run's row):
 
 1. A guest run attaches nothing; a reference in `run.start` is ignored.
-2. The thread has a current row of this agent: the run attaches it unchanged, even if the
-   reference or model in `run.start` differ. A change of an existing row comes only through
-   `agent_session.report`, so the `version` the adapter got with the payload stays valid for its
-   first `If-Match`.
-3. No current row of this agent and a reference given: the most recent row of this thread and
-   agent with that reference (a reset or rebind ended it after the run was queued) is attached
-   unchanged; otherwise the server creates a current row with the reference, `model` and
-   `started = false`. A new row starts at version 1 (03).
-4. No reference: nothing is attached; the first `agent_session.report` creates the row.
+2. The run was invoked with a row: it keeps that row unchanged, even if the reference or model in
+   `run.start` differ and even if a reset or a rebind ended the row while the run was queued (a
+   session switch during an active run leaves that run on its row, 9.2 and 9.4). A change of an
+   existing row comes only through `agent_session.report`, so the `version` the adapter got with
+   the payload stays valid for its first `If-Match`.
+3. The run was invoked without a row and a reference is given: the most recent row of this thread
+   and agent with that reference is attached unchanged; otherwise the server creates a current row
+   with the reference, `model` and `started = false`. A new row starts at version 1 (03). A row
+   bound while the run was queued is not attached: it is the session of the next run.
+4. No row and no reference: nothing is attached; the first `agent_session.report` creates the row.
 
 `runs.agent_session_id` is written in the same transaction. The reference is checked as in 9.4 point 1; an invalid one gives `400 validation_failed` with
 pointer `/external_session_ref`.
@@ -1067,7 +1070,9 @@ Der Import legt für einen importierten Thread mit früherer Sitzung eine frühe
    agent as author, and it does not reopen a closed thread (03 `messages`, R-DM-42). If a reset or
    rebind ended the bound row during the run, the new row is created already ended, with the same
    `end_reason` and `ended_at` now, so that decision stays in force (03 `ended_at`: "or was never
-   current"). `bind_failed` without a started session row of the run gives `409 conflict` with
+   current"). The new row starts at the version of the bound row plus one, so a concurrent
+   duplicate report with the old `If-Match` fails and the line is written exactly once.
+   `bind_failed` without a started session row of the run gives `409 conflict` with
    `reason` `session_not_bound`. Der Lauf geht weiter; die Box zeigt einmal "Frühere Sitzung nicht gefunden, neue
    Sitzung begonnen". Grund: Ein fehlender Verlauf darf das Weiterarbeiten nicht blockieren.
 5. Eine Import-Zeile wird nur gebunden, solange der Thread seit dem Import keine aktuelle Sitzung
@@ -1864,7 +1869,7 @@ Konfiguration des jeweiligen Programms außerhalb des Servers.
 | `component.custom_id_max_chars` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | Server | `10` | Felder je Formular |
 | `project.binding_text_max_chars` | Server | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) |
-| `agent.session_ref_max_bytes` | Server | `1024` | longest `external_session_ref` in bytes (bind, report, `run.start`; over it `too_long`); the maximum `2048` keeps an entry of the unique index on `(agent_id, external_session_ref)` within the PostgreSQL B-tree entry limit of 8 kB pages, so an over-long reference is a field error, never an internal error |
+| `agent.session_ref_max_bytes` | Server | `1024` | longest `external_session_ref` and longest `model` of a session in bytes (bind, report, `run.start`; over it `too_long`); the maximum `2048` keeps an entry of the unique index on `(agent_id, external_session_ref)` within the PostgreSQL B-tree entry limit of 8 kB pages, so an over-long reference is a field error, never an internal error |
 | `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | höchstens so oft JWKS neu laden |

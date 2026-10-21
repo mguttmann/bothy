@@ -7001,7 +7001,10 @@ export interface components {
              * @example sess-7f3a
              */
             external_session_ref: string;
-            /** @example model-large */
+            /**
+             * @description The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
+             * @example model-large
+             */
             model?: string;
             /** @description `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it. */
             started?: boolean;

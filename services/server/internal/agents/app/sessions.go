@@ -298,8 +298,11 @@ func (s *SessionService) bind(ctx context.Context, a actor.Actor, threadID ids.I
 	if err != nil {
 		return agents.Session{}, err
 	}
+	// A reference that fails the validation is current nowhere and never reaches the database
+	// before the permission is decided (a NUL would fail the query, R-AZ-01); step d refuses it.
+	refErr := domain.CheckExternalSessionRef(cmd.ExternalSessionRef, s.cfg.SessionRefMaxBytes)
 	var target bindTarget
-	if !op.IsZero() {
+	if !op.IsZero() && refErr == nil {
 		if target, err = s.boundElsewhere(ctx, op, cmd.ExternalSessionRef, info.ID); err != nil {
 			return agents.Session{}, err
 		}
@@ -311,8 +314,8 @@ func (s *SessionService) bind(ctx context.Context, a actor.Actor, threadID ids.I
 	if err := s.authorize(ctx, a, authorize.ActionAgentSessionBind, res); err != nil {
 		return agents.Session{}, err
 	}
-	if err := domain.CheckExternalSessionRef(cmd.ExternalSessionRef, s.cfg.SessionRefMaxBytes); err != nil {
-		return agents.Session{}, err
+	if refErr != nil {
+		return agents.Session{}, refErr
 	}
 	if target.set && !cmd.TakeOver {
 		return agents.Session{}, boundElsewhere()
@@ -601,7 +604,7 @@ func checkReport(cmd agents.ReportCmd, maxBytes int) error {
 	if err := domain.CheckExternalSessionRef(cmd.ExternalSessionRef, maxBytes); err != nil {
 		return err
 	}
-	if err := domain.CheckModel(cmd.Model); err != nil {
+	if err := domain.CheckModel(cmd.Model, maxBytes); err != nil {
 		return err
 	}
 	return domain.CheckBindFailed(cmd.BindFailed)
@@ -767,6 +770,14 @@ func (s *SessionService) importBinding(ctx context.Context, info chat.ThreadInfo
 	}
 	history := make([]domain.Session, 0, len(rows))
 	for _, r := range rows {
+		if r.IsCurrent {
+			// A concurrent first trigger committed its row after the lock found none (READ
+			// COMMITTED): that row is the session of this run when it is the operator's.
+			if r.AgentID == q.AgentID {
+				return agents.InvocationSession{Row: &r}, nil
+			}
+			return agents.InvocationSession{}, nil
+		}
 		history = append(history, toDomain(r))
 	}
 	cand, ok := domain.ImportBindingCandidate(history, q.AgentID)
@@ -822,12 +833,11 @@ func (s *SessionService) AttachOnStart(ctx context.Context, cmd agents.AttachOnS
 	if err := s.checkStart(cmd); err != nil {
 		return ids.ID{}, err
 	}
-	cur, found, err := s.d.Store.LockCurrentSession(ctx, info.ID)
-	if err != nil {
-		return ids.ID{}, err
-	}
-	if found && cur.AgentID == cmd.AgentID {
-		return cur.ID, nil
+	if !cmd.SessionID.IsZero() {
+		// The run keeps the row it was invoked with, also when a reset or a bind ended it while
+		// the run was queued: a session switch during an active run leaves that run on its row
+		// (09 9.2, 9.4; design note 8 h), and the next run gets the new mode.
+		return cmd.SessionID, nil
 	}
 	if cmd.ExternalSessionRef == "" {
 		return ids.ID{}, nil
@@ -843,7 +853,7 @@ func (s *SessionService) checkStart(cmd agents.AttachOnStartCmd) error {
 	if err := domain.CheckExternalSessionRef(cmd.ExternalSessionRef, s.cfg.SessionRefMaxBytes); err != nil {
 		return err
 	}
-	return domain.CheckModel(cmd.Model)
+	return domain.CheckModel(cmd.Model, s.cfg.SessionRefMaxBytes)
 }
 
 // createOnStart attaches the most recent row of the reference in the thread or creates the
