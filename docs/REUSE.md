@@ -259,7 +259,8 @@ in Discord, V1 liest aus Discord. Getestet wurden sie vor allem gegen Fake-Serve
   geschützten kurzen Namen entscheidet, ob ein menschlicher Titel als `auto` startet.
 - Umsetzung: `threads.title_source`, `thread.title.update` ([05-aktionen.md](spec/05-aktionen.md));
   Code-Stück 5.1.
-- Test: Tabellen-Test mit Platzhaltern und geschützten kurzen Namen.
+- Test: `TestIsPlaceholder_ProtectedShortNames` in `internal/chat/domain/title` (Tabellen-Test mit
+  Platzhaltern und geschützten kurzen Namen).
 
 ### L24 Neuer Chat über einen Umweg-Kanal (V3)
 

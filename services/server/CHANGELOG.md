@@ -11,6 +11,14 @@ documented in this file. The format is based on
 
 ### Added
 
+- Auto title and placeholder detection (M2-18, 09 section 12, AG-19): the package
+  `internal/chat/domain/title` decides placeholders and title sources in one place. The
+  placeholder words are data per language (`wordlists/de.txt`, `wordlists/en.txt`); the default of
+  `thread.placeholder_titles` is rendered from them and is now
+  `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]`, and a configured list
+  replaces it. A title change by an agent or app other than the thread's operator agent (the
+  creator) now sets `title_source = manual`, as 05 `thread.title.update` says; the operator agent
+  still keeps `auto` and gets `409 title_manual` on a manual title.
 - Start, renewal, end and cancellation of runs (M2-09, I3, R-SY-10, R-SY-11, R-SY-19): the
   operations `startRun`, `resumeRun`, `renewInvocationToken`, `awaitRunInput`, `finishRun` and
   `cancelRun` are enabled. A start checks the invocation token (signature, `kid`, `typ`, `alg`,
