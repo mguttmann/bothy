@@ -87,7 +87,7 @@ KINDS = {
 }
 """Kind column of the catalogue to the kind."""
 
-NO_ATTRIBUTES = frozenset({"none", "keine"})
+NO_ATTRIBUTES = frozenset({"none"})
 """Words of the attribute column for "no attribute"."""
 
 PERSON_KEYS = frozenset(

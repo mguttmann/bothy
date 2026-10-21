@@ -36,7 +36,7 @@ var kindWords = map[string]Kind{
 }
 
 // noAttributes are the words of the attribute column for "no attribute".
-var noAttributes = map[string]bool{"none": true, "keine": true}
+var noAttributes = map[string]bool{"none": true}
 
 var (
 	backticked = regexp.MustCompile("`([^`]+)`")
