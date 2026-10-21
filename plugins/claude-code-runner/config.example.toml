@@ -1,0 +1,40 @@
+# Example configuration of claude-code-runner (docs/spec/09-agenten.md 21). Keys are nested by
+# their dots: runner.stop_grace is stop_grace in [runner]. Defaults are shown; required keys
+# have no default.
+
+[runner]
+server_url = "https://chat.example.com"
+instance_id = "0192d3a0-0000-7000-8000-000000000001"
+agent_token_ref = "file:/var/lib/claude-code-runner/secrets/agent_token"
+dpop_key_ref = ""
+consumer = "default"
+tool_class = "chat"
+scoped_allowed_tools = []
+default_model = "model-large"
+anthropic_api_key_ref = ""
+allow_personal = false
+forward_ssh_agent = false
+cli_probe_timeout = "30s"
+poll_interval = "200ms"
+claude_bin = "claude"
+projects_root = "/srv/projects"
+state_dir = "/var/lib/claude-code-runner"
+followup_grace = "30s"
+stop_grace = "10s"
+kill_grace = "5s"
+session_lock_wait = "10m"
+max_parallel_runs = 4
+stream_log_retention = "14d"
+attach_allowed_roots = []
+attach_denied_patterns = []
+
+[adapter]
+invocation_token_leeway = "10s"
+jwks_refresh_min_interval = "60s"
+
+[agent]
+run_update_min_interval = "500ms"
+
+[sdk]
+http_timeout = "30s"
+retry_max_attempts = 5

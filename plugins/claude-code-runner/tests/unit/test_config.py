@@ -170,3 +170,16 @@ def test_check_argument() -> None:
     assert check_argument("Bash(git status)")
     for bad in ("", "-x", "a\x00b", "a\nb", "a\u200fb", "a\u2066b"):
         assert not check_argument(bad)
+
+
+def test_example_lists_every_runner_key() -> None:
+    import dataclasses
+    import tomllib
+
+    from claude_code_runner.config import RunnerConfig
+
+    example = tomllib.loads(
+        (Path(__file__).resolve().parents[2] / "config.example.toml").read_text()
+    )
+    fields = {f.name for f in dataclasses.fields(RunnerConfig)} - {"source", "sdk"}
+    assert set(example["runner"]) == fields
