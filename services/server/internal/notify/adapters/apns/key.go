@@ -51,21 +51,17 @@ func ParsePrivateKey(v secrets.Value) (*ecdsa.PrivateKey, error) {
 	return key, nil
 }
 
-// es256Signer implements jose.Signer with the APNs key: Alg is ES256 and Sign returns R || S as
-// exactly 64 bytes, each half left-padded to 32 bytes (RFC 7518 3.4), through jose.ES256Signer.
-// signs counts the signatures, so tests can count the JWT creations.
-type es256Signer struct {
-	key   *ecdsa.PrivateKey
-	count func()
-}
-
-// Alg returns jose.AlgES256.
-func (es256Signer) Alg() string { return jose.AlgES256 }
-
-// Sign signs SHA-256 of signingInput with the key.
-func (s es256Signer) Sign(signingInput []byte) ([]byte, error) {
-	if s.count != nil {
-		s.count()
-	}
-	return jose.ES256Signer{Key: s.key}.Sign(signingInput)
+// newSigner returns the ES256 signer of the APNs key as a jose.Signer: Alg is ES256 and Sign
+// returns R || S as exactly 64 bytes, each half left-padded to 32 bytes (RFC 7518 3.4), through
+// jose.ES256Signer. count, when set, is called once per signature, so tests can count the JWT
+// creations. It is a jose.SignerFunc, because the module boundaries let only kernel types cross
+// into kernel/jose (go-arch-lint deep scan).
+func newSigner(key *ecdsa.PrivateKey, count func()) jose.SignerFunc {
+	inner := jose.ES256Signer{Key: key}
+	return jose.SignerFunc{Algorithm: jose.AlgES256, Fn: func(signingInput []byte) ([]byte, error) {
+		if count != nil {
+			count()
+		}
+		return inner.Sign(signingInput)
+	}}
 }

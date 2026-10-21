@@ -60,7 +60,7 @@ func (m minter) mint(ctx context.Context, now time.Time) (tok, errType string, e
 	if err != nil {
 		return "", errorTypeInvalidKey, err
 	}
-	tok, err = jose.SignCompact(es256Signer{key: key, count: m.signed}, jose.Header{Kid: m.cfg.KeyID}, claims)
+	tok, err = jose.SignCompact(newSigner(key, m.signed), jose.Header{Kid: m.cfg.KeyID}, claims)
 	if err != nil {
 		return "", errorTypeInvalidKey, err
 	}
