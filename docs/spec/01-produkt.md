@@ -607,6 +607,13 @@ Herkunft (direkt, Gruppe, geerbt, Owner).
 
 **A4 Als Person ansehen.** Nur lesen; deutlicher Rahmen; jede Nutzung im Audit-Log.
 
+Console (M6-04, docs/DECISIONS.md D-M6-04-3): the console shows structure and access only. Starting
+the view from A3 or A1 calls `viewAsUser`; the console shows the spaces and channels of the answer
+as a structure list and the "Not visible" list (the spaces the owner sees and the person does not),
+and keeps the banner with name and remaining time on every page until `endViewAs` or the end time
+of `getConsoleSession`. A click on a channel opens nothing, because the console has no content
+routes (ADR 0028); the desktop app keeps showing content read-only.
+
 ```text
 +----------------------------------------------------------------------------------------------+
 | [Auge] Ansicht als Sam (nur lesen). Nichts wird gesendet. Protokolliert.       [Beenden]     |
