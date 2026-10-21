@@ -8,6 +8,7 @@
 # checks this file; it never rewrites it.
 version: 1
 enabled:             # operationIds that have a handler; sorted ascending
+  - ackAgentEvents
   - addGroupMember
   - addOwner
   - addReaction
@@ -71,6 +72,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getAgent
   - getApp
   - getChannel
+  - getConsumerState
   - getDevice
   - getDiscovery
   - getGrant
@@ -139,6 +141,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - moveThread
   - pairHost
   - pinMessage
+  - pollAgentEvents
   - previewGrant
   - putChannelDraft
   - putFeatureFlag
@@ -200,9 +203,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: abortUpload
     milestone: M3
     ticket: M3-03
-  - operation_id: ackAgentEvents
-    milestone: M2
-    ticket: M2-07
   - operation_id: addStatusIncidentUpdate
     milestone: M7
     ticket: M7-09
@@ -318,9 +318,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getCommand
     milestone: M2
     ticket: M2-16
-  - operation_id: getConsumerState
-    milestone: M2
-    ticket: M2-07
   - operation_id: getCostStats
     milestone: M6
     ticket: M6-05
@@ -443,9 +440,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: pauseImport
     milestone: M8
     ticket: M8-03
-  - operation_id: pollAgentEvents
-    milestone: M2
-    ticket: M2-07
   - operation_id: postIncomingWebhook
     milestone: M2
     ticket: M2-27
@@ -548,6 +542,7 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
 # moves it. The terminal channels are no gateway ops and are not listed.
 gateway_ops:
   enabled:           # sorted ascending
+    - ack
     - focus
     - heartbeat
     - identify
@@ -556,8 +551,6 @@ gateway_ops:
     - typing.start
     - typing.stop
   later:             # sorted by op
-    - op: ack
-      milestone: M2
     - op: command.autocomplete_result
       milestone: M2
     - op: run.update

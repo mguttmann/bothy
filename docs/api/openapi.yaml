@@ -12208,6 +12208,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -24654,6 +24656,7 @@ components:
         seq:
           type: integer
           format: int64
+          minimum: 0
           examples: [5301]
     ConsumerState:
       type: object
@@ -27266,6 +27269,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         consumer:
           type: string
+          pattern: ^[a-z0-9][a-z0-9_-]*$
           examples: [default]
         cursor:
           type: integer
@@ -27395,6 +27399,7 @@ components:
         seq:
           type: integer
           format: int64
+          minimum: 0
     GatewayRunUpdate:
       type: object
       additionalProperties: false

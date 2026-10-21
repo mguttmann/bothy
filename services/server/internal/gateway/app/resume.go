@@ -33,7 +33,7 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 		return closeWith(domain.CloseSessionInvalid)
 	}
 	g.sessions.update(func() { s.AuthSessionID, s.TokenID = a.SessionID, a.TokenID })
-	replace(g.sessions.bind(s, c))
+	g.replace(s, g.sessions.bind(s, c))
 	if !c.become(s, a, g.d.Clock.Now()) {
 		// The connection closed while resume ran: the session is detached again and expires
 		// with sync.resume_window.
@@ -51,7 +51,11 @@ func (g *Gateway) resume(ctx context.Context, c *Connection, d any) error {
 	g.connected(ctx, c, string(a.Kind))
 	c.beat(g.d.Clock.Now())
 	from := in.Cursor
-	if res.Reason != "" {
+	switch {
+	case g.consumerSession(a.Kind):
+		// The durable cursor of the consumer decides, not the client cursor (brief M2-07 note 4).
+		from = res.HeadSeq
+	case res.Reason != "":
 		if c.conn.Send(ResyncRequired{Reason: res.Reason, HeadSeq: res.HeadSeq, SyncEpoch: res.SyncEpoch}) == nil {
 			g.resynced(ctx, c, string(res.Reason))
 		}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	gosync "sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
@@ -88,7 +89,10 @@ type member struct {
 
 	// pending is true while the visible sets are unknown: the member is a candidate of every
 	// event, so the candidate set stays a superset of the allowed one.
-	pending      bool
+	pending bool
+	// consumer marks an agent session served by the ConsumerEngine: the hub keeps it out of the
+	// durable dispatch and wakes its runner instead (brief M2-07 note 6).
+	consumer     bool
 	scopeGen     uint64
 	spaces       []ids.ID
 	channels     []ids.ID
@@ -138,6 +142,10 @@ type Hub struct {
 	// and the flush decides with the rights of that moment (M1-65/15).
 	notLive   map[*member]struct{}
 	processed int64
+	// consumers serves agent sessions (M2-07); nil delivers to them like to people.
+	consumers *ConsumerEngine
+	// position is the hub position: the highest seq Dispatch has finished (Position).
+	position atomic.Int64
 
 	// lagMu guards the state of bothy.event.fanout.lag: the batches the tail announced (Known)
 	// that are not fully distributed, and the highest seq Dispatch distributed.
@@ -188,6 +196,32 @@ const (
 	errorTypeAdmit      = "admit"
 )
 
+// BindConsumers makes e the delivery of agent sessions registered from now on; internal/wire calls
+// it once before serving, after it built e over the hub position.
+func (h *Hub) BindConsumers(e *ConsumerEngine) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.consumers = e
+}
+
+// Position implements Position: the highest seq the log tail has passed through
+// Authorizer.Observe and Dispatch, or the head the tail started at (Seed).
+func (h *Hub) Position() int64 { return h.position.Load() }
+
+// Seed raises the hub position to head, the head the log tail of the process started at; later
+// events raise it in Dispatch. It never lowers it.
+func (h *Hub) Seed(head int64) { h.raise(head) }
+
+// raise sets the position to seq when seq is higher.
+func (h *Hub) raise(seq int64) {
+	for {
+		cur := h.position.Load()
+		if seq <= cur || h.position.CompareAndSwap(cur, seq) {
+			return
+		}
+	}
+}
+
 // Register implements Delivery: c enters the hub in phase catching_up as a candidate of every
 // event, then its visible sets are read (Authorizer.Scope in delivery mode) and the indices set,
 // unless an access.changed of the principal was processed meanwhile (that one set fresher ones).
@@ -198,6 +232,7 @@ func (h *Hub) Register(ctx context.Context, c *Connection, s *Session) {
 	_, a := c.current()
 	m := &member{c: c, s: s, pending: true, phase: domain.PhaseCatchingUp}
 	h.mu.Lock()
+	m.consumer = a.Kind == actor.KindAgent && h.consumers != nil
 	if old := h.members[c]; old != nil {
 		h.removeLocked(old)
 	}
@@ -229,6 +264,15 @@ func (h *Hub) Attach(ctx context.Context, c *Connection, from, head int64) error
 	h.mu.Unlock()
 	if m == nil {
 		return nil // the connection closed meanwhile
+	}
+	if m.consumer {
+		m.mu.Lock()
+		m.phase, m.head = domain.PhaseLive, head
+		m.mu.Unlock()
+		h.mu.Lock()
+		delete(h.notLive, m)
+		h.mu.Unlock()
+		return h.consumers.Attach(ctx, c, m.s, head)
 	}
 	// The runner outlives the identify or resume op: it drops the op's request memo, so every
 	// catch-up page reads the current rights version with its own memo (AZ-P9).
@@ -265,6 +309,9 @@ func (h *Hub) Detach(c *Connection) {
 	if cancel != nil {
 		cancel()
 	}
+	if m.consumer {
+		h.consumers.Detach(c)
+	}
 }
 
 // Len returns the number of registered connections.
@@ -297,6 +344,13 @@ func (h *Hub) Dispatch(ctx context.Context, ev sync.Event) {
 	}
 	h.advance(ctx, ev.Seq)
 	h.distributedUpTo(ev.Seq)
+	h.raise(ev.Seq)
+	h.mu.Lock()
+	e := h.consumers
+	h.mu.Unlock()
+	if e != nil {
+		e.WakeAll()
+	}
 }
 
 // encoded encodes the dispatch frame of one event once per form: with trace_context for agents,
@@ -316,13 +370,16 @@ func (e *encoded) frame(kind actor.Kind) ([]byte, error) {
 	if *cached != nil {
 		return *cached, nil
 	}
-	b, err := json.Marshal(outFrame{Op: "dispatch", D: e.ev.Envelope(sync.DeliveryFields{IncludeTraceContext: isAgent})})
+	b, err := json.Marshal(outFrame{Op: opDispatch, D: e.ev.Envelope(sync.DeliveryFields{IncludeTraceContext: isAgent})})
 	if err != nil {
 		return nil, err
 	}
 	*cached = b
 	return b, nil
 }
+
+// opDispatch is the op of a dispatch frame, durable or ephemeral.
+const opDispatch = "dispatch"
 
 // outFrame is the outer object {op, d} of a server frame the hub encodes itself.
 type outFrame struct {
@@ -396,6 +453,11 @@ func (h *Hub) candidates(ev sync.Event) []*member {
 // catches up, otherwise admitted and queued without waiting. A full buffer or queue closes m
 // with 4014; an unauthenticated decision with 4012; a failed check with 4000.
 func (h *Hub) deliver(ctx context.Context, m *member, ev sync.Event, enc *encoded) {
+	if m.consumer {
+		// Its runner reads the log up to the hub position (brief M2-07 note 6); only the
+		// indices of channel.created matter for it, through the revalidation and purge path.
+		return
+	}
 	m.mu.Lock()
 	switch {
 	case m.phase == domain.PhaseClosing:
@@ -512,6 +574,9 @@ func (h *Hub) advance(_ context.Context, seq int64) {
 	}
 	h.mu.Unlock()
 	for _, m := range live {
+		if m.consumer {
+			continue // its runner sends its own cursor frames
+		}
 		m.mu.Lock()
 		if m.phase != domain.PhaseLive || m.lastSeq >= seq {
 			m.mu.Unlock()

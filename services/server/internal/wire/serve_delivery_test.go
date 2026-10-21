@@ -175,7 +175,6 @@ func (w *dlWorld) addSession(p gwPerson) gwPerson {
 func (w *dlWorld) agentWithToken() (ids.ID, string, wstest.IdentifyParams) {
 	w.t.Helper()
 	agent := w.newAgent()
-	w.sql(`INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'custom')`, agent.String())
 	key, _ := identitytest.NewDeviceKey(jose.AlgES256)
 	tok, err := apitoken.Generate(nil, apitoken.KindAgent)
 	if err != nil {
@@ -572,8 +571,9 @@ const catchUpHeartbeatMissLimit = "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=9"
 func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 	t.Parallel()
 	const backlog = 2000
+	// The agent is a consumer (M2-07): it acknowledges as it reads, so its window keeps paging.
 	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
-		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", catchUpHeartbeatMissLimit)
+		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", catchUpHeartbeatMissLimit, "BOTHY_AGENT__MAX_INFLIGHT_EVENTS=1000")
 	space := w.newSpace("Engineering")
 	support := w.newChannel(space, "support")
 	other := w.newChannel(space, "other")
@@ -622,7 +622,7 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 	defer rcancel()
 	n := 0
 	for {
-		op, _, err := c2.Next(rctx)
+		op, d, err := c2.Next(rctx)
 		var ce *wstest.CloseError
 		if errors.As(err, &ce) {
 			if ce.Code != 4012 {
@@ -636,6 +636,11 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 		switch op {
 		case "dispatch":
 			n++
+			if n%200 == 0 {
+				var ev event
+				_ = json.Unmarshal(d, &ev)
+				_ = c2.Send("ack", map[string]any{"seq": ev.Seq})
+			}
 		case "catchup.complete":
 			t.Fatalf("the revoked token caught up on the whole backlog (%d dispatches)", n)
 		}

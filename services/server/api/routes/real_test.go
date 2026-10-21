@@ -733,6 +733,18 @@ func (stubServer) GetAgent(context.Context, rest.GetAgentRequestObject) (rest.Ge
 	return nil, nil
 }
 
+func (stubServer) GetConsumerState(context.Context, rest.GetConsumerStateRequestObject) (rest.GetConsumerStateResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PollAgentEvents(context.Context, rest.PollAgentEventsRequestObject) (rest.PollAgentEventsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AckAgentEvents(context.Context, rest.AckAgentEventsRequestObject) (rest.AckAgentEventsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateAgent(context.Context, rest.UpdateAgentRequestObject) (rest.UpdateAgentResponseObject, error) {
 	return nil, nil
 }
@@ -848,6 +860,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"setAllAgentsBillingMode": {"PUT /api/v1/instance/agent-billing-mode", "agent.billing_mode.set_all", "rl.admin"},
 		"setCredentialHolder":     {"PUT /api/v1/agents/{agent_id}/credential-holder", "agent.credential_holder.set", "rl.admin"},
 		"setAgentToolClass":       {"PUT /api/v1/agents/{agent_id}/tool-class", "agent.tool_class.set", "rl.admin"},
+		// M2-07
+		"getConsumerState": {"GET /api/v1/agents/me/consumers/{consumer}", "agent.events.consume", "rl.agent_runtime"},
+		"pollAgentEvents":  {"GET /api/v1/agents/me/consumers/{consumer}/events", "agent.events.consume", "rl.agent_runtime"},
+		"ackAgentEvents":   {"POST /api/v1/agents/me/consumers/{consumer}/ack", "agent.events.consume", "rl.agent_runtime"},
 		// M1-45
 		"disableUser":   {"POST /api/v1/users/{user_id}/disable", "user.disable", "rl.admin"},
 		"revokeDevice":  {"POST /api/v1/devices/{device_id}/revoke", "device.revoke", "rl.admin"},

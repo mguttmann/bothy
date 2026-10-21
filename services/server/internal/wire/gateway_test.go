@@ -12,6 +12,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -49,6 +50,9 @@ type fixedInstance struct{}
 
 func (fixedInstance) Load(context.Context) (instance.Record, error) { return instance.Record{}, nil }
 
+// noConsumers is the consumer port of agents for the wiring test; it is never called.
+type noConsumers struct{ agents.Consumers }
+
 // staticNonces is a nonce source for the wiring test.
 type staticNonces struct{}
 
@@ -80,11 +84,12 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		t.Fatal(err)
 	}
 	gw, err := wire.NewGateway(cfg, wire.GatewayDeps{Authenticator: actor.AnonymousOnly{}, Authorizer: allowAll{}, Nonces: staticNonces{},
-		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}, Threads: noThreads{}})
+		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}, Threads: noThreads{}, Consumers: noConsumers{}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	actions := map[string]authorize.Action{
+		"ack":   authorize.ActionAgentEventsConsume,
 		"focus": authorize.ActionGatewayFocus, "heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect,
 		"reauth": authorize.ActionGatewayConnect, "resume": authorize.ActionGatewayConnect, "typing.start": authorize.ActionTypingStart,
 		"typing.stop": authorize.ActionTypingStart,
@@ -97,7 +102,7 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		}
 	}
 	if got := gw.App.Dispatcher().Ops(); !slices.Equal(got, want) ||
-		!slices.Equal(want, []string{"focus", "heartbeat", "identify", "reauth", "resume", "typing.start", "typing.stop"}) {
+		!slices.Equal(want, []string{"ack", "focus", "heartbeat", "identify", "reauth", "resume", "typing.start", "typing.stop"}) {
 		t.Errorf("registered %v, enabled %v", got, want)
 	}
 	if cfg.HeartbeatInterval != 30*time.Second || cfg.ResumeWindow != 5*time.Minute {

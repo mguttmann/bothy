@@ -2,6 +2,30 @@
   "version": 1,
   "keys": [
     {
+      "name": "agent.ack_persist_interval",
+      "env": "BOTHY_AGENT__ACK_PERSIST_INTERVAL",
+      "kind": "duration",
+      "default": "1s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "acked_seq of an agent consumer is saved at the latest after this interval."
+    },
+    {
+      "name": "agent.ack_timeout",
+      "env": "BOTHY_AGENT__ACK_TIMEOUT",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Without an ack within this time the server delivers again from acked_seq + 1 with redelivered."
+    },
+    {
       "name": "agent.invocation_token_ttl",
       "env": "BOTHY_AGENT__INVOCATION_TOKEN_TTL",
       "kind": "duration",
@@ -24,6 +48,18 @@
       "max": "",
       "chapter": "09-agents.md",
       "doc": "Cache lifetime of the JWKS and how long a next key is published before it signs."
+    },
+    {
+      "name": "agent.max_inflight_events",
+      "env": "BOTHY_AGENT__MAX_INFLIGHT_EVENTS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2147483647",
+      "chapter": "04-sync-protocol.md",
+      "doc": "Most unacknowledged events on the way per agent consumer."
     },
     {
       "name": "api.cors_allowed_origins",

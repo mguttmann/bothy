@@ -2,7 +2,8 @@
 
 Status: connection and session built (M1-64); delivery of durable events, catch-up over the
 WebSocket, revocation of open connections and the shutdown close built (M1-65); focus, typing and
-the ephemeral publisher built (M1-66); frame conformance, gate G9, built (M1-67).
+the ephemeral publisher built (M1-66); frame conformance, gate G9, built (M1-67); agent consumers with
+the op `ack` built (M2-07).
 Normative are [docs/spec/04-sync-protocol.md](../../../../docs/spec/04-sync-protocol.md) section 6
 and [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); on any difference the
 chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64, M1-65, M1-66 and M1-67.
@@ -113,6 +114,40 @@ JSON pointer.
 Run: `cd services/server && go test -race ./api/... ./internal/gateway/... ./internal/wire/...`
 (also part of `make test`). Rulings: DECISIONS M1-67.
 
+## Agent consumers (M2-07)
+
+An agent session is a consumer (04 section 15): `gateway/app.ConsumerEngine` serves it instead of
+the durable dispatch of the hub, and serves the REST windows of `pollAgentEvents` through the
+source port `agents.ConsumerFeed`, which it implements.
+
+- Identify and resume: the client `cursor` and `sync_epoch` of an agent are ignored. Under a
+  per-process lock per consumer the engine saves the acknowledgement of an older connection of the
+  consumer in this process, takes the consumer over with `agents.Consumers.Take` (holder = the
+  gateway session; the first connection creates the cursor at `ready.head_seq`), closes the older
+  connection with `4015 consumer_replaced` (not resumable, so its `resume` gets `4006`), drops a
+  REST window of the consumer and starts the runner. A `resume` keeps the holder and continues from
+  the acknowledgement held in the session; its older connection closes with `4015`.
+- Runner: one goroutine per consumer connection reads pages after the window's position up to the
+  hub position (`Hub.Position`, the highest seq the log tail passed through `Observe` and
+  `Dispatch`), in filter mode with the rights version read once per page, and is woken by the hub
+  after each event, by an `ack` and by the ack deadline. The window (`domain.ConsumerWindow`)
+  holds at most `agent.max_inflight_events` unacknowledged dispatches, redelivers from
+  `acked_seq + 1` with `redelivered: true` after `agent.ack_timeout`, sends `cursor` after each
+  backlog page with skipped numbers, `catchup.complete {head_seq}` once it reaches the head of
+  `ready` and live `cursor` after `sync.cursor_advance_every` skipped numbers. `retention` and
+  `cursor_ahead` at the start send `resync_required` and move the cursor to the head. Every
+  envelope carries `trace_context` and passes the outgoing port `DeliveryHook`
+  (`adapters/passdelivery` until M2-08 binds `runs.Delivery`).
+- `ack {seq}` (action `agent.events.consume`, class `rl.agent_runtime` keyed by the agent):
+  `AcceptAck` authorizes and checks the bounds, the window takes it, nothing is written at once;
+  errors answer `error` and keep the connection, a revoked credential closes with `4012`.
+- Saving: `ConsumerEngine.Run` saves every held acknowledgement above its saved value each
+  `agent.ack_persist_interval` and drops REST windows idle for `sync.resume_window`; a detach or
+  close of any kind and step 3 of the shutdown (before `4013`) save at once. A save that finds
+  another holder closes with `4015`.
+- `access.changed` revalidates, re-indexes and purges agent sessions as for people; the purge also
+  releases the window budget of the removed targets.
+
 ## Revocation and shutdown
 
 - `access.changed` of principal P, before it is dispatched: every connection of P is revalidated
@@ -182,14 +217,16 @@ adapter.
 
 Enabled (section `gateway_ops` of `api/operations.yaml`): `identify`, `resume`, `heartbeat`,
 `reauth` with the action `gateway.connect`; `focus` with `gateway.focus`; `typing.start` and
-`typing.stop` with `typing.start`. Every other client op of the channel is unknown (`4001`) until
+`typing.stop` with `typing.start`; `ack` with `agent.events.consume` (module `agents` registers it,
+the handler is `app/ack.go`, M2-07). Every other client op of the channel is unknown (`4001`) until
 its ticket enables it.
 
 ## Close codes owned
 
 `4001` to `4009`, `4011`, `4016` to `4018`; used: `4000` (database or internal error, panic,
 handler without authorization check), `4012` (revoked at identify, heartbeat or delivery),
-`4013` (shutdown), `4014` (full outbound queue or live buffer, missed write deadline).
+`4013` (shutdown), `4014` (full outbound queue or live buffer, missed write deadline), `4015`
+(agent consumer taken over, M2-07).
 
 ## Sessions
 
@@ -206,8 +243,10 @@ resumable for `sync.resume_window`; the sweeper runs every `sync.resume_window`.
 `database.listen_reconnect_backoff_cap`, `shutdown.total_timeout`, `http.max_json_depth`, `ratelimit.rl.gateway_connect.per_minute`,
 `ratelimit.rl.gateway_connect.burst`, `sync.max_focused_threads`, `sync.typing_min_interval`,
 `sync.typing_ttl`, `sync.event_payload_max_bytes`, `ratelimit.rl.read.per_minute`,
-`ratelimit.rl.read.burst`, `ratelimit.rl.typing.per_minute`, `ratelimit.rl.typing.burst`; the
-DPoP windows `auth.dpop_nonce_ttl` and `auth.clock_leeway` apply through identity.
+`ratelimit.rl.read.burst`, `ratelimit.rl.typing.per_minute`, `ratelimit.rl.typing.burst`,
+`agent.ack_timeout`, `agent.ack_persist_interval`, `agent.max_inflight_events`,
+`ratelimit.rl.agent_runtime.per_minute`, `ratelimit.rl.agent_runtime.burst`; the DPoP windows
+`auth.dpop_nonce_ttl` and `auth.clock_leeway` apply through identity.
 
 ## Dependencies
 

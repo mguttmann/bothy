@@ -201,6 +201,9 @@ func newTestServerWith(t *testing.T, queueMax int, mod func(*Handler), gm app.Me
 		t.Fatal(err)
 	}
 	for _, op := range routes.GatewayOps() {
+		if op.Op == "ack" {
+			continue // ack needs the consumer engine of M2-07, which these transport tests do not build
+		}
 		if err := gw.Register(op.Op, authorize.ActionGatewayConnect); err != nil {
 			t.Fatal(err)
 		}

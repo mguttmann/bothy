@@ -13,6 +13,24 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// AddReactionResponse410Headers the declared response headers of an HTTP 410 response for AddReaction
+type AddReactionResponse410Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// AddReactionResponse429Headers the declared response headers of an HTTP 429 response for AddReaction
+type AddReactionResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// AddReactionResponseDefaultHeaders the declared response headers of an HTTP default response for AddReaction
+type AddReactionResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type AddReactionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -22257,6 +22275,13 @@ func ParsePollAgentEventsResponse(rsp *http.Response) (*PollAgentEventsResponse,
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest Gone
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON410 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -22352,6 +22377,16 @@ func ParsePollAgentEventsResponse(rsp *http.Response) (*PollAgentEventsResponse,
 			headers.CorrelationId = &value
 		}
 		response.Headers404 = &headers
+	case rsp.StatusCode == 410:
+		var headers PollAgentEventsResponse410Headers
+		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
+			var value CorrelationId
+			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			}
+			headers.CorrelationId = &value
+		}
+		response.Headers410 = &headers
 	case rsp.StatusCode == 429:
 		var headers PollAgentEventsResponse429Headers
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {

@@ -7,6 +7,21 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListAppsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r ListAppsResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
@@ -25892,23 +25907,5 @@ type AddReactionResponse403Headers struct {
 
 // AddReactionResponse404Headers the declared response headers of an HTTP 404 response for AddReaction
 type AddReactionResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddReactionResponse410Headers the declared response headers of an HTTP 410 response for AddReaction
-type AddReactionResponse410Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AddReactionResponse429Headers the declared response headers of an HTTP 429 response for AddReaction
-type AddReactionResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// AddReactionResponseDefaultHeaders the declared response headers of an HTTP default response for AddReaction
-type AddReactionResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

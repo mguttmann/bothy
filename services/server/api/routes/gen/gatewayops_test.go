@@ -188,6 +188,7 @@ func TestRealInputs_GatewayOps(t *testing.T) {
 		t.Fatalf("gateway ops: %v", err)
 	}
 	want := []gatewayOp{
+		{Op: "ack", Action: "agent.events.consume", Schema: "GatewayAck"},
 		{Op: "focus", Action: "gateway.focus", Schema: "GatewayFocus"},
 		{Op: "heartbeat", Action: "gateway.connect", Schema: "GatewayHeartbeat"},
 		{Op: "identify", Action: "gateway.connect", Schema: "GatewayIdentify"},

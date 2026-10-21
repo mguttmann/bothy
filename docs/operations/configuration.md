@@ -283,9 +283,9 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server |  | `2s` | base of the backoff in the outbox | planned (M4) |
 | `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server |  | `5m` | largest interval in the outbox | planned (M4) |
 | `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server | duration | `60s` | validity of an invocation token | active |
-| `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server |  | `30s` | without `ack`: redelivery | planned (M2) |
-| `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server |  | `1s` | `acked_seq` is stored at least this often | planned (M2) |
-| `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server |  | `100` | unacknowledged events per consumer | planned (M2) |
+| `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server | duration | `30s` | without `ack`: redelivery | active |
+| `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server | duration | `1s` | `acked_seq` is stored at least this often | active |
+| `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | int | `100` | unacknowledged events per consumer | active |
 | `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server |  | `500ms` | adapter throttle for `run.update` | planned (M2) |
 | `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server |  | `90s` | without a heartbeat, the agent counts as `offline` | planned (M2) |
 | `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server |  | `30s` | time for the adapter to report a cancellation | planned (M2) |
