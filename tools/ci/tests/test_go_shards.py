@@ -514,20 +514,19 @@ def test_packages_lists_the_longest_package_first_then_go_list_order(
     assert printed == ["example.com/server/internal/wire", *others]
 
 
-def test_a_package_of_half_a_shard_or_more_runs_alone() -> None:
-    # Measured: the longest package ran up to half again as long when other packages of its
-    # shard ran beside it, and its shard ended last. A package that alone needs at least half
-    # the mean load of a shard gets its shard for itself; the others share the rest.
-    timings = {"big": 600.0, **{f"p{i}": 100.0 for i in range(20)}}
-    units = [go_shards.Unit("m", p) for p in timings]
-    shards = go_shards.assign(units, timings, 4)  # mean load 650: big alone
-    [alone] = [s for s in shards if go_shards.Unit("m", "big") in s]
-    assert alone == [go_shards.Unit("m", "big")]
-    assert sorted(len(s) for s in shards if s is not alone) == [6, 7, 7]
-    # Below half the mean load it shares its shard.
-    shards = go_shards.assign(units, timings, 2)  # mean load 1300
-    [shared] = [s for s in shards if go_shards.Unit("m", "big") in s]
-    assert len(shared) > 1
+def test_each_module_lists_its_own_longest_package_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The longest package of the shard may belong to another module; each module still starts
+    # with its own longest package, then follows `go list` order.
+    _fake_list(monkeypatch, PACKAGES)
+    args = ["packages", "--shard", "1/1", "--timings", str(_timings_file(tmp_path))]
+    args += ["--tags", "contract_validate"]
+    assert go_shards.main([*args, "--module", "services/host", *MODULES]) == 0
+    assert capsys.readouterr().out.split() == [
+        "example.com/host/internal/a",
+        "example.com/host/cmd",
+    ]
 
 
 @pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)

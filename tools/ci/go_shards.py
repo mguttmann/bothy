@@ -9,8 +9,7 @@ coverage gate on the merged profile, which SonarQube reads as before.
 
 Assignment: every package of `go list ./...` in every Go module is one unit; units are sorted by
 their measured duration (TIMINGS, longest first, then by name) and each goes to the shard with the
-least total so far. A package that needs half the mean load of a shard or more gets a shard of
-its own. A package without a measured duration (a new one) weighs the median, so it
+least total so far. A package without a measured duration (a new one) weighs the median, so it
 still lands in exactly one shard. The split is deterministic: every shard computes the same one.
 
 Merge: `go test ./...` concatenates the profiles of its test binaries below one mode line; the
@@ -97,17 +96,10 @@ def assign(units: Iterable[Unit], timings: dict[str, float], total: int) -> list
     weighted = sorted({(-timings.get(u.package, default), u) for u in units})
     shards: list[list[Unit]] = [[] for _ in range(total)]
     loads = [0.0] * total
-    # A package that alone needs half the mean load of a shard or more runs alone: beside other
-    # packages it ran up to half again as long and ended its shard last (measured in CI). At
-    # least one shard stays open for the others.
-    alone_from = -sum(w for w, _ in weighted) / total / 2
-    open_shards = list(range(total))
     for negative, unit in weighted:
-        target = min(open_shards, key=lambda i: (loads[i], i))
+        target = min(range(total), key=lambda i: (loads[i], i))
         shards[target].append(unit)
         loads[target] -= negative
-        if -negative >= alone_from and len(open_shards) > 1 and len(shards[target]) == 1:
-            open_shards.remove(target)
     return shards
 
 
@@ -158,13 +150,13 @@ def _packages(args: argparse.Namespace) -> int:
     if args.module not in args.modules:
         raise ValueError(f"module {args.module} is not among the modules {args.modules}")
     units = [Unit(m, p) for m in args.modules for p in list_packages(m, args.tags)]
-    # `go test` starts packages roughly in the order given. The longest package of the shard
-    # goes first, so it does not start late and end the shard late; the others follow in
-    # `go list` order, which mixes long and short ones (all long ones at once slowed every
+    # `go test` starts packages roughly in the order given. The longest package of the module in
+    # this shard goes first, so it does not start late and end the shard late; the others follow
+    # in `go list` order, which mixes long and short ones (all long ones at once slowed every
     # package of a shard down: they compete for the CPUs and the databases).
     shard = assign(units, load_timings(args.timings), count)[index - 1]
-    rest = sorted(shard[1:], key=units.index)
-    mine = [u.package for u in shard[:1] + rest if u.module == args.module]
+    own = [u for u in shard if u.module == args.module]  # longest first, as assign() lists them
+    mine = [u.package for u in own[:1] + sorted(own[1:], key=units.index)]
     if args.record:
         args.record.parent.mkdir(parents=True, exist_ok=True)
         with args.record.open("a", encoding="utf-8") as fh:

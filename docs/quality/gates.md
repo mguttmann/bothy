@@ -44,8 +44,7 @@ component sources (`TOOLS_SOURCE_TESTS`) run in each test job as well.
 
 The Go tests run in shards at the same time (`tools/ci/go_shards.py`): every package of
 `go list ./...` in every Go module is assigned to exactly one shard, balanced by the package
-durations in `tools/ci/go_test_timings.json` (a package without a duration weighs the median; one
-that needs half the mean load of a shard or more runs alone),
+durations in `tools/ci/go_test_timings.json` (a package without a duration weighs the median),
 and each shard runs `go test` with the flags of the single run for its packages only. The plan
 lists `test-server` for all shards together; the result of the matrix fails when any shard
 fails. `test (server coverage)` merges the profiles as one `go test ./...` writes them (one mode
