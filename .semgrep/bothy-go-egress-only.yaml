@@ -13,7 +13,11 @@ rules:
     paths:
       # Test code: Go tests, the test support of services/*/test and the load tests of
       # services/*/perf (docs/spec/02-architecture.md "Code layout").
-      exclude: ["*_test.go", "test/", "tests/", "testsuite/", "/services/*/perf/"]
+      # The generated API client of services/server/api/restclient: oapi-codegen falls back to an
+      # own http.Client only when no client is passed, and its one user, the import tool, always
+      # passes its egress transport (restclient.WithHTTPClient, docs/DECISIONS.md D-M8-10-8).
+      exclude:
+        ["*_test.go", "test/", "tests/", "testsuite/", "/services/*/perf/", "/services/server/api/restclient/"]
     pattern-either:
       # Default clients and the package functions that use them; a reference without a call
       # (get := http.Get) is a use as well.

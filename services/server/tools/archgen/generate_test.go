@@ -168,7 +168,7 @@ func TestGenerateMigrationsSection(t *testing.T) {
 		"  migrations:\n    mayDependOn: [migrations]\n",
 		"  platform-pg:\n    mayDependOn: [platform-pg, kernel-ports, migrations]\n",
 		"  platform-jobs:\n    mayDependOn: [platform-jobs, kernel-ports, platform-pg]\n",
-		"  cmd:\n    mayDependOn: [cmd, wire, platform-jobs, platform-pg, kernel-ports, migrations]\n",
+		"  cmd:\n    mayDependOn: [cmd, wire, platform-jobs, platform-pg, kernel-ports, api, migrations]\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)

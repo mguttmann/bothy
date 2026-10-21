@@ -32,6 +32,7 @@ the overview.
 | `bothy migrate up\|status\|validate` | migrations (goose, rivermigrate); never implicitly at startup |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | setup, first owner, enrollment code (08-identity.md) |
 | `bothy config check\|print` | check the configuration (with `--secrets` also resolve every reference) and print it redacted |
+| `bothy import login\|logout` | login of the import tool as a `cli` device through device pairing and logout (22-import-migration.md 10.1); session file and DPoP client: [`cmd/bothy/importtool/bothyapi`](cmd/bothy/importtool/bothyapi/README.md) |
 | `bothy import discord ...` | import and read mirror through the API (22-import-migration.md); code under `cmd/bothy/importtool` (D-W-124), Discord read client: [`cmd/bothy/importtool/discord`](cmd/bothy/importtool/discord/README.md) |
 | `bothy restore finalize` | after a restore: new sync epoch (16-operations.md) |
 | `bothy secrets init\|export` | create and back up secrets (16-operations.md) |
