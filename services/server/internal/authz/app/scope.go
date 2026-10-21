@@ -34,7 +34,7 @@ func (a *Authorizer) Scope(ctx context.Context, p authorize.Principal, act autho
 	sc, d, err := a.scope(ctx, p, act)
 	allowed := err == nil && d.Outcome == domain.OutcomeAllow
 	authorize.RecordCheck(ctx, authorize.Check{Action: string(act), Kind: authorize.CheckScope, Allowed: allowed})
-	a.audit(ctx, act, "", ids.ID{}, nil, outcome(d), err)
+	a.audit(ctx, p, act, "", ids.ID{}, nil, outcome(d), err)
 	if err == nil && !allowed {
 		return authorize.Scope{}, outcome(d).Err()
 	}
@@ -100,7 +100,12 @@ func memoKey(spec domain.ActionSpec, s *actingPrincipal, p authorize.Principal) 
 	if s.kind == domain.KindApp {
 		appScope, _ = domain.AppScopeOf(spec.ID)
 	}
-	return scopeMemoKey{key: s.entry.key, viewAs: p.ViewAsPerson(), actingFor: p.ActingForPerson(), scope: appScope, hosts: isHostList(spec),
+	var actingFor ids.ID
+	if s.actingFor != nil {
+		// Only a bound binding outside delivery mode narrows the lists (bindActingFor).
+		actingFor = s.actingForUser
+	}
+	return scopeMemoKey{key: s.entry.key, viewAs: p.ViewAsPerson(), actingFor: actingFor, scope: appScope, hosts: isHostList(spec),
 		operated: isOperatedList(spec)}
 }
 
