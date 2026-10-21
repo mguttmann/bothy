@@ -115,6 +115,13 @@ type Deps struct {
 	// before every batch (brief M3-11 note 7, D-M3-11-5); internal/wire passes identity's
 	// Authenticator. The export refuses to start without it; the other use cases do not use it.
 	Credentials CredentialCheck
+	// Components reads the components of card messages for every representation (M2-15, the
+	// source port runs implements); nil shows every message without components (a role or a test
+	// without runs).
+	Components messaging.ComponentReader
+	// Cards checks and stores the components of a new card (M2-15, the source port runs
+	// implements); nil answers a card with 400 not_enabled.
+	Cards messaging.ComponentWriter
 }
 
 // CredentialCheck is the outgoing port that checks an authenticated principal again without a

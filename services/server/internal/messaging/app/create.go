@@ -23,16 +23,20 @@ import (
 type prepared struct {
 	clientMsgID ids.ID
 	origin      domain.Origin
-	content     string
-	replyTo     ids.ID
-	silent      bool
-	clearDraft  bool
+	// kind is text or, for an agent's card, card (M2-15).
+	kind       domain.Kind
+	content    string
+	replyTo    ids.ID
+	silent     bool
+	clearDraft bool
 	// mentionCheck is the mention_ids of the request; checkMentions is false when absent.
 	mentionCheck  []ids.ID
 	checkMentions bool
 	// handles are the distinct mention handles of content.
 	handles []string
 	hash    []byte
+	// card holds the checked components of a card (M2-15); empty for every other kind.
+	card cardPrepared
 }
 
 // Create implements messaging.Messages (brief D1): the thread (404 for an unknown or invisible
@@ -143,16 +147,18 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 		return prepared{}, err
 	}
 	kind := string(domain.KindText)
-	if cmd.Kind != nil && *cmd.Kind != kind {
+	if cmd.Kind != nil {
+		kind = *cmd.Kind
+	}
+	if kind != string(domain.KindText) && kind != string(domain.KindCard) {
 		return prepared{}, domain.NotEnabled("/kind")
 	}
-	switch {
-	case len(cmd.AttachmentIDs) > 0:
+	if len(cmd.AttachmentIDs) > 0 {
 		return prepared{}, domain.NotEnabled("/attachment_file_ids")
-	case cmd.Components > 0:
-		return prepared{}, domain.NotEnabled("/components")
-	case cmd.RunID != nil:
-		return prepared{}, domain.NotEnabled("/run_id")
+	}
+	isCard, err := cardRules(a, kind, cmd)
+	if err != nil {
+		return prepared{}, err
 	}
 	content := ""
 	if cmd.ContentMD != nil {
@@ -161,7 +167,7 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err := domain.CheckContent(content, s.cfg.MaxContentBytes); err != nil {
 		return prepared{}, err
 	}
-	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft}
+	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, kind: domain.Kind(kind), content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft}
 	// SkipMentions leaves handles empty, so send resolves and stores no mention (R-EX-09).
 	if !cmd.SkipMentions {
 		p.handles = domain.ScanMentions(content)
@@ -180,7 +186,17 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 		}
 		p.replyTo, replyTo = *cmd.ReplyToID, cmd.ReplyToID.String()
 	}
-	p.hash = domain.RequestHash(domain.HashInput{Context: hashContext, Kind: kind, Content: content, ReplyTo: replyTo})
+	hash := domain.HashInput{Context: hashContext, Kind: kind, Content: content, ReplyTo: replyTo}
+	if isCard {
+		if p.card.checked, err = s.checkCard(ctx, a, cmd, thread, p.handles); err != nil {
+			return prepared{}, err
+		}
+		hash.Card = p.card.checked.Canonical
+		if cmd.RunID != nil {
+			hash.RunID = cmd.RunID.String()
+		}
+	}
+	p.hash = domain.RequestHash(hash)
 	return p, nil
 }
 
@@ -246,18 +262,26 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	}
 	row, err := s.d.Store.InsertMessage(ctx, domain.Message{
 		ID: ids.New(), ThreadID: info.ID, ChannelID: info.ChannelID, ThreadSeq: seq, AuthorID: a.ID,
-		ClientMsgID: p.clientMsgID, PayloadSHA256: p.hash, Origin: p.origin, Kind: domain.KindText, ContentMD: p.content,
+		ClientMsgID: p.clientMsgID, PayloadSHA256: p.hash, Origin: p.origin, Kind: p.kind, ContentMD: p.content,
 		ContentFormat: domain.ContentFormat, ReplyToID: p.replyTo, Silent: p.silent, Version: 1, CreatedAt: now,
 		SearchLanguage: lang,
 	})
 	if err != nil {
 		return messaging.Created{}, err
 	}
-	s.countCreated(ctx, domain.Message{Origin: p.origin, Kind: domain.KindText})
+	s.countCreated(ctx, domain.Message{Origin: p.origin, Kind: p.kind})
 	if err := s.d.Store.InsertMentions(ctx, row.ID, info.ID, mentions, now); err != nil {
 		return messaging.Created{}, err
 	}
 	m := view(row, author, mentions)
+	// The components of a card come after the message row and before MessagePosted and
+	// message.created, which carries them (M2-15 design note 6 d).
+	if p.card.checked != nil {
+		p.card.checked.Input.ThreadID = info.ID
+	}
+	if m.Components, err = s.attach(ctx, row, p.card); err != nil {
+		return messaging.Created{}, err
+	}
 	posted := s.posted(a, info, m, p.clearDraft)
 	posted.CreatedThread, posted.ReopenedThread = created, line != nil
 	if err := s.announce(ctx, a, info, line, m, posted); err != nil {

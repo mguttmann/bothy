@@ -169,6 +169,27 @@ func (r *Repository) LockMessage(ctx context.Context, id ids.ID, visible []ids.I
 	return one(messageRow(row), err, "locking a message")
 }
 
+// LockCard implements app.Store (M2-15): the row of id locked without a visibility predicate,
+// because runs authorized the change on the card's path before (or a job names the card).
+func (r *Repository) LockCard(ctx context.Context, id ids.ID) (domain.Message, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.Message{}, false, err
+	}
+	row, err := q.LockCardMessage(ctx, uuid(id))
+	return one(messageRow(row), err, "locking a card")
+}
+
+// RaiseVersion implements app.Store (M2-15): version + 1 of the locked message id.
+func (r *Repository) RaiseVersion(ctx context.Context, id ids.ID) (domain.Message, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.Message{}, err
+	}
+	row, err := q.RaiseMessageVersion(ctx, uuid(id))
+	return changed(messageRow(row), err, "raising a message version")
+}
+
 // UpdateContent implements app.Store.
 func (r *Repository) UpdateContent(ctx context.Context, id ids.ID, visible []ids.ID, content string, at time.Time) (domain.Message, error) {
 	q, err := r.write(ctx)

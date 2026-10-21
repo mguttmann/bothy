@@ -270,6 +270,75 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (I
 	return i, err
 }
 
+const lockCardMessage = `-- name: LockCardMessage :one
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages WHERE id = $1 FOR UPDATE
+`
+
+type LockCardMessageRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
+// The card message of a component change locked by runs (M2-15, Messages.LockCard): runs
+// authorized the interaction or the component change on its path before, or a job or the end of a
+// run names it; the lock order is threads, runs, messages, then message_components.
+func (q *Queries) LockCardMessage(ctx context.Context, id pgtype.UUID) (LockCardMessageRow, error) {
+	row := q.db.QueryRow(ctx, lockCardMessage, id)
+	var i LockCardMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.ChannelID,
+		&i.ThreadSeq,
+		&i.AuthorPrincipalID,
+		&i.ClientMsgID,
+		&i.ClientPayloadSha256,
+		&i.Origin,
+		&i.Kind,
+		&i.SystemCode,
+		&i.ContentMd,
+		&i.ContentFormat,
+		&i.ReplyToMessageID,
+		&i.RunID,
+		&i.TriggerState,
+		&i.TriggerStateReason,
+		&i.TriggerStateAt,
+		&i.Silent,
+		&i.ImportItemID,
+		&i.Version,
+		&i.EditedAt,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const lockVisibleMessage = `-- name: LockVisibleMessage :one
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
@@ -314,6 +383,76 @@ type LockVisibleMessageRow struct {
 func (q *Queries) LockVisibleMessage(ctx context.Context, arg LockVisibleMessageParams) (LockVisibleMessageRow, error) {
 	row := q.db.QueryRow(ctx, lockVisibleMessage, arg.ID, arg.Visible)
 	var i LockVisibleMessageRow
+	err := row.Scan(
+		&i.ID,
+		&i.ThreadID,
+		&i.ChannelID,
+		&i.ThreadSeq,
+		&i.AuthorPrincipalID,
+		&i.ClientMsgID,
+		&i.ClientPayloadSha256,
+		&i.Origin,
+		&i.Kind,
+		&i.SystemCode,
+		&i.ContentMd,
+		&i.ContentFormat,
+		&i.ReplyToMessageID,
+		&i.RunID,
+		&i.TriggerState,
+		&i.TriggerStateReason,
+		&i.TriggerStateAt,
+		&i.Silent,
+		&i.ImportItemID,
+		&i.Version,
+		&i.EditedAt,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const raiseMessageVersion = `-- name: RaiseMessageVersion :one
+UPDATE messages SET version = version + 1
+WHERE id = $1
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+`
+
+type RaiseMessageVersionRow struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
+// A change of the components of the locked card (M2-15, Messages.ComponentsChanged): the next
+// version, so message.updated carries a new resource version (03 messages.version "state
+// change").
+func (q *Queries) RaiseMessageVersion(ctx context.Context, id pgtype.UUID) (RaiseMessageVersionRow, error) {
+	row := q.db.QueryRow(ctx, raiseMessageVersion, id)
+	var i RaiseMessageVersionRow
 	err := row.Scan(
 		&i.ID,
 		&i.ThreadID,
