@@ -819,7 +819,7 @@ func (s *AdminService) targetExists(ctx context.Context, tg domain.Target) error
 	case domain.TargetHost:
 		_, ok, err := hostsOrNone(s.d.Hosts).Host(ctx, tg.HostID)
 		if err != nil {
-			return sourceError(hostSourceName, err)
+			return sourceError("host source", err)
 		}
 		if !ok {
 			return errNotFound()
@@ -850,7 +850,7 @@ func (s *AdminService) targetLive(ctx context.Context, tg domain.Target) error {
 	case domain.TargetHost:
 		h, _, err := hostsOrNone(s.d.Hosts).Host(ctx, tg.HostID)
 		if err != nil {
-			return sourceError(hostSourceName, err)
+			return sourceError("host source", err)
 		}
 		if h.State == authz.HostRetired {
 			return errs.New(errs.CodeConflict, "The host is retired.")
