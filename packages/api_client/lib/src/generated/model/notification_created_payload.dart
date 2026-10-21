@@ -14,10 +14,11 @@ part 'notification_created_payload.g.dart';
 /// Properties:
 /// * [nid] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [kind]
-/// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [messageId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [threadId] - Thread of the hint; absent for hints without a thread.
+/// * [messageId] - Message the hint points at; absent when the hint points at no message.
+/// * [targetId] - Target of a hint without a thread: the waiting device for `security`, the grant or group of the reminder for `admin` (R-AZ-30).
 /// * [quiet] - Inside quiet hours; show without sound.
-/// * [count] - Bundled notifications of this thread.
+/// * [count] - 1, or the unread count of a bundled hint (13 4.5).
 /// * [spaceName]
 /// * [channelName]
 /// * [threadTitle]
@@ -37,19 +38,23 @@ abstract class NotificationCreatedPayload
   NotificationKind get kind;
   // enum kindEnum {  message,  mention,  dm,  run_done,  run_failed,  input_needed,  security,  admin,  };
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// Thread of the hint; absent for hints without a thread.
   @BuiltValueField(wireName: r'thread_id')
   String? get threadId;
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// Message the hint points at; absent when the hint points at no message.
   @BuiltValueField(wireName: r'message_id')
   String? get messageId;
+
+  /// Target of a hint without a thread: the waiting device for `security`, the grant or group of the reminder for `admin` (R-AZ-30).
+  @BuiltValueField(wireName: r'target_id')
+  String? get targetId;
 
   /// Inside quiet hours; show without sound.
   @BuiltValueField(wireName: r'quiet')
   bool get quiet;
 
-  /// Bundled notifications of this thread.
+  /// 1, or the unread count of a bundled hint (13 4.5).
   @BuiltValueField(wireName: r'count')
   int get count;
 
@@ -127,6 +132,13 @@ class _$NotificationCreatedPayloadSerializer
       yield r'message_id';
       yield serializers.serialize(
         object.messageId,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.targetId != null) {
+      yield r'target_id';
+      yield serializers.serialize(
+        object.targetId,
         specifiedType: const FullType(String),
       );
     }
@@ -245,6 +257,14 @@ class _$NotificationCreatedPayloadSerializer
           ) as String?;
           if (valueDes == null) continue;
           result.messageId = valueDes;
+          break;
+        case r'target_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.targetId = valueDes;
           break;
         case r'quiet':
           final valueDes = serializers.deserialize(

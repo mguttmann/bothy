@@ -10339,11 +10339,15 @@ export interface components {
         NotificationCreatedPayload: {
             nid: components["schemas"]["Uuid"];
             kind: components["schemas"]["NotificationKind"];
+            /** @description Thread of the hint; absent for hints without a thread. */
             thread_id?: components["schemas"]["Uuid"];
+            /** @description Message the hint points at; absent when the hint points at no message. */
             message_id?: components["schemas"]["Uuid"];
+            /** @description Target of a hint without a thread: the waiting device for `security`, the grant or group of the reminder for `admin` (R-AZ-30). */
+            target_id?: components["schemas"]["Uuid"];
             /** @description Inside quiet hours; show without sound. */
             quiet: boolean;
-            /** @description Bundled notifications of this thread. */
+            /** @description 1, or the unread count of a bundled hint (13 4.5). */
             count: number;
             space_name?: string;
             channel_name?: string;

@@ -20,9 +20,10 @@ class NotificationCreatedPayload:
         nid (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         kind (NotificationKind):
         quiet (bool): Inside quiet hours; show without sound.
-        count (int): Bundled notifications of this thread.
+        count (int): 1, or the unread count of a bundled hint (13 4.5).
         thread_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        target_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         space_name (str | Unset):
         channel_name (str | Unset):
         thread_title (str | Unset):
@@ -38,6 +39,7 @@ class NotificationCreatedPayload:
     count: int
     thread_id: UUID | Unset = UNSET
     message_id: UUID | Unset = UNSET
+    target_id: UUID | Unset = UNSET
     space_name: str | Unset = UNSET
     channel_name: str | Unset = UNSET
     thread_title: str | Unset = UNSET
@@ -63,6 +65,10 @@ class NotificationCreatedPayload:
         message_id: str | Unset = UNSET
         if not isinstance(self.message_id, Unset):
             message_id = str(self.message_id)
+
+        target_id: str | Unset = UNSET
+        if not isinstance(self.target_id, Unset):
+            target_id = str(self.target_id)
 
         space_name = self.space_name
 
@@ -92,6 +98,8 @@ class NotificationCreatedPayload:
             field_dict["thread_id"] = thread_id
         if message_id is not UNSET:
             field_dict["message_id"] = message_id
+        if target_id is not UNSET:
+            field_dict["target_id"] = target_id
         if space_name is not UNSET:
             field_dict["space_name"] = space_name
         if channel_name is not UNSET:
@@ -134,6 +142,13 @@ class NotificationCreatedPayload:
         else:
             message_id = UUID(_message_id)
 
+        _target_id = d.pop("target_id", UNSET)
+        target_id: UUID | Unset
+        if isinstance(_target_id, Unset):
+            target_id = UNSET
+        else:
+            target_id = UUID(_target_id)
+
         space_name = d.pop("space_name", UNSET)
 
         channel_name = d.pop("channel_name", UNSET)
@@ -155,6 +170,7 @@ class NotificationCreatedPayload:
             count=count,
             thread_id=thread_id,
             message_id=message_id,
+            target_id=target_id,
             space_name=space_name,
             channel_name=channel_name,
             thread_title=thread_title,
