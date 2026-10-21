@@ -5,5 +5,4 @@ agent_session.reset
 command.autocomplete
 file.transcript.submit
 import.apply
-interaction.create
 run.followup.create

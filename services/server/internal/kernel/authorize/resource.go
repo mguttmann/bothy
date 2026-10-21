@@ -40,7 +40,8 @@ type Resource struct {
 	RestrictedTags bool
 	// Grant describes the new grant of grant.create and the existing grant of grant.revoke.
 	Grant *GrantFacts
-	// Invoke describes the trigger of agent.invoke.
+	// Invoke describes the trigger of agent.invoke, and of interaction.create (the card's agent,
+	// origin human, the agent of the thread's active run; brief M2-15 design note 8 b).
 	Invoke *InvokeFacts
 	// Command describes a slash command (M2-16) for command.read and command.register on kind
 	// command and for command.invoke on the target thread; the owner of a command is OwnerID.
@@ -48,6 +49,11 @@ type Resource struct {
 	// an internal error; nil only in filter mode for the receive check of command.changed, whose
 	// path is the event scope (ResourceFromEvent).
 	Command *CommandFacts
+	// Interaction describes the component of interaction.create, and of the re-check before a
+	// delivery that an interaction caused (agent.invoke at stage deliver; 05 section 5 point 6,
+	// 04 section 15.3 step 2). nil for every other check; required for interaction.create, where
+	// a missing value is an internal error.
+	Interaction *InteractionFacts
 	// Token is the verdict of the invocation token of run.start and run.token.renew, computed by
 	// runs (M2-09), with the mode facts of run.start; required for those two actions, where a
 	// missing value is an internal error, ignored otherwise.
@@ -207,6 +213,52 @@ type InvokeFacts struct {
 	// thread_require_mention. runs sets it at delivery (M2-08); the acceptance decides on the main
 	// thread itself and leaves it false.
 	NewThread bool
+}
+
+// The stages of InteractionFacts (brief M2-15 design note 8 b and c).
+const (
+	// InteractionStageAccept is the check of interaction.create when a person operates a component.
+	InteractionStageAccept = "accept"
+	// InteractionStageDeliver is the check of agent.invoke before the delivery an interaction
+	// caused (interaction.created, or agent.invocation of a run it opened): the component is
+	// already used by that interaction, so its state and the rule run_active are not checked.
+	InteractionStageDeliver = "deliver"
+)
+
+// InteractionFacts describes the component a person operates, for the interaction rules of 05
+// section 5 point 6 (brief M2-15 design note 8): its state and expiry, required_capability and
+// restricted_to, and its run. The use case reads them from the locked rows (stage accept) or from
+// the component at delivery (stage deliver). The strings are the column values of
+// message_components and runs; authz refuses a value outside their lists as an internal error.
+//
+// Example (a click on an approval card bound to the run of Alex):
+//
+//	r := authorize.Resource{Kind: authorize.ResourceComponent, ID: c.ID, ThreadID: msg.ThreadID, OwnerID: msg.AuthorID,
+//		Invoke: &authorize.InvokeFacts{AgentID: msg.AuthorID, TriggerOrigin: "human", ActiveRunAgentID: active.AgentID},
+//		Interaction: &authorize.InteractionFacts{Stage: authorize.InteractionStageAccept, OwnerKind: "agent",
+//			ComponentState: c.State, ExpiresAt: c.ExpiresAt, RequiredCapability: "approve_actions",
+//			RestrictedTo: "run_starter", ComponentRunID: run.ID, ComponentRunActive: true, RunStarterID: run.TriggeredBy}}
+type InteractionFacts struct {
+	// Stage is InteractionStageAccept or InteractionStageDeliver.
+	Stage string
+	// OwnerKind is the kind of the card's author: agent or app.
+	OwnerKind string
+	// ComponentState is message_components.state (active, used, expired or disabled), read from
+	// the locked row.
+	ComponentState string
+	// ExpiresAt is message_components.expires_at; zero means never.
+	ExpiresAt time.Time
+	// RequiredCapability is message_components.required_capability; "" when none.
+	RequiredCapability string
+	// RestrictedTo is message_components.restricted_to: any, run_starter or owner.
+	RestrictedTo string
+	// ComponentRunID is message_components.run_id; zero for a component without a run.
+	ComponentRunID ids.ID
+	// ComponentRunActive reports that the run of ComponentRunID is queued, running or
+	// waiting_input.
+	ComponentRunActive bool
+	// RunStarterID is runs.triggered_by of the run of ComponentRunID; zero without a run.
+	RunStarterID ids.ID
 }
 
 // CommandFacts describes a slash command for command.read, command.register and command.invoke
