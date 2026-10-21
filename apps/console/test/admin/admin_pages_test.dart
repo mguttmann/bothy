@@ -308,6 +308,76 @@ void main() {
       },
     );
 
+    testWidgets(
+      'after a logout the next login in the tab sees nothing of the view',
+      (tester) async {
+        var stored = false;
+        final b = signedIn(
+          session: () => adminSession(
+            viewAsEnds: stored
+                ? DateTime.now().add(const Duration(minutes: 15))
+                : null,
+          ),
+        );
+        final viewAs = b.server.routes['GET /api/v1/users/$samId/view-as']!;
+        b.server.routes['GET /api/v1/users/$samId/view-as'] = (r) {
+          stored = true;
+          return viewAs(r);
+        };
+        b.server.routes['POST /api/v1/auth/logout'] = (_) {
+          stored = false;
+          return const Answer(204);
+        };
+        b.server.routes['POST /api/v1/auth/password/login'] = (_) =>
+            Answer(200, adminSession());
+        final c = await pumpConsole(tester, b, location: '/people');
+        final admin = ConsoleApp.adminOf(
+          tester.element(find.byType(Navigator).first),
+        );
+        unawaited(
+          admin.startViewAs(
+            const AdminPersonFixture().sam,
+            purpose: 'View as Sam',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(ViewAsStructure), findsOneWidget);
+
+        await tester.tap(find.text('Log out'));
+        await tester.pumpAndSettle();
+        c.logInAgain();
+        unawaited(c.loginWithPassword('robin', 'pw-Aa1!', '492039'));
+        await tester.pumpAndSettle();
+        expect(c.state, isA<ConsoleSignedIn>());
+        expect(admin.snapshot, isNull);
+        expect(admin.notVisible, isEmpty);
+        expect(c.path, isNot('/people/view-as'));
+        c.openRoute(const ConsoleRoute(ConsolePage.people, viewAs: true));
+        await tester.pumpAndSettle();
+        expect(find.byType(ViewAsStructure), findsNothing);
+        expect(find.text('Not visible for Sam: Engineering'), findsNothing);
+      },
+    );
+
+    testWidgets('a reload after the end of a view keeps the session', (
+      tester,
+    ) async {
+      var reads = 0;
+      final b = signedIn();
+      b.server.routes['GET /api/v1/console/session'] = (_) {
+        reads++;
+        // The first request after the end of a stored view ends it and answers this (07 9.2).
+        if (reads == 1) {
+          return const Answer(401, {'code': 'step_up_required', 'status': 401});
+        }
+        return Answer(200, adminSession());
+      };
+      final c = await pumpConsole(tester, b, location: '/people');
+      expect(reads, 2);
+      expect(c.state, isA<ConsoleSignedIn>());
+      expect(find.byType(PeopleList), findsOneWidget);
+    });
+
     testWidgets('a refused view shows the reason of the server', (
       tester,
     ) async {

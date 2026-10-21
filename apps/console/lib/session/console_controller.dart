@@ -312,7 +312,9 @@ class ConsoleController extends ChangeNotifier {
       await _completeOidcLogin(query);
       return;
     }
-    await _loadSession();
+    // A stored view whose end passed while the tab was closed answers the first request with
+    // 401 step_up_required and ends it (07 9.2); the session itself is valid, so read again.
+    await _loadSession(again: true);
     if (requested == ConsolePage.stepUpCallback) {
       await _completeStepUpOidc(query);
     }
@@ -618,6 +620,9 @@ class ConsoleController extends ChangeNotifier {
   }
 
   void _set(ConsoleState state) {
+    // E7 ends the session: the next login in this tab starts at the first page, not at a place
+    // of the person who logged out (brief M6-04, D-M6-04-3).
+    if (state is ConsoleLoggedOut) _route = ConsoleRoute.ofPage(ConsolePage.live);
     _state = state;
     notice = null;
     notifyListeners();

@@ -70,6 +70,7 @@ class ConsoleAdmin extends ChangeNotifier {
   Object? _failure;
   String _timeZone = 'UTC';
   bool _meRead = false;
+  String? _user;
 
   /// The answer of the last `viewAsUser` of this page load, or null (none yet, or a reload
   /// during a stored view).
@@ -166,6 +167,18 @@ class ConsoleAdmin extends ChangeNotifier {
   }
 
   void _onController() {
+    final user = controller.session?.userId;
+    if (user != _user) {
+      // A session ended or another person signed in: nothing of the last view and profile may
+      // stay (the structure is only for the owner who started it).
+      _user = user;
+      _snapshot = null;
+      _notVisible = const [];
+      _viewName = null;
+      _failure = null;
+      _timeZone = 'UTC';
+      _meRead = false;
+    }
     if (controller.state is ConsoleSignedIn && !_meRead) {
       _meRead = true;
       _readMe();
