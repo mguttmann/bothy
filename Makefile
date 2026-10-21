@@ -159,7 +159,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
-        runners-check release-pins install-options tofu-check tofu-vm-test commitlint \
+        runners-check release-pins install-options tofu-check tofu-vm-test commitlint fragments-check changelog-preview \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test
@@ -205,7 +205,7 @@ check: gates denylist sonar ## Every gate, identical to CI (before every push)
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint \
+gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint fragments-check \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
        api-clients tokens runners-check labels-check release-pins install-options tofu-check gitleaks semgrep trivy osv licenses
 
@@ -361,6 +361,18 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	  [[ "$$sums" =~ ^[0-9]+\ [0-9]+$$ ]] || { echo "coverage: tools/ci/lcov_filter.py printed no totals for $$p" >&2; exit 1; }; \
 	  awk -v s="$$sums" -v min=$(COVERAGE_DART_MIN) -v p=$$p 'BEGIN { split(s, a, " "); lf = a[1]; lh = a[2]; pct = lf ? 100*lh/lf : 100; if (pct < min) { printf "%s: coverage %.1f%% < %s%%\n", p, pct, min; exit 1 } }' || exit 1; done; fi
 	@[ -z "$(PY_ON)$(TS_ON)" ] || echo "  python/typescript components enforce their threshold in their own test config"
+
+fragments-check: ## Changelog and ruling fragments are well formed; a pull request adds no entry to a CHANGELOG.md or DECISIONS.md directly (PL/24)
+	@# The same range as commitlint: COMMIT_RANGE in CI, else the commits not yet on the remote main.
+	@base=""; \
+	if git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then base='@{upstream}'; \
+	elif git rev-parse --verify -q origin/main >/dev/null; then base=origin/main; fi; \
+	range="$${COMMIT_RANGE:-$${base:+$$base..HEAD}}"; \
+	$(UVRUN) python tools/ci/fragments.py check $${range:+--range "$$range"}
+
+changelog-preview: ## The CHANGELOG.md of a component with its fragments assembled, on stdout (writes nothing): make changelog-preview COMPONENT=<name>
+	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make changelog-preview COMPONENT=<name>"; exit 2; }
+	@$(UVRUN) python tools/ci/fragments.py assemble --component "$$COMPONENT" --print
 
 commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the remote main
 	@base=""; \

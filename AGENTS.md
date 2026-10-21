@@ -58,5 +58,7 @@ is.
 ## Working style
 
 - Reproduce a bug with a failing test before you fix it, and add a test for every change.
-- Keep a change inside the scope of its ticket; record rulings in `docs/DECISIONS.md`.
+- Keep a change inside the scope of its ticket; record rulings in
+  `docs/decisions.d/<ticket>.md` and changelog entries in `changelog.d/<ticket>.md` next to the
+  component's `CHANGELOG.md`, never in the shared files (docs/quality/gates.md, "Fragments").
 - No en dashes or em dashes anywhere; use a hyphen or rephrase.

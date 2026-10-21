@@ -5,8 +5,9 @@
 # (tools/ci/components.py): git-cliff selects and parses the commits, the script applies the
 # version rule of docs/spec/18-release.md section 3 (fix a patch, feat a minor, a break a
 # major, before 1.0.0 a minor). The changelog text is not generated; it comes from the entries
-# every ticket writes under "Unreleased" in the component's CHANGELOG.md, so the body template
-# stays empty.
+# every ticket writes into the component's changelog.d/<ticket>.md, which release_prep.py puts
+# under "Unreleased" in its CHANGELOG.md (tools/ci/fragments.py), so the body template stays
+# empty.
 
 [changelog]
 body = ""

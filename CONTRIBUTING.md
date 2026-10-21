@@ -136,7 +136,10 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
 - Diagrams are Mermaid sources (`.mmd`) with the rendered `.svg` next to them, or
   ```` ```mermaid ```` blocks in Markdown; `make diagrams` renders all of them.
 - Every component has a `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-  format; add your entry under `Unreleased`.
+  format. Do not edit it: write your entry into a file of its own, `changelog.d/<name>.md` next
+  to the component's `CHANGELOG.md`, with only `### Added`, `### Changed`, `### Deprecated`,
+  `### Removed`, `### Fixed` or `### Security` headings and list items; the release puts it under
+  `Unreleased` ([Fragments](docs/quality/gates.md#fragments)).
 
 ## Architecture decisions
 
@@ -149,7 +152,8 @@ Decisions with lasting effect are recorded as ADRs in `docs/adr/` (MADR 4, ADR 0
 3. Open a pull request; the discussion happens there. The merged ADR is `accepted`.
 4. Run `make adr-index` to update the index.
 
-Smaller rulings go into `docs/DECISIONS.md`.
+Smaller rulings go into a file of their own, `docs/decisions.d/<name>.md` (the ruling log
+`docs/DECISIONS.md`, section 10).
 
 ## Reporting security issues
 

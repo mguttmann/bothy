@@ -27,7 +27,8 @@ the deny-list job of CI scans this text. -->
       `docs/api/` and the specification, or this pull request changes none
 - [ ] New or changed limits are named configuration values, not numbers in prose
 - [ ] A decision with lasting effect has an ADR in `docs/adr/`
-- [ ] `CHANGELOG.md` of every affected component has an entry under `Unreleased`
+- [ ] Every affected component has a changelog fragment `changelog.d/<ticket>.md` next to its
+      `CHANGELOG.md` (docs/quality/gates.md, "Fragments")
 
 ## Security and privacy
 
