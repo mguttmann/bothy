@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/control"
 	"github.com/OWNER/bothy/services/host/internal/control/controltest"
 	"github.com/OWNER/bothy/services/host/internal/doctor"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/startup"
 )
 
@@ -38,7 +39,7 @@ func key() ed25519.PrivateKey {
 const (
 	base     = 20 * time.Millisecond
 	capDelay = 400 * time.Millisecond
-	waitLong = 10 * time.Second
+	waitLong = testkit.Patience
 )
 
 // newClient returns a client of srv with sessions (nil: RefuseSessions).
@@ -359,7 +360,7 @@ func kids(c *control.Client) string {
 // waitFor waits until cond holds.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(waitLong)
+	deadline := testkit.Deadline()
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out: %s", what)

@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/hosttest"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 	"github.com/OWNER/bothy/services/server/test/terminaltest"
@@ -37,7 +38,7 @@ const (
 	authTimeout  = 400 * time.Millisecond
 	probeTimeout = 400 * time.Millisecond
 	maxFrame     = 8192
-	waitLong     = 10 * time.Second
+	waitLong     = testkit.Patience
 )
 
 // hostCfg is the configuration of the control connection in the tests.
@@ -266,7 +267,7 @@ func (c *ctl) receives(name string, host ids.ID) bool {
 // eventually waits until cond holds or waitLong passes.
 func (c *ctl) eventually(what string, cond func() bool) {
 	c.t.Helper()
-	deadline := time.Now().Add(waitLong)
+	deadline := testkit.Deadline()
 	for !cond() {
 		if time.Now().After(deadline) {
 			c.t.Fatalf("timed out waiting for %s", what)
