@@ -38,6 +38,9 @@ type Repository struct {
 // Compile-time check: Repository is the outgoing port of the run rows.
 var _ app.Repository = (*Repository)(nil)
 
+// Compile-time check: Repository is the binding read of the acting-for resolution (M2-14).
+var _ app.RunBindings = (*Repository)(nil)
+
 // NewRepository returns the repository over pool, a pool of bothy_app.
 func NewRepository(pool *pg.Pool) *Repository { return &Repository{pool: pool} }
 
@@ -77,6 +80,21 @@ func (r *Repository) InsertRun(ctx context.Context, n app.NewRun) (app.RunRow, b
 func (r *Repository) Run(ctx context.Context, id ids.ID) (app.RunRow, bool, error) {
 	row, err := r.read(ctx).GetRun(ctx, uuid(id))
 	return one(row, err, "reading a run")
+}
+
+// RunBinding implements app.RunBindings (M2-14 Design note 3c and 3g): the binding columns of
+// the run id, read on the pool and never in the ambient transaction, because the authentication
+// of a request runs before its unit of work and takes no lock. found is false for an unknown id.
+func (r *Repository) RunBinding(ctx context.Context, id ids.ID) (domain.RunBinding, bool, error) {
+	row, err := sqlcgen.New(r.pool).GetRunBinding(ctx, uuid(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.RunBinding{}, false, nil
+	}
+	if err != nil {
+		return domain.RunBinding{}, false, mapError(err, "reading the binding of a run")
+	}
+	return domain.RunBinding{ID: idOf(row.ID), AgentID: idOf(row.AgentID), TriggeredBy: idOf(row.TriggeredBy),
+		ThreadID: idOf(row.ThreadID), State: row.State}, true, nil
 }
 
 // ActiveRunOfThread implements app.Repository.
