@@ -42,9 +42,9 @@ func withFragen(w *world) *titleWorld {
 	return tw
 }
 
-// createPost sends createThread as name in forum with a first message (a forum post needs one);
+// createPost sends createThread as Sam in forum with a first message (a forum post needs one);
 // title nil sends no title. It returns the thread of the 201 body.
-func (w *titleWorld) createPost(name string, forum ids.ID, title *string) map[string]any {
+func (w *titleWorld) createPost(forum ids.ID, title *string) map[string]any {
 	w.t.Helper()
 	body := `{"first_message":{"client_msg_id":"` + ids.New().String() + `","content_md":"Details follow"}`
 	if title != nil {
@@ -52,7 +52,7 @@ func (w *titleWorld) createPost(name string, forum ids.ID, title *string) map[st
 		body += `,"title":` + string(b)
 	}
 	body += "}"
-	m := w.want(w.do(name, http.MethodPost, "/api/v1/channels/"+forum.String()+"/threads", body, key()...), http.StatusCreated, "")
+	m := w.want(w.do("sam", http.MethodPost, "/api/v1/channels/"+forum.String()+"/threads", body, key()...), http.StatusCreated, "")
 	return m["thread"].(map[string]any)
 }
 
@@ -100,7 +100,7 @@ func TestCreateForumPost_TitleSource(t *testing.T) {
 		{ptrTo("Neuer Chat 3"), "auto"},
 		{ptrTo("  ohne   titel  "), "auto"},
 	} {
-		th := w.createPost("sam", w.fragen, c.title)
+		th := w.createPost(w.fragen, c.title)
 		id := th["id"].(string)
 		sent := ""
 		if c.title != nil {
@@ -125,7 +125,7 @@ func TestCreateForumPost_ProtectedShortNamesManual(t *testing.T) {
 	t.Parallel()
 	w := newTitleWorld(t)
 	for _, name := range []string{"AI", "C#", "PC 2"} {
-		if th := w.createPost("sam", w.fragen, ptrTo(name)); th["title_source"] != "manual" {
+		if th := w.createPost(w.fragen, ptrTo(name)); th["title_source"] != "manual" {
 			t.Fatalf("%q: %v", name, th)
 		}
 	}
@@ -152,7 +152,7 @@ func TestCreateThreadFromMessage_TitleSource(t *testing.T) {
 func TestSetThreadTitle_PersonAlwaysManual(t *testing.T) {
 	t.Parallel()
 	w := newTitleWorld(t)
-	th := w.createPost("sam", w.fragen, nil)
+	th := w.createPost(w.fragen, nil)
 	id := th["id"].(string)
 	r := w.setTitle("sam", id, "Neuer Chat 2", int64(th["version"].(float64)))
 	if r.StatusCode != http.StatusOK {
@@ -316,7 +316,7 @@ func TestSetThreadTitle_ConcurrentPersonAndOperatorAgent(t *testing.T) {
 	w := newTitleWorld(t)
 	const rounds = 20
 	for i := range rounds {
-		th := w.createPost("sam", w.fragen, nil)
+		th := w.createPost(w.fragen, nil)
 		id, v := th["id"].(string), int64(th["version"].(float64))
 		codes := map[string]int{}
 		var mu sync.Mutex
@@ -374,10 +374,10 @@ func TestPlaceholderTitles_ConfiguredList(t *testing.T) {
 	cfg := chatConfig
 	cfg.PlaceholderTitles = loaded.PlaceholderTitles
 	w := withFragen(runsWorldWith(t, cfg))
-	if th := w.createPost("sam", w.fragen, ptrTo("Draft 2")); th["title_source"] != "auto" {
+	if th := w.createPost(w.fragen, ptrTo("Draft 2")); th["title_source"] != "auto" {
 		t.Fatalf("Draft 2: %v", th)
 	}
-	if th := w.createPost("sam", w.fragen, ptrTo("Neuer Chat")); th["title_source"] != "manual" {
+	if th := w.createPost(w.fragen, ptrTo("Neuer Chat")); th["title_source"] != "manual" {
 		t.Fatalf("Neuer Chat: %v", th)
 	}
 }

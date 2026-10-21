@@ -3,10 +3,9 @@
 package title_test
 
 import (
-	"bufio"
 	"encoding/json"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -30,15 +29,13 @@ func TestWordListFiles(t *testing.T) {
 		t.Fatalf("languages %v", got)
 	}
 	for _, lang := range title.Languages() {
-		f, err := os.Open(filepath.Join("wordlists", lang+".txt"))
+		raw, err := fs.ReadFile(os.DirFS("wordlists"), lang+".txt")
 		if err != nil {
 			t.Fatal(err)
 		}
-		sc := bufio.NewScanner(f)
-		if !sc.Scan() || sc.Text() != "# SPDX-License-Identifier: Apache-2.0" {
+		if first, _, _ := strings.Cut(string(raw), "\n"); first != "# SPDX-License-Identifier: Apache-2.0" {
 			t.Errorf("%s: the first line is not the SPDX line", lang)
 		}
-		_ = f.Close()
 		got, ok := title.WordList(lang)
 		if !ok || !slices.Equal(got, wantLists[lang]) {
 			t.Errorf("%s: %v, want %v", lang, got, wantLists[lang])

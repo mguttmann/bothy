@@ -20,7 +20,7 @@ import (
 // allow_mentioned_agents on Support/Eskalation.
 func runsWorld(t *testing.T) *world {
 	t.Helper()
-	return runsWorldWith(t, chatConfig)
+	return withRunsExtensions(newWorld(t))
 }
 
 // runsWorldWith is runsWorld with the chat configuration chatCfg (M2-18).
@@ -28,6 +28,12 @@ func runsWorldWith(t *testing.T, chatCfg chatapp.Config) *world {
 	t.Helper()
 	w := newEmptyWorldWithChat(t, chapterSearch(t), chatCfg)
 	w.build()
+	return withRunsExtensions(w)
+}
+
+// withRunsExtensions adds the extensions of the brief M2-05 to the built world w.
+func withRunsExtensions(w *world) *world {
+	w.t.Helper()
 	// The instance row of bothy migrate up (snapshot and catch-up read head and epoch).
 	w.sql(`INSERT INTO instance (id, instance_id, schema_version, sync_epoch) VALUES (1, $1, 1, $2) ON CONFLICT (id) DO NOTHING`,
 		ids.New().String(), ids.New().String())
