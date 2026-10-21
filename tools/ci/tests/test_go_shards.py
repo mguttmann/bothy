@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -102,11 +104,24 @@ def _timings_file(tmp_path: Path) -> Path:
     return path
 
 
+WIRE_TESTS = ["TestA", "TestB", "TestC", "TestD", "TestE"]
+
+
+def _fake_tests(monkeypatch: pytest.MonkeyPatch, splits: dict[str, int]) -> None:
+    monkeypatch.setattr(go_shards, "SPLITS", splits)
+    monkeypatch.setattr(go_shards, "list_tests", lambda module, package: list(WIRE_TESTS))
+
+
 def _run_shards(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, total: int, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    total: int,
+    capsys: pytest.CaptureFixture[str],
+    splits: dict[str, int] | None = None,
 ) -> Path:
     """Run `packages` for every shard and module like the Makefile, into one folder per shard."""
     _fake_list(monkeypatch, PACKAGES)
+    _fake_tests(monkeypatch, splits or {})
     timings = _timings_file(tmp_path)
     shards = tmp_path / "shards"
     for index in range(1, total + 1):
@@ -117,7 +132,7 @@ def _run_shards(
             args += ["--tags", "contract_validate"]
             args += ["--record", str(record), "--module", module, *MODULES]
             assert go_shards.main(args) == 0
-            printed = capsys.readouterr().out.split()
+            printed = sorted({ln.split()[0] for ln in capsys.readouterr().out.splitlines()})
             if printed:
                 profile = folder / module / "coverage.out"
                 profile.parent.mkdir(parents=True, exist_ok=True)
@@ -545,3 +560,405 @@ def test_the_merge_lists_packages_with_the_tags_of_make_test(path: Path) -> None
         if "go_shards.py merge" in str(s.get("run"))
     ]
     assert f"merge --tags {tags} " in str(step["run"])
+
+
+# --- a package split across shards ----------------------------------------------------------
+
+WIRE = "example.com/server/internal/wire"
+SPLITS = {WIRE: 2}
+
+
+def test_a_split_package_becomes_one_unit_per_part() -> None:
+    units = go_shards.expand(_units(), SPLITS)
+    wire = [u for u in units if u.package == WIRE]
+    assert wire == [
+        go_shards.Unit("services/server", WIRE, "1/2"),
+        go_shards.Unit("services/server", WIRE, "2/2"),
+    ]
+    assert len(units) == len(_units()) + 1
+
+
+def test_the_parts_of_a_split_package_go_to_different_shards() -> None:
+    # Each part weighs its share of the package, so the two halves of wire open two shards.
+    shards = go_shards.assign(go_shards.expand(_units(), SPLITS), TIMINGS, 3)
+    holders = [i for i, s in enumerate(shards) for u in s if u.package == WIRE]
+    assert len(holders) == 2
+    assert len(set(holders)) == 2
+    heads = [(s[0].package.rsplit("/", 1)[1], s[0].part) for s in shards]
+    assert heads == [("integration", ""), ("wire", "1/2"), ("wire", "2/2")]
+
+
+def test_top_level_tests_come_from_the_test_files(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "a_test.go",
+        "package a\n\nfunc TestMain(m *testing.M) {}\nfunc TestB(t *testing.T) {}\n"
+        "func Test(t *testing.T) {}\nfunc Testing(t *testing.T) {}\n"
+        "func (s suite) TestMethod(t *testing.T) {}\nfunc helper() {}\n"
+        "func ExampleA() {}\nfunc FuzzC(f *testing.F) {}\nfunc BenchmarkD(b *testing.B) {}\n"
+        "func Test_under(t *testing.T) {}\n",
+    )
+    _write(tmp_path / "b_test.go", "package a_test\n\nfunc TestA(t *testing.T) {}\n")
+    _write(tmp_path / "c.go", "package a\n\nfunc TestNotATestFile(t *testing.T) {}\n")
+    assert go_shards.top_level_tests(tmp_path) == [
+        "ExampleA",
+        "FuzzC",
+        "Test",
+        "TestA",
+        "TestB",
+        "Test_under",
+    ]
+
+
+@pytest.mark.parametrize("parts", [2, 3])
+def test_the_part_filters_cover_every_name_once(parts: int) -> None:
+    names = [f"Test{c}" for c in "ABCDEFG"]
+    filters = [go_shards.part_filter(names, j, parts) for j in range(1, parts + 1)]
+    # The parts before the last run their own group; the last skips all the others, so a test
+    # the listing does not know still runs there.
+    assert all(f[0] == "-run" for f in filters[:-1])
+    assert filters[-1][0] == "-skip"
+    groups = [go_shards.pattern_names(f[1]) for f in filters[:-1]]
+    flat = [n for g in groups for n in g]
+    assert len(flat) == len(set(flat))
+    assert set(go_shards.pattern_names(filters[-1][1])) == set(flat)
+    assert 0 < len(flat) < len(names)
+
+
+_FIXTURE_TESTS = {
+    "a_test.go": """package fixture
+
+import "testing"
+
+func TestMain(m *testing.M) { m.Run() }
+func TestAlpha(t *testing.T) { t.Run("sub", func(t *testing.T) {}) }
+func TestBeta(t *testing.T) {}
+func TestAlphaLonger(t *testing.T) {}
+func Test_snake(t *testing.T) {}
+func FuzzGamma(f *testing.F) { f.Add(1); f.Fuzz(func(t *testing.T, n int) {}) }
+""",
+    "b_test.go": """package fixture_test
+
+import (
+	"fmt"
+	"testing"
+)
+
+func TestDelta(t *testing.T) { t.Parallel() }
+func TestEpsilon(t *testing.T) { t.Run("TestBeta", func(t *testing.T) {}) }
+func Example_zeta() {
+	fmt.Println("z")
+	// Output: z
+}
+""",
+}
+
+
+def _go_test_names(module: Path, *args: str) -> list[str]:
+    done = subprocess.run(  # nosec B603 B607 - the go tool on a fixture module
+        ["go", "test", "-count=1", *args, "."],
+        cwd=module,
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, "GOFLAGS": "-mod=mod", "GOWORK": "off"},
+    )
+    return done.stdout.splitlines()
+
+
+@pytest.mark.parametrize("parts", [2, 3])
+def test_every_top_level_test_of_a_split_package_runs_in_exactly_one_part(
+    tmp_path: Path, parts: int
+) -> None:
+    """Against the real go tool: the filters of the parts run each test, example and fuzz seed of
+    `go test -list` once in all parts together, with its subtests, and a test the listing
+    missed still runs (in the last part)."""
+    _write(tmp_path / "go.mod", "module example.com/fixture\n\ngo 1.21\n")
+    for name, text in _FIXTURE_TESTS.items():
+        _write(tmp_path / name, text)
+    every = [n for n in _go_test_names(tmp_path, "-list", ".*") if not n.startswith("ok ")]
+    listed = go_shards.top_level_tests(tmp_path)
+    assert sorted(every) == listed
+    missed = [n for n in listed if n != "TestDelta"]
+    ran: list[str] = []
+    for part in range(1, parts + 1):
+        flag, pattern = go_shards.part_filter(missed, part, parts)
+        lines = _go_test_names(tmp_path, "-v", flag, pattern)
+        ran += [ln.split()[-1] for ln in lines if ln.startswith("=== RUN")]
+    top = [n for n in ran if "/" not in n]
+    assert sorted(top) == sorted(every)
+    assert ran.count("TestAlpha/sub") == 1
+    assert ran.count("TestEpsilon/TestBeta") == 1
+
+
+def _merge(shards: Path, out: Path) -> int:
+    return go_shards.main(
+        ["merge", "--tags", "contract_validate", "--from", str(shards), "--to", str(out)]
+    )
+
+
+def _part_lines(shards: Path) -> list[list[str]]:
+    return [
+        line.split("\t")
+        for record in sorted(shards.glob(f"*/{RECORD_NAME}"))
+        for line in record.read_text(encoding="utf-8").splitlines()
+        if line.count("\t") == 5
+    ]
+
+
+@pytest.mark.parametrize("total", [1, 2, 3])
+def test_packages_prints_and_records_the_part_filters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    total: int,
+) -> None:
+    shards = _run_shards(tmp_path, monkeypatch, total, capsys, SPLITS)
+    parts = _part_lines(shards)
+    assert sorted((p[2], p[3]) for p in parts) == [(WIRE, "1/2"), (WIRE, "2/2")]
+    by_part = {p[3]: (p[4], p[5]) for p in parts}
+    assert by_part["1/2"] == go_shards.part_filter(WIRE_TESTS, 1, 2)
+    assert by_part["2/2"] == go_shards.part_filter(WIRE_TESTS, 2, 2)
+    assert _merge(shards, tmp_path / "repo") == 0, capsys.readouterr().err
+
+
+def test_merge_fails_when_a_part_did_not_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    shards = _run_shards(tmp_path, monkeypatch, 3, capsys, SPLITS)
+    for record in shards.glob(f"*/{RECORD_NAME}"):
+        lines = record.read_text(encoding="utf-8").splitlines()
+        kept = [ln for ln in lines if "\t2/2\t" not in ln]
+        record.write_text("".join(f"{ln}\n" for ln in kept), encoding="utf-8")
+    assert _merge(shards, tmp_path / "repo") == 1
+    assert f"{WIRE} part 2/2 ran in no shard" in capsys.readouterr().err
+
+
+def test_merge_fails_when_a_split_package_ran_whole(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The shards split wire, the merge expects it whole: the split and the merge disagree.
+    shards = _run_shards(tmp_path, monkeypatch, 2, capsys, SPLITS)
+    _fake_tests(monkeypatch, {})
+    assert _merge(shards, tmp_path / "repo") == 1
+    err = capsys.readouterr().err
+    assert f"{WIRE} ran in no shard" in err
+    assert f"{WIRE} part 1/2 is not a package of services/server" in err
+
+
+@pytest.mark.parametrize(
+    ("part", "pattern", "message"),
+    [
+        ("2/2", "^(TestA)$", "the parts of"),
+        ("1/2", "^(TestA|TestB|TestC)$", "the parts of"),
+        ("1/2", "TestA", "not a filter"),
+    ],
+)
+def test_merge_fails_when_the_part_filters_do_not_cover_the_tests_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    part: str,
+    pattern: str,
+    message: str,
+) -> None:
+    shards = _run_shards(tmp_path, monkeypatch, 2, capsys, SPLITS)
+    for record in shards.glob(f"*/{RECORD_NAME}"):
+        lines = record.read_text(encoding="utf-8").splitlines()
+        out = []
+        for line in lines:
+            fields = line.split("\t")
+            if len(fields) == 6 and fields[3] == part:
+                fields[5] = pattern
+            out.append("\t".join(fields) + "\n")
+        record.write_text("".join(out), encoding="utf-8")
+    assert _merge(shards, tmp_path / "repo") == 1
+    assert message in capsys.readouterr().err
+
+
+def test_merged_coverage_of_a_split_package_equals_the_single_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Every part writes the blocks of its test binary; the merge keeps all of them, so a block
+    # one part covers counts as covered as in the single run.
+    shards = _run_shards(tmp_path, monkeypatch, 3, capsys, SPLITS)
+    holders = sorted({p[0].split("/")[0] for p in _part_lines(shards)})
+    assert holders == ["2", "3"]
+    folders = {}
+    for record in shards.glob(f"*/{RECORD_NAME}"):
+        for line in record.read_text(encoding="utf-8").splitlines():
+            fields = line.split("\t")
+            if len(fields) == 6:
+                folders[fields[3]] = record.parent
+    blocks = {
+        "1/2": "w.go:1.1,2.2 4 1\nw.go:3.1,4.2 6 0\n",
+        "2/2": "w.go:1.1,2.2 4 0\nw.go:3.1,4.2 6 2\n",
+    }
+    for part, folder in folders.items():
+        profile = folder / "services/server" / "coverage.out"
+        profile.write_text(profile.read_text(encoding="utf-8") + blocks[part], encoding="utf-8")
+    out = tmp_path / "repo"
+    assert _merge(shards, out) == 0, capsys.readouterr().err
+    merged = out / "services/server" / "coverage.out"
+    single = _write(tmp_path / "single.out", "mode: atomic\nw.go:1.1,2.2 4 1\nw.go:3.1,4.2 6 2\n")
+    only_wire = _write(
+        tmp_path / "wire.out",
+        "mode: atomic\n"
+        + "".join(ln + "\n" for ln in merged.read_text().splitlines()[1:] if ln.startswith("w.go")),
+    )
+    assert go_shards.total(only_wire) == go_shards.total(single) == 100.0
+
+
+# --- the test command: go test for the units of a shard --------------------------------------
+
+_GO_FAKE = """#!{python}
+import json, os, sys
+args = sys.argv[1:]
+with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as fh:
+    fh.write(json.dumps({{"args": args, "cwd": os.getcwd()}}) + "\\n")
+if "-c" in args:
+    open(args[args.index("-o") + 1], "w").close()
+    sys.exit(int(os.environ.get("FAKE_BUILD_EXIT", "0")))
+[profile] = [a.split("=", 1)[1] for a in args if a.startswith("-coverprofile=")]
+packages = [a for a in args if "/" in a and not a.startswith("-")]
+with open(profile, "w", encoding="utf-8") as fh:
+    fh.write("mode: atomic\\n" + "".join(f"{{p}}/x.go:1.1,2.2 1 1\\n" for p in packages))
+for p in packages:
+    print(f"ok  \\t{{p}}\\t2.000s")
+sys.exit(1 if os.environ.get("FAKE_FAIL", "-") in args else 0)
+"""
+GO_FLAGS = ["-race", "-covermode=atomic", "-coverprofile=coverage.out", "-timeout=20m"]
+
+
+def _go(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    bin_dir = tmp_path / "gobin"
+    bin_dir.mkdir()
+    go = bin_dir / "go"
+    go.write_text(_GO_FAKE.format(python=sys.executable), encoding="utf-8")
+    go.chmod(0o755)
+    log = tmp_path / "go.log"
+    monkeypatch.setenv("PATH", f"{bin_dir}:/usr/bin:/bin")
+    monkeypatch.setenv("FAKE_LOG", str(log))
+    for module in MODULES:
+        (tmp_path / module).mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(tmp_path)
+    return log
+
+
+def _calls(log: Path) -> list[dict[str, Any]]:
+    if not log.exists():
+        return []
+    return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+
+
+def _test(tmp_path: Path, shard: str, module: str, *flags: str) -> int:
+    args = ["test", "--shard", shard, "--timings", str(_timings_file(tmp_path))]
+    args += ["--tags", "contract_validate", "--record", str(tmp_path / "rec" / RECORD_NAME)]
+    return go_shards.main([*args, "--module", module, *MODULES, "--", *(flags or GO_FLAGS)])
+
+
+def test_the_test_command_runs_the_packages_and_the_part_of_its_shard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = _go(tmp_path, monkeypatch)
+    _fake_list(monkeypatch, PACKAGES)
+    _fake_tests(monkeypatch, SPLITS)
+    # Shard 3 of 3: the second half of wire and the packages beside it (see the split tests).
+    assert _test(tmp_path, "3/3", "services/server") == 0
+    out = capsys.readouterr().out
+    calls = _calls(log)
+    assert {c["cwd"] for c in calls} == {str((tmp_path / "services/server").resolve())}
+    # One build first: the go test processes then find every package compiled, instead of
+    # compiling the module each on its own at the same time.
+    build, *runs = calls
+    assert build["args"][:2] == ["test", "-c"]
+    assert build["args"][4:] == ["-race", "-covermode=atomic", WIRE]
+    [whole] = [c["args"] for c in runs if "-skip" not in c["args"]]
+    [part] = [c["args"] for c in runs if "-skip" in c["args"]]
+    assert whole[: len(GO_FLAGS) + 1] == ["test", *GO_FLAGS]
+    assert WIRE not in whole
+    flag, pattern = go_shards.part_filter(WIRE_TESTS, 2, 2)
+    assert part == [
+        "test",
+        "-race",
+        "-covermode=atomic",
+        "-coverprofile=coverage.part1.out",
+        "-timeout=20m",
+        flag,
+        pattern,
+        WIRE,
+    ]
+    # The part's output follows a marker, so `timings` knows it measured a part.
+    assert f"go-shard: part 2/2 of {WIRE}\nok  \t{WIRE}\t2.000s\n" in out
+    module = tmp_path / "services/server"
+    assert not (module / "coverage.part1.out").exists()
+    merged = (module / "coverage.out").read_text(encoding="utf-8").splitlines()
+    assert merged[0] == "mode: atomic"
+    assert f"{WIRE}/x.go:1.1,2.2 1 1" in merged
+    assert len(merged) == 1 + len(whole) - len(GO_FLAGS) - 1 + 1
+
+
+def test_a_shard_of_one_part_runs_it_without_a_build_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = _go(tmp_path, monkeypatch)
+    _fake_list(monkeypatch, {"services/host": [], "services/server": [WIRE]})
+    _fake_tests(monkeypatch, SPLITS)
+    assert _test(tmp_path, "1/2", "services/server") == 0
+    [call] = _calls(log)
+    assert go_shards.part_filter(WIRE_TESTS, 1, 2)[1] in call["args"]
+    module = tmp_path / "services/server"
+    assert (module / "coverage.out").read_text(encoding="utf-8").startswith("mode: atomic\n")
+    assert sorted(p.name for p in module.iterdir()) == ["coverage.out"]
+    assert _test(tmp_path, "2/2", "services/host") == 0
+    assert "no package of services/host in shard 2/2" in capsys.readouterr().out
+    assert len(_calls(log)) == 1
+
+
+@pytest.mark.parametrize("fail", [WIRE, "example.com/server/internal/chat", "build"])
+def test_the_test_command_fails_when_a_go_test_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], fail: str
+) -> None:
+    log = _go(tmp_path, monkeypatch)
+    _fake_list(monkeypatch, {"services/host": [], "services/server": PACKAGES["services/server"]})
+    _fake_tests(monkeypatch, SPLITS)
+    if fail == "build":
+        monkeypatch.setenv("FAKE_BUILD_EXIT", "2")
+    else:
+        monkeypatch.setenv("FAKE_FAIL", fail)
+    assert _test(tmp_path, "1/1", "services/server") == 1
+    # A failed build runs nothing; a failed test lets the others finish and report.
+    assert len(_calls(log)) == (1 if fail == "build" else 4)
+    assert "go-shard: part 2/2" in capsys.readouterr().out or fail == "build"
+
+
+def test_the_test_command_needs_one_profile_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = _go(tmp_path, monkeypatch)
+    _fake_list(monkeypatch, PACKAGES)
+    _fake_tests(monkeypatch, SPLITS)
+    assert _test(tmp_path, "1/1", "services/server", "-race") == 1
+    assert "-coverprofile" in capsys.readouterr().err
+    assert _calls(log) == []
+
+
+def test_timings_count_a_part_as_its_share_of_the_package(tmp_path: Path) -> None:
+    log = _write(
+        tmp_path / "a.log",
+        "2026-10-21T01:48:29.0Z ok  \texample.com/a\t1.000s\n"
+        f"2026-10-21T01:48:30.0Z go-shard: part 2/2 of {WIRE}\n"
+        f"2026-10-21T01:48:30.0Z ok  \t{WIRE}\t300.000s\tcoverage: 1.0% of ...\n",
+    )
+    other = _write(tmp_path / "b.log", f"go-shard: part 1/2 of {WIRE}\nFAIL\t{WIRE}\t200.000s\n")
+    assert go_shards.parse_timings([log, other]) == {"example.com/a": 1.0, WIRE: 500.0}
+
+
+@pytest.mark.parametrize(("package", "parts"), sorted(go_shards.SPLITS.items()))
+def test_every_split_package_is_a_tested_package_of_the_tree(package: str, parts: int) -> None:
+    # A renamed or emptied package would leave a split that never applies.
+    module = next(m for m in ("services/server", "services/host") if f"/{m}/" in f"{package}/")
+    names = go_shards.list_tests(str(REPO / module), package)
+    assert len(names) >= 2 * parts
+    assert package in json.loads(go_shards.TIMINGS.read_text(encoding="utf-8"))
+    first = go_shards.pattern_names(go_shards.part_filter(names, 1, parts)[1])
+    assert len(names) // parts <= len(first) <= len(names) // parts + 1
