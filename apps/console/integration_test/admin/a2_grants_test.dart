@@ -54,8 +54,15 @@ void main() {
         : dayFromToday(30);
     await typeKey($, 'wizard.until', day);
     await typeKey($, 'wizard.reason', 'Campaign work');
-    await waitFor($, find.textContaining('Kampagnen'));
-    await waitFor($, find.textContaining('Texter'));
+    // The preview of the final request: the server's text names the agent of the hint.
+    await waitFor(
+      $,
+      find.descendant(
+        of: byKey('preview.text'),
+        matching: find.textContaining('Texter'),
+        matchRoot: true,
+      ),
+    );
     final text = _previewText($);
     // ignore: avoid_print
     print(

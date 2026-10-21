@@ -143,6 +143,12 @@ void main() {
 
     expect(find.byKey(const ValueKey('token.secret')), findsOneWidget);
     expect(find.text(_secret), findsOneWidget);
+    // No SelectionArea: in the web console it inserts a style the CSP blocks (D-M6-04-6).
+    expect(find.byType(SelectionArea), findsNothing);
+    expect(
+      tester.widget(find.byKey(const ValueKey('token.secret'))),
+      isA<SelectableText>(),
+    );
     expect(
       find.text(
         "This secret is shown only once. Copy it into the adapter's secret "

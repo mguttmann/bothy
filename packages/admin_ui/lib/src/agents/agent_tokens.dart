@@ -443,13 +443,14 @@ class _TokenSecretViewState extends State<TokenSecretView> {
               const SizedBox(height: DsSpace.s4),
               Semantics(
                 label: l.adminTokenSecretLabel,
-                child: SelectionArea(
-                  child: Text(
-                    widget.secret,
-                    key: const ValueKey('token.secret'),
-                    style: dsTextStyle(DsType.code)
-                        .copyWith(color: colors.textPrimary),
-                  ),
+                // SelectableText, not SelectionArea: in the web console a SelectionArea makes the
+                // engine insert a style element without the nonce, which the CSP blocks (brief
+                // M6-04, D-M6-04-6).
+                child: SelectableText(
+                  widget.secret,
+                  key: const ValueKey('token.secret'),
+                  style: dsTextStyle(DsType.code)
+                      .copyWith(color: colors.textPrimary),
                 ),
               ),
               Align(
