@@ -281,7 +281,7 @@ type problem struct {
 
 // wantProblem requires status, a body that validates against the schema Problem of the contract,
 // the code and the reason (empty: no reason member), and returns the problem.
-func (e *env) wantProblem(r harness.Response, status int, code, reason, label string) problem {
+func (e *env) wantProblem(r harness.Response, status int, code, reason, label string) problem { //nolint:unparam // callers may read the problem; the current ones check only its members.
 	e.t.Helper()
 	if r.Status != status {
 		e.t.Fatalf("%s = %d %s, want %d %s", label, r.Status, e.redact(r.Body), status, code)

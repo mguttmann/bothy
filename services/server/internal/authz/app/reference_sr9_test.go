@@ -141,6 +141,7 @@ func (m *refWorld) spaceVisible(space ids.ID, f func(ids.ID, *refChannel) refRig
 // requirementReason evaluates the requirement of the reference actions with r: "" when it holds,
 // else the reason of the first failing part.
 func requirementReason(a authorize.Action, r refRights) string {
+	//exhaustive:ignore // the reference covers only its actions; every other action has no requirement here.
 	switch a {
 	case authorize.ActionMessageCreate:
 		if r.level < 2 {
@@ -327,6 +328,7 @@ var (
 // p11Resource is the resource of act on channel c; the message actions name a message of the
 // agent itself, so the author rule never decides.
 func p11Resource(act authorize.Action, c *refChannel, agent ids.ID) authorize.Resource {
+	//exhaustive:ignore // the property names only its actions; the default covers the rest.
 	switch act {
 	case authorize.ActionMessageRead, authorize.ActionMessageRevisionsRead, authorize.ActionMessageUpdate, authorize.ActionMessageDelete,
 		authorize.ActionReactionAdd:

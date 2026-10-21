@@ -47,6 +47,12 @@ const maxSafeInteger = 1<<53 - 1
 // stepStatusCompleted is the status of a step or plan item that finished successfully.
 const stepStatusCompleted = "completed"
 
+// stepStatusFailed and stepStatusCancelled are the other end states of a step.
+const (
+	stepStatusFailed    = "failed"
+	stepStatusCancelled = "cancelled"
+)
+
 // The member names that several patchable objects share.
 const (
 	memberStatus = "status"
@@ -57,7 +63,7 @@ const (
 // The enums of the patchable members (04 schemas RunStep, RunPlan, RunFollowup).
 var (
 	stepKindValues     = []string{"tool_call", summaryKind, "subagent", "workflow", "background_job"}
-	stepStatusValues   = []string{"pending", "running", stepStatusCompleted, "failed", "cancelled"}
+	stepStatusValues   = []string{"pending", "running", stepStatusCompleted, stepStatusFailed, stepStatusCancelled}
 	planStatusValues   = []string{"pending", "in_progress", stepStatusCompleted}
 	followupStateValue = []string{"delivered", "absorbed"}
 )

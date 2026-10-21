@@ -304,7 +304,7 @@ func (w *readsWorld) forgeAutocomplete(e *env) string {
 	if err := json.Unmarshal(rawHead, &head); err != nil || head.Kid == "" {
 		e.t.Fatalf("the header of T has no kid: %v", err)
 	}
-	pemBytes, err := os.ReadFile(filepath.Join(e.s.SigningKeyDir, "invocation-"+head.Kid+".pem")) //nolint:gosec // G304: the key store of the own test server
+	pemBytes, err := os.ReadFile(filepath.Join(e.s.SigningKeyDir, "invocation-"+head.Kid+".pem"))
 	if err != nil {
 		e.t.Fatalf("the invocation key of T is not in the key store: %v", err)
 	}
@@ -345,19 +345,19 @@ func (w *readsWorld) tokenNeverLogged(e *env) {
 	for _, s := range w.sinks.Spans.GetSpans() {
 		telemetry = append(telemetry, s.Name, s.Status.Description)
 		for _, a := range s.Attributes {
-			telemetry = append(telemetry, string(a.Key)+"="+a.Value.Emit())
+			telemetry = append(telemetry, string(a.Key)+"="+a.Value.String())
 		}
 		for _, ev := range s.Events {
 			telemetry = append(telemetry, ev.Name)
 			for _, a := range ev.Attributes {
-				telemetry = append(telemetry, a.Value.Emit())
+				telemetry = append(telemetry, a.Value.String())
 			}
 		}
 	}
 	for _, r := range w.sinks.Logs.Records() {
 		telemetry = append(telemetry, r.Body().String())
 		r.WalkAttributes(func(kv attribute.KeyValue) bool {
-			telemetry = append(telemetry, string(kv.Key)+"="+kv.Value.Emit())
+			telemetry = append(telemetry, string(kv.Key)+"="+kv.Value.String())
 			return true
 		})
 	}

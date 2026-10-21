@@ -17,7 +17,7 @@ import (
 
 // callWithInvocation is consumerWorld.call with the Invocation-Token values of an agent inside a
 // run (07 guard rule SR9).
-func (w *invocationWorld) callWithInvocation(a consumerAgent, method, path string, body any, tokens ...string) (int, map[string]any) {
+func (w *invocationWorld) callWithInvocation(a consumerAgent, method, path string, body any, tokens ...string) (int, map[string]any) { //nolint:unparam // the method keeps the form of consumerWorld.call.
 	w.t.Helper()
 	var rd io.Reader
 	if body != nil {

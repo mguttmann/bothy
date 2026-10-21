@@ -230,7 +230,7 @@ func anyContains(rs []harness.Response, list []string) bool {
 // file fails with got, the observed set, so it can be reviewed and written once.
 func readGolden(e *env, got []string) []string {
 	e.t.Helper()
-	b, err := os.ReadFile(scopeGolden)
+	b, err := os.ReadFile(scopeGolden) //nolint:gosec // G304: the golden file of this package
 	if err != nil {
 		e.t.Fatalf("read %s: %v; the operations that called Scope are\n%s", scopeGolden, err, strings.Join(got, "\n"))
 	}

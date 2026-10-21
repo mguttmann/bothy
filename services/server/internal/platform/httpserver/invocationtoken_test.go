@@ -76,7 +76,7 @@ func TestAuth_InvocationTokenHeader(t *testing.T) {
 		}
 		for _, span := range httpservertest.Spans().Ended() {
 			for _, kv := range span.Attributes() {
-				if strings.Contains(kv.Value.Emit(), s) {
+				if strings.Contains(kv.Value.String(), s) {
 					t.Fatalf("an Invocation-Token value or segment appears in the span attribute %s", kv.Key)
 				}
 			}

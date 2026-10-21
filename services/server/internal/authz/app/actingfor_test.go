@@ -40,7 +40,7 @@ func (w *world) agentFor(agent, person ids.ID, r actingRun, status actor.ActingF
 }
 
 // grantLotse gives Lotse level l on the space and raises the rights version.
-func (w *world) grantLotse(t testing.TB, space ids.ID, l domain.Level, caps ...domain.Capability) ids.ID {
+func (w *world) grantLotse(t testing.TB, space ids.ID, l domain.Level, caps ...domain.Capability) ids.ID { //nolint:unparam // the level names the grant like the other grant helpers do.
 	t.Helper()
 	id := w.grant(t, domain.Subject{Kind: domain.SubjectAgent, PrincipalID: w.lotse}, domain.Target{Kind: domain.TargetSpace, SpaceID: space}, l, time.Time{}, caps...)
 	w.versions.Bump()

@@ -68,7 +68,7 @@ func IsSummaryStep(s DocStep) bool {
 
 // isFinished reports the end states of a step; only finished steps may be summarized.
 func isFinished(status string) bool {
-	return status == stepStatusCompleted || status == "failed" || status == "cancelled"
+	return status == stepStatusCompleted || status == stepStatusFailed || status == stepStatusCancelled
 }
 
 // summarize runs after the step adds of a patch. While the run has more steps than

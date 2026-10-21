@@ -158,7 +158,7 @@ func (w *world) start(handle, run, token string, extra ...string) *httpservertes
 }
 
 // startWith sends startRun with the mode and the tool class.
-func (w *world) startWith(handle, run, token, mode, tool string, extra ...string) *httpservertest.Response { //nolint:unparam // the request helpers name the agent handle like start and cancel do.
+func (w *world) startWith(handle, run, token, mode, tool string, extra ...string) *httpservertest.Response {
 	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/start", startBody(token, mode, tool, extra...))
 }
 
