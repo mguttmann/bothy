@@ -23,6 +23,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/OWNER/bothy/services/server/api/specschema"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
@@ -39,9 +40,13 @@ import (
 // P-09: without a Docker-compatible runtime the binary fails, it never skips). The templates run
 // the steps of bothy migrate up, so every database has its instance row.
 // TestMain builds the request validator first, so no readiness wait of a test pays for it
-// (docs/DECISIONS.md M1-31/18).
+// (docs/DECISIONS.md M1-31/18), and the contract bundle of the gateway harness, so no test pays
+// for it inside a token lifetime or a heartbeat window (PL/20).
 func TestMain(m *testing.M) {
 	if err := wire.WarmEnabledValidator(); err != nil {
+		panic(err)
+	}
+	if _, err := specschema.Default(); err != nil {
 		panic(err)
 	}
 	os.Exit(pgtest.Main(m, pgtest.WithSteps(wire.MigrationSteps)))
