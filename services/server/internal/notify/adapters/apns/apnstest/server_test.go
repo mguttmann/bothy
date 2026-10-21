@@ -7,7 +7,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 )
 
 const (
@@ -61,12 +61,19 @@ func jwt(t *testing.T, key *ecdsa.PrivateKey, keyID, iss string) string {
 	return tok
 }
 
-// client returns an HTTP/2 client that trusts the Fake.
-func client(srv *apnstest.Server) *http.Client {
-	return &http.Client{Transport: &http.Transport{ // nosemgrep: bothy-go-egress-only -- a test client of the in-process Fake on loopback
-		TLSClientConfig:   &tls.Config{RootCAs: srv.RootCAs(), MinVersion: tls.VersionTLS12},
-		ForceAttemptHTTP2: true,
-	}}
+// client returns an egress client with HTTP/2 that trusts the Fake.
+func client(t *testing.T, srv *apnstest.Server) *egress.Client {
+	t.Helper()
+	r, err := egress.ParseRule(srv.EgressRule())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := egress.New(egress.Config{AllowedHosts: []egress.Rule{r}, Timeout: 10 * time.Second, MaxResponseBytes: 1 << 16},
+		egress.Options{Purpose: "test", HTTP2: true}, egress.Deps{RootCAs: srv.RootCAs()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
 }
 
 type answer struct {
@@ -88,7 +95,7 @@ func send(t *testing.T, srv *apnstest.Server, method, path, bearer string) answe
 		req.Header.Set("Authorization", "bearer "+bearer)
 	}
 	req.Header.Set("Apns-Id", "0192f1d3-0a55-7b21-8c4d-5e6f7a8b9c0d")
-	resp, err := client(srv).Do(req)
+	resp, err := client(t, srv).Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
