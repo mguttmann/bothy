@@ -126,6 +126,34 @@ type Inserter interface {
 	// of args is not registered, or args has another type than the registered one. Other errors
 	// are those of the insert statement.
 	InsertTx(ctx context.Context, args Args, opts *InsertOptions) error
+	// InsertUniqueTx inserts a job with args like InsertTx unless a job of the same kind with
+	// equal args stands in a state that is not finalized (available, pending, retryable, running,
+	// scheduled); a completed, cancelled or discarded job does not count. Equal args means the
+	// fields tagged river:"unique" when the args type tags any field, else all fields (River's
+	// unique jobs by args). The comparison ignores the queue and the scheduled time. Window and
+	// throttle state is kept this way as one job per key (M3-19 design note 9 a). opts may be nil.
+	//
+	// It returns Inserted true and the new job's ScheduledAt, or Inserted false and the
+	// ScheduledAt of the standing job, which the caller reads as the end of an open window.
+	//
+	// Errors: those of InsertTx.
+	InsertUniqueTx(ctx context.Context, args Args, opts *InsertOptions) (InsertResult, error)
+	// PendingTx reads, in the ambient transaction of ctx, the job that InsertUniqueTx with args
+	// would stand back for: same kind, equal args in the same comparison, a state that is not
+	// finalized. It returns the job's ScheduledAt and ok true, or ok false when there is none.
+	// With several such jobs (inserted with InsertTx) it returns the earliest time.
+	//
+	// Errors: those of InsertTx (outside a unit of work, phases sync and audit, an unregistered
+	// kind or another type); others are those of the read.
+	PendingTx(ctx context.Context, args Args) (scheduledAt time.Time, ok bool, err error)
+}
+
+// InsertResult is the outcome of Inserter.InsertUniqueTx.
+type InsertResult struct {
+	// Inserted is false when a job of the same kind with equal args already stands.
+	Inserted bool
+	// ScheduledAt is the time of the inserted job, or of the standing one when Inserted is false.
+	ScheduledAt time.Time
 }
 
 // Runtime is the job runtime of one process: a River client over the pool of the process, the
