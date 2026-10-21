@@ -16,8 +16,8 @@ step-up of every flow needs. Steps:
 3. The seed through the API as Alex (spaces, channels, Sam, a group, a grant, two agents) and
    Sam's waiting device: Sam's devices call the API without the cookie with DPoP proofs signed by
    WebCrypto keys of the page (``PageDevice``). The ids and names go to ``window.__e2eSeed``.
-4. patrol's protocol: initialise, list the tests with ``__patrol__getTests`` and run each with
-   ``__patrol__runTest`` (up to 5 minutes each).
+4. patrol's protocol: list the tests with ``__patrol__getTests``, then per test a fresh load of
+   the bundle with the seed and the initialisation, and ``__patrol__runTest`` (up to 5 minutes).
 
 The result goes to ``/out/results/admin.json`` (per test its name, result and details, the
 violations, console CSP errors, foreign origins and downloads; never a secret, code or token).
@@ -780,19 +780,35 @@ def first_line(download: Download) -> str:
         return f.readline().rstrip("\r\n")[:500]
 
 
-def run_tests(page: Page) -> list[dict[str, Any]]:
-    """patrol's protocol: initialise, list the tests, run each in order; returns the results."""
+def open_bundle(page: Page, seed_json: str) -> None:
+    """Loads the bundle afresh, sets ``window.__e2eSeed`` and runs patrol's initialisation.
+
+    The Dart side runs every test of the bundle once per page load and executes only the one
+    requested through ``__patrol__runTest``; the others pass through without their body. So each
+    test needs its own load, as patrol's web runner does (web_runner/tests/test.spec.ts). The
+    seed is set before the initialisation, which is what the Dart side waits for.
+    """
+    page.goto(CONSOLE)
+    page.evaluate("(s) => { window.__e2eSeed = s; }", seed_json)
     page.evaluate("window.__patrol__isInitialised = true")
     page.wait_for_function(INITIALISE_JS, timeout=STEP_TIMEOUT_MS)
     page.wait_for_function("() => !!window.__patrol__runTest", timeout=TEST_TIMEOUT_MS)
+
+
+def run_tests(page: Page, seed_json: str) -> list[dict[str, Any]]:
+    """patrol's protocol: list the tests, then run each in order on its own page load; returns
+    the results."""
+    open_bundle(page, seed_json)
     tree = page.evaluate("() => window.__patrol__getTests()")
     tests = flatten_tests(tree["group"])
     results: list[dict[str, Any]] = []
-    for test in tests:
+    for index, test in enumerate(tests):
         if test.skip:
             results.append({"name": test.name, "result": "skipped", "details": None})
             say(f"{test.name}: skipped")
             continue
+        if index > 0:
+            open_bundle(page, seed_json)
         say(f"{test.name}: running")
         outcome = page.evaluate(RUN_TEST_JS, [test.name, TEST_TIMEOUT_MS])
         details = outcome.get("details") if isinstance(outcome, dict) else str(outcome)
@@ -854,9 +870,8 @@ def run_admin(pw: Playwright, login: Login, spki: str) -> dict[str, Any]:
         say("seed")
         document = seed(page, admin)
         check_seed(document)
-        page.evaluate("(s) => { window.__e2eSeed = s; }", json.dumps(document))
         say("patrol suites")
-        tests = run_tests(page)
+        tests = run_tests(page, json.dumps(document))
         result["tests"] = tests
         result["platform_actions"] = sorted(set(handler.actions))
         records = [DownloadRecord(d.suggested_filename, first_line(d)) for d in downloads]
