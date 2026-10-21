@@ -5,7 +5,7 @@ package stats
 import "context"
 
 // ClientMetricsBatch is a batch of app metrics (schema ClientMetricsBatch, docs/spec/
-// 15-client-architektur.md 17): platform, app version, density and theme of the app and the
+// 15-client-architecture.md 17): platform, app version, density and theme of the app and the
 // entries. Density and Theme are "" when absent.
 type ClientMetricsBatch struct {
 	Platform, AppVersion, Density, Theme string

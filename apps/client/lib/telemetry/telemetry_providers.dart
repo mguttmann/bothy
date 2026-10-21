@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The telemetry of the app as providers (docs/spec/15-client-architektur.md 16 and 17; ADR
+/// The telemetry of the app as providers (docs/spec/15-client-architecture.md 16 and 17; ADR
 /// 0057; brief M4-31 Design notes 2 and 4).
 ///
 /// [appMeasurementsProvider] hands the measurement points to the widgets, [metricsSenderProvider]

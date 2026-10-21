@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The collector of the app metrics (docs/spec/15-client-architektur.md 17, R-CL-10; ADR 0057;
+/// The collector of the app metrics (docs/spec/15-client-architecture.md 17, R-CL-10; ADR 0057;
 /// brief M4-31 Design note 1).
 ///
 /// The app measures only the closed list of docs/observability/signals.md 4.6a: [ClientMetric]

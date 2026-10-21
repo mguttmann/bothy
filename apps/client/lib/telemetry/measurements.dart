@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// The measurement points of the app metrics (docs/spec/15-client-architektur.md 17 and 19;
+/// The measurement points of the app metrics (docs/spec/15-client-architecture.md 17 and 19;
 /// brief M4-31 Scope).
 ///
 /// | Metric | Starts | Stops |

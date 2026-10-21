@@ -14,9 +14,7 @@ Map<String, String> catalogueRows() {
   final end = text.indexOf('### 4.7', start);
   final kinds = {
     'Histogram': 'histogram',
-    'Histogramm': 'histogram',
     'Counter': 'counter',
-    'Zähler': 'counter',
     'Gauge': 'gauge',
   };
   final rows = <String, String>{};

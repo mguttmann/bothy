@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Crash reports through `sentry_flutter`, without content (docs/spec/15-client-architektur.md
+/// Crash reports through `sentry_flutter`, without content (docs/spec/15-client-architecture.md
 /// 16; ADR 0057 item 5; brief M4-31 Design note 4).
 ///
 /// Sentry starts only when the build names a target (the define `CRASH_DSN`; there is no instance

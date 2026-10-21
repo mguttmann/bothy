@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-/// Sends the app metrics in batches (docs/spec/15-client-architektur.md 17; ADR 0057; brief
+/// Sends the app metrics in batches (docs/spec/15-client-architecture.md 17; ADR 0057; brief
 /// M4-31 Design note 2).
 ///
 /// Every `client.metrics.flush_interval` and when the app stops, [MetricsSender] takes what

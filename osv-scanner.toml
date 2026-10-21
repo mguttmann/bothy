@@ -1185,4 +1185,4 @@ name = "sentry_flutter"
 version = "10.1.0"
 ecosystem = "Pub"
 license.override = ["MIT"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file is MIT. Crash reports of apps/client (docs/spec/15-client-architektur.md 16, M4-31)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file is MIT. Crash reports of apps/client (docs/spec/15-client-architecture.md 16, M4-31)."

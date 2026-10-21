@@ -78,7 +78,7 @@ A release build on macOS needs a team signature: the release entitlements carry 
 access group of `flutter_secure_storage` (docs/spec/15-client-architecture.md 9). Debug builds run
 without one.
 
-Crash reports need a target in the build configuration (docs/spec/15-client-architektur.md 16):
+Crash reports need a target in the build configuration (docs/spec/15-client-architecture.md 16):
 `--dart-define=CRASH_DSN=<dsn>` and optionally `--dart-define=CRASH_ENVIRONMENT=<name>`. Without
 `CRASH_DSN` the crash path never starts and Settings hides `privacy.crash_reports`.
 
