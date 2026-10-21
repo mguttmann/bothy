@@ -282,7 +282,7 @@ func TestToleranceFromReference(t *testing.T) {
 	}
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "configuration.md")
-	if err := os.WriteFile(bad, []byte("| `other.key` | X | Server | duration | `1s` | x | aktiv |\n"), 0o600); err != nil {
+	if err := os.WriteFile(bad, []byte("| `other.key` | X | Server | duration | `1s` | x | active |\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := toleranceFromReference(bad); err == nil {

@@ -339,7 +339,7 @@ func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 func (w *RandomWorld) buildChannel(tb testing.TB, id string, c ChannelPlan) {
 	tb.Helper()
 	for _, msgs := range c.Threads {
-		body := map[string]any{"title": "Thema", "first_message": w.messageBody(msgs[0])}
+		body := map[string]any{"title": "Topic", "first_message": w.messageBody(msgs[0])}
 		if main := w.Main[id]; main != "" {
 			body["parent_message_id"] = w.Post(tb, main, false)
 		}
@@ -364,7 +364,7 @@ func (w *RandomWorld) buildChannel(tb testing.TB, id string, c ChannelPlan) {
 // messageBody is the createMessage body of a message, with a mention token of the person when
 // mention (03 messages, content format).
 func (w *RandomWorld) messageBody(mention bool) map[string]any {
-	text := "Hallo"
+	text := "Hello"
 	if mention {
 		text += " @" + w.humanHandle
 	}
@@ -439,7 +439,7 @@ func (w *RandomWorld) writePersonal(tb testing.TB) {
 			if main := w.Main[cid]; main != "" {
 				path, key = "/threads/"+main+"/draft", main
 			}
-			r := h.Do(tb.Context(), harness.Request{Method: http.MethodPut, Path: path, Body: map[string]any{"content_md": "Entwurf"}})
+			r := h.Do(tb.Context(), harness.Request{Method: http.MethodPut, Path: path, Body: map[string]any{"content_md": "Draft"}})
 			switch r.Status {
 			case http.StatusOK, http.StatusCreated:
 				w.Drafts[key] = cid
