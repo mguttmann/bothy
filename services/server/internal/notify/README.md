@@ -147,7 +147,7 @@ All five run on the queue `delivery` (02 12.2, 12.3):
 
 ### What later tickets plug in
 
-- M3-20 (`adapters/apns`) and M3-21 (`adapters/fcm`) implement `PushProvider` and map their answers onto the result classes; until a provider is registered, every `notify.push_send` ends with `no_provider`.
+- M3-20 (`adapters/apns`, see "APNs adapter") and M3-21 (`adapters/fcm`) implement `PushProvider` and map their answers onto the result classes; until a provider is registered, every `notify.push_send` ends with `no_provider`.
 - M3-22 adds the writes of `PushRegistrations` (`registerPush`, `unregisterPush`), the preview token and endpoint (with `BadgeCounter.For`) and the deactivation on logout, device revocation and user disable.
 - M3-23 replaces `presence.None` with the gateway's `presence.View` and `FailClosedRoutes` with `notification.created` and the delayed push.
 - M3-24 adds the delivery measurement of 13 9.
@@ -155,6 +155,53 @@ All five run on the queue `delivery` (02 12.2, 12.3):
 ### Rulings
 
 D-M3-19-1 to D-M3-19-22 in [docs/decisions.d/M3-19.md](../../../../docs/decisions.d/M3-19.md) ("M3-19 Hint jobs, automatic following and bundling").
+
+## APNs adapter (M3-20)
+
+`adapters/apns` implements `PushProvider` for registrations with `provider = apns` (13 5.1, 6.1, 7.1). `internal/wire` (`startAPNs` in `module_notify.go`) builds it only when APNs is enabled and only in the roles `worker` and `all`; the role `api` and an instance without APNs build none, read no secret, and their `apns` jobs end with `no_provider`.
+
+### Configuration
+
+APNs is enabled exactly when `push.apns.team_id`, `push.apns.key_id` and `push.apns.topics` are all set; then `push.apns.private_key_ref` is required. The cross-check `push_apns_complete` refuses a partial set, an empty or repeated topic and an enabled APNs without key reference; the loader refuses `push.apns.jwt_refresh_interval` outside 20 to 60 minutes in every role. At start `apns.New` resolves the key once and parses it (one PEM block `PRIVATE KEY`, PKCS #8, ECDSA on P-256); an error stops the start and names `push.apns.private_key_ref`. `bothy config check --secrets` resolves the key only with APNs enabled. Further keys: `push.ttl` (`apns-expiration`), `push.apns.retry_5xx_delay`, `push.apns.time_sensitive_enabled`.
+
+### Endpoints and connection
+
+`https://api.push.apple.com` for `environment = production`, `https://api.sandbox.push.apple.com` for `sandbox`, request `POST /3/device/<token>`. One egress client with `Options.HTTP2` serves both; its host policy allows exactly these two hosts on `https` port `443`, so no `egress.allowed_hosts` entry is needed. `net/http` keeps one multiplexed HTTP/2 connection per host open. `Deps.Endpoints` exists only for tests.
+
+### JWT cache and pause
+
+Per environment: one ES256 JWT (header `alg`, `kid`; claims `iss`, `iat`), created under the environment's lock by the first send that needs one and reused for `push.apns.jwt_refresh_interval`, so parallel sends create at most one per interval. Each creation resolves and parses the key again, so a rotated key is used from the next JWT on. `403 ExpiredProviderToken` forces one replacement and one retry; a second one within the interval is a configuration error. A configuration error (the other `403` reasons, a key that cannot be resolved or parsed) pauses the environment for one interval: sends return `config_error` without a request or a log record, then one send probes with a new JWT; an answer other than a configuration error ends the pause.
+
+### Answer table
+
+| Answer | Result |
+|---|---|
+| `200` | `accepted` |
+| any `410` | `disable` `token_invalid` with `InvalidSince` = `timestamp` |
+| `400 BadDeviceToken` | `disable` `token_invalid`, one Warn record that names the environment |
+| `400 DeviceTokenNotForTopic` | `disable` `topic_mismatch` |
+| `403 ExpiredProviderToken` | renew the JWT, retry once |
+| any other `403` | `config_error`, pause, one Error record |
+| `429 TooManyProviderTokenUpdates` | `program_error`, Error record |
+| any other `429` | `throttled` |
+| other `4xx` | `program_error`, Error record |
+| `5xx` | `retry` after `push.apns.retry_5xx_delay` |
+| other status | `program_error`, Error record |
+| no answer | Go error, transient for the job |
+
+Error records carry only `bothy.push.provider` and `error.type` (the Apple reason of the table or `other`); never a token, the JWT, the key, the topic or an ID.
+
+### Payload allow list
+
+Structs, not maps: `aps` with `alert` (`title-loc-key` `PUSH_TITLE`, `loc-key` `PUSH_BODY_<KIND>`), `mutable-content: 1`, `thread-id`, `category` (`<KIND>`), `sound` `default` (absent when quiet), `badge` (always, also `0`) and `interruption-level` (`passive` when quiet, `time-sensitive` only for `input_needed` with the switch, else `active`); the object `b` with `v`, `nid`, `k`, `i`, `t` and `m`. Thread and message keys are absent when the hint has none. The badge sync is exactly `{"aps":{"badge":<n>}}` with `apns-priority: 5`. Before any request: another provider or environment, an unknown kind, a zero `nid` or instance, `HasBadge` false or a payload above Apple's 4096 bytes give `program_error`; an empty or non-hex token `disable` `token_invalid`; an `app_id` outside `push.apns.topics` `disable` `topic_mismatch`.
+
+### Fake-APNs
+
+`adapters/apns/apnstest` is an in-process HTTP/2 server with TLS on `127.0.0.1` that verifies the bearer JWT like APNs (`403 MissingProviderToken`, `403 InvalidProviderToken`), answers `405` and `404` to a wrong method or path, answers per token from a script and records every request and TLS connection. It imports no testing package (M3-24 uses it for the push handoff measurement) and is never linked into `cmd/bothy`. The tests of M3-20 and the integration tests in `test/integration/notify` (`withAPNs`) use it; M3-21 to M3-24 build on it.
+
+### Rulings
+
+D-M3-20-0 to D-M3-20-8 in [docs/decisions.d/M3-20.md](../../../../docs/decisions.d/M3-20.md) ("M3-20 APNs adapter with Fake-APNs").
 
 ## Port (root package `internal/notify`)
 
