@@ -79,6 +79,12 @@ publish a port beyond loopback (the Ryuk container exposes `8080/tcp`, `defaultR
 retrieved 2026-10-12; switched off with `TESTCONTAINERS_RYUK_DISABLED`,
 [garbage collector](https://golang.testcontainers.org/features/garbage_collector/)).
 
+Docker picks the host port when the container starts, and another process (a test listening on
+`127.0.0.1:0` in the same ephemeral range) can take it before Docker binds it; the start then
+fails with `address already in use` or `port is already allocated`. `runRetrying` (`start.go`)
+removes the container of such a start and starts again on a new port, with a doubling pause, a
+bounded number of times and within the start deadline; any other start error returns at once.
+
 ## Cleanup
 
 After the tests `Main` terminates the container and removes the secrets directory. A test binary

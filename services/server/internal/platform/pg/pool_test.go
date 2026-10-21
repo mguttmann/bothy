@@ -26,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
@@ -467,7 +468,7 @@ func TestBootstrapSpansCarryNoVerifier(t *testing.T) {
 
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	ctx, parent := tp.Tracer("test").Start(context.Background(), "migrate")
-	conn, err := pg.Connect(ctx, db.SuperConfig(), providerFor(t, db.SecretsDir()), 10*time.Second, nil)
+	conn, err := pg.Connect(ctx, db.SuperConfig(), providerFor(t, db.SecretsDir()), testkit.Patience, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

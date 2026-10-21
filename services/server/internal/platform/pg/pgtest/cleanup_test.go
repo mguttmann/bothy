@@ -9,14 +9,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
 	"github.com/testcontainers/testcontainers-go"
 
@@ -29,6 +32,7 @@ import (
 var (
 	childMode    = flag.String("pgtest.child", "", "internal: the mode of the child of TestNoContainerSurvivesTheRun")
 	childTempDir = flag.String("pgtest.child-tmpdir", "", "internal: TMPDIR of the child of TestNoContainerSurvivesTheRun")
+	childRun     = flag.String("pgtest.child-run", "", "internal: the run label value of the child of TestNoContainerSurvivesTheRun")
 )
 
 // childContainerPrefix starts the line on which the child reports its container.
@@ -59,6 +63,7 @@ func TestPgtestChild(t *testing.T) {
 	if *childTempDir != "" {
 		t.Setenv("TMPDIR", *childTempDir)
 	}
+	runLabelValue = *childRun
 	db := New(t, WithoutMigrations())
 	_, _ = fmt.Fprintf(os.Stdout, "%s%s\n", childContainerPrefix, db.c.ctr.GetContainerID())
 	_, _ = io.Copy(io.Discard, os.Stdin)
@@ -112,9 +117,10 @@ func TestNoContainerSurvivesTheRun(t *testing.T) {
 			// The child's TMPDIR is a temporary directory of the parent's test: a child that never
 			// reaches the end of Main leaves its secrets directory there, and the parent's cleanup
 			// removes it.
+			run := randomHex(8)
 			args := append([]string{
 				"-test.run=^TestPgtestChild$", "-test.count=1", "-test.timeout=5m",
-				"-pgtest.child=" + tc.mode, "-pgtest.child-tmpdir=" + t.TempDir(),
+				"-pgtest.child=" + tc.mode, "-pgtest.child-tmpdir=" + t.TempDir(), "-pgtest.child-run=" + run,
 			}, tc.args...)
 			cmd := exec.CommandContext(ctx, os.Args[0], args...) // #nosec G204 G702 -- this test binary
 			var stderr bytes.Buffer
@@ -130,26 +136,40 @@ func TestNoContainerSurvivesTheRun(t *testing.T) {
 			if err := cmd.Start(); err != nil {
 				t.Fatal(err)
 			}
+			report := readChild(stdout)
 			waited := false
 			t.Cleanup(func() { // a parent that stops early must not leave its child running
 				if !waited {
 					_ = cmd.Process.Kill()
+					<-report.done
 					_ = cmd.Wait()
 				}
+				// Whatever the child left of its run goes, also when it never reported.
+				removeRun(ctx, t, cli.Client, run)
 			})
-			id := ""
-			sc := bufio.NewScanner(stdout)
-			for sc.Scan() {
-				if rest, ok := strings.CutPrefix(sc.Text(), childContainerPrefix); ok {
-					id = rest
-					break
+			// The child reports its container once New returned, which takes longer on a loaded
+			// host; a child that ends first, or hangs past Patience, fails with all its output.
+			id, reported := "", false
+			select {
+			case id = <-report.id:
+				reported = true
+			case <-report.done:
+				select { // the report line may come right before the end of the output
+				case id = <-report.id:
+					reported = true
+				default:
 				}
+			case <-time.After(testkit.Patience):
 			}
-			if id == "" {
+			if !reported {
 				_ = cmd.Process.Kill()
+				<-report.done
 				_ = cmd.Wait() // stderr is complete only after Wait
 				waited = true
-				t.Fatalf("the child reported no container; stderr:\n%s", stderr.String())
+				t.Fatalf("the child reported no container within %s; stdout:\n%s\nstderr:\n%s", testkit.Patience, report.output(), stderr.String())
+			}
+			if !runContainers(ctx, t, cli.Client, run)[id] {
+				t.Fatalf("the reported container %s does not carry the run label %s=%s", id, runLabel, run)
 			}
 			volumes := anonymousVolumes(ctx, t, cli.Client, id)
 			_ = stdin.Close() // lets the child go on
@@ -165,12 +185,11 @@ func TestNoContainerSurvivesTheRun(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			for sc.Scan() { // drain until the child exits, so it never blocks on a full pipe
-			}
+			<-report.done // the child's output up to its exit; it never blocks on a full pipe
 			waitErr := cmd.Wait()
 			waited = true
 			if tc.mode == "pass" && waitErr != nil {
-				t.Errorf("the passing child exited with %v; stderr:\n%s", waitErr, stderr.String())
+				t.Errorf("the passing child exited with %v; stdout:\n%s\nstderr:\n%s", waitErr, report.output(), stderr.String())
 			}
 			if tc.mode != "pass" && waitErr == nil {
 				t.Errorf("the %s child exited with 0", tc.mode)
@@ -186,6 +205,72 @@ func TestNoContainerSurvivesTheRun(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// childReport is the standard output of a child: every line in out, the container ID of the
+// report line on id, and done closed at the end of the output.
+type childReport struct {
+	mu   sync.Mutex
+	out  strings.Builder
+	id   chan string
+	done chan struct{}
+}
+
+// readChild reads the standard output of a child until it ends.
+func readChild(stdout io.Reader) *childReport {
+	r := &childReport{id: make(chan string, 1), done: make(chan struct{})}
+	go func() {
+		defer close(r.done)
+		sc := bufio.NewScanner(stdout)
+		for sc.Scan() {
+			line := sc.Text()
+			r.mu.Lock()
+			r.out.WriteString(line + "\n")
+			r.mu.Unlock()
+			if rest, ok := strings.CutPrefix(line, childContainerPrefix); ok {
+				select {
+				case r.id <- rest:
+				default:
+				}
+			}
+		}
+		// The rest of a line longer than the scanner's buffer is not needed; drain it, so the
+		// child never blocks on a full pipe.
+		_, _ = io.Copy(io.Discard, stdout)
+	}()
+	return r
+}
+
+// output returns the standard output of the child so far.
+func (r *childReport) output() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.out.String()
+}
+
+// runContainers returns the IDs of the containers that carry runLabel with the value run.
+func runContainers(ctx context.Context, t *testing.T, cli *client.Client, run string) map[string]bool {
+	t.Helper()
+	res, err := cli.ContainerList(ctx, client.ContainerListOptions{
+		All: true, Filters: client.Filters{}.Add("label", runLabel+"="+run),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]bool{}
+	for _, c := range res.Items {
+		ids[c.ID] = true
+	}
+	return ids
+}
+
+// removeRun removes, by ID, every container that carries runLabel with the value run, with its
+// anonymous volumes.
+func removeRun(ctx context.Context, t *testing.T, cli *client.Client, run string) {
+	t.Helper()
+	for id := range runContainers(ctx, t, cli, run) {
+		_, _ = cli.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 	}
 }
 
@@ -261,14 +346,21 @@ func TestReapLegacyRemovesOnlyOldUnwatchedContainers(t *testing.T) {
 	ctx := context.Background()
 	key := label + ".reap-" + randomHex(6)
 	start := func(labels map[string]string) string {
-		ctr, err := testcontainers.Run(ctx, Image,
-			testcontainers.WithName("bothy-pgtest-reap-"+randomHex(6)),
-			testcontainers.WithLabels(labels),
-			// A bounded sleep and AutoRemove: should this test die before its cleanup, the
-			// container still goes away on its own, as it has no watchdog.
-			testcontainers.WithEntrypoint("sleep", "600"),
-			testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) { hc.AutoRemove = true }),
-		)
+		// testcontainers publishes the port the image exposes; it goes on 127.0.0.1 like the
+		// port of pgtest, and runRetrying starts again when the host port Docker picked is taken.
+		ctr, err := runRetrying(ctx, func(ctx context.Context) (*testcontainers.DockerContainer, error) {
+			return testcontainers.Run(ctx, Image,
+				testcontainers.WithName("bothy-pgtest-reap-"+randomHex(6)),
+				testcontainers.WithLabels(labels),
+				// A bounded sleep and AutoRemove: should this test die before its cleanup, the
+				// container still goes away on its own, as it has no watchdog.
+				testcontainers.WithEntrypoint("sleep", "600"),
+				testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
+					hc.AutoRemove = true
+					hc.PortBindings = network.PortMap{network.MustParsePort(containerPort): {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "0"}}}
+				}),
+			)
+		})
 		if ctr != nil {
 			t.Cleanup(func() { _ = testcontainers.TerminateContainer(ctr) })
 		}
