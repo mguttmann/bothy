@@ -549,13 +549,13 @@ func (e AppManifestDeliveryMode) Valid() bool {
 
 // Defines values for AppManifestSchemaVersion.
 const (
-	N1 AppManifestSchemaVersion = 1
+	AppManifestSchemaVersionN1 AppManifestSchemaVersion = 1
 )
 
 // Valid indicates whether the value is a known member of the AppManifestSchemaVersion enum.
 func (e AppManifestSchemaVersion) Valid() bool {
 	switch e {
-	case N1:
+	case AppManifestSchemaVersionN1:
 		return true
 	default:
 		return false
@@ -1204,6 +1204,48 @@ func (e ComponentUpdateState) Valid() bool {
 	case ComponentUpdateStateActive:
 		return true
 	case ComponentUpdateStateDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleSessionStepUpMethod.
+const (
+	ConsoleSessionStepUpMethodOidcReauth   ConsoleSessionStepUpMethod = "oidc_reauth"
+	ConsoleSessionStepUpMethodPasskey      ConsoleSessionStepUpMethod = "passkey"
+	ConsoleSessionStepUpMethodPasswordTotp ConsoleSessionStepUpMethod = "password_totp"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleSessionStepUpMethod enum.
+func (e ConsoleSessionStepUpMethod) Valid() bool {
+	switch e {
+	case ConsoleSessionStepUpMethodOidcReauth:
+		return true
+	case ConsoleSessionStepUpMethodPasskey:
+		return true
+	case ConsoleSessionStepUpMethodPasswordTotp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleSessionStepUpMethodsAvailable.
+const (
+	ConsoleSessionStepUpMethodsAvailableOidcReauth   ConsoleSessionStepUpMethodsAvailable = "oidc_reauth"
+	ConsoleSessionStepUpMethodsAvailablePasskey      ConsoleSessionStepUpMethodsAvailable = "passkey"
+	ConsoleSessionStepUpMethodsAvailablePasswordTotp ConsoleSessionStepUpMethodsAvailable = "password_totp"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleSessionStepUpMethodsAvailable enum.
+func (e ConsoleSessionStepUpMethodsAvailable) Valid() bool {
+	switch e {
+	case ConsoleSessionStepUpMethodsAvailableOidcReauth:
+		return true
+	case ConsoleSessionStepUpMethodsAvailablePasskey:
+		return true
+	case ConsoleSessionStepUpMethodsAvailablePasswordTotp:
 		return true
 	default:
 		return false
@@ -2593,6 +2635,24 @@ func (e LlmCredentials) Valid() bool {
 	case LlmCredentialsOrganization:
 		return true
 	case LlmCredentialsPersonal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LoginClient.
+const (
+	LoginClientApp     LoginClient = "app"
+	LoginClientConsole LoginClient = "console"
+)
+
+// Valid indicates whether the value is a known member of the LoginClient enum.
+func (e LoginClient) Valid() bool {
+	switch e {
+	case LoginClientApp:
+		return true
+	case LoginClientConsole:
 		return true
 	default:
 		return false
@@ -5143,6 +5203,21 @@ func (e WebhookSubscriptionUpdateState) Valid() bool {
 	}
 }
 
+// Defines values for ConsoleRequest.
+const (
+	ConsoleRequestN1 ConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleRequest enum.
+func (e ConsoleRequest) Valid() bool {
+	switch e {
+	case ConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TargetKindPath.
 const (
 	TargetKindPathChannel TargetKindPath = "channel"
@@ -5182,6 +5257,111 @@ func (e VariantPath) Valid() bool {
 	case VariantPathPoster:
 		return true
 	case VariantPathSmall:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LogoutParamsXConsoleRequest.
+const (
+	LogoutParamsXConsoleRequestN1 LogoutParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the LogoutParamsXConsoleRequest enum.
+func (e LogoutParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case LogoutParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateStepUpChallengeParamsXConsoleRequest.
+const (
+	CreateStepUpChallengeParamsXConsoleRequestN1 CreateStepUpChallengeParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CreateStepUpChallengeParamsXConsoleRequest enum.
+func (e CreateStepUpChallengeParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case CreateStepUpChallengeParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BeginStepUpOidcReauthParamsXConsoleRequest.
+const (
+	BeginStepUpOidcReauthParamsXConsoleRequestN1 BeginStepUpOidcReauthParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the BeginStepUpOidcReauthParamsXConsoleRequest enum.
+func (e BeginStepUpOidcReauthParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case BeginStepUpOidcReauthParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CompleteStepUpOidcReauthParamsXConsoleRequest.
+const (
+	CompleteStepUpOidcReauthParamsXConsoleRequestN1 CompleteStepUpOidcReauthParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CompleteStepUpOidcReauthParamsXConsoleRequest enum.
+func (e CompleteStepUpOidcReauthParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case CompleteStepUpOidcReauthParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CompleteStepUpWithPasskeyParamsXConsoleRequest.
+const (
+	CompleteStepUpWithPasskeyParamsXConsoleRequestN1 CompleteStepUpWithPasskeyParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the CompleteStepUpWithPasskeyParamsXConsoleRequest enum.
+func (e CompleteStepUpWithPasskeyParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case CompleteStepUpWithPasskeyParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StepUpWithPasswordParamsXConsoleRequest.
+const (
+	StepUpWithPasswordParamsXConsoleRequestN1 StepUpWithPasswordParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the StepUpWithPasswordParamsXConsoleRequest enum.
+func (e StepUpWithPasswordParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case StepUpWithPasswordParamsXConsoleRequestN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EndViewAsParamsXConsoleRequest.
+const (
+	EndViewAsParamsXConsoleRequestN1 EndViewAsParamsXConsoleRequest = "1"
+)
+
+// Valid indicates whether the value is a known member of the EndViewAsParamsXConsoleRequest enum.
+func (e EndViewAsParamsXConsoleRequest) Valid() bool {
+	switch e {
+	case EndViewAsParamsXConsoleRequestN1:
 		return true
 	default:
 		return false
@@ -7551,6 +7731,44 @@ type ComponentUpdate struct {
 
 // ComponentUpdateState defines model for ComponentUpdate.State.
 type ComponentUpdateState string
+
+// ConsoleSession defines model for ConsoleSession.
+type ConsoleSession struct {
+	DisplayName string `json:"display_name"`
+
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt          Timestamp `json:"expires_at"`
+	IdleTimeoutSeconds int       `json:"idle_timeout_seconds"`
+
+	// StepUpAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	StepUpAt               *Timestamp                             `json:"step_up_at,omitempty"`
+	StepUpMethod           *ConsoleSessionStepUpMethod            `json:"step_up_method,omitempty"`
+	StepUpMethodsAvailable []ConsoleSessionStepUpMethodsAvailable `json:"step_up_methods_available"`
+
+	// StepUpValidUntil RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	StepUpValidUntil *Timestamp `json:"step_up_valid_until,omitempty"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId Uuid `json:"user_id"`
+	ViewAs *struct {
+		DisplayName string `json:"display_name"`
+
+		// EndsAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+		EndsAt Timestamp `json:"ends_at"`
+
+		// StartedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+		StartedAt Timestamp `json:"started_at"`
+
+		// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+		UserId Uuid `json:"user_id"`
+	} `json:"view_as,omitempty"`
+}
+
+// ConsoleSessionStepUpMethod defines model for ConsoleSession.StepUpMethod.
+type ConsoleSessionStepUpMethod string
+
+// ConsoleSessionStepUpMethodsAvailable defines model for ConsoleSession.StepUpMethodsAvailable.
+type ConsoleSessionStepUpMethodsAvailable string
 
 // ConsumerAck defines model for ConsumerAck.
 type ConsumerAck struct {
@@ -10645,6 +10863,9 @@ type LocalCredentialSet struct {
 	TotpEnroll *bool   `json:"totp_enroll,omitempty"`
 }
 
+// LoginClient `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+type LoginClient string
+
 // ManifestValidation defines model for ManifestValidation.
 type ManifestValidation struct {
 	Errors []FieldError `json:"errors"`
@@ -11261,6 +11482,9 @@ type OidcBeginRequest struct {
 	// Examples: com.example.teamchat:/login
 	AppRedirectUri string `json:"app_redirect_uri"`
 
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// ClientChallenge Base64url SHA-256 of a client verifier, binds the later `login_code` to this app instance.
 	//
 	// Examples: E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
@@ -11289,11 +11513,14 @@ type OidcBeginResponse struct {
 
 // OidcCompleteRequest defines model for OidcCompleteRequest.
 type OidcCompleteRequest struct {
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// ClientVerifier Examples: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
 	ClientVerifier string `json:"client_verifier"`
 
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 
 	// LoginCode One-time code the server appended to `app_redirect_uri` after the provider callback.
 	//
@@ -11425,11 +11652,14 @@ type PasskeyLoginCompleteRequest struct {
 	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChallengeId Uuid `json:"challenge_id"`
 
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// Credential WebAuthn `PublicKeyCredential` in JSON form.
 	Credential JsonObject `json:"credential"`
 
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 }
 
 // PasskeyRegisterComplete defines model for PasskeyRegisterComplete.
@@ -11446,8 +11676,11 @@ type PasskeyRegisterComplete struct {
 
 // PasswordLoginRequest defines model for PasswordLoginRequest.
 type PasswordLoginRequest struct {
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 
 	// LoginName Examples: alex
 	LoginName string `json:"login_name"`
@@ -14158,6 +14391,18 @@ type StepUpDeviceKeyRequest struct {
 	Signature string `json:"signature"`
 }
 
+// StepUpOidcBeginRequest defines model for StepUpOidcBeginRequest.
+type StepUpOidcBeginRequest struct {
+	AppRedirectUri string `json:"app_redirect_uri"`
+
+	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChallengeId     Uuid   `json:"challenge_id"`
+	ClientChallenge string `json:"client_challenge"`
+
+	// ProviderId UUIDv7 (RFC 9562), lowercase canonical form.
+	ProviderId Uuid `json:"provider_id"`
+}
+
 // StepUpPasskeyRequest defines model for StepUpPasskeyRequest.
 type StepUpPasskeyRequest struct {
 	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -14165,6 +14410,14 @@ type StepUpPasskeyRequest struct {
 
 	// Credential Free-form JSON object whose schema is named in the field description.
 	Credential JsonObject `json:"credential"`
+}
+
+// StepUpPasswordRequest defines model for StepUpPasswordRequest.
+type StepUpPasswordRequest struct {
+	// ChallengeId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChallengeId Uuid   `json:"challenge_id"`
+	Password    string `json:"password"`
+	TotpCode    string `json:"totp_code"`
 }
 
 // StepUpResult defines model for StepUpResult.
@@ -15012,8 +15265,11 @@ type TriggerState string
 
 // TrustedHeaderLoginRequest defines model for TrustedHeaderLoginRequest.
 type TrustedHeaderLoginRequest struct {
+	// Client `console`: no `device` or DPoP; cookie, no token (08, 7.5).
+	Client *LoginClient `json:"client,omitempty"`
+
 	// Device Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
-	Device DeviceRegistration `json:"device"`
+	Device *DeviceRegistration `json:"device,omitempty"`
 
 	// EnrollmentCode Optional enrollment code; links an unknown header login to the person of the code (08, 3.1).
 	//
@@ -15536,6 +15792,9 @@ type CommandIdPath = Uuid
 // ComponentIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type ComponentIdPath = Uuid
 
+// ConsoleRequest defines model for ConsoleRequest.
+type ConsoleRequest string
+
 // ConsumerPath Examples: default
 type ConsumerPath = string
 
@@ -15547,6 +15806,9 @@ type DeviceIdPath = Uuid
 
 // DpopProof defines model for DpopProof.
 type DpopProof = string
+
+// DpopProofLogin defines model for DpopProofLogin.
+type DpopProofLogin = string
 
 // EmojiPath One Unicode grapheme cluster, percent-encoded.
 //
@@ -15687,6 +15949,9 @@ type BadRequest = Problem
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Conflict = Problem
 
+// ConsoleLogin defines model for ConsoleLogin.
+type ConsoleLogin = ConsoleSession
+
 // Error Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Error = Problem
@@ -15722,6 +15987,9 @@ type RangeNotSatisfiable = Problem
 // ServiceUnavailable Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type ServiceUnavailable = Problem
+
+// StepUpDone defines model for StepUpDone.
+type StepUpDone = StepUpResult
 
 // TooManyRequests Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
@@ -15889,6 +16157,15 @@ type RedeemEnrollmentCodeParams struct {
 	DPoP DpopProof `json:"DPoP"`
 }
 
+// LogoutParams defines parameters for Logout.
+type LogoutParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *LogoutParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// LogoutParamsXConsoleRequest defines parameters for Logout.
+type LogoutParamsXConsoleRequest string
+
 // HandleOidcCallbackParams defines parameters for HandleOidcCallback.
 type HandleOidcCallbackParams struct {
 	// State State from the authorization request.
@@ -15906,8 +16183,8 @@ type HandleOidcCallbackParams struct {
 
 // CompleteOidcLoginParams defines parameters for CompleteOidcLogin.
 type CompleteOidcLoginParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
 
 // BeginPairingParams defines parameters for BeginPairing.
@@ -15924,15 +16201,60 @@ type CompletePairingParams struct {
 
 // CompletePasskeyLoginParams defines parameters for CompletePasskeyLogin.
 type CompletePasskeyLoginParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
 
 // LoginWithPasswordParams defines parameters for LoginWithPassword.
 type LoginWithPasswordParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
+
+// CreateStepUpChallengeParams defines parameters for CreateStepUpChallenge.
+type CreateStepUpChallengeParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *CreateStepUpChallengeParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// CreateStepUpChallengeParamsXConsoleRequest defines parameters for CreateStepUpChallenge.
+type CreateStepUpChallengeParamsXConsoleRequest string
+
+// BeginStepUpOidcReauthParams defines parameters for BeginStepUpOidcReauth.
+type BeginStepUpOidcReauthParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *BeginStepUpOidcReauthParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// BeginStepUpOidcReauthParamsXConsoleRequest defines parameters for BeginStepUpOidcReauth.
+type BeginStepUpOidcReauthParamsXConsoleRequest string
+
+// CompleteStepUpOidcReauthParams defines parameters for CompleteStepUpOidcReauth.
+type CompleteStepUpOidcReauthParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *CompleteStepUpOidcReauthParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// CompleteStepUpOidcReauthParamsXConsoleRequest defines parameters for CompleteStepUpOidcReauth.
+type CompleteStepUpOidcReauthParamsXConsoleRequest string
+
+// CompleteStepUpWithPasskeyParams defines parameters for CompleteStepUpWithPasskey.
+type CompleteStepUpWithPasskeyParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *CompleteStepUpWithPasskeyParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// CompleteStepUpWithPasskeyParamsXConsoleRequest defines parameters for CompleteStepUpWithPasskey.
+type CompleteStepUpWithPasskeyParamsXConsoleRequest string
+
+// StepUpWithPasswordParams defines parameters for StepUpWithPassword.
+type StepUpWithPasswordParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *StepUpWithPasswordParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// StepUpWithPasswordParamsXConsoleRequest defines parameters for StepUpWithPassword.
+type StepUpWithPasswordParamsXConsoleRequest string
 
 // RefreshTokenParams defines parameters for RefreshToken.
 type RefreshTokenParams struct {
@@ -15942,8 +16264,8 @@ type RefreshTokenParams struct {
 
 // LoginWithTrustedHeaderParams defines parameters for LoginWithTrustedHeader.
 type LoginWithTrustedHeaderParams struct {
-	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
-	DPoP DpopProof `json:"DPoP"`
+	// DPoP As `DpopProof`; not for `client = console`.
+	DPoP *DpopProofLogin `json:"DPoP,omitempty"`
 }
 
 // UpdateChannelParams defines parameters for UpdateChannel.
@@ -16090,6 +16412,15 @@ type UpdateComponentParams struct {
 	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
+
+// EndViewAsParams defines parameters for EndViewAs.
+type EndViewAsParams struct {
+	// XConsoleRequest CSRF header of the console (SEC-CORS-4).
+	XConsoleRequest *EndViewAsParamsXConsoleRequest `json:"X-Console-Request,omitempty"`
+}
+
+// EndViewAsParamsXConsoleRequest defines parameters for EndViewAs.
+type EndViewAsParamsXConsoleRequest string
 
 // ListCostEstimatesParams defines parameters for ListCostEstimates.
 type ListCostEstimatesParams struct {
@@ -17500,8 +17831,17 @@ type LoginWithPasswordJSONRequestBody = PasswordLoginRequest
 // CompleteStepUpWithDeviceKeyJSONRequestBody defines body for CompleteStepUpWithDeviceKey for application/json ContentType.
 type CompleteStepUpWithDeviceKeyJSONRequestBody = StepUpDeviceKeyRequest
 
+// BeginStepUpOidcReauthJSONRequestBody defines body for BeginStepUpOidcReauth for application/json ContentType.
+type BeginStepUpOidcReauthJSONRequestBody = StepUpOidcBeginRequest
+
+// CompleteStepUpOidcReauthJSONRequestBody defines body for CompleteStepUpOidcReauth for application/json ContentType.
+type CompleteStepUpOidcReauthJSONRequestBody = IdentityLinkComplete
+
 // CompleteStepUpWithPasskeyJSONRequestBody defines body for CompleteStepUpWithPasskey for application/json ContentType.
 type CompleteStepUpWithPasskeyJSONRequestBody = StepUpPasskeyRequest
+
+// StepUpWithPasswordJSONRequestBody defines body for StepUpWithPassword for application/json ContentType.
+type StepUpWithPasswordJSONRequestBody = StepUpPasswordRequest
 
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = TokenRefreshRequest
@@ -20355,7 +20695,7 @@ type ClientInterface interface {
 	// Logout End the current session
 	//
 	// Corresponds with POST /auth/logout (the `Logout` operationId).
-	Logout(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BeginOidcLoginWithBody Start an OIDC login
 	//
@@ -20485,7 +20825,7 @@ type ClientInterface interface {
 	// CreateStepUpChallenge Create a step-up challenge
 	//
 	// Corresponds with POST /auth/step-up/challenge (the `CreateStepUpChallenge` operationId).
-	CreateStepUpChallenge(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CreateStepUpChallenge(ctx context.Context, params *CreateStepUpChallengeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CompleteStepUpWithDeviceKeyWithBody Confirm step-up with the device key after user verification
 	//
@@ -20501,6 +20841,34 @@ type ClientInterface interface {
 	// Corresponds with POST /auth/step-up/device-key (the `CompleteStepUpWithDeviceKey` operationId).
 	CompleteStepUpWithDeviceKey(ctx context.Context, body CompleteStepUpWithDeviceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// BeginStepUpOidcReauthWithBody Start a console step-up with OIDC
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+	BeginStepUpOidcReauthWithBody(ctx context.Context, params *BeginStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BeginStepUpOidcReauth Start a console step-up with OIDC
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+	BeginStepUpOidcReauth(ctx context.Context, params *BeginStepUpOidcReauthParams, body BeginStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpOidcReauthWithBody Finish a console step-up with OIDC
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
+	CompleteStepUpOidcReauthWithBody(ctx context.Context, params *CompleteStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteStepUpOidcReauth Finish a console step-up with OIDC
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
+	CompleteStepUpOidcReauth(ctx context.Context, params *CompleteStepUpOidcReauthParams, body CompleteStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CompleteStepUpWithPasskeyWithBody Confirm step-up with a passkey
 	//
 	// Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.
@@ -20508,7 +20876,7 @@ type ClientInterface interface {
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
-	CompleteStepUpWithPasskeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CompleteStepUpWithPasskeyWithBody(ctx context.Context, params *CompleteStepUpWithPasskeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CompleteStepUpWithPasskey Confirm step-up with a passkey
 	//
@@ -20517,7 +20885,21 @@ type ClientInterface interface {
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
-	CompleteStepUpWithPasskey(ctx context.Context, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	CompleteStepUpWithPasskey(ctx context.Context, params *CompleteStepUpWithPasskeyParams, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StepUpWithPasswordWithBody Console step-up with password and TOTP
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
+	StepUpWithPasswordWithBody(ctx context.Context, params *StepUpWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StepUpWithPassword Console step-up with password and TOTP
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
+	StepUpWithPassword(ctx context.Context, params *StepUpWithPasswordParams, body StepUpWithPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RefreshTokenWithBody Rotate the refresh token
 	//
@@ -21001,6 +21383,16 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
 	CreateInteraction(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetConsoleSession Read the console session
+	//
+	// Corresponds with GET /console/session (the `GetConsoleSession` operationId).
+	GetConsoleSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EndViewAs End the stored view as person
+	//
+	// Corresponds with DELETE /console/session/view-as (the `EndViewAs` operationId).
+	EndViewAs(ctx context.Context, params *EndViewAsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListCostEstimates Cost estimates per run for reconciliation
 	//
@@ -24223,8 +24615,8 @@ func (c *Client) RedeemEnrollmentCode(ctx context.Context, params *RedeemEnrollm
 // Logout End the current session
 //
 // Corresponds with POST /auth/logout (the `Logout` operationId).
-func (c *Client) Logout(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLogoutRequest(c.Server)
+func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLogoutRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -24513,8 +24905,8 @@ func (c *Client) LoginWithPassword(ctx context.Context, params *LoginWithPasswor
 // CreateStepUpChallenge Create a step-up challenge
 //
 // Corresponds with POST /auth/step-up/challenge (the `CreateStepUpChallenge` operationId).
-func (c *Client) CreateStepUpChallenge(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateStepUpChallengeRequest(c.Server)
+func (c *Client) CreateStepUpChallenge(ctx context.Context, params *CreateStepUpChallengeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateStepUpChallengeRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -24559,6 +24951,74 @@ func (c *Client) CompleteStepUpWithDeviceKey(ctx context.Context, body CompleteS
 	return c.Client.Do(req)
 }
 
+// BeginStepUpOidcReauthWithBody Start a console step-up with OIDC
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+func (c *Client) BeginStepUpOidcReauthWithBody(ctx context.Context, params *BeginStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginStepUpOidcReauthRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginStepUpOidcReauth Start a console step-up with OIDC
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+func (c *Client) BeginStepUpOidcReauth(ctx context.Context, params *BeginStepUpOidcReauthParams, body BeginStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginStepUpOidcReauthRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteStepUpOidcReauthWithBody Finish a console step-up with OIDC
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
+func (c *Client) CompleteStepUpOidcReauthWithBody(ctx context.Context, params *CompleteStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpOidcReauthRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteStepUpOidcReauth Finish a console step-up with OIDC
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
+func (c *Client) CompleteStepUpOidcReauth(ctx context.Context, params *CompleteStepUpOidcReauthParams, body CompleteStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpOidcReauthRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CompleteStepUpWithPasskeyWithBody Confirm step-up with a passkey
 //
 // Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.
@@ -24566,8 +25026,8 @@ func (c *Client) CompleteStepUpWithDeviceKey(ctx context.Context, body CompleteS
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
-func (c *Client) CompleteStepUpWithPasskeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteStepUpWithPasskeyRequestWithBody(c.Server, contentType, body)
+func (c *Client) CompleteStepUpWithPasskeyWithBody(ctx context.Context, params *CompleteStepUpWithPasskeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpWithPasskeyRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -24585,8 +25045,42 @@ func (c *Client) CompleteStepUpWithPasskeyWithBody(ctx context.Context, contentT
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
-func (c *Client) CompleteStepUpWithPasskey(ctx context.Context, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteStepUpWithPasskeyRequest(c.Server, body)
+func (c *Client) CompleteStepUpWithPasskey(ctx context.Context, params *CompleteStepUpWithPasskeyParams, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpWithPasskeyRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StepUpWithPasswordWithBody Console step-up with password and TOTP
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
+func (c *Client) StepUpWithPasswordWithBody(ctx context.Context, params *StepUpWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStepUpWithPasswordRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StepUpWithPassword Console step-up with password and TOTP
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
+func (c *Client) StepUpWithPassword(ctx context.Context, params *StepUpWithPasswordParams, body StepUpWithPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStepUpWithPasswordRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -25457,491 +25951,6 @@ func (c *Client) CreateThread(ctx context.Context, channelId ChannelIdPath, para
 // Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
 func (c *Client) CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateUploadRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateUpload Start an upload
-//
-// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
-func (c *Client) CreateUpload(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, body CreateUploadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateUploadRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitClientMetricsWithBody Submit anonymous client measurements
-//
-// Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /client-metrics (the `SubmitClientMetrics` operationId).
-func (c *Client) SubmitClientMetricsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitClientMetricsRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitClientMetrics Submit anonymous client measurements
-//
-// Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /client-metrics (the `SubmitClientMetrics` operationId).
-func (c *Client) SubmitClientMetrics(ctx context.Context, body SubmitClientMetricsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitClientMetricsRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AnswerAutocompleteWithBody Answer an autocomplete request
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
-func (c *Client) AnswerAutocompleteWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAnswerAutocompleteRequestWithBody(c.Server, requestId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AnswerAutocomplete Answer an autocomplete request
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
-func (c *Client) AnswerAutocomplete(ctx context.Context, requestId RequestIdPath, body AnswerAutocompleteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAnswerAutocompleteRequest(c.Server, requestId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RegisterCommandWithBody Register a command
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /commands (the `RegisterCommand` operationId).
-func (c *Client) RegisterCommandWithBody(ctx context.Context, params *RegisterCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRegisterCommandRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RegisterCommand Register a command
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /commands (the `RegisterCommand` operationId).
-func (c *Client) RegisterCommand(ctx context.Context, params *RegisterCommandParams, body RegisterCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRegisterCommandRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RemoveCommand Remove a command
-//
-// Corresponds with DELETE /commands/{command_id} (the `RemoveCommand` operationId).
-func (c *Client) RemoveCommand(ctx context.Context, commandId CommandIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRemoveCommandRequest(c.Server, commandId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetCommand Read a command
-//
-// Corresponds with GET /commands/{command_id} (the `GetCommand` operationId).
-func (c *Client) GetCommand(ctx context.Context, commandId CommandIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCommandRequest(c.Server, commandId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateCommandWithBody Replace a command definition
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
-func (c *Client) UpdateCommandWithBody(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCommandRequestWithBody(c.Server, commandId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateCommand Replace a command definition
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
-func (c *Client) UpdateCommand(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, body UpdateCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateCommandRequest(c.Server, commandId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateComponentWithBody Disable or change an own component
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
-func (c *Client) UpdateComponentWithBody(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateComponentRequestWithBody(c.Server, componentId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateComponent Disable or change an own component
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PATCH /components/{component_id} (the `UpdateComponent` operationId).
-func (c *Client) UpdateComponent(ctx context.Context, componentId ComponentIdPath, params *UpdateComponentParams, body UpdateComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateComponentRequest(c.Server, componentId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateInteractionWithBody Use a button, select or form
-//
-// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
-// Idempotent by `(principal, client_interaction_id)`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
-func (c *Client) CreateInteractionWithBody(ctx context.Context, componentId ComponentIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateInteractionRequestWithBody(c.Server, componentId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateInteraction Use a button, select or form
-//
-// Single-use components accept exactly one interaction; later ones get 409 `component_used`.
-// Idempotent by `(principal, client_interaction_id)`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /components/{component_id}/interactions (the `CreateInteraction` operationId).
-func (c *Client) CreateInteraction(ctx context.Context, componentId ComponentIdPath, body CreateInteractionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateInteractionRequest(c.Server, componentId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListCostEstimates Cost estimates per run for reconciliation
-//
-// For the reconciliation app with scope `costs:reconcile` and for owners in a session, without step-up (05, R-AZ-28). One item per run of the given agents with cost entries of mode `organization` whose `occurred_at` lies in the range, sorted by `run_id`; runs whose entries in the range mix currencies are left out. Entries of mode `personal` never appear (03 `cost_entries`). Items name no channel, thread or content; the list is evaluated on the instance and not filtered by visible channels (06, 4 point 2).
-//
-// Corresponds with GET /costs/estimates (the `ListCostEstimates` operationId).
-func (c *Client) ListCostEstimates(ctx context.Context, params *ListCostEstimatesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListCostEstimatesRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ReconcileCostsWithBody Reconcile estimates with invoices
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
-func (c *Client) ReconcileCostsWithBody(ctx context.Context, params *ReconcileCostsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReconcileCostsRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ReconcileCosts Reconcile estimates with invoices
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /costs/reconcile (the `ReconcileCosts` operationId).
-func (c *Client) ReconcileCosts(ctx context.Context, params *ReconcileCostsParams, body ReconcileCostsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReconcileCostsRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitCostReconciliationWithBody Submit reconciled cost entries (app)
-//
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
-func (c *Client) SubmitCostReconciliationWithBody(ctx context.Context, params *SubmitCostReconciliationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitCostReconciliationRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SubmitCostReconciliation Submit reconciled cost entries (app)
-//
-// For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
-func (c *Client) SubmitCostReconciliation(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSubmitCostReconciliationRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetDevice Read a device
-//
-// A pending device polls this to learn when it was approved.
-//
-// Corresponds with GET /devices/{device_id} (the `GetDevice` operationId).
-func (c *Client) GetDevice(ctx context.Context, deviceId DeviceIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetDeviceRequest(c.Server, deviceId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ApproveDeviceWithBody Approve a pending device
-//
-// The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /devices/{device_id}/approve (the `ApproveDevice` operationId).
-func (c *Client) ApproveDeviceWithBody(ctx context.Context, deviceId DeviceIdPath, params *ApproveDeviceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewApproveDeviceRequestWithBody(c.Server, deviceId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ApproveDevice Approve a pending device
-//
-// The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /devices/{device_id}/approve (the `ApproveDevice` operationId).
-func (c *Client) ApproveDevice(ctx context.Context, deviceId DeviceIdPath, params *ApproveDeviceParams, body ApproveDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewApproveDeviceRequest(c.Server, deviceId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RevokeDeviceWithBody Revoke a device
-//
-// Closes its gateway connections with 4012 and revokes its sessions.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /devices/{device_id}/revoke (the `RevokeDevice` operationId).
-func (c *Client) RevokeDeviceWithBody(ctx context.Context, deviceId DeviceIdPath, params *RevokeDeviceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRevokeDeviceRequestWithBody(c.Server, deviceId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RevokeDevice Revoke a device
-//
-// Closes its gateway connections with 4012 and revokes its sessions.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /devices/{device_id}/revoke (the `RevokeDevice` operationId).
-func (c *Client) RevokeDevice(ctx context.Context, deviceId DeviceIdPath, params *RevokeDeviceParams, body RevokeDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRevokeDeviceRequest(c.Server, deviceId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateDmWithBody Open a direct message channel
-//
-// Returns the existing channel with 200 when the same participants already have one. 403
-// `feature_disabled` when `dm.enabled` is off.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /dms (the `CreateDm` operationId).
-func (c *Client) CreateDmWithBody(ctx context.Context, params *CreateDmParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateDmRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateDm Open a direct message channel
-//
-// Returns the existing channel with 200 when the same participants already have one. 403
-// `feature_disabled` when `dm.enabled` is off.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /dms (the `CreateDm` operationId).
-func (c *Client) CreateDm(ctx context.Context, params *CreateDmParams, body CreateDmJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateDmRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}

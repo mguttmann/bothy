@@ -112,7 +112,7 @@ type ServerInterface interface {
 	RedeemEnrollmentCode(w http.ResponseWriter, r *http.Request, params RedeemEnrollmentCodeParams)
 	// Logout End the current session
 	// (POST /auth/logout)
-	Logout(w http.ResponseWriter, r *http.Request)
+	Logout(w http.ResponseWriter, r *http.Request, params LogoutParams)
 	// BeginOidcLogin Start an OIDC login
 	// (POST /auth/oidc/begin)
 	BeginOidcLogin(w http.ResponseWriter, r *http.Request)
@@ -139,13 +139,22 @@ type ServerInterface interface {
 	LoginWithPassword(w http.ResponseWriter, r *http.Request, params LoginWithPasswordParams)
 	// CreateStepUpChallenge Create a step-up challenge
 	// (POST /auth/step-up/challenge)
-	CreateStepUpChallenge(w http.ResponseWriter, r *http.Request)
+	CreateStepUpChallenge(w http.ResponseWriter, r *http.Request, params CreateStepUpChallengeParams)
 	// CompleteStepUpWithDeviceKey Confirm step-up with the device key after user verification
 	// (POST /auth/step-up/device-key)
 	CompleteStepUpWithDeviceKey(w http.ResponseWriter, r *http.Request)
+	// BeginStepUpOidcReauth Start a console step-up with OIDC
+	// (POST /auth/step-up/oidc)
+	BeginStepUpOidcReauth(w http.ResponseWriter, r *http.Request, params BeginStepUpOidcReauthParams)
+	// CompleteStepUpOidcReauth Finish a console step-up with OIDC
+	// (POST /auth/step-up/oidc/complete)
+	CompleteStepUpOidcReauth(w http.ResponseWriter, r *http.Request, params CompleteStepUpOidcReauthParams)
 	// CompleteStepUpWithPasskey Confirm step-up with a passkey
 	// (POST /auth/step-up/passkey)
-	CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request)
+	CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request, params CompleteStepUpWithPasskeyParams)
+	// StepUpWithPassword Console step-up with password and TOTP
+	// (POST /auth/step-up/password)
+	StepUpWithPassword(w http.ResponseWriter, r *http.Request, params StepUpWithPasswordParams)
 	// RefreshToken Rotate the refresh token
 	// (POST /auth/token/refresh)
 	RefreshToken(w http.ResponseWriter, r *http.Request, params RefreshTokenParams)
@@ -221,6 +230,12 @@ type ServerInterface interface {
 	// SubmitClientMetrics Submit anonymous client measurements
 	// (POST /client-metrics)
 	SubmitClientMetrics(w http.ResponseWriter, r *http.Request)
+	// GetConsoleSession Read the console session
+	// (GET /console/session)
+	GetConsoleSession(w http.ResponseWriter, r *http.Request)
+	// EndViewAs End the stored view as person
+	// (DELETE /console/session/view-as)
+	EndViewAs(w http.ResponseWriter, r *http.Request, params EndViewAsParams)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath)
@@ -1931,8 +1946,35 @@ func (siw *ServerInterfaceWrapper) RedeemEnrollmentCode(w http.ResponseWriter, r
 // Logout operation middleware
 func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LogoutParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Console-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Console-Request")]; found {
+		var XConsoleRequest LogoutParamsXConsoleRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Console-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Console-Request", valueList[0], &XConsoleRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Console-Request", Err: err})
+			return
+		}
+
+		params.XConsoleRequest = &XConsoleRequest
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Logout(w, r)
+		siw.Handler.Logout(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2039,27 +2081,23 @@ func (siw *ServerInterfaceWrapper) CompleteOidcLogin(w http.ResponseWriter, r *h
 
 	headers := r.Header
 
-	// ------------- Required header parameter "DPoP" -------------
+	// ------------- Optional header parameter "DPoP" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
-		var DPoP DpopProof
+		var DPoP DpopProofLogin
 		n := len(valueList)
 		if n != 1 {
 			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
 			return
 		}
 
-		params.DPoP = DPoP
+		params.DPoP = &DPoP
 
-	} else {
-		err := fmt.Errorf("Header parameter DPoP is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2188,27 +2226,23 @@ func (siw *ServerInterfaceWrapper) CompletePasskeyLogin(w http.ResponseWriter, r
 
 	headers := r.Header
 
-	// ------------- Required header parameter "DPoP" -------------
+	// ------------- Optional header parameter "DPoP" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
-		var DPoP DpopProof
+		var DPoP DpopProofLogin
 		n := len(valueList)
 		if n != 1 {
 			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
 			return
 		}
 
-		params.DPoP = DPoP
+		params.DPoP = &DPoP
 
-	} else {
-		err := fmt.Errorf("Header parameter DPoP is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2233,27 +2267,23 @@ func (siw *ServerInterfaceWrapper) LoginWithPassword(w http.ResponseWriter, r *h
 
 	headers := r.Header
 
-	// ------------- Required header parameter "DPoP" -------------
+	// ------------- Optional header parameter "DPoP" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
-		var DPoP DpopProof
+		var DPoP DpopProofLogin
 		n := len(valueList)
 		if n != 1 {
 			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
 			return
 		}
 
-		params.DPoP = DPoP
+		params.DPoP = &DPoP
 
-	} else {
-		err := fmt.Errorf("Header parameter DPoP is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2270,8 +2300,35 @@ func (siw *ServerInterfaceWrapper) LoginWithPassword(w http.ResponseWriter, r *h
 // CreateStepUpChallenge operation middleware
 func (siw *ServerInterfaceWrapper) CreateStepUpChallenge(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateStepUpChallengeParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Console-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Console-Request")]; found {
+		var XConsoleRequest CreateStepUpChallengeParamsXConsoleRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Console-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Console-Request", valueList[0], &XConsoleRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Console-Request", Err: err})
+			return
+		}
+
+		params.XConsoleRequest = &XConsoleRequest
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateStepUpChallenge(w, r)
+		siw.Handler.CreateStepUpChallenge(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2295,11 +2352,161 @@ func (siw *ServerInterfaceWrapper) CompleteStepUpWithDeviceKey(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
+// BeginStepUpOidcReauth operation middleware
+func (siw *ServerInterfaceWrapper) BeginStepUpOidcReauth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BeginStepUpOidcReauthParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Console-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Console-Request")]; found {
+		var XConsoleRequest BeginStepUpOidcReauthParamsXConsoleRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Console-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Console-Request", valueList[0], &XConsoleRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Console-Request", Err: err})
+			return
+		}
+
+		params.XConsoleRequest = &XConsoleRequest
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BeginStepUpOidcReauth(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteStepUpOidcReauth operation middleware
+func (siw *ServerInterfaceWrapper) CompleteStepUpOidcReauth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteStepUpOidcReauthParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Console-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Console-Request")]; found {
+		var XConsoleRequest CompleteStepUpOidcReauthParamsXConsoleRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Console-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Console-Request", valueList[0], &XConsoleRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Console-Request", Err: err})
+			return
+		}
+
+		params.XConsoleRequest = &XConsoleRequest
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteStepUpOidcReauth(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CompleteStepUpWithPasskey operation middleware
 func (siw *ServerInterfaceWrapper) CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteStepUpWithPasskeyParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Console-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Console-Request")]; found {
+		var XConsoleRequest CompleteStepUpWithPasskeyParamsXConsoleRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Console-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Console-Request", valueList[0], &XConsoleRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Console-Request", Err: err})
+			return
+		}
+
+		params.XConsoleRequest = &XConsoleRequest
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CompleteStepUpWithPasskey(w, r)
+		siw.Handler.CompleteStepUpWithPasskey(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StepUpWithPassword operation middleware
+func (siw *ServerInterfaceWrapper) StepUpWithPassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StepUpWithPasswordParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Console-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Console-Request")]; found {
+		var XConsoleRequest StepUpWithPasswordParamsXConsoleRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Console-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Console-Request", valueList[0], &XConsoleRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Console-Request", Err: err})
+			return
+		}
+
+		params.XConsoleRequest = &XConsoleRequest
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StepUpWithPassword(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2365,27 +2572,23 @@ func (siw *ServerInterfaceWrapper) LoginWithTrustedHeader(w http.ResponseWriter,
 
 	headers := r.Header
 
-	// ------------- Required header parameter "DPoP" -------------
+	// ------------- Optional header parameter "DPoP" -------------
 	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
-		var DPoP DpopProof
+		var DPoP DpopProofLogin
 		n := len(valueList)
 		if n != 1 {
 			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
 			return
 		}
 
-		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
 		if err != nil {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
 			return
 		}
 
-		params.DPoP = DPoP
+		params.DPoP = &DPoP
 
-	} else {
-		err := fmt.Errorf("Header parameter DPoP is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
-		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -3390,6 +3593,61 @@ func (siw *ServerInterfaceWrapper) SubmitClientMetrics(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SubmitClientMetrics(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetConsoleSession operation middleware
+func (siw *ServerInterfaceWrapper) GetConsoleSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConsoleSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EndViewAs operation middleware
+func (siw *ServerInterfaceWrapper) EndViewAs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EndViewAsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Console-Request" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Console-Request")]; found {
+		var XConsoleRequest EndViewAsParamsXConsoleRequest
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Console-Request", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Console-Request", valueList[0], &XConsoleRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Console-Request", Err: err})
+			return
+		}
+
+		params.XConsoleRequest = &XConsoleRequest
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EndViewAs(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8627,6 +8885,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/challenge", wrapper.CreateStepUpChallenge)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/passkey", wrapper.CompleteStepUpWithPasskey)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/device-key", wrapper.CompleteStepUpWithDeviceKey)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/password", wrapper.StepUpWithPassword)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/oidc", wrapper.BeginStepUpOidcReauth)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/oidc/complete", wrapper.CompleteStepUpOidcReauth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/console/session", wrapper.GetConsoleSession)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/console/session/view-as", wrapper.EndViewAs)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me/profile", wrapper.UpdateMyProfile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/credentials", wrapper.GetMyCredentials)
@@ -8832,6 +9095,16 @@ type ConflictApplicationProblemPlusJSONResponse struct {
 	Headers ConflictResponseHeaders
 }
 
+type ConsoleLoginResponseHeaders struct {
+	CorrelationId *CorrelationId
+	SetCookie     *string
+}
+type ConsoleLoginJSONResponse struct {
+	Body ConsoleSession
+
+	Headers ConsoleLoginResponseHeaders
+}
+
 type ErrorResponseHeaders struct {
 	CorrelationId *CorrelationId
 }
@@ -8914,6 +9187,16 @@ type ServiceUnavailableApplicationProblemPlusJSONResponse struct {
 	Headers ServiceUnavailableResponseHeaders
 }
 
+type StepUpDoneResponseHeaders struct {
+	CorrelationId *CorrelationId
+	SetCookie     *string
+}
+type StepUpDoneJSONResponse struct {
+	Body StepUpResult
+
+	Headers StepUpDoneResponseHeaders
+}
+
 type TooManyRequestsResponseHeaders struct {
 	CorrelationId   *CorrelationId
 	RateLimit       *string
@@ -8929,6 +9212,7 @@ type TooManyRequestsApplicationProblemPlusJSONResponse struct {
 type UnauthorizedResponseHeaders struct {
 	CorrelationId   *CorrelationId
 	DPoPNonce       *string
+	SetCookie       *string
 	WWWAuthenticate *string
 }
 type UnauthorizedApplicationProblemPlusJSONResponse struct {
@@ -9083,9 +9367,18 @@ type StrictServerInterface interface {
 	// CompleteStepUpWithDeviceKey Confirm step-up with the device key after user verification
 	// (POST /auth/step-up/device-key)
 	CompleteStepUpWithDeviceKey(ctx context.Context, request CompleteStepUpWithDeviceKeyRequestObject) (CompleteStepUpWithDeviceKeyResponseObject, error)
+	// BeginStepUpOidcReauth Start a console step-up with OIDC
+	// (POST /auth/step-up/oidc)
+	BeginStepUpOidcReauth(ctx context.Context, request BeginStepUpOidcReauthRequestObject) (BeginStepUpOidcReauthResponseObject, error)
+	// CompleteStepUpOidcReauth Finish a console step-up with OIDC
+	// (POST /auth/step-up/oidc/complete)
+	CompleteStepUpOidcReauth(ctx context.Context, request CompleteStepUpOidcReauthRequestObject) (CompleteStepUpOidcReauthResponseObject, error)
 	// CompleteStepUpWithPasskey Confirm step-up with a passkey
 	// (POST /auth/step-up/passkey)
 	CompleteStepUpWithPasskey(ctx context.Context, request CompleteStepUpWithPasskeyRequestObject) (CompleteStepUpWithPasskeyResponseObject, error)
+	// StepUpWithPassword Console step-up with password and TOTP
+	// (POST /auth/step-up/password)
+	StepUpWithPassword(ctx context.Context, request StepUpWithPasswordRequestObject) (StepUpWithPasswordResponseObject, error)
 	// RefreshToken Rotate the refresh token
 	// (POST /auth/token/refresh)
 	RefreshToken(ctx context.Context, request RefreshTokenRequestObject) (RefreshTokenResponseObject, error)
@@ -9161,6 +9454,12 @@ type StrictServerInterface interface {
 	// SubmitClientMetrics Submit anonymous client measurements
 	// (POST /client-metrics)
 	SubmitClientMetrics(ctx context.Context, request SubmitClientMetricsRequestObject) (SubmitClientMetricsResponseObject, error)
+	// GetConsoleSession Read the console session
+	// (GET /console/session)
+	GetConsoleSession(ctx context.Context, request GetConsoleSessionRequestObject) (GetConsoleSessionResponseObject, error)
+	// EndViewAs End the stored view as person
+	// (DELETE /console/session/view-as)
+	EndViewAs(ctx context.Context, request EndViewAsRequestObject) (EndViewAsResponseObject, error)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
@@ -10546,8 +10845,10 @@ func (sh *strictHandler) RedeemEnrollmentCode(w http.ResponseWriter, r *http.Req
 }
 
 // Logout operation middleware
-func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request, params LogoutParams) {
 	var request LogoutRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.Logout(ctx, request.(LogoutRequestObject))
@@ -10823,8 +11124,10 @@ func (sh *strictHandler) LoginWithPassword(w http.ResponseWriter, r *http.Reques
 }
 
 // CreateStepUpChallenge operation middleware
-func (sh *strictHandler) CreateStepUpChallenge(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) CreateStepUpChallenge(w http.ResponseWriter, r *http.Request, params CreateStepUpChallengeParams) {
 	var request CreateStepUpChallengeRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateStepUpChallenge(ctx, request.(CreateStepUpChallengeRequestObject))
@@ -10877,9 +11180,77 @@ func (sh *strictHandler) CompleteStepUpWithDeviceKey(w http.ResponseWriter, r *h
 	}
 }
 
+// BeginStepUpOidcReauth operation middleware
+func (sh *strictHandler) BeginStepUpOidcReauth(w http.ResponseWriter, r *http.Request, params BeginStepUpOidcReauthParams) {
+	var request BeginStepUpOidcReauthRequestObject
+
+	request.Params = params
+
+	var body BeginStepUpOidcReauthJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BeginStepUpOidcReauth(ctx, request.(BeginStepUpOidcReauthRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BeginStepUpOidcReauth")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BeginStepUpOidcReauthResponseObject); ok {
+		if err := validResponse.VisitBeginStepUpOidcReauthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteStepUpOidcReauth operation middleware
+func (sh *strictHandler) CompleteStepUpOidcReauth(w http.ResponseWriter, r *http.Request, params CompleteStepUpOidcReauthParams) {
+	var request CompleteStepUpOidcReauthRequestObject
+
+	request.Params = params
+
+	var body CompleteStepUpOidcReauthJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteStepUpOidcReauth(ctx, request.(CompleteStepUpOidcReauthRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteStepUpOidcReauth")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteStepUpOidcReauthResponseObject); ok {
+		if err := validResponse.VisitCompleteStepUpOidcReauthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // CompleteStepUpWithPasskey operation middleware
-func (sh *strictHandler) CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) CompleteStepUpWithPasskey(w http.ResponseWriter, r *http.Request, params CompleteStepUpWithPasskeyParams) {
 	var request CompleteStepUpWithPasskeyRequestObject
+
+	request.Params = params
 
 	var body CompleteStepUpWithPasskeyJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -10901,6 +11272,39 @@ func (sh *strictHandler) CompleteStepUpWithPasskey(w http.ResponseWriter, r *htt
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CompleteStepUpWithPasskeyResponseObject); ok {
 		if err := validResponse.VisitCompleteStepUpWithPasskeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StepUpWithPassword operation middleware
+func (sh *strictHandler) StepUpWithPassword(w http.ResponseWriter, r *http.Request, params StepUpWithPasswordParams) {
+	var request StepUpWithPasswordRequestObject
+
+	request.Params = params
+
+	var body StepUpWithPasswordJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StepUpWithPassword(ctx, request.(StepUpWithPasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StepUpWithPassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StepUpWithPasswordResponseObject); ok {
+		if err := validResponse.VisitStepUpWithPasswordResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -11677,6 +12081,56 @@ func (sh *strictHandler) SubmitClientMetrics(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SubmitClientMetricsResponseObject); ok {
 		if err := validResponse.VisitSubmitClientMetricsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConsoleSession operation middleware
+func (sh *strictHandler) GetConsoleSession(w http.ResponseWriter, r *http.Request) {
+	var request GetConsoleSessionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConsoleSession(ctx, request.(GetConsoleSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConsoleSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConsoleSessionResponseObject); ok {
+		if err := validResponse.VisitGetConsoleSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EndViewAs operation middleware
+func (sh *strictHandler) EndViewAs(w http.ResponseWriter, r *http.Request, params EndViewAsParams) {
+	var request EndViewAsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EndViewAs(ctx, request.(EndViewAsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EndViewAs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EndViewAsResponseObject); ok {
+		if err := validResponse.VisitEndViewAsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

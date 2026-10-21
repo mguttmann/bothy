@@ -80,8 +80,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getApp
   - getChannel
   - getChannelBehavior
-  - getConsumerState
   - getConsoleSession
+  - getConsumerState
   - getDevice
   - getDiscovery
   - getFile
