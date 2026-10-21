@@ -193,6 +193,20 @@ func doctor(t *testing.T) (string, int) {
 	return host("doctor")
 }
 
+// doctorAnswer runs doctor until it answers: a service that refuses its start while doctor asks it
+// closes the admin endpoint before the answer, and the next call runs the checks without it.
+func doctorAnswer(t *testing.T) (string, int) {
+	t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		out, c := doctor(t)
+		if !strings.Contains(out, "the running service did not answer") || time.Now().After(deadline) {
+			return out, c
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
 func hasLine(out, line string) bool {
 	return slices.ContainsFunc(strings.Split(out, "\n"), func(l string) bool { return strings.HasPrefix(l, line) })
 }
