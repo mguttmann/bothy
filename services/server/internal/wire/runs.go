@@ -152,28 +152,53 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
 		Heartbeats: d.Heartbeats, Mismatches: mismatches,
 	}
-	var components *runsjobs.ComponentScheduler
-	if d.Components != nil {
-		if d.Cards == nil || d.ThreadLocks == nil {
-			return nil, errors.New("wire: the components of runs need the card port of messaging and the thread lock of chat")
-		}
-		if d.ComponentExpiry == nil {
-			components = &runsjobs.ComponentScheduler{}
-			d.ComponentExpiry = components
-		}
-		deps.Components, deps.Cards, deps.ThreadLocks, deps.ComponentExpiry = repo, d.Cards, d.ThreadLocks, d.ComponentExpiry
-	}
-	svc, err := runsapp.New(cfg, deps)
+	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
 		return nil, err
 	}
-	if d.Components != nil {
-		if err := d.Components.Bind(svc); err != nil {
-			return nil, err
-		}
-	}
 	return &Runs{Service: svc, Handlers: runshttp.New(svc), CommandHandlers: runshttp.NewCommandExec(svc), Expiry: sched,
 		CancelTimeouts: cancels, ComponentExpiry: components}, nil
+}
+
+// newRunsService builds the runs use cases over deps with the component collaborators of d
+// (componentDeps) and binds the component source of messaging to them (M2-15). It returns the
+// scheduler of runs.component_expiry that BindJobs binds (nil when there is none to bind).
+func newRunsService(cfg runsapp.Config, deps runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*runsapp.Service,
+	*runsjobs.ComponentScheduler, error) {
+	components, err := componentDeps(&deps, d, repo)
+	if err != nil {
+		return nil, nil, err
+	}
+	svc, err := runsapp.New(cfg, deps)
+	if err != nil {
+		return nil, nil, err
+	}
+	if d.Components != nil {
+		if err := d.Components.Bind(svc); err != nil {
+			return nil, nil, err
+		}
+	}
+	return svc, components, nil
+}
+
+// componentDeps sets the component collaborators of deps when d carries the component source of
+// messaging (M2-15) and returns the scheduler of runs.component_expiry that BindJobs binds (nil
+// when d brings its own or the components are off). Errors: the source without the card port of
+// messaging or the thread lock of chat.
+func componentDeps(deps *runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*runsjobs.ComponentScheduler, error) {
+	if d.Components == nil {
+		return nil, nil
+	}
+	if d.Cards == nil || d.ThreadLocks == nil {
+		return nil, errors.New("wire: the components of runs need the card port of messaging and the thread lock of chat")
+	}
+	var sched *runsjobs.ComponentScheduler
+	if d.ComponentExpiry == nil {
+		sched = &runsjobs.ComponentScheduler{}
+		d.ComponentExpiry = sched
+	}
+	deps.Components, deps.Cards, deps.ThreadLocks, deps.ComponentExpiry = repo, d.Cards, d.ThreadLocks, d.ComponentExpiry
+	return sched, nil
 }
 
 // BindJobs gives the schedulers of runs.queued_expiry, runs.cancel_timeout and

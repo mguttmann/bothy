@@ -146,17 +146,7 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err != nil {
 		return prepared{}, err
 	}
-	kind := string(domain.KindText)
-	if cmd.Kind != nil {
-		kind = *cmd.Kind
-	}
-	if kind != string(domain.KindText) && kind != string(domain.KindCard) {
-		return prepared{}, domain.NotEnabled("/kind")
-	}
-	if len(cmd.AttachmentIDs) > 0 {
-		return prepared{}, domain.NotEnabled("/attachment_file_ids")
-	}
-	isCard, err := cardRules(a, kind, cmd)
+	kind, isCard, err := kindOf(a, cmd)
 	if err != nil {
 		return prepared{}, err
 	}
@@ -191,13 +181,36 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 		if p.card.checked, err = s.checkCard(ctx, a, cmd, thread, p.handles); err != nil {
 			return prepared{}, err
 		}
-		hash.Card = p.card.checked.Canonical
-		if cmd.RunID != nil {
-			hash.RunID = cmd.RunID.String()
-		}
+		hash.Card, hash.RunID = p.card.checked.Canonical, runIDText(cmd.RunID)
 	}
 	p.hash = domain.RequestHash(hash)
 	return p, nil
+}
+
+// kindOf returns the kind of a new message (text without a kind member) and whether it is a card:
+// voice and every other kind are not enabled, attachments neither (M3-07), and the card rules of
+// M2-15 apply. Errors: 400 validation_failed.
+func kindOf(a actor.Actor, cmd messaging.CreateMessageCmd) (string, bool, error) {
+	kind := string(domain.KindText)
+	if cmd.Kind != nil {
+		kind = *cmd.Kind
+	}
+	if kind != string(domain.KindText) && kind != string(domain.KindCard) {
+		return "", false, domain.NotEnabled("/kind")
+	}
+	if len(cmd.AttachmentIDs) > 0 {
+		return "", false, domain.NotEnabled("/attachment_file_ids")
+	}
+	isCard, err := cardRules(a, kind, cmd)
+	return kind, isCard, err
+}
+
+// runIDText is the run_id of the request hash, "" when absent.
+func runIDText(run *ids.ID) string {
+	if run == nil {
+		return ""
+	}
+	return run.String()
 }
 
 // checkReply allows a reply only to a message of the same thread, deleted ones included; an

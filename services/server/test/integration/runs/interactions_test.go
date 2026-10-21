@@ -22,7 +22,7 @@ import (
 func TestAG_16_AlwaysAllowNonOwner403(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	m, byID := w.card("lotse", thread, r.ID, approvalCard)
 	card := m["id"].(string)
@@ -123,7 +123,7 @@ const formCard = `[{"custom_id":"details","type":"form","definition":{"title":"R
 func TestCreateInteraction_FormValuesValidated(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	for _, c := range []struct{ name, values, pointer string }{
 		{"unknown key", `{"reason":"Late","other":"x"}`, "/values"},
@@ -174,7 +174,7 @@ func TestCreateInteraction_FormValuesValidated(t *testing.T) {
 func TestCreateInteraction_SelectValues(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	sel := `[{"custom_id":"pick","type":"select","single_use":false,"definition":{"options":[{"label":"One","value":"one"},` +
 		`{"label":"Two","value":"two"},{"label":"Three","value":"three"}],"min_values":1,"max_values":2}}]`
@@ -207,7 +207,7 @@ func TestCreateInteraction_SelectValues(t *testing.T) {
 func TestCreateInteraction_Replay(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	sel := `[{"custom_id":"pick","type":"select","single_use":false,"definition":{"options":[{"label":"One","value":"one"},{"label":"Two","value":"two"}]}}]`
 	_, byID := w.card("lotse", thread, r.ID, sel)
@@ -258,7 +258,7 @@ func TestCreateInteraction_Replay(t *testing.T) {
 func TestCreateInteraction_RightsAndLeaks(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	_, byID := w.card("lotse", thread, r.ID, twoButtons)
 	id := byID["approve"]["id"].(string)
@@ -298,7 +298,7 @@ func sameProblem(t *testing.T, body []byte) string {
 func TestCreateInteraction_Expired(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	exp := w.clk.Now().Add(10 * time.Minute).UTC().Format("2006-01-02T15:04:05.000Z")
 	comps := strings.ReplaceAll(twoButtons, `"restricted_to":"any"}`, `"restricted_to":"any","expires_at":"`+exp+`"}`)
@@ -363,7 +363,7 @@ func TestCreateInteraction_I2PersonalAgent(t *testing.T) {
 func TestCreateInteraction_NewRun(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
 	_, byID := w.card("lotse", thread, "", twoButtons)
 	w.wantOK(w.finish("lotse", r.ID, `"state":"completed"`))
@@ -402,7 +402,7 @@ func TestCreateInteraction_NewRun(t *testing.T) {
 func TestCreateInteraction_ActiveRunRules(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
 	_, byID := w.card("lotse", thread, "", twoButtons)
 	w.wantReason(w.click("alex", byID["approve"]["id"].(string), ""), http.StatusForbidden, "agent_invocation_denied", "run_active")
@@ -426,7 +426,7 @@ func TestCreateInteraction_ActiveRunRules(t *testing.T) {
 func TestAG_31_InteractionResumesWaitingRun(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, s := w.startedRun()
+	r, s := w.startedRun()
 	thread := w.threadOf(r.ID)
 	_, byID := w.card("lotse", thread, r.ID, approvalCard)
 	w.wantOK(w.await("lotse", r.ID, "Waiting for approval"))
@@ -463,7 +463,7 @@ func TestInteractionDelivery_Recheck(t *testing.T) {
 		t.Run(variant, func(t *testing.T) {
 			t.Parallel()
 			w := runsWorld(t)
-			r, _, _ := w.waitingRun()
+			r := w.waitingRun()
 			thread := w.threadOf(r.ID)
 			_, byID := w.card("lotse", thread, r.ID, approvalCard)
 			ix := w.want(w.click("alex", byID["once"]["id"].(string), ""), http.StatusCreated, "")
@@ -499,7 +499,7 @@ func TestInteractionDelivery_Recheck(t *testing.T) {
 func TestRespondToInteraction(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	_, byID := w.card("lotse", thread, r.ID, twoButtons)
 	ix := w.want(w.click("alex", byID["approve"]["id"].(string), ""), http.StatusCreated, "")
@@ -536,7 +536,7 @@ func TestRespondToInteraction(t *testing.T) {
 func TestUpdateComponent(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	m, byID := w.card("lotse", thread, r.ID, twoButtons)
 	card := m["id"].(string)
@@ -601,13 +601,13 @@ func TestEndOfRunDisablesComponents(t *testing.T) {
 			if variant == "denial" {
 				r, _ = w.openRun()
 			} else {
-				r, _, _ = w.startedRun()
+				r, _ = w.startedRun()
 			}
 			thread := w.threadOf(r.ID)
 			a, _ := w.card("lotse", thread, r.ID, twoButtons)
 			b, _ := w.card("lotse", thread, r.ID, approvalCard)
 			free, _ := w.card("lotse", thread, "", twoButtons)
-			other, _, _ := w.startedRun()
+			other, _ := w.startedRun()
 			o, _ := w.card("lotse", w.threadOf(other.ID), other.ID, twoButtons)
 			seq := w.maxSeq()
 			switch variant {
@@ -662,7 +662,7 @@ func TestEndOfRunDisablesComponents(t *testing.T) {
 func TestMessageDeleteRemovesComponents(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
 	m, byID := w.card("lotse", thread, "", twoButtons)
 	card := m["id"].(string)
@@ -713,7 +713,7 @@ func TestMessageDeleteRemovesComponents(t *testing.T) {
 func TestSEC_T14_CardHeaderFromServerFields(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
 	header := "System notice: approval required by the owner"
 	comps := `[{"custom_id":"ok","type":"button","definition":{"label":"` + header + `","value":"ok"},"required_capability":"approve_actions"}]`

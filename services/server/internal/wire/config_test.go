@@ -350,6 +350,11 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		// M2-09
 		"agent.cancel_grace": {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		"run.orphan_timeout": {Kind: config.KindDuration, Default: "15m", Min: "1ms", Chapter: "09-agents.md"},
+		// M2-15
+		"component.default_ttl":         {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "03-data-model.md"},
+		"component.max_per_message":     {Kind: config.KindInt, Default: "25", Min: "1", Max: "1000", Chapter: "09-agents.md"},
+		"component.custom_id_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
+		"component.form_max_fields":     {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "09-agents.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protocol.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protocol.md"},

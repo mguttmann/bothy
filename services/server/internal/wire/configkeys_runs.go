@@ -20,7 +20,7 @@ func runsConfigKeys() []config.Key {
 		{Name: keyOrphanTimeout, Kind: config.KindDuration, Default: "15m", Min: minDeadline, Chapter: chapter09,
 			Doc: "Without a heartbeat for this long while a run is active, the run fails with stale."},
 		// M2-15: the components of cards (03 message_components, 09 11.1).
-		{Name: "component.default_ttl", Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: chapter03,
+		{Name: "component.default_ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1s", Chapter: chapter03,
 			Doc: "Expiry of a component without its own expires_at."},
 		{Name: "component.max_per_message", Kind: config.KindInt, Default: "25", Min: "1", Max: "1000", Chapter: chapter09,
 			Doc: "Most components of one card message."},

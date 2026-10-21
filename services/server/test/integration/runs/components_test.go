@@ -21,7 +21,7 @@ import (
 func TestCreateMessage_Card(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
 	seq := w.maxSeq()
 	m, byID := w.card("lotse", thread, r.ID, threeKinds)
@@ -100,10 +100,10 @@ func TestCreateMessage_Card(t *testing.T) {
 func TestCreateMessage_CardRules(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
-	other, _, _ := w.startedRun()
-	ended, _, _ := w.startedRun()
+	other, _ := w.startedRun()
+	ended, _ := w.startedRun()
 	w.wantOK(w.finish("lotse", ended.ID, `"state":"completed"`))
 	// A run of Texter in a thread of Marketing.
 	kth := w.newThread(w.kampagnen)
@@ -156,7 +156,7 @@ func TestCreateMessage_CardRules(t *testing.T) {
 func TestCreateMessage_CardSupportsComponentsOff(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
 	w.wantOK(w.do("owner", http.MethodPatch, "/api/v1/agents/"+w.lotse.String(), `{"operator_config":{"supports_components":false}}`,
 		ifMatch(w.agentVersion(w.lotse))...))
@@ -173,7 +173,7 @@ func TestCreateMessage_CardSupportsComponentsOff(t *testing.T) {
 func TestCreateMessage_CardReplayAndHash(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.startedRun()
+	r, _ := w.startedRun()
 	thread := w.threadOf(r.ID)
 	client := ids.New().String()
 	body := func(comps string) string {
@@ -208,7 +208,7 @@ func TestCreateMessage_CardReplayAndHash(t *testing.T) {
 func TestCreateInteraction_Button(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	m, byID := w.card("lotse", thread, r.ID, twoButtons)
 	card := m["id"].(string)
@@ -249,7 +249,7 @@ func TestCreateInteraction_Button(t *testing.T) {
 func TestAG_15_ConcurrentClicksOneWins(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
-	r, _, _ := w.waitingRun()
+	r := w.waitingRun()
 	thread := w.threadOf(r.ID)
 	m, byID := w.card("lotse", thread, r.ID, twoButtons)
 	card := m["id"].(string)
