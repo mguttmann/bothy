@@ -117,8 +117,14 @@ type restPage struct {
 }
 
 // poll calls pollAgentEvents of consumer at base and requires 200.
+//
+// A poll reads up to the hub position, which the log tail raises after a post has returned; so
+// for a consumer that exists, poll first waits until the tail has passed the newest event.
 func (w *consumerWorld) poll(base string, a consumerAgent, consumer, query string) (restPage, []event) {
 	w.t.Helper()
+	if code, _ := w.call(base, a, http.MethodGet, "/api/v1/agents/me/consumers/"+consumer, nil); code == http.StatusOK {
+		w.tailed(a, consumer)
+	}
 	code, b := w.call(base, a, http.MethodGet, "/api/v1/agents/me/consumers/"+consumer+"/events"+query, nil)
 	if code != http.StatusOK {
 		w.t.Fatalf("poll = %d %s", code, b)
@@ -186,12 +192,19 @@ func (w *consumerWorld) queryRow(_ context.Context, query string, args ...any) p
 // read yet stays, so the tail never sees a hole.
 func (w *consumerWorld) retain(a consumerAgent) {
 	w.t.Helper()
+	w.sql(`DELETE FROM event_log WHERE seq <= $1`, w.tailed(a, "default"))
+}
+
+// tailed waits until the log tail of the world's process has passed the newest event of the log
+// (the head_seq of the existing consumer of a reaches it) and returns that event's seq.
+func (w *consumerWorld) tailed(a consumerAgent, consumer string) int64 {
+	w.t.Helper()
 	var last int64
 	if err := w.queryRow(context.Background(), `SELECT coalesce(max(seq), 0) FROM event_log`).Scan(&last); err != nil {
 		w.t.Fatal(err)
 	}
-	testkit.Until(w.t, "the log tail at the newest event", func() bool { return w.state(a, "default").HeadSeq >= last })
-	w.sql(`DELETE FROM event_log WHERE seq <= $1`, last)
+	testkit.Until(w.t, "the log tail at the newest event", func() bool { return w.state(a, consumer).HeadSeq >= last })
+	return last
 }
 
 // quiet reads frames of c for d and returns them; the window must stay closed meanwhile.

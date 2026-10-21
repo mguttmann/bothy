@@ -800,7 +800,10 @@ func TestGatewayTokenExpiry(t *testing.T) {
 		}
 	}
 	// reauthDue moves the clock one second past the instant of reauth_required of a token issued
-	// at or before issued, beats, and returns the reauth_required that follows.
+	// at or before issued, beats, and returns the reauth_required that follows. It reads both the
+	// reauth_required and the heartbeat_ack of its heartbeat, in either order (a gateway tick may
+	// send the reauth_required before the heartbeat is answered), so no frame of it is left for
+	// the next read.
 	reauthDue := func(t *testing.T, c *wstest.Client, issued time.Time) rest.GatewayReauthRequired {
 		t.Helper()
 		if d := issued.Add(tokenTTL - tokenLead + time.Second).Sub(clk.Now()); d > 0 {
@@ -810,16 +813,22 @@ func TestGatewayTokenExpiry(t *testing.T) {
 			t.Fatalf("heartbeat: %v", err)
 		}
 		var rr rest.GatewayReauthRequired
-		for {
+		acked, due := false, false
+		for !acked || !due {
 			op, d := next(t, c)
-			if op == "heartbeat_ack" {
-				continue
+			switch {
+			case op == "heartbeat_ack" && !acked:
+				acked = true
+			case op == "reauth_required" && !due:
+				if wstest.Strict(d, &rr) != nil || rr.DpopNonce == "" {
+					t.Fatalf("after the reauth instant: %s %s, want reauth_required", op, d)
+				}
+				due = true
+			default:
+				t.Fatalf("after the reauth instant: %s %s, want reauth_required and heartbeat_ack", op, d)
 			}
-			if op != "reauth_required" || wstest.Strict(d, &rr) != nil || rr.DpopNonce == "" {
-				t.Fatalf("after the reauth instant: %s %s, want reauth_required", op, d)
-			}
-			return rr
 		}
+		return rr
 	}
 
 	t.Run("TestClose4011ExpiredWithoutReauth", func(t *testing.T) {
