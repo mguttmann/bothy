@@ -228,3 +228,29 @@ func TestCatchUpPageOneStructureScope(t *testing.T) {
 		t.Error("want one structure memo per page")
 	}
 }
+
+// TestCatchUp_ActingForWithholdsOwnAccessChanged (07 guard rule SR9, brief M2-14 requirement 14):
+// the own access.changed of an agent names the targets of its grants; a request bound to a run
+// of a person does not get it, so the catch-up names no channel the person may not read; without
+// the binding, and for the agent consumer, the event is delivered.
+func TestCatchUp_ActingForWithholdsOwnAccessChanged(t *testing.T) {
+	t.Parallel()
+	agent := ids.New()
+	log := &catchLog{min: 1, events: []sync.Event{{Seq: 1, ID: ids.New(), Type: "access.changed", SchemaVersion: 1, ResourceKind: "principal",
+		ResourceID: agent, ReceiveAction: "self", AudiencePrincipalID: agent, Payload: json.RawMessage(`{}`)}}}
+	s := newCatchUp(t, log, &catchAuthz{allowed: map[ids.ID]bool{}}, 1, 10)
+	own := actor.Actor{ID: agent, Kind: actor.KindAgent}
+	bound := own
+	bound.ActingFor = actor.ActingFor{Status: actor.ActingForBound, UserID: ids.New(), RunID: ids.New(), ThreadID: ids.New(), JTI: "jti"}
+	for _, c := range []struct {
+		name     string
+		a        actor.Actor
+		consumer bool
+		want     int
+	}{{"without the header", own, false, 1}, {"bound", bound, false, 0}, {"bound agent consumer", bound, true, 1}} {
+		page, err := s.PageEvents(actor.WithActor(context.Background(), c.a), sync.PageInput{After: 0, Head: 1, AgentConsumer: c.consumer})
+		if err != nil || len(page.Events) != c.want || page.NextCursor != 1 {
+			t.Errorf("%s: %d events, cursor %d, %v; want %d", c.name, len(page.Events), page.NextCursor, err, c.want)
+		}
+	}
+}
