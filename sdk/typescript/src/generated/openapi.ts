@@ -2207,7 +2207,7 @@ export interface paths {
         get?: never;
         /**
          * Set the title
-         * @description People set `title_source = manual`. The operator agent may only replace an `auto` title.
+         * @description Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
          */
         put: operations["setThreadTitle"];
         post?: never;

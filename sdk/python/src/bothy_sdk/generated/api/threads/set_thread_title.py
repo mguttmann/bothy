@@ -109,7 +109,9 @@ def sync_detailed(
 ) -> Response[Problem | Thread]:
     """Set the title
 
-     People set `title_source = manual`. The operator agent may only replace an `auto` title.
+     Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
+    may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
+    title_manual`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -146,7 +148,9 @@ def sync(
 ) -> Problem | Thread | None:
     """Set the title
 
-     People set `title_source = manual`. The operator agent may only replace an `auto` title.
+     Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
+    may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
+    title_manual`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -178,7 +182,9 @@ async def asyncio_detailed(
 ) -> Response[Problem | Thread]:
     """Set the title
 
-     People set `title_source = manual`. The operator agent may only replace an `auto` title.
+     Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
+    may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
+    title_manual`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -213,7 +219,9 @@ async def asyncio(
 ) -> Problem | Thread | None:
     """Set the title
 
-     People set `title_source = manual`. The operator agent may only replace an `auto` title.
+     Every principal except the thread's operator agent sets `title_source = manual`. The operator agent
+    may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409
+    title_manual`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
