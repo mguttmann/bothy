@@ -435,7 +435,7 @@ func TestNewRejectsBadConfig(t *testing.T) {
 		t.Fatal("empty config accepted")
 	}
 	e := newEnv(t, nil)
-	if err := e.gw.Register("focus", authorize.ActionGatewayFocus); err == nil {
+	if err := e.gw.Register("ack", authorize.ActionGatewayConnect); err == nil {
 		t.Error("an op without a handler of the gateway was registered")
 	}
 	if err := e.gw.Register("identify", authorize.ActionGatewayConnect); err == nil {

@@ -56,6 +56,18 @@ type Reauth struct {
 	DPoP        string `json:"dpop"`
 }
 
+// Focus is the body of focus (schema GatewayFocus): the complete set of the threads on screen,
+// which replaces the previous one, and idle.
+type Focus struct {
+	ThreadIDs []ids.ID `json:"thread_ids"`
+	Idle      bool     `json:"idle,omitempty"`
+}
+
+// Typing is the body of typing.start and typing.stop (schema GatewayTyping).
+type Typing struct {
+	ThreadID ids.ID `json:"thread_id"`
+}
+
 // Hello is the first frame after the upgrade (schema GatewayHello).
 type Hello struct {
 	HeartbeatInterval time.Duration

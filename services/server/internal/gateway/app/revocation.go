@@ -18,8 +18,10 @@ import (
 // itself is dispatched (04 section 8.3, 07 section 8.2 item 3), in this order: (a) each credential
 // is revalidated and gateway.connect decided again in delivery mode, an unauthenticated answer
 // closes with 4012 (08 "Lost device", "Disabling a person"); (b) the visible sets are read again
-// for the indices; (c) the queued and buffered dispatches of the removed targets are dropped. The
-// rights cache already saw the event (Observe), so every later check uses the new state.
+// for the indices; (c) the queued and buffered dispatches of the removed targets are dropped;
+// (d) every focused thread is re-checked and the unreadable ones leave the focus (04 section 8.3
+// item 2). The rights cache already saw the event (Observe), so every later check uses the new
+// state.
 func (h *Hub) accessChanged(ctx context.Context, ev sync.Event) {
 	removed := domain.NewTargets(nil, nil)
 	// A payload that cannot be read removes nothing here; the admission of later events still
@@ -35,6 +37,7 @@ func (h *Hub) accessChanged(ctx context.Context, ev sync.Event) {
 		}
 		h.reindex(ctx, m)
 		h.purge(m, removed)
+		h.recheckFocus(ctx, m, nil, nil)
 	}
 }
 

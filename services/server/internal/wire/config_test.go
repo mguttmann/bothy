@@ -277,6 +277,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"sync.reauth_lead_time":     {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		"sync.outbound_queue_max":   {Kind: config.KindInt, Default: "10000", Min: "1", Max: "1000000", Chapter: "04-sync-protocol.md"},
 		"gateway.write_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "02-architecture.md"},
+		// M1-66
+		"sync.max_focused_threads": {Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: "04-sync-protocol.md"},
+		"sync.typing_min_interval": {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "04-sync-protocol.md"},
+		"sync.typing_ttl":          {Kind: config.KindDuration, Default: "8s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{

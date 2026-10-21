@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -65,4 +66,23 @@ type EpochSource interface {
 // check (02 "Proof of the check").
 type ProofAlarm interface {
 	NotChecked(ctx context.Context, op string, action authorize.Action)
+}
+
+// OpLimiter holds the rate-limit classes of the client ops of M1-66 (platform/ratelimit, M1-19;
+// 05 "Rate-limit classes"): rl.read keyed by the principal for focus (x-rate-limit-class of
+// receive.focus) and rl.typing keyed by the connection for typing.start and typing.stop. Each call
+// takes one token and reports false when the bucket is empty. Errors: a class the limiter does
+// not know (a wiring fault).
+type OpLimiter interface {
+	// AllowRead takes a token of rl.read for principal.
+	AllowRead(principal ids.ID) (bool, error)
+	// AllowTyping takes a token of rl.typing for the connection conn.
+	AllowTyping(conn ids.ID) (bool, error)
+}
+
+// Threads is the part of the chat port (chat.Threads, M1-55) the gateway reads: the space and
+// channel of a thread for the scope of typing.started and the focus index. Info does not
+// authorize; the handlers authorize first. Errors: not_found for an unknown thread.
+type Threads interface {
+	Info(ctx context.Context, threadID ids.ID) (chat.ThreadInfo, error)
 }

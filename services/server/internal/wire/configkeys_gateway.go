@@ -4,8 +4,9 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
-// gatewayConfigKeys returns the keys of the WebSocket gateway (M1-64): the windows and limits of
-// 04 "Configuration values of this chapter" and the write deadline of 02. The rate limit of
+// gatewayConfigKeys returns the keys of the WebSocket gateway (M1-64, M1-66): the windows and
+// limits of 04 "Configuration values of this chapter", focus and typing, and the write deadline of
+// 02. The rate limit of
 // identify and resume is the class rl.gateway_connect (configkeys_ratelimit.go).
 func gatewayConfigKeys() []config.Key {
 	return []config.Key{
@@ -23,6 +24,12 @@ func gatewayConfigKeys() []config.Key {
 			Doc: "Lead time of reauth_required before a person's access token expires."},
 		{Name: "sync.outbound_queue_max", Kind: config.KindInt, Default: "10000", Min: "1", Max: "1000000", Chapter: chapter04,
 			Doc: "Frames in the outbound queue of a gateway connection before it closes with 4014."},
+		{Name: "sync.max_focused_threads", Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: chapter04,
+			Doc: "Threads a gateway connection may focus; a focus with more answers validation_failed."},
+		{Name: "sync.typing_min_interval", Kind: config.KindDuration, Default: "5s", Min: minDeadline, Chapter: chapter04,
+			Doc: "Shortest interval between two typing.started fan-outs of one connection and thread."},
+		{Name: "sync.typing_ttl", Kind: config.KindDuration, Default: "8s", Min: minDeadline, Chapter: chapter04,
+			Doc: "How long a typing indicator lasts without renewal (expires_at of typing.started)."},
 		{Name: "gateway.write_timeout", Kind: config.KindDuration, Default: "10s", Min: minDeadline, Chapter: chapter02,
 			Doc: "Deadline of one WebSocket write; a missed deadline closes the connection with 4014."},
 	}
