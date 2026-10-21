@@ -14,7 +14,8 @@ import (
 // which HasDuration marks, and the JSON columns, which hold the stored object ("{}" at least).
 type RunRow struct {
 	ID, ThreadID, AgentID ids.ID
-	// AgentSessionID is NULL until M2-12.
+	// AgentSessionID is runs.agent_session_id: the agent_sessions row the run attached at its
+	// start or at the first agent_session.report (M2-12); zero for NULL, always for a guest run.
 	AgentSessionID ids.ID
 	// TriggerKind is message, command or interaction.
 	TriggerKind string
@@ -201,4 +202,12 @@ type Repository interface {
 	// OrphanCandidates reads the runs in running or waiting_input, ascending by id, for the job
 	// runs.stall_check (M2-09); a thread has at most one (R-DM-14).
 	OrphanCandidates(ctx context.Context) ([]RunRow, error)
+	// SetRunSession writes runs.agent_session_id of runID and nothing else: no version change and
+	// no event (M2-12 design notes 10 and 12). It needs a unit of work. Errors: not_found for an
+	// unknown run.
+	SetRunSession(ctx context.Context, runID, sessionID ids.ID) error
+	// SessionUsed reports whether some run of threadID has runs.agent_session_id = sessionID, the
+	// difference of resume and bind (09 9.1, M2-12 design note 9). A session row belongs to one
+	// thread, so the thread bounds the lookup.
+	SessionUsed(ctx context.Context, threadID, sessionID ids.ID) (bool, error)
 }

@@ -325,7 +325,9 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 // emitInvocation appends agent.invocation as the last write of the acceptance (M2-08 design note
 // 14): audience the agent, receive action agent.events.consume, resource the run without version,
 // the scope of the run's thread and the payload AgentInvocationPayload without a token. The token
-// is a delivery field that Prepare adds per delivery (R-SY-07, R-SY-17).
+// is a delivery field that Prepare adds per delivery (R-SY-07, R-SY-17). The payload carries the
+// session of the run (M2-12 design note 9), decided after Open, so the run row is locked before
+// the session rows (03 6.3).
 func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, message ids.ID, mode string) error {
 	info, err := s.d.Threads.Info(ctx, sum.ThreadID)
 	if err != nil {
@@ -339,6 +341,10 @@ func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, messa
 	if err != nil {
 		return err
 	}
+	session, err := s.invocationSession(ctx, sum, operatorOf(info, ch))
+	if err != nil {
+		return err
+	}
 	p, err := domain.InvocationPayload(domain.InvocationPayloadInput{
 		RunID: sum.ID, ThreadID: sum.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, MessageID: message,
 		TriggeredBy: domain.PrincipalRefPayload{
@@ -346,7 +352,7 @@ func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, messa
 			AvatarFileID: optionalID(m.Author.AvatarFileID),
 		},
 		BillingMode: mode, SettingsVersion: ch.SettingsVersion,
-	})
+	}, session)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.invocation")
 	}

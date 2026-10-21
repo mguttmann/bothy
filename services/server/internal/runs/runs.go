@@ -143,7 +143,11 @@ type StartRun struct {
 	BillingModeUsed, ToolClassUsed, Model string
 	// BillingEvidence is nil when absent.
 	BillingEvidence *BillingEvidence
-	// ExternalSessionRef is nil when absent; a present one is not enabled before M2-12.
+	// ExternalSessionRef is the reference of the external session the runtime uses, nil when
+	// absent. At startRun of an operator run it attaches the current row of the agent or creates
+	// one with started false (agents.Sessions.AttachOnStart, M2-12 design note 10); an invalid one
+	// fails with 400 validation_failed and pointer /external_session_ref. resumeRun and a guest
+	// run ignore it.
 	ExternalSessionRef *string
 }
 

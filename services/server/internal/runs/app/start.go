@@ -38,13 +38,10 @@ func (s *Service) Resume(ctx context.Context, cmd runs.StartRun) (runs.StartResu
 // start runs one start or resume in one unit of work with the run row locked first: the token is
 // verified (signature, kid, typ, alg, iss, aud, run) without its expiry, StartVerdict decides
 // currency, expiry and endpoint, authorize decides run.start on the verdict and the mode facts, and
-// an allowed transition stores started_jti, the reported mode, the evidence and the model. An I3
-// mismatch fails the run in the same unit, which commits, and then answers 409.
+// an allowed transition stores started_jti, the reported mode, the evidence and the model; a start
+// (not a resume) then attaches its agent session (M2-12 design note 10). An I3 mismatch fails the
+// run in the same unit, which commits, and then answers 409.
 func (s *Service) start(ctx context.Context, cmd runs.StartRun, op domain.StartOp) (runs.StartResult, error) {
-	if cmd.ExternalSessionRef != nil {
-		// The session row it binds belongs to M2-12 (ruling D-M2-09-6).
-		return runs.StartResult{}, notEnabled("/external_session_ref")
-	}
 	v, err := s.verifier()
 	if err != nil {
 		return runs.StartResult{}, err
@@ -114,6 +111,12 @@ func (s *Service) startTx(ctx context.Context, a actor.Actor, cmd runs.StartRun,
 	})
 	if err != nil {
 		return startResult{}, err
+	}
+	if op == domain.StartOpStart {
+		// resumeRun keeps the row the run already has (09 9.1).
+		if err := s.attachOnStart(ctx, row, cmd); err != nil {
+			return startResult{}, err
+		}
 	}
 	doc, err := s.documentByID(ctx, t.Run.ID)
 	return startResult{run: doc}, err
