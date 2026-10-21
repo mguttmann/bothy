@@ -28,6 +28,9 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf 'termsuite: disposable test machine of the terminal suite\n' > /etc/termsuite-disposable
 
 STOPSIGNAL SIGRTMIN+3
-# trivy:ignore:AVD-DS-0002 systemd is process 1 and bothy-host install creates users and units as
-# root (24 2.2); the container exists only inside the throwaway test stack of the suite.
+# The image's default user is unprivileged, so it never runs as root by accident. The test service
+# termhost of compose.terminal.yaml starts it as root (user 0:0), because systemd is process 1 and
+# bothy-host install creates users and units as root (24 2.2); Trivy's DS-0002 names no line, so
+# an inline ignore cannot take it.
+USER nobody
 CMD ["/lib/systemd/systemd"]

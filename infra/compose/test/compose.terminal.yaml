@@ -62,8 +62,11 @@ services:
     profiles: [termhost]
     restart: "no"
     # systemd as process 1 needs a writable cgroup tree, and bothy-host creates a cgroup per
-    # session under Delegate=yes (24 6.5); only this test service is privileged.
+    # session under Delegate=yes (24 6.5); only this test service is privileged. It runs as root
+    # (the image's default user is unprivileged): systemd is process 1, and the operator steps of
+    # the suite run as root through docker exec.
     privileged: true
+    user: "0:0"
     tmpfs: [/run, /run/lock, /tmp]
     networks: [termhosts]
 
