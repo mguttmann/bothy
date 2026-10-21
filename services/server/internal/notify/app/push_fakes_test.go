@@ -652,11 +652,11 @@ func (s *fakeScheduler) Send(ctx context.Context, job app.PushJob, at time.Time)
 	return nil
 }
 
-func (s *fakeScheduler) BadgeSyncPending(_ context.Context, u ids.ID) (bool, error) {
+func (s *fakeScheduler) BadgeSyncPending(_ context.Context, u ids.ID) (time.Time, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, ok := s.syncs[u]
-	return ok, nil
+	at, ok := s.syncs[u]
+	return at, ok, nil
 }
 
 func (s *fakeScheduler) HoldEnd(_ context.Context, u ids.ID) (time.Time, bool, error) {

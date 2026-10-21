@@ -94,11 +94,14 @@ type CoalesceFlush struct {
 // Kind implements jobs.Args.
 func (CoalesceFlush) Kind() string { return KindCoalesceFlush }
 
-// BadgeSync are the arguments of notify.badge_sync: at most one pending per person (UserID is the
-// unique field), AfterSeq the seq before the read that lowered the badge.
+// BadgeSync are the arguments of notify.badge_sync: unique per person and scheduled time
+// (AtUnixMicro, beyond the brief's two fields, D-M3-19-15), so a follow-up sync inserts while
+// River still runs the previous one; the consumer keeps one waiting sync per person by reading
+// the latest pending one. AfterSeq is the seq before the read that lowered the badge.
 type BadgeSync struct {
-	UserID   ids.ID `json:"user_id" river:"unique"`
-	AfterSeq int64  `json:"after_seq"`
+	UserID      ids.ID `json:"user_id" river:"unique"`
+	AfterSeq    int64  `json:"after_seq"`
+	AtUnixMicro int64  `json:"at" river:"unique"`
 }
 
 // Kind implements jobs.Args.
@@ -191,13 +194,12 @@ func (s *Scheduler) Send(ctx context.Context, job app.PushJob, at time.Time) err
 }
 
 // BadgeSyncPending implements app.Scheduler.
-func (s *Scheduler) BadgeSyncPending(ctx context.Context, user ids.ID) (bool, error) {
+func (s *Scheduler) BadgeSyncPending(ctx context.Context, user ids.ID) (time.Time, bool, error) {
 	ins, err := s.inserter()
 	if err != nil {
-		return false, err
+		return time.Time{}, false, err
 	}
-	_, ok, err := ins.PendingTx(ctx, BadgeSync{UserID: user})
-	return ok, err
+	return ins.LatestPendingTx(ctx, BadgeSync{UserID: user}, "user_id")
 }
 
 // HoldEnd implements app.Scheduler.
@@ -215,7 +217,8 @@ func (s *Scheduler) ScheduleBadgeSync(ctx context.Context, user ids.ID, afterSeq
 	if err != nil {
 		return err
 	}
-	_, err = ins.InsertUniqueTx(ctx, BadgeSync{UserID: user, AfterSeq: afterSeq}, &jobs.InsertOptions{ScheduledAt: at})
+	_, err = ins.InsertUniqueTx(ctx, BadgeSync{UserID: user, AfterSeq: afterSeq, AtUnixMicro: at.UnixMicro()},
+		&jobs.InsertOptions{ScheduledAt: at})
 	return err
 }
 

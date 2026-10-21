@@ -126,11 +126,12 @@ type Scheduler interface {
 	Collect(ctx context.Context, user, thread ids.ID, end time.Time) (inserted bool, err error)
 	// Send inserts one job notify.push_send at at (zero: now).
 	Send(ctx context.Context, job PushJob, at time.Time) error
-	// BadgeSyncPending reports a pending notify.badge_sync of user.
-	BadgeSyncPending(ctx context.Context, user ids.ID) (bool, error)
+	// BadgeSyncPending returns the ScheduledAt of the latest pending notify.badge_sync of user;
+	// ok is false when none is pending. A sync due at or before now may already run.
+	BadgeSyncPending(ctx context.Context, user ids.ID) (at time.Time, ok bool, err error)
 	// HoldEnd returns the ScheduledAt of the latest pending notify.badge_sync_hold of user.
 	HoldEnd(ctx context.Context, user ids.ID) (end time.Time, ok bool, err error)
-	// ScheduleBadgeSync inserts notify.badge_sync of user unique at at.
+	// ScheduleBadgeSync inserts notify.badge_sync of user unique per (user, at) at at.
 	ScheduleBadgeSync(ctx context.Context, user ids.ID, afterSeq int64, at time.Time) error
 	// Hold inserts notify.badge_sync_hold of user unique per end at at, so the hold of an
 	// interval that River still runs never stops it.

@@ -147,7 +147,9 @@ func (p *Push) threadCounts(ctx context.Context, user, thread ids.ID, pos int64)
 
 // onReadState handles read_state.updated of person r for thread T (design note 16 b): when the
 // read lowers the badge number (T counts at the previous position and not at the new one), it
-// schedules one badge sync of r, unless one is pending, at the end of a pending hold or now. A
+// schedules one badge sync of r at the end of a pending hold or now, unless a sync that is not yet
+// due is pending (it carries this read). A sync that is due may already run and have read its
+// events, so then a follow-up goes no earlier than now plus notify.badge_sync_min_interval. A
 // mark as unread never lowers it.
 func (p *Push) onReadState(ctx context.Context, ev sync.Event) error {
 	user := ev.AudiencePrincipalID
@@ -168,11 +170,15 @@ func (p *Push) onReadState(ctx context.Context, ev sync.Event) error {
 	if err != nil || after {
 		return err
 	}
-	pending, err := p.d.Scheduler.BadgeSyncPending(ctx, user)
-	if err != nil || pending {
+	clock := p.d.Clock.Now()
+	syncAt, pending, err := p.d.Scheduler.BadgeSyncPending(ctx, user)
+	if err != nil || (pending && syncAt.After(clock)) {
 		return err
 	}
-	at := p.d.Clock.Now()
+	at := clock
+	if pending {
+		at = clock.Add(p.cfg.BadgeSyncMinInterval)
+	}
 	if end, ok, err := p.d.Scheduler.HoldEnd(ctx, user); err != nil {
 		return err
 	} else if ok && end.After(at) {
@@ -218,6 +224,13 @@ func (p *Push) BadgeSync(ctx context.Context, user ids.ID, afterSeq int64) error
 			return err
 		}
 		now := p.d.Clock.Now()
+		// A hold of an earlier sync that still runs keeps this one until its end, so a person
+		// gets at most one sync per notify.badge_sync_min_interval.
+		if end, ok, err := p.d.Scheduler.HoldEnd(ctx, user); err != nil {
+			return err
+		} else if ok && end.After(now) {
+			return p.d.Scheduler.ScheduleBadgeSync(ctx, user, afterSeq, end)
+		}
 		counting, err := p.counting(ctx, user)
 		if err != nil {
 			return err

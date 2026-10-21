@@ -583,8 +583,11 @@ The sync: the consumer `push` reads every `read_state.updated` of r. The read lo
 exactly when its thread counts at the previous read position of r (the `last_read_seq` of the
 newest earlier `read_state.updated` of r for that thread, else 0) and does not count at the new
 one; marking a thread unread never lowers it. Then the consumer schedules the job
-`notify.badge_sync` of r, unique per person: nothing if one is pending (it carries this read),
-else at the end of a pending `notify.badge_sync_hold` of r or now. The sync job counts the badge,
+`notify.badge_sync` of r, unique per person and time: nothing if a sync of r is pending and not
+yet due (it carries this read), else at the end of a pending `notify.badge_sync_hold` of r or
+now; when the pending sync is already due it may run and have read its events, so the follow-up
+goes no earlier than now plus `notify.badge_sync_min_interval`. A sync that finds a hold of an
+earlier sync still pending moves itself to the end of that hold. The sync job counts the badge,
 collects as `Cleared` the threads of the reads of r since the read that scheduled it that no
 longer count (distinct, in event order, the complete list), inserts `notify.badge_sync_hold` of r
 at now plus `notify.badge_sync_min_interval` (unique per person and end, so a hold that River

@@ -143,3 +143,43 @@ func TestBadgeSyncWithStandingHold_KeepsInterval(t *testing.T) {
 		t.Fatalf("badge syncs %+v, want one at the end of the second interval %s", syncs, want)
 	}
 }
+
+// TestBadgeSyncRunning_KeepsLaterFallingRead (13 8): a falling read that arrives while the due
+// badge sync already runs (it has read its events) schedules a follow-up sync after the interval,
+// so the later read reaches the phone in Cleared and is not dropped.
+func TestBadgeSyncRunning_KeepsLaterFallingRead(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t)
+	var threads []threadAt
+	for range 2 {
+		th := w.newThread(w.allgemein)
+		w.setLevel("alex", "thread", th, "all")
+		m := w.post("owner", th, "Export numbers are in")
+		threads = append(threads, threadAt{th: th, seq: m.ThreadSeq})
+	}
+	w.consume()
+	t0 := w.clk.Now()
+	w.readUpTo("alex", threads[0].th, threads[0].seq)
+	w.consume()
+	running := w.pendingOf(notifyjobs.KindBadgeSync)
+	if len(running) != 1 {
+		t.Fatalf("badge syncs %+v, want one", running)
+	}
+	// The sync runs its use case; River has not completed the job yet when the next read arrives.
+	var a notifyjobs.BadgeSync
+	must(t, json.Unmarshal(running[0].Args, &a))
+	must(t, w.push.Push.BadgeSync(context.Background(), a.UserID, a.AfterSeq))
+	w.clk.Set(t0.Add(time.Second))
+	w.readUpTo("alex", threads[1].th, threads[1].seq)
+	w.consume()
+	w.complete(running[0].ID)
+	// The badge is counted at send time, after both reads.
+	w.wantSyncCall(w.apns, w.alex, w.alexPhone.Registration, 0, 0, threads[0].th)
+	follow := w.pendingOf(notifyjobs.KindBadgeSync)
+	if len(follow) != 1 || follow[0].ScheduledAt.Before(t0.Add(badgeSyncInterval)) {
+		t.Fatalf("badge syncs %+v, want one follow-up not before %s", follow, t0.Add(badgeSyncInterval))
+	}
+	w.clk.Set(follow[0].ScheduledAt)
+	w.badgeSyncsDue()
+	w.wantSyncCall(w.apns, w.alex, w.alexPhone.Registration, 1, 0, threads[1].th)
+}
