@@ -22,7 +22,33 @@ ConsoleEnvironment browserEnvironment() {
     flowStore: SessionFlowStore(web.window.sessionStorage),
     navigation: WindowNavigation(web.window),
     passkeys: BrowserPasskeys(web.window.navigator.credentials),
+    downloads: AnchorDownloads(web.window.document),
   );
+}
+
+/// [FileDownloads] over a temporary `blob:` URL and an anchor with the `download` attribute:
+/// the browser saves the file, nothing is kept in browser storage, and the URL is revoked
+/// right after the click.
+class AnchorDownloads implements FileDownloads {
+  /// Creates the downloads of [document].
+  AnchorDownloads(this.document);
+
+  /// The document of the tab.
+  final web.Document document;
+
+  @override
+  void save(String name, String type, Uint8List bytes) {
+    final blob = web.Blob([bytes.toJS].toJS, web.BlobPropertyBag(type: type));
+    final url = web.URL.createObjectURL(blob);
+    final anchor = document.createElement('a') as web.HTMLAnchorElement
+      ..href = url
+      ..download = name
+      ..style.display = 'none';
+    document.body?.append(anchor);
+    anchor.click();
+    anchor.remove();
+    web.URL.revokeObjectURL(url);
+  }
 }
 
 /// [FlowStore] over a `Storage`, in the console the tab's `sessionStorage`.

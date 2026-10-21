@@ -8,7 +8,9 @@ import 'package:l10n/l10n.dart';
 import '../routes.dart';
 
 /// The shell of 01 5.5: the navigation on the left, the header with the signed-in person and
-/// "Log out", and the page. Every page is a placeholder until its ticket fills it.
+/// "Log out", and the page: [body] (the administration screens of M6-04), or a placeholder for
+/// a page whose ticket has not filled it yet. [banner] stands above the header on every page
+/// (the stored "View as person", 07 9.2).
 ///
 /// Focus moves per column (navigation, then header and page); the arrow keys move within the
 /// navigation, and the focus ring comes from the theme of `design_system`.
@@ -21,6 +23,8 @@ class ConsoleShell extends StatelessWidget {
     required this.page,
     required this.onOpen,
     required this.onLogout,
+    this.body,
+    this.banner,
   });
 
   /// `branding.product_name`.
@@ -37,6 +41,12 @@ class ConsoleShell extends StatelessWidget {
 
   /// Ends the session.
   final VoidCallback onLogout;
+
+  /// The content of the page, or null for the placeholder.
+  final Widget? body;
+
+  /// The banner above the header of every page, or null.
+  final Widget? banner;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +73,7 @@ class ConsoleShell extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  ?banner,
                   Padding(
                     padding: const EdgeInsets.all(DsSpace.s16),
                     child: Wrap(
@@ -86,10 +97,12 @@ class ConsoleShell extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(DsSpace.s16),
-                      child: Text(l.consolePlaceholderPage),
-                    ),
+                    child:
+                        body ??
+                        Padding(
+                          padding: const EdgeInsets.all(DsSpace.s16),
+                          child: Text(l.consolePlaceholderPage),
+                        ),
                   ),
                 ],
               ),

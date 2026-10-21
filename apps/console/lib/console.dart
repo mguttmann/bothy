@@ -10,10 +10,19 @@
 /// - [createConsoleApiClient]: the HTTP layer (cookie, CSRF header, no token).
 /// - [ConsoleEnvironment] and its ports: the browser.
 /// - [versionsMatch]: the version check against the server.
+/// - [ConsoleAdmin], [ConsoleAdminPage], [ConsoleRoute]: the administration screens A1 to A6 of
+///   `admin_ui` in the console, "View as person" with its banner, and the places below the pages
+///   (brief M6-04).
+/// - [ConsoleActionStepUp], [ConsoleStepUpInterceptor], [ConsoleStepUpDialog]: the step-up of
+///   an action in the browser (brief M6-04 Design note 2).
 library;
 
+export 'admin/admin_page.dart';
+export 'admin/console_admin.dart';
 export 'admin/console_route.dart';
+export 'admin/download_target.dart';
 export 'admin/step_up.dart';
+export 'admin/step_up_dialog.dart';
 export 'app.dart';
 export 'http/console_client.dart';
 export 'login/logged_out_view.dart';
