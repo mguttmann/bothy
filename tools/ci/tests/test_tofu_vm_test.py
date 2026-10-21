@@ -60,13 +60,13 @@ def test_firmware_of_aarch64(tmp_path: Path) -> None:
 def test_qemu_command_binds_ssh_on_loopback_only(tmp_path: Path) -> None:
     uefi = (tmp_path / "code.fd", tmp_path / "vars.fd")
     cmd = vt.qemu_command(
-        "qemu", "arm64", "hvf", tmp_path / "d.qcow2", 40022, "http://10.0.2.2:1/seed/",
+        "qemu", "arm64", "hvf", tmp_path / "d.qcow2", 40022, "http://192.0.2.2:1/seed/",
         tmp_path / "c.log", uefi,
     )  # fmt: skip
     joined = " ".join(cmd)
-    assert "hostfwd=tcp:127.0.0.1:40022-:22" in joined
+    assert "user,id=n0,net=192.0.2.0/24,host=192.0.2.2,hostfwd=tcp:127.0.0.1:40022-:22" in joined
     assert "-cpu host" in joined
-    assert "type=1,serial=ds=nocloud;s=http://10.0.2.2:1/seed/" in cmd
+    assert "type=1,serial=ds=nocloud;s=http://192.0.2.2:1/seed/" in cmd
     assert f"if=pflash,format=raw,readonly=on,file={uefi[0]}" in cmd
     x86 = vt.qemu_command("qemu", "amd64", "tcg", tmp_path / "d", 1, "u", tmp_path / "c", None)
     assert "q35" in x86
@@ -85,7 +85,7 @@ def test_seed_user_data_keeps_the_module_part_unchanged() -> None:
     assert parts[1] == module
     forward = json.loads(parts[0].removeprefix("#cloud-config\n"))
     script = forward["bootcmd"][1][2]
-    assert "tcp dport { 5000, 8000 } dnat to 10.0.2.2" in script
+    assert "tcp dport { 5000, 8000 } dnat to 192.0.2.2" in script
     assert forward["bootcmd"][0] == ["sysctl", "-qw", "net.ipv4.conf.all.route_localnet=1"]
 
 
