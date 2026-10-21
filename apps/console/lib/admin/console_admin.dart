@@ -193,6 +193,8 @@ class ConsoleAdmin extends ChangeNotifier {
 
   static Uuid7Generator _ids(Random random) => Uuid7Generator(
     nowMillis: () => DateTime.now().millisecondsSinceEpoch,
-    random: (bits) => random.nextInt(1 << bits),
+    // Not `1 << bits`: in the web build a shift works on 32 bits, so `1 << 31` is negative and
+    // `1 << 32` is 1; the power of two is exact up to 2^32, the limit of `nextInt`.
+    random: (bits) => random.nextInt(pow(2, bits).toInt()),
   );
 }

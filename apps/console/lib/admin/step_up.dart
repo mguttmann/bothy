@@ -138,12 +138,26 @@ class ConsoleActionStepUp {
 
   static const Map<String, Object?> _own = {consoleNoStepUpExtra: true};
 
+  Future<void>? _running;
+
   /// Runs one step-up for an action whose purpose is [purpose].
   ///
   /// Throws [StepUpCancelled] when the person cancels, the browser offers no passkey, no window
   /// can show the prompt or the person chose the OIDC re-login; the `DioException` of a refused
   /// challenge or confirmation otherwise.
-  Future<void> confirm(String purpose) async {
+  ///
+  /// While one step-up runs, a second request that needs one waits for it instead of opening a
+  /// second dialog (a page often loads several things at once); after a cancelled or failed
+  /// first step-up the waiting request ends with the same error.
+  Future<void> confirm(String purpose) {
+    final running = _running;
+    if (running != null) return running;
+    final next = _confirm(purpose);
+    _running = next;
+    return next.whenComplete(() => _running = null);
+  }
+
+  Future<void> _confirm(String purpose) async {
     final dialog = prompt();
     if (dialog == null) throw const StepUpCancelled();
     final auth = api().getAuthApi();
