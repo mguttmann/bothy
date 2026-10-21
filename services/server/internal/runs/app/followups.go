@@ -360,6 +360,12 @@ func (f *Followups) followOn(ctx context.Context, ended runs.RunSummary, cands [
 		if !allowed {
 			continue
 		}
+		// A job or a delivery ends runs without a principal; the anchor of the follow-on run is then
+		// written by the run's agent, the same principal as after finishRun (chat refuses a caller
+		// other than the principal of the unit).
+		if a, ok := actor.FromContext(ctx); !ok || a.ID.IsZero() {
+			ctx = actor.WithActor(ctx, actor.Actor{ID: ended.AgentID, Kind: actor.KindAgent})
+		}
 		sum, err := s.Open(ctx, OpenCmd{
 			ThreadID: ended.ThreadID, AgentID: ended.AgentID, TriggeredBy: msg.Author.ID, TriggeringMessageID: m,
 			TriggerKind: triggerKindMessage, BillingModeExpected: agent.BillingMode,

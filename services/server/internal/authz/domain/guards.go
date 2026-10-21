@@ -65,9 +65,9 @@ const (
 	// actionRunFollowupCreate is a follow-up of the active run; it takes the guard of
 	// agent.invoke (05 section 4.10, M2-11).
 	actionRunFollowupCreate = "run.followup.create"
-	actionGrantCreate = "grant.create"
-	actionGrantRevoke = "grant.revoke"
-	actionTokenCreate = "token.create"
+	actionGrantCreate       = "grant.create"
+	actionGrantRevoke       = "grant.revoke"
+	actionTokenCreate       = "token.create"
 )
 
 // guards applies the guards of the action (07 section 4.2 step 9): agent.invoke and
