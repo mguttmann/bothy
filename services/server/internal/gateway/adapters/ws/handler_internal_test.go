@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -176,6 +177,28 @@ func newTestServer(t *testing.T, queueMax int, mod func(*Handler)) *testServer {
 // newTestServerWith is newTestServer with the metrics gm of the gateway use cases.
 func newTestServerWith(t *testing.T, queueMax int, mod func(*Handler), gm app.Metrics) *testServer {
 	t.Helper()
+	return newTestServerOpts(t, queueMax, mod, serverOpts{gm: gm})
+}
+
+// testBeat is the heartbeat interval of the test server. Its heartbeat and identify deadlines are
+// those of testkit.PatientGateway, so no test that does not check a deadline loses its connection
+// on a loaded host; the deadline tests set their windows and inject a clock (serverOpts).
+const testBeat = 2 * time.Second
+
+// serverOpts are the optional parts of a test server: the metrics gm of the gateway use cases,
+// the clock of the gateway use cases and the clock of the handler (nil: the system clock), and
+// windows, which changes the deadlines of the gateway configuration.
+type serverOpts struct {
+	gm           app.Metrics
+	clock        clock.Clock
+	handlerClock clock.Clock
+	windows      func(*app.Config)
+}
+
+// newTestServerOpts is newTestServer with the options so.
+func newTestServerOpts(t *testing.T, queueMax int, mod func(*Handler), so serverOpts) *testServer {
+	t.Helper()
+	gm := so.gm
 	o := &order{}
 	transports := make(chan reqmeta.Transport, 16)
 	agent := actor.Actor{ID: ids.New(), Kind: actor.KindAgent, TokenID: ids.New(), CredentialExpiresAt: time.Now().Add(time.Hour)}
@@ -191,12 +214,16 @@ func newTestServerWith(t *testing.T, queueMax int, mod func(*Handler), gm app.Me
 	if err != nil {
 		t.Fatal(err)
 	}
-	gw, err := app.New(app.Config{HTU: publicURL + "/api/v1/gateway", IdentifyTimeout: 5 * time.Second, HeartbeatInterval: time.Second,
-		HeartbeatMissLimit: 2, ResumeWindow: time.Minute, ReauthLeadTime: time.Second, ProtocolVersions: []int{1},
-		MaxFocusedThreads: 20, TypingMinInterval: 5 * time.Second, TypingTTL: 8 * time.Second},
+	cfg := app.Config{HTU: publicURL + "/api/v1/gateway", IdentifyTimeout: testkit.Patience, HeartbeatInterval: testBeat,
+		HeartbeatMissLimit: testkit.HeartbeatMissLimit(testBeat), ResumeWindow: time.Minute, ReauthLeadTime: time.Second, ProtocolVersions: []int{1},
+		MaxFocusedThreads: 20, TypingMinInterval: 5 * time.Second, TypingTTL: 8 * time.Second}
+	if so.windows != nil {
+		so.windows(&cfg)
+	}
+	gw, err := app.New(cfg,
 		app.Deps{Authenticator: agentAuth{agent: agent, transports: transports}, Authorizer: allowAll{}, Nonces: nonce{}, Limiter: unlimited{}, Snapshot: snapshot{o},
 			CatchUp: catchUp{}, Epoch: epochSource{}, Delivery: delivery{o}, Decoder: NewDecoder(schemas, check), Alarm: noAlarm{},
-			Threads: noThreads{}, OpLimiter: noLimits{}, Publisher: noPublisher{}, Metrics: gm})
+			Threads: noThreads{}, OpLimiter: noLimits{}, Publisher: noPublisher{}, Metrics: gm, Clock: so.clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +236,7 @@ func newTestServerWith(t *testing.T, queueMax int, mod func(*Handler), gm app.Me
 		}
 	}
 	h, err := NewHandler(Config{PublicURL: publicURL, MaxFrameBytes: 1 << 16, MaxJSONDepth: 32, OutboundQueueMax: queueMax, WriteTimeout: 5 * time.Second},
-		Deps{Gateway: gw, Snapshot: synchttp.SnapshotREST})
+		Deps{Gateway: gw, Snapshot: synchttp.SnapshotREST, Clock: so.handlerClock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +324,7 @@ func TestOutboundQueueOverflowCloses4014(t *testing.T) {
 // random source.
 func TestTestClientJittersFirstHeartbeat(t *testing.T) {
 	t.Parallel()
-	interval := time.Second
+	interval := testBeat
 	for _, r := range []float64{0, 0.25, 0.999999} {
 		got := wstest.FirstHeartbeatDelay(interval, r)
 		if got < 0 || got >= interval {

@@ -38,6 +38,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/specschema"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // Path is the path of the gateway below the base URL.
@@ -459,7 +460,7 @@ func (c *Client) SendRaw(b []byte) error {
 			c.violate(idx, "", "", "client frame: "+err.Error())
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	return c.ws.Write(ctx, websocket.MessageText, b)
 }
@@ -469,7 +470,7 @@ func (c *Client) SendBinary(b []byte) error {
 	if !c.opts.rawClient {
 		c.violate(0, "", "", "binary client frame without WithRawClientFrames")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	return c.ws.Write(ctx, websocket.MessageBinary, b)
 }

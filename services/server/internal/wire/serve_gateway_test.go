@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	gosync "sync"
@@ -24,6 +25,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
+	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
@@ -58,14 +60,37 @@ type gwWorld struct {
 	reasons []string
 }
 
-// newGatewayWorld starts an api process with the gateway windows of extra (environment entries).
+// gwHeartbeatInterval is the sync.heartbeat_interval of a gateway world: the default of the key.
+const gwHeartbeatInterval = 30 * time.Second
+
+// patientWindows are the environment entries of testkit.PatientGateway for the heartbeat interval
+// interval: no heartbeat or identify deadline of the gateway closes a connection of a world
+// before the test has waited testkit.Patience for what it checks, however slow the host.
+func patientWindows(interval time.Duration) []string {
+	var env []string
+	for k, v := range testkit.PatientGateway(interval) {
+		env = append(env, config.EnvName(k)+"="+v)
+	}
+	slices.Sort(env)
+	return env
+}
+
+// newGatewayWorld starts an api process with the gateway windows of extra (environment entries)
+// over patientWindows(gwHeartbeatInterval); only a test of a deadline sets that window short.
 func newGatewayWorld(t *testing.T, extra ...string) *gwWorld {
+	t.Helper()
+	return newGatewayWorldWith(t, wire.Deps{}, extra...)
+}
+
+// newGatewayWorldWith is newGatewayWorld with the dependencies deps of the process (a clock).
+func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld {
 	t.Helper()
 	ctx := context.Background()
 	db := newServeDB(t)
 	completeSetup(t, db)
-	env := serveEnv(t, db, append([]string{"BOTHY_SERVER__PUBLIC_URL=" + gwPublicURL}, extra...)...)
-	p := start(t, wire.RoleAPI, env, wire.Deps{})
+	base := append([]string{"BOTHY_SERVER__PUBLIC_URL=" + gwPublicURL}, patientWindows(gwHeartbeatInterval)...)
+	env := serveEnv(t, db, append(base, extra...)...)
+	p := start(t, wire.RoleAPI, env, deps)
 	waitReadyz(t, p.waitInternal(t), http.StatusOK)
 	public := p.logs.port("public listener started")
 	values := loadEnv(t, env)
@@ -303,15 +328,17 @@ func liveSession(t *testing.T, c *wstest.Client) string {
 	return v.(string)
 }
 
+// gwFastBeat is the heartbeat interval of TestGateway: short, so a revocation is seen at the next
+// heartbeat within seconds; patientWindows keeps its deadline beyond testkit.Patience.
+const gwFastBeat = 2 * time.Second
+
 // TestGateway is the integration suite of M1-64 against a started api process (PostgreSQL 18 via
-// pgtest, people, devices, tokens and proofs from identity, the wstest client). The windows are
-// short: sync.heartbeat_interval 1s with sync.heartbeat_miss_limit 1, sync.identify_timeout 2s,
-// sync.resume_window 3s, sync.ws_max_frame_bytes 4096.
+// pgtest, people, devices, tokens and proofs from identity, the wstest client), with
+// patientWindows(gwFastBeat), the default sync.resume_window and sync.ws_max_frame_bytes 4096.
+// The deadlines themselves are tested in TestGatewayDeadlines.
 func TestGateway(t *testing.T) {
 	t.Parallel()
-	w := newGatewayWorld(t,
-		"BOTHY_SYNC__HEARTBEAT_INTERVAL=1s", "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=1", "BOTHY_SYNC__IDENTIFY_TIMEOUT=2s",
-		"BOTHY_SYNC__RESUME_WINDOW=3s", "BOTHY_SYNC__WS_MAX_FRAME_BYTES=4096")
+	w := newGatewayWorld(t, append(patientWindows(gwFastBeat), "BOTHY_SYNC__WS_MAX_FRAME_BYTES=4096")...)
 	ctx := context.Background()
 
 	t.Run("TestSECCORS3ForeignOriginRejected", func(t *testing.T) {
@@ -354,7 +381,7 @@ func TestGateway(t *testing.T) {
 		if err := w.owner.QueryRow(ctx, `SELECT sync_epoch::text FROM instance`).Scan(&epoch); err != nil {
 			t.Fatal(err)
 		}
-		if h.HeartbeatIntervalMs != 1000 || h.ResumeWindowMs != 3000 || len(h.ProtocolVersions) != 1 || h.ProtocolVersions[0] != 1 ||
+		if h.HeartbeatIntervalMs != gwFastBeat.Milliseconds() || h.ResumeWindowMs != (5*time.Minute).Milliseconds() || len(h.ProtocolVersions) != 1 || h.ProtocolVersions[0] != 1 ||
 			h.SyncEpoch.String() != epoch || h.DpopNonce == "" || time.Since(h.ServerTime) > time.Minute { // nosemgrep: bothy-go-test-wall-clock-wait -- the clock of the hello, not a wait
 			t.Fatalf("hello %+v", h)
 		}
@@ -442,15 +469,6 @@ func TestGateway(t *testing.T) {
 		w.expectClose(t, c, 4003)
 	})
 
-	t.Run("TestClose4003IdentifyTimeout", func(t *testing.T) {
-		c := w.dial(t)
-		start := time.Now()
-		w.expectClose(t, c, 4003)
-		if d := time.Since(start); d < time.Second {
-			t.Errorf("closed after %v, before sync.identify_timeout", d)
-		}
-	})
-
 	t.Run("TestClose4004BadProof", func(t *testing.T) {
 		p := w.newPerson("alex", identity.DeviceStateActive)
 		wrongHTU := w.params(p)
@@ -513,20 +531,6 @@ func TestGateway(t *testing.T) {
 		}
 	})
 
-	t.Run("TestClose4006ResumeAfterWindow", func(t *testing.T) {
-		p := w.newPerson("alex", identity.DeviceStateActive)
-		c, r := w.ready(t, w.params(p))
-		c.Abort()
-		time.Sleep(3500 * time.Millisecond)
-		n := w.dial(t)
-		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
-		defer cancel()
-		_, err := n.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
-		if ce := (*wstest.CloseError)(nil); !errors.As(err, &ce) || ce.Code != 4006 {
-			t.Fatalf("resume after the window: %v", err)
-		}
-	})
-
 	t.Run("TestClose4007ProtocolVersion", func(t *testing.T) {
 		p := w.newPerson("alex", identity.DeviceStateActive)
 		params := w.params(p)
@@ -558,44 +562,6 @@ func TestGateway(t *testing.T) {
 		if last == nil {
 			t.Fatal("not a single identify passed")
 		}
-	})
-
-	t.Run("TestClose4009HeartbeatTimeout", func(t *testing.T) {
-		p := w.newPerson("alex", identity.DeviceStateActive)
-		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
-		start := time.Now()
-		w.expectClose(t, c, 4009)
-		if d := time.Since(start); d < 1500*time.Millisecond {
-			t.Errorf("closed after %v, before the heartbeat deadline", d)
-		}
-	})
-
-	t.Run("TestFirstHeartbeatJitterTolerated", func(t *testing.T) {
-		p := w.newPerson("alex", identity.DeviceStateActive)
-		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
-		// Past one interval (1s) and inside the deadline of interval times (miss limit + 1) (2s),
-		// with room for the revalidation query of the heartbeat on a loaded runner: a heartbeat
-		// 300 ms before the deadline was closed with 4009 in CI while its query ran.
-		time.Sleep(1400 * time.Millisecond)
-		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
-			t.Fatal(err)
-		}
-		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
-		defer cancel()
-		op, _, err := c.Next(cctx)
-		if err != nil {
-			t.Fatalf("a first heartbeat shortly before twice the interval: %v", err)
-		}
-		if op != "heartbeat_ack" {
-			t.Fatalf("answer %s, want heartbeat_ack", op)
-		}
-	})
-
-	t.Run("TestClose4011AgentTokenExpired", func(t *testing.T) {
-		agent := w.newAgent()
-		tok := w.agentToken(agent, nil, time.Now().Add(3*time.Second))
-		c, _ := w.ready(t, wstest.IdentifyParams{APIToken: tok})
-		w.expectClose(t, c, 4011)
 	})
 
 	t.Run("TestClose4012RevokedAtIdentify", func(t *testing.T) {
@@ -695,14 +661,107 @@ func TestGateway(t *testing.T) {
 	})
 }
 
+// shiftClock is the system clock moved forward by Advance: a world's process reads it, so a test
+// reaches an expiry without waiting for it and without a window a loaded host could miss.
+type shiftClock struct {
+	mu    gosync.Mutex
+	shift time.Duration
+}
+
+// Now returns the system time plus the shift.
+func (c *shiftClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return time.Now().UTC().Add(c.shift)
+}
+
+// Advance moves the clock forward by d.
+func (c *shiftClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.shift += d
+}
+
+// TestGatewayDeadlines: each deadline of the gateway closes a connection of a started api process
+// with its code, each in a world of its own where only that window is short; nothing in the setup
+// of a subtest races the short window, so a slow host can only make the close come later. The
+// deadlines at the exact instant, and a first heartbeat after more than one interval, are tested
+// with an injected clock in gateway/app (TestIdentifyTimeout, TestHeartbeatDeadline,
+// TestResumeWindow) and over a real WebSocket in gateway/adapters/ws
+// (TestDeadlinesFollowTheInjectedClock).
+func TestGatewayDeadlines(t *testing.T) {
+	t.Parallel()
+
+	t.Run("TestClose4003IdentifyTimeout", func(t *testing.T) {
+		t.Parallel()
+		w := newGatewayWorld(t, "BOTHY_SYNC__IDENTIFY_TIMEOUT=2s") // nosemgrep: bothy-go-test-gateway-window -- the deadline under test; the client only dials
+		c := w.dial(t)
+		start := time.Now()
+		w.expectClose(t, c, 4003)
+		if d := time.Since(start); d < time.Second {
+			t.Errorf("closed after %v, before sync.identify_timeout", d)
+		}
+	})
+
+	t.Run("TestClose4009HeartbeatTimeout", func(t *testing.T) {
+		t.Parallel()
+		w := newGatewayWorld(t, "BOTHY_SYNC__HEARTBEAT_INTERVAL=1s", "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=1") // nosemgrep: bothy-go-test-gateway-window -- the deadline under test; the client sends no heartbeat
+		p := w.newPerson("alex", identity.DeviceStateActive)
+		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
+		start := time.Now()
+		w.expectClose(t, c, 4009)
+		if d := time.Since(start); d < 1500*time.Millisecond {
+			t.Errorf("closed after %v, before the heartbeat deadline", d)
+		}
+	})
+
+	t.Run("TestClose4006ResumeAfterWindow", func(t *testing.T) {
+		t.Parallel()
+		w := newGatewayWorld(t, "BOTHY_SYNC__RESUME_WINDOW=3s") // nosemgrep: bothy-go-test-gateway-window -- the window under test; the resume comes after it on purpose
+		ctx := context.Background()
+		p := w.newPerson("alex", identity.DeviceStateActive)
+		c, r := w.ready(t, w.params(p))
+		c.Abort()
+		time.Sleep(3500 * time.Millisecond)
+		n := w.dial(t)
+		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
+		defer cancel()
+		_, err := n.Resume(cctx, wstest.ResumeParams{SessionID: r.GatewaySessionId.String(), AccessToken: p.access, Proof: w.proofFor(p.key, p.access, gwHTU)})
+		if ce := (*wstest.CloseError)(nil); !errors.As(err, &ce) || ce.Code != 4006 {
+			t.Fatalf("resume after the window: %v", err)
+		}
+	})
+
+	// The token outlives the setup by an hour; the clock of the process then jumps past its
+	// expiry, and the next heartbeat (every gwFastBeat) lets the gateway close with 4011.
+	t.Run("TestClose4011AgentTokenExpired", func(t *testing.T) {
+		t.Parallel()
+		clk := &shiftClock{}
+		w := newGatewayWorldWith(t, wire.Deps{Clock: clk}, patientWindows(gwFastBeat)...)
+		agent := w.newAgent()
+		tok := w.agentToken(agent, nil, time.Now().Add(time.Hour))
+		c, _ := w.ready(t, wstest.IdentifyParams{APIToken: tok})
+		clk.Advance(time.Hour + time.Minute)
+		w.expectClose(t, c, 4011)
+	})
+}
+
+// tokenLead is the sync.reauth_lead_time of TestGatewayTokenExpiry and tokenTTL its
+// auth.access_token_ttl: reauth_required is due 2s after the issue of a token, its expiry comes
+// only after testkit.Patience, so the setup and identify of a loaded host never reach it.
+const (
+	tokenLead = testkit.Patience
+	tokenTTL  = tokenLead + 2*time.Second
+)
+
 // TestGatewayTokenExpiry: reauth and the expiry of a person's access token, with
-// auth.access_token_ttl 20s, auth.clock_leeway 0s and sync.reauth_lead_time 18s. The token must
-// outlive the setup and identify of a connection on a loaded CI runner (with 6s it expired
-// before identify there, closing with 4011); reauth_required still comes 2s after the issue.
+// auth.access_token_ttl tokenTTL, auth.clock_leeway 0s and sync.reauth_lead_time tokenLead. A
+// reauth_required already due at ready goes out at once. The subtests wait for the expiry in
+// parallel.
 func TestGatewayTokenExpiry(t *testing.T) {
 	t.Parallel()
-	w := newGatewayWorld(t, "BOTHY_AUTH__ACCESS_TOKEN_TTL=20s", "BOTHY_AUTH__CLOCK_LEEWAY=0s", "BOTHY_SYNC__REAUTH_LEAD_TIME=18s",
-		"BOTHY_SYNC__HEARTBEAT_INTERVAL=1s", "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=1")
+	w := newGatewayWorld(t, "BOTHY_AUTH__ACCESS_TOKEN_TTL="+strconv.FormatInt(int64(tokenTTL/time.Second), 10)+"s", "BOTHY_AUTH__CLOCK_LEEWAY=0s",
+		"BOTHY_SYNC__REAUTH_LEAD_TIME="+testkit.PatienceSetting)
 	ctx := context.Background()
 	next := func(t *testing.T, c *wstest.Client) (string, []byte) {
 		t.Helper()
@@ -715,65 +774,70 @@ func TestGatewayTokenExpiry(t *testing.T) {
 		return op, d
 	}
 
-	t.Run("TestClose4011ExpiredWithoutReauth", func(t *testing.T) {
-		p := w.newPerson("alex", identity.DeviceStateActive)
-		c, _ := w.ready(t, w.params(p))
-		op, d := next(t, c)
-		var rr rest.GatewayReauthRequired
-		if op != "reauth_required" || wstest.Strict(d, &rr) != nil || rr.DpopNonce == "" {
-			t.Fatalf("first frame %s %s", op, d)
-		}
-		w.remember(rr.DpopNonce)
-		w.expectClose(t, c, 4011)
-	})
+	t.Run("expiry", func(t *testing.T) {
+		t.Run("TestClose4011ExpiredWithoutReauth", func(t *testing.T) {
+			t.Parallel()
+			p := w.newPerson("alex", identity.DeviceStateActive)
+			c, _ := w.ready(t, w.params(p))
+			op, d := next(t, c)
+			var rr rest.GatewayReauthRequired
+			if op != "reauth_required" || wstest.Strict(d, &rr) != nil || rr.DpopNonce == "" {
+				t.Fatalf("first frame %s %s", op, d)
+			}
+			w.remember(rr.DpopNonce)
+			w.expectClose(t, c, 4011)
+		})
 
-	t.Run("TestReauthKeepsConnection", func(t *testing.T) {
-		p := w.newPerson("sam", identity.DeviceStateActive)
-		c, _ := w.ready(t, w.params(p))
-		op, d := next(t, c)
-		var rr rest.GatewayReauthRequired
-		if op != "reauth_required" || wstest.Strict(d, &rr) != nil {
-			t.Fatalf("first frame %s %s", op, d)
-		}
-		// An invalid proof answers error and keeps the connection.
-		bad := w.proofFor(p.key, p.access, "https://chat.example.com/api/v1/other")(rr.DpopNonce)
-		if err := c.Send("reauth", map[string]any{"access_token": p.access, "dpop": bad}); err != nil {
-			t.Fatal(err)
-		}
-		op, d = next(t, c)
-		var ef rest.GatewayError
-		if op != "error" || wstest.Strict(d, &ef) != nil || ef.Op != "reauth" || ef.Code != "invalid_dpop_proof" {
-			t.Fatalf("after a bad proof: %s %s", op, d)
-		}
-		// A refreshed token of the same session moves the expiry.
-		set, err := w.id.Sessions.Refresh(ctx, p.set.RefreshToken.Reveal(), identity.VerifiedProof{JKT: p.key.Thumbprint, PublicJWK: p.key.JWK, IssuedAt: time.Now()})
-		if err != nil {
-			t.Fatal(err)
-		}
-		fresh := set.AccessToken.Reveal()
-		w.remember(fresh, set.RefreshToken.Reveal())
-		if err := c.Send("reauth", map[string]any{"access_token": fresh, "dpop": w.proofFor(p.key, fresh, gwHTU)(rr.DpopNonce)}); err != nil {
-			t.Fatal(err)
-		}
-		time.Sleep(time.Until(rr.ExpiresAt.Add(time.Second)))
-		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
-			t.Fatalf("closed at the old expiry: %v", err)
-		}
-		op, _ = next(t, c)
-		if op != "reauth_required" {
-			t.Fatalf("after the old expiry: %s, want the next reauth_required", op)
-		}
-		// A token of another auth session of the same device closes with 4004.
-		other, err := w.id.Sessions.StartSession(ctx, identity.StartSession{UserID: p.user, DeviceID: p.device, AuthMethod: identity.AuthPasskey})
-		if err != nil {
-			t.Fatal(err)
-		}
-		tok := other.AccessToken.Reveal()
-		w.remember(tok, other.RefreshToken.Reveal())
-		if err := c.Send("reauth", map[string]any{"access_token": tok, "dpop": w.proofFor(p.key, tok, gwHTU)(rr.DpopNonce)}); err != nil {
-			t.Fatal(err)
-		}
-		w.expectClose(t, c, 4004)
+		t.Run("TestReauthKeepsConnection", func(t *testing.T) {
+			t.Parallel()
+			p := w.newPerson("sam", identity.DeviceStateActive)
+			c, _ := w.ready(t, w.params(p))
+			op, d := next(t, c)
+			var rr rest.GatewayReauthRequired
+			if op != "reauth_required" || wstest.Strict(d, &rr) != nil {
+				t.Fatalf("first frame %s %s", op, d)
+			}
+			// An invalid proof answers error and keeps the connection.
+			bad := w.proofFor(p.key, p.access, "https://chat.example.com/api/v1/other")(rr.DpopNonce)
+			if err := c.Send("reauth", map[string]any{"access_token": p.access, "dpop": bad}); err != nil {
+				t.Fatal(err)
+			}
+			op, d = next(t, c)
+			var ef rest.GatewayError
+			if op != "error" || wstest.Strict(d, &ef) != nil || ef.Op != "reauth" || ef.Code != "invalid_dpop_proof" {
+				t.Fatalf("after a bad proof: %s %s", op, d)
+			}
+			// A refreshed token of the same session moves the expiry.
+			set, err := w.id.Sessions.Refresh(ctx, p.set.RefreshToken.Reveal(), identity.VerifiedProof{JKT: p.key.Thumbprint, PublicJWK: p.key.JWK, IssuedAt: time.Now()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			fresh := set.AccessToken.Reveal()
+			w.remember(fresh, set.RefreshToken.Reveal())
+			if err := c.Send("reauth", map[string]any{"access_token": fresh, "dpop": w.proofFor(p.key, fresh, gwHTU)(rr.DpopNonce)}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(time.Until(rr.ExpiresAt.Add(time.Second)))
+			if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
+				t.Fatalf("closed at the old expiry: %v", err)
+			}
+			op, _ = next(t, c)
+			if op != "reauth_required" {
+				t.Fatalf("after the old expiry: %s, want the next reauth_required", op)
+			}
+			// A token of another auth session of the same device closes with 4004.
+			other, err := w.id.Sessions.StartSession(ctx, identity.StartSession{UserID: p.user, DeviceID: p.device, AuthMethod: identity.AuthPasskey})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tok := other.AccessToken.Reveal()
+			w.remember(tok, other.RefreshToken.Reveal())
+			if err := c.Send("reauth", map[string]any{"access_token": tok, "dpop": w.proofFor(p.key, tok, gwHTU)(rr.DpopNonce)}); err != nil {
+				t.Fatal(err)
+			}
+			w.expectClose(t, c, 4004)
+		})
+
 	})
 
 	t.Run("TestNoSecretsInCloseReasonsAndLogs", func(t *testing.T) {

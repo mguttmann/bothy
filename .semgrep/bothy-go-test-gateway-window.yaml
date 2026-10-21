@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-test-gateway-window
+    languages: [go]
+    severity: ERROR
+    paths:
+      include: ["*_test.go"]
+      # The use cases of the gateway run on an injected clock; testkit defines the patient windows.
+      exclude: ["services/*/internal/gateway/app/*", "services/*/internal/gateway/domain/*", "services/*/internal/platform/testkit/*"]
+    message: >-
+      A gateway test sets a heartbeat, identify or resume window of its own. On a loaded host and
+      under -race any step can take longer than such a window, and the gateway then closes the
+      connection (4009, 4003) or forgets the session in the middle of a test that checks something
+      else. Leave the windows of the test world (testkit.PatientGateway: no deadline before
+      testkit.Patience), or pass testkit.PatientGateway / testkit.HeartbeatMissLimit for another
+      heartbeat interval. A test of the deadline itself sets only that window and carries
+      `// nosemgrep: bothy-go-test-gateway-window -- <reason>`; it lets nothing in its setup race
+      the window, or it moves an injected clock (docs/DECISIONS.md PL/22).
+    pattern-either:
+      # Environment entries of a started process.
+      - pattern-regex: '"BOTHY_SYNC__(HEARTBEAT_INTERVAL|IDENTIFY_TIMEOUT|RESUME_WINDOW)=[^"]*"'
+      # A miss limit below 5 puts the deadline of the default interval (30s) before Patience.
+      - pattern-regex: '"BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=[0-4]"'
+      # The configuration of the gateway use cases with a literal limit or identify timeout.
+      - pattern-regex: '\b(HeartbeatMissLimit|IdentifyTimeout)\s*:\s*\d'

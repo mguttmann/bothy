@@ -22,6 +22,7 @@ package testkit
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -98,5 +99,35 @@ func Integration(t testing.TB) {
 	t.Helper()
 	if testing.Short() {
 		t.Skip("testkit: integration test (needs a container runtime); go test without -short runs it")
+	}
+}
+
+// maxMissLimit is the largest value of sync.heartbeat_miss_limit.
+const maxMissLimit = 100
+
+// HeartbeatMissLimit returns the smallest sync.heartbeat_miss_limit that, with the heartbeat
+// interval interval, puts the heartbeat deadline of the gateway (interval times the limit plus
+// one) at or beyond Patience. It panics when that limit exceeds the largest value of the key
+// (an interval below Patience/100).
+func HeartbeatMissLimit(interval time.Duration) int {
+	n := int((Patience + interval - 1) / interval)
+	if n > maxMissLimit {
+		panic("testkit: heartbeat interval " + interval.String() + " needs a miss limit above 100")
+	}
+	return n
+}
+
+// PatientGateway returns the deadlines of the gateway for a test that does not check them, as
+// configuration keys and values: sync.heartbeat_interval interval, sync.heartbeat_miss_limit
+// HeartbeatMissLimit(interval) and sync.identify_timeout Patience. A loaded host can delay a
+// heartbeat or an identify by an unknown factor, just like any other step; with these windows the
+// gateway does not close the connection (4009, 4003) before the test has waited Patience for what
+// it checks. The interval stays free, so a test still chooses how often a client beats. A test
+// of a deadline sets that one window itself (the Semgrep rule bothy-go-test-gateway-window).
+func PatientGateway(interval time.Duration) map[string]string {
+	return map[string]string{
+		"sync.heartbeat_interval":   strconv.FormatInt(interval.Milliseconds(), 10) + "ms",
+		"sync.heartbeat_miss_limit": strconv.Itoa(HeartbeatMissLimit(interval)),
+		"sync.identify_timeout":     PatienceSetting,
 	}
 }
