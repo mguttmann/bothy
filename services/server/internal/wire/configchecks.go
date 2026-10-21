@@ -68,6 +68,7 @@ var configChecks = []configCheck{
 	{name: "webhook_in_formats", keys: []string{keyWebhookInFormatsEnabled}, fn: webhookInFormats},
 	{name: "heartbeat_persist_below_orphan_timeout", keys: []string{keyHeartbeatPersistInterval, keyOrphanTimeout}, fn: heartbeatPersistBelowOrphanTimeout},
 	{name: "autocomplete_below_request_timeout", keys: []string{keyAutocompleteTimeout, keyHTTPRequestTimeout}, fn: autocompleteBelowRequestTimeout},
+	{name: "push_apns_complete", keys: apnsCheckKeys, fn: pushAPNsComplete},
 }
 
 // keyHeartbeatPersistInterval is agent.heartbeat_persist_interval, how often the heartbeat is
