@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -95,6 +96,13 @@ func (w *instance) step(i int, s Step) []string {
 		return w.check(s)
 	case KindParallel:
 		return w.parallel(i, s)
+	case KindSequence:
+		for j, q := range s.Sequence {
+			if msgs := w.step(i, q); len(msgs) > 0 {
+				return append([]string{fmt.Sprintf("sequence step %d", j)}, msgs...)
+			}
+		}
+		return nil
 	}
 	return []string{"unknown kind " + kind}
 }
@@ -498,6 +506,18 @@ func (w *instance) deviceStep(s Step) []string {
 	return []string{"unknown device op " + s.Do}
 }
 
+// unavailableRetries bounds the repeats of an opening answered 503 (a test constant).
+const unavailableRetries = 5
+
+// retryAfter returns the wait of a Retry-After header in seconds, at least 200 ms, at most 5 s.
+func retryAfter(v string) time.Duration {
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || n <= 0 {
+		return 200 * time.Millisecond
+	}
+	return min(time.Duration(n)*time.Second, 5*time.Second)
+}
+
 // sendOrFail turns a send error into a mismatch.
 func sendOrFail(err error, what string) []string {
 	if err != nil {
@@ -532,6 +552,16 @@ func (w *instance) openOrAttach(c *harness.Client, s Step) []string {
 		path = "/terminal/sessions/" + ses.id + "/attach"
 	}
 	resp := c.Do(w.ctx, harness.Request{Method: http.MethodPost, Path: path, Body: body})
+	// 503 unavailable with Retry-After is the answer to contention (several openings of one host at
+	// once, TestChaosTMT16); its unit of work rolled back, so the device sends it again, as a client
+	// does.
+	for attempt := 0; resp.Status == http.StatusServiceUnavailable && attempt < unavailableRetries; attempt++ {
+		select {
+		case <-w.ctx.Done():
+		case <-time.After(retryAfter(resp.Header.Get("Retry-After"))):
+		}
+		resp = c.Do(w.ctx, harness.Request{Method: http.MethodPost, Path: path, Body: body})
+	}
 	w.mu.Lock()
 	w.statuses[s.Session] = resp.Status
 	w.mu.Unlock()

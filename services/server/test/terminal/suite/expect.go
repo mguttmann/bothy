@@ -219,8 +219,12 @@ type ObservedHost struct {
 	KeyFingerprint string           `json:"key_fingerprint"`
 	Doctor         []ObservedDoctor `json:"doctor"`
 	Reported       []struct {
-		OSUser string `json:"os_user"`
+		OSUser   string   `json:"os_user"`
+		Workdirs []string `json:"workdirs"`
 	} `json:"reported_session_users"`
+	Profiles []struct {
+		Name string `json:"name"`
+	} `json:"profiles"`
 	SessionUsers []struct {
 		UserID string `json:"user_id"`
 		OSUser string `json:"os_user"`
@@ -306,6 +310,33 @@ func CompareHost(exp Expect, obs ObservedHost, people map[string]string) []strin
 		slices.Sort(want)
 		if !slices.Equal(got, want) {
 			out = append(out, fmt.Sprintf("reported_session_users %v, want %v", got, want))
+		}
+	}
+	for _, u := range sortedKeys(exp.Workdirs) {
+		var got []string
+		for _, r := range obs.Reported {
+			if r.OSUser == u {
+				got = append(got, r.Workdirs...)
+			}
+		}
+		if !slices.Equal(got, exp.Workdirs[u]) {
+			out = append(out, fmt.Sprintf("reported workdirs of %s %v, want %v", u, got, exp.Workdirs[u]))
+		}
+	}
+	if exp.Profiles != nil || exp.ProfilesLack != nil {
+		var got []string
+		for _, p := range obs.Profiles {
+			got = append(got, p.Name)
+		}
+		for _, p := range exp.Profiles {
+			if !slices.Contains(got, p) {
+				out = append(out, fmt.Sprintf("profiles %v lack %s", got, p))
+			}
+		}
+		for _, p := range exp.ProfilesLack {
+			if slices.Contains(got, p) {
+				out = append(out, fmt.Sprintf("profiles %v hold %s", got, p))
+			}
 		}
 	}
 	if exp.SessionUsers != nil {

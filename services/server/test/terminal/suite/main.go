@@ -174,3 +174,44 @@ func RunFile(t *testing.T, id string) {
 	}
 	Run(t, env, sc)
 }
+
+// StartEnv starts the stack of profile for one test outside an e2e package (TestChaosTMT16 in
+// test/chaos, whose TestMain belongs to the harness) and removes it in t.Cleanup.
+func StartEnv(t *testing.T, name, profile string) *Env {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), startWait)
+	t.Cleanup(cancel)
+	env, s, err := setup(ctx, name, profile)
+	if s != nil {
+		t.Cleanup(func() {
+			if t.Failed() {
+				s.Diagnose(context.WithoutCancel(ctx), os.Stderr)
+			}
+			if err := s.Down(context.WithoutCancel(ctx)); err != nil {
+				t.Errorf("terminal suite %s: removal: %v", name, err)
+			}
+		})
+	}
+	if err != nil {
+		t.Fatalf("terminal suite %s: %v", name, err)
+	}
+	pkg.env = env
+	return Get(t)
+}
+
+// RunScenario validates sc and runs its cases in env.
+func RunScenario(t *testing.T, env *Env, sc *Scenario) {
+	t.Helper()
+	keys, err := ConfigKeys(env.Repo.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profiles, err := LoadProfiles(env.Repo.ProfilesPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if probs := Validate(sc, Rules{Operations: env.Ops, ConfigKeys: keys, Profiles: profiles}); len(probs) > 0 {
+		t.Fatalf("%s is not valid: %v", sc.ID, probs)
+	}
+	Run(t, env, sc)
+}
