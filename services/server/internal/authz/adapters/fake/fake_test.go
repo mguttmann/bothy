@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -376,5 +377,32 @@ func TestHosts_TerminalFacts(t *testing.T) {
 	}
 	if _, err := h.SessionUsersOf(ctx, alex); err == nil {
 		t.Fatal("Fail(true) does not fail SessionUsersOf")
+	}
+}
+
+// TestTriggerHolders: the fake answers the set holders of a channel once each, ascending, nobody
+// elsewhere, and ErrInjected after Fail.
+func TestTriggerHolders(t *testing.T) {
+	t.Parallel()
+	f := fake.NewTriggerHolders()
+	ch, a, b := ids.New(), ids.New(), ids.New()
+	f.Set(ch, a, b)
+	r := authorize.Resource{Kind: authorize.ResourceChannel, ID: ch}
+	got, err := f.WithTrigger(context.Background(), r, []ids.ID{b, a, b, ids.New()})
+	if err != nil || len(got) != 2 || !slices.IsSortedFunc(got, func(x, y ids.ID) int { return slices.Compare(x[:], y[:]) }) {
+		t.Fatalf("WithTrigger = %v, %v", got, err)
+	}
+	if got, err := f.WithTrigger(context.Background(), authorize.Resource{Kind: authorize.ResourceChannel, ID: ids.New()}, []ids.ID{a}); err != nil || len(got) != 0 {
+		t.Fatalf("other channel = %v, %v", got, err)
+	}
+	if _, err := f.WithTrigger(context.Background(), authorize.Resource{Kind: authorize.ResourceThread, ID: ch}, []ids.ID{a}); err == nil {
+		t.Fatal("a thread resource gave no error")
+	}
+	f.Fail(true)
+	if _, err := f.WithTrigger(context.Background(), r, []ids.ID{a}); !errors.Is(err, fake.ErrInjected) {
+		t.Fatalf("after Fail: %v", err)
+	}
+	if f.Calls() != 4 {
+		t.Fatalf("%d calls", f.Calls())
 	}
 }
