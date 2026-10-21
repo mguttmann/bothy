@@ -807,8 +807,9 @@ Regeln:
    bildet `Authorizer.Scope` je Anfrage aus dem Rechte-Stand und der aktuellen Struktur
    (`StructureSource`): Kanäle mit eigener Freigabe und DM-Kanäle der Teilnahme, alle Kanäle der
    Bereiche in `fully_visible_space_ids`, bei `instance_wide` alle Kanäle außer DM, bei Agenten die
-   nach der Bediener-Regel bedienten. Neue Kanäle und Bereiche erscheinen so ohne neue
-   Rechte-Version. Ein Lint im Repository-Layer lehnt lesende sqlc-Abfragen auf diesen Tabellen
+   nach der Bediener-Regel bedienten. With `view_as` or `acting_for` (SR9) `Scope` intersects the
+   lists with those of that person, as `authorize` intersects the permissions. Neue Kanäle und
+   Bereiche erscheinen so ohne neue Rechte-Version. Ein Lint im Repository-Layer lehnt lesende sqlc-Abfragen auf diesen Tabellen
    ohne dieses Prädikat ab, außer sie stehen auf einer geprüften Ausnahmeliste (Auflösung für
    `authorize`, Laden einer schon geprüften Ressource, Jobs mit Systemrecht wie die Aufbewahrung,
    Log-Tail). The lint is `tools/lint/sql_visibility.py` (gate `sql-visibility`, AZ-P12); the
