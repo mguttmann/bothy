@@ -154,6 +154,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "run.overview.read", Right: "auth", RateLimitClass: "rl.read"},
 	{ID: "run.read", Right: "read", RateLimitClass: "rl.read"},
 	{ID: "run.start", Right: "agent-self und Marke gültig", RateLimitClass: "rl.agent_runtime"},
+	{ID: "run.token.renew", Right: "agent-self und Marke aktuell", RateLimitClass: "rl.agent_runtime"},
 	{ID: "run.update", Right: "agent-self", RateLimitClass: "rl.agent_runtime"},
 	{ID: "search.query", Right: "auth", RateLimitClass: "rl.search"},
 	{ID: "self.profile.update", Right: "self", RateLimitClass: "rl.write"},

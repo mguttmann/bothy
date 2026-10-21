@@ -48,6 +48,7 @@ const (
 	opTerminal
 	opDelivery
 	opHostSelf
+	opToken
 )
 
 // Fact names a fact of the resource descriptor that a conditional capability depends on.
@@ -70,6 +71,8 @@ type Expr struct {
 	// byKey maps a resource kind (ByKind) or a file purpose (ByFilePurpose) to its expression.
 	byKey  map[string]Expr
 	etappe string
+	// verdicts are the allowed token verdicts of Token.
+	verdicts []InvocationVerdict
 }
 
 // The atoms of the brief M1-28, "Requirement table". Each is true as described; the reason when
@@ -238,6 +241,9 @@ func (e Expr) String() string {
 	}
 	if e.op == opDeferred {
 		return "Deferred(" + e.etappe + ")"
+	}
+	if e.op == opToken {
+		return tokenString(e)
 	}
 	if e.op == opAll || e.op == opAny {
 		parts := make([]string, len(e.args))

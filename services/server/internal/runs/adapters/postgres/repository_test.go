@@ -137,8 +137,9 @@ func TestRepository_InsertAndActiveRun(t *testing.T) {
 	want := app.RunRow{
 		ID: n.ID, ThreadID: w.thread, AgentID: w.robin, TriggerKind: "message", TriggeringMessageID: w.msg,
 		TriggeredBy: w.alex, State: domain.StateQueued, Version: 1, BillingModeExpected: "organization",
-		InvocationJTI: n.InvocationJTI, Plan: []byte("{}"), Metrics: []byte("{}"), Currency: "USD", CostIsEstimate: true,
-		QueuedAt: queued.Truncate(time.Microsecond),
+		InvocationJTI: n.InvocationJTI, BillingEvidence: []byte("{}"), Plan: []byte("{}"), Metrics: []byte("{}"), Currency: "USD",
+		CostIsEstimate: true,
+		QueuedAt:       queued.Truncate(time.Microsecond),
 	}
 	if !reflect.DeepEqual(row, want) {
 		t.Errorf("inserted run:\n got %+v\nwant %+v", row, want)

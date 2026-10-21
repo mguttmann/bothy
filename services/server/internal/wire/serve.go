@@ -1659,9 +1659,11 @@ func (s *server) startJobs(ctx context.Context) error {
 		return err
 	}
 	var queuedExpiry runsjobs.Expirer
+	var lifecycle runsjobs.Lifecycle
 	if s.runs != nil {
-		queuedExpiry = s.runs.Service
+		queuedExpiry, lifecycle = s.runs.Service, s.runs.Service
 	}
+	presence := s.values.Duration(keyPresenceTimeout)
 	reg, err := NewJobRegistry(&JobModules{
 		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
 		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
@@ -1672,7 +1674,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		Deliveries:  ap.Webhooks,
 		FilesScan:   files.ScanRunner(),
 		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
-		QueuedExpiry: queuedExpiry,
+		QueuedExpiry: queuedExpiry, RunsLifecycle: lifecycle, StallInterval: presence,
 	})
 	if err != nil {
 		return err

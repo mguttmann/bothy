@@ -220,6 +220,9 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		}
 		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
 	}
+	if req.Contains(domain.Token()) && r.Token != nil {
+		in.Invocation = invocationFacts(r.Token)
+	}
 	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
 		var err error
 		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
@@ -493,6 +496,20 @@ func fileOnPath(r authorize.Resource) bool {
 		return r.File.Purpose == purposeAttachment
 	}
 	return !r.ThreadID.IsZero() || !r.ChannelID.IsZero() || !r.SpaceID.IsZero()
+}
+
+// invocationFacts converts the token facts of run.start and run.token.renew (M2-09).
+func invocationFacts(f *authorize.TokenFacts) *domain.InvocationFacts {
+	return &domain.InvocationFacts{Verdict: invocationVerdicts[f.Verdict], BillingModeUsed: f.BillingModeUsed,
+		BillingModeExpected: f.BillingModeExpected, BillingKeyType: f.BillingKeyType, BillingProvider: f.BillingProvider,
+		BillingMethod: f.BillingMethod, ToolClassUsed: f.ToolClassUsed, ToolClassClaim: f.ToolClassClaim}
+}
+
+// invocationVerdicts converts the verdicts of kernel/authorize; a value outside the map becomes
+// the zero verdict, which Decide refuses as an internal error.
+var invocationVerdicts = map[authorize.TokenVerdict]domain.InvocationVerdict{
+	authorize.TokenValid: domain.InvocationValid, authorize.TokenExpired: domain.InvocationExpired,
+	authorize.TokenSuperseded: domain.InvocationSuperseded, authorize.TokenInvalid: domain.InvocationInvalid,
 }
 
 // fileFacts converts the file facts of a resource; nil stays nil.

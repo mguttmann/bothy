@@ -311,6 +311,8 @@ const (
 	ActionRunRead Action = "run.read"
 	// ActionRunStart is the action run.start.
 	ActionRunStart Action = "run.start"
+	// ActionRunTokenRenew is the action run.token.renew.
+	ActionRunTokenRenew Action = "run.token.renew"
 	// ActionRunUpdate is the action run.update.
 	ActionRunUpdate Action = "run.update"
 	// ActionSearchQuery is the action search.query.
@@ -576,6 +578,7 @@ var actionByID = map[string]Action{
 	"run.overview.read":            ActionRunOverviewRead,
 	"run.read":                     ActionRunRead,
 	"run.start":                    ActionRunStart,
+	"run.token.renew":              ActionRunTokenRenew,
 	"run.update":                   ActionRunUpdate,
 	"search.query":                 ActionSearchQuery,
 	"self.profile.update":          ActionSelfProfileUpdate,
@@ -785,6 +788,7 @@ var actionList = []Action{
 	ActionRunOverviewRead,
 	ActionRunRead,
 	ActionRunStart,
+	ActionRunTokenRenew,
 	ActionRunUpdate,
 	ActionSearchQuery,
 	ActionSelfProfileUpdate,
