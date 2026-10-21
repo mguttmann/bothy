@@ -67,7 +67,7 @@ func TestMessagingMigration_Schema(t *testing.T) {
 		"CHECK (((trigger_state_reason IS NULL) OR (trigger_state = ANY (ARRAY['failed'::text, 'cancelled'::text]))))",
 		"CHECK ((kind = ANY (ARRAY['text'::text, 'voice'::text, 'run'::text, 'card'::text, 'system'::text])))",
 		"CHECK ((origin = ANY (ARRAY['human'::text, 'agent'::text, 'app'::text, 'import'::text, 'system'::text])))",
-		"CHECK ((system_code = 'thread.reopened'::text))",
+		"CHECK ((system_code = ANY (ARRAY['thread.reopened'::text, 'agent_session.resume_failed'::text])))",
 		"CHECK ((trigger_state = ANY (ARRAY['received'::text, 'queued'::text, 'working'::text, 'done'::text, 'failed'::text, 'cancelled'::text, 'followup_delivered'::text])))",
 		"FOREIGN KEY (author_principal_id) REFERENCES principals(id) ON DELETE RESTRICT",
 		"FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE RESTRICT",

@@ -175,6 +175,9 @@ var appPrivileges = map[string][]string{
 	// M2-10).
 	"runs":      {"SELECT", "INSERT", "UPDATE"},
 	"run_steps": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 agent_sessions (M2-12): a session ends with ended_at and end_reason, never with a
+	// delete; the rows are the session history of the thread.
+	"agent_sessions": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).
