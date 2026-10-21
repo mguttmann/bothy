@@ -22,6 +22,8 @@ import 'package:api_client/src/generated/model/heartbeat.dart';
 import 'package:api_client/src/generated/model/heartbeat_ack.dart';
 import 'package:api_client/src/generated/model/interaction.dart';
 import 'package:api_client/src/generated/model/interaction_respond.dart';
+import 'package:api_client/src/generated/model/invocation_token_grant.dart';
+import 'package:api_client/src/generated/model/invocation_token_renew.dart';
 import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/run.dart';
 import 'package:api_client/src/generated/model/run_await_input.dart';
@@ -1013,6 +1015,119 @@ class AgentRuntimeApi {
     );
   }
 
+  /// Get a fresh invocation token for an own waiting run
+  /// For a run in &#x60;queued&#x60; or &#x60;waiting_input&#x60; whose invocation token expired before the start (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its signature, audience, run and &#x60;jti&#x60; are: the &#x60;jti&#x60; equals the current one (&#x60;runs.invocation_jti&#x60;) or the one the last renewal replaced (&#x60;runs.renewed_from_jti&#x60;, retry after a lost answer), and it is not consumed by a start (&#x60;runs.started_jti&#x60; is NULL or differs, SQL &#x60;started_jti IS DISTINCT FROM jti&#x60;). A retry with the replaced token issues a fresh token again; the run still starts at most once. The server repeats every check it runs before a delivery (&#x60;agent.invoke&#x60; for the triggering person with current permissions, I2, SR2, SR3); on failure the run becomes &#x60;failed&#x60; and the answer is 403 &#x60;agent_invocation_denied&#x60;. A replaced or consumed token gets 403 &#x60;invocation_token_invalid&#x60; with &#x60;reason: superseded&#x60;; a run that already started gets 409 &#x60;already_started&#x60;.
+  ///
+  /// Parameters:
+  /// * [runId]
+  /// * [invocationTokenRenew]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [InvocationTokenGrant] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<InvocationTokenGrant>> renewInvocationToken({
+    required String runId,
+    required InvocationTokenRenew invocationTokenRenew,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/runs/{run_id}/invocation-token'.replaceAll(
+      '{'
+      r'run_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        runId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(InvocationTokenRenew);
+      _bodyData = _serializers.serialize(
+        invocationTokenRenew,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    InvocationTokenGrant? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(InvocationTokenGrant),
+            ) as InvocationTokenGrant;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<InvocationTokenGrant>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Report the external session reference and model
   ///
   ///
@@ -1250,7 +1365,7 @@ class AgentRuntimeApi {
   }
 
   /// Resume a run that waited for input
-  /// &#x60;waiting_input -&gt; running&#x60; with the token of the interaction or follow-up delivery.
+  /// &#x60;waiting_input -&gt; running&#x60; with the token of the interaction or follow-up delivery. The consumed start token (its &#x60;jti&#x60; equals &#x60;runs.started_jti&#x60;) gets 403 &#x60;invocation_token_invalid&#x60; with &#x60;reason: superseded&#x60; (09 section 4.5).
   ///
   /// Parameters:
   /// * [runId]
@@ -1459,7 +1574,7 @@ class AgentRuntimeApi {
   }
 
   /// Start a queued run
-  /// Compare-and-swap &#x60;queued -&gt; running&#x60; after checking the invocation token. Repeating the call with the same token after success returns 200 with &#x60;Idempotent-Replay: true&#x60;; any other token gets 409 &#x60;already_started&#x60;. A different &#x60;billing_mode_used&#x60; fails the run with &#x60;billing_mode_mismatch&#x60;.
+  /// Compare-and-swap &#x60;queued -&gt; running&#x60; after checking the invocation token. Repeating the call with the same token after success returns 200 with &#x60;Idempotent-Replay: true&#x60; while the run is &#x60;running&#x60;; any other token gets 409 &#x60;already_started&#x60;. Once the run waits for input, the start token is consumed and gets 403 &#x60;invocation_token_invalid&#x60; with &#x60;reason: superseded&#x60;. A different &#x60;billing_mode_used&#x60; fails the run with &#x60;billing_mode_mismatch&#x60;; a &#x60;tool_class_used&#x60; above the &#x60;tool_class&#x60; of the token fails it with 409 &#x60;tool_class_mismatch&#x60;. A token error gives 403 &#x60;invocation_token_invalid&#x60; with &#x60;reason&#x60; &#x60;expired&#x60; (renew with &#x60;renewInvocationToken&#x60;, then start again), &#x60;superseded&#x60; (a newer delivery replaced it) or &#x60;invalid&#x60; (09 section 4.5).
   ///
   /// Parameters:
   /// * [runId]

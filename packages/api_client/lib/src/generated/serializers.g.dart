@@ -382,6 +382,8 @@ Serializers _$serializers =
           ..add(InteractionResponse.serializer)
           ..add(InteractionStateEnum.serializer)
           ..add(InvariantViolation.serializer)
+          ..add(InvocationTokenGrant.serializer)
+          ..add(InvocationTokenRenew.serializer)
           ..add(JsonPatchOperation.serializer)
           ..add(JsonPatchOperationOpEnum.serializer)
           ..add(Jwks.serializer)

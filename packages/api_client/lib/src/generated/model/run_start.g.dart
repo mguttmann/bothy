@@ -12,6 +12,8 @@ class _$RunStart extends RunStart {
   @override
   final BillingMode billingModeUsed;
   @override
+  final ToolClass toolClassUsed;
+  @override
   final String? externalSessionRef;
   @override
   final String? model;
@@ -24,6 +26,7 @@ class _$RunStart extends RunStart {
   _$RunStart._({
     required this.invocationToken,
     required this.billingModeUsed,
+    required this.toolClassUsed,
     this.externalSessionRef,
     this.model,
     this.billingEvidence,
@@ -41,6 +44,7 @@ class _$RunStart extends RunStart {
     return other is RunStart &&
         invocationToken == other.invocationToken &&
         billingModeUsed == other.billingModeUsed &&
+        toolClassUsed == other.toolClassUsed &&
         externalSessionRef == other.externalSessionRef &&
         model == other.model &&
         billingEvidence == other.billingEvidence;
@@ -51,6 +55,7 @@ class _$RunStart extends RunStart {
     var _$hash = 0;
     _$hash = $jc(_$hash, invocationToken.hashCode);
     _$hash = $jc(_$hash, billingModeUsed.hashCode);
+    _$hash = $jc(_$hash, toolClassUsed.hashCode);
     _$hash = $jc(_$hash, externalSessionRef.hashCode);
     _$hash = $jc(_$hash, model.hashCode);
     _$hash = $jc(_$hash, billingEvidence.hashCode);
@@ -63,6 +68,7 @@ class _$RunStart extends RunStart {
     return (newBuiltValueToStringHelper(r'RunStart')
           ..add('invocationToken', invocationToken)
           ..add('billingModeUsed', billingModeUsed)
+          ..add('toolClassUsed', toolClassUsed)
           ..add('externalSessionRef', externalSessionRef)
           ..add('model', model)
           ..add('billingEvidence', billingEvidence))
@@ -82,6 +88,11 @@ class RunStartBuilder implements Builder<RunStart, RunStartBuilder> {
   BillingMode? get billingModeUsed => _$this._billingModeUsed;
   set billingModeUsed(BillingMode? billingModeUsed) =>
       _$this._billingModeUsed = billingModeUsed;
+
+  ToolClass? _toolClassUsed;
+  ToolClass? get toolClassUsed => _$this._toolClassUsed;
+  set toolClassUsed(ToolClass? toolClassUsed) =>
+      _$this._toolClassUsed = toolClassUsed;
 
   String? _externalSessionRef;
   String? get externalSessionRef => _$this._externalSessionRef;
@@ -107,6 +118,7 @@ class RunStartBuilder implements Builder<RunStart, RunStartBuilder> {
     if ($v != null) {
       _invocationToken = $v.invocationToken;
       _billingModeUsed = $v.billingModeUsed;
+      _toolClassUsed = $v.toolClassUsed;
       _externalSessionRef = $v.externalSessionRef;
       _model = $v.model;
       _billingEvidence = $v.billingEvidence?.toBuilder();
@@ -143,6 +155,11 @@ class RunStartBuilder implements Builder<RunStart, RunStartBuilder> {
               billingModeUsed,
               r'RunStart',
               'billingModeUsed',
+            ),
+            toolClassUsed: BuiltValueNullFieldError.checkNotNull(
+              toolClassUsed,
+              r'RunStart',
+              'toolClassUsed',
             ),
             externalSessionRef: externalSessionRef,
             model: model,

@@ -96,7 +96,9 @@ def sync_detailed(
 ) -> Response[Problem | Run]:
     """Resume a run that waited for input
 
-     `waiting_input -> running` with the token of the interaction or follow-up delivery.
+     `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed
+    start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason:
+    superseded` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -130,7 +132,9 @@ def sync(
 ) -> Problem | Run | None:
     """Resume a run that waited for input
 
-     `waiting_input -> running` with the token of the interaction or follow-up delivery.
+     `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed
+    start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason:
+    superseded` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -159,7 +163,9 @@ async def asyncio_detailed(
 ) -> Response[Problem | Run]:
     """Resume a run that waited for input
 
-     `waiting_input -> running` with the token of the interaction or follow-up delivery.
+     `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed
+    start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason:
+    superseded` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -191,7 +197,9 @@ async def asyncio(
 ) -> Problem | Run | None:
     """Resume a run that waited for input
 
-     `waiting_input -> running` with the token of the interaction or follow-up delivery.
+     `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed
+    start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason:
+    superseded` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
