@@ -7,7 +7,7 @@
 /// revisions, pins, templates, the capabilities of a channel view, main threads, threads from
 /// a message, title, close, reopen, move and mark unread; since M4-22 the files of 12 2 and 3:
 /// upload sessions with parts, completion, the scan result, thumbnails, transcripts and file
-/// tickets.
+/// tickets; since M4-30 notification preferences and the hints of 13 as `notification.created`.
 library;
 
 import 'dart:convert';
@@ -20,6 +20,7 @@ import 'fake_agent.dart';
 import 'fake_host.dart';
 
 part 'world_files.dart';
+part 'world_notify.dart';
 part 'world_thread_view.dart';
 
 /// A JSON object of the API.
@@ -362,13 +363,17 @@ final class FakeChannel {
 /// One event of the log, durable (with `seq`) or ephemeral.
 final class FakeEvent {
   /// Creates the event.
-  const FakeEvent(this.envelope, {this.audience});
+  const FakeEvent(this.envelope, {this.audience, this.devices});
 
   /// The envelope as sent (04 2.2).
   final JsonMap envelope;
 
   /// The only receiver of a personal event.
   final String? audience;
+
+  /// The devices of [audience] an ephemeral event goes to (`notification.created`, 13 4.6),
+  /// or null for every connection that may receive it.
+  final Set<String>? devices;
 
   /// The global `seq`, or null for an ephemeral event.
   int? get seq => envelope['seq'] as int?;
@@ -612,6 +617,104 @@ final class FakeWorld {
 
   /// Listeners of run document patches (the gateway).
   final List<RunPatchHook> runPatchHooks = [];
+
+  // -------------------------------------------------------------------------------------------
+  // Notifications (13; M4-30, world_notify.dart)
+
+  final Map<String, ({String level, DateTime? mutedUntil})> _notificationPrefs =
+      {};
+
+  /// `notify.user_default_level`, the last step of the effective level (13 3.1, 17).
+  String userDefaultLevel = 'mentions';
+
+  /// `notify.default_preview_mode`, the preview mode of a person without the setting
+  /// `notify.preview_mode` (13 6.4).
+  String defaultPreviewMode = 'full';
+
+  /// `notify.preview_max_chars`, the length of `excerpt` in characters (13 6.4).
+  int previewMaxChars = 240;
+
+  /// The people inside quiet hours right now; their hints carry `quiet: true`. The fake has
+  /// no quiet hour rules (13 3.4), this is a switch of the tests.
+  final Set<String> quietHours = {};
+
+  /// Whether [createMessage] calls [notify] for every new message (not for a replay); off so
+  /// tests without hints see no extra frames.
+  bool notifyOnMessages = false;
+
+  /// The devices of a person that have an open, live gateway connection; the gateway sets
+  /// it, without one no device has a route (13 4.6).
+  Set<String> Function(String userId) connectedDevices = _noDevices;
+
+  static Set<String> _noDevices(String userId) => const {};
+
+  /// Every hint [notify] created, in order.
+  final List<FakeNotification> notifications = [];
+
+  /// The recipients [notify] decided against: `level` (the effective level is too low) or
+  /// `no_route` (no active device with a live connection, 13 4.6 item 4).
+  final List<({String userId, String reason})> notificationSkips = [];
+
+  /// Stores the preference of [userId] for the target [targetKind] (`thread`, `channel` or
+  /// `space`) [targetId] at [level] (`all`, `mentions` or `mute`), muted until [mutedUntil]
+  /// when given (13 3.1). A later call replaces it.
+  ///
+  /// The fake has no REST endpoints and no `notification_pref.updated` events for
+  /// preferences (M4-33 adds them); tests set them here. Throws an [ArgumentError] for
+  /// another target kind or level.
+  ///
+  /// Example:
+  /// ```dart
+  /// world.setNotificationPref(sam.id, 'channel', general, 'all');
+  /// ```
+  void setNotificationPref(
+    String userId,
+    String targetKind,
+    String targetId,
+    String level, {
+    DateTime? mutedUntil,
+  }) => _setPref(userId, targetKind, targetId, level, mutedUntil);
+
+  /// Removes the preference of [userId] for [targetKind] [targetId]; nothing happens when
+  /// there is none. No event, as for [setNotificationPref].
+  void deleteNotificationPref(
+    String userId,
+    String targetKind,
+    String targetId,
+  ) => _notificationPrefs.remove('$userId|$targetKind|$targetId');
+
+  /// The effective level (`all`, `mentions` or `mute`) of [userId] for [threadId] (13 3.1):
+  /// the first existing value of the own preference for the thread, the channel and the
+  /// space, the channel's `default_notification_level`, `all` in a DM channel, the setting
+  /// `notify.default_level` and [userDefaultLevel]. A selected preference with `muted_until`
+  /// after [now] gives `mute`.
+  ///
+  /// Example:
+  /// ```dart
+  /// expect(world.effectiveLevel(sam.id, thread), 'mentions');
+  /// ```
+  String effectiveLevel(String userId, String threadId) =>
+      _effectiveLevel(userId, threadId);
+
+  /// Decides the hints of the message [messageId] (13 2) and delivers them (13 4.6, 6.3);
+  /// returns the hints created by this call, which [notifications] also records.
+  ///
+  /// No hint for `silent` messages, `origin` `import` or `system`, or message kind `run` or
+  /// `system`. Candidates are the active people (not agents) who see the channel, never the
+  /// author: `dm` in a DM channel and `mention` for a mentioned person need `mentions` or
+  /// `all`, `message` needs `all`. Each hint goes as the ephemeral `notification.created`
+  /// with the preview of the recipient's `notify.preview_mode` (13 6.4) to the live
+  /// connections of the recipient's active devices ([connectedDevices]); a recipient
+  /// without one gets nothing. Both kinds of refusal land in [notificationSkips].
+  /// Simplified: no runs, no bundling (`count` is 1), no pushes. Throws an
+  /// [ArgumentError] for an unknown message.
+  ///
+  /// Example:
+  /// ```dart
+  /// final message = world.createMessage(alex.id, thread, body).message;
+  /// final hints = world.notify(message['id']! as String);
+  /// ```
+  List<FakeNotification> notify(String messageId) => _notify(messageId);
 
   /// Checks before a message is stored: the first non-null answer is its `trigger_state`
   /// (`received` for a message that triggers an agent, 04 16.5).
@@ -1001,12 +1104,16 @@ final class FakeWorld {
   }
 
   /// Publishes an ephemeral event (no `seq`, never in the log) to the [eventHooks].
+  ///
+  /// [audience] makes it personal; [devices] names the devices of [audience] whose live
+  /// connections get it (the gateway sends an ephemeral event only with both).
   FakeEvent publishEphemeral(
     String type, {
     required JsonMap resource,
     required JsonMap payload,
     JsonMap scope = const {},
     String? audience,
+    Set<String>? devices,
   }) {
     final event = FakeEvent(
       _copy({
@@ -1020,6 +1127,7 @@ final class FakeWorld {
         'payload': payload,
       }),
       audience: audience,
+      devices: devices == null ? null : Set.unmodifiable(devices),
     );
     for (final hook in List.of(eventHooks)) {
       hook(event);
@@ -1163,6 +1271,7 @@ final class FakeWorld {
     for (final hook in List.of(messageHooks)) {
       hook(message, author);
     }
+    if (notifyOnMessages) notify(id);
     if (body['clear_draft'] == true) deleteDraft(authorId, threadId);
     return (message: message, replay: false);
   }

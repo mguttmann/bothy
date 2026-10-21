@@ -3,7 +3,7 @@
 /// The dispatcher (15 7.1, brief M4-14 Design note 2): it applies one durable event inside the
 /// transaction of its page by the duplicate rule (04 9 item 2), the catalogue, the version rule
 /// (04 9 item 3) and the applier of its type, and hands ephemeral events to the
-/// [EphemeralStore] and the run store hook.
+/// [EphemeralStore], the run store hook and the hint hook.
 library;
 
 import 'dart:async';
@@ -26,6 +26,7 @@ import 'ephemeral_store.dart';
 import 'fetcher.dart';
 import 'gap_filler.dart';
 import 'isolate_decode.dart';
+import 'notifications.dart';
 import 'sync_events.dart';
 import 'wire.dart';
 
@@ -82,6 +83,7 @@ final class SyncContext {
     required this.notify,
     required this.onEcho,
     required this.onRunUpdated,
+    required this.onNotification,
     required this.log,
   });
 
@@ -114,6 +116,9 @@ final class SyncContext {
 
   /// The `run.updated` hook of the run store.
   final RunUpdatedHook onRunUpdated;
+
+  /// Receives every well-formed `notification.created` (13 6.3); nothing of it is stored.
+  final void Function(NotificationCreated n) onNotification;
 
   /// One line per notable step, never content.
   final void Function(String line) log;
@@ -275,11 +280,14 @@ final class Dispatcher {
       return ApplyOutcome.skipped;
     }
     final info = EventCatalog.lookup(event.type);
-    if (info == null || event is UnknownEvent) return ApplyOutcome.skipped;
+    if (info == null) return ApplyOutcome.skipped;
+    // The generated event union holds only durable types, so an ephemeral event of the
+    // catalogue decodes as unknown; [applyEphemeral] reads its raw payload.
     if (!info.durable) {
       after.steps.add(() => applyEphemeral(event));
       return ApplyOutcome.applied;
     }
+    if (event is UnknownEvent) return ApplyOutcome.skipped;
     final applier = _appliers[event.type];
     if (applier == null) return ApplyOutcome.skipped;
     final c = ApplyContext(txn: txn, event: event, after: after, sync: sync);
@@ -302,7 +310,8 @@ final class Dispatcher {
 
   /// Applies an ephemeral event at once (04 2.1): typing and presence go to the
   /// [EphemeralStore], `run.updated` raw to the run store hook (also when truncated, Design
-  /// note 2h); other ephemeral types are skipped.
+  /// note 2h), `notification.created` to the hint hook (13 6.3, no local table); other
+  /// ephemeral types are skipped. A malformed payload is logged without its content.
   void applyEphemeral(DecodedEvent e) {
     try {
       final payload = obj(e.raw, 'payload');
@@ -320,6 +329,8 @@ final class Dispatcher {
           );
         case 'run.updated':
           sync.onRunUpdated(payload);
+        case 'notification.created':
+          sync.onNotification(NotificationCreated.fromPayload(payload));
       }
     } on FormatException {
       sync.log('ephemeral event skipped: ${e.type} malformed');

@@ -28,6 +28,7 @@ import 'ephemeral_store.dart';
 import 'fetcher.dart';
 import 'focus_manager.dart';
 import 'frames.dart';
+import 'notifications.dart';
 import 'outbox/executors.dart';
 import 'outbox/operations/message_ops.dart';
 import 'outbox/operations/personal_ops.dart';
@@ -282,6 +283,17 @@ final class SyncEngine {
   /// Notices to the app: removed targets, an overwritten draft, a resync, a sign-out.
   Stream<SyncNotice> get notices => catchUp.notices;
 
+  /// The hints the server sends over the gateway instead of a push (`notification.created`,
+  /// 13 5.3 and 6.3). The server decides who is notified, with which kind and preview
+  /// (R-PN-01); the app only shows them, for example as a desktop notification. Nothing is
+  /// stored; a malformed hint is logged without content and skipped.
+  ///
+  /// Example:
+  /// ```dart
+  /// engine.notifications.listen((n) => tray.show(n.threadTitle, n.excerpt));
+  /// ```
+  Stream<NotificationCreated> get notifications => catchUp.notifications;
+
   /// The typing throttle of the connection.
   TypingThrottle get typing => connection.typing;
 
@@ -321,6 +333,10 @@ final class EngineFocus {
 
   /// The focus the gateway confirmed last (sent and not rejected).
   Set<ThreadId> get current => _manager.current;
+
+  /// The `idle` flag given to [setVisible] last ("open but idle", 13 4.4); false before the
+  /// first call.
+  bool get idle => _idle;
 
   /// Sets the threads on screen; [idle] reports "open but idle" (13 4.4). Returns the threads
   /// that did not fit into `sync.max_focused_threads`. A recorded gap of a visible thread is

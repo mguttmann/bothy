@@ -29,11 +29,13 @@ const Set<String> skippedDurable = {
   'terminal_session.changed',
 };
 
-/// Ephemeral types the dispatcher hands to the ephemeral store or the run store hook.
+/// Ephemeral types the dispatcher hands to the ephemeral store, the run store hook or the
+/// hint hook.
 const Set<String> ephemeralHandled = {
   'typing.started',
   'agent.presence_changed',
   'run.updated',
+  'notification.created',
 };
 
 void main() {
