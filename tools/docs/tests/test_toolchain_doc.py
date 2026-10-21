@@ -74,9 +74,12 @@ def test_go_tools_are_read_from_go_mod() -> None:
 # Code generators pinned inside the SDK components (docs/DECISIONS.md M2-23/2): name to the
 # lock that pins it. Only the generators are read from these locks; the other dev tools of the
 # SDKs share their versions with tools/ (M2-23/10).
+# Generators of the SDKs: their cores and, with typedoc, the TypeScript API reference of
+# `make docs` and the doc gate of `npm run lint` (docs/DECISIONS.md D-M2-30-12).
 SDK_GENERATORS = {
     "openapi-python-client": "sdk/python/uv.lock",
     "openapi-typescript": "sdk/typescript/package-lock.json",
+    "typedoc": "sdk/typescript/package-lock.json",
 }
 SDK_RUNTIME = {"openapi-fetch": "sdk/typescript/package-lock.json"}
 
@@ -104,6 +107,7 @@ def test_sdk_generators_are_pinned_exactly_in_the_manifests() -> None:
     )
     package = json.loads((REPO / "sdk" / "typescript" / "package.json").read_text())
     assert package["devDependencies"]["openapi-typescript"] == pins["openapi-typescript"]
+    assert package["devDependencies"]["typedoc"] == pins["typedoc"]
 
 
 def test_codegen_table_of_chapter_06_names_the_pins() -> None:

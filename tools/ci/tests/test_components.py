@@ -15,11 +15,17 @@ import pytest
 @pytest.mark.parametrize(
     ("files", "expected"),
     [
-        # The real-server tests of the Python SDK build and run the server of this tree
-        # (services/server/test/sdkserver, M2-29), so a server change runs them too.
-        (["services/server/internal/chat/x.go"], ["sdk-python", "server"]),
-        (["services/server/internal/runs/app/patch.go"], ["sdk-python", "server"]),
-        (["services/server/test/sdkserver/sdkserver_test.go"], ["sdk-python", "server"]),
+        # The real-server tests of both SDKs build and run the server of this tree
+        # (services/server/test/sdkserver, M2-29 and M2-30), so a server change runs them too.
+        (["services/server/internal/chat/x.go"], ["sdk-python", "sdk-typescript", "server"]),
+        (
+            ["services/server/internal/runs/app/patch.go"],
+            ["sdk-python", "sdk-typescript", "server"],
+        ),
+        (
+            ["services/server/test/sdkserver/sdkserver_test.go"],
+            ["sdk-python", "sdk-typescript", "server"],
+        ),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"]),
         (["design/tokens/color.json"], ["apps"]),
         # The root files of the Dart workspace and its architecture test run the Dart gates

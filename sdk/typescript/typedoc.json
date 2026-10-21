@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/typedoc/typedoc-config.schema.json",
+  "name": "bothy-sdk",
+  "entryPoints": ["src/index.ts", "src/core.ts", "src/testing/index.ts"],
+  "tsconfig": "tsconfig.build.json",
+  "externalPattern": ["**/node_modules/**", "**/src/generated/**"],
+  "excludeExternals": true,
+  "intentionallyNotExported": [
+    "src/generated/openapi.ts:components",
+    "src/generated/openapi.ts:paths"
+  ],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "readme": "none",
+  "disableSources": true,
+  "hideGenerator": true,
+  "githubPages": false,
+  "plugin": [],
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "invalidPath": true,
+    "rewrittenLink": true,
+    "notDocumented": true,
+    "unusedMergeModuleWith": true
+  },
+  "treatWarningsAsErrors": true,
+  "treatValidationWarningsAsErrors": true,
+  "requiredToBeDocumented": [
+    "Module",
+    "Namespace",
+    "Enum",
+    "EnumMember",
+    "Variable",
+    "Function",
+    "Class",
+    "Constructor",
+    "Interface",
+    "Property",
+    "Method",
+    "Accessor",
+    "TypeAlias"
+  ]
+}

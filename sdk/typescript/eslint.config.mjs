@@ -8,7 +8,16 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["src/generated/", "coverage/", "node_modules/"] },
+  // dist/ and build/ hold the outputs of `npm run build` and `npm run docs` (D-M2-30-2).
+  {
+    ignores: [
+      "src/generated/",
+      "coverage/",
+      "node_modules/",
+      "dist/",
+      "build/",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

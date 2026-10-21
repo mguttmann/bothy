@@ -45,6 +45,9 @@ packages/**/coverage/
 packages/bothy_viz/harness/macos/
 # Coverage output of the SDK test runners (Vitest writes coverage/lcov.info)
 sdk/**/coverage/
+# Build output and typedoc reference of the TypeScript SDK (`npm run build`, `npm run docs`)
+sdk/typescript/dist/
+sdk/typescript/build/
 
 # Editors, operating systems and local agent state
 .DS_Store
