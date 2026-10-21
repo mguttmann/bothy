@@ -29,9 +29,11 @@ const _golden = {
 };
 
 String _previewText(PatrolIntegrationTester $) {
+  // The keyed widget is the Text itself (preview_panel.dart), so the root counts.
   final texts = find.descendant(
     of: byKey('preview.text'),
     matching: find.byType(Text),
+    matchRoot: true,
   );
   return [for (final e in texts.evaluate()) (e.widget as Text).data ?? '']
       .where((t) => t.isNotEmpty)
