@@ -23,7 +23,7 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
        systemd systemd-sysv dbus sudo cron procps acl iproute2 ca-certificates passwd util-linux \
        strace gdb python3-minimal netcat-openbsd \
     && rm -rf /var/lib/apt/lists/* \
-    && systemctl mask getty@tty1.service console-getty.service systemd-firstboot.service systemd-modules-load.service \
+    && systemctl mask getty@tty1 console-getty.service systemd-firstboot.service systemd-modules-load.service \
     && install -d -m 1777 /var/tmp/termsuite-markers \
     && printf 'termsuite: disposable test machine of the terminal suite\n' > /etc/termsuite-disposable
 
