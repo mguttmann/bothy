@@ -121,6 +121,34 @@ Acceptance (M2-08 additions): `Open` schedules `runs.queued_expiry` at `queued_a
 
 Job `runs.queued_expiry` (`adapters/jobs`, queue `default`, args the run only): `ExpireQueued` locks the run; still queued and due, it fails with `agent_unavailable`; queued but not yet due (the key was raised), it schedules itself again; otherwise nothing.
 
+## Command execution (M2-16)
+
+`CommandExec.Invoke` (`commands.go`, `app/command_exec.go`, handler `adapters/httpapi/commands.go`)
+runs `invokeCommand` in one unit of work: `agents.Commands.Resolve` (404 for a command not usable
+in the channel), the target thread (with `thread_id` a thread of the channel; without it the main
+thread of a text channel for a control command and for a model command only without
+`auto_thread`, else `400` `/thread_id` `required`), the thread row lock for a model command
+(`chat.Threads.LockForMessageChange`, the lock order of the acceptance), the active run of the
+thread and `DecideCommand`, then `command.invoke` and `agent.invoke` in request mode (the command
+addresses its owner like a mention; the active-run rule is `command.invoke`'s), the option values
+(`domain.ValidateOptionValues`) and the execution:
+
+- control command: `command.invoked` with audience the owner, receive action
+  `agent.events.consume`, resource `command` without version, `run_id` exactly when the owner has an
+  active run in the thread (R-AZ-25); no run, no anchor, no follow-up;
+- model command: `Open` with `trigger_kind = command` and `triggering_command_id`, then
+  `agent.invocation` with `command_invocation_id`, `command_id`, `command_name` and the options in
+  definition order, without `message_id`.
+
+A refusal maps to `403 agent_invocation_denied` with the reason, `403 channel_read_only` or `404`.
+The invoker is rendered by `messaging.Messages.PrincipalRefs`. At delivery (`app/delivery_command.go`)
+`command.invoked` takes its own path without a run lock and without recording a jti: `agent.invoke`
+for the re-check principal of the invoker on the thread of the payload, a denial sends nothing and
+writes one audit entry with `command_id`, `stage = delivery` and `event_type`; an allow issues a
+token with `trigger_kind = command`, `command_id` and the payload's `run_id` (a control grant may
+lack a run, `InvocationGrant.Control`). `agent.invocation` of a command run has its own resolver
+(the payload's `command_id` as the triggering object) and otherwise follows M2-08.
+
 ## Invocation tokens (M2-06)
 
 `app.InvocationTokens` issues and verifies the invocation tokens of invariant I3 (09 4.5, 05 section 5, ADR 0023). `internal/wire` builds it once per process in the signing keys step (`Runs.BindInvocationTokens`) over `instance.Keys`, the instance row and the configuration keys `agent.invocation_token_ttl` and `auth.clock_leeway`. It stays inside the module: every consumer up to M2-17 is in `runs`; M2-14 adds a port for other modules (D-M2-06-1).
@@ -158,7 +186,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Ereignisse und WebSocket-Ops
 
-- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 also `agent.invocation`; the others come with their tickets.
+- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 also `agent.invocation`, since M2-16 `command.invoked`; the others come with their tickets.
 - Kurzlebig: `run.updated`, `command.autocomplete_requested`.
 - WebSocket-Ops (Client an Server): `run.update`, `command.autocomplete_result`.
 

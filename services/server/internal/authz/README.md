@@ -250,6 +250,32 @@ The delivery job calls it in filter mode, so no denial is written (AZ-P13).
 
 Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
 
+### Slash commands (M2-16)
+
+`kernel/authorize.CommandFacts` on `Resource.Command` describes a command (owner kind, scope,
+`OfferedInChannelID` of a list item) and the invocation facts of `command.invoke`
+(`RequiredLevel`, `Control`, `ActiveRun`); the owner is `Resource.OwnerID`. In request mode a
+resource of kind `command`, and `command.invoke`, without the facts is an internal error; only the
+filter-mode receive check of `command.changed` takes the path from the event scope.
+
+- `command.read` takes the kinds `channel` (`Level(read)`, the list of `listChannelCommands`) and
+  `command` (`Auth`; the visibility decides). The catalogue names only `channel`, so
+  `domain.ActionResourceKinds` adds `command` for this action.
+- Visibility of kind `command` (`domain/commands.go`, `commandVisible`): without an offered channel
+  the owner, an effective owner, or a principal that sees the scope target (`read` on the channel,
+  the space visible, any principal for `instance`); with `OfferedInChannelID` = C `read` on C, C no
+  dm channel, the scope covers C, the owner active and C's effective operator, an agent guest
+  (`allow_mentioned_agents`, its own level at least `write` from its snapshot without session,
+  billing mode `organization`) or an app with level at least `write`. `commandFacts` and
+  `ownerOffer` (`app/commands.go`) gather the owner facts.
+- `command.register` keeps `Any(AgentSelf, AppSelf)`; its guard is the target rule: instance
+  passes, a space must be visible and the principal its default operator or with `write`, a
+  channel must be readable and no dm channel and the principal needs `write` (`not_found`, then
+  `level_insufficient`).
+- `command.invoke` is no longer deferred: `CommandLevel` is `Level(required_level)` of the facts;
+  its guard refuses a model command with `ActiveRun` (`run_active`) and fails closed for an app
+  owner until M2-25. The read-only and archive steps apply as for every write.
+
 ### Files (M3-03)
 
 `file.read` is no longer deferred. Its 05 text stays `read`; the expression chooses by purpose

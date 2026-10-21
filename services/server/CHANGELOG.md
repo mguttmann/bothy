@@ -11,6 +11,17 @@ documented in this file. The format is based on
 
 ### Added
 
+- Slash commands (M2-16): the operations `registerCommand`, `updateCommand`, `removeCommand`,
+  `getCommand` and `listChannelCommands` over the new table `commands` (migrations `00056` and
+  `00057`, with the foreign key of `runs.triggering_command_id`), and `invokeCommand`. Built-in
+  names are refused with `409 conflict` and `reason: command_name_reserved`; a scope only on targets
+  the owner operates or may write; at most `command.max_per_principal` live commands per owner;
+  every change writes one audit entry and one `command.changed`. A control command goes to its owner
+  as `command.invoked`, also during a run, and never creates a run; a model command opens a run with
+  `trigger_kind = command` and `agent.invocation` carries the command, its name and the parsed
+  options, and is refused with `403 agent_invocation_denied` and `reason: run_active` during an
+  active run. Every delivery re-checks `agent.invoke` with a fresh token. The configuration key
+  `command.autocomplete_max_choices` is active (the most static choices of one option).
 - Avatar and logo (M3-10): `setMyAvatar` and `deleteMyAvatar` (`self.profile.update`, people
   only), `uploadBrandingLogo` and `deleteBrandingLogo` (`instance.branding.update`, owner with
   fresh step-up, audited) and the public `getBrandingLogo` (`instance.discovery.read`). The image

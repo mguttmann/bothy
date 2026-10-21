@@ -774,6 +774,10 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
 
 ### Principal writer (M1-51)
 
+`LockPrincipal` (M2-16) locks the `principals` row of an agent or app until the end of the unit
+of work without changing it; the command register serializes the registrations of one owner on it
+(`command.max_per_principal` under concurrency).
+
 - Port (`principals.go`): `PrincipalWriter` with `CreatePrincipal` (`CreatePrincipalCmd`: optional
   id, kind `agent` or `app`, handle and display name with the rules of M1-26, a taken handle is
   `409 conflict` on `/handle` without regard to case, also against people), `SetPrincipalStatus`

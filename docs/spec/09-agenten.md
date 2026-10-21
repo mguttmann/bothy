@@ -326,10 +326,10 @@ or acknowledges a `seq` that process cannot yet deliver.
 
 | Ereignis | Wann | Nutzlast (Schema `<typ>.v1`, Auszug) | Marke |
 |---|---|---|---|
-| `agent.invocation` | neuer Lauf | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, Auslöser), `session` (4.9; fehlt beim Gast-Lauf), `capabilities_effective` | ja |
+| `agent.invocation` | neuer Lauf | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, Auslöser), `session` (4.9; fehlt beim Gast-Lauf), `capabilities_effective`; for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | ja |
 | `agent.followup` | Nachtrag (Abschnitt 7) | `run_id`, `message_id`, Auslöser | ja |
 | `interaction.created` | Komponente bedient | `interaction_id`, `component` (`custom_id`, Typ), `values`, `run_id`, Bediener | ja |
-| `command.invoked` | Steuerbefehl ausgeführt (10.4) | `command_id`, `name`, `options`, Ort, Auslöser | ja |
+| `command.invoked` | Steuerbefehl ausgeführt (10.4) | `command_id`, `name`, `options`, Ort, Auslöser; `run_id` exactly when the owner has an active run in the thread at execution time, then that run, never the run of another agent (R-AZ-25) | ja |
 | `run.cancel_requested` | Abbruch (Abschnitt 8) | `run_id`, `reason` | nein |
 | `agent.config_changed` | Prompt, Skills, Projektbindung geändert | `channel_id`, `settings_version` | nein |
 
@@ -1038,12 +1038,51 @@ Server legt an, ändert und entfernt; jede Änderung ist ein `command.register` 
 - Geltungsbereich nur auf Zielen, die der Agent bedient oder auf denen er `write` hat.
 - Höchstens `command.max_per_principal` Befehle je Agent oder App.
 
+Rules of the register (M2-16, docs/DECISIONS.md D-M2-16):
+
+- Target rule of `command.register`: `instance` needs nothing further; a space must be visible to
+  the owner (else `404`) and the owner its default operator or with effective `write` on it (else
+  `403 forbidden`, `level_insufficient`); a channel must exist, not be a dm channel and be readable
+  (else `404`), and the owner needs effective `write` on it, the operator rule included (else
+  `403`). On an update the rule checks the new scope only.
+- `command.max_per_principal` counts the live commands of the owner; registrations of one owner
+  serialize on its `principals` row. Beyond the limit: `400 validation_failed` with pointer empty
+  and code `limit_reached`. Removed commands do not count.
+- A built-in name of 10.1 answers `409 conflict` with `reason: command_name_reserved`, also on an
+  update; a name the owner already uses on the same scope target answers `409 conflict` without a
+  reason. The unique index treats the empty scope target of `instance` as equal
+  (`NULLS NOT DISTINCT`).
+- Definition: `description` is a plain string with at least one character that is not white
+  space, without control and bidi characters (SEC-IN-4), at most `command.description_max_chars`
+  characters; the translation map is not built. `scope_kind` is `instance`, `space` or `channel`;
+  `scope_id` is absent for `instance` and required otherwise. Defaults: `instance`, no options,
+  `trigger`, no control command. Options (`command_options.v1`, the array of `CommandOption`):
+  names after the command name pattern and unique; descriptions after the description rule;
+  `choices` and `autocomplete` only for `string`, `integer` and `choice`; a `choice` option needs
+  choices or `autocomplete`; at most `command.autocomplete_max_choices` static choices, each
+  value valid for the type and unique. The `command.changed` of the definition must fit
+  `sync.event_payload_max_bytes` (else `400`, pointer empty, `too_large`).
+- An update with the stored definition changes nothing (no event, no audit entry); removing a
+  removed command answers `204` without a write. The audit details name the change, the scope,
+  `control`, `required_level` and the version, never name, description or options.
+
 ### 10.3 Sichtbarkeit und Namenskonflikte
 
 `command.read` liefert für einen Thread: eingebaute Befehle, Befehle des Bedieners, Befehle von
 Gast-Agenten (nur wenn `allow_mentioned_agents`) und Befehle von Apps mit `write` auf dem Kanal.
 Bei gleichem Namen stehen die des Bedieners zuerst; andere werden mit dem Handle qualifiziert
 (`/handle:name`, 03).
+
+`listChannelCommands` (M2-16, docs/DECISIONS.md D-M2-16): the built-in commands are not part of the
+answer; the client shows the fixed list of 10.1 to everyone with `command.read`, and each built-in
+runs through its own operation. The answer lists the registered commands whose scope covers the
+channel and whose owner is active and offered there: the channel's effective operator, a guest
+agent only with `allow_mentioned_agents`, its own effective level at least `write` and billing
+mode `organization`, an app with effective `write`. Per owner and name only the most specific
+scope appears (`channel` before `space` before `instance`). Order: the commands of the effective
+operator first, then the others, each group by lower-case name, owner and ID. A dm channel lists
+nothing. The list has no thread parameter; in a thread with a fixed operator other than the
+channel's, the invocation follows the thread's operator through `agent.invoke`.
 
 ### 10.4 Ausführung
 
@@ -1058,6 +1097,41 @@ noch Interaktion; ohne die Spur könnten Box und Statistik seine Herkunft nicht 
 
 Befehle von Apps prüfen `required_level` und Scope; `agent.invoke` und I2 entfallen, weil keine
 Agenten-Laufzeit beteiligt ist (05 `command.invoke`, R-AZ-18).
+
+Execution of `invokeCommand` (M2-16, docs/DECISIONS.md D-M2-16), in this order:
+
+1. The command must be live and usable in the channel (its scope covers the channel, no more
+   specific command of the same owner and name shadows it); otherwise `404`, the same as an
+   unknown ID.
+2. Target thread: `thread_id` must name a thread of the channel (else `404`). Without `thread_id`:
+   in a text channel the main thread for a control command, and for a model command only when
+   `auto_thread` is false; otherwise, and in a forum channel, `400 validation_failed` with
+   `/thread_id` `required` (after a visibility check of the channel, so an invisible channel answers
+   `404`). A command has no message from which the `auto_thread` thread could start.
+3. A model command locks the thread row before it reads the active run (the lock order of the
+   message acceptance).
+4. `command.invoke` (`required_level`, `run_active` for a model command during an active run of any
+   agent, read-only and archived channels), then `agent.invoke` with the command as an explicit
+   address (like a mention: the operator's commands work regardless of `require_mention`, a guest's
+   only under the guest rule) and without the active-run rule, which `command.invoke` applied, so a
+   control command reaches its owner during the run of any agent. `not_found` gives `404`, a
+   read-only or archived channel `403 channel_read_only`, every other refusal `403
+   agent_invocation_denied` with the decision's reason.
+5. The option values: required options present, no unknown option or option twice, `string` a
+   display text, `integer` the canonical decimal form of a signed 64-bit integer, `boolean` `true`
+   or `false`, `choice` a static value unless `autocomplete` (then any display text), `user` a
+   UUID in canonical form (existence not checked), `file` `not_enabled` until files arrive; the
+   event must fit `sync.event_payload_max_bytes` (`/options` `too_large`).
+6. A control command appends `command.invoked`; its `run_id` is the owner's active run in the
+   thread, absent otherwise (R-AZ-25). A model command opens the run `queued` with
+   `trigger_kind = 'command'` and appends `agent.invocation`.
+
+The answer `202` carries a new `invocation_id` per accepted invocation (not stored; it appears as
+`invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`) and
+`accepted: true`; a refusal is an error response. Every delivery re-checks `agent.invoke` for the
+invoking person with the rights of that moment and carries a fresh token with
+`trigger_kind = command` and `command_id`; a refused `command.invoked` is not sent and changes no
+run.
 
 ### 10.5 Autovervollständigung
 
