@@ -118,10 +118,10 @@ authenticator):
    later step-up uses the passkey; a request answered with `401 step_up_required` gets one passkey
    step-up and is repeated once with the same `Idempotency-Key`;
 3. the seed through the API as Alex: the spaces Support (channels general, requests), Marketing
-   (Campaigns, Internal) and Engineering (builds); the person Sam with an enrollment code; the group
+   (Kampagnen, Intern: the names of the golden example of 07 9.3) and Engineering (builds); the person Sam with an enrollment code; the group
    Support Team with Sam; a grant of level write for Sam on Support; the agent Support Agent
    (operator of Support, credential holder Alex, billing mode personal) and the agent Texter
-   (billing mode organization, operator of Marketing/Campaigns and Marketing/Internal);
+   (billing mode organization, operator of Marketing/Kampagnen and Marketing/Intern);
 4. Sam's waiting device: two devices of Sam call the API without the cookie, with DPoP proofs
    signed by WebCrypto keys of the page that are not extractable. The first redeems the enrollment
    code, sets a random password and enrolls TOTP; the second logs in with password and TOTP as an

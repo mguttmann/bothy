@@ -595,7 +595,7 @@ def seed(page: Page, admin: ConsoleAdmin) -> dict[str, Any]:
         "support": ("Support", {"supportGeneral": "general", "supportRequests": "requests"}),
         "marketing": (
             "Marketing",
-            {"marketingCampaigns": "Campaigns", "marketingInternal": "Internal"},
+            {"marketingCampaigns": "Kampagnen", "marketingInternal": "Intern"},
         ),
         "engineering": ("Engineering", {"engineeringBuilds": "builds"}),
     }
