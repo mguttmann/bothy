@@ -315,9 +315,12 @@ INITIALISE_JS = """() => {
   return true;
 }"""
 
-# One patrol test, bounded so a hanging test fails with its name instead of blocking the run.
+# One patrol test, bounded so a hanging test fails with its name instead of blocking the run; a
+# rejected run (a Dart exception, for example after an earlier test left the app broken) is a
+# failure of this test, so the later tests still run and report.
 RUN_TEST_JS = """async ([name, ms]) => Promise.race([
-  window.__patrol__runTest(name),
+  window.__patrol__runTest(name).catch((e) => ({result: 'failure',
+    details: 'runTest rejected: ' + String((e && e.error) || e)})),
   new Promise((resolve) => setTimeout(
     () => resolve({result: 'failure', details: 'timeout after ' + ms + ' ms'}), ms)),
 ])"""
