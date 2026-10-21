@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Self, TypeVar
 from attrs import define as _attrs_define
 
 from ..models.billing_mode import BillingMode
+from ..models.tool_class import ToolClass
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -22,6 +23,7 @@ class RunStart:
         invocation_token (str): JWS from the delivered invocation (I3).
         billing_mode_used (BillingMode): Backend policy of an agent. `personal` runs on the subscription of exactly one
             person.
+        tool_class_used (ToolClass): Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
         external_session_ref (str | Unset): Absent when the runtime creates the reference only during the run; then the
             first `reportAgentSession` creates the session row.
         model (str | Unset):
@@ -31,6 +33,7 @@ class RunStart:
 
     invocation_token: str
     billing_mode_used: BillingMode
+    tool_class_used: ToolClass
     external_session_ref: str | Unset = UNSET
     model: str | Unset = UNSET
     billing_evidence: BillingEvidence | Unset = UNSET
@@ -39,6 +42,8 @@ class RunStart:
         invocation_token = self.invocation_token
 
         billing_mode_used = self.billing_mode_used.value
+
+        tool_class_used = self.tool_class_used.value
 
         external_session_ref = self.external_session_ref
 
@@ -54,6 +59,7 @@ class RunStart:
             {
                 "invocation_token": invocation_token,
                 "billing_mode_used": billing_mode_used,
+                "tool_class_used": tool_class_used,
             }
         )
         if external_session_ref is not UNSET:
@@ -74,6 +80,8 @@ class RunStart:
 
         billing_mode_used = BillingMode(d.pop("billing_mode_used"))
 
+        tool_class_used = ToolClass(d.pop("tool_class_used"))
+
         external_session_ref = d.pop("external_session_ref", UNSET)
 
         model = d.pop("model", UNSET)
@@ -88,6 +96,7 @@ class RunStart:
         run_start = cls(
             invocation_token=invocation_token,
             billing_mode_used=billing_mode_used,
+            tool_class_used=tool_class_used,
             external_session_ref=external_session_ref,
             model=model,
             billing_evidence=billing_evidence,

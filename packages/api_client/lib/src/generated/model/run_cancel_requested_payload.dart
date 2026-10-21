@@ -30,7 +30,7 @@ abstract class RunCancelRequestedPayload
 
   @BuiltValueField(wireName: r'reason')
   RunCancelRequestedPayloadReasonEnum get reason;
-  // enum reasonEnum {  user_cancelled,  access_revoked,  agent_disabled,  user_disabled,  };
+  // enum reasonEnum {  user_cancelled,  access_revoked,  agent_disabled,  user_disabled,  channel_read_only,  };
 
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'requested_by')
@@ -186,6 +186,9 @@ class RunCancelRequestedPayloadReasonEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'user_disabled')
   static const RunCancelRequestedPayloadReasonEnum userDisabled =
       _$runCancelRequestedPayloadReasonEnum_userDisabled;
+  @BuiltValueEnumConst(wireName: r'channel_read_only')
+  static const RunCancelRequestedPayloadReasonEnum channelReadOnly =
+      _$runCancelRequestedPayloadReasonEnum_channelReadOnly;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const RunCancelRequestedPayloadReasonEnum unknownDefaultOpenApi =
       _$runCancelRequestedPayloadReasonEnum_unknownDefaultOpenApi;
