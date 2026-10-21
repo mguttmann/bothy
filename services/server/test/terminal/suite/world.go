@@ -487,20 +487,37 @@ func (w *instance) waitHostReady(h *hostInst) error {
 			State     string `json:"state"`
 			Connected bool   `json:"connected"`
 			Reported  []struct {
-				OSUser string `json:"os_user"`
+				OSUser   string   `json:"os_user"`
+				Workdirs []string `json:"workdirs"`
 			} `json:"reported_session_users"`
 			NoiseKey string `json:"noise_public_key"`
+			Profiles []struct {
+				Name string `json:"name"`
+			} `json:"profiles"`
+			Doctor []ObservedDoctor `json:"doctor"`
 		}
 		if resp.Status == http.StatusOK && json.Unmarshal(resp.Body, &host) == nil {
+			offered := map[string]bool{}
+			for _, p := range host.Profiles {
+				offered[p.Name] = true
+			}
 			reported := map[string]bool{}
+			dirs := map[string]int{}
 			for _, r := range host.Reported {
 				reported[r.OSUser] = true
+				dirs[r.OSUser] = len(r.Workdirs)
 			}
 			ok := host.State == "active" && host.Connected
 			for _, u := range h.spec.Assign {
 				ok = ok && reported[u]
+				// The working directories and the profile claude follow with the first report after
+				// pairing; a session user with configured ones is ready once both are reported.
+				if configuredWorkdirs(h.spec, u) {
+					ok = ok && dirs[u] > 0 && offered["claude"]
+				}
 			}
-			last = fmt.Sprintf("state %s, connected %v, %d reported", host.State, host.Connected, len(host.Reported))
+			last = fmt.Sprintf("state %s, connected %v, %d reported, workdirs %v, claude offered %v, doctor %s", host.State, host.Connected,
+				len(host.Reported), dirs, offered["claude"], doctorSummary(host.Doctor))
 			if ok {
 				key, err := b64url(host.NoiseKey)
 				if err != nil {
@@ -519,6 +536,17 @@ func (w *instance) waitHostReady(h *hostInst) error {
 		}
 	}
 	return fmt.Errorf("the host did not become ready within %s (%s)", hostReadyWait, last)
+}
+
+// configuredWorkdirs reports whether the host's configuration lists working directories of the
+// profile claude for the session user u.
+func configuredWorkdirs(spec HostSpec, u string) bool {
+	m, ok := spec.Config["host_service.claude_workdirs"].(map[string]any)
+	if !ok {
+		return false
+	}
+	l, ok := m[u].([]any)
+	return ok && len(l) > 0
 }
 
 // hostConfig renders /etc/bothy-host/config.yaml: the session users, the host-service keys of the

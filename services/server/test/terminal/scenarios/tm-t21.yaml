@@ -1,0 +1,614 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T21 of 24 14 (standstill through HD6, T-TM-14) with real host services: the seven parts in one
+# case each, every case starting from a fresh world and running the parts before it, so each part
+# builds on the state before (brief M2-48 Design note 9). "Instance operator" steps run as root in
+# the host container, steps of a person in her shell session; "the console shows" is the server
+# data the console reads (Host.doctor with session_user, the assignment in Host.session_users). A
+# subscription login is the credential file the Fake-claude writes with login (24 7.4), found by
+# HD6 within host_service.credential_check_interval through host_service.claude_bin.
+id: tm-t21
+title: Standstill through HD6 (T-TM-14)
+sources: ["24 14 TM-T21", "24 2.2", "24 7.4", "24 10.3", "24 13", "R-TM-27"]
+profile: default
+world:
+  people: [alex, sam, robin]
+  owners: [sam, robin]
+  hosts:
+    - name: r1
+      assigned_to: alex
+      llm_credentials: organization
+      session_users: [term-alex, term-sam, term-robin]
+      assign: {alex: term-alex, sam: term-sam}
+      config: {host_service.claude_bin: /opt/termsuite/bin/claude}
+  grants:
+    - {subject: alex, host: r1}
+cases:
+  - name: a
+    steps:
+      # (a) in a shell session on a host with organization the first person logs in with a
+      # subscription; then the second person opens
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a2, expect: {status: 201}}
+      - {device: sam, do: connect, session: a2, expect: {}}
+      - {device: sam, do: handshake, session: a2, expect: {}}
+      - {device: sam, do: start, session: a2}
+      - {device: sam, do: send, session: a2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: a2, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "PATH=/opt/termsuite/bin:$PATH claude login\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "Login successful"}}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: a2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: audit
+        expect: {resource: a1, action: terminal.terminate, details: {close_reason: host_policy_violation}}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a3, expect: {status: 201}}
+      - {device: sam, do: connect, session: a3, expect: {}}
+      - {device: sam, do: handshake, session: a3, expect: {}}
+      - {device: sam, do: start, session: a3}
+      - check: session
+        session: a3
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+  - name: b
+    steps:
+      # (a) in a shell session on a host with organization the first person logs in with a
+      # subscription; then the second person opens
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a2, expect: {status: 201}}
+      - {device: sam, do: connect, session: a2, expect: {}}
+      - {device: sam, do: handshake, session: a2, expect: {}}
+      - {device: sam, do: start, session: a2}
+      - {device: sam, do: send, session: a2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: a2, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "PATH=/opt/termsuite/bin:$PATH claude login\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "Login successful"}}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: a2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: audit
+        expect: {resource: a1, action: terminal.terminate, details: {close_reason: host_policy_violation}}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a3, expect: {status: 201}}
+      - {device: sam, do: connect, session: a3, expect: {}}
+      - {device: sam, do: handshake, session: a3, expect: {}}
+      - {device: sam, do: start, session: a3}
+      - check: session
+        session: a3
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (b) the second person also logs in with a subscription in their account
+      - {host: r1, do: exec_as, user: term-sam, run: [bash, -c, "PATH=/opt/termsuite/bin:$PATH claude login"]}
+      - check: host
+        host: r1
+        expect:
+          doctor:
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-sam}
+  - name: c
+    steps:
+      # (a) in a shell session on a host with organization the first person logs in with a
+      # subscription; then the second person opens
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a2, expect: {status: 201}}
+      - {device: sam, do: connect, session: a2, expect: {}}
+      - {device: sam, do: handshake, session: a2, expect: {}}
+      - {device: sam, do: start, session: a2}
+      - {device: sam, do: send, session: a2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: a2, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "PATH=/opt/termsuite/bin:$PATH claude login\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "Login successful"}}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: a2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: audit
+        expect: {resource: a1, action: terminal.terminate, details: {close_reason: host_policy_violation}}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a3, expect: {status: 201}}
+      - {device: sam, do: connect, session: a3, expect: {}}
+      - {device: sam, do: handshake, session: a3, expect: {}}
+      - {device: sam, do: start, session: a3}
+      - check: session
+        session: a3
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (b) the second person also logs in with a subscription in their account
+      - {host: r1, do: exec_as, user: term-sam, run: [bash, -c, "PATH=/opt/termsuite/bin:$PATH claude login"]}
+      - check: host
+        host: r1
+        expect:
+          doctor:
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-sam}
+      # (c) the instance operator removes the login of the second person, locks the session user of
+      # the first only on the host, then the owner ends their assignment
+      - {host: r1, do: exec, script: "rm -f /home/term-sam/.claude/fake-auth /home/term-sam/.claude/.credentials.json && usermod -L term-alex"}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {revoke_session_users: ["${alex.id}"], reason: terminal suite}
+        expect: {status: 200}
+      - check: host
+        host: r1
+        expect:
+          doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]
+          doctor_lacks: [{check: hd6_llm_login, ok: false, session_user: term-sam}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: c1, expect: {status: 201}}
+      - {device: sam, do: connect, session: c1, expect: {}}
+      - {device: sam, do: handshake, session: c1, expect: {}}
+      - {device: sam, do: start, session: c1}
+      - check: session
+        session: c1
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+  - name: d
+    steps:
+      # (a) in a shell session on a host with organization the first person logs in with a
+      # subscription; then the second person opens
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a2, expect: {status: 201}}
+      - {device: sam, do: connect, session: a2, expect: {}}
+      - {device: sam, do: handshake, session: a2, expect: {}}
+      - {device: sam, do: start, session: a2}
+      - {device: sam, do: send, session: a2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: a2, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "PATH=/opt/termsuite/bin:$PATH claude login\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "Login successful"}}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: a2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: audit
+        expect: {resource: a1, action: terminal.terminate, details: {close_reason: host_policy_violation}}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a3, expect: {status: 201}}
+      - {device: sam, do: connect, session: a3, expect: {}}
+      - {device: sam, do: handshake, session: a3, expect: {}}
+      - {device: sam, do: start, session: a3}
+      - check: session
+        session: a3
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (b) the second person also logs in with a subscription in their account
+      - {host: r1, do: exec_as, user: term-sam, run: [bash, -c, "PATH=/opt/termsuite/bin:$PATH claude login"]}
+      - check: host
+        host: r1
+        expect:
+          doctor:
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-sam}
+      # (c) the instance operator removes the login of the second person, locks the session user of
+      # the first only on the host, then the owner ends their assignment
+      - {host: r1, do: exec, script: "rm -f /home/term-sam/.claude/fake-auth /home/term-sam/.claude/.credentials.json && usermod -L term-alex"}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {revoke_session_users: ["${alex.id}"], reason: terminal suite}
+        expect: {status: 200}
+      - check: host
+        host: r1
+        expect:
+          doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]
+          doctor_lacks: [{check: hd6_llm_login, ok: false, session_user: term-sam}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: c1, expect: {status: 201}}
+      - {device: sam, do: connect, session: c1, expect: {}}
+      - {device: sam, do: handshake, session: c1, expect: {}}
+      - {device: sam, do: start, session: c1}
+      - check: session
+        session: c1
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (d) the instance operator takes this session user out with bothy-host session-user remove,
+      # whose home is readable by all
+      - {host: r1, do: exec, run: [chmod, "0755", /home/term-alex]}
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex], expect: {exit: 0}}
+      - {host: r1, do: exec, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["700"]}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          reported_session_users: [term-robin, term-sam]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}, {check: hd6_llm_login, ok: false}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: d1, expect: {status: 201}}
+      - {device: sam, do: connect, session: d1, expect: {}}
+      - {device: sam, do: handshake, session: d1, expect: {}}
+      - {device: sam, do: start, session: d1}
+      - {device: sam, do: send, session: d1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: d1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: d2, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+  - name: e
+    steps:
+      # (a) in a shell session on a host with organization the first person logs in with a
+      # subscription; then the second person opens
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a2, expect: {status: 201}}
+      - {device: sam, do: connect, session: a2, expect: {}}
+      - {device: sam, do: handshake, session: a2, expect: {}}
+      - {device: sam, do: start, session: a2}
+      - {device: sam, do: send, session: a2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: a2, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "PATH=/opt/termsuite/bin:$PATH claude login\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "Login successful"}}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: a2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: audit
+        expect: {resource: a1, action: terminal.terminate, details: {close_reason: host_policy_violation}}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a3, expect: {status: 201}}
+      - {device: sam, do: connect, session: a3, expect: {}}
+      - {device: sam, do: handshake, session: a3, expect: {}}
+      - {device: sam, do: start, session: a3}
+      - check: session
+        session: a3
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (b) the second person also logs in with a subscription in their account
+      - {host: r1, do: exec_as, user: term-sam, run: [bash, -c, "PATH=/opt/termsuite/bin:$PATH claude login"]}
+      - check: host
+        host: r1
+        expect:
+          doctor:
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-sam}
+      # (c) the instance operator removes the login of the second person, locks the session user of
+      # the first only on the host, then the owner ends their assignment
+      - {host: r1, do: exec, script: "rm -f /home/term-sam/.claude/fake-auth /home/term-sam/.claude/.credentials.json && usermod -L term-alex"}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {revoke_session_users: ["${alex.id}"], reason: terminal suite}
+        expect: {status: 200}
+      - check: host
+        host: r1
+        expect:
+          doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]
+          doctor_lacks: [{check: hd6_llm_login, ok: false, session_user: term-sam}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: c1, expect: {status: 201}}
+      - {device: sam, do: connect, session: c1, expect: {}}
+      - {device: sam, do: handshake, session: c1, expect: {}}
+      - {device: sam, do: start, session: c1}
+      - check: session
+        session: c1
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (d) the instance operator takes this session user out with bothy-host session-user remove,
+      # whose home is readable by all
+      - {host: r1, do: exec, run: [chmod, "0755", /home/term-alex]}
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex], expect: {exit: 0}}
+      - {host: r1, do: exec, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["700"]}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          reported_session_users: [term-robin, term-sam]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}, {check: hd6_llm_login, ok: false}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: d1, expect: {status: 201}}
+      - {device: sam, do: connect, session: d1, expect: {}}
+      - {device: sam, do: handshake, session: d1, expect: {}}
+      - {device: sam, do: start, session: d1}
+      - {device: sam, do: send, session: d1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: d1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: d2, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+      # (e) bothy-host session-user add with the removed name
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, add, term-alex], expect: {exit: 1, stderr_contains: ["is bound to a person on this host"]}}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-robin, term-sam]}
+  - name: f
+    steps:
+      # (a) in a shell session on a host with organization the first person logs in with a
+      # subscription; then the second person opens
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a2, expect: {status: 201}}
+      - {device: sam, do: connect, session: a2, expect: {}}
+      - {device: sam, do: handshake, session: a2, expect: {}}
+      - {device: sam, do: start, session: a2}
+      - {device: sam, do: send, session: a2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: a2, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "PATH=/opt/termsuite/bin:$PATH claude login\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "Login successful"}}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: a2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: audit
+        expect: {resource: a1, action: terminal.terminate, details: {close_reason: host_policy_violation}}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a3, expect: {status: 201}}
+      - {device: sam, do: connect, session: a3, expect: {}}
+      - {device: sam, do: handshake, session: a3, expect: {}}
+      - {device: sam, do: start, session: a3}
+      - check: session
+        session: a3
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (b) the second person also logs in with a subscription in their account
+      - {host: r1, do: exec_as, user: term-sam, run: [bash, -c, "PATH=/opt/termsuite/bin:$PATH claude login"]}
+      - check: host
+        host: r1
+        expect:
+          doctor:
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-sam}
+      # (c) the instance operator removes the login of the second person, locks the session user of
+      # the first only on the host, then the owner ends their assignment
+      - {host: r1, do: exec, script: "rm -f /home/term-sam/.claude/fake-auth /home/term-sam/.claude/.credentials.json && usermod -L term-alex"}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {revoke_session_users: ["${alex.id}"], reason: terminal suite}
+        expect: {status: 200}
+      - check: host
+        host: r1
+        expect:
+          doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]
+          doctor_lacks: [{check: hd6_llm_login, ok: false, session_user: term-sam}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: c1, expect: {status: 201}}
+      - {device: sam, do: connect, session: c1, expect: {}}
+      - {device: sam, do: handshake, session: c1, expect: {}}
+      - {device: sam, do: start, session: c1}
+      - check: session
+        session: c1
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (d) the instance operator takes this session user out with bothy-host session-user remove,
+      # whose home is readable by all
+      - {host: r1, do: exec, run: [chmod, "0755", /home/term-alex]}
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex], expect: {exit: 0}}
+      - {host: r1, do: exec, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["700"]}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          reported_session_users: [term-robin, term-sam]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}, {check: hd6_llm_login, ok: false}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: d1, expect: {status: 201}}
+      - {device: sam, do: connect, session: d1, expect: {}}
+      - {device: sam, do: handshake, session: d1, expect: {}}
+      - {device: sam, do: start, session: d1}
+      - {device: sam, do: send, session: d1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: d1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: d2, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+      # (e) bothy-host session-user add with the removed name
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, add, term-alex], expect: {exit: 1, stderr_contains: ["is bound to a person on this host"]}}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-robin, term-sam]}
+      # (f) bothy-host session-user add with a new name while the second person has a session, then
+      # the owner assigns the new name to a third person
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: f1, expect: {status: 201}}
+      - {device: sam, do: connect, session: f1, expect: {}}
+      - {device: sam, do: handshake, session: f1, expect: {}}
+      - {device: sam, do: start, session: f1}
+      - {device: sam, do: send, session: f1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: f1, expect: {output: "ready-${marker}"}}
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, add, term-new], expect: {exit: 0}}
+      - check: session
+        session: f1
+        expect: {state: closed, close_reason: host_restarted}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-new, term-robin, term-sam]}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {add_session_users: [{user_id: "${robin.id}", os_user: term-new}], reason: terminal suite}
+        expect: {status: 200}
+      - check: host
+        host: r1
+        expect: {session_users: {sam: term-sam, robin: term-new}}
+  - name: g
+    steps:
+      # (a) in a shell session on a host with organization the first person logs in with a
+      # subscription; then the second person opens
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a2, expect: {status: 201}}
+      - {device: sam, do: connect, session: a2, expect: {}}
+      - {device: sam, do: handshake, session: a2, expect: {}}
+      - {device: sam, do: start, session: a2}
+      - {device: sam, do: send, session: a2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: a2, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "PATH=/opt/termsuite/bin:$PATH claude login\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "Login successful"}}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - {device: sam, do: wait_close, session: a2, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: audit
+        expect: {resource: a1, action: terminal.terminate, details: {close_reason: host_policy_violation}}
+      - check: host
+        host: r1
+        expect: {doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: a3, expect: {status: 201}}
+      - {device: sam, do: connect, session: a3, expect: {}}
+      - {device: sam, do: handshake, session: a3, expect: {}}
+      - {device: sam, do: start, session: a3}
+      - check: session
+        session: a3
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (b) the second person also logs in with a subscription in their account
+      - {host: r1, do: exec_as, user: term-sam, run: [bash, -c, "PATH=/opt/termsuite/bin:$PATH claude login"]}
+      - check: host
+        host: r1
+        expect:
+          doctor:
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}
+            - {check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-sam}
+      # (c) the instance operator removes the login of the second person, locks the session user of
+      # the first only on the host, then the owner ends their assignment
+      - {host: r1, do: exec, script: "rm -f /home/term-sam/.claude/fake-auth /home/term-sam/.claude/.credentials.json && usermod -L term-alex"}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {revoke_session_users: ["${alex.id}"], reason: terminal suite}
+        expect: {status: 200}
+      - check: host
+        host: r1
+        expect:
+          doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-alex}]
+          doctor_lacks: [{check: hd6_llm_login, ok: false, session_user: term-sam}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: c1, expect: {status: 201}}
+      - {device: sam, do: connect, session: c1, expect: {}}
+      - {device: sam, do: handshake, session: c1, expect: {}}
+      - {device: sam, do: start, session: c1}
+      - check: session
+        session: c1
+        expect: {state: closed, close_reason: open_failed, close_detail: subscription_login_detected}
+      # (d) the instance operator takes this session user out with bothy-host session-user remove,
+      # whose home is readable by all
+      - {host: r1, do: exec, run: [chmod, "0755", /home/term-alex]}
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex], expect: {exit: 0}}
+      - {host: r1, do: exec, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["700"]}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          reported_session_users: [term-robin, term-sam]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}, {check: hd6_llm_login, ok: false}]
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: d1, expect: {status: 201}}
+      - {device: sam, do: connect, session: d1, expect: {}}
+      - {device: sam, do: handshake, session: d1, expect: {}}
+      - {device: sam, do: start, session: d1}
+      - {device: sam, do: send, session: d1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: d1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: d2, expect: {status: 403, code: terminal_denied, reason: no_session_user}}
+      - check: audit
+        expect: {actor: alex, resource: r1, action: terminal.open, decision: deny}
+      # (e) bothy-host session-user add with the removed name
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, add, term-alex], expect: {exit: 1, stderr_contains: ["is bound to a person on this host"]}}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-robin, term-sam]}
+      # (f) bothy-host session-user add with a new name while the second person has a session, then
+      # the owner assigns the new name to a third person
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: f1, expect: {status: 201}}
+      - {device: sam, do: connect, session: f1, expect: {}}
+      - {device: sam, do: handshake, session: f1, expect: {}}
+      - {device: sam, do: start, session: f1}
+      - {device: sam, do: send, session: f1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: f1, expect: {output: "ready-${marker}"}}
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, add, term-new], expect: {exit: 0}}
+      - check: session
+        session: f1
+        expect: {state: closed, close_reason: host_restarted}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-new, term-robin, term-sam]}
+      - as: owner
+        call: updateHost
+        params: {host_id: "${r1.id}"}
+        if_match: /hosts/${r1.id}
+        with: {add_session_users: [{user_id: "${robin.id}", os_user: term-new}], reason: terminal suite}
+        expect: {status: 200}
+      - check: host
+        host: r1
+        expect: {session_users: {sam: term-sam, robin: term-new}}
+      # (g) while the host service is stopped, a subscription login file lies in the account of the
+      # second person, then the host restarts; then the instance operator removes the file and
+      # calls bothy-host restart
+      - {host: r1, do: exec, run: [systemctl, stop, bothy-host.service]}
+      - {host: r1, do: exec_as, user: term-sam, run: [bash, -c, "PATH=/opt/termsuite/bin:$PATH claude login"]}
+      - {host: r1, do: reboot}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          doctor: [{check: hd6_llm_login, ok: false, code: subscription_login_detected, session_user: term-sam}]
+          session_users: {sam: term-sam, robin: term-new}
+          unit: {n_restarts: 0, exec_main_status: 78, active: false}
+      - wait: [terminal.host_heartbeat_interval, terminal.host_heartbeat_interval, terminal.host_heartbeat_interval]
+      - check: host
+        host: r1
+        expect: {connected: false, unit: {n_restarts: 0, exec_main_status: 78, active: false}}
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD6 FAIL subscription_login_detected session_user=term-sam"]}}
+      - {host: r1, do: exec, run: [rm, -f, /home/term-sam/.claude/fake-auth, /home/term-sam/.claude/.credentials.json]}
+      - {host: r1, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd6_llm_login, ok: false}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: g1, expect: {status: 201}}
+      - {device: sam, do: connect, session: g1, expect: {}}
+      - {device: sam, do: handshake, session: g1, expect: {}}
+      - {device: sam, do: start, session: g1}
+      - {device: sam, do: send, session: g1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: g1, expect: {output: "ready-${marker}"}}
+      - check: session
+        session: g1
+        expect: {state: active}

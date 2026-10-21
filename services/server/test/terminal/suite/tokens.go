@@ -48,6 +48,18 @@ func (w *instance) tokenOf(spec TokenSpec, own string) ([]byte, []string) {
 			return nil, []string{err.Error()}
 		}
 		return t, nil
+	case spec.Forge == "wdi_outside":
+		// A server that bypasses the host service's list: the own claims with a wdi outside the
+		// reported list of osu, signed with the active terminal key of the stack (TM-T29 (g)).
+		kid, priv, err := w.activeTerminalKey()
+		if err != nil {
+			return nil, []string{err.Error()}
+		}
+		t, err := ResignClaims(own, priv, map[string]string{"kid": kid}, map[string]any{"wdi": 99})
+		if err != nil {
+			return nil, []string{err.Error()}
+		}
+		return t, nil
 	case spec.Forge == "invocation_typ":
 		kid, priv, err := w.activeTerminalKey()
 		if err != nil {
@@ -103,6 +115,13 @@ func (w *instance) activeTerminalKey() (string, ed25519.PrivateKey, error) {
 //
 // Errors: a token that is no compact JWS.
 func Resign(token string, priv ed25519.PrivateKey, set map[string]string) ([]byte, error) {
+	return ResignClaims(token, priv, set, nil)
+}
+
+// ResignClaims is Resign that also replaces the claims of claims.
+//
+// Errors: a token that is no compact JWS.
+func ResignClaims(token string, priv ed25519.PrivateKey, set map[string]string, claims map[string]any) ([]byte, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, errors.New("the session token is no compact JWS")
@@ -122,7 +141,26 @@ func Resign(token string, priv ed25519.PrivateKey, set map[string]string) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	input := base64.RawURLEncoding.EncodeToString(nh) + "." + parts[1]
+	payload := parts[1]
+	if len(claims) > 0 {
+		pb, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		var c map[string]any
+		if err := json.Unmarshal(pb, &c); err != nil {
+			return nil, err
+		}
+		for k, v := range claims {
+			c[k] = v
+		}
+		nb, err := json.Marshal(c)
+		if err != nil {
+			return nil, err
+		}
+		payload = base64.RawURLEncoding.EncodeToString(nb)
+	}
+	input := base64.RawURLEncoding.EncodeToString(nh) + "." + payload
 	sig := ed25519.Sign(priv, []byte(input))
 	return []byte(input + "." + base64.RawURLEncoding.EncodeToString(sig)), nil
 }

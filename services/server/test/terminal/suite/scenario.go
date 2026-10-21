@@ -154,6 +154,9 @@ type Step struct {
 	Script string   `yaml:"script"`
 	User   string   `yaml:"user"`
 	To     string   `yaml:"to"`
+	// Until repeats an exec until its expectation holds (a change on the machine that comes later,
+	// like the run of a crontab entry), within the bound of a check.
+	Until bool `yaml:"until"`
 
 	// Server: restart, front_mode or sql.
 	Server  string `yaml:"server"`
@@ -172,6 +175,8 @@ type Step struct {
 
 	// Parallel runs its steps at once.
 	Parallel []Step `yaml:"parallel"`
+	// Sequence runs its steps in order (a lane of a parallel step).
+	Sequence []Step `yaml:"sequence"`
 
 	// Expect holds the literal expectations; Keep binds names to values of the answer.
 	Expect *Expect           `yaml:"expect"`
@@ -223,14 +228,21 @@ type Expect struct {
 	ExitCode    *int   `yaml:"exit_code"`
 
 	// host: getHost and the rows of the host.
-	Connected            *bool             `yaml:"connected"`
-	Doctor               []DoctorEntry     `yaml:"doctor"`
-	DoctorLacks          []DoctorEntry     `yaml:"doctor_lacks"`
-	ReportedSessionUsers []string          `yaml:"reported_session_users"`
-	SessionUsers         map[string]string `yaml:"session_users"`
-	DisabledReason       string            `yaml:"disabled_reason"`
-	NoKeys               *bool             `yaml:"no_keys"`
-	Unit                 *UnitExpect       `yaml:"unit"`
+	Connected            *bool         `yaml:"connected"`
+	Doctor               []DoctorEntry `yaml:"doctor"`
+	DoctorLacks          []DoctorEntry `yaml:"doctor_lacks"`
+	ReportedSessionUsers []string      `yaml:"reported_session_users"`
+	// Workdirs maps a reported session user to the display names of its reported working
+	// directories, in order.
+	Workdirs map[string][]string `yaml:"workdirs"`
+	// Profiles are the names of the reported profiles, in any order; ProfilesLack names profiles
+	// that must not be reported.
+	Profiles       []string          `yaml:"profiles"`
+	ProfilesLack   []string          `yaml:"profiles_lack"`
+	SessionUsers   map[string]string `yaml:"session_users"`
+	DisabledReason string            `yaml:"disabled_reason"`
+	NoKeys         *bool             `yaml:"no_keys"`
+	Unit           *UnitExpect       `yaml:"unit"`
 
 	// audit: entries of audit_events, of the actor and the resource named here (names of the
 	// world: a person, a host, a session, a grant), written since the start of the case.
@@ -305,6 +317,7 @@ const (
 	KindWait     = "wait"
 	KindCheck    = "check"
 	KindParallel = "parallel"
+	KindSequence = "sequence"
 )
 
 // The do values of device and host steps and the values of server and check steps.
@@ -342,6 +355,9 @@ func (s Step) Kind() (string, error) {
 	}
 	if len(s.Parallel) > 0 {
 		kinds = append(kinds, KindParallel)
+	}
+	if len(s.Sequence) > 0 {
+		kinds = append(kinds, KindSequence)
 	}
 	if len(kinds) != 1 {
 		return "", fmt.Errorf("%w: a step has %d kinds %v, want exactly one", ErrScenario, len(kinds), kinds)
@@ -423,8 +439,7 @@ func Validate(sc *Scenario, r Rules) []string {
 			add("%s: no step", c.Name)
 			continue
 		}
-		last := c.Steps[len(c.Steps)-1]
-		if last.Check == "" {
+		if !endsWithCheck(c.Steps[len(c.Steps)-1]) {
 			add("%s: the last step is no check", c.Name)
 		}
 		for i, s := range c.Steps {
@@ -434,6 +449,25 @@ func Validate(sc *Scenario, r Rules) []string {
 		}
 	}
 	return probs
+}
+
+// endsWithCheck reports whether s is a check, a sequence that ends with one, or a parallel step
+// whose every lane ends with one (Multiply).
+func endsWithCheck(s Step) bool {
+	switch {
+	case s.Check != "":
+		return true
+	case len(s.Sequence) > 0:
+		return endsWithCheck(s.Sequence[len(s.Sequence)-1])
+	case len(s.Parallel) > 0:
+		for _, p := range s.Parallel {
+			if !endsWithCheck(p) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // validateStep returns the problems of one step.
@@ -497,10 +531,10 @@ func validateStep(s Step, r Rules, prof Profile, id string) []string {
 		if s.Expect == nil {
 			probs = append(probs, "a check needs expect")
 		}
-	case KindParallel:
-		for i, p := range s.Parallel {
+	case KindParallel, KindSequence:
+		for i, p := range append(slices.Clone(s.Parallel), s.Sequence...) {
 			for _, q := range validateStep(p, r, prof, id) {
-				probs = append(probs, fmt.Sprintf("parallel %d: %s", i, q))
+				probs = append(probs, fmt.Sprintf("%s %d: %s", kind, i, q))
 			}
 		}
 	}

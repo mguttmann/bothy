@@ -10,8 +10,19 @@ import (
 )
 
 // hostStep runs a step of a host container: the operator's commands as root, a person's
-// commands as their user, and the faults of the machine.
+// commands as their user, and the faults of the machine. An exec with until repeats until its
+// expectation holds.
 func (w *instance) hostStep(s Step) []string {
+	if s.Until && s.Expect != nil && (s.Do == "exec" || s.Do == "exec_as") {
+		once := s
+		once.Until = false
+		return w.poll(func() []string { return w.hostStep(once) })
+	}
+	return w.hostOnce(s)
+}
+
+// hostOnce runs a host step once.
+func (w *instance) hostOnce(s Step) []string {
 	h, err := w.container(s.Host)
 	if err != nil {
 		return []string{err.Error()}

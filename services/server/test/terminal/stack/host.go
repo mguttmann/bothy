@@ -28,6 +28,10 @@ const (
 	MarkerDir = "/var/tmp/termsuite-markers"
 	// FakeClaude is the path of M2-42's Fake-claude in a host container.
 	FakeClaude = HostBinDir + "/claude"
+	// ClaudeStartLog is the start log of the Fake-claude (one line per start: the path of its
+	// program, and for an interactive start the working directory and CLAUDE_CONFIG_DIR; never a
+	// key, only its SHA-256), writable by every user of the container (TM-T29).
+	ClaudeStartLog = "/var/tmp/termsuite-claude-starts.log"
 )
 
 // Binaries are the programs the suite builds once per test binary for the host containers.
@@ -50,7 +54,7 @@ func BuildHostBinaries(ctx context.Context, root, dir, arch string) (Binaries, e
 	b := Binaries{HostService: filepath.Join(dir, "bothy-host"), FakeClaude: filepath.Join(dir, "claude")}
 	builds := [][]string{
 		{"build", "-trimpath", "-ldflags", "-X github.com/OWNER/bothy/services/host/internal/buildinfo.PlatformSuite=1", "-o", b.HostService, "./cmd/bothy-host"},
-		{"build", "-trimpath", "-o", b.FakeClaude, "./testdata/fakeclaude"},
+		{"build", "-trimpath", "-ldflags", "-X main.startLog=" + ClaudeStartLog, "-o", b.FakeClaude, "./testdata/fakeclaude"},
 	}
 	for _, args := range builds {
 		if err := goBuild(ctx, filepath.Join(root, "services", "host"), []string{"GOOS=linux", "GOARCH=" + arch}, args...); err != nil {
@@ -175,7 +179,7 @@ func (h *Host) Provision(ctx context.Context, bins Binaries) error {
 			return err
 		}
 	}
-	if _, err := h.Shell(ctx, "chown root:root "+HostBinDir+"/* && chmod 0755 "+HostBinDir+"/*"); err != nil {
+	if _, err := h.Shell(ctx, "chown root:root "+HostBinDir+"/* && chmod 0755 "+HostBinDir+"/* && install -m 0666 /dev/null "+ClaudeStartLog); err != nil {
 		return err
 	}
 	if _, err := h.Exec(ctx, bytes.NewReader(h.s.CA.PEM()), "bash", "-c", "cat > /usr/local/share/ca-certificates/termsuite-test-ca.crt"); err != nil {

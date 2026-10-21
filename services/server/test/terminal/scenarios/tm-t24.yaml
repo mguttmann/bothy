@@ -1,0 +1,402 @@
+# SPDX-License-Identifier: Apache-2.0
+# TM-T24 of 24 14 (foreign home folders, 2.2 item 4; T-TM-04, T-TM-13, T-TM-14) with a real host
+# service: the parts of the row in one case each, every case starting from a fresh world and
+# running the parts before it. A is the session user term-alex, B term-sam; the user who is no
+# session user is created by the operator. The long runner of A is a crontab entry that opens the
+# home once a trigger file exists, created after session-user remove (brief M2-48 Design note 9).
+id: tm-t24
+title: Foreign home folders (2.2 item 4)
+sources: ["24 14 TM-T24", "24 2.2 HD9 HD11", "24 2.2 item 4", "16 4.4"]
+profile: default
+world:
+  people: [alex, sam]
+  owners: [alex, sam]
+  hosts:
+    - {name: r1, session_users: [term-alex, term-sam], assign: {alex: term-alex, sam: term-sam}}
+cases:
+  - name: foreign_home_listable
+    steps:
+      # a session user can list the home folder of a user who is not a session user: the start is
+      # refused with a code (HD9), the output on the host names that user, the entry in
+      # reported_doctor names no name
+      - {host: r1, do: exec, script: "useradd --create-home term-ghost && chmod 0755 /home/term-ghost"}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: ""}]
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable", "user=term-ghost"]}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+  - name: without_right
+    steps:
+      # a session user can list the home folder of a user who is not a session user: the start is
+      # refused with a code (HD9), the output on the host names that user, the entry in
+      # reported_doctor names no name
+      - {host: r1, do: exec, script: "useradd --create-home term-ghost && chmod 0755 /home/term-ghost"}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: ""}]
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable", "user=term-ghost"]}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+      # then without this permission: passed
+      - {host: r1, do: exec, run: [chmod, "0700", /home/term-ghost]}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+  - name: open_home_of_a
+    steps:
+      # a session user can list the home folder of a user who is not a session user: the start is
+      # refused with a code (HD9), the output on the host names that user, the entry in
+      # reported_doctor names no name
+      - {host: r1, do: exec, script: "useradd --create-home term-ghost && chmod 0755 /home/term-ghost"}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: ""}]
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable", "user=term-ghost"]}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+      # then without this permission: passed
+      - {host: r1, do: exec, run: [chmod, "0700", /home/term-ghost]}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      # then A sets up a long runner in a session (a crontab entry that reopens the home once the
+      # trigger file exists, created after the following remove) and opens the home for all others
+      # while B has a session: HD11 not passed with the name of A, only the sessions of A end
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: b1, expect: {status: 201}}
+      - {device: sam, do: connect, session: b1, expect: {}}
+      - {device: sam, do: handshake, session: b1, expect: {}}
+      - {device: sam, do: start, session: b1}
+      - {device: sam, do: send, session: b1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: b1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "printf '%s\\n' '* * * * * [ -f /var/tmp/termsuite-trigger-a ] && chmod 0755 /home/term-alex' | crontab - && chmod 0755 /home/term-alex\n"}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]}
+      - check: session
+        session: b1
+        expect: {state: active}
+  - name: after_restart
+    steps:
+      # a session user can list the home folder of a user who is not a session user: the start is
+      # refused with a code (HD9), the output on the host names that user, the entry in
+      # reported_doctor names no name
+      - {host: r1, do: exec, script: "useradd --create-home term-ghost && chmod 0755 /home/term-ghost"}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: ""}]
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable", "user=term-ghost"]}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+      # then without this permission: passed
+      - {host: r1, do: exec, run: [chmod, "0700", /home/term-ghost]}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      # then A sets up a long runner in a session (a crontab entry that reopens the home once the
+      # trigger file exists, created after the following remove) and opens the home for all others
+      # while B has a session: HD11 not passed with the name of A, only the sessions of A end
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: b1, expect: {status: 201}}
+      - {device: sam, do: connect, session: b1, expect: {}}
+      - {device: sam, do: handshake, session: b1, expect: {}}
+      - {device: sam, do: start, session: b1}
+      - {device: sam, do: send, session: b1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: b1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "printf '%s\\n' '* * * * * [ -f /var/tmp/termsuite-trigger-a ] && chmod 0755 /home/term-alex' | crontab - && chmod 0755 /home/term-alex\n"}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]}
+      - check: session
+        session: b1
+        expect: {state: active}
+      # then the host service restarts: the host starts, HD9 passes, and HD11 still names A
+      - {host: r1, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}]
+  - name: after_remove
+    steps:
+      # a session user can list the home folder of a user who is not a session user: the start is
+      # refused with a code (HD9), the output on the host names that user, the entry in
+      # reported_doctor names no name
+      - {host: r1, do: exec, script: "useradd --create-home term-ghost && chmod 0755 /home/term-ghost"}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: ""}]
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable", "user=term-ghost"]}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+      # then without this permission: passed
+      - {host: r1, do: exec, run: [chmod, "0700", /home/term-ghost]}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      # then A sets up a long runner in a session (a crontab entry that reopens the home once the
+      # trigger file exists, created after the following remove) and opens the home for all others
+      # while B has a session: HD11 not passed with the name of A, only the sessions of A end
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: b1, expect: {status: 201}}
+      - {device: sam, do: connect, session: b1, expect: {}}
+      - {device: sam, do: handshake, session: b1, expect: {}}
+      - {device: sam, do: start, session: b1}
+      - {device: sam, do: send, session: b1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: b1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "printf '%s\\n' '* * * * * [ -f /var/tmp/termsuite-trigger-a ] && chmod 0755 /home/term-alex' | crontab - && chmod 0755 /home/term-alex\n"}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]}
+      - check: session
+        session: b1
+        expect: {state: active}
+      # then the host service restarts: the host starts, HD9 passes, and HD11 still names A
+      - {host: r1, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}]
+      # then the instance operator takes A out with session-user remove: the home of A is accessible
+      # only to A, and the start passes HD9
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex], expect: {exit: 0}}
+      - {host: r1, do: exec, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["700"]}}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-sam], doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+  - name: long_runner_reopens
+    steps:
+      # a session user can list the home folder of a user who is not a session user: the start is
+      # refused with a code (HD9), the output on the host names that user, the entry in
+      # reported_doctor names no name
+      - {host: r1, do: exec, script: "useradd --create-home term-ghost && chmod 0755 /home/term-ghost"}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: ""}]
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable", "user=term-ghost"]}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+      # then without this permission: passed
+      - {host: r1, do: exec, run: [chmod, "0700", /home/term-ghost]}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      # then A sets up a long runner in a session (a crontab entry that reopens the home once the
+      # trigger file exists, created after the following remove) and opens the home for all others
+      # while B has a session: HD11 not passed with the name of A, only the sessions of A end
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: b1, expect: {status: 201}}
+      - {device: sam, do: connect, session: b1, expect: {}}
+      - {device: sam, do: handshake, session: b1, expect: {}}
+      - {device: sam, do: start, session: b1}
+      - {device: sam, do: send, session: b1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: b1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "printf '%s\\n' '* * * * * [ -f /var/tmp/termsuite-trigger-a ] && chmod 0755 /home/term-alex' | crontab - && chmod 0755 /home/term-alex\n"}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]}
+      - check: session
+        session: b1
+        expect: {state: active}
+      # then the host service restarts: the host starts, HD9 passes, and HD11 still names A
+      - {host: r1, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}]
+      # then the instance operator takes A out with session-user remove: the home of A is accessible
+      # only to A, and the start passes HD9
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex], expect: {exit: 0}}
+      - {host: r1, do: exec, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["700"]}}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-sam], doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      # then the long runner opens the home of A, and the instance operator calls doctor: HD9 does
+      # not pass, doctor ends with an exit code other than 0, the host service reports and exits,
+      # reported_doctor has an HD9 entry with the name of A, and the console names it with the
+      # person of its assignment
+      - {host: r1, do: exec, run: [crontab, -l, -u, term-alex], expect: {exit: 0, stdout_contains: [termsuite-trigger-a]}}
+      - {host: r1, do: exec, run: [touch, /var/tmp/termsuite-trigger-a]}
+      - {host: r1, do: exec, until: true, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["755"]}}
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable"]}}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: term-alex}]
+          session_users: {alex: term-alex, sam: term-sam}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+  - name: after_delete_and_restart
+    steps:
+      # a session user can list the home folder of a user who is not a session user: the start is
+      # refused with a code (HD9), the output on the host names that user, the entry in
+      # reported_doctor names no name
+      - {host: r1, do: exec, script: "useradd --create-home term-ghost && chmod 0755 /home/term-ghost"}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: ""}]
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable", "user=term-ghost"]}}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+      # then without this permission: passed
+      - {host: r1, do: exec, run: [chmod, "0700", /home/term-ghost]}
+      - {host: r1, do: restart_service}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      # then A sets up a long runner in a session (a crontab entry that reopens the home once the
+      # trigger file exists, created after the following remove) and opens the home for all others
+      # while B has a session: HD11 not passed with the name of A, only the sessions of A end
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: b1, expect: {status: 201}}
+      - {device: sam, do: connect, session: b1, expect: {}}
+      - {device: sam, do: handshake, session: b1, expect: {}}
+      - {device: sam, do: start, session: b1}
+      - {device: sam, do: send, session: b1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: b1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: step_up}
+      - {device: alex, do: open, on: r1, session: a1, expect: {status: 201}}
+      - {device: alex, do: connect, session: a1, expect: {}}
+      - {device: alex, do: handshake, session: a1, expect: {}}
+      - {device: alex, do: start, session: a1}
+      - {device: alex, do: send, session: a1, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: alex, do: expect_output, session: a1, expect: {output: "ready-${marker}"}}
+      - {device: alex, do: send, session: a1, text: "printf '%s\\n' '* * * * * [ -f /var/tmp/termsuite-trigger-a ] && chmod 0755 /home/term-alex' | crontab - && chmod 0755 /home/term-alex\n"}
+      - {device: alex, do: wait_close, session: a1, expect: {close: {code: 4100, reason: host_policy_violation}}}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]}
+      - check: session
+        session: b1
+        expect: {state: active}
+      # then the host service restarts: the host starts, HD9 passes, and HD11 still names A
+      - {host: r1, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r1
+        expect:
+          connected: true
+          doctor: [{check: hd11_shared_locations, ok: false, code: shared_location, session_user: term-alex}]
+          doctor_lacks: [{check: hd9_foreign_homes, ok: false}]
+      # then the instance operator takes A out with session-user remove: the home of A is accessible
+      # only to A, and the start passes HD9
+      - {host: r1, do: exec, run: [/opt/bothy-host/bin/bothy-host, session-user, remove, term-alex], expect: {exit: 0}}
+      - {host: r1, do: exec, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["700"]}}
+      - check: host
+        host: r1
+        expect: {connected: true, reported_session_users: [term-sam], doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      # then the long runner opens the home of A, and the instance operator calls doctor: HD9 does
+      # not pass, doctor ends with an exit code other than 0, the host service reports and exits,
+      # reported_doctor has an HD9 entry with the name of A, and the console names it with the
+      # person of its assignment
+      - {host: r1, do: exec, run: [crontab, -l, -u, term-alex], expect: {exit: 0, stdout_contains: [termsuite-trigger-a]}}
+      - {host: r1, do: exec, run: [touch, /var/tmp/termsuite-trigger-a]}
+      - {host: r1, do: exec, until: true, run: [stat, -c, "%a", /home/term-alex], expect: {exit: 0, stdout_contains: ["755"]}}
+      - {host: r1, do: doctor, expect: {exit_not: 0, stdout_contains: ["HD9 FAIL foreign_home_listable"]}}
+      - check: host
+        host: r1
+        expect:
+          connected: false
+          unit: {exec_main_status: 78, active: false}
+          doctor: [{check: hd9_foreign_homes, ok: false, code: foreign_home_listable, session_user: term-alex}]
+          session_users: {alex: term-alex, sam: term-sam}
+      - check: markers
+        host: r1
+        expect: {markers: 0}
+      # then the instance operator removes the long runners of A, ends its processes, deletes A with
+      # its home and calls bothy-host restart: HD9 passes, and B opens again
+      - {host: r1, do: exec, script: "crontab -r -u term-alex; pkill -KILL -u term-alex; userdel --remove term-alex; rm -f /var/tmp/termsuite-trigger-a; true"}
+      - {host: r1, do: restart_service, expect: {exit: 0}}
+      - check: host
+        host: r1
+        expect: {connected: true, doctor_lacks: [{check: hd9_foreign_homes, ok: false}]}
+      - {device: sam, do: step_up}
+      - {device: sam, do: open, on: r1, session: b2, expect: {status: 201}}
+      - {device: sam, do: connect, session: b2, expect: {}}
+      - {device: sam, do: handshake, session: b2, expect: {}}
+      - {device: sam, do: start, session: b2}
+      - {device: sam, do: send, session: b2, text: "printf '%s-%s\\n' ready ${marker}\n"}
+      - {device: sam, do: expect_output, session: b2, expect: {output: "ready-${marker}"}}
+      - check: session
+        session: b2
+        expect: {state: active}
