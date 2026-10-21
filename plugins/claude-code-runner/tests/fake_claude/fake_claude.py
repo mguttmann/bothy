@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -110,6 +111,10 @@ class Fake:
         )
         if self.scenario.get("ignore_sigterm"):
             signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        if self.scenario.get("spawn_child"):
+            # A background job of a tool call: it stays in the turn's process group.
+            child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
+            self.record("child", child_pid=child.pid)
         first = sys.stdin.readline()
         self.record("stdin", line=first.rstrip("\n"))
         source = self.scenario.get("api_key_source")

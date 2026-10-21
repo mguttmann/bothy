@@ -50,7 +50,7 @@ async def test_group_cwd_and_files(tmp_path: Path) -> None:
         "sys.stderr.write('err\\n')\n"
     )
     turn = start(tmp_path, code)
-    turn.write_line('{"type":"user"}')
+    await turn.write_line('{"type":"user"}')
     turn.close_stdin()
     assert await turn.wait(10)
     lines = turn.paths.stream.read_text().splitlines()
@@ -121,3 +121,45 @@ async def _until_line(turn: Turn, text: str) -> None:
             return
         await asyncio.sleep(0.01)
     raise AssertionError("line not seen")
+
+
+@pytest.mark.anyio
+async def test_large_stdin_line_does_not_block_the_loop(tmp_path: Path) -> None:
+    import asyncio
+
+    turn = start(tmp_path, "import time\ntime.sleep(1.5)\nimport sys\nsys.stdin.read()")
+    ticks = 0
+
+    async def ticker() -> None:
+        nonlocal ticks
+        while True:
+            ticks += 1
+            await asyncio.sleep(0.05)
+
+    task = asyncio.ensure_future(ticker())
+    await turn.write_line("x" * 400_000)
+    task.cancel()
+    assert ticks >= 10  # the loop ran while the pipe was full
+    turn.close_stdin()
+    assert await turn.wait(10)
+
+
+@pytest.mark.anyio
+async def test_terminate_ends_children_after_the_leader(tmp_path: Path) -> None:
+    code = (
+        "import subprocess, sys\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        "print(child.pid, flush=True)\n"
+    )
+    turn = start(tmp_path, code)
+    assert await turn.wait(10)
+    child = int(turn.paths.stream.read_text().split()[0])
+    os.kill(child, 0)  # still running after the leader exited
+    await terminate(turn, stop_grace=1.0, kill_grace=1.0, poll=0.02)
+    for _ in range(100):
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.02)
+    raise AssertionError("the child of the turn survived")

@@ -50,3 +50,13 @@ def test_sweep(tmp_path: Path) -> None:
     assert not old_file.parent.exists()
     assert new.exists()
     assert keep.exists()
+
+
+def test_sweep_keeps_the_session_usage(tmp_path: Path) -> None:
+    usage = tmp_path / "sessions" / "s" / "usage.json"
+    usage.parent.mkdir(parents=True)
+    usage.write_text("{}")
+    past = time.time() - 3600
+    os.utime(usage, (past, past))
+    assert sweep(tmp_path, 60.0) == 0
+    assert usage.exists()

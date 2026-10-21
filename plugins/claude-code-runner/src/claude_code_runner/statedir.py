@@ -25,6 +25,9 @@ __all__ = ["StateDirError", "ensure_private_dir", "sweep", "write_private"]
 
 _OPEN_BITS = stat.S_IRWXG | stat.S_IRWXO
 _SWEPT = ("sessions", "files")
+# The cumulative usage of a session is state, not a recording: without it a resumed session
+# would report its whole cost again (09 18.7).
+_KEPT = frozenset({"usage.json"})
 
 
 class StateDirError(Exception):
@@ -101,7 +104,8 @@ def write_private(path: Path, data: str | bytes, *, atomic: bool = False) -> Non
 def sweep(root: Path, retention: float, now: float | None = None) -> int:
     """Delete files older than ``retention`` under ``sessions/`` and ``files/`` of ``root``.
 
-    Directories left empty are removed too; symbolic links are never followed.
+    Directories left empty are removed too; symbolic links are never followed; the usage of a
+    session (``usage.json``) is kept.
 
     Args:
         root: ``runner.state_dir``.
@@ -120,6 +124,8 @@ def sweep(root: Path, retention: float, now: float | None = None) -> int:
         for dirpath, dirnames, filenames in os.walk(base, topdown=False):
             here = Path(dirpath)
             for filename in filenames:
+                if filename in _KEPT:
+                    continue
                 item = here / filename
                 with contextlib.suppress(FileNotFoundError):
                     info = item.lstat()

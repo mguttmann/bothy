@@ -61,6 +61,7 @@ from bothy_sdk.generated.models import (
     AgentSession,
     AgentSessionReport,
     BillingEvidence,
+    CostReport,
     Me,
     RunContext,
     RunFinish,
@@ -565,7 +566,7 @@ class _Turn:
         )
         log("turn_started", **self.ids)
         try:
-            self.turn.write_line(line)
+            await self.turn.write_line(line)
             await self._follow(own_uuid)
         except asyncio.CancelledError:
             # A runtime never outlives the end of its run (09 1 point 4).
@@ -605,14 +606,11 @@ class _Turn:
                 result = message
         if result is not None:
             turn.close_stdin()
-            if not await turn.wait(self.cfg.stop_grace, self.cfg.poll_interval):
-                await terminate(
-                    turn, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval
-                )
-        else:
-            await terminate(turn, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval)
+            await turn.wait(self.cfg.stop_grace, self.cfg.poll_interval)
+        # Always: the group may hold children the leader left behind (a background job).
+        await terminate(turn, self.cfg.stop_grace, self.cfg.kill_grace, self.cfg.poll_interval)
         if result is None or result.get("is_error") is True or result.get("subtype") != "success":
-            await self._fail_runtime(turn.exit_label())
+            await self._fail_runtime(turn.exit_label(), result)
             return
         await self._complete(result, live)
 
@@ -649,49 +647,83 @@ class _Turn:
                 return
         log("session_report_failed", code="version_conflict", **self.ids)
 
-    async def _fail_runtime(self, exit_label: str) -> None:
+    async def _fail_runtime(self, exit_label: str, result: Mapping[str, Any] | None = None) -> None:
         patch = self.handle.patch
         step = patch.add_step(
             "status", "runtime_error", title="", status="failed", detail={"exit": exit_label}
         )
         patch.update_step(step, finished_at=datetime.now(UTC))
-        await self._finish("failed", reason="runtime_error")
+        if result is None:
+            await self._finish("failed", reason="runtime_error")
+            return
+        # A failed turn may still have spent tokens: they are this run's, never the next one's.
+        reports, metrics = self._usage(result, None)
+        await self._finish("failed", reason="runtime_error", metrics=metrics, costs=reports)
 
-    async def _complete(self, result: Mapping[str, Any], live: LiveBox) -> None:
-        text = result.get("result") if isinstance(result.get("result"), str) else ""
-        title, reply = split_title(str(text), self.title_request)
-        if reply.strip():
-            entry = await self.handle.send(reply)
-            if entry.state is OutboxState.FAILED:
-                log("reply_refused", code=entry.problem_code or "unknown", **self.ids)
-                await self._finish("failed", reason="adapter_error")
-                return
-        if self.title_request and title:
-            outcome = await propose_title(self.handle.client, self.state.thread_id, title)
-            log("title_proposed", outcome=outcome, **self.ids)
+    def _usage(
+        self, result: Mapping[str, Any], live: LiveBox | None
+    ) -> tuple[list[CostReport], RunMetrics]:
+        """The cost reports (stored as pending before the finish) and the metrics of the run."""
         store = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
         reports = store.pending_for(str(self.handle.run_id))
         if reports is None:
             current = parse_model_usage(result)
             reports = cost_reports(difference(store.load().values, current))
             store.record(str(self.handle.run_id), current, reports, context_windows(result))
-        totals = {
-            "tokens_in": sum(_n(r.tokens_in) for r in reports),
-            "tokens_out": sum(_n(r.tokens_out) for r in reports),
-            "tokens_cache_read": sum(_n(r.tokens_cache_read) for r in reports),
-            "tokens_cache_write": sum(_n(r.tokens_cache_write) for r in reports),
-        }
         metrics = RunMetrics(
-            tokens_in=totals["tokens_in"],
-            tokens_out=totals["tokens_out"],
-            tokens_cache_read=totals["tokens_cache_read"],
-            tokens_cache_write=totals["tokens_cache_write"],
-            subagents=live.subagents,
-            background_jobs=live.background_jobs,
-            api_retries=live.api_retries,
+            tokens_in=sum(_n(r.tokens_in) for r in reports),
+            tokens_out=sum(_n(r.tokens_out) for r in reports),
+            tokens_cache_read=sum(_n(r.tokens_cache_read) for r in reports),
+            tokens_cache_write=sum(_n(r.tokens_cache_write) for r in reports),
         )
-        if live.context_pct is not None:
-            metrics.context_pct = live.context_pct
+        if live is not None:
+            metrics.subagents = live.subagents
+            metrics.background_jobs = live.background_jobs
+            metrics.api_retries = live.api_retries
+            if live.context_pct is not None:
+                metrics.context_pct = live.context_pct
+        return reports, metrics
+
+    async def _deliver(self, reply: str) -> str | None:
+        """Send the reply; ``None`` once it is stored on the server, else the problem code.
+
+        A reply still pending after the SDK's own retries (a transient outage) is sent again
+        with the same ``client_msg_id`` up to ``sdk.retry_max_attempts`` times, so a run never
+        ends ``completed`` with its answer lost.
+        """
+        entry = await self.handle.send(reply)
+        outbox = self.handle.outbox
+        settings = self.cfg.sdk
+        for attempt in range(settings.retry_max_attempts):
+            if entry.state is OutboxState.SENT:
+                return None
+            if entry.state is OutboxState.FAILED:
+                return entry.problem_code or "unknown"
+            await self.handle.client.clock.sleep(
+                min(settings.retry_backoff_cap, settings.retry_backoff_base * 2**attempt)
+            )
+            await outbox.flush()
+            pending = {e.entry_id for e in await outbox.store.pending()}
+            if entry.entry_id not in pending:
+                failed = {e.entry_id: e for e in await outbox.failed()}
+                gone = failed.get(entry.entry_id)
+                return None if gone is None else (gone.problem_code or "unknown")
+        return "reply_not_delivered"
+
+    async def _complete(self, result: Mapping[str, Any], live: LiveBox) -> None:
+        text = result.get("result") if isinstance(result.get("result"), str) else ""
+        title, reply = split_title(str(text), self.title_request)
+        if reply.strip():
+            problem = await self._deliver(reply)
+            if problem is not None:
+                log("reply_refused", code=problem, **self.ids)
+                reports, metrics = self._usage(result, live)
+                await self._finish("failed", reason="adapter_error", metrics=metrics, costs=reports)
+                return
+        if self.title_request and title:
+            outcome = await propose_title(self.handle.client, self.state.thread_id, title)
+            log("title_proposed", outcome=outcome, **self.ids)
+        reports, metrics = self._usage(result, live)
         await self._finish("completed", metrics=metrics, costs=reports)
 
     async def _finish(self, state: str, **kwargs: Any) -> None:

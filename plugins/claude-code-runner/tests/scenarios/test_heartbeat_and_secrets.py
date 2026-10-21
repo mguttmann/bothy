@@ -86,7 +86,10 @@ async def test_br_13_no_secret_values_leak(world: World, logs: pytest.LogCapture
         assert API_KEY not in message
         assert token not in message
     for path in _files(world.state):
-        data = path.read_bytes()
+        try:
+            data = path.read_bytes()
+        except FileNotFoundError:  # a SQLite journal that was just removed
+            continue
         assert API_KEY.encode() not in data, path
         assert token.encode() not in data, path
     for turn in world.turns():

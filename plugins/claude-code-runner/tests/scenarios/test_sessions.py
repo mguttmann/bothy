@@ -176,3 +176,46 @@ async def test_inbox_survives_restart(world: World) -> None:
     assert await world.ended(run.run_id) == "completed"
     assert len(world.requests("startRun")) == 1
     assert len(world.turns()) == 1
+
+
+async def test_failed_run_reports_its_cost_once(world: World) -> None:
+    world.scenario(fixture="error_result")
+    await world.start()
+    first = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(first.run_id) == "failed"
+    failed = [r for r in world.requests("finishRun") if str(first.run_id) in r.path][-1].json
+    assert failed["reason"] == "runtime_error"
+    assert [c["tokens_in"] for c in failed["costs"]] == [300]
+    world.scenario(fixture="resume")
+    second = await world.fake.trigger("Again", thread_id=first.thread_id)
+    assert await world.ended(second.run_id) == "completed"
+    done = [r for r in world.requests("finishRun") if str(second.run_id) in r.path][-1].json
+    assert [c["tokens_in"] for c in done["costs"]] == [5700 - 300]
+
+
+async def test_children_of_a_turn_end_with_the_run(world: World) -> None:
+    world.scenario(fixture="plain", spawn_child=True)
+    await world.start()
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "completed"
+    child = world.calls("child")[0]["child_pid"]
+    await world.until(lambda: _gone(child), 20)
+
+
+def _gone(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    return False
+
+
+async def test_undelivered_reply_fails_the_run(world: World) -> None:
+    from bothy_sdk.testing.faults import Fault as _Fault
+
+    world.scenario(fixture="plain")
+    world.fake.inject("createMessage", _Fault.disconnect(), times=50)
+    await world.start()
+    run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
+    assert await world.ended(run.run_id) == "failed"
+    assert world.fake.run_state(run.run_id).state_reason == "adapter_error"

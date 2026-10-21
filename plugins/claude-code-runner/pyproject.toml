@@ -37,9 +37,20 @@ dev = [
   "ruff==0.17.0",
 ]
 
+[build-system]
+# Installed into its own environment, so the console script `claude-code-runner` of the README
+# exists; never built for an index before the release chain of the component (M7, OQ-17).
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+claude_code_runner = ["py.typed", "prompts/*.md"]
+
 [tool.uv]
-# Not built or published before the release chain of the component (M7, OQ-17).
-package = false
+package = true
 
 [tool.uv.sources]
 bothy-sdk = { path = "../../sdk/python", editable = true }

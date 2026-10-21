@@ -142,8 +142,12 @@ class Turn:
             )
         return cls(process, paths)
 
-    def write_line(self, line: str) -> None:
-        """Write one line to stdin of the turn.
+    async def write_line(self, line: str) -> None:
+        """Write one line to stdin of the turn without blocking the event loop.
+
+        A line larger than the pipe buffer blocks until the CLI reads it; the write runs in a
+        worker thread, so heartbeats, other runs and a stop go on meanwhile, and `terminate`
+        ends a blocked write with a broken pipe.
 
         Args:
             line: The JSON line without its line break.
@@ -151,9 +155,14 @@ class Turn:
         stdin = self.process.stdin
         if stdin is None:
             return
-        with contextlib.suppress(BrokenPipeError, ValueError):
-            stdin.write(line.encode("utf-8") + b"\n")
-            stdin.flush()
+        data = line.encode("utf-8") + b"\n"
+
+        def write() -> None:
+            with contextlib.suppress(BrokenPipeError, ValueError, OSError):
+                stdin.write(data)
+                stdin.flush()
+
+        await asyncio.to_thread(write)
 
     def close_stdin(self) -> None:
         """Close stdin; the turn ends after its ``result``."""
@@ -208,8 +217,32 @@ def _signal_group(turn: Turn, sig: signal.Signals) -> None:
         os.killpg(turn.pgid, sig)
 
 
+def _group_alive(turn: Turn) -> bool:
+    """Whether the leader or any other process of the turn's group still runs."""
+    if turn.alive():
+        return True
+    try:
+        os.killpg(turn.pgid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
+
+
+async def _group_gone(turn: Turn, grace: float, poll: float) -> bool:
+    deadline = time.monotonic() + grace
+    while _group_alive(turn):
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(poll)
+    return True
+
+
 async def terminate(turn: Turn, stop_grace: float, kill_grace: float, poll: float) -> None:
-    """End a turn and every process of its group (18.6).
+    """End a turn and every process of its group (18.6), also after the leader exited.
+
+    SIGINT to the group, SIGTERM after ``runner.stop_grace``, SIGKILL after
+    ``runner.kill_grace``; children that outlived the leader (a background job of a tool call)
+    get the same escalation, so no process of a run outlives it.
 
     Args:
         turn: The turn.
@@ -218,12 +251,14 @@ async def terminate(turn: Turn, stop_grace: float, kill_grace: float, poll: floa
         poll: ``runner.poll_interval``.
     """
     for sig, grace in ((signal.SIGINT, stop_grace), (signal.SIGTERM, kill_grace)):
-        if not turn.alive():
+        if not _group_alive(turn):
             break
         _signal_group(turn, sig)
-        if await turn.wait(grace, poll):
+        if await _group_gone(turn, grace, poll):
             break
-    _signal_group(turn, signal.SIGKILL)  # also children that outlived the leader
+    if _group_alive(turn):
+        _signal_group(turn, signal.SIGKILL)
+        await _group_gone(turn, max(kill_grace, poll), poll)
     await turn.wait(max(kill_grace, poll), poll)
 
 
