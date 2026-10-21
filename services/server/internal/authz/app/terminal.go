@@ -23,7 +23,7 @@ import (
 func terminalState(ctx context.Context, hosts authz.HostSource, snap *domain.Snapshot) error {
 	users, err := hosts.SessionUsersOf(ctx, snap.PrincipalID)
 	if err != nil {
-		return sourceError("host source", err)
+		return sourceError(hostSourceName, err)
 	}
 	snap.SessionUsers = make(map[ids.ID]domain.SessionUserFact, len(users))
 	for _, u := range users {
@@ -34,7 +34,7 @@ func terminalState(ctx context.Context, hosts authz.HostSource, snap *domain.Sna
 	}
 	personal, err := hosts.PersonalHosts(ctx)
 	if err != nil {
-		return sourceError("host source", err)
+		return sourceError(hostSourceName, err)
 	}
 	snap.PersonalHosts = make(map[ids.ID]ids.ID, len(personal))
 	for _, h := range personal {
@@ -231,5 +231,5 @@ func wrapHostSource(err error) error {
 	if err == nil {
 		return nil
 	}
-	return sourceError("host source", err)
+	return sourceError(hostSourceName, err)
 }

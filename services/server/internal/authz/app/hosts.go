@@ -13,6 +13,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
+// hostSourceName names the host source in the errors of its reads.
+const hostSourceName = "host source"
+
 // The target host of M2-39 (07 section 2.12): a host lies outside the tree instance, space,
 // channel. Its facts come fresh from the HostSource of the terminal module; the rights on it are
 // TerminalOn of the snapshot and the holder of the host.
@@ -47,7 +50,7 @@ func (a *Authorizer) resolveHost(ctx context.Context, id ids.ID) (resolved, bool
 	}
 	h, ok, err := a.hosts.Host(ctx, id)
 	if err != nil {
-		return resolved{}, false, sourceError("host source", err)
+		return resolved{}, false, sourceError(hostSourceName, err)
 	}
 	if !ok {
 		return resolved{}, false, nil
@@ -97,7 +100,7 @@ func (a *Authorizer) hostSetOf(ctx context.Context, snap domain.Snapshot, princi
 	}
 	own, err := a.hosts.AssignedTo(ctx, principal)
 	if err != nil {
-		return hostSet{}, sourceError("host source", err)
+		return hostSet{}, sourceError(hostSourceName, err)
 	}
 	for _, h := range own {
 		set.ids[h] = true
@@ -189,7 +192,7 @@ func (a *Authorizer) hostSelf(ctx context.Context, id ids.ID, r authorize.Resour
 	}
 	own, found, err := a.hosts.Host(ctx, id)
 	if err != nil {
-		return authorize.Decision{}, sourceError("host source", err)
+		return authorize.Decision{}, sourceError(hostSourceName, err)
 	}
 	if !found {
 		return outcome(failed), nil

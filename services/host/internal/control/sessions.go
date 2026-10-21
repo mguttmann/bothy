@@ -56,7 +56,11 @@ func (RefuseSessions) Open(ctx context.Context, o SessionOpen, n Notifier) {
 }
 
 // Close implements Sessions: nothing runs.
-func (RefuseSessions) Close(context.Context, SessionClose) {}
+func (RefuseSessions) Close(context.Context, SessionClose) {
+	// RefuseSessions never opens a session, so there is none to close.
+}
 
 // EndAll implements Sessions: nothing runs.
-func (RefuseSessions) EndAll(context.Context) {}
+func (RefuseSessions) EndAll(context.Context) {
+	// RefuseSessions never opens a session, so there is none to end.
+}

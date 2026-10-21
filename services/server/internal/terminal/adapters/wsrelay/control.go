@@ -146,7 +146,7 @@ func (h *Handler) serve(ctx context.Context, ws *websocket.Conn) {
 	defer close(k.ended)
 	defer c.stopTimer()
 	defer func() {
-		if p := recover(); p != nil {
+		if recover() != nil {
 			h.d.Log.LogAttrs(ctx, slog.LevelError, msgPanic, slog.String(logErrorType, errorPanic))
 			k.close(domain.CodeUnknownError)
 		}

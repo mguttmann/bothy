@@ -82,8 +82,11 @@ type Client struct {
 	first   chan startup.Ready
 	// delivered is set once the first ready went to Login or Login gave up waiting for it.
 	delivered bool
-	// pending is the last ready that arrived before a ready handler was set.
+	// pending is the newest later ready the ready handler has not taken yet; applying is set
+	// while the one worker of the handler runs, so readies are applied one at a time and the
+	// newest last.
 	pending  *startup.Ready
+	applying bool
 	stopped  chan struct{}
 	stopErr  error
 	loopDone chan struct{}
@@ -142,12 +145,36 @@ func (c *Client) Keys() *KeyStore { return &c.keys }
 func (c *Client) SetReadyHandler(f func(context.Context, startup.Ready)) {
 	c.mu.Lock()
 	c.onReady = f
-	pending := c.pending
-	c.pending = nil
+	// A ready that arrived before the handler (Login had given up) is the current declaration.
+	c.startApplyLocked()
 	c.mu.Unlock()
-	if pending != nil && f != nil {
-		// A ready that arrived before the handler (Login had given up) is the current declaration.
-		go f(context.Background(), *pending)
+}
+
+// startApplyLocked starts the worker of the ready handler when a ready waits and none runs;
+// c.mu is held.
+func (c *Client) startApplyLocked() {
+	if c.onReady == nil || c.pending == nil || c.applying {
+		return
+	}
+	c.applying = true
+	go c.applyReadies(c.onReady)
+}
+
+// applyReadies hands the waiting readies to f one at a time until none waits: a ready that
+// arrives while f runs replaces an older waiting one, so the newest declaration is applied last
+// (the server sends ready on every change of llm_credentials, 24 7.4).
+func (c *Client) applyReadies(f func(context.Context, startup.Ready)) {
+	for {
+		c.mu.Lock()
+		r := c.pending
+		c.pending = nil
+		if r == nil {
+			c.applying = false
+			c.mu.Unlock()
+			return
+		}
+		c.mu.Unlock()
+		f(context.Background(), *r)
 	}
 }
 
@@ -368,21 +395,17 @@ func (c *Client) drop(k *conn) {
 }
 
 // deliver hands a ready to Login (the first) or to the ready handler (every later one).
-func (c *Client) deliver(ctx context.Context, r startup.Ready, k *conn) {
+func (c *Client) deliver(r startup.Ready, k *conn) {
 	c.mu.Lock()
 	c.live = k
-	f, first := c.onReady, !c.delivered
+	first := !c.delivered
 	c.delivered = true
-	c.mu.Unlock()
 	if first {
+		c.mu.Unlock()
 		c.first <- r
 		return
 	}
-	if f == nil {
-		c.mu.Lock()
-		c.pending = &r
-		c.mu.Unlock()
-		return
-	}
-	go f(context.WithoutCancel(ctx), r)
+	c.pending = &r
+	c.startApplyLocked()
+	c.mu.Unlock()
 }

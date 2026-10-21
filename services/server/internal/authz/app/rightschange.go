@@ -644,11 +644,11 @@ func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 	}
 	hosts, err := h.d.Hosts.HostIDs(ctx)
 	if err != nil {
-		return structureView{}, sourceError("host source", err)
+		return structureView{}, sourceError(hostSourceName, err)
 	}
 	personal, err := h.d.Hosts.PersonalHosts(ctx)
 	if err != nil {
-		return structureView{}, sourceError("host source", err)
+		return structureView{}, sourceError(hostSourceName, err)
 	}
 	w := structureView{hosts: hosts, personal: map[ids.ID]ids.ID{}}
 	for _, p := range personal {
@@ -812,7 +812,7 @@ func (h *RightsHook) channelTarget(ctx context.Context, id ids.ID) (ids.ID, []id
 func (h *RightsHook) hostTarget(ctx context.Context, id ids.ID) ([]ids.ID, error) {
 	f, ok, err := h.d.Hosts.Host(ctx, id)
 	if err != nil {
-		return nil, sourceError("host source", err)
+		return nil, sourceError(hostSourceName, err)
 	}
 	if !ok {
 		return nil, nil

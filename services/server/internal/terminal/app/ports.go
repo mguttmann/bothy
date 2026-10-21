@@ -217,17 +217,21 @@ func (NoLinks) OpenSession(context.Context, ids.ID, SessionOpen) error { return 
 func (NoLinks) CloseSession(context.Context, ids.ID, ids.ID, domain.CloseReason) error { return nil }
 
 // CloseHost implements ControlLinks: nothing to close.
-func (NoLinks) CloseHost(ids.ID, domain.CloseCode) {}
+func (NoLinks) CloseHost(ids.ID, domain.CloseCode) {
+	// Without control connections no host is connected, so there is nothing to close.
+}
 
 // Connected implements ControlLinks: false.
 func (NoLinks) Connected(ids.ID) bool { return false }
 
 // SendReady implements ControlLinks: nothing to send.
-func (NoLinks) SendReady(ids.ID) {}
+func (NoLinks) SendReady(ids.ID) {
+	// Without control connections there is no connection to send ready on.
+}
 
 // TerminalKeys reads the published signing keys of purpose terminal (instance.Keys); the control
 // connection hands them to the host service in hello and heartbeat_ack (24 section 5.3).
-type TerminalKeys interface {
+type TerminalKeys interface { // NOSONAR: named after what it reads, like instance.Keys; see D-M2-43-24.
 	// PublicKeys returns the next, active and retiring keys of p, read fresh.
 	PublicKeys(ctx context.Context, p instance.Purpose) ([]instance.PublicKey, error)
 }

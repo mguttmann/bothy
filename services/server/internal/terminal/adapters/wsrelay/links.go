@@ -25,7 +25,7 @@ const (
 )
 
 // ReadySource re-reads the content of ready of a host (app.Service.Ready).
-type ReadySource interface {
+type ReadySource interface { // NOSONAR: names the source of ready it stands for; see D-M2-43-24.
 	Ready(ctx context.Context, l app.Login) (app.Ready, domain.CloseCode, error)
 }
 

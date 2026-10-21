@@ -248,7 +248,7 @@ func (k *conn) handle(ctx context.Context, f frameOrEnd, ready *bool) (outcome, 
 				return outcome{Reaction: Reaction{Kind: Backoff}}, true
 			}
 		}
-		c.deliver(ctx, startup.Ready{LLMCredentials: b.LLMCredentials}, k)
+		c.deliver(startup.Ready{LLMCredentials: b.LLMCredentials}, k)
 	case *HeartbeatAck:
 		if b.JWKS != nil {
 			c.keys.Set(*b.JWKS)

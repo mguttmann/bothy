@@ -597,3 +597,69 @@ func TestLateReadyReachesHandler(t *testing.T) {
 		t.Fatal("the late ready never reached the handler")
 	}
 }
+
+// TestLaterReadiesApplyInOrder (M2-43, review of the pull request): the server sends ready again
+// on every change of the declaration; the ready handler (startup.Service.OnReady, which stores the
+// declaration and evaluates HD6) never runs twice at the same time, and the newest ready is the
+// last one it applies, so an older declaration never overwrites a newer one.
+func TestLaterReadiesApplyInOrder(t *testing.T) {
+	t.Parallel()
+	srv := controltest.New(t)
+	c := newClient(t, srv, nil)
+	var (
+		mu      gosync.Mutex
+		active  int
+		overlap bool
+		applied []string
+	)
+	entered := make(chan struct{}, 8)
+	release := make(chan struct{})
+	c.SetReadyHandler(func(_ context.Context, r startup.Ready) {
+		mu.Lock()
+		active++
+		overlap = overlap || active > 1
+		first := len(applied) == 0
+		applied = append(applied, string(r.LLMCredentials))
+		mu.Unlock()
+		entered <- struct{}{}
+		if first {
+			<-release
+		}
+		mu.Lock()
+		active--
+		mu.Unlock()
+	})
+	done := make(chan error, 1)
+	go func() { _, err := c.Login(ctx(t)); done <- err }()
+	conn, _ := handshake(t, srv, 60000, "organization")
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Report(ctx(t), sampleReport("Debian 13")); err != nil {
+		t.Fatal(err)
+	}
+	conn.Expect(t, ctx(t), "report")
+	for _, decl := range []string{"personal", "organization"} {
+		if err := conn.Send(ctx(t), "ready", controltest.Ready(hostID, decl)); err != nil {
+			t.Fatal(err)
+		}
+		conn.Expect(t, ctx(t), "report")
+	}
+	<-entered // the first later ready runs and blocks
+	// A second handler call while the first still runs is the defect; give it time to show.
+	select {
+	case <-entered:
+	case <-time.After(300 * time.Millisecond): // nosemgrep: bothy-go-test-wall-clock-wait -- a bounded give-up: the defect shows within milliseconds
+	}
+	close(release)
+	waitFor(t, "the newest ready is applied", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return active == 0 && len(applied) >= 2 && applied[len(applied)-1] == "organization"
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	if overlap {
+		t.Errorf("the ready handler ran twice at the same time: %v", applied)
+	}
+}
