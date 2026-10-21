@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // fakeEvent is one durable event of the fake server.
@@ -371,9 +372,7 @@ func runWorld(t *testing.T, w *world) (Canaries, string, error) {
 	t.Helper()
 	var log bytes.Buffer
 	cfg := Config{PublicURL: "https://chat.example.com", Canary: testCanary, SetupStdout: []byte(testCode + "\n"), Log: &log}
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
-	c, err := Run(ctx, cfg, &fakeREST{w: w}, w.dial)
+	c, err := Run(testkit.Context(t), cfg, &fakeREST{w: w}, w.dial)
 	return c, log.String(), err
 }
 
