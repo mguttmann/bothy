@@ -669,11 +669,12 @@ func TestBehaviorChangesAndEvents(t *testing.T) {
 		if slices.Contains(got, "agent.config_changed") {
 			t.Fatalf("Lotse received agent.config_changed after it stopped operating the channel: %v", got)
 		}
-		if !slices.Contains(envelopeTypes(b.listedEvents(b.w.Owner, head), allgemein), "agent.config_changed") {
-			// The owner never receives the personal event; the row itself must exist.
-			if !slices.Contains(types(b.eventsAfter(head), allgemein), "agent.config_changed") {
-				t.Fatal("no agent.config_changed was written")
-			}
+		// The owner is outside the audience of the personal event; the row itself must exist.
+		if got := envelopeTypes(b.listedEvents(b.w.Owner, head), allgemein); slices.Contains(got, "agent.config_changed") {
+			t.Fatalf("the owner received the personal agent.config_changed: %v", got)
+		}
+		if !slices.Contains(types(b.eventsAfter(head), allgemein), "agent.config_changed") {
+			t.Fatal("no agent.config_changed was written")
 		}
 	})
 

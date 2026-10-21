@@ -359,7 +359,7 @@ Rulings: docs/DECISIONS.md D-M2-02-1 to D-M2-02-13. Tests: `domain/behavior_test
 `FuzzValidateBehavior`), `app/behavior_internal_test.go`, `test/integration/behavior` and the
 canary class `manage_only` of `test/canary`.
 
-## Port (Wurzelpaket `internal/chat`)
+## Port (root package `internal/chat`)
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).
