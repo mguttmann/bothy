@@ -9,17 +9,20 @@ downloads the shards' profiles, merges them per module and runs the coverage gat
 profile, which SonarQube reads as before.
 
 Assignment: every package of `go list ./...` in every Go module is one unit; a package of SPLITS
-is K units instead, its parts 1/K to K/K, each weighing 1/K of the package. Units are sorted by
+is K units instead, its parts 1/K to K/K, each weighing its measured duration (TIMINGS keeps it as
+`<package>@<J>/<K>`), else 1/K of the package. Units are sorted by
 their measured duration (TIMINGS, longest first, then by name) and each goes to the shard with the
 least total so far. A package without a measured duration (a new one) weighs the median, so it
 still lands in exactly one shard. The split is deterministic: every shard computes the same one.
 
 Parts: the top-level tests of a split package (the Test, Example and Fuzz functions of its
-`_test.go` files) go round-robin into K groups by name; part J < K runs `-run ^(group J)$`, part K
-`-skip` with the names of all other groups. So every top-level test runs in exactly one part, a
-test the listing missed in the last one. A shard runs its whole packages in one `go test` and each
-part in another at the same time (after one `go test -c` that compiles the module for all of
-them) and merges their profiles into the module's profile.
+`_test.go` files) go into K groups of about equal measured duration (TIMINGS keeps them as
+`<package>#<test>`, from the `-v` output of the parts; without them the names go round-robin);
+part J < K runs `-run ^(group J)$`, part K `-skip` with the names of all other groups. So every
+top-level test runs in exactly one part, a test the listing missed in the last one. A shard runs
+its whole packages in one `go test` and each part in another (with `-v`) at the same time, after
+one `go test -c` that compiles the module for all of them, and merges their profiles into the
+module's profile.
 
 Merge: `go test ./...` concatenates the profiles of its test binaries below one mode line; the
 merge does the same with the shards' profiles. Every block of the single run is in the merged
@@ -42,8 +45,8 @@ Usage:
       merge the shard folders below DIR (each with RECORD and <module>/coverage.out) into
       ROOT/<module>/coverage.out
   go_shards.py timings LOG...
-      print the mean duration per package of `go test` logs as JSON (to refresh TIMINGS); a part
-      of K counts K times, as an estimate of the whole package
+      print the mean duration per package (and per test of a split package) of `go test` logs
+      as JSON (to refresh TIMINGS); a part of K counts K times, as an estimate of the package
 
 Exit codes: 0 done, 1 a check failed (the reason on stderr).
 """
@@ -69,6 +72,8 @@ PROFILE = "coverage.out"
 _RESULT = re.compile(r"^(?:\S+\s)?(?:ok|FAIL)\s+(\S+)\s+(\d+(?:\.\d+)?)s\b")
 # The line `test` prints before the output of a part, so `timings` counts the part as its share.
 _MARKER = re.compile(r"^(?:\S+\s)?go-shard: part (\d+)/(\d+) of (\S+)$")
+# The result line of a top-level test in the -v output of a part.
+_TEST_RESULT = re.compile(r"^(?:\S+\s)?--- (?:PASS|FAIL|SKIP): ([^\s/]+) \((\d+(?:\.\d+)?)s\)$")
 
 
 # Packages whose tests are split across shards, with the number of parts: alone each would set
@@ -118,15 +123,28 @@ def top_level_tests(directory: Path) -> list[str]:
     return sorted(names - {"TestMain"})
 
 
-def part_filter(names: Sequence[str], part: int, parts: int) -> tuple[str, str]:
+def part_filter(
+    names: Sequence[str], part: int, parts: int, weights: dict[str, float] | None = None
+) -> tuple[str, str]:
     """The `go test` filter (flag, pattern) of part `part` of `parts` of a package.
 
-    The sorted top-level tests `names` go round-robin into `parts` groups; part J < K runs group J
+    The top-level tests `names` go into `parts` groups of about equal measured duration
+    (`weights`, longest first, each to the lighter group; an unmeasured test weighs the median,
+    so without measurements the sorted names go round-robin). Part J < K runs group J
     (`-run ^(...)$`), the last part skips the groups of all other parts (`-skip ^(...)$`). Both
     filters match whole top-level names only, so every top-level test runs in exactly one part,
     also one the listing missed: it is in no group and runs in the last part.
     """
-    groups = [sorted(names)[j::parts] for j in range(parts)]
+    weights = weights or {}
+    known = [weights[n] for n in names if n in weights]
+    default = statistics.median(known) if known else 1.0
+    groups: list[list[str]] = [[] for _ in range(parts)]
+    loads = [0.0] * parts
+    for negative, name in sorted({(-weights.get(n, default), n) for n in names}):
+        target = min(range(parts), key=lambda i: (loads[i], i))
+        groups[target].append(name)
+        loads[target] -= negative
+    groups = [sorted(g) for g in groups]
     if part < parts:
         return "-run", "^(" + "|".join(groups[part - 1]) + ")$"
     return "-skip", "^(" + "|".join(n for g in groups[:-1] for n in g) + ")$"
@@ -182,7 +200,13 @@ def assign(units: Iterable[Unit], timings: dict[str, float], total: int) -> list
     units = list(units)
     known = [timings[u.package] for u in units if u.package in timings]
     default = statistics.median(known) if known else 1.0
-    weighted = sorted({(-timings.get(u.package, default) / _parts(u), u) for u in units})
+
+    def weight(unit: Unit) -> float:
+        # A part weighs its own measured duration, else its share of the package.
+        own = timings.get(f"{unit.package}@{unit.part}") if unit.part else None
+        return own if own is not None else timings.get(unit.package, default) / _parts(unit)
+
+    weighted = sorted({(-weight(u), u) for u in units})
     shards: list[list[Unit]] = [[] for _ in range(total)]
     loads = [0.0] * total
     for negative, unit in weighted:
@@ -193,19 +217,35 @@ def assign(units: Iterable[Unit], timings: dict[str, float], total: int) -> list
 
 
 def parse_timings(logs: Sequence[Path]) -> dict[str, float]:
-    """The mean duration per package of the `ok`/`FAIL` result lines of `go test` logs."""
+    """The mean durations of the `go test` logs.
+
+    Per package from its `ok`/`FAIL` result lines, per part of a split package as
+    `<package>@<J>/<K>` and per top-level test of a part (from its `-v` output) as
+    `<package>#<test>`.
+    """
     seen: dict[str, list[float]] = {}
     for log in logs:
-        parts: dict[str, int] = {}
+        parts: dict[str, str] = {}  # the part J/K whose output follows, per split package
+        current = ""  # the split package whose part output this is
         for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
             marker = _MARKER.match(line)
             if marker:
-                parts[marker[3]] = int(marker[2])
+                parts[marker[3]] = f"{marker[1]}/{marker[2]}"
+                current = marker[3]
+            test = _TEST_RESULT.match(line)
+            if test and current:
+                seen.setdefault(f"{current}#{test[1]}", []).append(float(test[2]))
             match = _RESULT.match(line)
-            if match:
-                # A part of K ran about 1/K of the package: K times it estimates the whole.
-                share = parts.pop(match[1], 1)
-                seen.setdefault(match[1], []).append(float(match[2]) * share)
+            if match and match[1] == current:
+                current = ""
+            if match and match[1] in parts:
+                # The part itself, and K times it as an estimate of the whole package.
+                seen.setdefault(f"{match[1]}@{parts[match[1]]}", []).append(float(match[2]))
+                seen.setdefault(match[1], []).append(
+                    float(match[2]) * int(parts.pop(match[1]).split("/")[1])
+                )
+            elif match:
+                seen.setdefault(match[1], []).append(float(match[2]))
     return {pkg: round(statistics.fmean(v), 3) for pkg, v in sorted(seen.items())}
 
 
@@ -253,7 +293,8 @@ def _shard(args: argparse.Namespace) -> tuple[int, int, list[tuple[Unit, str, st
     # this shard goes first, so it does not start late and end the shard late; the others follow
     # in `go list` order, which mixes long and short ones (all long ones at once slowed every
     # package of a shard down: they compete for the CPUs and the databases).
-    shard = assign(expand(units, SPLITS), load_timings(args.timings), count)[index - 1]
+    timings = load_timings(args.timings)
+    shard = assign(expand(units, SPLITS), timings, count)[index - 1]
     own = [u for u in shard if u.module == args.module]  # longest first, as assign() lists them
     order = {(u.module, u.package): i for i, u in enumerate(units)}
     mine = own[:1] + sorted(own[1:], key=lambda u: (order[(u.module, u.package)], u.part))
@@ -261,7 +302,11 @@ def _shard(args: argparse.Namespace) -> tuple[int, int, list[tuple[Unit, str, st
     for unit in mine:
         if unit.part:
             part, parts = parse_shard(unit.part)
-            flag, pattern = part_filter(list_tests(unit.module, unit.package), part, parts)
+            names = list_tests(unit.module, unit.package)
+            weights = {
+                n: timings[f"{unit.package}#{n}"] for n in names if f"{unit.package}#{n}" in timings
+            }
+            flag, pattern = part_filter(names, part, parts, weights)
             planned.append((unit, flag, pattern))
         else:
             planned.append((unit, "", ""))
@@ -383,7 +428,7 @@ def _test(args: argparse.Namespace) -> int:
         args_ = [f"-coverprofile={own}" if a == profiles[0] else a for a in flags]
         out = tempfile.TemporaryFile()  # noqa: SIM115 - closed below, after the process ended
         proc = subprocess.Popen(  # nosec B603 B607 - go test with the Makefile's flags
-            ["go", "test", *args_, flag, pattern, unit.package],
+            ["go", "test", *args_, "-v", flag, pattern, unit.package],
             cwd=module,
             stdout=out,
             stderr=subprocess.STDOUT,
