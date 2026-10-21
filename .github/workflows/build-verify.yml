@@ -598,6 +598,16 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: make postgres-image postgres-image-test
         run: make postgres-image postgres-image-test
+      # As in ci.yml: the flakes of the job (tools/ci/flakes.py); no artifact without a flake.
+      - name: Upload the flakes
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flakes-postgres-image-amd64
+          path: .cache/flakes/
+          include-hidden-files: true # .cache starts with a dot
+          if-no-files-found: ignore
+          retention-days: 7
 
   postgres-image-arm64:
     name: postgres-image (arm64)
@@ -620,6 +630,16 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: make postgres-image postgres-image-test
         run: make postgres-image postgres-image-test
+      # As in ci.yml: the flakes of the job (tools/ci/flakes.py); no artifact without a flake.
+      - name: Upload the flakes
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flakes-postgres-image-arm64
+          path: .cache/flakes/
+          include-hidden-files: true # .cache starts with a dot
+          if-no-files-found: ignore
+          retention-days: 7
 
   # As in ci.yml: platform tests of the apps on macOS, Windows and Android emulators.
   apps-macos:

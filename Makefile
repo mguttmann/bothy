@@ -46,6 +46,15 @@ GO_SHARD_RECORD ?= .cache/go-shard/go-shard.txt
 GO_TEST_TAGS := contract_validate
 # The flags of every `go test` of `make test`, in one run or in shards.
 GO_TEST_FLAGS = -race -tags $(GO_TEST_TAGS) -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT)
+# CI=true (GitHub Actions sets it): every `go test` of the gates runs through tools/ci/flakes.py,
+# which runs it with the pinned gotestsum, reruns failed tests and records each rerun that passed
+# (a flake) in FLAKE_DIR and the job summary; `flutter test` runs a failed test once more (preset
+# `ci` of each member's dart_test.yaml). Without CI=true every test runs once and a failure fails
+# (docs/quality/gates.md, section "Flakes").
+CI ?=
+FLAKE_DIR ?= .cache/flakes
+FLAKES_ON := $(filter true,$(CI))
+comma := ,
 # Host system of the Dart performance tests: they run in profile mode on macOS only.
 PERF_HOST ?= $(shell uname -s)
 
@@ -83,11 +92,17 @@ FETCH := $(UVRUN) python tools/bin/fetch_tools.py
 # go, a Docker-compatible runtime and the pins of the server gates; a gap fails (R-QA-02).
 GO_PREREQS := $(UVRUN) python tools/ci/go_prereqs.py
 GO_SHARDS := $(UVRUN) python tools/ci/go_shards.py
+# Absolute paths: the Go tests call it from inside a module.
+FLAKES := $(UV) run --project $(CURDIR)/tools --locked --quiet python $(CURDIR)/tools/ci/flakes.py
 CODEGEN_CHECK := $(UVRUN) python tools/ci/codegen_check.py
 MIGRATIONS_LINT := $(UVRUN) python tools/ci/migrations_lint.py
 SEMGREP := $(UV)x --quiet --python 3.12 --from semgrep==$(SEMGREP_VERSION) semgrep
 # Path of a pinned release binary, resolved (and fetched on first use) inside a recipe.
 tool = "$$($(FETCH) path $(1))"
+# `go test` with the flags $(1) for the packages $(2); with CI=true through flakes.py (reruns and
+# the flake report), with the pinned gotestsum that $(gotestsum) sets as `gts` before.
+go_test = $(if $(FLAKES_ON),$(FLAKES) go --dir $(abspath $(FLAKE_DIR)) --gotestsum "$$gts" --packages "$(2)" -- $(1),go test $(1) $(2))
+gotestsum = $(if $(FLAKES_ON),gts=$(call tool,gotestsum) || exit 1;,)
 # A pinned Node tool must be installed (`make bootstrap`); without it the gate fails with a hint.
 need_node = [ -x $(NODE_BIN)/$(1) ] || { echo "$(1): $(NODE_BIN)/$(1) not found; run \`make bootstrap\`" >&2; exit 2; }
 skip = printf '  SKIP  %-14s %s\n' '$(1)' '$(2)'
@@ -276,12 +291,12 @@ test: ## All tests with coverage data
 	@# GO_TEST_SHARD: the same command for the packages of one shard; the CI job
 	@# "test (server coverage)" merges the shards' profiles (tools/ci/go_shards.py).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
-	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
+	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; $(gotestsum) \
 	  if [ -n "$(GO_TEST_SHARD)" ]; then mkdir -p "$(dir $(GO_SHARD_RECORD))" && : > "$(GO_SHARD_RECORD)" || exit 1; fi; \
 	  for m in $(GO_MODS); do \
 	    if [ -n "$(GO_TEST_SHARD)" ]; then \
-	      GO_ARCH_LINT="$$gal" $(GO_SHARDS) test --shard "$(GO_TEST_SHARD)" --record "$(abspath $(GO_SHARD_RECORD))" --tags $(GO_TEST_TAGS) --module $$m $(GO_MODS) -- $(GO_TEST_FLAGS) || exit 1; \
-	    else (cd $$m && GO_ARCH_LINT="$$gal" go test $(GO_TEST_FLAGS) ./...) || exit 1; fi; done; fi
+	      GO_ARCH_LINT="$$gal" $(GO_SHARDS) test --shard "$(GO_TEST_SHARD)" --record "$(abspath $(GO_SHARD_RECORD))" --tags $(GO_TEST_TAGS) $(if $(FLAKES_ON),--flakes $(abspath $(FLAKE_DIR)) --gotestsum "$$gts") --module $$m $(GO_MODS) -- $(GO_TEST_FLAGS) || exit 1; \
+	    else (cd $$m && GO_ARCH_LINT="$$gal" $(call go_test,$(GO_TEST_FLAGS),./...)) || exit 1; fi; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@# The workspace resolves once at the root (one pubspec.lock); then every member runs its tests.
@@ -289,7 +304,13 @@ test: ## All tests with coverage data
 	else for p in $(DART_PKGS); do \
 	  [ -d $$p/test ] || { echo "$$p: no test/ directory (docs/spec/23-quality.md, 3)" >&2; exit 1; }; done; \
 	  $(FLUTTER) pub get --enforce-lockfile || exit 1; \
-	  for p in $(DART_PKGS); do (cd $$p && $(FLUTTER) test --coverage) || exit 1; done; fi
+	  $(if $(FLAKES_ON),mkdir -p .cache/dart-reports && printf 'add_presets: [ci]\n' > .cache/dart-reports/ci.yaml || exit 1;) \
+	  for p in $(DART_PKGS); do \
+	    $(if $(FLAKES_ON),r="$(CURDIR)/.cache/dart-reports/$$(printf '%s' "$$p" | tr / -).json"; rm -f "$$r";) \
+	    rc=0; (cd $$p && $(if $(FLAKES_ON),DART_TEST_CONFIG="$(CURDIR)/.cache/dart-reports/ci.yaml") \
+	      $(FLUTTER) test --coverage $(if $(FLAKES_ON),--file-reporter "json:$$r")) || rc=1; \
+	    $(if $(FLAKES_ON),$(FLAKES) dart --dir $(abspath $(FLAKE_DIR)) --package $$p "$$r" || exit 1;) \
+	    [ $$rc -eq 0 ] || exit 1; done; fi
 	@# JVM tests of the Android code (brief M5-01): without a JDK 17 or the Android SDK
 	@# (ANDROID_HOME) the Gradle wrapper fails, and so does this gate (P-09).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,jvm-test,no Dart package selected); \
@@ -309,9 +330,9 @@ test: ## All tests with coverage data
 # responses on the server side (tag contract_validate).
 contract-test: ## Contract tests G7: Schemathesis against the server of this tree (Docker runtime)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,contract-test,no Go module selected); \
-	else $(GO_PREREQS) test || exit 1; \
-	  cd services/server && CONTRACT_MAX_EXAMPLES=$(CONTRACT_MAX_EXAMPLES) go test -count=1 -tags contract_validate,contract_live \
-	    -run '^TestG7_' -timeout $(CONTRACT_TIMEOUT) ./test/contract/... || exit 1; fi
+	else $(GO_PREREQS) test || exit 1; $(gotestsum) \
+	  cd services/server && CONTRACT_MAX_EXAMPLES=$(CONTRACT_MAX_EXAMPLES) $(call go_test,-count=1 -tags contract_validate$(comma)contract_live \
+	    -run '^TestG7_' -timeout $(CONTRACT_TIMEOUT),./test/contract/...) || exit 1; fi
 
 coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	@if [ -z "$(TOOLS_ON)" ]; then $(call tools_skip,tools-coverage); \
@@ -819,10 +840,10 @@ image: ## Build bothy-server for IMAGE_PLATFORMS into IMAGE_OCI and load the hos
 image-test: ## Structure tests of the image from make image (IMAGE=<ref> tests another loaded image)
 	@docker info >/dev/null 2>&1 || { echo "image-test: no Docker runtime reachable; the image tests need one (P-09)" >&2; exit 1; }
 	@[ -f "$(IMAGE_OCI)" ] || { echo "image-test: $(IMAGE_OCI) is missing; run make image first" >&2; exit 1; }
-	@gl=$(call tool,golangci-lint) || exit 1; \
+	@gl=$(call tool,golangci-lint) || exit 1; $(gotestsum) \
 	cd services/server && "$$gl" run --build-tags imagetest ./test/image/... || exit 1; \
 	BOTHY_TEST_IMAGE='$(or $(IMAGE),$(IMAGE_NAME):$(IMAGE_TAG))' BOTHY_TEST_IMAGE_OCI='$(abspath $(IMAGE_OCI))' \
-	  go test -tags imagetest -count=1 ./test/image/... || exit 1
+	  $(call go_test,-tags imagetest -count=1,./test/image/...) || exit 1
 
 # ---- database image (brief M7-01; not part of `gates`: needs Docker with buildx) ------------------
 # bothy-postgres is postgres:18 plus pgBackRest and bothy-backupd; its tag is pg18-<server version>
@@ -848,10 +869,10 @@ postgres-image: ## Build bothy-postgres for IMAGE_PLATFORMS into POSTGRES_IMAGE_
 postgres-image-test: ## Two-container test of bothy-postgres: archive-push, full backup, PITR, verify (after make postgres-image)
 	@docker info >/dev/null 2>&1 || { echo "postgres-image-test: no Docker runtime reachable; the image tests need one (P-09)" >&2; exit 1; }
 	@[ -f "$(POSTGRES_IMAGE_OCI)" ] || { echo "postgres-image-test: $(POSTGRES_IMAGE_OCI) is missing; run make postgres-image first" >&2; exit 1; }
-	@gl=$(call tool,golangci-lint) || exit 1; \
+	@gl=$(call tool,golangci-lint) || exit 1; $(gotestsum) \
 	cd services/server && "$$gl" run --build-tags imagetest ./test/postgresimage/... || exit 1; \
 	BOTHY_TEST_IMAGE='$(or $(POSTGRES_IMAGE),$(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG))' BOTHY_TEST_IMAGE_OCI='$(abspath $(POSTGRES_IMAGE_OCI))' \
-	  go test -tags imagetest -count=1 -v -timeout 20m ./test/postgresimage/... || exit 1
+	  $(call go_test,-tags imagetest -count=1 -v -timeout 20m,./test/postgresimage/...) || exit 1
 
 # Tests of the setup wizard (brief M7-29): POSIX shell tests with stubs for docker, curl, cosign
 # and sudo (infra/compose/test/install/README.md). They run in the pinned Debian container, so the

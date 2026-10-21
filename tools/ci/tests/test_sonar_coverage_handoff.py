@@ -84,7 +84,12 @@ def test_test_jobs_upload_the_reports_after_make_test(job: str, part: str) -> No
         i for i, s in enumerate(steps) if re.search(r"make (-o )?test coverage", str(s.get("run")))
     )
     [pack] = [i for i, s in enumerate(steps) if "REPORTS" in s.get("env", {})]
-    [upload] = [i for i, s in enumerate(steps) if _uses(s, "actions/upload-artifact")]
+    # Besides the flake report of the job (flakes-<job>, tools/ci/flakes.py).
+    [upload] = [
+        i
+        for i, s in enumerate(steps)
+        if _uses(s, "actions/upload-artifact") and not s["with"]["name"].startswith("flakes-")
+    ]
     assert make < pack < upload
     assert steps[upload]["with"]["name"] == f"{SONAR_ARTIFACT}-{part}"
     assert steps[upload]["with"]["if-no-files-found"] == "error"

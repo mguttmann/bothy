@@ -35,9 +35,11 @@ shard, that the filters of the parts run each top-level test once, and that ever
 profile of each module it tested.
 
 Usage:
-  go_shards.py test --shard I/N --module M [--timings F] [--record F] [--tags T] MODULE... -- FLAGS
+  go_shards.py test --shard I/N --module M [--timings F] [--record F] [--tags T]
+                    [--flakes DIR --gotestsum PATH] MODULE... -- FLAGS
       run `go test FLAGS` in module M for its packages and parts in shard I of N (FLAGS need one
-      -coverprofile=FILE); --record appends them to F
+      -coverprofile=FILE); --record appends them to F; --flakes runs each `go test` through
+      flakes.py (gotestsum, reruns of failed tests, flakes recorded in DIR; CI only)
   go_shards.py packages --shard I/N --module M [--timings F] [--record F] [--tags T] MODULE...
       print the packages of module M in shard I of N (one per line, the longest one first; a
       part with its filter flag and pattern); --record appends them to F
@@ -66,6 +68,8 @@ from pathlib import Path
 from typing import IO, NamedTuple
 
 TIMINGS = Path(__file__).resolve().with_name("go_test_timings.json")
+# The CI runner of `go test` with reruns and the flake report (--flakes, docs/quality/gates.md).
+FLAKES = Path(__file__).resolve().with_name("flakes.py")
 # The list of packages a shard ran, written by `packages --record` and read by `merge`.
 RECORD = "go-shard.txt"
 PROFILE = "coverage.out"
@@ -421,14 +425,14 @@ def _test(args: argparse.Namespace) -> int:
             return 1
     running: list[tuple[subprocess.Popen[bytes], Unit | None, Path, IO[bytes] | None]] = []
     if whole:
-        main = subprocess.Popen(["go", "test", *flags, *whole], cwd=module)  # nosec B603 B607
+        main = subprocess.Popen(_go_test(args, flags, whole), cwd=module)  # nosec B603 B607
         running.append((main, None, profile, None))
     for number, (unit, flag, pattern) in enumerate(parts, 1):
         own = profile.with_name(f"{profile.stem}.part{number}{profile.suffix}")
         args_ = [f"-coverprofile={own}" if a == profiles[0] else a for a in flags]
         out = tempfile.TemporaryFile()  # noqa: SIM115 - closed below, after the process ended
         proc = subprocess.Popen(  # nosec B603 B607 - go test with the Makefile's flags
-            ["go", "test", *args_, "-v", flag, pattern, unit.package],
+            _go_test(args, [*args_, "-v", flag, pattern], [unit.package]),
             cwd=module,
             stdout=out,
             stderr=subprocess.STDOUT,
@@ -452,6 +456,25 @@ def _test(args: argparse.Namespace) -> int:
         path.unlink()
     merged.replace(module / profile)
     return 0
+
+
+def _go_test(args: argparse.Namespace, flags: Sequence[str], packages: Sequence[str]) -> list[str]:
+    """`go test FLAGS PACKAGES`, or with --flakes that command through flakes.py with reruns."""
+    if not args.flakes:
+        return ["go", "test", *flags, *packages]
+    return [
+        sys.executable,
+        str(FLAKES),
+        "go",
+        "--dir",
+        str(args.flakes),
+        "--gotestsum",
+        args.gotestsum,
+        "--packages",
+        " ".join(packages),
+        "--",
+        *flags,
+    ]
 
 
 def _cover_once(filters: Sequence[tuple[str, str]]) -> bool:
@@ -496,6 +519,10 @@ def main(argv: list[str] | None = None) -> int:
     test.add_argument("--timings", type=Path, default=TIMINGS)
     test.add_argument("--record", type=Path)
     test.add_argument("--tags", default="", help="the build tags of `go test`")
+    test.add_argument(
+        "--flakes", type=Path, help="rerun failed tests, record flakes in this folder"
+    )
+    test.add_argument("--gotestsum", default="gotestsum", help="the gotestsum of --flakes")
     test.add_argument("modules", nargs="+")
     test.set_defaults(run=_test)
     timings = sub.add_parser("timings")

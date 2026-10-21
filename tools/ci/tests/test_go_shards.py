@@ -375,7 +375,9 @@ def test_the_matrix_runs_every_shard_once(path: Path) -> None:
     # Every shard reports, also after another failed: the merge then names every gap.
     assert job["strategy"]["fail-fast"] is False
     assert job["name"] == f"test (server, shard ${{{{ matrix.shard }}}} of {total})"
-    [upload] = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/upload-")]
+    # Besides the flake report of the shard (flakes-<job>, tools/ci/flakes.py).
+    uploads = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/upload-")]
+    [upload] = [s for s in uploads if not s["with"]["name"].startswith("flakes-")]
     assert upload["with"]["name"] == "go-shard-${{ matrix.shard }}"
     assert upload["with"]["if-no-files-found"] == "error"
 

@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The list of flaky tests (docs/quality/gates.md, section "Flakes"). In CI a failed test runs
+# again (tools/ci/flakes.py); each one that then passed is a flake, which its job uploads as the
+# artifact flakes-<job>. Every hour this workflow reads the flake artifacts of the CI runs of the
+# last two days and adds one comment per run with flakes to the open issue labelled `flake`
+# (created when there is none), whose body lists every flaky test, the most frequent first.
+# Only the default GITHUB_TOKEN: read the runs and their artifacts, write the issue.
+
+name: flakes
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flakes
+  cancel-in-progress: false
+
+jobs:
+  issue:
+    name: flakes (tracking issue)
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read # the CI runs and their flake artifacts
+      issues: write # the tracking issue, its comments and its label
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - name: Add the flakes of the CI runs to the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: uv run --project tools --locked --quiet python tools/ci/flakes.py issue --repo "$REPO" --workflow ci.yml --hours 48

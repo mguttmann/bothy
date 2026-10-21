@@ -17,6 +17,10 @@ testing/git_fixtures.py.
 Both rules apply when pytest starts (`pytest_configure`), so collection and fixtures of every
 scope see them, and again before each test, in case a test changed the environment.
 tools/ci/tests/test_git_env_isolation.py holds both rules.
+
+CI also sets CI=true, which switches `make test` to reruns with a flake report
+(tools/ci/flakes.py); the tests read the Makefile as a workstation does and write no job
+summary, so CI, FLAKE_DIR and GITHUB_STEP_SUMMARY are removed the same way.
 """
 
 from __future__ import annotations
@@ -47,6 +51,9 @@ GIT_IDENTITY_VARIABLES = (
     "GIT_CONFIG_PARAMETERS",
 )
 
+# The switch and the outputs of the CI reruns (tools/ci/flakes.py).
+FLAKE_VARIABLES = ("CI", "FLAKE_DIR", "GITHUB_STEP_SUMMARY")
+
 # GIT_CONFIG_COUNT replaces any configuration a caller passed the same way.
 RUNNER_GIT_ENVIRONMENT = {
     "GIT_CONFIG_GLOBAL": os.devnull,
@@ -59,7 +66,7 @@ RUNNER_GIT_ENVIRONMENT = {
 
 def pytest_configure() -> None:
     """Isolate git for the whole run: collection and fixtures of every scope."""
-    for name in (*GIT_LOCATION_VARIABLES, *GIT_IDENTITY_VARIABLES):
+    for name in (*GIT_LOCATION_VARIABLES, *GIT_IDENTITY_VARIABLES, *FLAKE_VARIABLES):
         os.environ.pop(name, None)
     os.environ.update(RUNNER_GIT_ENVIRONMENT)
 
@@ -67,7 +74,7 @@ def pytest_configure() -> None:
 @pytest.fixture(autouse=True)
 def _isolate_git(monkeypatch: pytest.MonkeyPatch) -> None:
     """Let git find the repository from the working directory of each call, without identity."""
-    for name in (*GIT_LOCATION_VARIABLES, *GIT_IDENTITY_VARIABLES):
+    for name in (*GIT_LOCATION_VARIABLES, *GIT_IDENTITY_VARIABLES, *FLAKE_VARIABLES):
         monkeypatch.delenv(name, raising=False)
     for name, value in RUNNER_GIT_ENVIRONMENT.items():
         monkeypatch.setenv(name, value)
