@@ -436,16 +436,17 @@ func (a *Authorizer) loadRecheck(ctx context.Context, ref authz.CredentialRef, v
 }
 
 // checkRecheck passes every principal without the marker and refuses the marker of the check
-// without a request (R-AZ-29) outside its one use in
-// this build: only agent.invoke (command.invoke and interaction.create follow with M2-25), only a
-// person, and never with a session, device, token, installation, "view as" or acting for. Each
-// violation is a programming error of the server, never a decision (M2-08 design note 4).
+// without a request (R-AZ-29) outside its uses in this build: only agent.invoke (command.invoke
+// and interaction.create follow with M2-25) and push.deliver, the hint check of the worker
+// consumer push and of the job notify.push_send (R-AZ-31, M3-19 design note 7); only a person, and
+// never with a session, device, token, installation, "view as" or acting for. Each violation is a
+// programming error of the server, never a decision (M2-08 design note 4).
 func checkRecheck(p authorize.Principal, act authorize.Action) error {
 	if !authorize.IsRecheckPrincipal(p) {
 		return nil
 	}
-	if act != authorize.ActionAgentInvoke {
-		return internal("the re-check principal is allowed only with agent.invoke")
+	if act != authorize.ActionAgentInvoke && act != authorize.ActionPushDeliver {
+		return internal("the re-check principal is allowed only with agent.invoke and push.deliver")
 	}
 	if p.PrincipalKind() != domain.KindUser || p.PrincipalID().IsZero() || !p.SessionRef().IsZero() || !p.DeviceRef().IsZero() ||
 		!p.TokenRef().IsZero() || !p.InstallationRef().IsZero() || !p.ViewAsPerson().IsZero() || !p.ActingForPerson().IsZero() {
