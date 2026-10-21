@@ -305,6 +305,43 @@ The deny entry carries codes as details, never a token or `jti`: `token_verdict`
 `billing_mode_mismatch`; `tool_class` (the claim) and `tool_class_used` for `tool_class_mismatch`.
 A value that is not a code is left out, so the denial is still written.
 
+### Acting-for binding (SR9, M2-14)
+
+An agent that works inside a run sends the run's invocation token in the request header
+`Invocation-Token`; identity checks it on every request through `identity.ActingForSource` (runs)
+and puts the result into `actor.ActingFor` (status `bound`, `run_inactive` or `invalid`, the
+triggering person, the run and its thread). authz reads it through `authorize.ActingForBinder`
+(`authorize.ActingForOf`) in `bindActingFor`, right after the liveness and pending checks:
+
+- Delivery mode (`authorize.Delivery`) ignores the binding completely: an agent consumer is judged
+  by its own grants (07 section 8.1). `Filter(ctx)` stays bound.
+- `domain.CheckActingFor`: `invalid` (and any unknown status) ends every action and `Scope` with
+  `forbidden invocation_token_invalid`, `Decision.Detail` `invalid`, before the path is resolved;
+  `run_inactive` does the same with `Detail` `run_inactive`, except for the unbound actions.
+- The mode table `domain.ActingForModeOf` (golden `domain/testdata/actingfor_modes.golden`):
+  own exceptions `message.create`, `run.update`, `run.finish`, `interaction.respond`,
+  `agent_session.report`; unbound `run.start` and `run.token.renew`; every other action is bound
+  (fail closed for new actions). `domain.ActingForApplies` decides after the path is resolved: an
+  own exception uses only the agent's rights when the resolved thread equals the run's thread and,
+  for a resource of kind `run`, the run is the own run; elsewhere it is bound.
+- Bound: the rights are `eff(agent) ∩ eff(person)` on the path; a target visible only with the
+  agent's own rights is `not_found acting_for_insufficient`, a requirement that holds only with
+  them is `forbidden acting_for_insufficient`; when the agent alone fails, its own reason stays.
+  `Scope` intersects every list the same way.
+- The person's rights: the snapshot of the check without a request (R-AZ-29, `loadRecheck`, cache
+  key `recheck`), so an owner keeps the owner rights without a session and no token principal of
+  the same person shares the entry; a person who is not active has no rights (SR7).
+- Denials of a principal with a binding name `acting_for_user_id` and `run_id` (IDs, absent for
+  `invalid`) and, for `invocation_token_invalid`, `token_verdict`; never the token or its `jti`.
+
+What SR9 does not cover: the server cannot tell a request inside a run that omits the header from
+one outside a run (AZ-M45, hint H1); the SDKs and reference adapters always send it (M2-29, M2-30,
+M2-33, M2-34). Knowledge a runtime keeps across runs is outside the API (H1, T-AI-01). An owner who
+triggered with a personal API token is intersected as owner (the residual of R-AZ-29). Gateway
+connections carry no binding (D-M2-14). Tests: `app/actingfor_test.go`,
+`app/reference_sr9_test.go` (AZ-P8 dimension, `TestAZP11_ActingForProperty`),
+`domain/actingfor_test.go`, `BenchmarkAuthorizeCachedActingFor`.
+
 ### How a module builds a `Resource`
 
 Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
