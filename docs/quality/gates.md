@@ -45,12 +45,16 @@ component sources (`TOOLS_SOURCE_TESTS`) run in each test job as well.
 The Go tests run in shards at the same time (`tools/ci/go_shards.py`): every package of
 `go list ./...` in every Go module is assigned to exactly one shard, balanced by the package
 durations in `tools/ci/go_test_timings.json` (a package without a duration weighs the median),
-and each shard runs `go test` with the flags of the single run for its packages only. The plan
+and each shard runs `go test` with the flags of the single run for its packages only. A package
+of `SPLITS` in `go_shards.py` (`internal/wire`) runs in parts instead, each in one shard: its
+top-level tests go into groups of about equal measured duration (`<package>#<test>` in the
+timings), part J < K runs `-run '^(group J)$'` and the last part `-skip` with the other groups,
+so every top-level test runs in exactly one part. The plan
 lists `test-server` for all shards together; the result of the matrix fails when any shard
 fails. `test (server coverage)` merges the profiles as one `go test ./...` writes them (one mode
 line, then the blocks of every test binary; the same coverage, with fewer repeated count-0
-copies), after checking that every shard ran and every package ran in exactly
-one shard, and runs the coverage threshold on the merged profile; `ci-ok` and `build-verify-ok`
+copies), after checking that every shard ran, every package or part ran in exactly
+one shard and the filters of the parts run each top-level test once, and runs the coverage threshold on the merged profile; `ci-ok` and `build-verify-ok`
 require the shards, `test (server coverage)` and `test (server contract)` (`FOLLOWS` in `tools/ci/ci_ok.py`). To refresh the durations, run
 `tools/ci/go_shards.py timings` on the logs of the shards.
 
