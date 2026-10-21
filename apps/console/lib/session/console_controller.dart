@@ -622,7 +622,8 @@ class ConsoleController extends ChangeNotifier {
   void _set(ConsoleState state) {
     // E7 ends the session: the next login in this tab starts at the first page, not at a place
     // of the person who logged out (brief M6-04, D-M6-04-3).
-    if (state is ConsoleLoggedOut) _route = ConsoleRoute.ofPage(ConsolePage.live);
+    if (state is ConsoleLoggedOut)
+      _route = ConsoleRoute.ofPage(ConsolePage.live);
     _state = state;
     notice = null;
     notifyListeners();
