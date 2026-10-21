@@ -21,7 +21,7 @@ import (
 // non-interactive shell starts with SIGINT ignored and a shell cannot trap it again. psql
 // answers with the file "answer" and fails while it is empty; timeout runs its command.
 var watchdogStubs = map[string]string{
-	"docker-entrypoint.sh": "#!/bin/sh\necho start >>\"$STUB_DIR/started\"\nexec perl -e '$SIG{INT} = sub { open(my $f, \">\", \"$ENV{STUB_DIR}/stopped\"); exit 0 }; sleep 60'\n",
+	"docker-entrypoint.sh": "#!/bin/sh\necho start >>\"$STUB_DIR/started\"\nexec perl -e '$SIG{INT} = sub { open(my $f, \">\", \"$ENV{STUB_DIR}/stopped\"); exit 0 }; open(my $r, \">>\", \"$ENV{STUB_DIR}/ready\"); print $r \"ready\\n\"; close $r; sleep 60'\n",
 	"psql":                 "#!/bin/sh\n[ -s \"$STUB_DIR/answer\" ] || exit 1\ncat \"$STUB_DIR/answer\"\n",
 	"timeout":              "#!/bin/sh\nshift\nexec \"$@\"\n",
 }
@@ -167,6 +167,15 @@ func TestWatchdogScript(t *testing.T) {
 }
 
 // starts returns how often the stub server started.
+// readies returns how often the stub server had its SIGINT handler in place.
+func (w *watchdogRun) readies() int {
+	b, err := os.ReadFile(filepath.Join(w.dir, "ready"))
+	if err != nil {
+		return 0
+	}
+	return strings.Count(string(b), "ready\n")
+}
+
 func (w *watchdogRun) starts() int {
 	b, err := os.ReadFile(filepath.Join(w.dir, "started"))
 	if err != nil {
@@ -185,7 +194,9 @@ func TestWatchdogScriptRestartsOnUSR1(t *testing.T) {
 	t.Parallel()
 	w := startWatchdog(t, bin, "t 1\n")
 	deadline := testkit.Deadline()
-	for w.starts() < 1 {
+	// Wait until the stub has its SIGINT handler: "started" is written before it is in place,
+	// and an INT before that ends the stub without the fast shutdown the test checks.
+	for w.readies() < 1 {
 		if time.Now().After(deadline) {
 			t.Fatal("the stub server did not start")
 		}
