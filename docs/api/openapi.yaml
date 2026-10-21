@@ -24183,7 +24183,9 @@ components:
       additionalProperties: false
       description: |
         Creates a forum post (with `title` and `first_message`) or a thread from a message of the
-        main thread (with `parent_message_id`, optional `first_message`).
+        main thread (with `parent_message_id`, optional `first_message`). `first_message.run_id` is
+        never valid, because a new thread has no run: `400 validation_failed` with pointer
+        `/first_message/run_id` and `errors[].code` `run_mismatch`.
       properties:
         title:
           type: string
@@ -24383,6 +24385,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         run_id:
           $ref: '#/components/schemas/Uuid'
+          description: 'Set only for `kind = run`: the run whose live box this anchor holds.'
         trigger_state:
           $ref: '#/components/schemas/TriggerState'
         trigger_state_at:
@@ -24456,7 +24459,7 @@ components:
           type: boolean
         run_id:
           $ref: '#/components/schemas/Uuid'
-          description: Agents only; the run this answer belongs to.
+          description: 'Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`.'
         components:
           type: array
           description: Agents and apps only; requires `kind = card`.

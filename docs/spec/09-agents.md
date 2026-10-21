@@ -541,7 +541,7 @@ rate-limit class from 05.
 | Report step | `run.update` on `/steps/<id>` | step ID (UUIDv7) from the adapter | the server assigns `ordinal` |
 | Acknowledge follow-up | `run.update` on `/followups/<message_id>/state` | state only forward | `delivered`, then `absorbed` |
 | Finish run | `run.finish` | same end state repeated = `200` | Body: `state`, `reason`, `summary`, `usage` (4.10) |
-| Send reply | `message.create` | `client_msg_id` | `origin = agent`; the adapter stores the ID before sending |
+| Send reply | `message.create` | `client_msg_id` | `origin = agent`; the adapter stores the ID before sending. Optional `run_id`, only for an active run (`queued`, `running`, `waiting_input`) of the agent itself in the target thread; otherwise `400 validation_failed` with `errors[].code` `run_mismatch` (also for a person or app, an unknown run, a run of another thread or agent, one body for all), or for an own ended run `409 conflict` with `reason` `run_not_active`. `run_id` is checked, not stored, and not part of the canonical request of `client_msg_id`. The adapter sends its replies before `run.finish` (04 16.5); a reply refused after the end of the run it sends again without `run_id`, with the same `client_msg_id` (M2-19). |
 | Send file | `file.upload`, then `message.create` | upload session, `client_msg_id` | needs `+upload` and the feature `files_out` |
 | Question, approval | `message.create` with `kind = card` and components | `client_msg_id` | then `run.finish` with `waiting_input` (section 11) |
 | Change components | `component.update` | `version` | only own messages |
@@ -1364,8 +1364,8 @@ Everyone with `file.read` sees the transcript under the message.
 
 Cron jobs and background work of a runtime report results without a human trigger:
 
-1. The agent writes with `message.create` into a report channel on which it has `write`. There is
-   no run (`runs.triggered_by` is a person) and no token.
+1. The agent writes with `message.create` without `run_id` into a report channel on which it has
+   `write`. There is no run (`runs.triggered_by` is a person) and no token.
 2. Per report a new thread (`thread.create`, title from the first line) or a fixed
    thread; the adapter configuration chooses.
 3. Notification according to the settings of the channel ([13-push-notifications.md](13-push-notifications.md)).
