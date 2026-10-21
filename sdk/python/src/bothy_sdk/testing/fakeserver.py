@@ -65,7 +65,14 @@ _PUBLIC = frozenset({"getDiscovery", "getJwks"})
 # Consumer operations judge the agent by its own grants: the run binding is ignored there.
 _DELIVERY = frozenset({"pollAgentEvents", "ackAgentEvents", "getConsumerState"})
 _IDEMPOTENT_KEY_OPS = frozenset(
-    {"updateComponent", "respondToInteraction", "registerCommand", "updateCommand", "removeCommand"}
+    {
+        "updateComponent",
+        "respondToInteraction",
+        "registerCommand",
+        "updateCommand",
+        "removeCommand",
+        "reportAgentSession",
+    }
 )
 _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("GET", "/instance/discovery", "getDiscovery"),
@@ -93,6 +100,11 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("DELETE", "/commands/{command_id}", "removeCommand"),
     ("GET", "/channels/{channel_id}/commands", "listChannelCommands"),
     ("POST", "/command-autocompletions/{request_id}/answer", "answerAutocomplete"),
+    ("GET", "/me", "getMe"),
+    ("GET", "/files/{file_id}/content", "downloadFile"),
+    ("GET", "/threads/{thread_id}", "getThread"),
+    ("PUT", "/threads/{thread_id}/title", "setThreadTitle"),
+    ("POST", "/threads/{thread_id}/agent-sessions/report", "reportAgentSession"),
 )
 _COMPILED = tuple(
     (method, re.compile("^" + re.sub(r"\{(\w+)\}", r"(?P<\1>[^/]+)", path) + "$"), op)
@@ -178,6 +190,7 @@ class FakeServer:
         dpop: Bind Lotse's API token to a DPoP key (``credentials.dpop``); else a bearer token.
         billing_mode: Lotse's configured billing mode (``personal`` or ``organization``).
         tool_class: Lotse's configured tool class (``chat``, ``scoped`` or ``host``).
+        costs: Accept ``RunFinish.costs``; off by default, like the server before M2-22.
 
     Raises:
         ValueError: An unknown timing key.
@@ -200,7 +213,7 @@ class FakeServer:
         heartbeats: Every heartbeat body received (REST and gateway member ``agent``).
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - every option of the fake is a keyword
         self,
         *,
         clock: FakeClock | None = None,
@@ -208,6 +221,7 @@ class FakeServer:
         dpop: bool = True,
         billing_mode: str = "organization",
         tool_class: str = "scoped",
+        costs: bool = False,
     ) -> None:
         """Create the server; `start` (or ``async with``) opens the listener."""
         self.clock = clock or FakeClock()
@@ -226,6 +240,7 @@ class FakeServer:
             billing_mode=billing_mode,
             tool_class=tool_class,
             append=self.hub.append,
+            costs=costs,
         )
         key = FileDpopKey(ec.generate_private_key(ec.SECP256R1())) if dpop else None
         self.credentials = Credentials(
@@ -339,18 +354,139 @@ class FakeServer:
 
     # Scenario helpers ---------------------------------------------------------------------
 
-    async def trigger(self, text: str = "Hello @Lotse") -> Triggered:
-        """Alex posts ``text`` in a new thread: a queued run and its ``agent.invocation``.
+    async def trigger(  # noqa: PLR0913 - the parts of a trigger a scenario chooses
+        self,
+        text: str = "Hello @Lotse",
+        *,
+        channel_id: UUID | None = None,
+        author: str = "alex",
+        trigger_kind: str = "message",
+        attachments: tuple[UUID, ...] | list[UUID] = (),
+        thread_id: UUID | None = None,
+    ) -> Triggered:
+        """A person posts ``text``: a queued run and its ``agent.invocation``.
+
+        The payload carries the thread's current agent session, if any (M2-12).
 
         Args:
             text: The message content.
+            channel_id: A served channel (`add_forum`); Allgemein when omitted.
+            author: ``alex`` or ``robin``.
+            trigger_kind: ``message`` or ``interaction`` (the token names that object).
+            attachments: Files of `add_file` attached to the message.
+            thread_id: An existing thread to post in; a new thread when omitted.
 
         Returns:
             The run, thread and message.
         """
-        run = self.world.trigger(text)
+        person = {"alex": self.world.alex, "robin": self.world.robin}[author]
+        run = self.world.trigger(
+            text,
+            channel_id=channel_id,
+            author=person,
+            trigger_kind=trigger_kind,
+            attachments=tuple(attachments),
+            thread_id=thread_id,
+        )
         await _settle()
         return Triggered(run.id, run.thread_id, run.triggering_message_id)
+
+    def add_forum(
+        self,
+        name: str,
+        workspace_ref: str | None,
+        *,
+        model: str | None = None,
+        allowed_tools: list[str] | None = None,
+        prompt: str = "",
+    ) -> UUID:
+        """A channel Lotse serves, with a project binding unless ``workspace_ref`` is ``None``.
+
+        Args:
+            name: A label for the test (not stored).
+            workspace_ref: The binding's ``workspace_ref``; ``None`` for a channel without one.
+            model: ``runner_config.model``.
+            allowed_tools: ``runner_config.allowed_tools``.
+            prompt: ``behavior.prompt``.
+
+        Returns:
+            The channel ID.
+        """
+        del name
+        return self.world.add_forum(
+            workspace_ref, model=model, allowed_tools=allowed_tools, prompt=prompt
+        )
+
+    def update_forum(self, channel_id: UUID, **changes: Any) -> None:
+        """Change a forum and deliver ``agent.config_changed`` (``settings_version`` + 1).
+
+        Args:
+            channel_id: The forum.
+            **changes: ``workspace_ref``, ``model``, ``allowed_tools`` or ``prompt``.
+        """
+        self.world.update_forum(channel_id, **changes)
+
+    def remove_channel(self, channel_id: UUID) -> None:
+        """Lotse stops serving the channel (``agent.config_changed``, then ``404``).
+
+        Args:
+            channel_id: The channel.
+        """
+        self.world.remove_channel(channel_id)
+
+    def add_file(self, content: bytes, *, name: str, mime: str, status: str = "clean") -> UUID:
+        """Store a file for attachments and ``downloadFile``.
+
+        Args:
+            content: The bytes.
+            name: ``original_name``.
+            mime: ``mime_type``.
+            status: ``scan_status``: ``clean``, ``skipped``, ``pending`` or ``blocked``.
+
+        Returns:
+            The file ID.
+        """
+        return self.world.add_file(content, name=name, mime=mime, status=status)
+
+    def set_context(self, run_id: UUID, doc: Mapping[str, Any]) -> None:
+        """Serve ``doc`` as the run's ``getRunContext`` (its ``run_id`` is set to the run).
+
+        Args:
+            run_id: The run.
+            doc: A ``RunContext`` document.
+        """
+        self.world.runs[run_id].context = dict(doc)
+
+    def thread(self, thread_id: UUID) -> dict[str, Any]:
+        """The ``getThread`` body of a thread.
+
+        Args:
+            thread_id: The thread.
+
+        Returns:
+            The Thread document.
+        """
+        return self.world.thread_doc(str(thread_id))
+
+    def set_title_source(self, thread_id: UUID, source: str) -> None:
+        """Set ``title_source`` (``manual`` makes ``setThreadTitle`` answer ``title_manual``).
+
+        Args:
+            thread_id: The thread.
+            source: ``auto`` or ``manual``.
+        """
+        self.world.thread_meta[thread_id]["title_source"] = source
+
+    def sessions(self, thread_id: UUID) -> list[dict[str, Any]]:
+        """The agent session rows of a thread.
+
+        Args:
+            thread_id: The thread.
+
+        Returns:
+            The rows, oldest first.
+        """
+        return [dict(r) for r in self.world.sessions.get(thread_id, [])]
 
     async def deliver_followup(self, run_id: UUID, text: str = "One more thing") -> UUID:
         """Alex posts a follow-up to the run: ``agent.followup``.
@@ -732,6 +868,8 @@ class FakeServer:
             out["Sunset"] = self._deprecated[operation_id]
         if body is None:
             return web.Response(status=status, headers=out)
+        if isinstance(body, bytes):
+            return web.Response(status=status, body=body, headers=out)
         content_type = out.pop("Content-Type", "application/json")
         return web.Response(
             status=status, text=json.dumps(body), content_type=content_type, headers=out
@@ -844,11 +982,26 @@ class FakeServer:
                 {},
             )
         if op == "listServedChannels":
-            return 200, {"items": [world.channel_config()]}, {}
+            return 200, {"items": [world.channel_config(c) for c in world.channels]}, {}
         if op == "getServedChannelConfig":
-            if p["channel_id"] != str(world.channel_id):
-                raise FakeProblem("not_found")
-            return 200, world.channel_config(), {"ETag": f'"{world.settings_version}"'}
+            channel = world.channel_or_404(p["channel_id"])
+            config = world.channel_config(channel)
+            return 200, config, {"ETag": f'"{config["behavior"]["settings_version"]}"'}
+        if op == "getMe":
+            me = {"principal": world.lotse.ref(), "is_owner": False}
+            return 200, {**me, "permission_version": world.permission_version}, {}
+        if op == "downloadFile":
+            content, mime = world.download(p["file_id"])
+            return 200, content, {"Content-Type": mime}
+        if op == "getThread":
+            doc = world.thread_doc(p["thread_id"])
+            return 200, doc, {"ETag": f'"{doc["version"]}"'}
+        if op == "setThreadTitle":
+            doc = world.set_title(p["thread_id"], body, request.headers.get("If-Match"))
+            return 200, doc, {"ETag": f'"{doc["version"]}"'}
+        if op == "reportAgentSession":
+            row = world.report_session(p["thread_id"], body, request.headers.get("If-Match"))
+            return 200, row, {"ETag": f'"{row["version"]}"'}
         if op == "getRun":
             run = world.run_or_404(p["run_id"])
             return 200, world.run_doc(run), {"ETag": f'"{run.version}"'}

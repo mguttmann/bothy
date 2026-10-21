@@ -24,6 +24,13 @@ documented in this file. The format is based on
   at run time (`state`, degraded reasons, `runtime_version`, `billing_modes_supported`,
   `project_readiness`); `Adapter.send_heartbeat` sends one at once; `AgentHandler.on_ready`
   follows every ready source.
+- FakeServer parts for the runner scenarios (M2-34): served forums with a project binding
+  (`add_forum`, `update_forum` with `agent.config_changed`, `remove_channel`), the routes
+  `getMe`, `downloadFile`, `getThread`, `setThreadTitle` and `reportAgentSession`, files with a
+  scan status (`add_file`), triggers in a forum, in an existing thread, with attachments or with
+  `trigger_kind` `interaction`, the thread's current agent session in the payload, a context per
+  run (`set_context`), `startRun` with `external_session_ref` (M2-12) and `finishRun` with
+  `costs` behind the switch `FakeServer(costs=True)` (the server books costs from M2-22 on).
 - Generated core `bothy_sdk.generated` from `docs/api/openapi.yaml` (openapi-python-client
   0.29.1, standard settings): models and sync and async functions of every REST operation.
 - `make generate` and `make generate-check` (gate G4: drift check, compileall, mypy).

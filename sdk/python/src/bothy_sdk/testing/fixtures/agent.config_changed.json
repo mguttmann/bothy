@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "id": "01900000-0000-7000-8000-000000000202",
+    "kind": "user"
+  },
+  "audience": "self",
+  "id": "01900000-0000-7000-8000-000000000906",
+  "occurred_at": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "channel_id": "01900000-0000-7000-8000-000000000103",
+    "settings_version": 2
+  },
+  "permission_version": 1,
+  "resource": {
+    "id": "01900000-0000-7000-8000-000000000103",
+    "kind": "channel"
+  },
+  "schema_version": 1,
+  "scope": {
+    "channel_id": "01900000-0000-7000-8000-000000000103",
+    "space_id": "01900000-0000-7000-8000-000000000104"
+  },
+  "seq": 6,
+  "type": "agent.config_changed"
+}
