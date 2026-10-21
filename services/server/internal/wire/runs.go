@@ -8,6 +8,8 @@ import (
 	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
+	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -26,7 +28,9 @@ import (
 )
 
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
-// run.step_detail_max_bytes, run.queued_max_age). The error names the key whose binding failed, never a value.
+// run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
+// agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars). The
+// error names the key whose binding failed, never a value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -48,6 +52,9 @@ type Runs struct {
 	Invocations *runsapp.InvocationTokens
 	// Expiry schedules runs.queued_expiry (M2-08); the jobs step binds its inserter (BindJobs).
 	Expiry *runsjobs.Scheduler
+	// CancelTimeouts schedules runs.cancel_timeout (M2-09); the jobs step binds its inserter
+	// (BindJobs).
+	CancelTimeouts *runsjobs.CancelScheduler
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -69,6 +76,12 @@ type RunsDeps struct {
 	// Expiry schedules runs.queued_expiry; nil means the scheduler over the job runtime of the
 	// process (Runs.BindJobs). A test world without jobs passes one that schedules nothing.
 	Expiry runsapp.ExpiryScheduler
+	// CancelTimeouts schedules runs.cancel_timeout (M2-09); nil means the scheduler over the job
+	// runtime of the process (Runs.BindJobs).
+	CancelTimeouts runsapp.CancelTimeoutScheduler
+	// Heartbeats reads the persisted heartbeat for runs.stall_check (M2-09); nil means the reader
+	// of the agents module over pool.
+	Heartbeats runsapp.HeartbeatReader
 }
 
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
@@ -100,22 +113,46 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		sched = &runsjobs.Scheduler{}
 		d.Expiry = sched
 	}
+	var cancels *runsjobs.CancelScheduler
+	if d.CancelTimeouts == nil {
+		cancels = &runsjobs.CancelScheduler{}
+		d.CancelTimeouts = cancels
+	}
+	if d.Heartbeats == nil {
+		hb, err := agentsapp.NewHeartbeatReader(agentspg.NewRepository(pool))
+		if err != nil {
+			return nil, err
+		}
+		d.Heartbeats = hb
+	}
+	mismatches, err := runsmetrics.NewMismatches(nil)
+	if err != nil {
+		return nil, err
+	}
 	svc, err := runsapp.New(cfg, runsapp.Deps{
 		Repo: runspg.NewRepository(pool), UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
-		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry,
+		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
+		Heartbeats: d.Heartbeats, Mismatches: mismatches,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Runs{Service: svc, Handlers: runshttp.New(svc), Expiry: sched}, nil
+	return &Runs{Service: svc, Handlers: runshttp.New(svc), Expiry: sched, CancelTimeouts: cancels}, nil
 }
 
-// BindJobs gives the scheduler of runs.queued_expiry the inserter of the job runtime; the jobs
-// step calls it once the runtime exists. A Runs built with its own scheduler ignores it.
+// BindJobs gives the schedulers of runs.queued_expiry and runs.cancel_timeout the inserter of the
+// job runtime; the jobs step calls it once the runtime exists. A Runs built with its own
+// scheduler ignores it for that scheduler.
 func (r *Runs) BindJobs(ins jobs.Inserter) {
-	if r != nil && r.Expiry != nil {
+	if r == nil {
+		return
+	}
+	if r.Expiry != nil {
 		r.Expiry.Bind(ins)
+	}
+	if r.CancelTimeouts != nil {
+		r.CancelTimeouts.Bind(ins)
 	}
 }
 
