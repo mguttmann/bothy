@@ -85,6 +85,8 @@ COMPOSE = Path("infra/compose/compose.yaml")
 """Compose file with the image defaults `${BOTHY_<X>_VERSION:-<version>}`."""
 OTEL_DIR = Path("infra/otel")
 """Collector base `collector.yaml` and the overlays under `exporters/`."""
+SMOKE_COLLECTOR_OVERLAY = Path("infra/compose/test/otel/file.yaml")
+"""Overlay "file" of the Compose smoke test (M1-73): test only, validated with the base alone."""
 PROMETHEUS_DIR = Path("infra/observability/prometheus")
 """Prometheus configuration; Compose mounts it at /etc/prometheus/."""
 RULES_DIR = PROMETHEUS_DIR / "rules"
@@ -708,6 +710,9 @@ def check_collector(ctx: Context) -> list[str]:
     run in both orders, because overlays replace lists, so the merged result depends on the
     order of `BOTHY_OTEL_EXPORTER` and `BOTHY_OTEL_EXPORTER_2`.
 
+    The overlay "file" of the Compose smoke test (`SMOKE_COLLECTOR_OVERLAY`) runs with the base
+    alone; it never meets an exporter overlay in an installation.
+
     A reference to a config provider other than `COLLECTOR_PROVIDERS` (`${https:...}`,
     `${s3:...}`, ...), also one nested in another reference, is a finding, and then no
     `validate` runs: the collector resolves such a reference while it validates, and its
@@ -734,9 +739,16 @@ def check_collector(ctx: Context) -> list[str]:
     overlays = sorted((otel / "exporters").glob("*.yaml"))
     if not overlays:
         return [f"no overlay in {OTEL_DIR / 'exporters'}/"]
+    smoke = ctx.root / SMOKE_COLLECTOR_OVERLAY
+    if not smoke.is_file():
+        return [f"{SMOKE_COLLECTOR_OVERLAY} is missing"]
+    smoke_copy = ctx.workdir / "otel-smoke" / smoke.name
+    smoke_copy.parent.mkdir()
+    shutil.copy2(smoke, smoke_copy)
     paired = [o for o in overlays if o.stem != NO_PAIR_OVERLAY]
     runs: list[tuple[str, list[Path]]] = [("base", [base])]
     runs += [(f"base + {o.stem}", [base, o]) for o in overlays]
+    runs.append(("base + smoke file", [base, smoke_copy]))
     runs += [
         (f"base + {a.stem} + {b.stem}", [base, a, b]) for a, b in itertools.permutations(paired, 2)
     ]
@@ -1326,9 +1338,14 @@ def _env_value(raw: str) -> str:
 def _allowlist_structure(root: Path, base: Mapping[str, Any]) -> list[str]:
     """Findings where telemetry could reach an exporter without `redaction/allowlist`."""
     files: list[tuple[Path, Mapping[str, Any]]] = [(OTEL_DIR / "collector.yaml", base)]
-    for overlay in sorted((root / OTEL_DIR / "exporters").glob("*.yaml")):
-        spec = yaml.safe_load(overlay.read_text(encoding="utf-8")) or {}
-        files.append((OTEL_DIR / "exporters" / overlay.name, spec))
+    overlays = [
+        OTEL_DIR / "exporters" / o.name for o in (root / OTEL_DIR / "exporters").glob("*.yaml")
+    ]
+    if (root / SMOKE_COLLECTOR_OVERLAY).is_file():
+        overlays.append(SMOKE_COLLECTOR_OVERLAY)
+    for rel in sorted(overlays):
+        spec = yaml.safe_load((root / rel).read_text(encoding="utf-8")) or {}
+        files.append((rel, spec))
     receivers = set()
     for _, spec in files:
         receivers |= set((spec.get("receivers") or {}).keys())
@@ -1372,7 +1389,10 @@ def _remote_references(root: Path) -> list[str]:
     *others, last = sorted(COLLECTOR_PROVIDERS)
     allowed = f"{', '.join(others)} and {last}"
     found: list[str] = []
-    for path in sorted((root / OTEL_DIR).rglob("*.yaml")):
+    paths = sorted((root / OTEL_DIR).rglob("*.yaml"))
+    if (root / SMOKE_COLLECTOR_OVERLAY).is_file():
+        paths.append(root / SMOKE_COLLECTOR_OVERLAY)
+    for path in paths:
         text = path.read_text(encoding="utf-8")
         try:
             texts = list(_yaml_strings(yaml.safe_load(text)))

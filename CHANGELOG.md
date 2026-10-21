@@ -25,6 +25,14 @@ operated, and the order of the build.
 
 ### Added
 
+- Compose smoke test (M1-73): `make portability` runs `infra/compose/smoke.sh`, which starts the
+  server core from the real `bothy-server` image with the installation Compose file and a test
+  overlay (`infra/compose/test/`), proves secrets init, migrations, the setup lock, the first
+  owner, enrollment with device keys and DPoP, space, channel, thread and messages, ordered live
+  delivery, REST and gateway catch-up, step-up and revocation with `4012` through the black-box
+  probe `services/server/test/smoke`, and scans the collector export and the container logs for
+  the run's canary, tokens, enrollment code and principal ID. Missing Docker, an old Engine or
+  Compose or a missing image exit with code 2. The release bundle leaves the test overlay out.
 - Gate `sql-visibility` (M1-70, AZ-P12): `tools/lint/sql_visibility.py` rejects every reading
   sqlc query on a content table without `channel_id = ANY(...)` or `space_id = ANY(...)` unless it
   stands with a category and a reason on `tools/lint/sql_visibility.yaml`; stale, duplicate and

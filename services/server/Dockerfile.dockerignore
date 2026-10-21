@@ -3,7 +3,8 @@
 # Build context of services/server/Dockerfile (the repository root, as in release.yml). BuildKit
 # reads this file instead of a root .dockerignore, so other builds are not affected. Everything
 # is ignored except the sources the binary is built from; tests and test data never enter the
-# context. Embedded files live in migrations/ (migrations/embed.go), which is allowed.
+# context. Embedded files live in migrations/ (migrations/embed.go), which is allowed. The only
+# test sources are those of the smoke probe, built only by the target smoke.
 *
 !services/server/go.mod
 !services/server/go.sum
@@ -12,5 +13,7 @@
 !services/server/cmd/
 !services/server/internal/
 !services/server/migrations/
+# The probe of the Compose smoke test (target smoke, brief M1-73); its tests stay out below.
+!services/server/test/smoke/
 **/*_test.go
 **/testdata/

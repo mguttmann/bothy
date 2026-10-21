@@ -9,7 +9,7 @@ operation, and keeps derived values equal to their source (PLAN M1-04, chapter 1
 | Check | Checks |
 |---|---|
 | `tool-versions` | pinned versions of `otelcol-contrib`, `promtool`, `amtool`, `loki`, `tempo` equal to `BOTHY_<X>_VERSION` in `infra/compose/.env.example` and the defaults in `infra/compose/compose.yaml` (a leading `v` does not count) |
-| `collector` | `otelcol-contrib validate` for the base alone, the base with each overlay and with every ordered pair of two overlays except `none`; before that, a reference to a config provider other than `env`, `file` and `yaml` (`${https:...}`, `${s3:...}`) is a finding and no `validate` runs |
+| `collector` | `otelcol-contrib validate` for the base alone, the base with each overlay and with every ordered pair of two overlays except `none`, and the base with the overlay `file` of the Compose smoke test (`infra/compose/test/otel/file.yaml`, M1-73) alone; before that, a reference to a config provider other than `env`, `file` and `yaml` (`${https:...}`, `${s3:...}`) is a finding and no `validate` runs |
 | `collector-allowlist` | `bothy.*` keys of `redaction/allowlist` equal to the table in `docs/observability/signals.md` 5.3; the allowlist works: `allow_all_keys` is false, every trace and log pipeline with a receiver runs it, and no overlay redefines the processor or a pipeline of the base |
 | `prometheus-config` | `promtool check config` on a copy whose `/etc/prometheus/` paths point into the copy, so that the rule files are checked too; every entry of `rule_files` lies under `/etc/prometheus/` (relative: from `prometheus.yaml`) and hits a file, and every file in `rules/` is loaded |
 | `prometheus-rules` | `promtool check rules` for every file in `rules/` |
@@ -103,3 +103,6 @@ fails, 2 for a wrong call. A run executes all checks and shows all findings.
    subtree, it goes into `SUBTREES`.
 5. `check_collector` reads a new collector configuration (such as a test overlay) only if it lies
    under `infra/otel/exporters/` or the check names its place explicitly.
+   The overlay `file` of the Compose smoke test is such a named place
+   (`SMOKE_COLLECTOR_OVERLAY`, M1-73): `collector` validates it with the base alone,
+   `collector-allowlist` and the provider rule read it as well.
