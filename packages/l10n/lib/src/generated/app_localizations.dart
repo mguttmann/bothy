@@ -10800,6 +10800,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image'**
   String get adminLogoFileType;
+
+  /// Neutral text of a local notification without preview fields (01 section 10.2).
+  ///
+  /// In en, this message translates to:
+  /// **'New message'**
+  String get notificationPlaceholder;
+
+  /// Title of a local notification with the two names of 01 section 10.2.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} · {title}'**
+  String notificationTitle(String name, String title);
+
+  /// Text of a local notification: author and shortened text (01 section 10.2).
+  ///
+  /// In en, this message translates to:
+  /// **'{author}: {excerpt}'**
+  String notificationText(String author, String excerpt);
+
+  /// First line of a bundled local notification with the unread count of the thread (13 section 4.5).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 new message} other{{count} new messages}}'**
+  String notificationBundled(int count);
+
+  /// Title of the local notification of kind security: a device of the person waits for approval (13 section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'New device'**
+  String get notificationSecurityTitle;
+
+  /// Text of the local notification of kind security (13 section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'A new device is waiting for your approval.'**
+  String get notificationSecurityText;
+
+  /// Title of the local notification of kind admin (13 section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'Administration'**
+  String get notificationAdminTitle;
+
+  /// Text of the local notification of kind admin (13 section 2).
+  ///
+  /// In en, this message translates to:
+  /// **'A reminder from the administration is waiting.'**
+  String get notificationAdminText;
+
+  /// Menu item of the icon in the Windows notification area that shows the window (15 section 10.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get trayOpen;
+
+  /// Menu item of the icon in the Windows notification area that ends the app and its connection (15 section 10.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Quit'**
+  String get trayQuit;
+
+  /// Note in the Notifications settings: a closed app gets no notifications (13 section 5.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications arrive only while the app is running.'**
+  String get settingsNotificationsWhileRunning;
+
+  /// Switch in the Notifications settings: start the app when the person signs in to the computer; a device setting (15 section 10.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Start at login'**
+  String get settingsStartAtLogin;
+
+  /// Shown instead of the switch Start at login where the system offers no login start (15 section 10.3).
+  ///
+  /// In en, this message translates to:
+  /// **'This system does not offer starting at login for the app.'**
+  String get settingsStartAtLoginUnavailable;
 }
 
 class _AppLocalizationsDelegate

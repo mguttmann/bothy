@@ -10368,5 +10368,82 @@
   "adminLogoFileType": "Image",
   "@adminLogoFileType": {
     "description": "Name of the file type group of the logo in the system file dialog (PNG, JPEG, WebP)."
+  },
+  "notificationPlaceholder": "New message",
+  "@notificationPlaceholder": {
+    "description": "Neutral text of a local notification without preview fields (01 section 10.2)."
+  },
+  "notificationTitle": "{name} · {title}",
+  "@notificationTitle": {
+    "description": "Title of a local notification with the two names of 01 section 10.2.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "general"
+      },
+      "title": {
+        "type": "String",
+        "example": "Release notes"
+      }
+    }
+  },
+  "notificationText": "{author}: {excerpt}",
+  "@notificationText": {
+    "description": "Text of a local notification: author and shortened text (01 section 10.2).",
+    "placeholders": {
+      "author": {
+        "type": "String",
+        "example": "Sam"
+      },
+      "excerpt": {
+        "type": "String",
+        "example": "Build is green"
+      }
+    }
+  },
+  "notificationBundled": "{count, plural, =1{1 new message} other{{count} new messages}}",
+  "@notificationBundled": {
+    "description": "First line of a bundled local notification with the unread count of the thread (13 section 4.5).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationSecurityTitle": "New device",
+  "@notificationSecurityTitle": {
+    "description": "Title of the local notification of kind security: a device of the person waits for approval (13 section 2)."
+  },
+  "notificationSecurityText": "A new device is waiting for your approval.",
+  "@notificationSecurityText": {
+    "description": "Text of the local notification of kind security (13 section 2)."
+  },
+  "notificationAdminTitle": "Administration",
+  "@notificationAdminTitle": {
+    "description": "Title of the local notification of kind admin (13 section 2)."
+  },
+  "notificationAdminText": "A reminder from the administration is waiting.",
+  "@notificationAdminText": {
+    "description": "Text of the local notification of kind admin (13 section 2)."
+  },
+  "trayOpen": "Open",
+  "@trayOpen": {
+    "description": "Menu item of the icon in the Windows notification area that shows the window (15 section 10.3)."
+  },
+  "trayQuit": "Quit",
+  "@trayQuit": {
+    "description": "Menu item of the icon in the Windows notification area that ends the app and its connection (15 section 10.3)."
+  },
+  "settingsNotificationsWhileRunning": "Notifications arrive only while the app is running.",
+  "@settingsNotificationsWhileRunning": {
+    "description": "Note in the Notifications settings: a closed app gets no notifications (13 section 5.3)."
+  },
+  "settingsStartAtLogin": "Start at login",
+  "@settingsStartAtLogin": {
+    "description": "Switch in the Notifications settings: start the app when the person signs in to the computer; a device setting (15 section 10.3)."
+  },
+  "settingsStartAtLoginUnavailable": "This system does not offer starting at login for the app.",
+  "@settingsStartAtLoginUnavailable": {
+    "description": "Shown instead of the switch Start at login where the system offers no login start (15 section 10.3)."
   }
 }

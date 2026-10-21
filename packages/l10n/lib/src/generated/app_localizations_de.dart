@@ -6782,4 +6782,58 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get adminLogoFileType => 'Bild';
+
+  @override
+  String get notificationPlaceholder => 'Neue Nachricht';
+
+  @override
+  String notificationTitle(String name, String title) {
+    return '$name · $title';
+  }
+
+  @override
+  String notificationText(String author, String excerpt) {
+    return '$author: $excerpt';
+  }
+
+  @override
+  String notificationBundled(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count neue Nachrichten',
+      one: '1 neue Nachricht',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationSecurityTitle => 'Neues Gerät';
+
+  @override
+  String get notificationSecurityText =>
+      'Ein neues Gerät wartet auf deine Bestätigung.';
+
+  @override
+  String get notificationAdminTitle => 'Verwaltung';
+
+  @override
+  String get notificationAdminText => 'Eine Erinnerung der Verwaltung wartet.';
+
+  @override
+  String get trayOpen => 'Öffnen';
+
+  @override
+  String get trayQuit => 'Beenden';
+
+  @override
+  String get settingsNotificationsWhileRunning =>
+      'Hinweise kommen nur, solange die App läuft.';
+
+  @override
+  String get settingsStartAtLogin => 'Bei Anmeldung starten';
+
+  @override
+  String get settingsStartAtLoginUnavailable =>
+      'Dieses System bietet den Start bei Anmeldung für die App nicht an.';
 }
