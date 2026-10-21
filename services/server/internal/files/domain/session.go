@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// SessionState is file_upload_sessions.state (docs/spec/03-datenmodell.md 4.7).
+// SessionState is file_upload_sessions.state (docs/spec/03-data-model.md 4.7).
 type SessionState string
 
 // The states of an upload session.
@@ -26,7 +26,7 @@ const (
 var ErrTransition = errors.New("files: session transition not allowed")
 
 // CheckTransition reports whether an upload session may go from one state to another: only an
-// open session changes, to completed, aborted or expired (docs/spec/12-dateien.md "2"). Every
+// open session changes, to completed, aborted or expired (docs/spec/12-files.md "2"). Every
 // other pair, also a state to itself, gives an error wrapping ErrTransition.
 //
 // Example:

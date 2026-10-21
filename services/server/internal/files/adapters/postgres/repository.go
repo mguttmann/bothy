@@ -2,7 +2,7 @@
 
 // Package postgres is the PostgreSQL adapter of the files module (M3-03): the sqlc queries in
 // queries/, the generated code in sqlcgen/ and Repository, which implements app.Repository over
-// the tables files, file_upload_sessions and file_upload_parts (docs/spec/03-datenmodell.md 4.7).
+// the tables files, file_upload_sessions and file_upload_parts (docs/spec/03-data-model.md 4.7).
 // Only this package runs SQL on them (03 Grundsatz 12). Every read is keyed by a file id or by the
 // uploader (07 7.4 rule 1).
 //

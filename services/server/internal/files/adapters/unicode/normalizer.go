@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package unicode is the adapter of the files module for Unicode normalization: NFC of file
-// names with golang.org/x/text/unicode/norm (docs/spec/12-dateien.md 6.2), because the
+// names with golang.org/x/text/unicode/norm (docs/spec/12-files.md 6.2), because the
 // architecture gate allows the library only in adapters (02 7.2; the same pattern as messaging
 // adapters/unicode). It implements app.NameNormalizer.
 //

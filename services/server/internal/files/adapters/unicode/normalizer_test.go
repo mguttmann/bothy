@@ -12,9 +12,9 @@ import (
 // TestDecomposedNameStaysComposed: a decomposed name is composed by the adapter and stays so
 // through CleanName (brief M3-03 TestCleanName).
 func TestDecomposedNameStaysComposed(t *testing.T) {
-	decomposed := "Bericht A\u0308rger.pdf"
+	decomposed := "Report Cafe\u0301.pdf"
 	got := domain.CleanName(unicode.Normalizer{}.NFC(decomposed), 255)
-	if got != "Bericht Ärger.pdf" {
+	if got != "Report Caf\u00e9.pdf" {
 		t.Fatalf("got %q", got)
 	}
 }

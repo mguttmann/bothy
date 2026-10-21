@@ -26,7 +26,7 @@ Upload sessions in parts, object storage drivers, scan, metadata removal, thumbn
 
 ## Upload sessions (M3-03)
 
-Normative: [12-dateien.md](../../../../docs/spec/12-dateien.md) sections 2, 3 and 6, the rulings D-M3-03-1 to D-M3-03-27 in [docs/DECISIONS.md](../../../../docs/DECISIONS.md).
+Normative: [12-files.md](../../../../docs/spec/12-files.md) sections 2, 3 and 6, the rulings D-M3-03-1 to D-M3-03-27 in [docs/DECISIONS.md](../../../../docs/DECISIONS.md).
 
 - **Port.** `Uploads` (`Create`, `PutPart`, `State`, `Complete`, `Abort`) and `Files` (`Get`); the actor comes from `kernel/actor`. An unknown and a foreign file answer the same `404`. `Register` declares `file.updated`.
 - **Tables.** `files` (retention class `content`), `file_upload_sessions` and `file_upload_parts` (retention class `transient`), exactly as 03 4.7; `files.search_vector` of 03 5; the foreign key `principals.avatar_file_id -> files(id) ON DELETE SET NULL`, added `NOT VALID` and validated by the next migration. The retention jobs are M7-05.

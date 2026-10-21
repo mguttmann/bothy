@@ -84,7 +84,7 @@ func DisplayText(s string) error {
 
 // IsBidiControl reports whether r is one of the bidi controls of SEC-IN-4 that DisplayText
 // rejects (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069). Callers that clean a
-// text instead of rejecting it, such as the file names of docs/spec/12-dateien.md "6.2", use it so
+// text instead of rejecting it, such as the file names of docs/spec/12-files.md "6.2", use it so
 // that the set stays in one place.
 //
 // Example:

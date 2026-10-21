@@ -70,7 +70,7 @@ type Resource struct {
 	Event *EventScope
 }
 
-// FileFacts describes a file for the visibility rule of kind file (docs/spec/05-aktionen.md
+// FileFacts describes a file for the visibility rule of kind file (docs/spec/05-actions.md
 // section 2.2, docs/DECISIONS.md D-M3-03-17): an attachment that is not attached yet is visible
 // only to its uploader (Resource.OwnerID) with read on its scope channel (Resource.ChannelID); an
 // attached one to every reader of the path of its message (Resource.ThreadID or ChannelID); the

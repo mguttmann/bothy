@@ -31,7 +31,7 @@ func IsHiddenRune(r rune) bool {
 	return false
 }
 
-// CleanName cleans a file name that is already in NFC (docs/spec/12-dateien.md "6.2"; the
+// CleanName cleans a file name that is already in NFC (docs/spec/12-files.md "6.2"; the
 // application layer applies NFC through its NameNormalizer port first) and returns the value of
 // files.original_name. It never rejects a name:
 //

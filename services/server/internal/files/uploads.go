@@ -11,14 +11,14 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Register declares the durable event the files module appends (M1-25, docs/spec/05-aktionen.md
+// Register declares the durable event the files module appends (M1-25, docs/spec/05-actions.md
 // section 6): file.updated, written by M3-03 when an upload is aborted and by M3-04 to M3-10 for
 // the later states. internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("files", authorize.EventFileUpdated)
 }
 
-// Uploads is the upload half of docs/spec/12-dateien.md section 3 in mode direct (M3-03). The
+// Uploads is the upload half of docs/spec/12-files.md section 3 in mode direct (M3-03). The
 // actor comes from kernel/actor in the context; every method authorizes it and answers an unknown
 // and a foreign upload with the same 404 not_found. Errors are kernel/errs errors.
 type Uploads interface {

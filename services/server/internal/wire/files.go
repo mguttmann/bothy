@@ -140,7 +140,7 @@ func fileS3(v *config.Values) error {
 	return cfg.Validate(rules)
 }
 
-// The S3 limits of the part plan (docs/spec/12-dateien.md 3.1, source Q1): at most 10,000 parts
+// The S3 limits of the part plan (docs/spec/12-files.md 3.1, source Q1): at most 10,000 parts
 // per multipart upload and at least 5 MiB per part except the last. They are protocol constants,
 // not settings.
 const (

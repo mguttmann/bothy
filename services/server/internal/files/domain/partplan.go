@@ -3,7 +3,7 @@
 package domain
 
 // PlanParts returns the part plan of an upload of size bytes in parts of partSize bytes
-// (docs/spec/12-dateien.md "3.1"): count is size / partSize rounded up, last is the length of the
+// (docs/spec/12-files.md "3.1"): count is size / partSize rounded up, last is the length of the
 // last part, which is the rest and may be smaller. Both arguments are at least 1 (the schema
 // guarantees size_bytes >= 1 and the configuration file.upload_part_bytes >= 1); for other
 // values it returns 0, 0.

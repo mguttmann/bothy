@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: Apache-2.0
 -- Upload sessions (M3-03): files, file_upload_sessions and file_upload_parts exactly as
--- docs/spec/03-datenmodell.md section 4.7 states them, with files.search_vector of section 5. The
+-- docs/spec/03-data-model.md section 4.7 states them, with files.search_vector of section 5. The
 -- tables are new and empty, so their keys, checks and indexes are created with them. Only the
 -- module files reads and writes them. Retention classes: content for files, transient for the
 -- sessions and their parts (the jobs follow with M7-05). The range of part_number (1 to

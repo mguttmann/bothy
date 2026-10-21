@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- files (M3-03, docs/spec/03-datenmodell.md 4.7). Every read is keyed by the file id or by the
+-- files (M3-03, docs/spec/03-data-model.md 4.7). Every read is keyed by the file id or by the
 -- uploader, never a list across channels (07 7.4 rule 1; the exceptions of AZ-P12 in
 -- tools/lint/sql_visibility.yaml).
 

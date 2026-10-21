@@ -18,7 +18,7 @@ import (
 )
 
 // TestMigrationFilesTables holds files, file_upload_sessions and file_upload_parts against
-// docs/spec/03-datenmodell.md section 4.7 column by column with every key, check and index
+// docs/spec/03-data-model.md section 4.7 column by column with every key, check and index
 // (M3-03), files.search_vector as the stored generated column of section 5 with its GIN index,
 // and the deferred foreign key principals.avatar_file_id (M1-26), validated by the second
 // migration. A second up changes nothing, and the table check of files refuses a purpose other

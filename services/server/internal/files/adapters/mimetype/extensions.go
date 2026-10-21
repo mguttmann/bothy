@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package mimetype is the adapter of the files module for the extensions of a media type, used by
-// the early check of file.denied_mime_types (docs/spec/12-dateien.md 6.1, docs/DECISIONS.md
+// the early check of file.denied_mime_types (docs/spec/12-files.md 6.1, docs/DECISIONS.md
 // D-M3-03-5). It reads the tables of github.com/gabriel-vasile/mimetype, the library 12 6.1
 // names, instead of mime.ExtensionsByType, which reads tables of the operating system and differs
 // between hosts. It implements app.TypeExtensions.

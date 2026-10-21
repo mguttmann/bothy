@@ -29,7 +29,7 @@ func MissingParts(count int, confirmed []int) []int {
 }
 
 // Ranges writes ascending part numbers as comma separated ranges, the detail of
-// 409 upload_incomplete (docs/spec/12-dateien.md "3.4" point 1): consecutive numbers become
+// 409 upload_incomplete (docs/spec/12-files.md "3.4" point 1): consecutive numbers become
 // "a-b", single numbers stay. An empty list gives "".
 //
 // Example:
