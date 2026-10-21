@@ -99,13 +99,27 @@ func newGatewayWorld(t *testing.T, extra ...string) *gwWorld {
 // deps is the clock of the side identity and of the proofs too.
 func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld {
 	t.Helper()
+	return newGatewayWorldRole(t, wire.RoleAPI, deps, extra...)
+}
+
+// newGatewayWorldAs starts a process in role with the gateway windows of extra (role all for the
+// desktop hints of M3-23, whose consumer and jobs share the process with the gateway).
+func newGatewayWorldAs(t *testing.T, role wire.Role, extra ...string) *gwWorld {
+	t.Helper()
+	return newGatewayWorldRole(t, role, wire.Deps{}, extra...)
+}
+
+// newGatewayWorldRole starts a process in role with the dependencies deps and the gateway windows
+// of extra over patientWindows(gwHeartbeatInterval).
+func newGatewayWorldRole(t *testing.T, role wire.Role, deps wire.Deps, extra ...string) *gwWorld {
+	t.Helper()
 	ctx := context.Background()
 	db := newServeDB(t)
 	completeSetup(t, db)
 	base := append([]string{"BOTHY_SERVER__PUBLIC_URL=" + gwPublicURL, "BOTHY_AUTH__ACCESS_TOKEN_TTL=" + strconv.Itoa(int(gwAccessTokenTTL.Hours())) + "h"},
 		patientWindows(gwHeartbeatInterval)...)
 	env := serveEnv(t, db, append(base, extra...)...)
-	p := start(t, wire.RoleAPI, env, deps)
+	p := start(t, role, env, deps)
 	waitReadyz(t, p.waitInternal(t), http.StatusOK)
 	public := p.logs.port("public listener started")
 	values := loadEnv(t, env)

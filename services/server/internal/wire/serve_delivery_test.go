@@ -59,7 +59,13 @@ func (w *gwWorld) partitions(t *testing.T) {
 // newDeliveryWorld starts the world with the environment entries extra.
 func newDeliveryWorld(t *testing.T, extra ...string) *dlWorld {
 	t.Helper()
-	w := newGatewayWorld(t, extra...)
+	return newDeliveryWorldAs(t, wire.RoleAPI, extra...)
+}
+
+// newDeliveryWorldAs starts the world with a process in role (M3-23: role all).
+func newDeliveryWorldAs(t *testing.T, role wire.Role, extra ...string) *dlWorld {
+	t.Helper()
+	w := newGatewayWorldAs(t, role, extra...)
 	w.partitions(t)
 	owner := w.newPerson("alex", identity.DeviceStateActive)
 	w.sql(`INSERT INTO owners (id, user_id, reason) VALUES ($1, $2, 'test')`, ids.New().String(), owner.user.String())
