@@ -3,6 +3,7 @@
 package httpserver_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -56,4 +57,26 @@ func TestSchemaValidator(t *testing.T) {
 	if _, err := httpserver.NewSchemaValidator(httpservertest.Contract, []string{"Missing"}); err == nil {
 		t.Error("an unknown schema name was accepted")
 	}
+}
+
+// TestSchemaValidatorConcurrentUse: the gateway validates the frames of many connections at
+// the same time with one validator; under -race concurrent calls must not race (the engine
+// renders the schema on every call and writes into the shared schema model while it does).
+func TestSchemaValidatorConcurrentUse(t *testing.T) {
+	t.Parallel()
+	v, err := httpserver.NewSchemaValidator(httpservertest.Contract, []string{"ThingCreate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			for range 20 {
+				if err := v.Validate("ThingCreate", []byte(`{"name":"abc","color":"red","nested":{"flag":true}}`)); err != nil {
+					t.Errorf("valid value: %v", err)
+				}
+			}
+		})
+	}
+	wg.Wait()
 }

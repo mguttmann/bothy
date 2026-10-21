@@ -1183,6 +1183,9 @@ documented in this file. The format is based on
 
 ### Fixed
 
+- The gateway's frame validator (`httpserver.SchemaValidator`) no longer races when several
+  connections validate frames at the same time: the validation engine writes into the shared
+  schema model on every call, so calls now take turns.
 - Signing keys: a start whose key store `secrets.signing_key_dir` holds none of the unretired
   keys (a new or wrong volume) no longer retires every key of the instance; it ends with an error
   and changes no key. The new key `signing_key.accept_lost_keys` (default `false`) allows the

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -19,8 +20,10 @@ import (
 // SchemaValidator checks a JSON value against one named schema of components.schemas of the
 // contract, with the engine and the field codes of the request Validator (SEC-IN-1, W7): the
 // gateway validates the body d of every client frame with it (M1-64), where no HTTP operation
-// exists. It knows only the schemas it was built for and is safe for concurrent use.
+// exists. It knows only the schemas it was built for and is safe for concurrent use: the engine
+// renders the schema model on every call and writes into it while it does, so calls take turns.
 type SchemaValidator struct {
+	mu      sync.Mutex
 	v       schema_validation.SchemaValidator
 	schemas map[string]*base.Schema
 }
@@ -82,7 +85,10 @@ func (v *SchemaValidator) Validate(name string, body []byte) error {
 	if !ok {
 		return errs.Wrap(errs.CodeInternalError, errors.New("httpserver: unknown schema "+name), "httpserver: schema validator")
 	}
-	if valid, found := v.v.ValidateSchemaBytes(s, body); !valid {
+	v.mu.Lock()
+	valid, found := v.v.ValidateSchemaBytes(s, body)
+	v.mu.Unlock()
+	if !valid {
 		if len(found) == 0 {
 			return errs.New(errs.CodeValidationFailed, "").WithFields(field("", fieldCodeInvalid))
 		}
