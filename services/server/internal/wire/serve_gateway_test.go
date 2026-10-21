@@ -23,6 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/apitoken"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -52,6 +53,8 @@ type gwWorld struct {
 	id     *wire.Identity
 	pepper []byte
 	cfg    wire.GatewayConfig
+	// clk is the clock of the process and of the side identity (deps.Clock or the system clock).
+	clk clock.Clock
 	// env is the environment of the process, for a second process on the same database.
 	env []string
 	// secrets are every token, proof and nonce of the world; reasons every close reason seen.
@@ -82,7 +85,8 @@ func newGatewayWorld(t *testing.T, extra ...string) *gwWorld {
 	return newGatewayWorldWith(t, wire.Deps{}, extra...)
 }
 
-// newGatewayWorldWith is newGatewayWorld with the dependencies deps of the process (a clock).
+// newGatewayWorldWith is newGatewayWorld with the dependencies deps of the process; a clock of
+// deps is the clock of the side identity and of the proofs too.
 func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld {
 	t.Helper()
 	ctx := context.Background()
@@ -139,7 +143,7 @@ func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, err := wire.NewIdentity(cfg, pool, a.UoW(), allowAll{}, wire.IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin}, pepper, nil, log)
+	id, err := wire.NewIdentity(cfg, pool, a.UoW(), allowAll{}, wire.IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin}, pepper, deps.Clock, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +159,11 @@ func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &gwWorld{t: t, db: db, owner: owner, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env}
+	clk := deps.Clock
+	if clk == nil {
+		clk = clock.System()
+	}
+	return &gwWorld{t: t, db: db, owner: owner, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env, clk: clk}
 }
 
 // sql runs a statement as the schema owner.
@@ -209,7 +217,7 @@ func (w *gwWorld) newPerson(handle string, state identity.DeviceState) gwPerson 
 // proofFor returns the proof function of key over token with htu.
 func (w *gwWorld) proofFor(key *identitytest.Key, token, htu string) func(string) string {
 	return func(nonce string) string {
-		pr := identitytest.SignDPoPProof(key, identitytest.ProofClaims{HTM: http.MethodGet, HTU: htu, IAT: time.Now(), Nonce: nonce, ATH: dpop.ATH(token)})
+		pr := identitytest.SignDPoPProof(key, identitytest.ProofClaims{HTM: http.MethodGet, HTU: htu, IAT: w.clk.Now(), Nonce: nonce, ATH: dpop.ATH(token)})
 		w.remember(pr, nonce)
 		return pr
 	}
@@ -750,22 +758,25 @@ func TestGatewayDeadlines(t *testing.T) {
 	})
 }
 
-// tokenLead is the sync.reauth_lead_time of TestGatewayTokenExpiry and tokenTTL its
-// auth.access_token_ttl: reauth_required is due 2s after the issue of a token, its expiry comes
-// only after testkit.Patience, so the setup and identify of a loaded host never reach it.
+// tokenTTL is the auth.access_token_ttl of TestGatewayTokenExpiry and tokenLead its
+// sync.reauth_lead_time.
 const (
-	tokenLead = testkit.Patience
-	tokenTTL  = tokenLead + 2*time.Second
+	tokenTTL  = 10 * time.Minute
+	tokenLead = time.Minute
 )
 
 // TestGatewayTokenExpiry: reauth and the expiry of a person's access token, with
-// auth.access_token_ttl tokenTTL, auth.clock_leeway 0s and sync.reauth_lead_time tokenLead. A
-// reauth_required already due at ready goes out at once. The subtests wait for the expiry in
-// parallel.
+// auth.access_token_ttl tokenTTL, auth.clock_leeway 0s and sync.reauth_lead_time tokenLead. The
+// process and the side identity read a shiftClock: a subtest identifies, then moves the clock to
+// the instant of reauth_required and past the expiry, so no setup on a loaded host can reach the
+// lifetime of a token. The heartbeat deadline is beyond every move (an interval of an hour), and
+// the clients beat by hand, which also makes the gateway tick at once after a move. The subtests
+// share the clock and run one after the other.
 func TestGatewayTokenExpiry(t *testing.T) {
 	t.Parallel()
-	w := newGatewayWorld(t, "BOTHY_AUTH__ACCESS_TOKEN_TTL="+strconv.FormatInt(int64(tokenTTL/time.Second), 10)+"s", "BOTHY_AUTH__CLOCK_LEEWAY=0s",
-		"BOTHY_SYNC__REAUTH_LEAD_TIME="+testkit.PatienceSetting)
+	clk := &shiftClock{}
+	w := newGatewayWorldWith(t, wire.Deps{Clock: clk}, append(patientWindows(time.Hour),
+		"BOTHY_AUTH__ACCESS_TOKEN_TTL=10m", "BOTHY_AUTH__CLOCK_LEEWAY=0s", "BOTHY_SYNC__REAUTH_LEAD_TIME=60s")...)
 	ctx := context.Background()
 	next := func(t *testing.T, c *wstest.Client) (string, []byte) {
 		t.Helper()
@@ -777,71 +788,96 @@ func TestGatewayTokenExpiry(t *testing.T) {
 		}
 		return op, d
 	}
-
-	t.Run("expiry", func(t *testing.T) {
-		t.Run("TestClose4011ExpiredWithoutReauth", func(t *testing.T) {
-			t.Parallel()
-			p := w.newPerson("alex", identity.DeviceStateActive)
-			c, _ := w.ready(t, w.params(p))
+	// beat sends a heartbeat and requires its heartbeat_ack: the connection is open, and the
+	// gateway ticked after it.
+	beat := func(t *testing.T, c *wstest.Client) {
+		t.Helper()
+		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
+			t.Fatalf("heartbeat: %v", err)
+		}
+		if op, d := next(t, c); op != "heartbeat_ack" {
+			t.Fatalf("after a heartbeat: %s %s, want heartbeat_ack", op, d)
+		}
+	}
+	// reauthDue moves the clock one second past the instant of reauth_required of a token issued
+	// at or before issued, beats, and returns the reauth_required that follows.
+	reauthDue := func(t *testing.T, c *wstest.Client, issued time.Time) rest.GatewayReauthRequired {
+		t.Helper()
+		if d := issued.Add(tokenTTL - tokenLead + time.Second).Sub(clk.Now()); d > 0 {
+			clk.Advance(d)
+		}
+		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
+			t.Fatalf("heartbeat: %v", err)
+		}
+		var rr rest.GatewayReauthRequired
+		for {
 			op, d := next(t, c)
-			var rr rest.GatewayReauthRequired
+			if op == "heartbeat_ack" {
+				continue
+			}
 			if op != "reauth_required" || wstest.Strict(d, &rr) != nil || rr.DpopNonce == "" {
-				t.Fatalf("first frame %s %s", op, d)
+				t.Fatalf("after the reauth instant: %s %s, want reauth_required", op, d)
 			}
-			w.remember(rr.DpopNonce)
-			w.expectClose(t, c, 4011)
-		})
+			return rr
+		}
+	}
 
-		t.Run("TestReauthKeepsConnection", func(t *testing.T) {
-			t.Parallel()
-			p := w.newPerson("sam", identity.DeviceStateActive)
-			c, _ := w.ready(t, w.params(p))
-			op, d := next(t, c)
-			var rr rest.GatewayReauthRequired
-			if op != "reauth_required" || wstest.Strict(d, &rr) != nil {
-				t.Fatalf("first frame %s %s", op, d)
-			}
-			// An invalid proof answers error and keeps the connection.
-			bad := w.proofFor(p.key, p.access, "https://chat.example.com/api/v1/other")(rr.DpopNonce)
-			if err := c.Send("reauth", map[string]any{"access_token": p.access, "dpop": bad}); err != nil {
-				t.Fatal(err)
-			}
-			op, d = next(t, c)
-			var ef rest.GatewayError
-			if op != "error" || wstest.Strict(d, &ef) != nil || ef.Op != "reauth" || ef.Code != "invalid_dpop_proof" {
-				t.Fatalf("after a bad proof: %s %s", op, d)
-			}
-			// A refreshed token of the same session moves the expiry.
-			set, err := w.id.Sessions.Refresh(ctx, p.set.RefreshToken.Reveal(), identity.VerifiedProof{JKT: p.key.Thumbprint, PublicJWK: p.key.JWK, IssuedAt: time.Now()})
-			if err != nil {
-				t.Fatal(err)
-			}
-			fresh := set.AccessToken.Reveal()
-			w.remember(fresh, set.RefreshToken.Reveal())
-			if err := c.Send("reauth", map[string]any{"access_token": fresh, "dpop": w.proofFor(p.key, fresh, gwHTU)(rr.DpopNonce)}); err != nil {
-				t.Fatal(err)
-			}
-			time.Sleep(time.Until(rr.ExpiresAt.Add(time.Second)))
-			if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
-				t.Fatalf("closed at the old expiry: %v", err)
-			}
-			op, _ = next(t, c)
-			if op != "reauth_required" {
-				t.Fatalf("after the old expiry: %s, want the next reauth_required", op)
-			}
-			// A token of another auth session of the same device closes with 4004.
-			other, err := w.id.Sessions.StartSession(ctx, identity.StartSession{UserID: p.user, DeviceID: p.device, AuthMethod: identity.AuthPasskey})
-			if err != nil {
-				t.Fatal(err)
-			}
-			tok := other.AccessToken.Reveal()
-			w.remember(tok, other.RefreshToken.Reveal())
-			if err := c.Send("reauth", map[string]any{"access_token": tok, "dpop": w.proofFor(p.key, tok, gwHTU)(rr.DpopNonce)}); err != nil {
-				t.Fatal(err)
-			}
-			w.expectClose(t, c, 4004)
-		})
+	t.Run("TestClose4011ExpiredWithoutReauth", func(t *testing.T) {
+		p := w.newPerson("alex", identity.DeviceStateActive)
+		issued := clk.Now()
+		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
+		beat(t, c)
+		rr := reauthDue(t, c, issued)
+		w.remember(rr.DpopNonce)
+		if rr.ExpiresAt.After(issued.Add(tokenTTL)) || rr.ExpiresAt.After(clk.Now().Add(tokenLead)) {
+			t.Fatalf("reauth_required for the expiry %v, token issued at %v", rr.ExpiresAt, issued)
+		}
+		clk.Advance(rr.ExpiresAt.Sub(clk.Now()))
+		_ = c.Send("heartbeat", map[string]any{"last_seq": 0})
+		w.expectClose(t, c, 4011)
+	})
 
+	t.Run("TestReauthKeepsConnection", func(t *testing.T) {
+		p := w.newPerson("sam", identity.DeviceStateActive)
+		issued := clk.Now()
+		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
+		rr := reauthDue(t, c, issued)
+		// An invalid proof answers error and keeps the connection.
+		bad := w.proofFor(p.key, p.access, "https://chat.example.com/api/v1/other")(rr.DpopNonce)
+		if err := c.Send("reauth", map[string]any{"access_token": p.access, "dpop": bad}); err != nil {
+			t.Fatal(err)
+		}
+		op, d := next(t, c)
+		var ef rest.GatewayError
+		if op != "error" || wstest.Strict(d, &ef) != nil || ef.Op != "reauth" || ef.Code != "invalid_dpop_proof" {
+			t.Fatalf("after a bad proof: %s %s", op, d)
+		}
+		// A refreshed token of the same session moves the expiry.
+		set, err := w.id.Sessions.Refresh(ctx, p.set.RefreshToken.Reveal(), identity.VerifiedProof{JKT: p.key.Thumbprint, PublicJWK: p.key.JWK, IssuedAt: clk.Now()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fresh := set.AccessToken.Reveal()
+		w.remember(fresh, set.RefreshToken.Reveal())
+		refreshed := clk.Now()
+		if err := c.Send("reauth", map[string]any{"access_token": fresh, "dpop": w.proofFor(p.key, fresh, gwHTU)(rr.DpopNonce)}); err != nil {
+			t.Fatal(err)
+		}
+		beat(t, c)
+		clk.Advance(rr.ExpiresAt.Add(time.Second).Sub(clk.Now()))
+		beat(t, c)
+		next := reauthDue(t, c, refreshed)
+		// A token of another auth session of the same device closes with 4004.
+		other, err := w.id.Sessions.StartSession(ctx, identity.StartSession{UserID: p.user, DeviceID: p.device, AuthMethod: identity.AuthPasskey})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tok := other.AccessToken.Reveal()
+		w.remember(tok, other.RefreshToken.Reveal())
+		if err := c.Send("reauth", map[string]any{"access_token": tok, "dpop": w.proofFor(p.key, tok, gwHTU)(next.DpopNonce)}); err != nil {
+			t.Fatal(err)
+		}
+		w.expectClose(t, c, 4004)
 	})
 
 	t.Run("TestNoSecretsInCloseReasonsAndLogs", func(t *testing.T) {
