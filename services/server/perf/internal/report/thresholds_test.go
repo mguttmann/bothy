@@ -175,6 +175,11 @@ func TestProfileModes(t *testing.T) {
 		{2, 16 << 30, report.ModeBelow},
 		{4, 4 << 30, report.ModeBelow},
 		{16, 4 << 30, report.ModeBelow},
+		// MemTotal of a Linux VM with 8 GiB is below 8 GiB (the kernel keeps its share), and
+		// that host has the memory of the profile (M1-72/16).
+		{4, 8152604 << 10, report.ModeMatch},
+		{8, 8152604 << 10, report.ModeEmulated},
+		{4, 6 << 30, report.ModeBelow},
 	}
 	for _, c := range cases {
 		if got := report.ModeFor(ref, c.cpus, c.mem); got != c.want {
@@ -188,6 +193,9 @@ func TestProfileModes(t *testing.T) {
 	}
 	if got := report.ModeWith(ref, 12, 36<<30, report.Runtime{CPUs: 8, MemoryBytes: 16 << 30}); got != report.ModeEmulated {
 		t.Errorf("runtime above the profile: %s, want emulated", got)
+	}
+	if got := report.ModeWith(ref, 12, 36<<30, report.Runtime{CPUs: 4, MemoryBytes: 8152604 << 10}); got != report.ModeEmulated {
+		t.Errorf("runtime with the MemTotal of an 8 GiB VM: %s, want emulated", got)
 	}
 	if got := report.ModeWith(ref, 4, 8<<30, report.Runtime{}); got != report.ModeMatch {
 		t.Errorf("unknown runtime: %s, want the host mode match", got)

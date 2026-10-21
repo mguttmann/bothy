@@ -16,7 +16,9 @@ thresholds are the `perf.*` rows of the table "Configuration values of this chap
 the test process and with the container runtime of the database (`docker info`, the Linux VM of
 Docker on macOS):
 
-- `match`: the host has exactly the vCPUs of the profile and at least its memory.
+- `match`: the host has exactly the vCPUs of the profile and at least its memory. The memory counts as
+  the operating system reports it (MemTotal, the memory of the Docker VM), which leaves out what the
+  kernel keeps, so a share of the profile's memory is enough (`report.hasMemory`, M1-72/16).
 - `emulated`: the host is larger; the server process gets `GOMAXPROCS` equal to the vCPUs of the
   profile and the PostgreSQL container `--cpus` and `--memory` of the profile (`pgtest.Limits`).
 - `below`: the host or the container runtime is smaller than the profile. The values are measured

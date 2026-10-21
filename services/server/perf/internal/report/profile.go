@@ -62,12 +62,26 @@ func ParseReference(text string) (Reference, error) {
 	return Reference{CPUs: cpus, MemoryBytes: mem << shift}, nil
 }
 
+// The memory an operating system reports (MemTotal of /proc/meminfo, the memory of the Docker
+// VM) leaves out what the kernel and the firmware keep, so a host with the memory of the profile
+// reports a little less. A host has the memory of ref when it reports at least
+// memoryReportedNum/memoryReportedDen of it (M1-72/16).
+const (
+	memoryReportedNum = 9
+	memoryReportedDen = 10
+)
+
+// hasMemory reports whether mem reported bytes are the memory of ref.
+func hasMemory(ref Reference, mem int64) bool {
+	return mem*memoryReportedDen >= ref.MemoryBytes*memoryReportedNum
+}
+
 // ModeFor returns the mode of a host with cpus logical CPUs and mem bytes of memory: match with
-// exactly the CPUs of ref and at least its memory, emulated with more CPUs and at least its
-// memory, below otherwise.
+// exactly the CPUs of ref and its memory (hasMemory), emulated with more CPUs and its memory,
+// below otherwise.
 func ModeFor(ref Reference, cpus int, mem int64) Mode {
 	switch {
-	case mem < ref.MemoryBytes || cpus < ref.CPUs:
+	case !hasMemory(ref, mem) || cpus < ref.CPUs:
 		return ModeBelow
 	case cpus == ref.CPUs:
 		return ModeMatch
