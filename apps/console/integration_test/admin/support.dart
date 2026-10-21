@@ -101,6 +101,8 @@ Future<ConsoleController> openConsole(
   if (!$.tester.testTextInput.isRegistered) $.tester.testTextInput.register();
   await $.tester.pumpWidget(
     ConsoleApp(
+      // A new app each time: the same widget type would keep the state of the last one.
+      key: UniqueKey(),
       environment: ConsoleEnvironment.browser(),
       initialLocation: Uri(path: path),
       locale: const Locale('en'),
@@ -187,6 +189,7 @@ bool _enabled(Element e) => switch (e.widget) {
 Future<void> tapOn(PatrolIntegrationTester $, Finder finder) async {
   final end = DateTime.now().add(const Duration(seconds: 60));
   await waitFor($, finder);
+  await _settleStepUp($);
   while (!_enabled(finder.evaluate().last)) {
     if (!DateTime.now().isBefore(end)) {
       throw _failure('$finder stays disabled; ${screenText()}');
@@ -207,6 +210,7 @@ Future<void> tapKey(PatrolIntegrationTester $, String key) =>
 Future<void> typeKey(PatrolIntegrationTester $, String key, String text) async {
   final f = byKey(key);
   await waitFor($, f);
+  await _settleStepUp($);
   await $.tester.ensureVisible(f);
   await $.tester.enterText(f, text);
   await $.tester.pump(const Duration(milliseconds: 300));
@@ -216,6 +220,22 @@ Future<void> typeKey(PatrolIntegrationTester $, String key, String text) async {
 Future<void> pick(PatrolIntegrationTester $, String key, String item) async {
   await tapKey($, key);
   await tapKey($, item);
+}
+
+/// Confirms a step-up dialog that is open or opens within a moment, and waits until it is gone,
+/// so the next tap or key never lands on its barrier (which would cancel it).
+Future<void> _settleStepUp(PatrolIntegrationTester $) async {
+  for (var i = 0; i < 3; i++) {
+    await $.tester.pump(const Duration(milliseconds: 100));
+  }
+  final dialog = find.byKey(const ValueKey('consoleStepUp.dialog'));
+  if (dialog.evaluate().isEmpty) return;
+  final passkey = find.byKey(_passkey);
+  if (passkey.evaluate().isNotEmpty) {
+    stepUps++;
+    await $.tester.tap(passkey);
+  }
+  await waitGone($, dialog);
 }
 
 /// Fails unless the flow confirmed at least one step-up through the console's adapter.
