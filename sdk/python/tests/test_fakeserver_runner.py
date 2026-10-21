@@ -250,3 +250,19 @@ async def test_trigger_kind_interaction_claims_the_interaction(fake: FakeServer)
     assert payload["trigger_kind"] == "interaction"
     assert "message_id" not in payload
     assert _claims(event["invocation_token"])["interaction_id"] == payload["interaction_id"]
+
+
+async def test_context_given_with_the_trigger(fake: FakeServer) -> None:
+    voice = fake.add_file(b"ogg", name="memo.ogg", mime="audio/ogg", transcript="spoken words")
+    earlier = fake.world.context(str((await fake.trigger("before")).run_id))["trigger_message"]
+    earlier = {**earlier, "trust": "unverified"}
+    run = await fake.trigger("now", attachments=[voice], context={"thread_context": [earlier]})
+    async with _api(fake) as api:
+        event = await _invocation(api, run.run_id)
+        r = await api.get(
+            f"/runs/{run.run_id}/context", headers={"Invocation-Token": event["invocation_token"]}
+        )
+    ctx = models.RunContext.from_dict(r.json())
+    assert ctx.trigger_message.content_md == "now"
+    assert ctx.trigger_message.attachments[0].transcript == "spoken words"
+    assert [m.content_md for m in ctx.thread_context] == ["before"]

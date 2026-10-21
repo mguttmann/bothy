@@ -363,6 +363,7 @@ class FakeServer:
         trigger_kind: str = "message",
         attachments: tuple[UUID, ...] | list[UUID] = (),
         thread_id: UUID | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> Triggered:
         """A person posts ``text``: a queued run and its ``agent.invocation``.
 
@@ -375,6 +376,9 @@ class FakeServer:
             trigger_kind: ``message`` or ``interaction`` (the token names that object).
             attachments: Files of `add_file` attached to the message.
             thread_id: An existing thread to post in; a new thread when omitted.
+            context: A ``RunContext`` to serve for the run (``thread_context``,
+                ``channel_context``, ``context_floor_seq``, ...); its ``trigger_message`` is the
+                triggering message unless given. When omitted the thread is the context.
 
         Returns:
             The run, thread and message.
@@ -387,6 +391,7 @@ class FakeServer:
             trigger_kind=trigger_kind,
             attachments=tuple(attachments),
             thread_id=thread_id,
+            context=context,
         )
         await _settle()
         return Triggered(run.id, run.thread_id, run.triggering_message_id)
@@ -434,7 +439,15 @@ class FakeServer:
         """
         self.world.remove_channel(channel_id)
 
-    def add_file(self, content: bytes, *, name: str, mime: str, status: str = "clean") -> UUID:
+    def add_file(
+        self,
+        content: bytes,
+        *,
+        name: str,
+        mime: str,
+        status: str = "clean",
+        transcript: str | None = None,
+    ) -> UUID:
         """Store a file for attachments and ``downloadFile``.
 
         Args:
@@ -442,11 +455,14 @@ class FakeServer:
             name: ``original_name``.
             mime: ``mime_type``.
             status: ``scan_status``: ``clean``, ``skipped``, ``pending`` or ``blocked``.
+            transcript: The transcript of a voice attachment, if any.
 
         Returns:
             The file ID.
         """
-        return self.world.add_file(content, name=name, mime=mime, status=status)
+        return self.world.add_file(
+            content, name=name, mime=mime, status=status, transcript=transcript
+        )
 
     def set_context(self, run_id: UUID, doc: Mapping[str, Any]) -> None:
         """Serve ``doc`` as the run's ``getRunContext`` (its ``run_id`` is set to the run).

@@ -371,6 +371,7 @@ class World:
         trigger_kind: str = "message",
         attachments: tuple[UUID, ...] = (),
         thread_id: UUID | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> RunRecord:
         """A message (in a new thread or ``thread_id``), a queued run and its ``agent.invocation``.
 
@@ -399,6 +400,8 @@ class World:
             trigger_kind=trigger_kind,
             trigger_object=obj,
         )
+        if context is not None:
+            run.context = {"context_floor_seq": 0, "thread_context": [], **context}
         self.runs[run.id] = run
         payload: dict[str, Any] = {
             "run_id": str(run.id),
@@ -910,9 +913,13 @@ class World:
     def context(self, run_id: str) -> dict[str, Any]:
         """``getRunContext``: the trigger and the thread as marked items."""
         run = self.run_or_404(run_id)
-        if run.context is not None:
-            return {**run.context, "run_id": str(run.id)}
         items = [self._context_item(self.messages[m], run) for m in self.threads[run.thread_id]]
+        if run.context is not None:
+            doc = {**run.context, "run_id": str(run.id)}
+            if "trigger_message" not in doc:
+                trigger_id = str(run.triggering_message_id)
+                doc["trigger_message"] = next(i for i in items if i["message_id"] == trigger_id)
+            return doc
         trigger = next(i for i in items if i["message_id"] == str(run.triggering_message_id))
         doc = {
             "run_id": str(run.id),
@@ -1101,10 +1108,18 @@ class World:
         meta["version"] += 1
         return self.thread_doc(thread_id)
 
-    def add_file(self, content: bytes, *, name: str, mime: str, status: str) -> UUID:
+    def add_file(
+        self, content: bytes, *, name: str, mime: str, status: str, transcript: str | None = None
+    ) -> UUID:
         """A stored file with its scan status (``clean``, ``skipped``, ``pending``, ``blocked``)."""
         file_id = uuid7()
-        self.files[file_id] = {"content": content, "name": name, "mime": mime, "status": status}
+        self.files[file_id] = {
+            "content": content,
+            "name": name,
+            "mime": mime,
+            "status": status,
+            "transcript": transcript,
+        }
         return file_id
 
     def attachment(self, file_id: UUID) -> dict[str, Any]:
@@ -1116,6 +1131,7 @@ class World:
             "mime_type": f["mime"],
             "size_bytes": len(f["content"]),
             "scan_status": f["status"],
+            **({"transcript": f["transcript"]} if f["transcript"] is not None else {}),
         }
 
     def download(self, file_id: str) -> tuple[bytes, str]:
