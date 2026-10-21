@@ -12,7 +12,7 @@ import (
 )
 
 // TestRealClient_BelowMaxFileKB: every part of the checked-in client stays below repo.max_file_kb
-// (docs/spec/23-qualitaet.md), the limit the hook check-added-large-files holds.
+// (docs/spec/23-quality.md), the limit the hook check-added-large-files holds.
 func TestRealClient_BelowMaxFileKB(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("..", "*.gen.go"))
 	if err != nil || len(files) == 0 {

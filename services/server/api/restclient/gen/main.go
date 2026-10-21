@@ -33,7 +33,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/internal/gosplit"
 )
 
-// maxFileBytes is repo.max_file_kb (docs/spec/23-qualitaet.md) in bytes: the hook
+// maxFileBytes is repo.max_file_kb (docs/spec/23-quality.md) in bytes: the hook
 // check-added-large-files refuses larger files.
 const maxFileBytes = 1024 * 1024
 
@@ -146,7 +146,7 @@ func writeParts(out string, parts [][]byte) error {
 // it from the current directory, which go generate sets to a directory of the module.
 func runOapiCodegen(ctx context.Context, configPath, specPath, dir string) error {
 	var diag bytes.Buffer
-	resolve := exec.CommandContext(ctx, "go", "tool", "-n", "oapi-codegen")
+	resolve := exec.CommandContext(ctx, "go", "tool", "-n", "oapi-codegen") // NOSONAR: the go of go generate; see M1-17/33.
 	resolve.Stderr = &diag
 	bin, err := resolve.Output()
 	if err != nil {
