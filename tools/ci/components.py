@@ -89,6 +89,8 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     "tools/api-checks/breaking.py": ("server",),
     "tools/catalog/": (),
     "tools/configdoc/": (),
+    # `make contract-test` (G7) runs tools/contract/live_contract.py in the job test (server).
+    "tools/contract/": ("server",),
     "tools/denylist/": (),
     # The token generator writes the committed Dart tokens and icons of packages/design_system,
     # like design/, and design/build/tokens.resolved.json, which the server's designkeys

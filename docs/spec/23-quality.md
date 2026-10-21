@@ -204,6 +204,8 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | `quality.coverage.dart_min_percent` | `80` | percent | Minimum coverage per Dart package | `Makefile` (`COVERAGE_DART_MIN`) |
 | `quality.coverage.python_min_percent` | `80` | percent | Minimum coverage per Python project under `sdk/` and `plugins/` | the project's `pyproject.toml` (`fail_under` in `[tool.coverage.report]`) |
 | `quality.coverage.typescript_min_percent` | `80` | percent | Minimum coverage per TypeScript project | the project's `vitest.config.ts` (`coverage.thresholds`) |
+| `quality.contract.max_examples` | `100` | count | Examples per operation in G7 | `Makefile` (`CONTRACT_MAX_EXAMPLES`) |
+| `quality.contract.timeout` | `180m` | duration | Time limit of `make contract-test` (G7) | `Makefile` (`CONTRACT_TIMEOUT`) |
 | `quality.perf.timeout` | `60m` | duration | Time limit of `make perf` per Go module | `Makefile` (`PERF_TIMEOUT`) |
 | `quality.test.go_timeout` | `20m` | duration | Time limit of each Go test binary in `make test` (`go test -timeout`) | `Makefile` (`GO_TEST_TIMEOUT`) |
 | `quality.test.patience` | `3m` | duration | Longest wait of a Go test for something that must happen (a server ready, a job run, a message) | `services/server/internal/platform/testkit` (`Patience`) |

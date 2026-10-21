@@ -22,6 +22,8 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `pytest` | `9.1.1` | tests of the tools | MIT | standard |
 | `pytest-cov` | `7.1.0` | coverage in pytest | MIT | standard |
 | `coverage` | `7.16.2` | coverage threshold | Apache-2.0 | basis of pytest-cov |
+| `schemathesis` | `4.30.1` | property-based contract tests G7 against the server of the working tree (`make contract-test`, `tools/contract/`) | MIT | 06 "Contract tests and gate": the version probed there; derives cases and stateful sequences from openapi.yaml and takes a custom auth for the DPoP proofs |
+| `cryptography` | `50.0.2` | ES256 signatures of the DPoP proofs of G7 (`tools/contract/dpop.py`) | Apache-2.0 OR BSD-3-Clause | the maintained OpenSSL binding of Python; the standard library has no ECDSA |
 | `markdown-it-py` | `4.2.0` | CommonMark parser as the oracle in the tests of `tools/configdoc` (code spans and code blocks for rule D7) | MIT | CommonMark-compliant parser with GFM tables ([markdown-it-py](https://github.com/executablebooks/markdown-it-py), retrieved 2026-10-12); only in tests, the tool itself stays with the standard library and PyYAML |
 | `pre-commit` | `4.6.2` | hooks for commit, commit-msg, pre-push | MIT | widespread, hooks as a file in the repository |
 | `pre-commit-hooks` | `v6.0.0` | file hygiene hooks | MIT | maintained standard hooks, pinned by commit SHA |

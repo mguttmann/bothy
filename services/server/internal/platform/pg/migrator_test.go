@@ -14,6 +14,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
@@ -309,10 +310,14 @@ func TestMigrateStepHonoursLockTimeout(t *testing.T) {
 	if _, err := tx.Exec(ctx, "LOCK TABLE locked_table IN ACCESS SHARE MODE"); err != nil {
 		t.Fatal(err)
 	}
+	// The pool and the migrator are built before the clock starts: under a loaded runner the
+	// connection alone can take seconds. 55P03 is the proof that lock_timeout ended the wait; the
+	// bound only catches a migration that waits for the holder instead.
+	m := newMigrator(t, migrateDB(t, db, pg.RoleOwner, 300*time.Millisecond), fsys, pg.MigratorOptions{})
 	start := time.Now()
-	_, err = newMigrator(t, migrateDB(t, db, pg.RoleOwner, 300*time.Millisecond), fsys, pg.MigratorOptions{}).Up(ctx)
+	_, err = m.Up(ctx)
 	assertSQLState(t, err, "55P03")
-	if elapsed := time.Since(start); elapsed > 5*time.Second {
+	if elapsed := time.Since(start); elapsed > testkit.Patience {
 		t.Errorf("the migration waited %s for the lock", elapsed)
 	}
 }

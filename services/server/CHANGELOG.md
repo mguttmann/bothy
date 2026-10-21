@@ -70,6 +70,14 @@ documented in this file. The format is based on
   `depguard` rule forbids the package `plugin` in the server module (ADR 0022). Manifests with
   the escape of NUL or of an unpaired surrogate are refused, and manifest values that are no audit
   code enter the audit hashed, so no checked manifest makes install or upgrade fail with 500.
+- Contract tests G7 and G8 (M1-71): `make contract-test` runs Schemathesis against the server of
+  this tree with a throwaway PostgreSQL and the matrix world (every enabled operation as owner and as
+  a plain user, the stateful phase, SEC-T06, the project checks problem format, `Correlation-Id`, no
+  JSON `null` and 404 equality); `go test -tags contract_validate` validates every response of
+  every integration test against `docs/api/openapi.yaml` (`internal/platform/httpserver/contractcheck`,
+  exit code 3 on a violation, absent from the production build). The shared test harness
+  `test/harness` runs the real server in the test process, and `egress.Deps.DenyAll` with
+  `wire.Deps.EgressDenyAll` keeps a test server off the network.
 - Moving threads (M1-62): `moveThread` moves a thread into another channel whose effective
   operator equals the thread's fixed operator (otherwise `409 operator_mismatch`); it needs
   `manage` on source and target (an invisible target is the same `404` as an unknown one), is

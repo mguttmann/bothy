@@ -86,8 +86,15 @@ tests of `tools/archgen` check the generated configuration with the pinned go-ar
 without this variable. By hand, from `services/server`:
 
 ```sh
-GO_ARCH_LINT="$(uv run --project ../../tools --locked --quiet python ../../tools/bin/fetch_tools.py path go-arch-lint)" go test -race ./...
+GO_ARCH_LINT="$(uv run --project ../../tools --locked --quiet python ../../tools/bin/fetch_tools.py path go-arch-lint)" go test -race -tags contract_validate ./...
 ```
+
+Contract tests (M1-71): the tag `contract_validate` turns on G8, the validation of every response of
+the public listener against `docs/api/openapi.yaml`
+([`contractcheck`](internal/platform/httpserver/contractcheck/README.md); a violation ends the test
+binary with exit code 3). `make contract-test` runs G7, Schemathesis against the server of this tree
+([`test/contract`](test/contract/README.md)). Full-server tests build on the shared harness
+[`test/harness`](test/harness/README.md).
 
 ## Image
 
