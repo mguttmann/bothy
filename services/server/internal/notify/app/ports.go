@@ -202,3 +202,27 @@ type MentionSource interface {
 
 // RegistrationSource is notify.PushRegistrations.
 type RegistrationSource = notify.PushRegistrations
+
+// Metrics records the push signals of docs/observability/signals.md 4.4 (bothy.push.sent,
+// bothy.push.send.duration, bothy.push.skipped). Attribute values are codes only, never a person,
+// a thread, a token or a text.
+type Metrics interface {
+	// Sent counts one provider answer with bothy.push.provider and bothy.outcome.
+	Sent(ctx context.Context, provider, outcome string)
+	// SendDuration records the duration of one provider request.
+	SendDuration(ctx context.Context, provider string, d time.Duration)
+	// Skipped counts one hint or job that ends without sending, with bothy.reason.
+	Skipped(ctx context.Context, reason string)
+}
+
+// NopMetrics records nothing; tests and processes without a meter use it.
+type NopMetrics struct{}
+
+// Sent implements Metrics.
+func (NopMetrics) Sent(context.Context, string, string) {}
+
+// SendDuration implements Metrics.
+func (NopMetrics) SendDuration(context.Context, string, time.Duration) {}
+
+// Skipped implements Metrics.
+func (NopMetrics) Skipped(context.Context, string) {}

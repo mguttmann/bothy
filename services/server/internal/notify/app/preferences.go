@@ -10,6 +10,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/notify"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
@@ -146,12 +147,13 @@ func resourceOf(p chat.NotificationPath, id, owner ids.ID) authorize.Resource {
 	return r
 }
 
-// upsertPreference is the single write path of notification_preferences (brief M3-18 note 6):
+// upsertPreference is one of the two write paths of notification_preferences (brief M3-18 note
+// 6; the other is insertPreferenceIfAbsent of the automatic following, M3-19):
 // it cuts mutedUntil to whole microseconds, stores it as given (also when it has passed,
 // docs/DECISIONS.md D-M3-18-3), writes with one statement and appends notification_pref.updated
 // on a change. Equal stored values answer the stored row without event and without a new
-// version. It neither authorizes nor locks the path: its callers do (Put; the automatic
-// following of M3-19 in the transaction of a message). It needs a unit of work.
+// version. It neither authorizes nor locks the path: its caller Put does. It needs a unit of
+// work.
 func (s *Service) upsertPreference(ctx context.Context, user ids.ID, target notify.Target, level string, mutedUntil time.Time) (notify.Preference, error) {
 	in := notify.Preference{Target: target, Level: level, MutedUntil: domain.TruncateMicro(mutedUntil).UTC()}
 	if mutedUntil.IsZero() {
@@ -182,4 +184,24 @@ func (s *Service) upsertPreference(ctx context.Context, user ids.ID, target noti
 // the transaction of the message and has authorized and locked the path itself.
 func (s *Service) UpsertPreference(ctx context.Context, user ids.ID, target notify.Target, level string, mutedUntil time.Time) (notify.Preference, error) {
 	return s.upsertPreference(ctx, user, target, level, mutedUntil)
+}
+
+// insertPreferenceIfAbsent is the second write path of notification_preferences (13 3.2, brief
+// M3-19 design note 17, D-M3-19-14): it inserts level for user on target with version 1 at at
+// only when the person has no own row on that target, and appends notification_pref.updated
+// through events only for an inserted row. An upsert would overwrite an own mute or mentions,
+// which 13 3.2 forbids ("no own setting for this thread yet"). It neither authorizes nor locks
+// the path: the automatic following calls it in the unit of work of the message the person
+// wrote. inserted is false when a row existed.
+func insertPreferenceIfAbsent(ctx context.Context, store Store, events eventlog.Appender, at time.Time, user ids.ID, target notify.Target,
+	level string) (notify.Preference, bool, error) {
+	row, inserted, err := store.InsertPreferenceIfAbsent(ctx, user, notify.Preference{Target: target, Level: level}, at.UTC())
+	if err != nil || !inserted {
+		return notify.Preference{}, false, err
+	}
+	e, err := prefEvent(ctx, user, row, false)
+	if err != nil {
+		return notify.Preference{}, false, err
+	}
+	return row, true, events.Append(ctx, e)
 }

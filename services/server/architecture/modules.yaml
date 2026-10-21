@@ -96,7 +96,7 @@ modules:
               passkey.revoke, device.list, device.approve, device.revoke, device.expire,
               session.list, session.revoke, session.extension.create, token.list, token.create,
               token.revoke, access.view_as.end]
-    events: [user.updated, session.revoked]
+    events: [user.updated, session.revoked, device.pending]
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance, authz]
@@ -258,7 +258,8 @@ modules:
     ws_ops: []
     # authz (M3-19): the candidate readers of a channel for hints (authz.Recipients).
     depends_on: [identity, chat, messaging, sync, authz]
-    adapter_vendors: [pgx]   # sqlc code and the repository (M3-18)
+    # pgx: sqlc code and the repository (M3-18); otel: the span push.send and the push metrics (M3-19).
+    adapter_vendors: [pgx, otel]
   apps:
     tables: [apps, app_installations, webhook_subscriptions, webhook_deliveries, incoming_webhooks]
     actions: [app.read, app.install, app.scopes.update, app.suspend, app.resume, app.uninstall,
