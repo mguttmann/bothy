@@ -108,3 +108,32 @@ func TestCredentialState(t *testing.T) {
 		t.Fatalf("CredentialState = %v %q %v %v", active, state, key, observed)
 	}
 }
+
+// TestActingFor_PresentAndBinding (M2-14): the zero value means no Invocation-Token header; a
+// binding with a person but without a status reads as bound (fail closed); the invalid binding
+// carries no IDs.
+func TestActingFor_PresentAndBinding(t *testing.T) {
+	t.Parallel()
+	if (actor.ActingFor{}).Present() {
+		t.Fatal("the zero value is no header")
+	}
+	if st, u, r, th := (actor.Actor{Kind: actor.KindAgent}).ActingForBinding(); st != "" || !u.IsZero() || !r.IsZero() || !th.IsZero() {
+		t.Fatalf("no header: %q %v %v %v", st, u, r, th)
+	}
+	alex, run, thread := ids.New(), ids.New(), ids.New()
+	bound := actor.Actor{Kind: actor.KindAgent, ActingFor: actor.ActingFor{Status: actor.ActingForBound, UserID: alex, RunID: run, ThreadID: thread, JTI: "j"}}
+	if st, u, r, th := bound.ActingForBinding(); st != "bound" || u != alex || r != run || th != thread {
+		t.Fatalf("bound: %q %v %v %v", st, u, r, th)
+	}
+	legacy := actor.Actor{Kind: actor.KindAgent, ActingFor: actor.ActingFor{UserID: alex}}
+	if st, _, _, _ := legacy.ActingForBinding(); st != "bound" {
+		t.Fatalf("a person without status: %q, want bound", st)
+	}
+	inv := actor.Actor{Kind: actor.KindAgent, ActingFor: actor.ActingFor{Status: actor.ActingForInvalid}}
+	if st, u, _, _ := inv.ActingForBinding(); st != "invalid" || !u.IsZero() || !inv.ActingFor.Present() {
+		t.Fatalf("invalid: %q %v", st, u)
+	}
+	if !(actor.Credentials{InvocationTokens: []string{"x"}}).Present() {
+		t.Fatal("the Invocation-Token header alone is a credential (401 without Authorization)")
+	}
+}
