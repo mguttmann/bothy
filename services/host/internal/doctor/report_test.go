@@ -236,3 +236,44 @@ func TestSetDeclarationDuringEntryScans(t *testing.T) {
 		t.Fatal("no result after the scans")
 	}
 }
+
+// blockingHelpers holds the first Check until release is closed, so a test can change the
+// declaration while a run of doctor is in progress.
+type blockingHelpers struct {
+	Helpers
+	entered chan struct{}
+	release chan struct{}
+	once    *sync.Once
+}
+
+func (b blockingHelpers) Check(ctx context.Context, user string, req Request) (HelperResult, error) {
+	b.once.Do(func() {
+		close(b.entered)
+		<-b.release
+	})
+	return b.Helpers.Check(ctx, user, req)
+}
+
+// A declaration that arrives while a run of doctor is in progress must not be lost when the run
+// stores its result (M2-48: the host reported claude without the declaration of its ready and the
+// profile stayed missing until the next change).
+func TestSetDeclarationDuringRunKeepsDeclaration(t *testing.T) {
+	x := newTW(t)
+	b := blockingHelpers{Helpers: x.env.Helpers, entered: make(chan struct{}), release: make(chan struct{}), once: &sync.Once{}}
+	x.env.Helpers = b
+	x.env.Declaration = state.DeclNone
+	runner := NewRunner(x.env, nil)
+	done := make(chan *Result)
+	go func() { done <- runner.RunFull(context.Background()) }()
+	<-b.entered
+	runner.SetDeclaration(state.DeclOrganization)
+	close(b.release)
+	res := <-done
+	runner.WaitScans()
+	if res.Declaration != state.DeclOrganization {
+		t.Errorf("RunFull result declaration %q, want %q", res.Declaration, state.DeclOrganization)
+	}
+	if got := runner.Last().Declaration; got != state.DeclOrganization {
+		t.Errorf("Last declaration %q, want %q", got, state.DeclOrganization)
+	}
+}
