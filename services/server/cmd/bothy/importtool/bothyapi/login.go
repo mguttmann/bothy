@@ -201,7 +201,8 @@ func Logout(ctx context.Context, opts Options) error {
 		return err
 	}
 	c.core.setSession(disk)
-	resp, err := c.LogoutWithResponse(ctx)
+	// The DPoP logout of a device sends no X-Console-Request (D-M6-01-14).
+	resp, err := c.LogoutWithResponse(ctx, &restclient.LogoutParams{})
 	switch {
 	case errors.Is(err, ErrSessionRevoked):
 	case err != nil:
