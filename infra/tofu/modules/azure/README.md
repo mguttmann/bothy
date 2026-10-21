@@ -14,7 +14,7 @@ The shared inputs of the contract and the setup inputs of `generic-vm` are in
 | Input | Here |
 |---|---|
 | `database_mode` | `container` only: Azure Database for PostgreSQL offers PostgreSQL 18 (section "PostgreSQL 18"), but `install.sh` has no option for an external database (docs/DECISIONS.md D-M7-16-4) |
-| `object_storage_mode` | `filesystem` (volume, driver `fs`) or `seaweedfs` (profile `s3`); `s3` is refused, because Azure Blob Storage has no S3 API ([16-betrieb.md](../../../../docs/spec/16-betrieb.md) 3 rule 4) |
+| `object_storage_mode` | `filesystem` (volume, driver `fs`) or `seaweedfs` (profile `s3`); `s3` is refused, because Azure Blob Storage has no S3 API ([16-operations.md](../../../../docs/spec/16-operations.md) 3 rule 4) |
 | `admin_ssh_public_keys` | at least one key: Azure needs one for the administrator when password login is off; `ssh-rsa` or `ssh-ed25519` |
 | `backup_offsite` | an S3 bucket elsewhere (section "Off-site") |
 

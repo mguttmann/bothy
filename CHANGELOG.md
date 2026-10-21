@@ -32,7 +32,7 @@ operated, and the order of the build.
   compliance mode and a writer that cannot delete versions. Database and files stay in the
   Compose stack: the modules refuse `database_mode = managed` and `object_storage_mode = s3`,
   because `install.sh` cannot use an external database or S3 service yet; Amazon RDS and Azure
-  Database for PostgreSQL offer PostgreSQL 18 (checked 2026-10-20, docs/spec/16-betrieb.md 3
+  Database for PostgreSQL offer PostgreSQL 18 (checked 2026-10-20, docs/spec/16-operations.md 3
   rule 6). Providers pinned to one version (`hetznercloud/hcloud` 1.70.0, `hashicorp/aws`
   6.69.1, `hashicorp/azurerm` 5.10.0) with lock files for every gate platform;
   `tools/bin/tofu_providers.py` fills an offline mirror checked against them, and

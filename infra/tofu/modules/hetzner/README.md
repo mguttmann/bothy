@@ -22,7 +22,7 @@ Inputs of this module:
 | Input | Default | Meaning |
 |---|---|---|
 | `location` | - | Hetzner Cloud location, for example `nbg1` |
-| `server_type` | - | server type, for example `cx22` (4 GiB for the virus scan, [16-betrieb.md](../../../../docs/spec/16-betrieb.md) 3 rule 2) |
+| `server_type` | - | server type, for example `cx22` (4 GiB for the virus scan, [16-operations.md](../../../../docs/spec/16-operations.md) 3 rule 2) |
 | `image` | `ubuntu-24.04` | system image (Ubuntu or Debian with systemd) |
 | `ssh_allowed_cidrs` | `[]` | networks from which the firewall admits SSH; `/0` is refused |
 | `existing_ssh_keys` | `[]` | names or IDs of SSH keys already in the project; set, the module uploads no key and gives the server these, because Hetzner Cloud refuses a public key the project holds once (a second instance, a key from the Console); cloud-init still uses `admin_ssh_public_keys` |
@@ -63,7 +63,7 @@ the backups from a compromised host (R-OP-09).
 ## PostgreSQL 18
 
 Hetzner Cloud offers no managed PostgreSQL service, so only the container path exists
-([16-betrieb.md](../../../../docs/spec/16-betrieb.md) 3 rule 6).
+([16-operations.md](../../../../docs/spec/16-operations.md) 3 rule 6).
 
 ## Outputs
 

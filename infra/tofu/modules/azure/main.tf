@@ -3,7 +3,7 @@
 # admits only the edge port from the internet and denies every other inbound packet, a static
 # public address and one Linux VM whose custom data comes from generic-vm (Docker, the verified
 # release, the setup wizard). PostgreSQL and the files stay in the Compose stack: install.sh has
-# no option for an external database, and Azure Blob Storage has no S3 API (docs/spec/16-betrieb.md
+# no option for an external database, and Azure Blob Storage has no S3 API (docs/spec/16-operations.md
 # 3 rule 4), so the files use the volume or SeaweedFS (docs/DECISIONS.md D-M7-16-4). The off-site
 # target is an S3 bucket elsewhere, passed in backup_offsite, because bothy-backupd writes to S3
 # only (D-M7-16-5).

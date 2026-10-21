@@ -230,7 +230,7 @@ variable "location" {
 }
 
 variable "server_type" {
-  description = "Server type of the Compose host, e.g. cx22 (4 GiB memory are enough for the virus scan, docs/spec/16-betrieb.md 3 rule 2)."
+  description = "Server type of the Compose host, e.g. cx22 (4 GiB memory are enough for the virus scan, docs/spec/16-operations.md 3 rule 2)."
   type        = string
 }
 

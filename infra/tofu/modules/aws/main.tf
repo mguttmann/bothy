@@ -155,7 +155,7 @@ resource "aws_vpc_security_group_ingress_rule" "host" {
 }
 
 # Egress to everywhere: the host fetches Docker, the release and the images, the server talks
-# to the OIDC provider, the push services and webhook targets (docs/spec/16-betrieb.md 4.1 rule 3);
+# to the OIDC provider, the push services and webhook targets (docs/spec/16-operations.md 4.1 rule 3);
 # the server's own egress filter (SEC-NET) decides per request.
 #trivy:ignore:AVD-AWS-0104 The host needs egress to package mirrors, registries and the push services.
 resource "aws_vpc_security_group_egress_rule" "all" {
@@ -214,7 +214,7 @@ resource "aws_eip" "host" {
 
 # ---- Off-site bucket (offsite_region) ----------------------------------------------------------
 #
-# Append-only for the instance (docs/spec/16-betrieb.md 8.2 item 3, R-OP-09,
+# Append-only for the instance (docs/spec/16-operations.md 8.2 item 3, R-OP-09,
 # docs/operations/backup-restore.md 2): versioning, Object Lock in compliance mode with a default
 # retention, a lifecycle rule that removes noncurrent versions after the retention, and a writer
 # user whose policy cannot delete versions or change the lock. The module creates no access key:
