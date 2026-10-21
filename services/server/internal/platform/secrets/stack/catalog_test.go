@@ -222,6 +222,7 @@ func TestCatalogPendingAndGenerators(t *testing.T) {
 		"db_app_password":         {stack.GeneratorToken, ""},
 		"db_maint_password":       {stack.GeneratorToken, ""},
 		"db_monitor_password":     {stack.GeneratorToken, ""},
+		"db_backup_password":      {stack.GeneratorToken, ""},
 		"pgbackrest_cipher_pass":  {stack.GeneratorToken, ""},
 		"restic_password":         {stack.GeneratorToken, ""},
 		"grafana_admin_password":  {stack.GeneratorToken, ""},

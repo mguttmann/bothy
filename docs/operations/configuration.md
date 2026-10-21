@@ -650,8 +650,8 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server | enum(disable, verify-full) | `verify-full` | TLS to the database; in the internal Compose network `disable` (SEC-TLS-5) | active |
 | `database.sslrootcert` | `BOTHY_DATABASE__SSLROOTCERT` | Server | string | empty | CA bundle for `verify-full`; empty uses the system roots | active |
 | `database.max_conns` | `BOTHY_DATABASE__MAX_CONNS` | Server | int | `20` | size of the connection pool per process (start value until the load test) | active |
-| `migrate.require_recent_backup` | `BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP` | Server |  | `true` | `migrate` requires a fresh backup | planned (M7) |
-| `migrate.recent_backup_max_age` | `BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE` | Server |  | `24h` | how old this backup may be | planned (M7) |
+| `migrate.require_recent_backup` | `BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP` | Server | bool | `true` | `migrate` requires a fresh backup | active |
+| `migrate.recent_backup_max_age` | `BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE` | Server | duration | `24h` | how old this backup may be | active |
 | `migrate.lock_timeout` | `BOTHY_MIGRATE__LOCK_TIMEOUT` | Server | duration | `5s` | `lock_timeout` per migration step | active |
 | `migrate.bootstrap_user` | `BOTHY_MIGRATE__BOOTSTRAP_USER` | Server | string | `postgres` | superuser login only for `migrate up --bootstrap` | active |
 | `migrate.bootstrap_password_ref` | `BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_superuser_password` | its password | active |
@@ -659,16 +659,19 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `migrate.app_password_ref` | `BOTHY_MIGRATE__APP_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_app_password` | password for `bothy_app` | active |
 | `migrate.maint_password_ref` | `BOTHY_MIGRATE__MAINT_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_maint_password` | password for `bothy_maint` | active |
 | `migrate.monitor_password_ref` | `BOTHY_MIGRATE__MONITOR_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_monitor_password` | password for `bothy_monitor` | active |
-| `backup.pg.full_schedule` | `BOTHY_BACKUP__PG__FULL_SCHEDULE` | Server |  | `0 2 * * 0` | schedule of the full backup (cron) | planned (M7) |
-| `backup.pg.diff_schedule` | `BOTHY_BACKUP__PG__DIFF_SCHEDULE` | Server |  | `0 2 * * 1-6` | schedule of the differential backup (cron) | planned (M7) |
+| `migrate.backup_password_ref` | `BOTHY_MIGRATE__BACKUP_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_backup_password` | password for `bothy_backup` (M7-02) | active |
+| `backup.pg.full_schedule` | `BOTHY_BACKUP__PG__FULL_SCHEDULE` | Server | string | `0 2 * * 0` | schedule of the full backup (cron) | active |
+| `backup.pg.diff_schedule` | `BOTHY_BACKUP__PG__DIFF_SCHEDULE` | Server | string | `0 2 * * 1-6` | schedule of the differential backup (cron) | active |
 | `backup.pg.archive_timeout` | `BOTHY_BACKUP__PG__ARCHIVE_TIMEOUT` | Server |  | `60s` | a WAL segment is archived at the latest after this time | planned (M7) |
-| `backup.pg.retention_full` | `BOTHY_BACKUP__PG__RETENTION_FULL` | Server |  | `4` | full backups kept in repo2 | planned (M7) |
-| `backup.pg.local_retention_full` | `BOTHY_BACKUP__PG__LOCAL_RETENTION_FULL` | Server |  | `1` | full backups kept in repo1 | planned (M7) |
-| `backup.logical.schedule` | `BOTHY_BACKUP__LOGICAL__SCHEDULE` | Server |  | `0 3 * * *` | schedule of `pg_dump` (cron) | planned (M7) |
-| `backup.logical.retention` | `BOTHY_BACKUP__LOGICAL__RETENTION` | Server |  | `30d` | retention of the logical backup | planned (M7) |
-| `backup.objects.schedule` | `BOTHY_BACKUP__OBJECTS__SCHEDULE` | Server |  | `30 3 * * *` | schedule of the object backup (cron) | planned (M7) |
-| `backup.objects.retention` | `BOTHY_BACKUP__OBJECTS__RETENTION` | Server |  | `90d` | retention of the object snapshots | planned (M7) |
-| `backup.offsite.target` | `BOTHY_BACKUP__OFFSITE__TARGET` | Server |  | empty | off-site target; empty means local only (warning in console and status) | planned (M7) |
+| `backup.pg.retention_full` | `BOTHY_BACKUP__PG__RETENTION_FULL` | Server | int | `4` | full backups kept in repo2 | active |
+| `backup.pg.local_retention_full` | `BOTHY_BACKUP__PG__LOCAL_RETENTION_FULL` | Server | int | `1` | full backups kept in repo1 | active |
+| `backup.logical.schedule` | `BOTHY_BACKUP__LOGICAL__SCHEDULE` | Server | string | `0 3 * * *` | schedule of `pg_dump` (cron) | active |
+| `backup.logical.retention` | `BOTHY_BACKUP__LOGICAL__RETENTION` | Server | duration | `30d` | retention of the logical backup | active |
+| `backup.objects.schedule` | `BOTHY_BACKUP__OBJECTS__SCHEDULE` | Server | string | `30 3 * * *` | schedule of the object backup (cron) | active |
+| `backup.objects.retention` | `BOTHY_BACKUP__OBJECTS__RETENTION` | Server | duration | `90d` | retention of the object snapshots | active |
+| `backup.offsite.target` | `BOTHY_BACKUP__OFFSITE__TARGET` | Server | string | empty | off-site target; empty means local only (warning in console and status) | active |
+| `backup.offsite.region` | `BOTHY_BACKUP__OFFSITE__REGION` | Server | string | `us-east-1` | region of the off-site bucket (signing of S3 requests) | active |
+| `backup.offsite.use_path_style` | `BOTHY_BACKUP__OFFSITE__USE_PATH_STYLE` | Server | bool | `true` | path-style addressing of the off-site bucket (`https://<host>/<bucket>`); `false` uses virtual hosts | active |
 | `backup.max_age` | `BOTHY_BACKUP__MAX_AGE` | Server |  | `26h` | no successful backup for longer than this: alert | planned (M7) |
 | `backup.restore_test.schedule` | `BOTHY_BACKUP__RESTORE_TEST__SCHEDULE` | Server |  | `0 5 * * 6` | schedule of the restore test (cron) | planned (M7) |
 | `backup.restore_test.sample_files` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_FILES` | Server |  | `200` | files checked per test | planned (M7) |
@@ -888,6 +891,7 @@ into which `secrets-init` copies the file.
 | `db_app_password` | generated | server, migrate | role `bothy_app`, `database.password_ref` |
 | `db_maint_password` | generated | server, migrate | role `bothy_maint` (retention job) |
 | `db_monitor_password` | generated | collector, migrate | role `bothy_monitor`, receiver `postgresql` |
+| `db_backup_password` | generated | migrate, backup | role `bothy_backup` of `bothy-backupd`, which writes only `backup_runs` (`migrate.backup_password_ref`; `database.password_ref` of `backup`) |
 | `token_pepper` | generated | server | `auth.token_pepper_ref` |
 | `totp_key` | generated, 32 bytes | server | `auth.totp_key_ref`: AES-256-GCM key of the TOTP secrets in `local_credentials` ([08-identity.md](../spec/08-identity.md) 2.5) |
 | `telemetry_pseudonym_key` | generated, at least 32 bytes | server, collector | `telemetry.pseudonym_key_ref`, `hmac_key` of the allowlist |
@@ -904,7 +908,7 @@ into which `secrets-init` copies the file.
 | `fcm_service_account.json` | supplied | server | push for Android |
 | `oidc/<provider>_client_secret` | supplied | server | OIDC with `client_secret_basic` (`client_secret_ref` in `identity_providers.config`) |
 | `oidc/<provider>_client_key.pem` | supplied | server | OIDC with `private_key_jwt`: private key of the client assertion, PKCS#8 (`client_key_ref`, [08-identity.md](../spec/08-identity.md) 2.6) |
-| `offsite/` | supplied | backup | access to the off-site target (S3 keys or SSH key) |
+| `offsite/` | supplied | backup | key of the off-site S3 bucket (`backup.offsite.target`): `access_key_id`, `secret_access_key`, optional `ca.crt` for a private CA; may write and read, never remove a stored version ([backup-restore.md](backup-restore.md) 2) |
 | `alertmanager_bothy_webhook_url` | supplied | alertmanager | incoming webhook of the alert channel |
 | `alertmanager_external_webhook_url` | supplied | alertmanager | external on-call channel |
 | `alertmanager_heartbeat_url` | supplied | alertmanager | external heartbeat for the watchdog |
@@ -1005,7 +1009,7 @@ These variables are not server configuration; Compose derives values of the serv
 | `BOTHY_CLAMD_ADDRESS` | `tcp://clamav:3310` | sets `file.scan.clamd_address` (chapter 12) |
 | `BOTHY_PG_SHM_SIZE` | `256m` | shared memory of the database container |
 | `BOTHY_PG_ARCHIVE_TIMEOUT` | `60s` | sets `archive_timeout` in PostgreSQL; equal to `backup.pg.archive_timeout` |
-| `BOTHY_BACKUP_OFFSITE_TARGET` | empty | sets `backup.offsite.target` |
+| `BOTHY_BACKUP_OFFSITE_TARGET` | empty | sets `backup.offsite.target` (`s3:https://<host>[:<port>]/<bucket>[/<prefix>]`) and `BOTHY_PGBACKREST_REPO2` of `postgres` |
 | `BOTHY_OTEL_EXPORTER` | `none` | first collector overlay |
 | `BOTHY_OTEL_EXPORTER_2` | `none` | second collector overlay |
 | `BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS` | `15000` | sets `OTEL_METRIC_EXPORT_INTERVAL` of the server processes |
@@ -1047,6 +1051,7 @@ not through `.env`; only the entry point of the image reads them
 | `BOTHY_PGBACKREST_REPO_HOST` | postgres | host name of the pgBackRest repository host (`backup`); required |
 | `BOTHY_PG_ARCHIVE_TIMEOUT` | postgres | `archive_timeout` of PostgreSQL, from the row above; required |
 | `BOTHY_PGBACKREST_PG_HOST` | backup | host name of the database host (`postgres`); required |
+| `BOTHY_PGBACKREST_REPO2` | postgres | `on` when `BOTHY_BACKUP_OFFSITE_TARGET` is set, else empty: `archive-push` also writes to repo2 (M7-02) |
 
 ## 10. Maintenance
 

@@ -20,6 +20,7 @@ import (
 var secretFiles = map[pg.Role]string{
 	pg.RoleOwner: "db_owner_password", pg.RoleApp: "db_app_password",
 	pg.RoleMaint: "db_maint_password", pg.RoleMonitor: "db_monitor_password",
+	pg.RoleBackup: "db_backup_password",
 }
 
 // pgtestPasswords reads the role passwords pgtest bootstrapped.
@@ -116,8 +117,8 @@ func TestBootstrapIdempotent(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if seen != 4 {
-		t.Errorf("%d bothy_* roles, want 4", seen)
+	if seen != 5 {
+		t.Errorf("%d bothy_* roles, want 5", seen)
 	}
 	var monitor bool
 	if err := super.QueryRow(ctx, "SELECT pg_has_role('bothy_monitor', 'pg_monitor', 'MEMBER')").Scan(&monitor); err != nil || !monitor {
@@ -204,11 +205,17 @@ func TestBootstrapDatabaseGrants(t *testing.T) {
 		{"SELECT has_database_privilege('bothy_app', current_database(), 'CONNECT')", true},
 		{"SELECT has_database_privilege('bothy_maint', current_database(), 'CONNECT')", true},
 		{"SELECT has_database_privilege('bothy_monitor', current_database(), 'CONNECT')", true},
+		{"SELECT has_database_privilege('bothy_backup', current_database(), 'CONNECT')", true},
+		{"SELECT has_database_privilege('bothy_backup', current_database(), 'CREATE')", false},
 		{"SELECT has_database_privilege('bothy_app', current_database(), 'CREATE')", false},
 		{"SELECT has_database_privilege('bothy_app', current_database(), 'TEMPORARY')", false},
 		{"SELECT has_schema_privilege('bothy_app', 'public', 'USAGE')", true},
 		{"SELECT has_schema_privilege('bothy_maint', 'public', 'USAGE')", true},
 		{"SELECT has_schema_privilege('bothy_monitor', 'public', 'USAGE')", false},
+		{"SELECT has_schema_privilege('bothy_backup', 'public', 'USAGE')", true},
+		{"SELECT has_schema_privilege('bothy_backup', 'public', 'CREATE')", false},
+		// bothy_backup is no member of pg_monitor; its only table right comes with backup_runs.
+		{"SELECT pg_has_role('bothy_backup', 'pg_monitor', 'MEMBER')", false},
 		{"SELECT has_schema_privilege('bothy_app', 'public', 'CREATE')", false},
 		// PUBLIC (grantee 0) keeps no right on the database or the schema.
 		{"SELECT EXISTS (SELECT 1 FROM pg_database, aclexplode(datacl) a WHERE datname = current_database() AND a.grantee = 0)", false},

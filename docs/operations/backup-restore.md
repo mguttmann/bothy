@@ -25,8 +25,14 @@ stanza is `bothy`; `postgres` and `backup` talk over pgBackRest TLS on port 8432
 certificates of `pgbackrest_tls/`; repo1 is the volume `pgbackrest-repo` of `backup`, encrypted
 with `aes-256-cbc` and `pgbackrest_cipher_pass`. A full backup by hand:
 `docker compose exec backup pgbackrest --stanza=bothy backup --type=full`; the check of the
-repository: `docker compose exec backup pgbackrest --stanza=bothy verify`. Schedules, repo2 and
-`expire` come with M7-02.
+repository: `docker compose exec backup pgbackrest --stanza=bothy verify`.
+
+As built in M7-02 ([bothy-backupd README](../../services/server/cmd/bothy-backupd/README.md),
+[16-operations.md](../spec/16-operations.md) 8.2 "As built"): `bothy-backupd` runs every kind on its
+`backup.*` schedule, writes a row of `backup_runs` per run and a manifest per successful run, and
+reports the metrics `bothy.backup.*` and `bothy.storage.volume.*`. One kind by hand:
+`docker compose exec backup bothy-backupd backup pg_full` (also `pg_diff`, `logical`,
+`objects`); exit code `0` means the run succeeded.
 
 ## 2. Set up
 
@@ -35,6 +41,29 @@ repository: `docker compose exec backup pgbackrest --stanza=bothy verify`. Sched
    read for `backup`, a second one with delete only with the owner. SFTP: access without delete, cleanup
    through a second access.
 2. Put the access into `secrets/offsite/`, set `BOTHY_BACKUP_OFFSITE_TARGET`.
+
+   As built (M7-02): only S3-compatible targets are supported (docs/DECISIONS.md D-M7-02-4).
+   `BOTHY_BACKUP_OFFSITE_TARGET` (the key `backup.offsite.target`) has the form
+   `s3:https://<host>[:<port>]/<bucket>[/<prefix>]`, for example
+   `s3:https://s3.example.com/bothy-backup/instance-1`; `backup.offsite.region` and
+   `backup.offsite.use_path_style` describe the endpoint. The bucket needs versioning and Object
+   Lock with a default retention in mode Compliance of at least `backup.objects.retention`, and
+   a lifecycle rule on the whole prefix that expires noncurrent versions
+   (`NoncurrentVersionExpiration`, `NoncurrentDays` at least the Object Lock period) and removes
+   expired delete markers. Without that rule nothing ever leaves the bucket: on a versioned bucket
+   every deletion by restic or pgBackRest, the owner's expiry in section 9 included, only adds a
+   delete marker and keeps the old version (docs/DECISIONS.md D-M7-02-12).
+   `secrets/offsite/` holds three files of the key of `backup`: `access_key_id`,
+   `secret_access_key` and, for a private CA only, `ca.crt`. That key may list, read and write
+   objects (for AWS: `s3:ListBucket`, `s3:ListBucketVersions`, `s3:GetObject`, `s3:PutObject`,
+   `s3:DeleteObject` for restic's own lock files, which on a versioned bucket only adds a delete
+   marker); it must not hold `s3:DeleteObjectVersion`, `s3:PutObjectRetention`,
+   `s3:BypassGovernanceRetention` or bucket settings. The owner's second key, with the right to
+   delete old versions, never goes into `secrets/` (section 9). The Compose file sets
+   `BOTHY_PGBACKREST_REPO2=on` for `postgres` when the target is set, so `archive-push` writes
+   every WAL segment into repo2 as well. While the off-site target cannot be reached,
+   `archive-push` fails and PostgreSQL keeps the segments in `pg_wal` and retries
+   (`BothyWalArchiveStale`); the volume `pgdata` grows until the target answers again.
 3. `docker compose up -d backup`; on its first start `bothy-backupd` creates the pgBackRest stanza and
    the restic repository. It retries `stanza-create` until the database and its pgBackRest
    server answer; its log line `stanza bothy is ready` and the health check of `backup` (a TLS
@@ -59,6 +88,17 @@ Every run writes a manifest (JSON, encrypted next to the backup). Fields:
 | `pgbackrest.label`, `restic.snapshot_id` | reference to the backups |
 
 The manifest contains no contents and no secrets.
+
+As built (M7-02): the JSON has the schema name `schema: backup_manifest.v1` and the fields above,
+nested as their names say (`event_log.head_seq`, `audit.last_hash` as lowercase hex,
+`files.total_bytes`); `row_counts` holds an exact `count(*)` of every table of the schema
+`public` (partitions through their parent), read as `migrate.bootstrap_user` in one `READ ONLY`
+transaction with `REPEATABLE READ`. `pgbackrest.label` is the label in repo1 and is set for
+`pg_full` and `pg_diff`; `restic.snapshot_id` is set for `logical` and for `objects` with the
+driver `fs`. The manifest is stored in `backup_runs.manifest` and as a restic snapshot with the
+tags `manifest`, `<kind>` and `<run id>` in the restic repository (off-site, or local without a
+target), which restic encrypts with `restic_password`. Every string has a closed form, so
+`bothy-backupd` refuses a manifest field that could carry text.
 
 ## 4. Automatic restore test
 
@@ -190,3 +230,31 @@ M7-22/2). Not proven: a real cloud bucket in mode Compliance; the owner checks t
 checkpoint object of a new bucket once (`HeadObject` shows mode `COMPLIANCE` and a retain-until
 date). A `file://` target stays possible and is not immutable: then the owner copies the
 checkpoints with their own access into the bucket above.
+
+## 9. Off-site expiry by the owner
+
+`bothy-backupd` never deletes anything in the off-site bucket: its key in `secrets/offsite/`
+cannot remove a stored version (R-OP-09), and it runs `pgbackrest expire` on repo1 only. Old
+backups in the bucket stay until the owner removes them with the separate key that may delete
+versions after the Object Lock period:
+
+1. Keep the owner's key outside the stack, for example on the owner's device; never place it
+   under `secrets/`.
+2. Copy it for the run into a temporary directory with the same three file names as
+   `secrets/offsite/` (`access_key_id`, `secret_access_key`, optional `ca.crt`), readable by the
+   user `999`, and mount it read-only:
+   `docker compose run --rm -v /path/to/owner-key:/run/offsite-admin:ro backup bothy-backupd expire --offsite --credentials /run/offsite-admin`.
+3. The command runs `pgbackrest expire` on repo2 keeping `backup.pg.retention_full` full
+   backups, and `restic forget --prune` for the snapshots of `logical` older than
+   `backup.logical.retention`, of `objects` older than `backup.objects.retention` and of the
+   manifests older than the larger of both. On the versioned bucket these deletions only add
+   delete markers: the forgotten files become noncurrent versions, and the lifecycle rule of
+   section 2 removes them `NoncurrentDays` later, once the Object Lock no longer holds them. So
+   off-site data lives up to its retention plus `NoncurrentDays`; the command does not delete
+   versions itself. Exit code `0` means every step succeeded, not that space was freed; the
+   bucket's version listing shows when the rule has run.
+4. Remove the temporary copy of the key afterwards.
+
+The object mirror of the driver `s3` (below `<prefix>/objects/`) keeps objects deleted from the
+file bucket as current versions; the owner deletes them by hand with the same key, and the rule of
+section 2 removes the old versions `NoncurrentDays` later.

@@ -61,6 +61,8 @@ Every row of the table in configuration.md section 5 is an entry with name, orig
   self-signed CA limited to leaf certificates (`ca.crt`; its key is never written) and per host
   `postgres` and `backup` an ECDSA P-256 key in PKCS#8 (`<host>.key`) with a certificate for the
   host name with server and client use (`<host>.crt`), all valid for `PGBackRestTLSValidity`.
+- `db_backup_password` (M7-02) is the password of the role `bothy_backup`: `migrate` sets it with
+  `--bootstrap`, `backup` (bothy-backupd) logs in with it to record `backup_runs`.
 - `pending`: the generator comes with a later ticket (`Entry.PendingOn`):
   `s3_access_key` and `s3_secret_key` (M3, supplied until then). If
   they are missing, `init` reports them as `pending` and ends with exit code 0; when supplied,

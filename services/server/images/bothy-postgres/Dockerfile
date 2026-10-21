@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Image bothy-postgres (docs/spec/16-operations.md 2, docs/spec/18-release.md "Server images" rules
-# 2 and 4, brief M7-01): the official postgres:18 plus pgBackRest and bothy-backupd. One image
+# 2 and 4, briefs M7-01 and M7-02): the official postgres:18 plus pgBackRest, restic and
+# bothy-backupd. One image
 # serves the Compose services postgres and backup; entrypoint.sh picks the role. Build context is
 # the repository root; Dockerfile.dockerignore next to this file keeps it to what the image needs:
 #
@@ -29,6 +30,10 @@ RUN want="$(tr -d '[:space:]' < VERSION)"; \
     if [ "$VERSION" != "$want" ]; then echo "build argument VERSION=$VERSION differs from services/server/VERSION ($want)" >&2; exit 1; fi
 COPY services/server/cmd/bothy-backupd ./cmd/bothy-backupd
 COPY services/server/internal ./internal
+# bothy-backupd reads the configuration schema of the server (internal/wire), which embeds the
+# API routes and the migrations.
+COPY services/server/api ./api
+COPY services/server/migrations ./migrations
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN=local GOFLAGS=-mod=readonly \
@@ -80,8 +85,43 @@ RUN set -eu; \
     # from here on first use. The configuration the entry point writes lives in /tmp, and
     # /etc/pgbackrest is a link owned by root to it, so no copied path below /etc is writable by
     # the user (docs/DECISIONS.md D-M7-01-9).
-    mkdir -p /owned/var/lib/pgbackrest /owned/var/log/pgbackrest /link/etc; \
+    # bothy-backupd writes its scratch files (the pg_dump file of a logical run) below
+    # /var/lib/bothy-backup, the volume backup-scratch (brief M7-02).
+    mkdir -p /owned/var/lib/pgbackrest /owned/var/log/pgbackrest /owned/var/lib/bothy-backup /link/etc; \
     ln -s /tmp/bothy-pgbackrest /link/etc/pgbackrest
+
+# restic (BSD-2-Clause) for the logical and the object backup (docs/spec/16-operations.md 8.1,
+# brief M7-02): the release binary of the target architecture, checked against the SHA-256 of
+# that architecture pinned here (from the release's SHA256SUMS), so a changed download fails the
+# build. A version update changes RESTIC_VERSION and both checksums together. The binary gets the
+# file capability cap_dac_read_search (restic's documented way to back up as a user that does not
+# own the files): the volume files belongs to the server's user 65532 with mode 0700, and the
+# service backup runs as 999 with cap_add DAC_READ_SEARCH (infra/compose/compose.yaml); without
+# that capability in the container the kernel refuses to start restic (docs/DECISIONS.md
+# D-M7-02-10).
+FROM --platform=$BUILDPLATFORM postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336 AS restic
+ARG TARGETARCH
+ARG RESTIC_VERSION=0.19.1
+ARG RESTIC_SHA256_AMD64=f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c
+ARG RESTIC_SHA256_ARM64=a5f64aaab53d51e311fa3829124c5b703f2d14cf187d8640b6be3b2b49376465
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Only the downloader and bzip2 of the build platform are installed; this stage never ends in a
+# final image layer.
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) want="$RESTIC_SHA256_AMD64" ;; \
+      arm64) want="$RESTIC_SHA256_ARM64" ;; \
+      *) echo "no restic checksum for $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    apt-get update -qq; \
+    apt-get install -y -qq --no-install-recommends curl ca-certificates bzip2 libcap2-bin >/dev/null; \
+    curl -fsSL --proto '=https' -o /tmp/restic.bz2 \
+      "https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_linux_${TARGETARCH}.bz2"; \
+    echo "$want  /tmp/restic.bz2" | sha256sum -c -; \
+    bunzip2 /tmp/restic.bz2; \
+    install -D -m 0555 /tmp/restic /out/restic; \
+    setcap cap_dac_read_search=+ep /out/restic; \
+    getcap /out/restic | grep -q cap_dac_read_search
 
 FROM postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
 ARG VERSION REVISION
@@ -97,7 +137,9 @@ COPY --from=packages /rootfs/var/lib/dpkg/status.d/ /var/lib/dpkg/status.d/
 COPY --from=packages --chown=999:999 --chmod=0750 /owned/var/lib/pgbackrest /var/lib/pgbackrest
 COPY --from=packages --chown=999:999 --chmod=0750 /owned/var/log/pgbackrest /var/log/pgbackrest
 COPY --from=packages /link/etc/ /etc/
+COPY --from=packages --chown=999:999 --chmod=0700 /owned/var/lib/bothy-backup /var/lib/bothy-backup
 COPY --from=build --chown=0:0 --chmod=0555 /out/bothy-backupd /usr/local/bin/bothy-backupd
+COPY --from=restic --chown=0:0 --chmod=0555 /out/restic /usr/local/bin/restic
 COPY --chown=0:0 --chmod=0555 services/server/images/bothy-postgres/check-pgbackrest-version.sh /usr/local/bin/check-pgbackrest-version.sh
 COPY --chown=0:0 --chmod=0555 services/server/images/bothy-postgres/entrypoint.sh /usr/local/bin/bothy-postgres-entrypoint
 # Numeric, so runtimes that enforce "run as non-root" can verify it: the user postgres of the base

@@ -40,6 +40,13 @@ type MigrateConfig struct {
 	MaintPasswordRef string `config:"migrate.maint_password_ref"`
 	// MonitorPasswordRef is migrate.monitor_password_ref.
 	MonitorPasswordRef string `config:"migrate.monitor_password_ref"`
+	// BackupPasswordRef is migrate.backup_password_ref.
+	BackupPasswordRef string `config:"migrate.backup_password_ref"`
+	// RequireRecentBackup is migrate.require_recent_backup: migrate up refuses pending
+	// migrations without a recent successful backup (docs/spec/16-operations.md 10 item 1).
+	RequireRecentBackup bool `config:"migrate.require_recent_backup"`
+	// RecentBackupMaxAge is migrate.recent_backup_max_age, how old that backup may be.
+	RecentBackupMaxAge time.Duration `config:"migrate.recent_backup_max_age"`
 }
 
 // MigrateSettings binds the keys of bothy migrate from v.
@@ -58,5 +65,6 @@ func (c MigrateConfig) PasswordRefs() map[pg.Role]string {
 	return map[pg.Role]string{
 		pg.RoleOwner: c.OwnerPasswordRef, pg.RoleApp: c.AppPasswordRef,
 		pg.RoleMaint: c.MaintPasswordRef, pg.RoleMonitor: c.MonitorPasswordRef,
+		pg.RoleBackup: c.BackupPasswordRef,
 	}
 }

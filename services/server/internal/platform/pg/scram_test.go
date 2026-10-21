@@ -119,7 +119,7 @@ func TestRoleStatements(t *testing.T) {
 func TestRoles(t *testing.T) {
 	t.Parallel()
 	got := Roles()
-	want := []Role{"bothy_owner", "bothy_app", "bothy_maint", "bothy_monitor"}
+	want := []Role{"bothy_owner", "bothy_app", "bothy_maint", "bothy_monitor", "bothy_backup"}
 	if len(got) != len(want) {
 		t.Fatalf("Roles() = %v", got)
 	}
@@ -128,7 +128,8 @@ func TestRoles(t *testing.T) {
 			t.Errorf("Roles()[%d] = %s, want %s", i, got[i], want[i])
 		}
 	}
-	if RoleOwner != "bothy_owner" || RoleApp != "bothy_app" || RoleMaint != "bothy_maint" || RoleMonitor != "bothy_monitor" {
+	if RoleOwner != "bothy_owner" || RoleApp != "bothy_app" || RoleMaint != "bothy_maint" || RoleMonitor != "bothy_monitor" ||
+		RoleBackup != "bothy_backup" {
 		t.Error("role constants differ from 16-operations.md 7.1")
 	}
 }

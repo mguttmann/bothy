@@ -29,7 +29,8 @@ check  loads the configuration as the server start does, without starting, and p
        reads the Object Lock configuration of the bucket and fails unless it has a default
        retention in mode COMPLIANCE of at least retention.audit. Every secret reference that
        uses env: adds a warning on stderr, because file: is the recommended form
-       (16-operations.md 5.2).
+       (16-operations.md 5.2), and so does an empty backup.offsite.target (local backup
+       only, 16-operations.md 8.1).
 print  prints the effective value and the source of every key, sorted by name. Secret
        references are shown as references; nothing is resolved. The output is always
        redacted; --redacted only states it, and --redacted=false is a usage error.
@@ -96,6 +97,7 @@ func configCommand(ctx context.Context, args, env []string, schema func() (*conf
 		return exitOK
 	}
 	warnEnvRefs(s, values, stderr)
+	warnLocalBackup(s, values, stderr)
 	if o.resolve && !checkSecretRefs(ctx, s, values, env, stdout, stderr) {
 		return exitFailure
 	}
@@ -185,6 +187,18 @@ func warnEnvRefs(s *config.Schema, values *config.Values, stderr io.Writer) {
 		if k.Kind == config.KindSecretRef && strings.HasPrefix(values.String(k.Name), "env:") {
 			_, _ = fmt.Fprintf(stderr, "warning: %s uses an env: reference; prefer file: (16-operations.md 5.2)\n", k.Name)
 		}
+	}
+}
+
+// keyOffsiteTarget is the off-site target of bothy-backupd (M7-02).
+const keyOffsiteTarget = "backup.offsite.target"
+
+// warnLocalBackup prints a warning on stderr when s has backup.offsite.target and its effective
+// value is empty: the backups then stay on the host and are lost with it (16-operations.md 8.1).
+// It is a warning, not a problem, because a local backup is a valid start.
+func warnLocalBackup(s *config.Schema, values *config.Values, stderr io.Writer) {
+	if hasKey(s, keyOffsiteTarget) && values.String(keyOffsiteTarget) == "" {
+		_, _ = fmt.Fprintf(stderr, "warning: %s is empty: local backup only (16-operations.md 8.1)\n", keyOffsiteTarget)
 	}
 }
 

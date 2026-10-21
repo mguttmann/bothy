@@ -153,7 +153,7 @@ func TestServeFailsWithoutBinary(t *testing.T) {
 func TestVersion(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	if code := run(context.Background(), []string{"version"}, &stdout, &stderr); code != exitOK {
+	if code := run(context.Background(), []string{"version"}, nil, &stdout, &stderr); code != exitOK {
 		t.Fatalf("version returned %d: %s", code, stderr.String())
 	}
 	if got := strings.TrimSpace(stdout.String()); got != buildinfo.Version() {
@@ -183,7 +183,7 @@ func TestUsage(t *testing.T) {
 		{[]string{"--pgbackrest", ""}, exitUsage},
 	} {
 		var stdout, stderr bytes.Buffer
-		if got := run(context.Background(), tc.args, &stdout, &stderr); got != tc.code {
+		if got := run(context.Background(), tc.args, nil, &stdout, &stderr); got != tc.code {
 			t.Errorf("run(%q) = %d, want %d; stderr %s", tc.args, got, tc.code, stderr.String())
 		}
 	}
@@ -277,7 +277,7 @@ func TestHealthcheck(t *testing.T) {
 		{"missing key", healthArgs(dir, addr, "--key", filepath.Join(dir, "missing.key")), exitFailure, "client certificate"},
 	} {
 		var stdout, stderr bytes.Buffer
-		code := run(context.Background(), tc.args, &stdout, &stderr)
+		code := run(context.Background(), tc.args, nil, &stdout, &stderr)
 		if code != tc.code || !strings.Contains(stderr.String(), tc.stderr) {
 			t.Errorf("%s: code %d stderr %q, want %d and %q", tc.name, code, stderr.String(), tc.code, tc.stderr)
 		}
@@ -314,7 +314,7 @@ func TestHealthcheckSilentServer(t *testing.T) {
 	// In a goroutine, so a check that ignored --timeout fails the test after testkit.Patience;
 	// the cleanup then releases the silent connections.
 	done := make(chan int, 1)
-	go func() { done <- run(context.Background(), args, &stdout, &stderr) }()
+	go func() { done <- run(context.Background(), args, nil, &stdout, &stderr) }()
 	if code := testkit.Receive(t, "the end of the healthcheck within --timeout", done); code != exitFailure {
 		t.Errorf("silent server: code %d, want 1", code)
 	}
@@ -326,7 +326,7 @@ func TestRunServesUntilTheServerFails(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	args := []string{"--pgbackrest", filepath.Join(t.TempDir(), "missing"), "--retry", "1ms"}
-	if code := run(context.Background(), args, &stdout, &stderr); code != exitFailure {
+	if code := run(context.Background(), args, nil, &stdout, &stderr); code != exitFailure {
 		t.Errorf("run without a pgbackrest binary = %d, want %d; stderr %s", code, exitFailure, stderr.String())
 	}
 }

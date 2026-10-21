@@ -23,6 +23,7 @@ collector is counted.
 | `setup.go` | `Deps`, `Exporters` (in-process replacements of the OTLP exporters for tests, M1-69), `Setup`, `Telemetry`, providers, sampler, OpenTelemetry error handler |
 | `env.go` | the `OTEL_*` variables the package interprets itself |
 | `resource.go` | resource of the process |
+| `metricsonly.go` | `SetupMetrics`, `MetricsDeps`, `MeterTelemetry`: metrics only, for processes without pseudonyms (`bothy-backupd`, M7-02) |
 | `queue.go` | in-flight budget and front queue of one signal |
 | `spans.go` | span processor, attribute filter and counting span exporter |
 | `txnspan.go` | `SubscriberSpan`, the span `txn.subscribe <module>` of an in-transaction subscriber (kernel/txn tracer, M1-13) |
@@ -71,6 +72,14 @@ handler := otel.Middleware(mux)          // after Setup
 - `NewCommandLogger(w, level)` is the logger of short-lived commands and of the time before the
   configuration exists: JSON lines, the same allowlist, never OTLP. `cmd/bothy` uses it at
   `telemetry.logs.level`, `info` before the configuration is loaded.
+
+`SetupMetrics(ctx, cfg, otel.MetricsDeps{ServiceName: "bothy-backupd", ...})` is the setup of a
+process that sends only metrics and has no pseudonym key (M7-02): the same resource with its own
+`service.name` (and without `bothy.server.role` when `cfg.Role` is empty), the views of the metric
+registry, the OTLP metric exporter selected from `MetricsDeps.Env` and
+`bothy.telemetry.dropped`. It installs nothing globally; the caller passes
+`MeterTelemetry.MeterProvider()` to its instruments. With `telemetry.enabled` false only a test
+reader (`MetricsDeps.Reader`) reads.
 
 ## Signals
 

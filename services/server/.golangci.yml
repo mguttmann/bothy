@@ -69,9 +69,13 @@ linters:
             - $all
             - "!**/internal/files/adapters/s3/**"
             - "!**/internal/audit/adapters/s3sink/**"
+            - "!**/internal/status/adapters/s3mirror/**"
+            # The image test of bothy-postgres acts as the owner of the off-site bucket: it sets
+            # the Object Lock configuration and tries deletions with the key of backup (M7-02).
+            - "!**/test/postgresimage/**"
           deny:
             - pkg: github.com/aws/
-              desc: only internal/files/adapters/s3 and internal/audit/adapters/s3sink may import the AWS SDK (12 "15", ADR 0048, M7-22)
+              desc: only internal/files/adapters/s3, internal/audit/adapters/s3sink, internal/status/adapters/s3mirror and the image test of bothy-postgres may import the AWS SDK (12 "15", ADR 0048, M7-22, M7-02)
         # ID-T27 (docs/spec/08-identity.md "15. Tests"): every random part of a token or code of
         # identity (refresh tokens, cookies, API tokens, codes) comes from crypto/rand, so the
         # identity module may not import math/rand at all, tests included (M1-34).

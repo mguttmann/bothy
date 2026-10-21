@@ -30,6 +30,13 @@ type serveOptions struct {
 	stanza string
 	// retry is the wait between two attempts of stanza-create.
 	retry time.Duration
+	// config is the configuration file of --config; "" means BOTHY_CONFIG_FILE or none.
+	config string
+	// env is the environment of the pgBackRest children (the process environment plus the
+	// repo2 options of the off-site target); nil means the environment of this process.
+	env []string
+	// loop runs next to the TLS server until its context ends (the scheduler); nil runs nothing.
+	loop func(ctx context.Context)
 }
 
 // serve starts "pgbackrest server" as a child process with this process's stdout and stderr
@@ -48,7 +55,7 @@ func serve(ctx context.Context, opts serveOptions, signals <-chan os.Signal, std
 
 	// The child outlives a canceled ctx until stop has sent SIGTERM: exec would kill it outright.
 	child := exec.CommandContext(context.WithoutCancel(ctx), opts.pgbackrest, "server") //nolint:gosec // G204: the binary is a flag of the operator.
-	child.Stdout, child.Stderr = log, log
+	child.Stdout, child.Stderr, child.Env = log, log, opts.env
 	if err := child.Start(); err != nil {
 		log.printf("bothy-backupd: start the pgBackRest TLS server: %v", err)
 		return exitFailure
@@ -60,6 +67,13 @@ func serve(ctx context.Context, opts serveOptions, signals <-chan os.Signal, std
 	go func() {
 		defer close(stanzaDone)
 		createStanza(ctx, opts, log)
+	}()
+	loopDone := make(chan struct{})
+	go func() {
+		defer close(loopDone)
+		if opts.loop != nil {
+			opts.loop(ctx)
+		}
 	}()
 
 	var code int
@@ -75,6 +89,7 @@ func serve(ctx context.Context, opts serveOptions, signals <-chan os.Signal, std
 	}
 	cancel()
 	<-stanzaDone
+	<-loopDone
 	return code
 }
 
@@ -104,7 +119,7 @@ func exitedBySIGTERM(exit *exec.ExitError) bool {
 func createStanza(ctx context.Context, opts serveOptions, log *lineWriter) {
 	for {
 		cmd := exec.CommandContext(ctx, opts.pgbackrest, "--stanza="+opts.stanza, "stanza-create") //nolint:gosec // G204: binary and stanza are flags of the operator.
-		cmd.Stdout, cmd.Stderr = log, log
+		cmd.Stdout, cmd.Stderr, cmd.Env = log, log, opts.env
 		err := cmd.Run()
 		if err == nil {
 			log.printf("bothy-backupd: stanza %s is ready", opts.stanza)

@@ -17,22 +17,24 @@ import (
 // Role is a database role of docs/spec/16-operations.md 7.1.
 type Role string
 
-// The four roles of the server. bothy_owner owns the database and the schema public and runs
+// The five roles of the server. bothy_owner owns the database and the schema public and runs
 // the DDL of bothy migrate; bothy_app does the DML of api and worker; bothy_maint trims the
-// audit log; bothy_monitor has pg_monitor for the collector.
+// audit log; bothy_monitor has pg_monitor for the collector; bothy_backup writes only the table
+// backup_runs for bothy-backupd (03 4.12, brief M7-02 design note 3).
 const (
 	RoleOwner   Role = "bothy_owner"
 	RoleApp     Role = "bothy_app"
 	RoleMaint   Role = "bothy_maint"
 	RoleMonitor Role = "bothy_monitor"
+	RoleBackup  Role = "bothy_backup"
 )
 
-// Roles returns the four roles in a fixed order: owner, app, maint, monitor.
-func Roles() []Role { return []Role{RoleOwner, RoleApp, RoleMaint, RoleMonitor} }
+// Roles returns the five roles in a fixed order: owner, app, maint, monitor, backup.
+func Roles() []Role { return []Role{RoleOwner, RoleApp, RoleMaint, RoleMonitor, RoleBackup} }
 
 func (r Role) known() bool {
 	switch r {
-	case RoleOwner, RoleApp, RoleMaint, RoleMonitor:
+	case RoleOwner, RoleApp, RoleMaint, RoleMonitor, RoleBackup:
 		return true
 	default:
 		return false
@@ -50,7 +52,7 @@ const roleAttributes = "LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION 
 // advisory lock; its value is arbitrary but fixed ("bothyboo" as eight ASCII bytes).
 const bootstrapLockID int64 = 0x626f746879626f6f
 
-// Bootstrap creates or updates the four roles and their passwords (BootstrapRoles), then makes
+// Bootstrap creates or updates the five roles and their passwords (BootstrapRoles), then makes
 // database owned by bothy_owner and grants the database and schema rights
 // (BootstrapDatabase). super is a connection of a superuser (migrate.bootstrap_user) to
 // database. It is idempotent: a second run with the same passwords changes nothing visible,
@@ -137,7 +139,7 @@ func isRace(err error) bool {
 
 // roleStatement returns CREATE ROLE (create) or ALTER ROLE for role with the attributes of
 // roleAttributes and the password verifier. DDL takes no bind parameters, so the statement is
-// built here: the role is one of the four constants, quoted as an identifier, and the verifier
+// built here: the role is one of the five constants, quoted as an identifier, and the verifier
 // must have the exact form of verifierPattern (base64, digits, "$" and ":"), so the literal
 // cannot be broken out of.
 func roleStatement(create bool, role Role, verifier string) (string, error) {
@@ -188,7 +190,8 @@ func checkPasswords(passwords map[Role]secrets.Value) error {
 
 // BootstrapDatabase is the per-database part of Bootstrap: bothy_owner owns database and its
 // schema public; PUBLIC loses every right on both; bothy_app, bothy_maint and bothy_monitor get
-// CONNECT, bothy_app and bothy_maint USAGE on public (16 7.1 rule 2). No default privileges:
+// CONNECT, bothy_app and bothy_maint USAGE on public (16 7.1 rule 2); bothy_backup gets CONNECT
+// and USAGE on public, its only table right comes from the migration of backup_runs. No default privileges:
 // each migration grants what bothy_app needs on its tables (rule 3).
 //
 // super must be connected to database (the schema statements act on the current database);
@@ -207,10 +210,10 @@ func BootstrapDatabase(ctx context.Context, super *pgx.Conn, database string) er
 	stmts := []string{
 		"ALTER DATABASE " + db + " OWNER TO " + RoleOwner.identifier(),
 		"REVOKE ALL ON DATABASE " + db + " FROM PUBLIC",
-		"GRANT CONNECT ON DATABASE " + db + " TO " + roleList(RoleApp, RoleMaint, RoleMonitor),
+		"GRANT CONNECT ON DATABASE " + db + " TO " + roleList(RoleApp, RoleMaint, RoleMonitor, RoleBackup),
 		"ALTER SCHEMA public OWNER TO " + RoleOwner.identifier(),
 		"REVOKE ALL ON SCHEMA public FROM PUBLIC",
-		"GRANT USAGE ON SCHEMA public TO " + roleList(RoleApp, RoleMaint),
+		"GRANT USAGE ON SCHEMA public TO " + roleList(RoleApp, RoleMaint, RoleBackup),
 	}
 	err := pgx.BeginFunc(ctx, super, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", bootstrapLockID); err != nil {

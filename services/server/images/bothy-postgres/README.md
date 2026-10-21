@@ -3,7 +3,7 @@
 The database image of a Bothy instance ([16-operations.md](../../../../docs/spec/16-operations.md)
 sections 2 and 8, [18-release.md](../../../../docs/spec/18-release.md) "Server images" rules 2
 and 4, [ADR 0058](../../../../docs/adr/0058-backup-with-pgbackrest-object-backup-and-restore-test.md)):
-the official `postgres:18` image, pinned by digest, plus pgBackRest and
+the official `postgres:18` image, pinned by digest, plus pgBackRest, restic (M7-02) and
 [`bothy-backupd`](../../cmd/bothy-backupd/README.md). One image serves the two Compose services
 `postgres` and `backup` (R-OP-07), so both always run the same pgBackRest.
 
@@ -16,8 +16,9 @@ make postgres-image-test   # the two-container test of services/server/test/post
 ```
 
 Build context is the repository root; [`Dockerfile.dockerignore`](Dockerfile.dockerignore) keeps
-it to `go.mod`, `go.sum`, `VERSION`, `cmd/bothy-backupd/`, `internal/` and the two scripts of this
-directory. The build argument `VERSION` must equal `services/server/VERSION`; `REVISION` and
+it to `go.mod`, `go.sum`, `VERSION`, `cmd/bothy-backupd/`, `internal/`, `api/` and `migrations/`
+(`bothy-backupd` reads the configuration schema of the server, which embeds both) and the two
+scripts of this directory. The build argument `VERSION` must equal `services/server/VERSION`; `REVISION` and
 `SOURCE_URL` fill the OCI labels. The tag is `pg18-<server version>`, never `latest`.
 
 No build step runs on the target platform, so one host builds both platforms natively and no
@@ -27,6 +28,7 @@ emulation is involved (docs/DECISIONS.md D-M7-01-2):
 |---|---|---|
 | `build` | build platform | cross compiles `bothy-backupd` (static, without cgo) |
 | `packages` | build platform | checks the fingerprint of the PostgreSQL project's Debian repository key, checks the pinned pgBackRest version against the minimum, downloads `pgbackrest` and `libssh2-1t64` for the target architecture (apt verifies them against the signed indexes) and unpacks them |
+| `restic` | build platform | downloads the restic release binary of the target architecture and checks it against the SHA-256 of that architecture pinned in the Dockerfile (`RESTIC_VERSION`, `RESTIC_SHA256_AMD64`, `RESTIC_SHA256_ARM64`, from the release's `SHA256SUMS`); an update changes all three together |
 | final | target platform | `postgres:18` plus the unpacked files, the package records under `/var/lib/dpkg/status.d/` (for image scanners), `bothy-backupd` and the scripts; only copies |
 
 pgBackRest comes from `apt.postgresql.org` (suite `trixie-pgdg`, the Debian release of the base
@@ -44,7 +46,7 @@ entry point [`entrypoint.sh`](entrypoint.sh) (`bothy-postgres-entrypoint`) write
 | Command | Role | What runs |
 |---|---|---|
 | `postgres` (default) | database host `postgres` | PostgreSQL with `wal_level=replica`, `archive_mode=on`, `archive_command` = `pgbackrest --stanza=bothy archive-push %p` and `archive_timeout` from `BOTHY_PG_ARCHIVE_TIMEOUT` (16 7.2); next to it `pgbackrest server`, through which the repository host runs its backups |
-| `bothy-backupd ...` | repository host `backup` | `bothy-backupd`: the pgBackRest TLS server of the repository, stanza creation |
+| `bothy-backupd ...` | repository host `backup` | `bothy-backupd`: the pgBackRest TLS server of the repository, stanza creation, the scheduled backups (pgBackRest, `pg_dump`, restic), manifests and metrics (M7-02) |
 | `pgbackrest ...` | database host | a pgBackRest command such as `restore` with the configuration of the database host; creates `PGDATA` on a fresh volume |
 | anything else | database host | handed to the entry point of the base image |
 
@@ -67,13 +69,26 @@ accepts a key only when no other user can read it, so `secrets-init` runs with
 | `pgbackrest_tls/postgres.crt`, `postgres.key` | own certificate | (copy, unused) |
 | `pgbackrest_tls/backup.crt`, `backup.key` | (copy, unused) | own certificate |
 | `pgbackrest_cipher_pass` | no | yes, written into the configuration file |
-| `db_superuser_password` | `POSTGRES_PASSWORD_FILE` | not read in M7-01 |
+| `db_superuser_password` | `POSTGRES_PASSWORD_FILE` | `migrate.bootstrap_password_ref`: `pg_dump` and the manifest queries |
+| `db_backup_password` | no | `database.password_ref` of the role `bothy_backup` (`backup_runs`) |
+| `restic_password` | no | `RESTIC_PASSWORD_FILE` of restic |
+| `offsite/` | no | key of the off-site bucket: `access_key_id`, `secret_access_key`, optional `ca.crt` |
 
 | Variable | Role | Meaning |
 |---|---|---|
 | `BOTHY_PGBACKREST_REPO_HOST` | database | host name of the repository host (Compose: `backup`), required |
 | `BOTHY_PG_ARCHIVE_TIMEOUT` | database, command `postgres` | `archive_timeout`, equal to `backup.pg.archive_timeout`, required |
 | `BOTHY_PGBACKREST_PG_HOST` | repository | host name of the database host (Compose: `postgres`), required |
+| `BOTHY_PGBACKREST_REPO2` | database | `on` when an off-site target is set: the configuration of the database host names repo2 on the same repository host, so `archive-push` writes every segment into repo1 and repo2; empty otherwise |
+
+restic carries the file capability `cap_dac_read_search` so that the user `999` can read the
+volume `files` of the server (owner `65532`, mode `0700`); the container of `backup` needs
+`--cap-add DAC_READ_SEARCH` (Compose: `cap_add`), else restic does not start (D-M7-02-10).
+
+The repository host gets repo2 (the off-site bucket) not from the entry point but from
+`bothy-backupd`, as `PGBACKREST_REPO2_*` variables of its pgBackRest children. The server
+configuration of `bothy-backupd` comes from the `BOTHY_*` variables of the server
+(docs/operations/configuration.md); the variables above are not part of it.
 
 The variables of the base image (`POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD_FILE`, `PGDATA`)
 keep their meaning.
@@ -86,5 +101,11 @@ keep their meaning.
   and `pgbackrest verify`; a client certificate of another CA is rejected; the database container
   has one network, the internal one, and cannot reach `192.0.2.1:443`; the labels, the user, the
   version guard and both platforms of the archive are checked.
+- `TestBackupKinds` (M7-02) runs every kind of `bothy-backupd` against the database container,
+  repo1 in a volume and an off-site bucket of SeaweedFS with versioning and Object Lock in mode
+  Compliance: one succeeded `backup_runs` row per run with its manifest, the manifest as restic
+  snapshot next to the backup, `expire` only on repo1, the key of `backup` refused when it deletes
+  a stored version and unable to change it by an overwrite, the metrics of `signals.md` at an OTLP
+  collector, and `bothy migrate up` after a recent backup.
 - The same package without the build tag tests the version guard against fake binaries (`make test`).
 - The CI job `postgres-image` runs both targets on `ubuntu-24.04` and `ubuntu-24.04-arm`.
