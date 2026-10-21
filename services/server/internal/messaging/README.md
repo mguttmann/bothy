@@ -1,6 +1,6 @@
 # Modul `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. The reads of the consumer push of notify built (M3-19): `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore` and `Newest`.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -86,7 +86,7 @@ adapter on the global meter provider.
 
 ## Port (Wurzelpaket `internal/messaging`)
 
-- Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader`.
+- Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader`.
 - Gibt In-Tx-Ereignisse aus: `MessagePosted`, `MessageDeleted`.
 - Abonniert In-Tx-Ereignisse: `chat.ThreadMoved`.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `files.AttachmentLocator`, kernel `personaldata.Participant`.
@@ -224,6 +224,24 @@ lets the run and its anchor be written in either order.
 `TriggerMessageOf(ctx, messageID)` (M2-08): the trigger facts of one message for the delivery
 check of runs, without content and without an authorization: place, author as `PrincipalRef`,
 origin, kind, the stored mentions and the trigger state. `not_found` for an unknown message.
+
+The reads of the consumer push of notify (M3-19 design notes 5 and 9 d; 13 section 2.1), in
+`app/pushreads.go` over the store port `app.PushReadStore` (part of `Store`) and the queries of
+`queries/pushreads.sql`. They return positions only (`AnchorRef{MessageID, RunID, ThreadSeq}` or
+`MessageRef{ID, ThreadSeq}`), never content, and `found = false` instead of an error when no row
+matches. None authorizes and none carries the visible channel predicate: the consumer has no
+principal and reads like the log tail, and notify checks every hint with `push.deliver` (07
+section 7.4 rule 1); `predicate_test.go` lists them with this reason.
+
+- `LastAnchorBefore(ctx, threadID, beforeThreadSeq)`: the newest run anchor (`kind = 'run'`,
+  the only rows with `run_id`) of the thread with `thread_seq` below the bound (query
+  `LastAnchorBefore`, backwards over `messages_thread_seq_key`).
+- `AnchorOf(ctx, runID)`: the anchor of the run (query `AnchorOfRun`, over `messages_run_id_key`).
+- `LastAgentMessageBefore(ctx, threadID, agentID, afterThreadSeq, beforeThreadSeq)`: the newest
+  message of the agent strictly between the bounds with `origin = 'agent'`, `kind IN ('text',
+  'voice', 'card')` and `deleted_at IS NULL` (query `LastAgentMessageBefore`).
+- `Newest(ctx, threadID)`: the newest message of the thread that is not deleted and whose kind is
+  neither `run` nor `system`, the target of a bundled hint (query `NewestMessage`).
 
 Lock order: neither port takes the thread lock for a message change. runs holds its `runs` row
 and then updates the message (`SetTriggerState` last in the acceptance), so both orders of runs

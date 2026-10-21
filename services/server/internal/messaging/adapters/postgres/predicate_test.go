@@ -25,6 +25,16 @@ var visiblePredicateAllowlist = map[string]string{
 	"SetTriggerState": "the trigger state of runs (M2-05, 09 section 6): runs calls it without a reader for a message it " +
 		"accepted or whose run it changed in the same unit of work; it returns the row only to append message.updated, " +
 		"whose receive action message.read sync checks per reader",
+	// The reads of the consumer push of notify (M3-19 design notes 5 and 9 d): a worker without a
+	// principal that reads like the log tail; notify checks every hint with push.deliver.
+	"LastAnchorBefore": "the run anchor before a position for the consumer push (M3-19), a system job without a principal; " +
+		"it returns positions only and notify checks every hint with push.deliver",
+	"AnchorOfRun": "the anchor of a run for the consumer push (M3-19), a system job without a principal; it returns " +
+		"positions only and notify checks every hint with push.deliver",
+	"LastAgentMessageBefore": "the last agent message of a run for the consumer push (M3-19), a system job without a " +
+		"principal; it returns positions only and notify checks every hint with push.deliver",
+	"NewestMessage": "the newest message of a thread for the flush hint of notify (M3-19), a system job without a " +
+		"principal; it returns positions only and notify checks every hint with push.deliver",
 	// The template statements of M1-60 (INT-W22/5): personal templates belong to no channel, and the
 	// writes follow the locked visible read GetVisibleTemplate.
 	"ListPersonalTemplates": "the personal templates of the caller (owner_user_id), which belong to no channel; " +

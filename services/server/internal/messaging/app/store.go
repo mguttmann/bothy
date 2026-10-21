@@ -21,6 +21,9 @@ var ErrClientMsgIDTaken = errors.New("messaging: the author already used this cl
 // and mentions. Reads join the ambient transaction of ctx; writes need one. Errors are
 // kernel/errs errors except ErrClientMsgIDTaken.
 type Store interface {
+	// PushReadStore answers the reads of the consumer push of notify (M3-19).
+	PushReadStore
+
 	// Message reads the message id; found is false for an unknown id.
 	Message(ctx context.Context, id ids.ID) (m domain.Message, found bool, err error)
 	// MessageByClientID reads the message of author with clientMsgID (the idempotency lookup).
