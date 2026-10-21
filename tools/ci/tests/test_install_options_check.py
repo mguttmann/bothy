@@ -175,7 +175,7 @@ def test_spec_change_is_seen(repo: Repo) -> None:
 
 
 def test_spec_chapter_must_be_unique(repo: Repo) -> None:
-    repo.write("docs/spec/16-betrieb.md", spec())
+    repo.write("docs/spec/16-operations-copy.md", spec())
     assert any("exactly one" in f for f in ioc.check(repo.root))
 
 

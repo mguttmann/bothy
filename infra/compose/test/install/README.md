@@ -1,7 +1,7 @@
 # Tests of the setup wizard install.sh
 
 Tests of [infra/compose/install.sh](../../install.sh), the setup wizard of
-[docs/spec/16-betrieb.md](../../../../docs/spec/16-betrieb.md), section 3.1. They run the script
+[docs/spec/16-operations.md](../../../../docs/spec/16-operations.md), section 3.1. They run the script
 against stubs: no container of Bothy starts, nothing goes to the network, nothing outside a work
 folder is written.
 

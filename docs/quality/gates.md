@@ -29,7 +29,7 @@ once for the components of the plan, the tests split by component
 
 | Job | Make targets | Runs |
 |---|---|---|
-| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins` | always |
+| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins install-options` | always |
 | `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
 | `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses` | always |
 | `test (tools)` | `test coverage` with no component (the Python tools) | always |

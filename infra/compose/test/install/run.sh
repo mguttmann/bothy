@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests of the setup wizard infra/compose/install.sh (docs/spec/16-betrieb.md, section 3.1) with
+# Tests of the setup wizard infra/compose/install.sh (docs/spec/16-operations.md, section 3.1) with
 # stubs of docker, curl, cosign and sudo (stubs/): no container starts and nothing goes to the
 # network. The cases are in cases.sh; README.md next to this file says what they cover.
 # `make install-test` runs this file in a pinned Debian container, INSTALL_TEST_NATIVE=1 on the host.

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Stub of sudo for the tests of install.sh (README.md next to this folder). install.sh must never
-# call sudo (docs/spec/16-betrieb.md, section 3.1, rule 2): the stub records the call, leaves the
+# call sudo (docs/spec/16-operations.md, section 3.1, rule 2): the stub records the call, leaves the
 # marker STUB_LOG.sudo that fails the running test and refuses.
 
 printf 'sudo %s\n' "$*" >>"${STUB_LOG:?STUB_LOG is not set}"

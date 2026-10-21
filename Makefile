@@ -226,7 +226,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
 	$(call tool,actionlint) -shellcheck= -pyflakes= .github/workflows/*.yml
 	@# Shell scripts of the Compose installation and their tests (brief M7-29); each file's shebang
-	@# selects the dialect, install.sh is POSIX sh (docs/spec/16-betrieb.md 3.1 rule 5).
+	@# selects the dialect, install.sh is POSIX sh (docs/spec/16-operations.md 3.1 rule 5).
 	$(call tool,shellcheck) $$(git ls-files -- 'infra/compose/*.sh' 'infra/compose/test/install/*.sh' 'infra/compose/test/install/stubs/*')
 	@if [ -n "$${GH_TOKEN:-}" ]; then $(UVRUN) zizmor --min-severity low .github/workflows; \
 	else echo "  zizmor: offline (set GH_TOKEN for the online audits)"; $(UVRUN) zizmor --offline --min-severity low .github/workflows; fi

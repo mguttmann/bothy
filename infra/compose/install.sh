@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Setup wizard of the product: installs one instance with Docker Compose in one command. Normative
-# description: docs/spec/16-betrieb.md, section 3.1; release artifact of the product component,
+# description: docs/spec/16-operations.md, section 3.1; release artifact of the product component,
 # docs/spec/18-release.md, section 2.1. It does nothing the manual path
 # (docs/operations/install-compose.md) does not also do: check the host, fetch and verify the
 # installation bundle of its built-in version, write infra/compose/.env, start the stack, wait for
@@ -932,7 +932,7 @@ set_trusted_proxies() {
 		tp_value=${tp_value:+$tp_value,}$tp_v6
 	fi
 	[ -n "$tp_value" ] ||
-		die start "the network $tp_net has no gateway; set BOTHY_TRUSTED_PROXIES in $env_file by hand (docs/spec/16-betrieb.md, section 4.3)"
+		die start "the network $tp_net has no gateway; set BOTHY_TRUSTED_PROXIES in $env_file by hand (docs/spec/16-operations.md, section 4.3)"
 	env_set BOTHY_TRUSTED_PROXIES "$tp_value" || die start "cannot write BOTHY_TRUSTED_PROXIES into $env_file"
 	say "set BOTHY_TRUSTED_PROXIES=$tp_value (gateway of the network $tp_net) in $env_file"
 }
@@ -982,7 +982,7 @@ step_start() {
 		ss_url=http://127.0.0.1:$ss_port/api/v1/instance/discovery
 		ss_status=$(curl -sS -o /dev/null -w '%{http_code}' "$ss_url" </dev/null)
 		[ "$ss_status" = 200 ] ||
-			die start "GET $ss_url answered '$ss_status', not 200; check BOTHY_TRUSTED_PROXIES in $env_file (gateway of the Compose network, docs/spec/16-betrieb.md, section 4.3)"
+			die start "GET $ss_url answered '$ss_status', not 200; check BOTHY_TRUSTED_PROXIES in $env_file (gateway of the Compose network, docs/spec/16-operations.md, section 4.3)"
 	fi
 }
 
@@ -1042,7 +1042,7 @@ step_finish() {
 		printf '  2. The owner was set up before; a new code for an owner: cd %s && docker compose exec %s bothy setup issue-enrollment-code --user %s\n' \
 			"$compose_dir" "$api_service" "$opt_owner_handle"
 	fi
-	printf '  3. Escrow the secrets, apart from the server and the off-site target (docs/spec/16-betrieb.md, section 5.4):\n'
+	printf '  3. Escrow the secrets, apart from the server and the off-site target (docs/spec/16-operations.md, section 5.4):\n'
 	printf '     cd %s && docker compose run --rm -T secrets-init secrets export --from /run/bothy/secrets/_store --age-recipient <age public key> > bundle.age\n' "$compose_dir"
 	printf '  4. See the state: cd %s && docker compose ps\n' "$compose_dir"
 	if [ -z "$(env_get BOTHY_BACKUP_OFFSITE_TARGET)" ]; then
