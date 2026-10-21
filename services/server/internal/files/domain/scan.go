@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// VerdictKind is the class of a clamd answer (docs/spec/12-dateien.md 5.2).
+// VerdictKind is the class of a clamd answer (docs/spec/12-files.md 5.2).
 type VerdictKind string
 
 // The verdict classes. A timeout or a connection error is no verdict: the scanner returns an

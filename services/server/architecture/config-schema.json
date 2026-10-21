@@ -1600,7 +1600,7 @@
       "enum": [],
       "min": "1",
       "max": "2147483647",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Largest chunk of an INSTREAM to clamd, and the bound of its reply."
     },
     {
@@ -1612,7 +1612,7 @@
       "enum": [],
       "min": "",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Unix socket of clamd as unix:// followed by an absolute path; no other transport is accepted."
     },
     {
@@ -1624,7 +1624,7 @@
       "enum": [],
       "min": "1",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Mirror of the clamd option StreamMaxLength; the server does not start when file.max_upload_bytes is larger while the scan is required."
     },
     {
@@ -1636,7 +1636,7 @@
       "enum": [],
       "min": "1s",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Interval of the PING to clamd, the first pause of a retried scan and the deadline of a PING."
     },
     {
@@ -1648,7 +1648,7 @@
       "enum": [],
       "min": "1",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Scans that one worker process runs at the same time."
     },
     {
@@ -1663,7 +1663,7 @@
       ],
       "min": "",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Virus scan of uploads: required keeps every file undeliverable until clamd checked it (fail closed), off marks files skipped."
     },
     {
@@ -1675,7 +1675,7 @@
       "enum": [],
       "min": "1s",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Longest pause between two attempts to scan a file while clamd is not reachable."
     },
     {
@@ -1687,7 +1687,7 @@
       "enum": [],
       "min": "1s",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Deadline of the read pass with the scan of one file."
     },
     {
@@ -1699,7 +1699,7 @@
       "enum": [],
       "min": "1",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Bytes at the start of a file the type detection reads."
     },
     {

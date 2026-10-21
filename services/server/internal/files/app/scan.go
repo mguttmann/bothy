@@ -23,7 +23,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
-// The values of file.scan.mode (docs/spec/12-dateien.md 5.3).
+// The values of file.scan.mode (docs/spec/12-files.md 5.3).
 const (
 	// ScanModeRequired scans every file and keeps it pending while clamd is not reachable.
 	ScanModeRequired = "required"

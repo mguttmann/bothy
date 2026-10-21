@@ -21,7 +21,7 @@ const (
 	msgScanQueueFailed    = "file scan queue count failed"
 )
 
-// ScanHealth is the health monitor of the worker (docs/spec/12-dateien.md 5.3, brief M3-04 design
+// ScanHealth is the health monitor of the worker (docs/spec/12-files.md 5.3, brief M3-04 design
 // note 11): every file.scan.health_interval it pings clamd (mode required only), keeps the result
 // in memory for files.ScannerHealth (per process, docs/DECISIONS.md D-M3-04-11) and records
 // bothy.file.scan.queue. It never changes the readiness of the process: a missing clamd keeps

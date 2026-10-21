@@ -8,7 +8,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// FileFinalized is the in-transaction event of a file that became final (docs/spec/12-dateien.md
+// FileFinalized is the in-transaction event of a file that became final (docs/spec/12-files.md
 // 2 "endgültig", 10; 02 "Ports, Ereignisse und Quellen je Modul"): the scan pass of M3-04
 // publishes it in the unit of work that writes the final state, so a subscriber (the release of
 // held agent invocations, M3-07) sees the state and the event together. It carries only the id;

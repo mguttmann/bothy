@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Static checks of the clamd wiring of the Compose stack (M3-04, docs/spec/12-dateien.md 5.4,
-docs/spec/19-sicherheit.md SEC-TLS-5): clamd is reached only over its Unix socket in the volume
+"""Static checks of the clamd wiring of the Compose stack (M3-04, docs/spec/12-files.md 5.4,
+docs/spec/19-security.md SEC-TLS-5): clamd is reached only over its Unix socket in the volume
 clamav-socket, and infra/compose/clamav/clamd.conf sets the mandatory options. No network."""
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def test_one_unix_address_everywhere() -> None:
     env_text = ENV_EXAMPLE.read_text(encoding="utf-8")
     example = re.search(r"^BOTHY_CLAMD_ADDRESS=(\S+)$", env_text, re.MULTILINE)
     assert example, "BOTHY_CLAMD_ADDRESS missing in .env.example"
-    chapter = chapter_default("12-dateien.md", "file.scan.clamd_address")
+    chapter = chapter_default("12-files.md", "file.scan.clamd_address")
     assert m.group("value") == example.group(1) == chapter
     assert chapter.startswith("unix:///")
     socket = PurePosixPath(clamd_options()["LocalSocket"][0])
@@ -116,8 +116,8 @@ def test_clamd_conf_mandatory_options() -> None:
     if "TCPSocket" in opts:
         assert opts.get("TCPAddr", [""])[0] in {"127.0.0.1", "localhost", "::1"}
     stream = clamd_size(opts["StreamMaxLength"][0])
-    assert stream == int(chapter_default("12-dateien.md", "file.scan.clamd_stream_max_bytes"))
-    max_upload = int(chapter_default("03-datenmodell.md", "file.max_upload_bytes"))
+    assert stream == int(chapter_default("12-files.md", "file.scan.clamd_stream_max_bytes"))
+    max_upload = int(chapter_default("03-data-model.md", "file.max_upload_bytes"))
     assert clamd_size(opts["MaxFileSize"][0]) >= max_upload
     for default in ("MaxScanSize", "MaxRecursion", "MaxFiles", "AlertEncrypted"):
         assert default not in opts, f"{default} must stay at the clamd default (12 5.4)"

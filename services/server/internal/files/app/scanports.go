@@ -11,7 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Scanner is the outgoing port to the virus scanner (docs/spec/12-dateien.md 5, ADR 0033);
+// Scanner is the outgoing port to the virus scanner (docs/spec/12-files.md 5, ADR 0033);
 // adapters/clamd implements it over the clamd protocol. Implementations are safe for concurrent
 // use and bound the number of parallel scans themselves (file.scan.max_concurrent).
 type Scanner interface {
@@ -30,7 +30,7 @@ type TypeDetector interface {
 	Detect(head []byte) string
 }
 
-// ScanQueue inserts the job files.scan (02 "Job-Katalog"); adapters/jobs implements it over the
+// ScanQueue inserts the job files.scan (02 12.3 "Job catalogue"); adapters/jobs implements it over the
 // job runtime. It must be called inside a unit of work, so the job exists exactly when the change
 // that needs it commits.
 type ScanQueue interface {

@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- The scan pass of M3-04 (docs/spec/12-dateien.md 3.4, 5). The job files.scan has no principal, so
+-- The scan pass of M3-04 (docs/spec/12-files.md 3.4, 5). The job files.scan has no principal, so
 -- its reads are keyed by the file id only (the exceptions of AZ-P12 in
 -- tools/lint/sql_visibility.yaml); the count of the health monitor reads no content.
 

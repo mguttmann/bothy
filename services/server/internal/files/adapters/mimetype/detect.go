@@ -11,7 +11,7 @@ import (
 )
 
 // Detector detects the media type of a file from its first file.sniff_bytes for the scan pass
-// (docs/spec/12-dateien.md 6.1, source Q14). It reads only the buffered head and never unpacks an
+// (docs/spec/12-files.md 6.1, source Q14). It reads only the buffered head and never unpacks an
 // archive (SEC-UP-7): mimetype.Detect inspects the bytes it is given and opens no container
 // beyond them. Build it with NewDetector, which sets the read limit of the library to
 // file.sniff_bytes; the zero value reads only the library's default of 4 KiB. It is safe for
