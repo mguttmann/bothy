@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package postgres is the PostgreSQL adapter of the notify module (M3-18): the Repository
+// Package postgres is the PostgreSQL adapter of the notify module (M3-18, M3-19): the Repository
 // implements the outgoing port app.Store over the sqlc queries of notification_preferences and
-// quiet_hours in queries/. Only this module reads and writes the two tables (03 principle 12).
+// quiet_hours in queries/, and Registrations implements the read port notify.PushRegistrations
+// and the outgoing port app.RegistrationStore over push_registrations. Only this module reads and
+// writes the three tables (03 principle 12).
 package postgres
 
 import (
@@ -77,6 +79,22 @@ func (r *Repository) UpsertPreference(ctx context.Context, user ids.ID, p notify
 		return notify.Preference{}, false, failed(err, "writing a notification preference")
 	}
 	return preference(row), true, nil
+}
+
+// InsertPreferenceIfAbsent implements app.Store with INSERT ... ON CONFLICT DO NOTHING
+// RETURNING (automatic following, 13 section 3.2): the row is inserted with version 1 unless the
+// person has one for the target; inserted is false, and the row not returned, when one existed.
+// Outside a unit of work it returns an internal error.
+func (r *Repository) InsertPreferenceIfAbsent(ctx context.Context, user ids.ID, p notify.Preference, at time.Time) (notify.Preference, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return notify.Preference{}, false, err
+	}
+	row, err := q.InsertPreferenceIfAbsent(ctx, sqlcgen.InsertPreferenceIfAbsentParams{
+		UserID: uuid(user), TargetKind: p.Target.Kind, TargetID: uuid(p.Target.ID), Level: p.Level, MutedUntil: stamp(p.MutedUntil),
+		UpdatedAt: stamp(at),
+	})
+	return onePreference(row, err, "inserting a notification preference")
 }
 
 // Preference implements app.Store.

@@ -41,3 +41,12 @@ WHERE user_id = ANY (@user_ids::uuid[])
   AND ((target_kind = 'thread' AND target_id = @thread_id)
     OR (target_kind = 'channel' AND target_id = @channel_id)
     OR (target_kind = 'space' AND target_id = sqlc.narg(space_id)));
+
+-- name: InsertPreferenceIfAbsent :one
+-- Automatic following (13 section 3.2, M3-19 design note 17): inserts the row with version 1
+-- only when the person has no own row for the target yet; an existing level is never
+-- overwritten. No row is returned when one existed.
+INSERT INTO notification_preferences (user_id, target_kind, target_id, level, muted_until, version, updated_at)
+VALUES (@user_id, @target_kind, @target_id, @level, sqlc.narg(muted_until), 1, @updated_at)
+ON CONFLICT (user_id, target_kind, target_id) DO NOTHING
+RETURNING *;

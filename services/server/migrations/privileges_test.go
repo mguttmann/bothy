@@ -139,6 +139,9 @@ var appPrivileges = map[string][]string{
 	// M3-18: the notification levels and quiet hours of a person.
 	"notification_preferences": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"quiet_hours":              {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 push_registrations (M3-19): the job notify.push_send writes the delivery columns, M3-22
+	// inserts and removes registrations, the retention of class security deletes old rows.
+	"push_registrations": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 section 4.7 (M3-03): the cleanup of M3-08 deletes sessions, parts and files.
 	"files":                {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_upload_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
