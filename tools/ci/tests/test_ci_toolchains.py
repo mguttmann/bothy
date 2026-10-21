@@ -160,6 +160,12 @@ def test_apps_android_runs_the_instrumented_tests_on_an_emulator(level: int) -> 
     assert emulator["with"]["target"] == "google_apis"
     platform = "uv run --project tools --locked --quiet python tools/ci/apps_platform.py"
     assert emulator["with"]["script"] == f"{platform} --system android"
+    # The packages of the emulator come first, with retries (tools/ci/android_sdk.py).
+    [install] = [s for s in steps if "tools/ci/android_sdk.py" in str(s.get("run", ""))]
+    sdk = "uv run --project tools --locked --quiet python tools/ci/android_sdk.py"
+    assert install["run"] == f"{sdk} --api-level {level}"
+    assert steps.index(install) < steps.index(emulator)
+    assert any(_uses(s, "astral-sh/setup-uv") for s in steps[: steps.index(install)])
 
 
 def test_jdk_and_android_sdk_for_the_jvm_tests() -> None:
