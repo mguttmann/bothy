@@ -229,6 +229,66 @@ skip only then.
   `migrations/` nor `migrations.sha256` (no migration, nothing to check). If only
   the checksum file is left, it fails.
 
+## Flakes
+
+A flake is a test that failed in CI and passed when it ran again. Reruns keep a flake from
+blocking a pull request or `main`; every one of them is recorded, so the class fixes have a list.
+Only CI reruns: GitHub sets `CI=true`, and without it (`make test`, `make check`, the pre-push
+gate on a workstation) every test runs once and a failure fails.
+
+What reruns (`tools/ci/flakes.py`, tests `tools/ci/tests/test_flakes.py`):
+
+* Go: every `go test` of `test` (each shard of `test (server)` and the host module), `contract-test`,
+  `image-test` and `postgres-image-test` runs through the pinned gotestsum
+  (`tools/bin/tools.lock.json`) with `--rerun-fails=2 --rerun-fails-max-failures=10
+  --rerun-fails-abort-on-data-race --rerun-fails-run-root-test`. A failed test runs again
+  alone as its top-level test (`-run '^Name$'` in its package), at most twice; a package that
+  failed without a failed test (TestMain, a check after the tests, an exit outside a test) runs
+  again as a whole with the filters of the first run. The flags stay those of the single run
+  (`-race`, the tags, `-covermode=atomic -coverpkg=./...`, the timeout), and so does the shard
+  split. gotestsum runs `go test -json` through `flakes.py exec` (`--raw-command`), which tests
+  only the package of a rerun; the packages are the ones the recipe or `go_shards.py` names.
+* Coverage: each attempt writes its own profile, and `coverage.out` is their merge in the form
+  `go test ./...` and `go_shards.py merge` write (one mode line, then the blocks of every
+  attempt). A statement counts as covered when any attempt ran it, so a run with a rerun has
+  the coverage of a run without one; a rerun never replaces the profile of the first run.
+* Dart and Flutter: `flutter test` of the pinned Flutter has no `--retry` option, and the global test configuration
+  (`DART_TEST_CONFIG`) rejects `retry`. Each member's `dart_test.yaml` therefore defines the
+  preset `ci` with `retry: 1`, and `make test` with `CI=true` switches it on through a global
+  configuration `add_presets: [ci]`: a failed test runs once more. A member without the preset
+  fails in CI ("Undefined preset") and in `test_flakes.py`. The JSON report of
+  `flutter test --file-reporter` names the tests that reported an error and then passed.
+* Not rerun: `perf` (not in CI; a budget miss must not pass on a second try), the platform
+  suite of the host service (`make -C services/host platform-test`, it changes the machine), the
+  JVM tests and the Python and TypeScript tests.
+
+What still fails:
+
+* a test that fails in every attempt, the first run and each rerun;
+* more failed tests in one `go test` than `--rerun-fails-max-failures` allows (then nothing
+  reruns: that is no flake);
+* a data race (`WARNING: DATA RACE`): never rerun, it fails at once;
+* a panic, a test timeout, a build error and any other error of `go test` (gotestsum
+  stops the reruns);
+* a rerun whose package fails in another place (TestMain after the rerun, a new failure).
+
+What a rerun can hide: a failure that only shows when the tests of a package run together (an
+order dependency, a check in TestMain that only the other tests trip) passes when it coincides
+with a flake of a test of the same package; the flake list then names that test, so it stays
+visible.
+
+Where the list is:
+
+* each run prints `FLAKE (<tool>): <package> <test>` lines and writes a table to the job summary;
+* each test job uploads its flakes as the artifact `flakes-<job>` (`FLAKE_DIR`, default
+  `.cache/flakes/`, JSON with the schema of `flakes.py`; none without a flake);
+* the scheduled workflow `flakes.yml` reads the flake artifacts of the CI runs that finished in
+  the window its `--hours` names: it adds one comment per run with flakes to the open issue labelled `flake`
+  (title "Flaky tests (reruns that passed in CI)", created with the label when there is none) and
+  keeps the issue body as the list of every flaky test, the most frequent first. It uses only
+  the `GITHUB_TOKEN` (`actions: read`, `issues: write`). Close the issue when its list is fixed;
+  the next flake opens a new one.
+
 ## Performance (`make perf`)
 
 `make perf` runs the load tests of every Go module with performance targets (list `PERF_MODULES`

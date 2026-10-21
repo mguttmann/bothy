@@ -2,3 +2,8 @@
 # alchemist tags every golden test with `golden` (docs/DECISIONS.md D-M4-04-5).
 tags:
   golden:
+# Preset `ci`: CI runs a failed test once more and reports a pass after it as a flake
+# (DART_TEST_CONFIG of `make test` with CI=true; docs/quality/gates.md, section "Flakes").
+presets:
+  ci:
+    retry: 1

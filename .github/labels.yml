@@ -77,3 +77,8 @@
 - name: "dependencies"
   color: "0366d6"
   description: "Dependency updates (Renovate)"
+
+# The tracking issue of the flaky tests (workflow flakes.yml, docs/quality/gates.md "Flakes").
+- name: "flake"
+  color: "d93f0b"
+  description: "A test that failed in CI and passed in a rerun"
