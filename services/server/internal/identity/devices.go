@@ -81,6 +81,15 @@ type RegisterDevice struct {
 	ApprovedBy *ids.ID
 }
 
+// DeviceRef is one active device of a person as the consumer push reads it
+// (Devices.ActiveForUsers, M3-19 design note 8).
+type DeviceRef struct {
+	// ID is devices.id.
+	ID ids.ID
+	// Platform is devices.platform (ios, android, macos, windows, web, cli).
+	Platform string
+}
+
 // Device is a device as the API shows it (schema Device without push_registrations, which M3
 // adds). Zero values are absent members.
 type Device struct {
