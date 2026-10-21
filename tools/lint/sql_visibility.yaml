@@ -254,3 +254,27 @@ exceptions:
   - query: runs.AllSteps
     category: after_authorize
     reason: "every step of the one run whose run.read authorize allowed (getRun); run_steps has no channel_id (D-M2-05-9)"
+  - query: messaging.LastAnchorBefore
+    category: system_job
+    reason: "the consumer push reads the newest run anchor before an agent message of the one thread of the event, like the log tail; every hint is checked with push.deliver before it is decided and sent (M3-19 design note 5)"
+  - query: messaging.AnchorOfRun
+    category: system_job
+    reason: "the consumer push reads the anchor of the one run of a run.state_changed, like the log tail; every hint is checked with push.deliver (M3-19 design note 5)"
+  - query: messaging.LastAgentMessageBefore
+    category: system_job
+    reason: "the consumer push reads the last agent message of the one run that ended, to point its hint at it; nothing of the row but its id and position leaves, and every hint is checked with push.deliver (M3-19 design note 5)"
+  - query: messaging.NewestMessage
+    category: system_job
+    reason: "the flush job of a bundling window reads the newest message of the one thread of the window for its pointer; the hint is checked with push.deliver first (M3-19 design note 9 d)"
+  - query: sync.ResourceEvents
+    category: log_tail
+    reason: "the consumer push reads the retained events of one run, message or thread in commit order, like the log tail; every hint is checked with push.deliver before it is decided and sent (M3-19 design notes 5 and 16)"
+  - query: sync.PersonalEvents
+    category: log_tail
+    reason: "the badge sync job reads the read_state.updated events of its one person, like the log tail; only thread ids that no longer count leave, and the person is checked as an active human (M3-19 design note 16)"
+  - query: sync.ReadPositionsOfThread
+    category: system_job
+    reason: "the flush job reads the stored read positions of the people the consumer push selected for one thread; only numbers leave, and the hint is checked with push.deliver (M3-19 design note 9 d)"
+  - query: sync.ReadPositionsOfUser
+    category: system_job
+    reason: "the badge count reads one person's read positions in the threads of its visible channels; every counted thread is confirmed with push.deliver (M3-19 design note 16)"

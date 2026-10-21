@@ -168,14 +168,24 @@ func (s *Sync) NewConsumerRunner() (*syncapp.ConsumerRunner, error) {
 }
 
 // consumerHandlers returns the production worker consumers of the event log: webhooks over the
-// apps step (M2-26); M3-19 registers push here (ADR 0051, PLAN P-13). A nil ap (the apps step did
-// not run) registers none.
-func consumerHandlers(ap *Apps) map[sync.ConsumerName]sync.ConsumerHandler {
-	if ap == nil {
+// apps step (M2-26) and push over the push path of notify (M3-19; ADR 0051, PLAN P-13). A nil ap
+// or push (the step did not run) registers none of its consumer.
+func consumerHandlers(ap *Apps, push *Push) map[sync.ConsumerName]sync.ConsumerHandler {
+	out := map[sync.ConsumerName]sync.ConsumerHandler{}
+	if ap != nil {
+		out[sync.ConsumerWebhooks] = ap.Consumer()
+	}
+	if push != nil {
+		out[sync.ConsumerPush] = push.Consumer()
+	}
+	if len(out) == 0 {
 		return nil
 	}
-	return map[sync.ConsumerName]sync.ConsumerHandler{sync.ConsumerWebhooks: ap.Consumer()}
+	return out
 }
+
+// History returns the reads of retained events for the worker consumers (sync.History, M3-19).
+func (s *Sync) History() sync.History { return s.repo }
 
 // startConsumers is the start of the worker consumers in worker and all after River (02
 // "Start" step 8): it registers handlers, inserts their cursor rows at the head (Ensure),

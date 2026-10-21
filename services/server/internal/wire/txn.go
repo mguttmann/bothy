@@ -166,7 +166,8 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 }
 
 // subscribeArchivesAndRuns registers chat.ChannelArchived and chat.SpaceArchived -> notify, then
-// messaging.MessagePosted -> runs after the existing subscribers (M2-05), then
+// messaging.MessagePosted -> runs after the existing subscribers (M2-05) and -> notify (the
+// automatic following, M3-19), then
 // authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09), then
 // chat.ChannelArchived -> apps (the incoming webhooks of the channel, M2-27).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
@@ -180,6 +181,10 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 		return errNoRunsAcceptor
 	}
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnMessagePosted); err != nil {
+		return err
+	}
+	// The automatic following of notify, after the subscribers of sync and runs (13 3.2, M3-19).
+	if err := txn.Subscribe(reg, m.NotifySubscribers.OnMessagePosted); err != nil {
 		return err
 	}
 	// The revocation and the disabled agent end or stop the affected runs in the same

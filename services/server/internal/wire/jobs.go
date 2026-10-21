@@ -15,6 +15,7 @@ import (
 	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
 	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
 	instancejobs "github.com/OWNER/bothy/services/server/internal/instance/adapters/jobs"
+	notifyjobs "github.com/OWNER/bothy/services/server/internal/notify/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -117,6 +118,9 @@ type JobModules struct {
 	// runs.stall_check.
 	RunsLifecycle runsjobs.Lifecycle
 	StallInterval time.Duration
+	// Push is the push path of notify, the use cases of notify.push_send, notify.coalesce_flush
+	// and notify.badge_sync (M3-19); nil only where no job runs.
+	Push notifyjobs.UseCases
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
@@ -127,7 +131,8 @@ type JobModules struct {
 // on the queue files without a River job timeout (M3-04) and files.thumbnail on the queue files
 // with the timeout file.image.processing_timeout (M3-06), runs.queued_expiry on the queue
 // default (M2-08) and runs.cancel_timeout and the periodic runs.stall_check on the queue
-// maintenance (M2-09); the error is the first rejected registration.
+// maintenance (M2-09), and the five jobs of notify on the queue delivery (M3-19); the error is
+// the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -164,6 +169,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := runsjobs.RegisterLifecycle(reg, m.RunsLifecycle, m.StallInterval); err != nil {
+		return nil, err
+	}
+	if err := notifyjobs.Register(reg, m.Push); err != nil {
 		return nil, err
 	}
 	return reg, nil

@@ -37,6 +37,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
@@ -53,6 +54,7 @@ import (
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
+	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/migrations"
@@ -112,6 +114,9 @@ type Deps struct {
 	// empty until M2-26 and M3-19) in worker and all; nil keeps it. Tests register probe
 	// handlers here.
 	ConsumerHandlers map[sync.ConsumerName]sync.ConsumerHandler
+	// PushProviders are the push providers of the push path (M3-19); production registers none
+	// until M3-20 and M3-21. Tests register fakepush providers here.
+	PushProviders []notifyapp.PushProvider
 	// ConsumerGauges registers the lag gauges of the worker consumers in every role; nil means
 	// otelmetrics.RegisterConsumerGauges on the global meter provider of otel.Setup. Tests read
 	// the gauges of a role through their own meter provider here.
@@ -222,6 +227,8 @@ type server struct {
 	stats *Stats
 	// notify is the notify module (M3-18), built in the chat step over chat, sync and identity.
 	notify *Notify
+	// push is the push path of notify (M3-19), built in the jobs step.
+	push *Push
 	// syncReads is catch-up and snapshot of sync (M1-63), built in the chat step after personal.
 	syncReads *SyncReads
 	// files is the files module (M3-03): the upload sessions over the object store, built in the
@@ -1036,7 +1043,7 @@ func (s *server) startNotify(pool *pg.Pool, a *Audit, az authorize.Authorizer, s
 	if err != nil {
 		return nil, err
 	}
-	if err := a.NotifySubscribers().Bind(sy.Appender(), c.Service); err != nil {
+	if err := a.NotifySubscribers().WithClock(s.deps.Clock).Bind(sy.Appender(), c.Service); err != nil {
 		return nil, err
 	}
 	return n, nil
@@ -1594,9 +1601,9 @@ func (s *server) startSync(context.Context) error {
 // (startConsumers) with the production handlers or those of Deps.ConsumerHandlers.
 func (s *server) startEventConsumers(ctx context.Context) error {
 	s.mu.Lock()
-	sy, ap := s.sync, s.apps
+	sy, ap, push := s.sync, s.apps, s.push
 	s.mu.Unlock()
-	handlers := consumerHandlers(ap)
+	handlers := consumerHandlers(ap, push)
 	if s.deps.ConsumerHandlers != nil {
 		handlers = s.deps.ConsumerHandlers
 	}
@@ -1663,6 +1670,10 @@ func (s *server) startJobs(ctx context.Context) error {
 	if s.runs != nil {
 		queuedExpiry, lifecycle = s.runs.Service, s.runs.Service
 	}
+	push, err := s.buildPush(pool, a, sy)
+	if err != nil {
+		return err
+	}
 	presence := s.values.Duration(keyPresenceTimeout)
 	reg, err := NewJobRegistry(&JobModules{
 		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
@@ -1675,6 +1686,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		FilesScan:   files.ScanRunner(),
 		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
 		QueuedExpiry: queuedExpiry, RunsLifecycle: lifecycle, StallInterval: presence,
+		Push: push.Push,
 	})
 	if err != nil {
 		return err
@@ -1689,14 +1701,40 @@ func (s *server) startJobs(ctx context.Context) error {
 	rn := s.runs
 	s.mu.Unlock()
 	rn.BindJobs(rt.Inserter())
+	push.BindJobs(rt.Inserter())
 	s.mu.Lock()
-	s.jobsRT = rt
+	s.jobsRT, s.push = rt, push
 	s.mu.Unlock()
 	if err := rt.Start(ctx); err != nil {
 		return err
 	}
 	s.runner.FailOn("jobs", rt.Failed())
 	return nil
+}
+
+// buildPush builds the push path of notify (M3-19) in the jobs step over the modules of the
+// earlier steps; the providers come from Deps.PushProviders (none in production until M3-20 and
+// M3-21).
+func (s *server) buildPush(pool *pg.Pool, a *Audit, sy *Sync) (*Push, error) {
+	s.mu.Lock()
+	n, c, m, p, id, az, rec := s.notify, s.chat, s.messaging, s.personal, s.identity, s.authorizer, s.instance
+	s.mu.Unlock()
+	if n == nil || c == nil || m == nil || p == nil || id == nil {
+		return nil, errors.New("wire: the push path needs the chat step and the identity step")
+	}
+	recipients, ok := az.(authz.Recipients)
+	if !ok {
+		return nil, errors.New("wire: the push path needs the Authorizer of authz (authz.Recipients)")
+	}
+	cfg, err := PushConfig(s.values)
+	if err != nil {
+		return nil, err
+	}
+	return NewPush(cfg, pool, a.UoW(), PushDeps{
+		Notify: n, Authorizer: az, Recipients: recipients, Directory: id.Directory, Devices: id.Devices, Settings: p.Service.Settings(),
+		Chat: c.Service, Messaging: m.Service, History: sy.History(), Positions: syncpg.NewPersonalRepository(pool),
+		InstanceID: rec.InstanceID, Providers: s.deps.PushProviders,
+	}, s.deps.Clock, s.logger())
 }
 
 // stopJobs stops River (worker, all); it does nothing when the runtime never started.

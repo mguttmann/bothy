@@ -40,6 +40,7 @@ var configKeyGroups = []func() []config.Key{
 	searchConfigKeys,
 	webhookConfigKeys,
 	notifyConfigKeys,
+	pushConfigKeys,
 	agentsConfigKeys,
 	runsConfigKeys,
 }
