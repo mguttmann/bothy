@@ -181,6 +181,8 @@ type Identity struct {
 	pepper          []byte
 	clk             clock.Clock
 	log             *slog.Logger
+	// actingFor resolves the Invocation-Token header (BindActingFor, M2-14); nil until bound.
+	actingFor identity.ActingForSource
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -285,6 +287,11 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	}, nil
 }
 
+// BindActingFor sets the source of the Invocation-Token header (07 guard rule SR9, brief M2-14)
+// that the Authenticator of BindSessions uses; the start calls it before BindSessions. Without it
+// every header is invalid (identity.NoActingForSource, fail closed).
+func (i *Identity) BindActingFor(src identity.ActingForSource) { i.actingFor = src }
+
 // BindSessions builds the session part of identity (M1-34) over the signing keys of instance and
 // the instance id (the issuer of access tokens): the use cases of identity.Auth, the Authenticator
 // of the HTTP chain and the session handlers, the step-up use cases with their handlers and
@@ -323,7 +330,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	auth, err := app.NewAuthenticator(i.cfg, app.AuthenticatorDeps{
 		AccessTokens: tokens, DPoP: i.DPoP, Sessions: i.repo, APITokens: i.repo, Pepper: i.pepper, Clock: i.clk, Log: i.log,
 		Binding: i.TrustedHeader, Revoker: sessions, UoW: i.uow, Audit: i.writes.Audit,
-		Apps: i.writes.Apps, Console: console,
+		Apps: i.writes.Apps, Console: console, ActingFor: i.actingFor,
 	})
 	if err != nil {
 		return err
