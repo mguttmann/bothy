@@ -51,6 +51,10 @@ type Store interface {
 	// muted_until differs with version + 1, in one statement; changed is false, and the row not
 	// returned, when the stored values are equal.
 	UpsertPreference(ctx context.Context, user ids.ID, p notify.Preference, at time.Time) (out notify.Preference, changed bool, err error)
+	// InsertPreferenceIfAbsent inserts p for user with version 1 unless a row of user and
+	// p.Target exists (INSERT ... ON CONFLICT DO NOTHING RETURNING, M3-19 design note 17);
+	// inserted is false, and the row not returned, when one existed.
+	InsertPreferenceIfAbsent(ctx context.Context, user ids.ID, p notify.Preference, at time.Time) (out notify.Preference, inserted bool, err error)
 	// Preference returns the row of user and target; found is false for none.
 	Preference(ctx context.Context, user ids.ID, target notify.Target) (p notify.Preference, found bool, err error)
 	// DeletePreference deletes the row of user and target and returns it; found is false for none.
