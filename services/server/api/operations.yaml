@@ -18,6 +18,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - archiveChannel
   - archiveSpace
   - attachTerminalSession
+  - awaitRunInput
   - beginEnrollment
   - beginIdentityLink
   - beginOidcLogin
@@ -25,6 +26,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPasskeyLogin
   - beginPasskeyRegistration
   - beginStepUpOidcReauth
+  - cancelRun
   - closeTerminalSession
   - closeThread
   - completeEnrollment
@@ -85,6 +87,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - explainSpaceAccess
   - exportAuditEvents
   - exportChannel
+  - finishRun
   - getAgent
   - getApp
   - getBrandingLogo
@@ -193,8 +196,10 @@ enabled:             # operationIds that have a handler; sorted ascending
   - refreshToken
   - removeGroupMember
   - removeReaction
+  - renewInvocationToken
   - reopenThread
   - resumeApp
+  - resumeRun
   - revokeDevice
   - revokeGrant
   - revokeIncomingWebhook
@@ -217,6 +222,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setSpaceOperator
   - setThreadTags
   - setThreadTitle
+  - startRun
   - stepUpWithPassword
   - submitClientMetrics
   - submitCspReport
@@ -256,18 +262,12 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: autocompleteCommand
     etappe: M2
     ticket: M2-17
-  - operation_id: awaitRunInput
-    etappe: M2
-    ticket: M2-09
   - operation_id: bindAgentSession
     etappe: M2
     ticket: M2-12
   - operation_id: cancelImport
     etappe: M8
     ticket: M8-03
-  - operation_id: cancelRun
-    etappe: M2
-    ticket: M2-09
   - operation_id: closePrice
     etappe: M2
     ticket: M2-22
@@ -309,9 +309,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M7-09
   - operation_id: downloadGdprExport
     etappe: M7
-  - operation_id: finishRun
-    etappe: M2
-    ticket: M2-09
   - operation_id: getAgentTriggerers
     etappe: M2
   - operation_id: getCommand
@@ -421,9 +418,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: respondToInteraction
     etappe: M2
     ticket: M2-15
-  - operation_id: resumeRun
-    etappe: M2
-    ticket: M2-09
   - operation_id: search
     etappe: M3
     ticket: M3-14
@@ -442,9 +436,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: startImport
     etappe: M8
     ticket: M8-03
-  - operation_id: startRun
-    etappe: M2
-    ticket: M2-09
   - operation_id: submitCostReconciliation
     etappe: M2
     ticket: M2-28
