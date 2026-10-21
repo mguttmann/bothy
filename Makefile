@@ -159,7 +159,7 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
-        runners-check release-pins install-options commitlint \
+        runners-check release-pins install-options tofu-check tofu-vm-test commitlint \
         review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test
@@ -207,7 +207,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
-       api-clients tokens runners-check labels-check release-pins install-options gitleaks semgrep trivy osv licenses
+       api-clients tokens runners-check labels-check release-pins install-options tofu-check gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
 fmt: ## Format all code in place
@@ -240,9 +240,9 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
 	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
 	$(call tool,actionlint) -shellcheck= -pyflakes= .github/workflows/*.yml
-	@# Shell scripts of the Compose installation and their tests (brief M7-29); each file's shebang
-	@# selects the dialect, install.sh is POSIX sh (docs/spec/16-operations.md 3.1 rule 5).
-	$(call tool,shellcheck) $$(git ls-files -- 'infra/compose/*.sh' 'infra/compose/test/install/*.sh' 'infra/compose/test/install/stubs/*')
+	@# Shell scripts of the Compose installation and their tests (brief M7-29) and the host setup of
+	@# the OpenTofu module generic-vm (brief M7-15); each file's shebang selects the dialect.
+	$(call tool,shellcheck) $$(git ls-files -- 'infra/compose/*.sh' 'infra/compose/test/install/*.sh' 'infra/compose/test/install/stubs/*' 'infra/tofu/*.sh')
 	@if [ -n "$${GH_TOKEN:-}" ]; then $(UVRUN) zizmor --min-severity low .github/workflows; \
 	else echo "  zizmor: offline (set GH_TOKEN for the online audits)"; $(UVRUN) zizmor --offline --min-severity low .github/workflows; fi
 	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
@@ -638,6 +638,33 @@ release-pins: ## Server version pinned by the product bundle: SemVer, no server 
 
 install-options: ## Options of the portability test equal 16 3.1; documented install command names VERSION (brief M7-29)
 	$(UVRUN) python tools/ci/install_options_check.py check
+
+# OpenTofu modules (brief M7-15, infra/tofu/README.md): format, then init and validate of the root
+# that calls all four modules and of the test root of generic-vm. As in ops-check, the only
+# provider source is an empty local mirror, so init never downloads (the modules need no
+# provider today; one that does fails here until it has a pinned offline path,
+# docs/DECISIONS.md D-M7-15-3). Data directory and CLI configuration are temporary.
+TOFU_ROOTS := infra/tofu/test/validate infra/tofu/test/generic-vm
+tofu-check: ## OpenTofu: fmt -check, offline init -backend=false and validate of the roots that call every module
+	@tofu=$(call tool,tofu) || exit 1; \
+	"$$tofu" fmt -check -recursive -diff infra/tofu || exit 1; \
+	tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT; mkdir "$$tmp/mirror"; \
+	printf 'provider_installation {\n  filesystem_mirror {\n    path = "%s"\n  }\n}\n' "$$tmp/mirror" >"$$tmp/offline.tfrc"; \
+	for root in $(TOFU_ROOTS); do \
+	  data="$$tmp/data-$$(basename "$$root")"; \
+	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" init -backend=false -input=false -no-color >/dev/null || exit 1; \
+	  TF_CLI_CONFIG_FILE="$$tmp/offline.tfrc" TF_DATA_DIR="$$data" "$$tofu" -chdir="$$root" validate -no-color || exit 1; \
+	done
+
+# The local VM test of generic-vm (brief M7-15 Design note 2): the product trial on this host, a
+# pinned Ubuntu cloud image in QEMU with the rendered user data, the smoke probe through SSH, a
+# second delivery over SSH that must change nothing, and a tampered bundle that must stop the
+# setup. Not part of `check` and not in CI: the trial refuses to run under GitHub Actions (D-W-127).
+tofu-vm-test: ## Local VM test of the OpenTofu module generic-vm with QEMU (build host only, outside check)
+	@[ -z "$${GITHUB_ACTIONS:-}" ] || { echo "tofu-vm-test: refuses to run under GitHub Actions" >&2; exit 2; }
+	@tofu=$(call tool,tofu) && cosign=$(call tool,cosign) && syft=$(call tool,syft) || exit 1; \
+	$(UVRUN) python tools/ci/tofu_vm_test.py --tofu "$$tofu" --cosign "$$cosign" --syft "$$syft" \
+	  $(if $(TRIAL_PLATFORMS),--platforms '$(TRIAL_PLATFORMS)')
 
 gitleaks: ## Secret scan of every commit reachable from HEAD (all refs: GITLEAKS_LOG_OPTS=--all)
 	$(call tool,gitleaks) git --config .gitleaks.toml --redact --no-banner --log-opts="$(GITLEAKS_LOG_OPTS)" $(GITLEAKS_FLAGS) .
