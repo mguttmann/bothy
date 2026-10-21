@@ -7801,4 +7801,24 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get consoleTerminalPinningNotice =>
+      'Im Browser bemerkt diese Prüfung nur einen Schlüsselwechsel, den der Server meldet; gegen den Server selbst schützt sie nicht.';
+
+  @override
+  String get consoleTerminalPasskeyTitle => 'Passkey nötig';
+
+  @override
+  String get consoleTerminalPasskeySetup =>
+      'Ein Terminal öffnet in der Konsole nur mit einem Passkey, und für dich ist keiner eingerichtet. Bitte einen Eigentümer, einen Passkey für dich einzurichten, und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.';
+
+  @override
+  String get consoleTerminalPasskeyClose => 'Schließen';
+
+  @override
+  String get consoleTerminalOpen => 'Terminal öffnen';
+
+  @override
+  String get consoleTerminalBack => 'Zurück zum Rechner';
 }
