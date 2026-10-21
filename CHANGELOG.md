@@ -487,6 +487,9 @@ operated, and the order of the build.
 
 ### Fixed
 
+- CI: the Android emulator jobs install the emulator and the system image of their level with retries
+  before the emulator action (`tools/ci/android_sdk.py`), so a broken download no longer fails
+  the job (PL/18).
 - `make sonar-new-code` (`quality_sync.py new-code`, also a step of the manual workflow
   `sonar-config.yml`) gives the SonarQube Cloud project a new code definition of the last 30
   days when it has none of its own (`api/settings/set` with `sonar.leak.period` and

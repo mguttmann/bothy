@@ -926,6 +926,10 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # The emulator and its system image before the action, with retries: the action gives up
+      # on the first broken download (tools/ci/android_sdk.py).
+      - name: Install the emulator packages
+        run: uv run --project tools --locked --quiet python tools/ci/android_sdk.py --api-level 26
       - name: make apps-platform (Android)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -963,6 +967,10 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # The emulator and its system image before the action, with retries: the action gives up
+      # on the first broken download (tools/ci/android_sdk.py).
+      - name: Install the emulator packages
+        run: uv run --project tools --locked --quiet python tools/ci/android_sdk.py --api-level 36
       - name: make apps-platform (Android)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
