@@ -164,7 +164,7 @@ func (s *ConsumerService) Poll(ctx context.Context, consumer string, limit int) 
 	if err != nil {
 		return agents.FeedPage{}, err
 	}
-	page, err := feed.Poll(ctx, consumer, limit)
+	page, err := feed.Poll(withoutActingFor(ctx), consumer, limit)
 	if err != nil {
 		return agents.FeedPage{}, err
 	}
@@ -172,6 +172,21 @@ func (s *ConsumerService) Poll(ctx context.Context, consumer string, limit int) 
 		return agents.FeedPage{}, errs.New(errs.CodeResyncRequired, "the consumer was moved to the head").WithReason(page.Resync)
 	}
 	return page, nil
+}
+
+// withoutActingFor returns ctx with the actor's Invocation-Token binding removed (07 guard rule
+// SR9, section 8.1 row "Agent consumers", brief M2-14 design note 6): an agent consumer receives
+// by its own grants, so the feed of pollAgentEvents must never be narrowed by the binding (the
+// feed reads in filter mode, which stays bound, and would skip events for good). The binding was
+// already checked by authorizeConsume, so an invalid header or an ended run still refuses the
+// poll.
+func withoutActingFor(ctx context.Context) context.Context {
+	a, ok := actor.FromContext(ctx)
+	if !ok || !a.ActingFor.Present() {
+		return ctx
+	}
+	a.ActingFor = actor.ActingFor{}
+	return actor.WithActor(ctx, a)
 }
 
 // Ack implements agents.ConsumerAPI (ackAgentEvents): the head of the serving process, CheckAck,
