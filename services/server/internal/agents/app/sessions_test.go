@@ -1189,3 +1189,26 @@ func TestSessionsAttachOnStart(t *testing.T) {
 		}
 	})
 }
+
+// TestCurrentSession (M2-13 design note 5): the read of the run context returns the current row
+// of the thread, none for a thread without one or with ended rows only, and authorizes nothing.
+func TestCurrentSession(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	e := newSessEnv(t)
+	if _, found, err := e.svc.CurrentSession(ctx, e.thread); err != nil || found {
+		t.Fatalf("no row: %v %v", found, err)
+	}
+	e.row(e.thread, e.lotse.ID, "sess-a", false, true, 0)
+	if _, found, err := e.svc.CurrentSession(ctx, e.thread); err != nil || found {
+		t.Fatalf("ended row only: %v %v", found, err)
+	}
+	cur := e.row(e.thread, e.lotse.ID, "sess-b", true, false, time.Hour)
+	got, found, err := e.svc.CurrentSession(ctx, e.thread)
+	if err != nil || !found || got != cur || got.Started {
+		t.Fatalf("current: %+v %v %v", got, found, err)
+	}
+	if n := len(e.checksSnapshot()); n != 0 {
+		t.Fatalf("%d authorize calls", n)
+	}
+}

@@ -184,6 +184,20 @@ type AddSessionCost struct {
 	Currency string
 }
 
+// CurrentSessions is the read of the current session of a thread for the run context of runs
+// (09 section 4.6, M2-13 design note 5): it never authorizes, because runs decided
+// run.context.read on the run of the thread first, and it never writes. SessionService implements
+// it next to Sessions.
+type CurrentSessions interface {
+	// CurrentSession returns the current row of the thread (ended_at NULL); found is false for
+	// none. It reads inside the ambient transaction of ctx, or on the pool outside one.
+	//
+	// Example:
+	//
+	//	s, found, err := cur.CurrentSession(ctx, threadID)
+	CurrentSession(ctx context.Context, threadID ids.ID) (s Session, found bool, err error)
+}
+
 // ActiveRun is the active run of a thread as runs reports it to agents (R-DM-14): its id, agent,
 // session row (runs.agent_session_id, zero for NULL) and state (queued, running or waiting_input).
 type ActiveRun struct {

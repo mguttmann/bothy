@@ -47,6 +47,10 @@ type ThreadInfo struct {
 	ChannelKind, Kind, State string
 	// OperatorAgentID is the fixed operator; zero for none and for a main thread.
 	OperatorAgentID ids.ID
+	// ParentMessageID is the message the thread started from (03 threads.parent_message_id; it
+	// keeps pointing into the source channel after a move, M1-62); zero for none. Info sets it;
+	// Locate leaves it zero (M2-13).
+	ParentMessageID ids.ID
 	// CreatedBy is the creator.
 	CreatedBy ids.ID
 	// Version is threads.version.

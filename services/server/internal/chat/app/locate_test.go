@@ -71,7 +71,8 @@ func TestThreadsLocate(t *testing.T) {
 	wantCode(t, err, errs.CodeInternalError)
 }
 
-// TestTriggerChannel (M2-05): the channel facts carry kind, space, the five switches and the
+// TestTriggerChannel (M2-05, M2-13): the channel facts carry kind, space, the five switches,
+// history_backfill_limit and the
 // effective operator after inheritance from the space; an unknown channel is not_found; nothing is
 // authorized.
 func TestTriggerChannel(t *testing.T) {
@@ -89,19 +90,21 @@ func TestTriggerChannel(t *testing.T) {
 	f := e.store.channels[forum.ID]
 	f.OperatorInherit, f.OperatorAgentID = false, ownOp
 	f.RequireMention, f.ThreadRequireMention, f.FreeResponse, f.AutoThread, f.AllowMentionedAgents = false, true, true, false, true
+	f.HistoryBackfillLimit = 7
 	e.store.channels[forum.ID] = f
 	e.store.mu.Unlock()
 	e.az.err = errs.New(errs.CodeForbidden, "authorize called")
 
 	got, err := e.svc.TriggerChannel(ctx, text.ID)
 	want := chat.TriggerChannel{ChannelID: text.ID, SpaceID: sp.ID, Kind: "text", EffectiveOperatorID: spaceOp, MainThreadID: text.MainThreadID,
-		RequireMention: true, AutoThread: true, SettingsVersion: e.store.channels[text.ID].SettingsVersion}
+		RequireMention: true, AutoThread: true, HistoryBackfillLimit: e.store.channels[text.ID].HistoryBackfillLimit,
+		SettingsVersion: e.store.channels[text.ID].SettingsVersion}
 	if err != nil || got != want {
 		t.Fatalf("text %+v, %v; want %+v", got, err, want)
 	}
 	got, err = e.svc.TriggerChannel(ctx, forum.ID)
 	want = chat.TriggerChannel{ChannelID: forum.ID, SpaceID: sp.ID, Kind: "forum", EffectiveOperatorID: ownOp,
-		ThreadRequireMention: true, FreeResponse: true, AllowMentionedAgents: true, SettingsVersion: f.SettingsVersion}
+		ThreadRequireMention: true, FreeResponse: true, AllowMentionedAgents: true, HistoryBackfillLimit: 7, SettingsVersion: f.SettingsVersion}
 	if err != nil || got != want {
 		t.Fatalf("forum %+v, %v; want %+v", got, err, want)
 	}

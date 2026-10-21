@@ -73,6 +73,15 @@ type SessionService struct {
 // Compile-time check: the incoming port.
 var _ agents.Sessions = (*SessionService)(nil)
 
+// Compile-time check: SessionService is the read of the run context (M2-13).
+var _ agents.CurrentSessions = (*SessionService)(nil)
+
+// CurrentSession implements agents.CurrentSessions (M2-13 design note 5): the current row of the
+// thread without authorization and without a lock; runs authorized run.context.read first.
+func (s *SessionService) CurrentSession(ctx context.Context, threadID ids.ID) (agents.Session, bool, error) {
+	return s.d.Store.CurrentSession(ctx, threadID)
+}
+
 // NewSessions returns the session use cases. Errors: a missing collaborator or
 // agent.session_ref_max_bytes below 1.
 //

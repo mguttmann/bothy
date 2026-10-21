@@ -97,6 +97,10 @@ func TestThreadUseCases(t *testing.T) {
 	if err != nil || th.ParentMessageID != msg || th.TitleSource != "auto" {
 		t.Fatalf("thread %+v, %v", th, err)
 	}
+	// The routing data carry the parent message (M2-13 design note 2).
+	if info, err := e.svc.Info(context.Background(), th.ID); err != nil || info.ParentMessageID != msg {
+		t.Fatalf("info %+v, %v", info, err)
+	}
 	_, err = e.newThread(e.owner, chat.CreateThreadCmd{ChannelID: text.ID, Parent: &chat.ParentMessage{MessageID: msg, ThreadID: text.MainThreadID}})
 	wantCode(t, err, errs.CodeConflict)
 	for _, cmd := range []chat.CreateThreadCmd{
