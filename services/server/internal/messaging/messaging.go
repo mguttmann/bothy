@@ -111,6 +111,14 @@ type MessagePosted struct {
 	CreatedAt time.Time
 }
 
+// MessageRef names one message by ID and position in its thread.
+type MessageRef struct {
+	// ID is the message.
+	ID ids.ID
+	// ThreadSeq is its position in the thread.
+	ThreadSeq int64
+}
+
 // PrincipalRef is the minimal public view of a principal (schema PrincipalRef).
 type PrincipalRef struct {
 	ID ids.ID
@@ -291,11 +299,15 @@ type TriggerMessage struct {
 	TriggerState, TriggerStateReason string
 }
 
-// AnchorRef names a written live box anchor.
+// AnchorRef names a live box anchor of a run (09 section 5.4: the only message with run_id, kind
+// run, silent).
 type AnchorRef struct {
 	// MessageID is the anchor; ThreadSeq its position in the thread.
 	MessageID ids.ID
 	ThreadSeq int64
+	// RunID is the run of the anchor; the reads of the consumer push (M3-19) set it,
+	// CreateRunAnchor leaves it zero because its caller knows the run.
+	RunID ids.ID
 }
 
 // Messages is the incoming port of sending (M1-56) and reading (M1-57). The caller a is the principal of the request;

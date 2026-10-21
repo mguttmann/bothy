@@ -9,7 +9,7 @@ version: 1
 exclude: [tools]
 kernel:
   core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang]   # usable by every package
-  ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
+  ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure, presence]
 platform:                   # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
   config: {depends_on: [], vendors: [yaml]}
   egress: {depends_on: [], vendors: []}
@@ -258,7 +258,8 @@ modules:
     events: [notification_pref.updated, quiet_hours.updated]
     ephemeral_events: [notification.created]
     ws_ops: []
-    depends_on: [identity, chat, messaging, sync]
+    # authz (M3-19): the candidate readers of a channel for hints (authz.Recipients).
+    depends_on: [identity, chat, messaging, sync, authz]
     adapter_vendors: [pgx]   # sqlc code and the repository (M3-18)
   apps:
     tables: [apps, app_installations, webhook_subscriptions, webhook_deliveries, incoming_webhooks]

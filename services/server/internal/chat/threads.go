@@ -59,6 +59,18 @@ type ThreadInfo struct {
 	LastMessageSeq, UnreadFloorSeq int64
 }
 
+// ThreadPosition is one thread that can be unread for somebody (Threads.UnreadCandidates, M3-19):
+// last_message_seq is above unread_floor_seq. A person's unread count is LastMessageSeq -
+// GREATEST(last_read_seq, UnreadFloorSeq) (03 read_states "Unread").
+type ThreadPosition struct {
+	// ThreadID is the thread; ChannelID its channel.
+	ThreadID, ChannelID ids.ID
+	// ChannelKind is text, forum or dm.
+	ChannelKind string
+	// LastMessageSeq and UnreadFloorSeq are the counters of the thread (03 threads).
+	LastMessageSeq, UnreadFloorSeq int64
+}
+
 // ThreadCounter are the counters of one thread for the unread counters of the snapshot (M1-63):
 // a person's unread count there is LastMessageSeq - GREATEST(last_read_seq, UnreadFloorSeq).
 type ThreadCounter struct {
