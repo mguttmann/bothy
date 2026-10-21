@@ -6,9 +6,6 @@ import (
 	"errors"
 	"log/slog"
 
-	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -143,34 +140,37 @@ type PushDeps struct {
 	Presence presence.View
 	// Routes takes the gateway and delayed routes; nil means notifyapp.FailClosedRoutes.
 	Routes notifyapp.LiveRoutes
-	// Meter is the meter provider of the push metrics; nil means the global one.
-	Meter metric.MeterProvider
-	// Tracer is the tracer provider of the span push.send; nil means the global one.
-	Tracer trace.TracerProvider
+	// Metrics records the push signals; nil means notify/adapters/otelmetrics on the global meter
+	// provider, which also gets the gauge bothy.push.registrations.active. Tests pass their own.
+	Metrics notifyapp.Metrics
 }
 
 // NewPush builds the push path over pool with the unit of work uow, the configuration cfg, the
-// collaborators d, the clock (nil means clock.System()) and log. It registers the gauge
-// bothy.push.registrations.active on d.Meter. It opens no connection; the scheduler stays unbound
+// collaborators d, the clock (nil means clock.System()) and log. Without d.Metrics it registers
+// the gauge bothy.push.registrations.active on the global meter provider. It opens no connection; the scheduler stays unbound
 // until Push.BindJobs. Errors: a missing collaborator or a value the push path refuses.
 func NewPush(cfg notifyapp.PushConfig, pool *pg.Pool, uow txn.UnitOfWork, d PushDeps, clk clock.Clock, log *slog.Logger) (*Push, error) {
 	if d.Notify == nil || d.Chat == nil || d.Messaging == nil || d.Recipients == nil || d.History == nil {
 		return nil, errors.New("wire: the push path needs notify, chat, messaging, the recipients of authz and the history of sync")
 	}
-	metrics, err := notifymetrics.New(d.Meter)
-	if err != nil {
-		return nil, err
-	}
 	regs := notifypg.NewRegistrations(pool)
-	if _, err := notifymetrics.RegisterActiveGauge(d.Meter, regs); err != nil {
-		return nil, err
+	metrics := d.Metrics
+	if metrics == nil {
+		m, err := notifymetrics.New(nil)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := notifymetrics.RegisterActiveGauge(nil, regs); err != nil {
+			return nil, err
+		}
+		metrics = m
 	}
 	sched := notifyjobs.NewScheduler(nil)
 	p, err := notifyapp.NewPush(cfg, notifyapp.PushDeps{
 		Facts: d.Notify.Service.Facts(), Settings: d.Settings, Authorizer: d.Authorizer, Readers: d.Recipients,
 		Principals: d.Directory, Devices: d.Devices, Registrations: regs, Store: regs, Presence: d.Presence, Routes: d.Routes,
 		Scheduler: sched, History: d.History, Positions: d.Positions, Threads: d.Chat, Messages: d.Messaging,
-		Mentions: d.Messaging.Mentions(), Providers: notifyjobs.Traced(d.Providers, d.Tracer), UoW: uow, InstanceID: d.InstanceID,
+		Mentions: d.Messaging.Mentions(), Providers: notifyjobs.Traced(d.Providers, nil), UoW: uow, InstanceID: d.InstanceID,
 		Clock: clk, Metrics: metrics, Log: log,
 	})
 	if err != nil {
