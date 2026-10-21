@@ -102,12 +102,12 @@ func (w *world) runVersion(run string) int64 {
 	return w.count(`SELECT version FROM runs WHERE id = $1`, run)
 }
 
-// patchFollowup sends patchRun as handle: replace /followups/<message>/state with state at the
+// patchFollowup sends patchRun as Lotse: replace /followups/<message>/state with state at the
 // current version of the run.
-func (w *world) patchFollowup(handle, run, message, state string) *httpservertest.Response {
+func (w *world) patchFollowup(run, message, state string) *httpservertest.Response {
 	body := `{"base_version":` + strconv.FormatInt(w.runVersion(run), 10) + `,"ops":[{"op":"replace","path":"/followups/` + message +
 		`/state","value":"` + state + `"}]}`
-	return w.do(handle, http.MethodPatch, "/api/v1/runs/"+run, body)
+	return w.do("lotse", http.MethodPatch, "/api/v1/runs/"+run, body)
 }
 
 // say posts a text message as name into thread and returns its id.

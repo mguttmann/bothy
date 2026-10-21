@@ -253,23 +253,12 @@ func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info c
 	if err != nil {
 		return nil, err
 	}
-	p := actor.Actor{ID: ev.AuthorID, Kind: actor.Kind(ev.AuthorKind)}
-	if a, ok := actor.FromContext(ctx); ok && a.ID == ev.AuthorID {
-		p = a
-	}
+	p := authorOf(ctx, ev)
 	switch {
 	case d.Outcome == domain.OutcomeNone:
 		return nil, nil
 	case d.Outcome == domain.OutcomeFollowUp:
-		// The follow-up of the active run (M2-11 design note 3); without the follow-up service
-		// nothing is written (D-M2-05-12).
-		if s.fu == nil {
-			return nil, nil
-		}
-		if active == nil || active.ID != d.RunID {
-			return nil, errs.New(errs.CodeInternalError, "runs: a follow-up decision without the locked active run")
-		}
-		return nil, s.fu.Accept(ctx, ev, info, d, *active, p)
+		return nil, s.followup(ctx, ev, info, d, active, p)
 	case d.Outcome == domain.OutcomeReject && d.Reason == domain.ReasonMultipleAgentsMentioned:
 		// No single agent to check: no authorize and no audit (D-M2-05-12).
 		return nil, s.fail(ctx, ev.MessageID, string(d.Reason))
@@ -296,6 +285,27 @@ func (s *Service) settle(ctx context.Context, ev messaging.MessagePosted, info c
 		return nil, s.fail(ctx, ev.MessageID, string(d.Reason))
 	}
 	return s.invoke(ctx, ev, info, d, p)
+}
+
+// authorOf is the principal of the author of ev: the actor of the request when it is the author,
+// else the author by id and kind.
+func authorOf(ctx context.Context, ev messaging.MessagePosted) actor.Actor {
+	if a, ok := actor.FromContext(ctx); ok && a.ID == ev.AuthorID {
+		return a
+	}
+	return actor.Actor{ID: ev.AuthorID, Kind: actor.Kind(ev.AuthorKind)}
+}
+
+// followup hands a follow-up decision to the follow-up service (M2-11 design note 3); without it
+// nothing is written (D-M2-05-12). The decision's run must be the locked active run.
+func (s *Service) followup(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, d domain.Decision, active *RunRow, p actor.Actor) error {
+	if s.fu == nil {
+		return nil
+	}
+	if active == nil || active.ID != d.RunID {
+		return errs.New(errs.CodeInternalError, "runs: a follow-up decision without the locked active run")
+	}
+	return s.fu.Accept(ctx, ev, info, d, *active, p)
 }
 
 // withoutTriggerRight checks a candidate that M does not mention in filter mode first: a person

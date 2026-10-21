@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,20 +34,20 @@ func TestFollowupStatesForwardOnly(t *testing.T) {
 	th := ids.MustParse(r.Thread)
 	a, b := w.say("sam", th, "One"), w.say("sam", th, "Two")
 	seq := w.maxSeq()
-	w.wantOK(w.patchFollowup("lotse", r.ID, b, "delivered"))
-	w.wantOK(w.patchFollowup("lotse", r.ID, b, "delivered"))
+	w.wantOK(w.patchFollowup(r.ID, b, "delivered"))
+	w.wantOK(w.patchFollowup(r.ID, b, "delivered"))
 	if n := w.messageUpdates(b, seq); n != 1 {
 		t.Fatalf("%d message.updated for delivered twice", n)
 	}
-	w.wantOK(w.patchFollowup("lotse", r.ID, a, "absorbed"))
+	w.wantOK(w.patchFollowup(r.ID, a, "absorbed"))
 	v, events := w.runVersion(r.ID), w.eventCount()
-	w.want(w.patchFollowup("lotse", r.ID, a, "delivered"), http.StatusConflict, "invalid_state_transition")
+	w.want(w.patchFollowup(r.ID, a, "delivered"), http.StatusConflict, "invalid_state_transition")
 	w.wantFollowup(a, r.ID, "absorbed", "followup_delivered")
 	if w.runVersion(r.ID) != v || w.eventCount() != events {
 		t.Fatal("a refused backward move changed the run or wrote events")
 	}
 	other := w.say("alex", w.mainThread(w.allgemein), "Not a follow-up")
-	p := w.want(w.patchFollowup("lotse", r.ID, other, "delivered"), http.StatusBadRequest, "validation_failed")
+	p := w.want(w.patchFollowup(r.ID, other, "delivered"), http.StatusBadRequest, "validation_failed")
 	if !strings.Contains(mustString(t, p), "patch_target_missing") {
 		t.Fatalf("problem %v", p)
 	}
@@ -266,7 +267,7 @@ func TestRunEndSettlesOnEveryEndPath(t *testing.T) {
 			r, end := c.setup(w)
 			m := w.say("sam", ids.MustParse(r.Thread), "Addition")
 			end(w, r)
-			if got := w.lifecycle(r.ID); !strings.Contains("completed failed cancelled", got.State) {
+			if got := w.lifecycle(r.ID); !slices.Contains([]string{"completed", "failed", "cancelled"}, got.State) {
 				t.Fatalf("run %+v", got)
 			}
 			row, ok := w.fuOf(m)
@@ -441,7 +442,7 @@ func TestRunDocumentListsFollowups(t *testing.T) {
 	r, _, _ := w.started()
 	th := ids.MustParse(r.Thread)
 	a, b := w.say("sam", th, "One"), w.say("alex", th, "Two")
-	w.wantOK(w.patchFollowup("lotse", r.ID, a, "delivered"))
+	w.wantOK(w.patchFollowup(r.ID, a, "delivered"))
 	resp := w.do("alex", http.MethodGet, "/api/v1/runs/"+r.ID, "")
 	doc := w.wantOK(resp)
 	if got := docFollowups(doc); len(got) != 2 || got[a] != "delivered" || got[b] != "queued" {
@@ -525,7 +526,7 @@ func TestFollowupSchemas(t *testing.T) {
 	r, _, _ := w.started()
 	after := w.maxSeq()
 	m := w.say("sam", ids.MustParse(r.Thread), "Addition")
-	w.wantOK(w.patchFollowup("lotse", r.ID, m, "delivered"))
+	w.wantOK(w.patchFollowup(r.ID, m, "delivered"))
 	w.validateFollowupPayloads()
 	contract := loadContract(t)
 	page := w.wantOK(w.do("alex", http.MethodGet, "/api/v1/events?limit=500&after="+strconvI(after), ""))

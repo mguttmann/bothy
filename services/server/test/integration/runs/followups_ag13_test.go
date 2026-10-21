@@ -60,13 +60,13 @@ func TestAG13_Steer(t *testing.T) {
 		t.Fatalf("current %v", conflict["current"])
 	}
 	seq := w.maxSeq()
-	w.wantOK(w.patchFollowup("lotse", r.ID, m, "delivered"))
+	w.wantOK(w.patchFollowup(r.ID, m, "delivered"))
 	w.wantFollowup(m, r.ID, "delivered", "followup_delivered")
 	if n := w.messageUpdates(m, seq); n != 1 {
 		t.Fatalf("%d message.updated", n)
 	}
 	seq = w.maxSeq()
-	w.wantOK(w.patchFollowup("lotse", r.ID, m, "absorbed"))
+	w.wantOK(w.patchFollowup(r.ID, m, "absorbed"))
 	w.wantFollowup(m, r.ID, "absorbed", "followup_delivered")
 	if n := w.messageUpdates(m, seq); n != 0 {
 		t.Fatalf("%d message.updated after absorbed", n)
@@ -150,8 +150,8 @@ func TestAG13_DeliveredNotAbsorbedIsDeferred(t *testing.T) {
 	th := ids.MustParse(r.Thread)
 	a := w.say("sam", th, "Absorbed one")
 	b := w.say("sam", th, "Delivered one")
-	w.wantOK(w.patchFollowup("lotse", r.ID, a, "absorbed"))
-	w.wantOK(w.patchFollowup("lotse", r.ID, b, "delivered"))
+	w.wantOK(w.patchFollowup(r.ID, a, "absorbed"))
+	w.wantOK(w.patchFollowup(r.ID, b, "delivered"))
 	w.wantOK(w.finish("lotse", r.ID, `"state":"failed","reason":"runtime_error"`))
 	w.wantFollowup(a, r.ID, "absorbed", "followup_delivered")
 	w.wantFollowup(b, r.ID, "deferred", "received")
@@ -171,7 +171,7 @@ func TestAG13_FollowOnRunMovesRestWithSteer(t *testing.T) {
 	r, _, _ := w.started()
 	th := ids.MustParse(r.Thread)
 	a, b, c := w.say("sam", th, "One"), w.say("alex", th, "Two"), w.say("sam", th, "Three")
-	w.wantOK(w.patchFollowup("lotse", r.ID, b, "delivered"))
+	w.wantOK(w.patchFollowup(r.ID, b, "delivered"))
 	seq := w.maxSeq()
 	w.wantOK(w.finish("lotse", r.ID, `"state":"completed"`))
 	next, ok := w.runOf(a)

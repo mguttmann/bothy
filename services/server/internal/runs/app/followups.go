@@ -101,6 +101,19 @@ func (f *Followups) mode(ctx context.Context, agentID ids.ID) (domain.FollowupMo
 // agent.followup when FollowupEventNeeded for the effective mode. The run's state, invocation_jti
 // and billing mode stay. Errors: those of the collaborators.
 func (f *Followups) Accept(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, d domain.Decision, run RunRow, p actor.Actor) error {
+	allowed, err := f.authorizeFollowup(ctx, ev, info, d, run, p)
+	if err != nil || !allowed {
+		return err
+	}
+	return f.store(ctx, ev.MessageID, run)
+}
+
+// authorizeFollowup decides run.followup.create for p (design note 3 c and d): a candidate that M
+// does not mention is checked in filter mode first and a person without trigger is silent; a
+// denial in request mode sets trigger_state failed with the reason of domain.Settle. It reports
+// whether the follow-up is allowed.
+func (f *Followups) authorizeFollowup(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, d domain.Decision, run RunRow,
+	p actor.Actor) (bool, error) {
 	s := f.s
 	res := authorize.Resource{
 		Kind: authorize.ResourceThread, ID: info.ID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, OwnerID: info.CreatedBy,
@@ -109,34 +122,35 @@ func (f *Followups) Accept(ctx context.Context, ev messaging.MessagePosted, info
 	}
 	if !d.Mentioned {
 		v, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), p, authorize.ActionRunFollowupCreate, res)
-		if err != nil {
-			return err
-		}
-		if !v.Allowed() && v.Reason == denyLevelInsufficient {
-			return nil
+		if err != nil || (!v.Allowed() && v.Reason == denyLevelInsufficient) {
+			return false, err
 		}
 	}
 	v, err := s.d.Authorizer.Authorize(ctx, p, authorize.ActionRunFollowupCreate, res)
+	if err != nil || v.Allowed() {
+		return v.Allowed(), err
+	}
+	if !knownDenials[string(v.Reason)] {
+		s.d.Log.LogAttrs(ctx, slog.LevelError, msgUnknownFollowupDenial, slog.String(keyAction, string(authorize.ActionRunFollowupCreate)))
+	}
+	st, err := domain.Settle(d, domain.Verdict{Reason: string(v.Reason)})
 	if err != nil {
-		return err
+		return false, err
 	}
-	if !v.Allowed() {
-		if !knownDenials[string(v.Reason)] {
-			s.d.Log.LogAttrs(ctx, slog.LevelError, msgUnknownFollowupDenial, slog.String(keyAction, string(authorize.ActionRunFollowupCreate)))
-		}
-		st, err := domain.Settle(d, domain.Verdict{Reason: string(v.Reason)})
-		if err != nil {
-			return err
-		}
-		return s.fail(ctx, ev.MessageID, string(st.Reason))
-	}
-	if err := f.rows.InsertFollowup(ctx, run.ID, ev.MessageID); err != nil {
+	return false, s.fail(ctx, ev.MessageID, string(st.Reason))
+}
+
+// store writes an allowed follow-up (design note 3 e): the row in queued, one version step of the
+// run, trigger_state received and agent.followup when the effective mode asks for it.
+func (f *Followups) store(ctx context.Context, message ids.ID, run RunRow) error {
+	s := f.s
+	if err := f.rows.InsertFollowup(ctx, run.ID, message); err != nil {
 		return err
 	}
 	if _, err := s.d.Repo.RaiseRunVersion(ctx, run.ID); err != nil {
 		return err
 	}
-	if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: ev.MessageID, State: string(domain.TriggerStateReceived)}); err != nil {
+	if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: message, State: string(domain.TriggerStateReceived)}); err != nil {
 		return err
 	}
 	mode, err := f.mode(ctx, run.AgentID)
@@ -144,7 +158,7 @@ func (f *Followups) Accept(ctx context.Context, ev messaging.MessagePosted, info
 		return err
 	}
 	if domain.FollowupEventNeeded(mode, run.State) {
-		return f.emit(ctx, run.ID, run.ThreadID, run.AgentID, ev.MessageID)
+		return f.emit(ctx, run.ID, run.ThreadID, run.AgentID, message)
 	}
 	return nil
 }
