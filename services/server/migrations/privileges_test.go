@@ -178,6 +178,11 @@ var appPrivileges = map[string][]string{
 	// 03 agent_sessions (M2-12): a session ends with ended_at and end_reason, never with a
 	// delete; the rows are the session history of the thread.
 	"agent_sessions": {"SELECT", "INSERT", "UPDATE"},
+	// 03 message_components and interactions (M2-15): runs deletes the components of a deleted
+	// message (its tombstone keeps the row, so the cascade never fires); interactions go only with
+	// their component or message (cascade).
+	"message_components": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"interactions":       {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

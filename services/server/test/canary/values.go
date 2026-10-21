@@ -25,6 +25,9 @@ type Class string
 const (
 	// ClassContent is content and direct personal data: message text, names, titles, e-mail
 	// addresses, display names. Allowed only in events to principals that may read its scope.
+	// Labels of components are content of the card's channel; form values (M2-15) are content
+	// too, but of a scope only the card's agent reads (formScope), because every reader of the
+	// channel sees the card and only the agent may see the values.
 	ClassContent Class = "content"
 	// ClassAdminReason is the reason of an administrative change; like content, and additionally
 	// in audit_events.details as the reserved member reason (19 SEC-AUD-5).

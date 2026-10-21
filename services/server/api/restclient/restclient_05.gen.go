@@ -13,6 +13,64 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// UpdateAgentWithBodyWithResponse Change an agent
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
+func (c *ClientWithResponses) UpdateAgentWithBodyWithResponse(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentResponse, error) {
+	rsp, err := c.UpdateAgentWithBody(ctx, agentId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAgentResponse(rsp)
+}
+
+// UpdateAgentWithResponse Change an agent
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
+func (c *ClientWithResponses) UpdateAgentWithResponse(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, body UpdateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentResponse, error) {
+	rsp, err := c.UpdateAgent(ctx, agentId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAgentResponse(rsp)
+}
+
+// SetAgentBillingModeWithBodyWithResponse Switch the backend policy of an agent
+//
+// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
+// else could trigger the agent.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
+func (c *ClientWithResponses) SetAgentBillingModeWithBodyWithResponse(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAgentBillingModeResponse, error) {
+	rsp, err := c.SetAgentBillingModeWithBody(ctx, agentId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAgentBillingModeResponse(rsp)
+}
+
+// SetAgentBillingModeWithResponse Switch the backend policy of an agent
+//
+// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
+// else could trigger the agent.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
+func (c *ClientWithResponses) SetAgentBillingModeWithResponse(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, body SetAgentBillingModeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAgentBillingModeResponse, error) {
+	rsp, err := c.SetAgentBillingMode(ctx, agentId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAgentBillingModeResponse(rsp)
+}
+
 // SetCredentialHolderWithBodyWithResponse Change the credential holder
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).

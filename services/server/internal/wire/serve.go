@@ -51,6 +51,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
+	"github.com/OWNER/bothy/services/server/internal/runs/adapters/messagingsource"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
@@ -962,13 +963,16 @@ func (s *server) startChat(context.Context) error {
 	if err != nil {
 		return err
 	}
+	// The components of cards: runs implements the source ports of messaging, bound once the runs
+	// module exists (M2-15).
+	components := messagingsource.New()
 	m, err := NewMessaging(mcfg, pool, a.UoW(), az, MessagingWrites{Events: sy.Appender(), Redactor: sy.Redactor(), Audit: a.Recorder(),
-		Credentials: lazyCredentials(s.authenticator)},
+		Credentials: lazyCredentials(s.authenticator), Components: components},
 		c.Service, id.Directory, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
-	rn, err := s.buildRuns(pool, a, az, sy, c, m)
+	rn, err := s.buildRuns(pool, a, az, sy, c, m, components)
 	if err != nil {
 		return err
 	}
@@ -1007,9 +1011,10 @@ func (s *server) startChat(context.Context) error {
 
 // buildRuns builds the runs module (M2-05) in the chat step over messaging (anchor and trigger
 // state), the threads and channel facts of chat and the agent facts of the agents step, binds the
-// acceptance of the unit of work to it and, in the worker role, registers the gauge
-// bothy.run.active on the global meter provider.
-func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, m *Messaging) (*Runs, error) {
+// acceptance of the unit of work and the component source of messaging (M2-15) to it and, in the
+// worker role, registers the gauge bothy.run.active on the global meter provider.
+func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, m *Messaging,
+	components *messagingsource.Source) (*Runs, error) {
 	cfg, err := RunsConfig(s.values)
 	if err != nil {
 		return nil, err
@@ -1032,6 +1037,7 @@ func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy 
 	rn, err := NewRuns(cfg, pool, a.UoW(), az, RunsDeps{
 		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(), Sessions: ss.Service,
+		Components: components, Cards: m.Service, ThreadLocks: c.Service,
 	}, s.deps.Clock, s.logger())
 	if err != nil {
 		return nil, err
@@ -1717,8 +1723,9 @@ func (s *server) startJobs(ctx context.Context) error {
 	}
 	var queuedExpiry runsjobs.Expirer
 	var lifecycle runsjobs.Lifecycle
+	var componentExpiry runsjobs.ComponentExpirer
 	if s.runs != nil {
-		queuedExpiry, lifecycle = s.runs.Service, s.runs.Service
+		queuedExpiry, lifecycle, componentExpiry = s.runs.Service, s.runs.Service, s.runs.Service
 	}
 	presence := s.values.Duration(keyPresenceTimeout)
 	mods := &JobModules{
@@ -1732,7 +1739,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		FilesScan:   files.ScanRunner(),
 		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
 		TerminalSweep: tm.Service, TerminalSweepInterval: sweepCfg.Interval,
-		QueuedExpiry: queuedExpiry, RunsLifecycle: lifecycle, StallInterval: presence,
+		QueuedExpiry: queuedExpiry, RunsLifecycle: lifecycle, StallInterval: presence, ComponentExpiry: componentExpiry,
 	}
 	if s.deps.JobModules != nil {
 		s.deps.JobModules(mods)

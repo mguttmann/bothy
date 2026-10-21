@@ -72,9 +72,10 @@ const (
 )
 
 // guards applies the guards of the action (07 section 4.2 step 9): agent.invoke and the session
-// switches agent_session.reset and agent_session.bind with its facts (brief M2-12), token.create,
-// the mode guard of run.start (M2-09) and the terminal guards SR10, SR11 and SR12 of terminal.open
-// and terminal.attach (M2-40). The
+// switches agent_session.reset and agent_session.bind with its facts (brief M2-12), the same guard
+// with the interaction rules on interaction.create (M2-15), token.create, the mode guard of
+// run.start (M2-09) and the terminal guards SR10, SR11 and SR12 of terminal.open and
+// terminal.attach (M2-40). The
 // delegation limits of grant.create and grant.revoke belong to the requirement (decideDelegation).
 func guards(in *Input) (Decision, error) {
 	switch in.Action {
@@ -89,7 +90,12 @@ func guards(in *Input) (Decision, error) {
 		if in.Invoke == nil {
 			return Decision{}, internalError(in.Action + " without its trigger")
 		}
-		return invokeGuard(in, in.Invoke), nil
+		if in.Interaction != nil && in.Interaction.Stage != InteractionStageDeliver {
+			return Decision{}, internalError("agent.invoke with interaction facts outside stage deliver")
+		}
+		return invokeGuard(in, in.Invoke)
+	case actionInteractionCreate:
+		return interactionGuard(in)
 	case actionRunStart:
 		if in.Invocation == nil {
 			return Decision{}, internalError("run.start without its token facts")
@@ -145,48 +151,99 @@ func notSelfForPersonalToken(in *Input, reason Reason) Reason {
 }
 
 // invokeGuard applies 05 section 5 points 1 to 5, 7 and 8 in this order (brief M1-28 "Guards").
-func invokeGuard(in *Input, f *InvokeFacts) Decision {
-	if in.Principal.Kind != KindUser || f.TriggerOrigin != OriginHuman {
-		return deny(OutcomeForbidden, ReasonOriginNotHuman)
+// With interaction facts (interaction.create, and agent.invoke at stage deliver; brief M2-15
+// design note 8 b and c) the mention rule of point 3 counts as met, point 6 (componentRules)
+// comes between SR2 and the project rules, and at stage accept run_active closes point 8.
+// Interaction facts that cannot be evaluated are an internal error.
+func invokeGuard(in *Input, f *InvokeFacts) (Decision, error) {
+	ia := in.Interaction
+	if ia != nil {
+		if err := checkInteraction(ia); err != nil {
+			return Decision{}, err
+		}
 	}
-	if !reachable(in.Path, f) {
-		return deny(OutcomeForbidden, ReasonAgentNotReachable)
+	if r := invokeReason(in, f, ia); r != "" {
+		return deny(OutcomeForbidden, r), nil
 	}
-	if f.BillingMode != BillingOrganization && f.CredentialHolderID != in.Principal.ID {
-		return deny(OutcomeForbidden, ReasonBillingModePersonalNotHolder)
+	return Allow, nil
+}
+
+// invokeReason is the reason of the first refusing point of invokeGuard; "" allows.
+func invokeReason(in *Input, f *InvokeFacts, ia *InteractionFacts) Reason {
+	if r := triggerReason(in, f, ia != nil); r != "" {
+		return r
 	}
-	if r := devRules(in.Eff.Owner, f); r != "" {
-		return deny(OutcomeForbidden, r)
+	if ia != nil {
+		if r := componentRules(in, ia); r != "" {
+			return r
+		}
 	}
+	if r := projectRules(in.Eff.Owner, f); r != "" {
+		return r
+	}
+	return activeRunReason(f, ia)
+}
+
+// triggerReason applies points 1 to 5 of 05 section 5: a human trigger, a reachable agent (card
+// marks the mention rule met for an interaction), I2 and SR2.
+func triggerReason(in *Input, f *InvokeFacts, card bool) Reason {
+	switch {
+	case in.Principal.Kind != KindUser || f.TriggerOrigin != OriginHuman:
+		return ReasonOriginNotHuman
+	case !reachable(in.Path, f, card):
+		return ReasonAgentNotReachable
+	case f.BillingMode != BillingOrganization && f.CredentialHolderID != in.Principal.ID:
+		return ReasonBillingModePersonalNotHolder
+	case toolClassOwnerOnly(in.Eff.Owner, f):
+		return ReasonToolClassOwnerOnly
+	}
+	return ""
+}
+
+// activeRunReason applies point 8: an active run of another agent, and at stage accept a component
+// without a run while the agent's run is active, which would need a second run that cannot exist
+// (R-DM-14); a follow-up is a message (05 section 5 point 8).
+func activeRunReason(f *InvokeFacts, ia *InteractionFacts) Reason {
 	if !f.ActiveRunAgentID.IsZero() && f.ActiveRunAgentID != f.AgentID {
-		return deny(OutcomeForbidden, ReasonRunActiveOtherAgent)
+		return ReasonRunActiveOtherAgent
 	}
-	return Allow
+	if ia != nil && ia.Stage == InteractionStageAccept && ia.ComponentRunID.IsZero() && f.ActiveRunAgentID == f.AgentID {
+		return ReasonRunActive
+	}
+	return ""
 }
 
 // reachable is point 2 (no agents in dms) and point 3: the agent is active and either operates
-// the thread with the mention rule fulfilled, or is an allowed guest.
-func reachable(path Path, f *InvokeFacts) bool {
+// the thread with the mention rule fulfilled, or is an allowed guest. card marks a trigger by a
+// component of the agent's own card: the card is the agent's address to the person, so it counts
+// as a mention (brief M2-15 design note 8 b); a guest still needs allow_mentioned_agents, its own
+// write and billing mode organization.
+func reachable(path Path, f *InvokeFacts, card bool) bool {
 	if path.DM || path.Kind != PathChannel || f.AgentID.IsZero() {
 		return false
 	}
 	if !f.AgentFound || f.AgentKind != KindAgent || f.AgentStatus != "active" || !f.PolicyFound {
 		return false
 	}
+	mentioned := f.MentionsAgent || card
 	mainThread := path.ThreadID.IsZero() || path.ThreadMain || f.NewThread
-	mentionRule := f.FreeResponse || f.MentionsAgent || (mainThread && !f.RequireMention) || (!mainThread && !f.ThreadRequireMention)
+	mentionRule := f.FreeResponse || mentioned || (mainThread && !f.RequireMention) || (!mainThread && !f.ThreadRequireMention)
 	if path.ThreadOperator() == f.AgentID && mentionRule {
 		return true
 	}
-	return f.MentionsAgent && f.AllowMentionedAgents && f.AgentLevel >= LevelWrite && f.BillingMode == BillingOrganization
+	return mentioned && f.AllowMentionedAgents && f.AgentLevel >= LevelWrite && f.BillingMode == BillingOrganization
 }
 
-// devRules are SR2 (point 5), the project binding (point 7) and SR3 rule 1; owner is the
-// effective owner role of the principal.
-func devRules(owner bool, f *InvokeFacts) Reason {
+// toolClassOwnerOnly is SR2 (point 5): an agent of tool class host, configured or reported, is
+// triggered only by an effective owner or a person with a ready own dev environment.
+func toolClassOwnerOnly(owner bool, f *InvokeFacts) bool {
+	return max(toolRank(f.ToolClass), toolRank(f.ReportedToolClass)) >= toolRank(ToolHost) && !owner && !f.DevEnvironmentReady
+}
+
+// projectRules are the project binding (point 7) and SR3 rule 1; owner is the effective owner role
+// of the principal. They follow SR2 and, with interaction facts, point 6.
+func projectRules(owner bool, f *InvokeFacts) Reason {
 	switch {
-	case max(toolRank(f.ToolClass), toolRank(f.ReportedToolClass)) >= toolRank(ToolHost) && !owner && !f.DevEnvironmentReady:
-		return ReasonToolClassOwnerOnly
 	case f.ProjectBound && !f.ProjectReady:
 		return ReasonProjectNotReady
 	case f.ProjectBound && !owner && !f.DevEnvironmentReady:

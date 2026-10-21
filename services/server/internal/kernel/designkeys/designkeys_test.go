@@ -136,3 +136,46 @@ func TestListsAreCopies(t *testing.T) {
 		}
 	}
 }
+
+// TestIconNamesFromTokens: the semantic icon names are exactly the keys of ds.icons.glyphs of the
+// resolved tokens (docs/design/icons.md "Rules", M2-15); a glyph file name, an emoji or a free name
+// is none.
+func TestIconNamesFromTokens(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile(root + "design/build/tokens.resolved.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f struct {
+		Icons struct {
+			Glyphs map[string]json.RawMessage `json:"glyphs"`
+		} `json:"icons"`
+	}
+	if err := json.Unmarshal(b, &f); err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for k := range f.Icons.Glyphs {
+		want = append(want, k)
+	}
+	slices.Sort(want)
+	got := designkeys.IconNames()
+	if len(got) == 0 || !slices.Equal(got, want) {
+		t.Fatalf("IconNames() = %v, want %v", got, want)
+	}
+	for _, name := range got {
+		if !designkeys.IsIconName(name) {
+			t.Errorf("IsIconName(%q) = false", name)
+		}
+	}
+	for _, s := range []string{"", "warning", "paper-plane-right", "State.warning", "state.warning ", "\U0001F680", "rocket"} {
+		if designkeys.IsIconName(s) {
+			t.Errorf("IsIconName(%q) = true", s)
+		}
+	}
+	a := designkeys.IconNames()
+	a[0] = "changed"
+	if designkeys.IconNames()[0] == "changed" {
+		t.Error("IconNames returns the package list itself")
+	}
+}

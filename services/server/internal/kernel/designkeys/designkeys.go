@@ -22,3 +22,15 @@ func IsSpaceIcon(key string) bool {
 	_, found := slices.BinarySearch(spaceIcons, key)
 	return found
 }
+
+// IconNames returns the semantic icon names of the design system (the keys of ds.icons.glyphs),
+// sorted; a copy.
+func IconNames() []string { return slices.Clone(iconNames) }
+
+// IsIconName reports whether name is exactly a semantic icon name, for example "state.warning".
+// A glyph file name ("warning"), an emoji or a free name is not (docs/design/icons.md "Rules"); the
+// icon of a button component is checked with it (M2-15).
+func IsIconName(name string) bool {
+	_, found := slices.BinarySearch(iconNames, name)
+	return found
+}

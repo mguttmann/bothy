@@ -9,6 +9,48 @@ import (
 	"net/http"
 )
 
+type CreateHostResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *HostPairingCode
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *UnprocessableEntity
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateHostResponse201Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *CreateHostResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateHostResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *CreateHostResponse403Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *CreateHostResponse409Headers
+	// Headers422 the parsed response headers for an HTTP 422 response
+	Headers422 *CreateHostResponse422Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *CreateHostResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *CreateHostResponseDefaultHeaders
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateHostResponse) GetJSON201() *HostPairingCode {
+	return r.JSON201
+}
+
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r CreateHostResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
@@ -5391,6 +5433,11 @@ type RespondToInteractionResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// RespondToInteractionResponse409Headers the declared response headers of an HTTP 409 response for RespondToInteraction
+type RespondToInteractionResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // RespondToInteractionResponse422Headers the declared response headers of an HTTP 422 response for RespondToInteraction
 type RespondToInteractionResponse422Headers struct {
 	CorrelationId *CorrelationId
@@ -5422,6 +5469,8 @@ type RespondToInteractionResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *UnprocessableEntity
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
@@ -5438,6 +5487,8 @@ type RespondToInteractionResponse struct {
 	Headers403 *RespondToInteractionResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *RespondToInteractionResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *RespondToInteractionResponse409Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
 	Headers422 *RespondToInteractionResponse422Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -5469,6 +5520,11 @@ func (r RespondToInteractionResponse) GetApplicationproblemJSON403() *Forbidden 
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r RespondToInteractionResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RespondToInteractionResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -25910,62 +25966,4 @@ func (c *ClientWithResponses) GetAgentWithResponse(ctx context.Context, agentId 
 		return nil, err
 	}
 	return ParseGetAgentResponse(rsp)
-}
-
-// UpdateAgentWithBodyWithResponse Change an agent
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
-func (c *ClientWithResponses) UpdateAgentWithBodyWithResponse(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentResponse, error) {
-	rsp, err := c.UpdateAgentWithBody(ctx, agentId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateAgentResponse(rsp)
-}
-
-// UpdateAgentWithResponse Change an agent
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
-func (c *ClientWithResponses) UpdateAgentWithResponse(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, body UpdateAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentResponse, error) {
-	rsp, err := c.UpdateAgent(ctx, agentId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateAgentResponse(rsp)
-}
-
-// SetAgentBillingModeWithBodyWithResponse Switch the backend policy of an agent
-//
-// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
-// else could trigger the agent.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
-func (c *ClientWithResponses) SetAgentBillingModeWithBodyWithResponse(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAgentBillingModeResponse, error) {
-	rsp, err := c.SetAgentBillingModeWithBody(ctx, agentId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAgentBillingModeResponse(rsp)
-}
-
-// SetAgentBillingModeWithResponse Switch the backend policy of an agent
-//
-// Switching to `personal` requires `credential_holder_id` and fails with `i1_violation` if anyone
-// else could trigger the agent.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /agents/{agent_id}/billing-mode (the `SetAgentBillingMode` operationId).
-func (c *ClientWithResponses) SetAgentBillingModeWithResponse(ctx context.Context, agentId AgentIdPath, params *SetAgentBillingModeParams, body SetAgentBillingModeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAgentBillingModeResponse, error) {
-	rsp, err := c.SetAgentBillingMode(ctx, agentId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAgentBillingModeResponse(rsp)
 }

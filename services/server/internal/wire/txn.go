@@ -148,7 +148,8 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (the end of
 // terminal sessions at every revocation, M2-46).
 // authorize.AccessChanged, published by authz, and agents.AgentDisabled reach runs last (M2-09,
-// 02 section 4.3), then agents.SessionAttached (M2-12).
+// 02 section 4.3), then agents.SessionAttached (M2-12), and messaging.MessageDeleted reaches runs
+// after them (the components of a deleted card, M2-15).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -204,7 +205,7 @@ func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 // messaging.MessagePosted -> runs after the existing subscribers (M2-05), then
 // chat.ChannelArchived -> apps (the incoming webhooks of the channel, M2-27), then the terminal
 // subscribers (M2-46), then authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09), then
-// agents.SessionAttached -> runs (M2-12).
+// agents.SessionAttached -> runs (M2-12), then messaging.MessageDeleted -> runs (M2-15).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -246,7 +247,11 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	}
 	// A report that creates or replaces the session row of a run attaches it to the run and, on
 	// fail open, writes the system line (M2-12).
-	return txn.Subscribe(reg, m.RunsAcceptor.OnSessionAttached)
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnSessionAttached); err != nil {
+		return err
+	}
+	// The components of a deleted message go in the deleting transaction (03 messages, M2-15).
+	return txn.Subscribe(reg, m.RunsAcceptor.OnMessageDeleted)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

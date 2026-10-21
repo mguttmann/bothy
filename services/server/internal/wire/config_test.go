@@ -355,6 +355,11 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"run.orphan_timeout": {Kind: config.KindDuration, Default: "15m", Min: "1ms", Chapter: "09-agenten.md"},
 		// M2-12
 		"agent.session_ref_max_bytes": {Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: "09-agenten.md"},
+		// M2-15
+		"component.default_ttl":         {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "03-datenmodell.md"},
+		"component.max_per_message":     {Kind: config.KindInt, Default: "25", Min: "1", Max: "1000", Chapter: "09-agenten.md"},
+		"component.custom_id_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agenten.md"},
+		"component.form_max_fields":     {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "09-agenten.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protokoll.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protokoll.md"},

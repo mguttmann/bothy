@@ -179,23 +179,6 @@ func (a *Authorizer) resolveGrant(ctx context.Context, id ids.ID, revoked bool) 
 	return res, true, nil
 }
 
-// tokenAndInvokeFacts adds the facts of token.create (the holder), of a requirement on the
-// invocation token (run.start, run.token.renew) and of agent.invoke to in.
-func (a *Authorizer) tokenAndInvokeFacts(ctx context.Context, s *actingPrincipal, spec domain.ActionSpec, req domain.Expr,
-	r authorize.Resource, res resolved, t time.Time, in *domain.Input) error {
-	if spec.ID == string(authorize.ActionTokenCreate) {
-		pf, found, err := a.principal.Principal(ctx, r.ID)
-		if err != nil {
-			return sourceError("principal source", err)
-		}
-		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
-	}
-	if req.Contains(domain.Token()) && r.Token != nil {
-		in.Invocation = invocationFacts(r.Token)
-	}
-	return a.guardFacts(ctx, s, spec.ID, r, res, t, in)
-}
-
 // gather builds the fact bundle of domain.Decide for one call: the effective rights on the path
 // with the "view as" and acting-for intersections and the facts the action and the resource kind
 // need (brief M1-28: decide.go stays pure).
@@ -230,7 +213,7 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	if err := a.grantFacts(spec.ID, r, res, &in); err != nil {
 		return domain.Input{}, err
 	}
-	if err := a.tokenAndInvokeFacts(ctx, s, spec, req, r, res, t, &in); err != nil {
+	if err := a.actionFacts(ctx, s, spec, req, r, res, t, &in); err != nil {
 		return domain.Input{}, err
 	}
 	if in.Principal.ActingFor {
@@ -240,6 +223,31 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		}
 	}
 	return in, nil
+}
+
+// actionFacts fills the facts of the action-specific atoms and guards: the holder of
+// token.create, the token facts of run.start and run.token.renew, and the trigger of agent.invoke
+// and interaction.create with the facts of the component (brief M2-15 design note 8 b;
+// agent.invoke carries them at stage deliver, note 8 c).
+func (a *Authorizer) actionFacts(ctx context.Context, s *actingPrincipal, spec domain.ActionSpec, req domain.Expr, r authorize.Resource,
+	res resolved, t time.Time, in *domain.Input) error {
+	if spec.ID == string(authorize.ActionTokenCreate) {
+		pf, found, err := a.principal.Principal(ctx, r.ID)
+		if err != nil {
+			return sourceError("principal source", err)
+		}
+		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
+	}
+	if req.Contains(domain.Token()) && r.Token != nil {
+		in.Invocation = invocationFacts(r.Token)
+	}
+	if err := a.guardFacts(ctx, s, spec.ID, r, res, t, in); err != nil {
+		return err
+	}
+	if triggers(spec.ID) {
+		in.Interaction = interactionFacts(r.Interaction)
+	}
+	return nil
 }
 
 // pendingReason is the reason of a pending person or device whose pending gate passed.
@@ -413,13 +421,15 @@ func (a *Authorizer) guardFacts(ctx context.Context, s *actingPrincipal, action 
 	return err
 }
 
-// invokeGuarded reports the actions with the agent.invoke guard: agent.invoke and the session
-// switches agent_session.reset and agent_session.bind (05 section 4.6, brief M2-12 design note 5),
+// invokeGuarded reports the actions with the agent.invoke guard: agent.invoke, interaction.create
+// (M2-15) and the session switches agent_session.reset and agent_session.bind (05 section 4.6,
+// brief M2-12 design note 5),
 // whose descriptor carries the invoke facts of the thread's operator. Without them Decide refuses
 // the call as an internal error.
 func invokeGuarded(action string) bool {
 	switch action {
-	case string(authorize.ActionAgentInvoke), string(authorize.ActionAgentSessionReset), string(authorize.ActionAgentSessionBind):
+	case string(authorize.ActionAgentInvoke), string(authorize.ActionInteractionCreate), string(authorize.ActionAgentSessionReset),
+		string(authorize.ActionAgentSessionBind):
 		return true
 	}
 	return false
@@ -524,6 +534,22 @@ func fileOnPath(r authorize.Resource) bool {
 		return r.File.Purpose == purposeAttachment
 	}
 	return !r.ThreadID.IsZero() || !r.ChannelID.IsZero() || !r.SpaceID.IsZero()
+}
+
+// triggers reports the actions that trigger an agent and so take the facts of the agent.invoke
+// guard: agent.invoke and interaction.create (M2-15).
+func triggers(action string) bool {
+	return action == string(authorize.ActionAgentInvoke) || action == string(authorize.ActionInteractionCreate)
+}
+
+// interactionFacts converts the interaction facts of a descriptor (M2-15); nil stays nil.
+func interactionFacts(f *authorize.InteractionFacts) *domain.InteractionFacts {
+	if f == nil {
+		return nil
+	}
+	return &domain.InteractionFacts{Stage: f.Stage, OwnerKind: f.OwnerKind, ComponentState: f.ComponentState, ExpiresAt: f.ExpiresAt,
+		RequiredCapability: f.RequiredCapability, RestrictedTo: f.RestrictedTo, ComponentRunID: f.ComponentRunID,
+		ComponentRunActive: f.ComponentRunActive, RunStarterID: f.RunStarterID}
 }
 
 // invocationFacts converts the token facts of run.start and run.token.renew (M2-09).

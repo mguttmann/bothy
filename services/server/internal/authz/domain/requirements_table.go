@@ -139,7 +139,9 @@ var requirementGroups = []struct {
 	{"public (gültiger Kopplungs-Code)", Public, []string{"host.pair"}},
 	{"owner oder assignee oder +terminal", All(HumanSession, Any(Owner, Assignee, Terminal)), []string{"host.read"}},
 	{"owner", Deferred("M8"), []string{"import.apply"}},
-	{"trigger", Deferred("M2"), []string{"interaction.create"}},
+	// interaction.create (M2-15 design note 8 b): trigger on the path; the guard of agent.invoke with
+	// the interaction rules follows in step 9.
+	{"trigger", AtLeast(LevelTrigger), []string{"interaction.create"}},
 	{"agent-self bzw. app-self", Any(AgentSelf, AppSelf), []string{"interaction.respond"}},
 	{"write", All(AtLeast(LevelWrite), HasCapIf(CapUpload, FactHasAttachments)), []string{"message.create"}},
 	{"(write und Autor) oder manage", Any(All(AtLeast(LevelWrite), Self), HasCap(CapManage)), []string{

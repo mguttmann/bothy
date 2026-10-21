@@ -367,7 +367,7 @@ func TestExportChannel_AuditFailureSendsNothing(t *testing.T) {
 	t.Parallel()
 	svc, err := messagingapp.New(messagingapp.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, TemplateNameMaxChars: 10,
 		TemplateMaxPerScope: 5, ListContentMaxBytes: 10, PageSizeDefault: 1, PageSizeMax: 10, EmojiMaxBytes: 64, MaxDistinctReactions: 20,
-		MaxPinsPerThread: 50}, messagingapp.Deps{
+		HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50}, messagingapp.Deps{
 		Store: struct{ messagingapp.Store }{}, UoW: runUnit{}, Authorizer: allowAll{}, Events: struct{ eventlog.Appender }{},
 		Redactor: struct{ eventlog.Redactor }{}, Audit: failingAudit{}, Threads: struct{ chat.Threads }{},
 		Directory: struct{ identity.Directory }{}, Cursors: httpapi.Cursors{}, Symbols: struct{ messagingapp.SymbolNormalizer }{},

@@ -16430,6 +16430,11 @@ type UpdateComponentResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// UpdateComponentResponse409Headers the declared response headers of an HTTP 409 response for UpdateComponent
+type UpdateComponentResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // UpdateComponentResponse412Headers the declared response headers of an HTTP 412 response for UpdateComponent
 type UpdateComponentResponse412Headers struct {
 	CorrelationId *CorrelationId
@@ -16471,6 +16476,8 @@ type UpdateComponentResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
 	ApplicationproblemJSON412 *PreconditionFailed
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
@@ -16491,6 +16498,8 @@ type UpdateComponentResponse struct {
 	Headers403 *UpdateComponentResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *UpdateComponentResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *UpdateComponentResponse409Headers
 	// Headers412 the parsed response headers for an HTTP 412 response
 	Headers412 *UpdateComponentResponse412Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
@@ -16526,6 +16535,11 @@ func (r UpdateComponentResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r UpdateComponentResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateComponentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
@@ -22763,46 +22777,4 @@ type CreateHostResponse429Headers struct {
 // CreateHostResponseDefaultHeaders the declared response headers of an HTTP default response for CreateHost
 type CreateHostResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type CreateHostResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *HostPairingCode
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CreateHostResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CreateHostResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CreateHostResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CreateHostResponse403Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *CreateHostResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *CreateHostResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreateHostResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CreateHostResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateHostResponse) GetJSON201() *HostPairingCode {
-	return r.JSON201
 }

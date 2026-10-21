@@ -12,13 +12,14 @@ import (
 )
 
 // Register declares the durable events runs appends (M1-25, docs/spec/05-aktionen.md section 6):
-// run.state_changed (M2-05), agent.invocation (M2-08) and run.cancel_requested (M2-09), and the
-// gateway op run.update it serves (M2-10).
+// run.state_changed (M2-05), agent.invocation (M2-08), run.cancel_requested (M2-09) and
+// interaction.created (M2-15), and the gateway op run.update it serves (M2-10).
 // internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunStateChanged)
 	r.Event("runs", authorize.EventAgentInvocation)
 	r.Event("runs", authorize.EventRunCancelRequested)
+	r.Event("runs", authorize.EventInteractionCreated)
 	// The live-box op of the adapter (M2-10); run.updated is ephemeral and needs no declaration.
 	r.Op("runs", authorize.OpRunUpdate)
 }

@@ -1,6 +1,6 @@
 # Modul `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -24,7 +24,10 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
   `ReactionView`) and `Pins` (`Pin`, `Unpin`, `List` with `PinView`) take the caller from the
   context too (M1-59); `Message` carries `Reactions` (`ReactionCount`), `MyReactions` and `Pinned`.
   `Export` (`export.go`, M3-11) with `Channel`, `ChannelExportQuery`, `ExportStream`, the alias
-  `MessageView` and `ErrExportAborted`.
+  `MessageView` and `ErrExportAborted`. `components.go` (M2-15): the source ports
+  `ComponentWriter` and `ComponentReader` with `ComponentInput`, `CardInput`, `CheckedCard`,
+  `Component` and `CardFacts`; `Message.Components` and `CreateMessageCmd.Components` and `RunID`;
+  `Messages.LockCard`, `ComponentsChanged` and `PrincipalOf`.
 - `domain/`: the message row (`Message`), `OriginFor` (09 section 3.2), `CheckClientMsgID`,
   `CheckContent`, `CheckMentionCount`, the mention scanner `ScanMentions` with `CodeMask` (the code
   structure of CommonMark 0.31.2), `RequestHash` (04 section 5.1 point 3), `SystemLine` and
@@ -38,7 +41,8 @@ Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Exp
   `ReactionLimitReached` and `PinLimitReached`; for M3-11 `ValidateExportRange`, the keyset
   `ExportCursor` and the walk `ExportWalk` over thread and message pages.
 - `app/`: `Service` with `Create` and `CreateThread` (`create.go`, `threads.go`), `History` and
-  `Get`, `Update`, `Delete` and `Revisions` (`edit.go`), `Service.Mentions()`,
+  `Get`, `Update`, `Delete` and `Revisions` (`edit.go`), the card rules, `LockCard`,
+  `ComponentsChanged` and the component part of the representation (`cards.go`, M2-15), `Service.Mentions()`,
   `Service.Templates()`, `Service.Reactions()` and `Service.Pins()` (the other ports over the same
   service; `reactions.go`, `pins.go`), the batch loader `decorate` of the one representation
   (`view.go`), the outgoing ports `Store` (with `HistoryRead`, `HistoryRows`, `ReactionRead`,
@@ -86,7 +90,7 @@ adapter on the global meter provider.
 
 ## Port (Wurzelpaket `internal/messaging`)
 
-- Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker, `AppendSystemLine` seit M2-12), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader`.
+- Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker, `AppendSystemLine` seit M2-12), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader` und `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
 - Gibt In-Tx-Ereignisse aus: `MessagePosted`, `MessageDeleted`.
 - Abonniert In-Tx-Ereignisse: `chat.ThreadMoved`.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `files.AttachmentLocator`, kernel `personaldata.Participant`.
@@ -123,9 +127,9 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 1. `chat.Threads.Info`, then `message.create` on the thread; an unknown and an invisible thread
    give the same `404`, `read` only `403`, a read-only or archived channel
    `403 channel_read_only`, an app without `messages:write` `403 scope_missing`.
-2. The body: `client_msg_id` a UUIDv7 (`not_uuid_v7`); `kind` absent or `text` (`voice` and
-   `card` are `not_enabled`, so are non-empty `attachment_file_ids`, non-empty `components` and any
-   `run_id`); `content_md` with a visible character (`empty`), without U+0000 (`invalid`) and at
+2. The body: `client_msg_id` a UUIDv7 (`not_uuid_v7`); `kind` absent, `text` or (M2-15) `card`
+   with the card rules of "Cards and components" below (`voice` is `not_enabled`, so are non-empty
+   `attachment_file_ids` and `run_id` with any kind but `card`); `content_md` with a visible character (`empty`), without U+0000 (`invalid`) and at
    most `message.max_content_bytes` UTF-8 bytes (`413 payload_too_large`), stored byte for byte;
    `reply_to_message_id` a message of the same thread (`not_in_thread`, the same for an unknown
    id); at most `message.max_mentions` distinct handles (`too_many_mentions`).
@@ -148,6 +152,10 @@ Canonical hash (`client_payload_sha256`): SHA-256 over `bothy-msg-v1`, then cont
 content, reply target and the attachment ids joined by `,`, each as `uvarint(length)` and bytes.
 The context is `thread:<id>` for `createMessage` and
 `new-thread:<channel>|<parent>|<title>|<sorted tag ids>` for the first message of `createThread`.
+A request with `components` or `run_id` uses `bothy-msg-v2` (M2-15, D-M2-15-7): the fields of v1
+in v1 order, then `run_id` (empty when absent) and `CheckedCard.Canonical`, each as
+`uvarint(length)` and bytes; every other request keeps `bothy-msg-v1` byte for byte, so a message
+stored before M2-15 still replays.
 
 Mentions (03 messages "Inhaltsformat", 07 section 4.6): `ScanMentions` finds `@` and a handle
 `[a-z0-9][a-z0-9._-]*` (case-insensitive) at the start of the text or after a character that is
@@ -174,8 +182,8 @@ thread by its channel path and the flow of `createMessage` with `CreatedThread`.
 
 Events: `message.created` per message with `message.read` as receive action, scope space,
 channel and thread, resource the message with version 1, `client_msg_id` echoed (not for a system
-line) and the payload `{message: Message}` with empty attachments, reactions and components,
-`pinned: false` and no `my_reactions`; `run_id`, `trigger_state`, `trigger_state_at` and
+line) and the payload `{message: Message}` with empty attachments and reactions, the components of
+a card (M2-15; `[]` for every other message), `pinned: false` and no `my_reactions`; `run_id`, `trigger_state`, `trigger_state_at` and
 `trigger_state_reason` are members only when set, never `null` (ADR 0053), in events and in REST
 alike, and a tombstone keeps them because they are not content (03 `messages`). A payload that is not smaller than
 `sync.event_payload_max_bytes` gets the longest valid UTF-8 prefix of `content_md` that fits,
@@ -247,6 +255,62 @@ language, `message.created` without the `client_msg_id` echo, then `MessagePoste
 is the principal of the request, as for the run anchor, and the author outside a request. It
 returns the written line. Errors: internal outside a unit of work and for a code that is not a
 system code of 03; `not_found` for an unknown thread.
+
+## Cards and components (M2-15)
+
+`runs` owns `message_components`; `messaging` owns `messages` and may not import `runs`. So
+`messaging` declares two source ports in `components.go` and runs implements both in
+`internal/runs/adapters/messagingsource`; `internal/wire` passes the `Source` as
+`MessagingWrites.Components` (nil: every message shows `components: []` and a card is
+`not_enabled`).
+
+- `ComponentWriter.Check(ctx, CardInput)` validates the components of a request without database
+  access (`component.v1`, the server fields) and returns `CheckedCard` with `Canonical`, the input
+  of the request hash, and the components as they will be stored; `ComponentWriter.Attach(ctx,
+  messageID, CheckedCard)` stores them in the ambient unit of work and returns them in position
+  order. Errors are runs' (`400 validation_failed` per finding, `400 invalid` on `/run_id`,
+  `403 feature_disabled`).
+- `ComponentReader.ForMessages(ctx, messageIDs)` returns the components of the given messages in
+  position order, in the ambient transaction when there is one. messaging names only messages that
+  `authorize` checked or that it loaded for an event of the same transaction (07 7.4 rule 1).
+
+Card rules of `createMessage` (`cards.go` `cardRules`, after the decoder, D-M2-15-5): non-empty
+`components` require `kind = card` (`invalid` on `/kind`); `kind = card` requires a component
+(`required` on `/components`); only agents send cards (people `invalid` on `/components`, apps
+`not_enabled` until M2-25); `run_id` is accepted only with `kind = card` (`not_enabled` otherwise
+until M2-19); `content_md` keeps the rule of M1-56. Then `ComponentWriter.Check` and the size rule:
+the largest `message.updated` payload of the card (every component disabled, used and expiring,
+`reply_to_message_id`, `edited_at`, pinned, the most distinct reactions of the longest symbol,
+`message.max_mentions` mentions, the author with the longest handle and display name and an
+avatar), with an empty content, `content_truncated` and the longest form of every ID and number,
+built from configured bounds only (D-M2-15-28), must fit
+`sync.event_payload_max_bytes`, else `too_long` on `/components`, because components cannot be cut
+(04 section 2.2 rule 2; D-M2-15-26). `Messages.CardFits` checks the same reserve for
+`updateComponent` after a new definition is written. In the unit of work the
+message row is inserted first, then `Attach`, then `message.created` with the components is
+appended and `MessagePosted` is published (in that order, D-M2-05-3); `201` carries them, a replay `200` the current ones. `messages.run_id` stays NULL for a
+card (D-M2-15-6).
+
+Port methods for runs (none authorizes; runs decided):
+
+- `LockCard(ctx, messageID)` locks the message row (`SELECT ... FOR UPDATE`, no visibility
+  predicate) in the ambient unit of work and returns `CardFacts` (place, author and its kind,
+  kind, `Deleted`, `Version`); `not_found` for an unknown message, internal outside a unit of work.
+- `ComponentsChanged(ctx, messageID)` raises `messages.version` by one and appends
+  `message.updated` with the representation of the card, its current components included; the
+  caller holds the lock of `LockCard`. It returns the new version; internal outside a unit of work
+  and for a missing or deleted card (D-M2-15-1, 02 section 4.7).
+- `PrincipalOf(ctx, principalID)` returns the `PrincipalRef` of a principal the way
+  `TriggerMessageOf` returns an author: `triggered_by` of `agent.invocation` for a run an
+  interaction opened (D-M2-15-23).
+
+Representation: a new card's `201` answer and its `message.created` carry the components that
+`Attach` returned; every other builder of `Message` (a replay of `createMessage`, `getMessage`,
+`listThreadMessages`, `updateMessage`, the payloads of `message.updated`) fills `components`
+through `decorate` with one `ForMessages` call per answer or page, never one per message, and only
+for live cards; every other message, and every tombstone, has `components: []`.
+`Component` carries no form values (they live only in `interactions`), so no `message.*` event
+carries them.
 
 ## Reading (M1-57)
 
@@ -505,7 +569,7 @@ Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContex
 - Löschen leert den Inhalt und schwärzt die Nutzlast der Ereignisse in derselben Transaktion (03, 6.5).
 - Eine Erwähnung eines Prinzipals ohne Leserecht wird gespeichert, löst aber nichts aus (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59, M1-60 and D-M3-11-1 to D-M3-11-10.
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59, M1-60, D-M3-11-1 to D-M3-11-10 and D-M2-15-1 to D-M2-15-25.
 
 ## Kapitel
 

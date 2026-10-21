@@ -8,10 +8,11 @@
 -- name: InsertRun :one
 -- The conflict target names the predicate of runs_thread_active_key: a thread with an active run
 -- gets no second one (R-DM-14), and no row comes back.
-INSERT INTO runs (id, thread_id, agent_id, trigger_kind, triggering_message_id, triggered_by, state, version,
-    billing_mode_expected, invocation_jti, queued_at)
+INSERT INTO runs (id, thread_id, agent_id, trigger_kind, triggering_message_id, triggering_interaction_id, triggered_by, state,
+    version, billing_mode_expected, invocation_jti, queued_at)
 VALUES (sqlc.arg(id), sqlc.arg(thread_id), sqlc.arg(agent_id), sqlc.arg(trigger_kind), sqlc.narg(triggering_message_id),
-    sqlc.arg(triggered_by), 'queued', 1, sqlc.arg(billing_mode_expected), sqlc.arg(invocation_jti), sqlc.arg(queued_at))
+    sqlc.narg(triggering_interaction_id), sqlc.arg(triggered_by), 'queued', 1, sqlc.arg(billing_mode_expected),
+    sqlc.arg(invocation_jti), sqlc.arg(queued_at))
 ON CONFLICT (thread_id) WHERE state IN ('queued', 'running', 'waiting_input') DO NOTHING
 RETURNING *;
 

@@ -58,6 +58,15 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   and the Fake-Host (`test/terminal/fakehost`): `start`, a `data` frame with a canary input
   (content of the session's scope, which no observer reads), a `resize`, the Fake-Host's `data`
   frame with a canary output, and `close`. `Scenario.TerminalIO` keeps the positive controls.
+  `scenario_components.go` drives the run lifecycle (M2-09) and components and interactions
+  (M2-15): a message of Alex in Support/Allgemein opens a run of Lotse, which takes the invocation
+  token from its consumer (`pollAgentEvents`), starts the run, posts a card bound to it with a
+  button, a select and a form whose labels are canaries and waits for input; Alex chooses an
+  option, submits the form with canary values (`201`) and a canary choice outside `choices`
+  (`400`); Robin gets `404`; Lotse takes `interaction.created` from its consumer, renews the token
+  and resumes the run, answers with a canary `response.text`, relabels the button without
+  `If-Match` (`428`) and with it (`200`) and finishes the run; the owner cancels the run of Lotse
+  in Support/Eskalation.
 
 ## Sinks
 
@@ -94,6 +103,16 @@ only the settings version in its events. Error records name their operation, so 
 Alex (reads Support without `manage`) is an observer with gateway, `listEvents` and `getSnapshot`;
 the pages of the operator Lotse are foreign records too.
 
+Component form values (M2-15) are `content` of the scope `formScope`, which only Lotse, the
+card's agent, reads: they may appear in `interaction.created` of Lotse's consumer and otherwise
+only in the success bodies of `createInteraction` to Alex and of
+`respondToInteraction` to Lotse (no sink captures them); Sam reads the card's channel and still
+may not see them. The canary `response.text` is `content` of a scope no observer reads
+(`respondToInteraction` writes no event). Labels, title, placeholder and option labels of the
+card are `content` of Support/Allgemein. The events of Lotse's consumer are foreign records
+without their `invocation_token`, the agent's own credential of the delivery; the tokens are
+secrets and may appear nowhere.
+
 Echo fields (ruling M1-69/2) are the fields of an error response the contract returns to the
 caller: `current` of `version_conflict` and `base_version_conflict` (06 "Errors" item 3, the
 representation the caller may read) and the `pointer` of an `unknown_member` error, which names
@@ -111,8 +130,9 @@ UUID text and as 32 hex digits. Texts shorter than eight characters are not sear
 ## Adding an operation
 
 Call the new operation in the step of its area (`scenario_chat.go`, `scenario_admin.go`,
-`scenario_auth.go`, `scenario_apps.go`, `scenario_files.go`) with `sc.Reg.New(...)` in every free-text input, the
-scope of the channel or space it belongs to, and the expected status. An operation the scenario
+`scenario_auth.go`, `scenario_apps.go`, `scenario_files.go`, `scenario_components.go`) with
+`sc.Reg.New(...)` in every free-text input, the scope of the channel or space it belongs to, and
+the expected status. An operation the scenario
 cannot call goes into `Exempt` with its reason; the expected list is empty.
 
 ## Not covered
@@ -123,8 +143,8 @@ cannot call goes into `Exempt` with its reason; the expected list is empty.
   of the server, the standard logger or slog.
 - Texts shorter than eight characters: six-digit TOTP codes are registered, but would match
   unrelated digits.
-- File names, transcripts, search terms, push tokens, component form values and tool arguments:
-  their tickets in M2 and M3 extend the scenario (channel prompts and skill references since
-  M2-02).
+- Transcripts, search terms, push tokens and tool arguments: their tickets in M2 and M3 extend
+  the scenario (channel prompts and skill references since M2-02, file names since M3-03,
+  component form values since M2-15).
 - The `current` member of a 412 and the `pointer` of `unknown_member` are judged as echoes to the
   caller, not as leaks (ruling M1-69/2).

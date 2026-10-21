@@ -19,7 +19,7 @@ part 'component.g.dart';
 /// * [id] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [customId]
 /// * [type]
-/// * [definition] - Schema `component.v1` (label, style, options, form fields).
+/// * [definition] - Schema `component.v1` (09, 11.1) as stored, with the defaults applied (button `style`, select `min_values` and `max_values`, field `required`).
 /// * [position]
 /// * [singleUse]
 /// * [requiredCapability]
@@ -43,7 +43,7 @@ abstract class Component implements Built<Component, ComponentBuilder> {
   ComponentType get type;
   // enum typeEnum {  button,  select,  form,  };
 
-  /// Schema `component.v1` (label, style, options, form fields).
+  /// Schema `component.v1` (09, 11.1) as stored, with the defaults applied (button `style`, select `min_values` and `max_values`, field `required`).
   @BuiltValueField(wireName: r'definition')
   BuiltMap<String, JsonObject?> get definition;
 

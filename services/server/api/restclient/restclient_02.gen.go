@@ -16,6 +16,44 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CompleteStepUpWithPasskeyWithBody Confirm step-up with a passkey
+//
+// Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
+func (c *Client) CompleteStepUpWithPasskeyWithBody(ctx context.Context, params *CompleteStepUpWithPasskeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpWithPasskeyRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteStepUpWithPasskey Confirm step-up with a passkey
+//
+// Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
+func (c *Client) CompleteStepUpWithPasskey(ctx context.Context, params *CompleteStepUpWithPasskeyParams, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpWithPasskeyRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // StepUpWithPasswordWithBody Console step-up with password and TOTP
 //
 // Takes any type of body and a specified content type.

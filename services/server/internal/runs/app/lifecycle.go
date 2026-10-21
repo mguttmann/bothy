@@ -33,7 +33,10 @@ type OpenCmd struct {
 	// ThreadID is the target thread; AgentID the agent; TriggeredBy the person who triggered;
 	// TriggeringMessageID the message whose trigger_state follows the run (zero for none).
 	ThreadID, AgentID, TriggeredBy, TriggeringMessageID ids.ID
-	// TriggerKind is message (command and interaction come with M2-16 and M2-15).
+	// TriggeringInteractionID is the interaction of trigger_kind interaction (M2-15); zero for
+	// every other kind.
+	TriggeringInteractionID ids.ID
+	// TriggerKind is message or interaction (M2-15); command comes with M2-16.
 	TriggerKind string
 	// BillingModeExpected is the agent's billing mode now (ruling D-M2-05-5).
 	BillingModeExpected string
@@ -113,13 +116,14 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 	if err := needUnit(ctx, "Open"); err != nil {
 		return runs.RunSummary{}, err
 	}
-	if cmd.TriggerKind != triggerKindMessage || cmd.ThreadID.IsZero() || cmd.AgentID.IsZero() || cmd.TriggeredBy.IsZero() {
-		return runs.RunSummary{}, errs.New(errs.CodeInternalError, "runs: Open needs a thread, an agent, a person and the trigger kind message")
+	if !validOpen(cmd) {
+		return runs.RunSummary{}, errs.New(errs.CodeInternalError,
+			"runs: Open needs a thread, an agent, a person and the trigger kind message or interaction with its object")
 	}
 	row, inserted, err := s.d.Repo.InsertRun(ctx, NewRun{
 		ID: ids.New(), ThreadID: cmd.ThreadID, AgentID: cmd.AgentID, TriggeredBy: cmd.TriggeredBy, TriggerKind: cmd.TriggerKind,
-		TriggeringMessageID: cmd.TriggeringMessageID, BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(),
-		QueuedAt: s.now(),
+		TriggeringMessageID: cmd.TriggeringMessageID, TriggeringInteractionID: cmd.TriggeringInteractionID,
+		BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
 	})
 	if err != nil {
 		return runs.RunSummary{}, err
@@ -154,6 +158,22 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 		return runs.RunSummary{}, err
 	}
 	return sum, nil
+}
+
+// validOpen checks the shape of an OpenCmd: a thread, an agent and a person; trigger_kind message
+// without an interaction, or interaction with its interaction and without a message (03 runs, the
+// check on the triggering_* columns).
+func validOpen(cmd OpenCmd) bool {
+	if cmd.ThreadID.IsZero() || cmd.AgentID.IsZero() || cmd.TriggeredBy.IsZero() {
+		return false
+	}
+	switch cmd.TriggerKind {
+	case triggerKindMessage:
+		return cmd.TriggeringInteractionID.IsZero()
+	case triggerKindInteraction:
+		return !cmd.TriggeringInteractionID.IsZero() && cmd.TriggeringMessageID.IsZero()
+	}
+	return false
 }
 
 // activeExists returns the ActiveRunExistsError of a thread whose insert met the partial unique

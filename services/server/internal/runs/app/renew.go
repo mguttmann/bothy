@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -108,6 +109,11 @@ func (s *Service) renewChecked(ctx context.Context, row RunRow, c tokenClaims, w
 	if err != nil {
 		return renewResult{}, err
 	}
+	if tr.gone {
+		// The interaction of the token no longer exists (its card was deleted, M2-15): the token
+		// names a trigger that cannot be checked again, so it is not renewed.
+		return renewResult{}, errs.New(errs.CodeInvocationTokenInvalid, "").WithReason("invalid")
+	}
 	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{row.AgentID})
 	if err != nil {
 		return renewResult{}, err
@@ -125,6 +131,7 @@ func (s *Service) renewChecked(ctx context.Context, row RunRow, c tokenClaims, w
 		Kind: authorize.ResourceThread, ID: row.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, OwnerID: info.CreatedBy,
 		Invoke: &authorize.InvokeFacts{AgentID: row.AgentID, TriggerOrigin: tr.origin, MentionsAgent: tr.mentions,
 			ActiveRunAgentID: row.AgentID, NewThread: tr.newThread},
+		Interaction: tr.facts,
 	}
 	d, err := s.d.Authorizer.Authorize(authorize.WithPermissionVersion(authorize.Filter(ctx), version), actor.Recheck(tr.person),
 		authorize.ActionAgentInvoke, r)
@@ -176,10 +183,37 @@ func (s *Service) refuseRenewal(ctx context.Context, row RunRow, eventType strin
 	return renewResult{committed: errs.New(errs.CodeAgentInvocationDenied, "").WithReason(reason), handle: handle, reason: reason}, nil
 }
 
+// renewalInteraction is the delivery an interaction token came with (M2-15, D-M2-15-22):
+// agent.invocation for the interaction that opened the run (its payload names the interaction,
+// also once the card was deleted), interaction.created with its interaction and run otherwise.
+func renewalInteraction(in runs.DeliveryInput, row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, error) {
+	ix, err := ids.Parse(c.InteractionID)
+	if err != nil || ix.IsZero() {
+		return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: an interaction token without its interaction")
+	}
+	if row.TriggerKind == triggerKindInteraction && (row.TriggeringInteractionID == ix || row.TriggeringInteractionID.IsZero()) {
+		p, err := json.Marshal(struct {
+			InteractionID string `json:"interaction_id"`
+		}{ix.String()})
+		if err != nil {
+			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
+		}
+		in.Type, in.Payload = domain.EventAgentInvocation, p
+		return in, nil
+	}
+	p, err := json.Marshal(map[string]map[string]string{"interaction": {"id": ix.String(), "run_id": row.ID.String()}})
+	if err != nil {
+		return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
+	}
+	in.Type, in.ResourceKind, in.ResourceID, in.Payload = domain.EventInteractionCreated, resourceInteraction, ix, p
+	return in, nil
+}
+
 // renewalInput is the delivery the presented token came with, rebuilt from its claims for the
 // resolver of the delivery check: trigger_kind message is agent.invocation, followup is
-// agent.followup with its message. interaction and command come with M2-15 and M2-16; until then
-// their tokens are not renewed (internal error, nothing issued).
+// agent.followup with its message; interaction (M2-15) is agent.invocation for the interaction
+// that opened the run and interaction.created for any other interaction of the run. command comes
+// with M2-16; until then its tokens are not renewed (internal error, nothing issued).
 func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, error) {
 	in := runs.DeliveryInput{AgentID: row.AgentID, ResourceKind: resourceRun, ResourceID: row.ID}
 	//exhaustive:ignore // interaction, command and autocomplete are not renewed until M2-15 and M2-16 (default).
@@ -196,6 +230,8 @@ func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, er
 			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the follow-up of a renewal")
 		}
 		in.Type, in.Payload = domain.EventAgentFollowup, p
+	case domain.TriggerInteraction:
+		return renewalInteraction(in, row, c)
 	default:
 		return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: no renewal for the trigger kind of this token yet")
 	}

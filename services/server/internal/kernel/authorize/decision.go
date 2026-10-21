@@ -68,6 +68,9 @@ const (
 	reasonI6Violation     Reason = "i6_violation"
 	reasonHostNotActive   Reason = "host_not_active"
 	reasonTokenInvalid    Reason = "invocation_token_invalid"
+	// reasonComponentInactive is a component that is not active, has expired or belongs to an
+	// ended run (M2-15).
+	reasonComponentInactive Reason = "component_inactive"
 )
 
 // terminalReasons are the reasons of forbidden that answer 403 terminal_denied, with the reason of
@@ -96,6 +99,15 @@ var terminalReasons = map[Reason]string{
 //     profile_unknown, session_limit); host_not_active gives 409 host_unavailable without one;
 //   - forbidden with invocation_token_invalid (M2-09): 403 invocation_token_invalid with Detail,
 //     the token verdict, as reason;
+//   - forbidden with component_inactive (M2-15): 409 component_used without the reason, which
+//     stays in the audit, so a lost race answers the same whether authorize or the single-use
+//     lock decided (brief M2-15 design note 8 d);
+//   - forbidden with a reason of the agent.invoke guard (M2-15): origin_not_human,
+//     agent_not_reachable, billing_mode_personal_not_holder, tool_class_owner_only,
+//     project_not_ready, run_active and run_active_other_agent give 403 agent_invocation_denied
+//     with the reason; every other reason of interaction.create, component.update and
+//     interaction.respond (level_insufficient, capability_missing, component_restricted,
+//     subject_kind_not_allowed, not_self, view_as_read_only) stays 403 forbidden with the reason;
 //   - invariant_violation: 409 with the reason as code (i1_violation, i6_violation, last_owner,
 //     billing_mode_mismatch, tool_class_mismatch) and the reason extension.
 //
@@ -115,6 +127,9 @@ func (d Decision) Err() error {
 		}
 		if d.Reason == reasonTokenInvalid {
 			return errs.New(errs.CodeInvocationTokenInvalid, "").WithReason(d.Detail)
+		}
+		if d.Reason == reasonComponentInactive {
+			return errs.New(errs.CodeComponentUsed, "")
 		}
 		code, ok := forbiddenCodes[d.Reason]
 		if !ok {
@@ -145,6 +160,16 @@ var forbiddenCodes = map[Reason]errs.Code{
 	reasonChannelReadOnly: errs.CodeChannelReadOnly,
 	// An archived channel or space is read-only for everyone (07 section 4.5, M1-53).
 	reasonChannelArchived: errs.CodeChannelReadOnly,
+	// The guard of agent.invoke (05 section 5 points 1 to 5, 7 and 8), also on interaction.create
+	// (brief M2-15 design note 8 d): the person may use the channel, but the agent may not be
+	// triggered now.
+	"origin_not_human":                 errs.CodeAgentInvocationDenied,
+	"agent_not_reachable":              errs.CodeAgentInvocationDenied,
+	"billing_mode_personal_not_holder": errs.CodeAgentInvocationDenied,
+	"tool_class_owner_only":            errs.CodeAgentInvocationDenied,
+	"project_not_ready":                errs.CodeAgentInvocationDenied,
+	"run_active":                       errs.CodeAgentInvocationDenied,
+	"run_active_other_agent":           errs.CodeAgentInvocationDenied,
 }
 
 // revokedReasons are the reasons of unauthenticated that answer session_revoked.

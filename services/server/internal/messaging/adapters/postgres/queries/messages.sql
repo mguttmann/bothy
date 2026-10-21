@@ -72,3 +72,22 @@ WHERE id = @id AND origin = 'human'
 RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
     silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at;
+
+-- name: LockCardMessage :one
+-- The card message of a component change locked by runs (M2-15, Messages.LockCard): runs
+-- authorized the interaction or the component change on its path before, or a job or the end of a
+-- run names it; the lock order is threads, runs, messages, then message_components.
+SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+FROM messages WHERE id = @id FOR UPDATE;
+
+-- name: RaiseMessageVersion :one
+-- A change of the components of the locked card (M2-15, Messages.ComponentsChanged): the next
+-- version, so message.updated carries a new resource version (03 messages.version "state
+-- change").
+UPDATE messages SET version = version + 1
+WHERE id = @id
+RETURNING id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
+    system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at;

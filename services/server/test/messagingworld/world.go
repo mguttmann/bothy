@@ -351,7 +351,7 @@ func build(t *testing.T, subscribe Subscribe, personal bool, notifyCfg *notifyap
 	mcfg := messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax,
 		TemplateNameMaxChars: TemplateNameMax, TemplateMaxPerScope: TemplateMax,
 		ListContentMaxBytes: ListContentMax, PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax,
-		EmojiMaxBytes: EmojiMax, MaxDistinctReactions: MaxDistinctReactions, MaxPinsPerThread: MaxPins}
+		EmojiMaxBytes: EmojiMax, MaxDistinctReactions: MaxDistinctReactions, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: MaxPins}
 	for _, o := range opts {
 		o(&mcfg)
 	}
@@ -448,7 +448,7 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 		QueuedMaxAge: 48 * time.Hour,
 		ClockLeeway:  30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
 		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000,
-		EventPayloadMaxBytes: 65536}, pool, uow, az,
+		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, EventPayloadMaxBytes: 65536, MaxContentBytes: 4096}, pool, uow, az,
 		wire.RunsDeps{Events: writes.Events, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Expiry: noExpiry{}}, w.Clock, log)
 	if err != nil {
 		w.t.Fatal(err)

@@ -242,7 +242,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | int | `16384` | Größe von `run_steps.detail` | aktiv |
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | int | `2000` | gespeicherte Schritte je Lauf | aktiv |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | ohne Fortschritt: Stillstandshinweis | geplant (M2) |
-| `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | Ablauf einer Komponente ohne eigene Angabe | geplant (M2) |
+| `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server | duration | `24h` | Ablauf einer Komponente ohne eigene Angabe | aktiv |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server |  | `5` | danach wird eine Push-Registrierung deaktiviert | geplant (M3) |
 | `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | leer | erlaubte Ziel-Hosts für ausgehende Webhooks | aktiv |
 | `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | int | `20` | danach wird ein Abo deaktiviert | aktiv |
@@ -423,9 +423,9 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 | `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server |  | `25` | Vorschläge je Antwort | geplant (M2) |
 | `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | int | `100` | Befehle je Agent oder App | aktiv |
 | `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | int | `100` | Länge einer Beschreibung | aktiv |
-| `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server |  | `25` | Komponenten je Nachricht | geplant (M2) |
-| `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server |  | `100` | Länge von `custom_id` | geplant (M2) |
-| `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server |  | `10` | Felder je Formular | geplant (M2) |
+| `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server | int | `25` | Komponenten je Nachricht | aktiv |
+| `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server | int | `100` | Länge von `custom_id` | aktiv |
+| `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server | int | `10` | Felder je Formular | aktiv |
 | `project.binding_text_max_chars` | `BOTHY_PROJECT__BINDING_TEXT_MAX_CHARS` | Server | int | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) | aktiv |
 | `agent.session_ref_max_bytes` | `BOTHY_AGENT__SESSION_REF_MAX_BYTES` | Server | int | `1024` | longest `external_session_ref` and longest `model` of a session in bytes (bind, report, `run.start`; over it `too_long`); the maximum `2048` keeps an entry of the unique index on `(agent_id, external_session_ref)` within the PostgreSQL B-tree entry limit of 8 kB pages, so an over-long reference is a field error, never an internal error | aktiv |
 | `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | list(string) | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer | aktiv |

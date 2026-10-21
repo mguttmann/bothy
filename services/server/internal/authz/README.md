@@ -206,7 +206,7 @@ and its ticket appends the function to `moduleRegistrations` in `internal/wire/a
 3. The rights version (pinned, request memo, or `instance.Versions`), the snapshot entry from the cache, the liveness checks (status, session, device, token, installation) and the pending rule (`principal_pending`, `device_pending`; `device.list` only for the own device).
 4. The path is resolved fresh from `StructureSource` (thread, channel, space; a grant's target; a host has no path). A missing object is `not_found no_grant`; a hint that contradicts the structure is an internal error.
 5. The effective rights on the path (`domain.Effective`): dm participation, owner, the highest level and union of capabilities of instance, space and channel grants, the operator rule, the limits of agents and apps; then the intersections with "view as" and acting for.
-6. `domain.Decide`: visibility per resource kind (D4), the requirement with the reason of the deciding atom, the app scope (`domain/scopes.go`), the read-only channel, "view as" is read-only, step-up (`auth.step_up_max_age`), the guards of `agent.invoke`, `grant.create`, `grant.revoke` and `token.create` (M1-44: a personal token only for the person itself, else `forbidden not_self`; the application layer reads the holder's kind from the principal source into `domain.TokenFacts`). The requirement of `token.create` names `owner` before `self`, so a caller with neither right is refused with `owner_only` for an agent or app holder (SR5: the owner's personal token has no owner role) and with `not_self` for another person.
+6. `domain.Decide`: visibility per resource kind (D4), the requirement with the reason of the deciding atom, the app scope (`domain/scopes.go`), the read-only channel, "view as" is read-only, step-up (`auth.step_up_max_age`), the guards of `agent.invoke` (also on `interaction.create`, M2-15), `grant.create`, `grant.revoke` and `token.create` (M1-44: a personal token only for the person itself, else `forbidden not_self`; the application layer reads the holder's kind from the principal source into `domain.TokenFacts`). The requirement of `token.create` names `owner` before `self`, so a caller with neither right is refused with `owner_only` for an agent or app holder (SR5: the owner's personal token has no owner role) and with `not_self` for another person.
 7. The check is recorded in the request check log; outside filter mode every denial goes to `auditing.Recorder.RecordDenial` (aggregated) and every error to `RecordDetached` with decision `error`. A recorder failure is logged and never changes the decision.
 
 `Scope(ctx, p, a)` serves list actions whose requirement is read on a channel path or a space: it builds the visible channels, spaces, fully visible spaces and the instance-wide flag per request from the snapshot and the current structure (07 sections 7.2 and 7.4) and memoises them in the request memo only.
@@ -343,9 +343,63 @@ connections carry no binding (D-M2-14). Tests: `app/actingfor_test.go`,
 `app/reference_sr9_test.go` (AZ-P8 dimension, `TestAZP11_ActingForProperty`),
 `domain/actingfor_test.go`, `BenchmarkAuthorizeCachedActingFor`.
 
+### Interactions (M2-15)
+
+`interaction.create` is no longer deferred (removed from `domain/testdata/deferred_actions.golden`):
+its row in `domain/requirements_table.go` is `AtLeast(LevelTrigger)` ("trigger") on the resource
+`component`, a channel path kind, so a component resolves through its `ThreadID` and a person
+without read on the channel gets `not_found`. The descriptor carries `Invoke` (the card's author as
+`AgentID`, which must equal `OwnerID`, origin `human`, the agent of the thread's active run) and
+`Interaction` (`authorize.InteractionFacts`, stage `accept`, read from the locked rows); missing
+facts, another stage, an `AgentID` other than the author and a card of an app (`OwnerKind = app`,
+until M2-25) are internal errors, and so is a state, `restricted_to` or capability outside its list.
+
+The guard (`domain/guards.go` `invokeGuard`, `domain/interaction.go`) is the guard of `agent.invoke`
+with these additions, in this order (brief M2-15 design note 8 b):
+
+1. `origin_not_human`; 2. and 3. `agent_not_reachable`, where the mention rule counts as met for
+   the operator of the thread whatever the mention switches say (the card is the agent's own
+   address to the person); a guest agent still needs `allow_mentioned_agents`, its own `write` and
+   billing mode `organization`; 4. `billing_mode_personal_not_holder` (I2); 5.
+   `tool_class_owner_only` (SR2);
+6. at stage `accept`: `component_inactive` for a state other than `active`, an expiry at or before
+   the request time, or a run that is no longer active; at both stages: `capability_missing` when
+   `required_capability` is not among the effective capabilities on the path,
+   `component_restricted` for `restricted_to = run_starter` when the principal is neither the run's
+   starter nor an effective owner, and for `restricted_to = owner` when it is not an effective owner
+   (owners hold every capability and pass every restriction);
+7. `project_not_ready`, `dev_environment_not_ready`;
+8. `run_active_other_agent` when the thread's active run belongs to another agent; at stage
+   `accept` `run_active` for a component without a run while the card's agent has an active run.
+
+Stage `deliver` is `agent.invoke` with `Interaction` set (the re-check before the delivery an
+interaction caused, design note 8 c): it skips the state check and `run_active` and evaluates the
+capability and the restriction with the rights of that moment. `agent.invoke` with interaction
+facts of another stage is an internal error; without them it behaves as before (SR2, then the
+project rules, then `run_active_other_agent`). Denials are audited by the normal flow (07 4.2).
+
+`component.update` and `interaction.respond` keep `Any(AgentSelf, AppSelf)` with `OwnerID` the
+card's author: the author is allowed, a person gets `forbidden subject_kind_not_allowed`, another
+agent `not_found no_grant` without read on the channel and `forbidden not_self` with read.
+
+`Decision.Err()` (design note 8 d): `forbidden component_inactive` answers `409 component_used`
+without a reason (the reason stays in the audit, so a lost race answers the same whether
+`authorize` or the single-use lock decided); `origin_not_human`, `agent_not_reachable`,
+`billing_mode_personal_not_holder`, `tool_class_owner_only`, `project_not_ready`, `run_active` and
+`run_active_other_agent` answer `403 agent_invocation_denied` with the reason, for `agent.invoke`
+as well; `level_insufficient`, `capability_missing`, `component_restricted`,
+`subject_kind_not_allowed`, `not_self` and `view_as_read_only` stay `403 forbidden` with the reason,
+`channel_read_only` and `channel_archived` `403 channel_read_only`, `not_found` `404`.
+
+Tests: `domain/interaction_test.go` (`TestInteractionCreate_RequirementNotDeferred`,
+`TestInteractionCreate_ReasonOrder`, `TestInteractionCreate_OwnerPassesRestrictions`,
+`TestInteractionCreate_MentionRuleMet`, `TestInteractionCreate_StageDeliver`),
+`app/interaction_test.go` (`TestAZ_M42_Decision`, `TestAZ_M43_Decision`, the world of 07 10) and
+`kernel/authorize` `TestDecisionMapping_Interactions`.
+
 ### How a module builds a `Resource`
 
-Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `agent_session.reset` and `agent_session.bind`, `TargetThreadID` for `agent_session.bind`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `agent_session.reset`, `agent_session.bind` and `interaction.create`, `TargetThreadID` for `agent_session.bind`, `Interaction` for `interaction.create` and for `agent.invoke` at stage `deliver`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
 
 ### Files (M3-03)
 

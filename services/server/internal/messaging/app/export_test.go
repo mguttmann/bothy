@@ -79,7 +79,7 @@ func exportService(t *testing.T, store app.Store, az authorize.Authorizer, rec a
 	t.Helper()
 	svc, err := app.New(app.Config{MaxContentBytes: 100, MaxMentions: 1, EventPayloadMaxBytes: 100, TemplateNameMaxChars: 10,
 		TemplateMaxPerScope: 5, ListContentMaxBytes: 4, PageSizeDefault: 1, PageSizeMax: pageSize, EmojiMaxBytes: 64,
-		MaxDistinctReactions: 20, MaxPinsPerThread: 50},
+		MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50},
 		app.Deps{Store: store, UoW: runUoW{}, Authorizer: az, Events: noEvents{}, Threads: oneThread{info: chat.ThreadInfo{}},
 			Directory: anyone{}, Log: slog.New(logs), Errors: cnt, Cursors: noCursors{}, Redactor: struct{ eventlog.Redactor }{},
 			Audit: rec, Symbols: anySymbol{}, Credentials: cred})
