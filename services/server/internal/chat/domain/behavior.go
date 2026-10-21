@@ -101,24 +101,24 @@ func ValidateBehavior(b Behavior, l BehaviorLimits) []errs.FieldError {
 	return out
 }
 
-// ChangedFields returns the codes of the fields that differ between old and new, in the closed
+// ChangedFields returns the codes of the fields that differ between old and next, in the closed
 // order require_mention, thread_require_mention, free_response, auto_thread,
 // allow_mentioned_agents, history_backfill_limit, prompt, skills. The prompt compares byte by
 // byte, the skills in order; nil and empty skill lists are equal.
-func ChangedFields(old, new Behavior) []string {
+func ChangedFields(old, next Behavior) []string {
 	var out []string
 	for _, f := range []struct {
 		code    string
 		changed bool
 	}{
-		{ChangedRequireMention, old.RequireMention != new.RequireMention},
-		{ChangedThreadRequireMention, old.ThreadRequireMention != new.ThreadRequireMention},
-		{ChangedFreeResponse, old.FreeResponse != new.FreeResponse},
-		{ChangedAutoThread, old.AutoThread != new.AutoThread},
-		{ChangedAllowMentionedAgents, old.AllowMentionedAgents != new.AllowMentionedAgents},
-		{ChangedHistoryBackfillLimit, old.HistoryBackfillLimit != new.HistoryBackfillLimit},
-		{ChangedPrompt, old.Prompt != new.Prompt},
-		{ChangedSkills, !slices.Equal(old.Skills, new.Skills)},
+		{ChangedRequireMention, old.RequireMention != next.RequireMention},
+		{ChangedThreadRequireMention, old.ThreadRequireMention != next.ThreadRequireMention},
+		{ChangedFreeResponse, old.FreeResponse != next.FreeResponse},
+		{ChangedAutoThread, old.AutoThread != next.AutoThread},
+		{ChangedAllowMentionedAgents, old.AllowMentionedAgents != next.AllowMentionedAgents},
+		{ChangedHistoryBackfillLimit, old.HistoryBackfillLimit != next.HistoryBackfillLimit},
+		{ChangedPrompt, old.Prompt != next.Prompt},
+		{ChangedSkills, !slices.Equal(old.Skills, next.Skills)},
 	} {
 		if f.changed {
 			out = append(out, f.code)
@@ -127,9 +127,9 @@ func ChangedFields(old, new Behavior) []string {
 	return out
 }
 
-// ConfigChanged reports whether the agent configuration changed between old and new: the prompt
+// ConfigChanged reports whether the agent configuration changed between old and next: the prompt
 // or the skills (05 section 6 agent.config_changed; a switch-only change reaches the operator
 // through channel.settings_changed, docs/DECISIONS.md D-M2-02-3).
-func ConfigChanged(old, new Behavior) bool {
-	return old.Prompt != new.Prompt || !slices.Equal(old.Skills, new.Skills)
+func ConfigChanged(old, next Behavior) bool {
+	return old.Prompt != next.Prompt || !slices.Equal(old.Skills, next.Skills)
 }
