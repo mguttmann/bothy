@@ -489,6 +489,32 @@ def test_unknown_exporter_in_overlay_fails(tree: Path) -> None:
     assert len([f for f in found if " local" in f.splitlines()[0]]) == 1 + 2 * len(partners)
 
 
+SMOKE_OVERLAY = Path("infra/compose/test/otel/file.yaml")
+
+
+def test_smoke_overlay_is_validated_with_the_base(tree: Path) -> None:
+    """The overlay "file" of the Compose smoke test (M1-73) runs with the base alone."""
+    edit(tree / SMOKE_OVERLAY, "exporters:\n", "exporters:\n  bogus: {}\n")
+    [single] = findings(tree, "collector")
+    assert single.startswith("base + smoke file: ")
+    assert 'unknown type: "bogus"' in single
+
+
+def test_smoke_overlay_must_exist(tree: Path) -> None:
+    (tree / SMOKE_OVERLAY).unlink()
+    assert findings(tree, "collector") == (f"{SMOKE_OVERLAY} is missing",)
+
+
+def test_smoke_overlay_must_not_redefine_a_base_pipeline(tree: Path) -> None:
+    edit(
+        tree / SMOKE_OVERLAY,
+        "    traces/smoke:\n",
+        "    traces/in:\n      receivers: [otlp]\n      exporters: [nop]\n    traces/smoke:\n",
+    )
+    found = findings(tree, "collector-allowlist")
+    assert f"{SMOKE_OVERLAY} redefines the base pipeline traces/in" in found
+
+
 def test_pair_failure_is_detected(tree: Path) -> None:
     """Each overlay passes alone with the base; only the pair breaks (lists merge by order)."""
     exporters = tree / OTEL / "exporters"
