@@ -11,6 +11,36 @@ documented in this file. The format is based on
 
 ### Added
 
+- Agent sessions per thread (M2-12, AG-17, AG-18, R-AG-02, R-AG-04, R-DM-42): the module
+  `agents` keeps the table `agent_sessions` (migration `00057`, with the FK
+  `runs.agent_session_id -> agent_sessions(id) ON DELETE SET NULL` validated by `00058`) and
+  enables `listAgentSessions`, `resetAgentSession`, `bindAgentSession` and `reportAgentSession`.
+  A thread has at most one current session and an external session (`agent_id`,
+  `external_session_ref`) is current in at most one thread; both are partial unique indexes, and
+  every insert uses `ON CONFLICT DO NOTHING`, so no unique violation reaches a client as 500. The history is an unpaginated list, newest
+  first. A reset ends the current row with `reset` (409 `no_current_session` without one) and
+  leaves an active run on its row; a bind is a compare-and-swap over
+  `expected_current_session_id` (409 `session_changed`) and needs `take_over` for a session
+  current in another thread (409 `session_bound_elsewhere`), where authz checks `trigger` and
+  `agent.invoke` as the second target (`authorize.Resource.TargetThreadID`); both actions are no
+  longer deferred. A report is a compare-and-swap over `agent_sessions.version` with `If-Match`
+  (an absent header means the run has no row yet and the report creates it; otherwise 412
+  `version_conflict` with `current`), `started` only moves forward, and `bind_failed:
+  session_missing` (409 `session_not_bound` without a started row) ends the bound row with
+  `rebind`, starts a new one and writes exactly one system line `agent_session.resume_failed`
+  with the run's agent as author that never reopens a closed thread (migrations `00059` and
+  `00060` add the code to the CHECK of `messages.system_code` and validate it). Every operator
+  invocation carries `session_mode` (`new`, `resume`, `bind`) and, where a row exists,
+  `agent_session`; a guest run has neither. `run.start` with `external_session_ref` creates or
+  attaches the row and sets `runs.agent_session_id` (the 400 `not_enabled` of M2-09 is gone);
+  an imported earlier session binds exactly once at the first trigger, with an allow audit entry
+  `agent_session.bind` (`cause` `import`) and its cost baseline, and fails open; after an
+  operator change the former operator's row ends with `agent_changed` at the next run. Every
+  change of a row appends `agent_session.changed`. New port methods
+  `agents.Sessions.ForInvocation` and `AttachOnStart`, the source `agents.RunSource` (implemented
+  by `runs`), the In-Tx event `agents.SessionAttached` (subscribed by `runs`),
+  `messaging.Messages.AppendSystemLine`, and the configuration key
+  `agent.session_ref_max_bytes`. No new job, metric or problem code.
 - Run document, patches and live box (M2-10, ADR 0025, R-SY-05): the operation `patchRun` and the
   gateway op `run.update` are enabled and call one use case (`run.update`, agent-self,
   `rl.agent_runtime`, no `Idempotency-Key`). The agent of an active run changes its live box with

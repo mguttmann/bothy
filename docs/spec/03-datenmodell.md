@@ -1202,7 +1202,7 @@ Modul: `messaging`.
 | `client_payload_sha256` | `bytea` | nein | | Hash der kanonischen Anfrage; erkennt Wiederverwendung mit anderem Inhalt |
 | `origin` | `text` | nein | | `CHECK (origin IN ('human','agent','app','import','system'))`; nur `human` löst Agenten aus |
 | `kind` | `text` | nein | `'text'` | `CHECK (kind IN ('text','voice','run','card','system'))`; `run` = Anker der Live-Box; `card` = Nachricht mit Komponenten (Rückfrage, Freigabe) |
-| `system_code` | `text` | ja | | `CHECK (system_code IN ('thread.reopened'))`; gesetzt genau bei `kind = 'system'`; Clients bilden die Zeile in ihrer Sprache aus Code und Autor |
+| `system_code` | `text` | ja | | `CHECK (system_code IN ('thread.reopened','agent_session.resume_failed'))`; gesetzt genau bei `kind = 'system'`; Clients bilden die Zeile in ihrer Sprache aus Code und Autor |
 | `content_md` | `text` | nein | `''` | Markdown; Größe bis `message.max_content_bytes`; nach Löschung und bei Systemzeilen leer |
 | `content_format` | `smallint` | nein | `1` | Version des Markdown-Dialekts |
 | `reply_to_message_id` | `uuid` | ja | | Antwort mit Zitat; gleicher Thread |
@@ -1243,7 +1243,12 @@ Aufbewahrung: `content`.
 Löschen leert `content_md`, löscht Anhänge, Revisionen, Erwähnungen, Komponenten, Reaktionen und
 die Anheftung und schwärzt die Nutzlast der zugehörigen Ereignisse (Abschnitt 6.5). Zeile und
 `thread_seq` bleiben. Eine Systemzeile `thread.reopened` schreibt der Server, wenn eine Nachricht
-einen erledigten Thread wieder öffnet; Autor ist die Person, deren Nachricht ihn öffnete.
+einen erledigten Thread wieder öffnet; Autor ist die Person, deren Nachricht ihn öffnete. If the server
+accepts a report `agent_session.report` with `bind_failed` (the session of the run is missing in
+the runtime; fail open according to [09-agenten.md](09-agenten.md), section 9.5 item 4, and
+[22-import-migration.md](22-import-migration.md), section 9 step 5), it writes in the same
+transaction exactly one system line `agent_session.resume_failed`; the author is the agent of the
+run. A system line does not reopen a done thread (R-DM-42).
 
 Inhaltsformat `content_format = 1`: Markdown nach CommonMark 0.31.2
 (https://spec.commonmark.org/0.31.2/, abgerufen 2026-10-10) [belegt], ohne rohes HTML
@@ -3393,6 +3398,7 @@ erDiagram
 | R-DM-39 | Sitzungsbenutzer je Person in `host_session_users`, Name je Rechner eindeutig über alle Zeilen, auch beendete. | Ruling T12: Anmeldedaten eines Sitzungsbenutzers gehören genau einer Person; ein wieder vergebener Name gäbe der nächsten Person die Anmeldungen und Dauerläufer der vorigen ([24-terminal.md](24-terminal.md), Abschnitt 2.2). |
 | R-DM-40 | `terminal_sessions` verweist mit `(host_session_user_id, host_id, user_id)` auf `host_session_users(id, host_id, user_id)`. | Ein Fremdschlüssel nur auf `id` ließe einen Sitzungsbenutzer eines anderen Rechners oder einer anderen Person zu; der Host-Dienst bände einen neuen Namen dann an die falsche Person (D-W-66). |
 | R-DM-41 | `hosts.reported_session_users` hält die gemeldeten Namen der Sitzungsbenutzer mit den Anzeigenamen ihrer Arbeitsordner. | Der Server ordnet nur Namen zu, die der Rechner kennt, und bietet je Person nur ihre eigenen Arbeitsordner an (Rulings T12 und T13; D-W-62, D-W-63). |
+| R-DM-42 | If the server accepts a report `agent_session.report` with `bind_failed`, it writes in the same transaction exactly one system line `agent_session.resume_failed` with the agent of the run as author; system lines do not reopen a done thread. | 09, section 9.5, and 22, section 9, require exactly one system message on fail open, according to R-DM-34 with a code instead of text; the session belongs to the agent, and reopening would write a second system line `thread.reopened` for the same notice (D-W-104). |
 | R-DM-44 | A held agent invocation is recorded in `runs.invocation_held_until`. | Without a flag `runs` cannot tell whether the invocation of a waiting run has already been written; the release on `files.FileFinalized` and the job `runs.invocation_hold_timeout` serialize on the run row and write it exactly once ([04-sync-protokoll.md](04-sync-protokoll.md), section 15.3 step 1, R-SY-20, D-K-G6; D-W-104). |
 | R-DM-47 | `runs.invocation_held_until` is also set while the server transcript of a triggering voice message is `pending`; the release follows the same rules with `voice.transcript_hold_max`. | 04 section 15.3 step 1 and R-SY-20 hold `agent.invocation` until a server transcript is final, and the column already names `voice.transcript_hold_max`, but its rule named only attachments (D-W-108). |
 | R-DM-49 | `auth_sessions` stores "View as person" of a console session in `view_as_user_id` and `view_as_started_at` (console sessions only, both set or both empty); `access.view_as` from a console session sets them in the transaction of its audit entry, `access.view_as.end` or the first request after `authz.view_as_max_duration` clears them with an audit entry of the end. | [07-rechte.md](07-rechte.md) section 9.2 requires state on the console session (target person, start) and operations to start and end it, added to the core contract before PLAN M6-01 builds the console session (D-W-100 extended to M5 and M6). |

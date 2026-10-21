@@ -15,3 +15,4 @@ subscribe identity.DeviceRevoked -> terminal github.com/OWNER/bothy/services/ser
 subscribe identity.SessionEnded -> terminal github.com/OWNER/bothy/services/server/internal/terminal/app.(*Subscribers).OnSessionEnded-fm
 subscribe kernel.AccessChanged -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAccessChanged-fm
 subscribe agents.AgentDisabled -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAgentDisabled-fm
+subscribe agents.SessionAttached -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnSessionAttached-fm

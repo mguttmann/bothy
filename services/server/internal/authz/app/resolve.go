@@ -193,13 +193,7 @@ func (a *Authorizer) tokenAndInvokeFacts(ctx context.Context, s *actingPrincipal
 	if req.Contains(domain.Token()) && r.Token != nil {
 		in.Invocation = invocationFacts(r.Token)
 	}
-	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
-		var err error
-		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
-			return err
-		}
-	}
-	return nil
+	return a.guardFacts(ctx, s, spec.ID, r, res, t, in)
 }
 
 // gather builds the fact bundle of domain.Decide for one call: the effective rights on the path
@@ -405,6 +399,30 @@ func shapeOf(g *authorize.GrantFacts) (domain.GrantShape, domain.Target, error) 
 	}
 	tg := domain.Target{Kind: domain.TargetKind(g.TargetKind), SpaceID: g.TargetSpaceID, ChannelID: g.TargetChannelID, HostID: g.TargetHostID}
 	return domain.GrantShape{SubjectKind: domain.SubjectKind(g.SubjectKind), TargetKind: tg.Kind, Level: lvl, Caps: caps}, tg, nil
+}
+
+// guardFacts fills the invoke facts of an action with the agent.invoke guard (invokeGuarded)
+// whose descriptor carries them; without them Decide refuses the call.
+func (a *Authorizer) guardFacts(ctx context.Context, s *actingPrincipal, action string, r authorize.Resource, res resolved,
+	t time.Time, in *domain.Input) error {
+	if !invokeGuarded(action) || r.Invoke == nil {
+		return nil
+	}
+	var err error
+	in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t)
+	return err
+}
+
+// invokeGuarded reports the actions with the agent.invoke guard: agent.invoke and the session
+// switches agent_session.reset and agent_session.bind (05 section 4.6, brief M2-12 design note 5),
+// whose descriptor carries the invoke facts of the thread's operator. Without them Decide refuses
+// the call as an internal error.
+func invokeGuarded(action string) bool {
+	switch action {
+	case string(authorize.ActionAgentInvoke), string(authorize.ActionAgentSessionReset), string(authorize.ActionAgentSessionBind):
+		return true
+	}
+	return false
 }
 
 // invokeFacts gathers the facts of the agent.invoke guard; inside a structure scope the project

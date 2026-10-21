@@ -1129,12 +1129,13 @@ class AgentRuntimeApi {
   }
 
   /// Report the external session reference and model
-  ///
+  /// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). &#x60;If-Match&#x60; is the compare-and-swap over &#x60;agent_sessions.version&#x60;: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 &#x60;version_conflict&#x60; with &#x60;current&#x60;. 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;session_bound_elsewhere&#x60; (the reference is current in another thread), &#x60;session_changed&#x60; (the thread got another current session) or &#x60;session_not_bound&#x60; (&#x60;bind_failed&#x60; without a started session row).
   ///
   /// Parameters:
   /// * [threadId]
   /// * [agentSessionReport]
   /// * [idempotencyKey] - UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+  /// * [ifMatch] - Optional ETag; when given, a mismatch gives 412 `version_conflict`.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1148,6 +1149,7 @@ class AgentRuntimeApi {
     required String threadId,
     required AgentSessionReport agentSessionReport,
     String? idempotencyKey,
+    String? ifMatch,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1169,6 +1171,7 @@ class AgentRuntimeApi {
       method: r'POST',
       headers: <String, dynamic>{
         if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+        if (ifMatch != null) r'If-Match': ifMatch,
         ...?headers,
       },
       extra: <String, dynamic>{

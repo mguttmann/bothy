@@ -693,6 +693,22 @@ func (stubServer) ListActiveRuns(context.Context, rest.ListActiveRunsRequestObje
 	return nil, nil
 }
 
+func (stubServer) ListAgentSessions(context.Context, rest.ListAgentSessionsRequestObject) (rest.ListAgentSessionsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ResetAgentSession(context.Context, rest.ResetAgentSessionRequestObject) (rest.ResetAgentSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) BindAgentSession(context.Context, rest.BindAgentSessionRequestObject) (rest.BindAgentSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ReportAgentSession(context.Context, rest.ReportAgentSessionRequestObject) (rest.ReportAgentSessionResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateMessage(context.Context, rest.UpdateMessageRequestObject) (rest.UpdateMessageResponseObject, error) {
 	return nil, nil
 }
@@ -994,7 +1010,7 @@ func (stubServer) SubmitClientMetrics(context.Context, rest.SubmitClientMetricsR
 // records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), the threads
 // (M1-55), sending (M1-56), editing and deleting (M1-58), the preferences (M3-18) and the upload
 // sessions with getFile (M3-03), the downloads, tickets and transcripts (M3-05), the avatar and
-// logo operations (M3-10) and the client metrics (M4-31). A handler
+// logo operations (M3-10), the client metrics (M4-31) and the agent sessions (M2-12). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -1189,6 +1205,11 @@ func TestRealTable_Enabled(t *testing.T) {
 		"awaitRunInput":        {"POST /api/v1/runs/{run_id}/await-input", "run.finish", "rl.agent_runtime"},
 		"finishRun":            {"POST /api/v1/runs/{run_id}/finish", "run.finish", "rl.agent_runtime"},
 		"cancelRun":            {"POST /api/v1/runs/{run_id}/cancel", "run.cancel", "rl.trigger"},
+		// M2-12
+		"listAgentSessions":  {"GET /api/v1/threads/{thread_id}/agent-sessions", "agent_session.read", "rl.read"},
+		"resetAgentSession":  {"POST /api/v1/threads/{thread_id}/agent-sessions/reset", "agent_session.reset", "rl.trigger"},
+		"bindAgentSession":   {"POST /api/v1/threads/{thread_id}/agent-sessions/bind", "agent_session.bind", "rl.trigger"},
+		"reportAgentSession": {"POST /api/v1/threads/{thread_id}/agent-sessions/report", "agent_session.report", "rl.agent_runtime"},
 		// M1-58
 		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
 		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},

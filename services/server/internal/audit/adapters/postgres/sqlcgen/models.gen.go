@@ -38,6 +38,25 @@ type AgentConsumerCursor struct {
 	UpdatedAt       pgtype.Timestamptz
 }
 
+type AgentSession struct {
+	ID                   pgtype.UUID
+	ThreadID             pgtype.UUID
+	AgentID              pgtype.UUID
+	ExternalSessionRef   string
+	IsCurrent            bool
+	Started              bool
+	Model                pgtype.Text
+	CumulativeCostMicros int64
+	CostBaselineMicros   int64
+	Currency             string
+	CostIsEstimate       bool
+	DevEnvironmentID     pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+	EndedAt              pgtype.Timestamptz
+	EndReason            pgtype.Text
+	Version              int64
+}
+
 type ApiToken struct {
 	ID          pgtype.UUID
 	PrincipalID pgtype.UUID

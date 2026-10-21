@@ -62,6 +62,9 @@ type Handlers struct {
 	// setAgentBillingMode, setAllAgentsBillingMode, setCredentialHolder and setAgentToolClass
 	// (agents, M1-51).
 	*agentshttp.Agents
+	// AgentSessions implements listAgentSessions, resetAgentSession, bindAgentSession and
+	// reportAgentSession (agents, M2-12).
+	*agentshttp.AgentSessions
 	// Spaces implements listSpaces, createSpace, getSpace, updateSpace, moveSpace, archiveSpace
 	// and putMySidebarSpace (chat, M1-52).
 	*chathttp.Spaces

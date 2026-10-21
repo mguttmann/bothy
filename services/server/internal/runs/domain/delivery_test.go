@@ -206,7 +206,7 @@ func TestInvocationPayload(t *testing.T) {
 		TriggeredBy: domain.PrincipalRefPayload{ID: ids.New().String(), Kind: "user", Handle: "alex", DisplayName: "Alex"},
 		BillingMode: "organization", SettingsVersion: 3,
 	}
-	p, err := domain.InvocationPayload(in)
+	p, err := domain.InvocationPayload(in, domain.DecideSession(true, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,14 +216,20 @@ func TestInvocationPayload(t *testing.T) {
 			t.Errorf("payload carries %s: %s", forbidden, p)
 		}
 	}
+	if m := members(t, p); m["session_mode"] != "new" || m["agent_session"] != nil {
+		t.Errorf("operator run without a row: %s", p)
+	}
 	in.SettingsVersion, in.SpaceID = 0, ids.ID{}
-	p, err = domain.InvocationPayload(in)
+	p, err = domain.InvocationPayload(in, domain.DecideSession(false, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	validateAgainst(t, "AgentInvocationPayload", p)
+	if m := members(t, p); m["session_mode"] != nil || m["agent_session"] != nil {
+		t.Errorf("guest run: %s", p)
+	}
 	in.MessageID = ids.ID{}
-	if _, err := domain.InvocationPayload(in); err == nil {
+	if _, err := domain.InvocationPayload(in, domain.DecideSession(true, nil)); err == nil {
 		t.Error("a payload without the message")
 	}
 	run, thread, msg := ids.New(), ids.New(), ids.New()
@@ -240,5 +246,63 @@ func TestInvocationPayload(t *testing.T) {
 	}
 	if _, err := domain.FollowupPayload(run, ids.ID{}, msg); err == nil {
 		t.Error("a follow-up payload without the thread")
+	}
+}
+
+// members decodes the top-level members of a payload.
+func members(t *testing.T, p []byte) map[string]any {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(p, &m); err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+// TestInvocationPayload_Session (M2-12 design note 9): every mode with its row validates against
+// AgentInvocationPayload with agent_session in schema order before session_mode; the constructor
+// refuses a missing decision, a guest run with a row, and resume or bind without a row.
+func TestInvocationPayload_Session(t *testing.T) {
+	t.Parallel()
+	in := domain.InvocationPayloadInput{
+		RunID: ids.New(), ThreadID: ids.New(), ChannelID: ids.New(), MessageID: ids.New(),
+		TriggeredBy: domain.PrincipalRefPayload{ID: ids.New().String(), Kind: "user", Handle: "alex", DisplayName: "Alex"},
+		BillingMode: "organization",
+	}
+	// The schema AgentSession as agents.SessionJSON writes it; runs/domain never decodes it.
+	raw := json.RawMessage(`{"id":"` + ids.New().String() + `","thread_id":"` + in.ThreadID.String() + `","agent_id":"` + ids.New().String() +
+		`","external_session_ref":"sess-1","is_current":true,"started":true,"model":"model-a",` +
+		`"cost":{"amount_micros":0,"currency":"USD","is_estimate":false},"created_at":"2026-10-14T09:00:00.000Z","version":2}`)
+	for _, c := range []struct {
+		row  *domain.SessionRow
+		mode string
+	}{
+		{&domain.SessionRow{JSON: raw}, "new"},
+		{&domain.SessionRow{JSON: raw, Started: true, Used: true}, "resume"},
+		{&domain.SessionRow{JSON: raw, Started: true}, "bind"},
+	} {
+		p, err := domain.InvocationPayload(in, domain.DecideSession(true, c.row))
+		if err != nil {
+			t.Fatal(err)
+		}
+		validateAgainst(t, "AgentInvocationPayload", p)
+		m := members(t, p)
+		if m["session_mode"] != c.mode || m["agent_session"].(map[string]any)["external_session_ref"] != "sess-1" {
+			t.Errorf("mode %s: %s", c.mode, p)
+		}
+		if a, b := strings.Index(string(p), `"agent_session"`), strings.Index(string(p), `"session_mode"`); a < 0 || a > b {
+			t.Errorf("schema order: %s", p)
+		}
+	}
+	for name, d := range map[string]domain.SessionDecision{
+		"no decision":    {},
+		"guest with row": {Mode: domain.SessionGuest, Row: raw},
+		"resume no row":  {Mode: domain.SessionResume},
+		"bind no row":    {Mode: domain.SessionBind},
+		"unknown mode":   {Mode: "later", Row: raw},
+	} {
+		if _, err := domain.InvocationPayload(in, d); err == nil {
+			t.Errorf("%s: no error", name)
+		}
 	}
 }

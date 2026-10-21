@@ -8,6 +8,9 @@ part of 'message.dart';
 
 const MessageSystemCodeEnum _$messageSystemCodeEnum_threadPeriodReopened =
     const MessageSystemCodeEnum._('threadPeriodReopened');
+const MessageSystemCodeEnum
+_$messageSystemCodeEnum_agentSessionPeriodResumeFailed =
+    const MessageSystemCodeEnum._('agentSessionPeriodResumeFailed');
 const MessageSystemCodeEnum _$messageSystemCodeEnum_unknownDefaultOpenApi =
     const MessageSystemCodeEnum._('unknownDefaultOpenApi');
 
@@ -15,6 +18,8 @@ MessageSystemCodeEnum _$messageSystemCodeEnumValueOf(String name) {
   switch (name) {
     case 'threadPeriodReopened':
       return _$messageSystemCodeEnum_threadPeriodReopened;
+    case 'agentSessionPeriodResumeFailed':
+      return _$messageSystemCodeEnum_agentSessionPeriodResumeFailed;
     case 'unknownDefaultOpenApi':
       return _$messageSystemCodeEnum_unknownDefaultOpenApi;
     default:
@@ -25,6 +30,7 @@ MessageSystemCodeEnum _$messageSystemCodeEnumValueOf(String name) {
 final BuiltSet<MessageSystemCodeEnum> _$messageSystemCodeEnumValues =
     BuiltSet<MessageSystemCodeEnum>(const <MessageSystemCodeEnum>[
       _$messageSystemCodeEnum_threadPeriodReopened,
+      _$messageSystemCodeEnum_agentSessionPeriodResumeFailed,
       _$messageSystemCodeEnum_unknownDefaultOpenApi,
     ]);
 
@@ -35,10 +41,12 @@ class _$MessageSystemCodeEnumSerializer
     implements PrimitiveSerializer<MessageSystemCodeEnum> {
   static const Map<String, Object> _toWire = const <String, Object>{
     'threadPeriodReopened': 'thread.reopened',
+    'agentSessionPeriodResumeFailed': 'agent_session.resume_failed',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
     'thread.reopened': 'threadPeriodReopened',
+    'agent_session.resume_failed': 'agentSessionPeriodResumeFailed',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 

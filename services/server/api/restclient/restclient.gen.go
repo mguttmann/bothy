@@ -305,6 +305,27 @@ func (e AgentInvocationEventType) Valid() bool {
 	}
 }
 
+// Defines values for AgentInvocationPayloadSessionMode.
+const (
+	Bind   AgentInvocationPayloadSessionMode = "bind"
+	New    AgentInvocationPayloadSessionMode = "new"
+	Resume AgentInvocationPayloadSessionMode = "resume"
+)
+
+// Valid indicates whether the value is a known member of the AgentInvocationPayloadSessionMode enum.
+func (e AgentInvocationPayloadSessionMode) Valid() bool {
+	switch e {
+	case Bind:
+		return true
+	case New:
+		return true
+	case Resume:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentInvocationPayloadTriggerKind.
 const (
 	AgentInvocationPayloadTriggerKindCommand     AgentInvocationPayloadTriggerKind = "command"
@@ -452,6 +473,21 @@ const (
 func (e AgentSessionChangedEventType) Valid() bool {
 	switch e {
 	case AgentSessionChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentSessionReportBindFailed.
+const (
+	SessionMissing AgentSessionReportBindFailed = "session_missing"
+)
+
+// Valid indicates whether the value is a known member of the AgentSessionReportBindFailed enum.
+func (e AgentSessionReportBindFailed) Valid() bool {
+	switch e {
+	case SessionMissing:
 		return true
 	default:
 		return false
@@ -2653,12 +2689,15 @@ func (e LoginClient) Valid() bool {
 
 // Defines values for MessageSystemCode.
 const (
-	MessageSystemCodeThreadReopened MessageSystemCode = "thread.reopened"
+	MessageSystemCodeAgentSessionResumeFailed MessageSystemCode = "agent_session.resume_failed"
+	MessageSystemCodeThreadReopened           MessageSystemCode = "thread.reopened"
 )
 
 // Valid indicates whether the value is a known member of the MessageSystemCode enum.
 func (e MessageSystemCode) Valid() bool {
 	switch e {
+	case MessageSystemCodeAgentSessionResumeFailed:
+		return true
 	case MessageSystemCodeThreadReopened:
 		return true
 	default:
@@ -6022,6 +6061,7 @@ type AgentInvocationEventType string
 
 // AgentInvocationPayload Sent to the agent; the envelope carries a fresh `invocation_token` per delivery.
 type AgentInvocationPayload struct {
+	// AgentSession The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`.
 	AgentSession *AgentSession `json:"agent_session,omitempty"`
 
 	// BillingMode Backend policy of an agent. `personal` runs on the subscription of exactly one person.
@@ -6042,6 +6082,9 @@ type AgentInvocationPayload struct {
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
 
+	// SessionMode `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+	SessionMode *AgentInvocationPayloadSessionMode `json:"session_mode,omitempty"`
+
 	// SettingsVersion Channel settings version; reload `agent.config.read` when newer than cached.
 	SettingsVersion *int64 `json:"settings_version,omitempty"`
 
@@ -6055,6 +6098,9 @@ type AgentInvocationPayload struct {
 	// TriggeredBy Minimal public view of a principal, embedded in other objects.
 	TriggeredBy PrincipalRef `json:"triggered_by"`
 }
+
+// AgentInvocationPayloadSessionMode `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+type AgentInvocationPayloadSessionMode string
 
 // AgentInvocationPayloadTriggerKind defines model for AgentInvocationPayload.TriggerKind.
 type AgentInvocationPayloadTriggerKind string
@@ -6237,8 +6283,14 @@ type AgentSessionEndReason string
 
 // AgentSessionBind defines model for AgentSessionBind.
 type AgentSessionBind struct {
+	// ExpectedCurrentSessionId Current session of the thread as the client saw it; absent when the thread has none. A mismatch answers 409 `conflict` with `reason` `session_changed` (09, 9.4).
+	ExpectedCurrentSessionId *Uuid `json:"expected_current_session_id,omitempty"`
+
 	// ExternalSessionRef Examples: sess-7f3a
 	ExternalSessionRef string `json:"external_session_ref"`
+
+	// TakeOver Required when the session is current in another thread; otherwise 409 `conflict` with `reason` `session_bound_elsewhere`.
+	TakeOver *bool `json:"take_over,omitempty"`
 }
 
 // AgentSessionChangedEvent Durable event `agent_session.changed`.
@@ -6315,12 +6367,25 @@ type AgentSessionList struct {
 
 // AgentSessionReport defines model for AgentSessionReport.
 type AgentSessionReport struct {
-	// ExternalSessionRef Examples: sess-7f3a
+	// BindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+	BindFailed *AgentSessionReportBindFailed `json:"bind_failed,omitempty"`
+
+	// ExternalSessionRef The reference the runtime actually uses; a different one replaces the stored reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
+	//
+	// Examples: sess-7f3a
 	ExternalSessionRef string `json:"external_session_ref"`
 
-	// Model Examples: model-large
+	// Model The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
+	//
+	// Examples: model-large
 	Model *string `json:"model,omitempty"`
+
+	// Started `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it.
+	Started *bool `json:"started,omitempty"`
 }
+
+// AgentSessionReportBindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+type AgentSessionReportBindFailed string
 
 // AgentTriggerers Principals that may trigger the calling agent (allow list of the adapter).
 type AgentTriggerers struct {
@@ -10892,7 +10957,7 @@ type Message struct {
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent bool  `json:"silent"`
 
-	// SystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+	// SystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
 	SystemCode *MessageSystemCode `json:"system_code,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -10910,7 +10975,7 @@ type Message struct {
 	Version            int64   `json:"version"`
 }
 
-// MessageSystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+// MessageSystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
 type MessageSystemCode string
 
 // MessageCreate defines model for MessageCreate.
@@ -17134,6 +17199,9 @@ type BindAgentSessionParams struct {
 type ReportAgentSessionParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
 }
 
 // ResetAgentSessionParams defines parameters for ResetAgentSession.
@@ -23615,12 +23683,16 @@ type ClientInterface interface {
 
 	// BindAgentSessionWithBody Bind an existing external session
 	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/bind (the `BindAgentSession` operationId).
 	BindAgentSessionWithBody(ctx context.Context, threadId ThreadIdPath, params *BindAgentSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BindAgentSession Bind an existing external session
+	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23629,6 +23701,8 @@ type ClientInterface interface {
 
 	// ReportAgentSessionWithBody Report the external session reference and model
 	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -23636,12 +23710,16 @@ type ClientInterface interface {
 
 	// ReportAgentSession Report the external session reference and model
 	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
 	ReportAgentSession(ctx context.Context, threadId ThreadIdPath, params *ReportAgentSessionParams, body ReportAgentSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ResetAgentSession Start a new agent session in the thread
+	//
+	// Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/reset (the `ResetAgentSession` operationId).
 	ResetAgentSession(ctx context.Context, threadId ThreadIdPath, params *ResetAgentSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -25396,156 +25474,6 @@ func (c *Client) CompleteStepUpWithPasskeyWithBody(ctx context.Context, params *
 // Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
 func (c *Client) CompleteStepUpWithPasskey(ctx context.Context, params *CompleteStepUpWithPasskeyParams, body CompleteStepUpWithPasskeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCompleteStepUpWithPasskeyRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// StepUpWithPasswordWithBody Console step-up with password and TOTP
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
-func (c *Client) StepUpWithPasswordWithBody(ctx context.Context, params *StepUpWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewStepUpWithPasswordRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// StepUpWithPassword Console step-up with password and TOTP
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
-func (c *Client) StepUpWithPassword(ctx context.Context, params *StepUpWithPasswordParams, body StepUpWithPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewStepUpWithPasswordRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RefreshTokenWithBody Rotate the refresh token
-//
-// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
-// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
-// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
-// server issues a new access token and returns the same refresh token, without rotation.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
-func (c *Client) RefreshTokenWithBody(ctx context.Context, params *RefreshTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRefreshTokenRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RefreshToken Rotate the refresh token
-//
-// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
-// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
-// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
-// server issues a new access token and returns the same refresh token, without rotation.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
-func (c *Client) RefreshToken(ctx context.Context, params *RefreshTokenParams, body RefreshTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRefreshTokenRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// LoginWithTrustedHeaderWithBody Log in with the identity header of a trusted reverse proxy
-//
-// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
-// otherwise 404.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
-func (c *Client) LoginWithTrustedHeaderWithBody(ctx context.Context, params *LoginWithTrustedHeaderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLoginWithTrustedHeaderRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
-//
-// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
-// otherwise 404.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
-func (c *Client) LoginWithTrustedHeader(ctx context.Context, params *LoginWithTrustedHeaderParams, body LoginWithTrustedHeaderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLoginWithTrustedHeaderRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetChannel Read a channel
-//
-// Corresponds with GET /channels/{channel_id} (the `GetChannel` operationId).
-func (c *Client) GetChannel(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetChannelRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateChannelWithBody Change name or topic
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
-func (c *Client) UpdateChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateChannelRequestWithBody(c.Server, channelId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

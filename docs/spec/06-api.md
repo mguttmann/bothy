@@ -320,7 +320,8 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
    Inhalt. Grund: Eine Seite bleibt so unter `api.page_size_max` mal diesem Wert statt mal
    `message.max_content_bytes`.
 6. Ohne Paginierung bleiben nur Listen, deren Menge klein ist (Bereiche, Kanäle eines Bereichs,
-   Tags, Einstellungen, Owner, Gruppenliste einer Person). Wächst eine davon, kommt ein neuer,
+   Tags, Einstellungen, Owner, Gruppenliste einer Person, the agent sessions of a thread in
+   `listAgentSessions`, newest first by `created_at`, then `id`). Wächst eine davon, kommt ein neuer,
    paginierter Endpunkt; die alte Antwortform bleibt (Abschnitt 13).
 
 ## 7. Idempotenz

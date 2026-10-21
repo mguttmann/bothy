@@ -159,6 +159,32 @@ func (r *Repository) OrphanCandidates(ctx context.Context) ([]app.RunRow, error)
 	return runs(rows, err, "reading the orphan candidates")
 }
 
+// SetRunSession implements app.Repository: runs.agent_session_id only. Errors: not_found for an
+// unknown run, internal outside a unit of work.
+func (r *Repository) SetRunSession(ctx context.Context, runID, sessionID ids.ID) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	n, err := q.SetRunSession(ctx, sqlcgen.SetRunSessionParams{SessionID: optionalUUID(sessionID), ID: uuid(runID)})
+	if err != nil {
+		return mapError(err, "setting the session of a run")
+	}
+	if n == 0 {
+		return errs.New(errs.CodeNotFound, "runs: the run of a session is gone")
+	}
+	return nil
+}
+
+// SessionUsed implements app.Repository.
+func (r *Repository) SessionUsed(ctx context.Context, threadID, sessionID ids.ID) (bool, error) {
+	used, err := r.read(ctx).SessionUsed(ctx, sqlcgen.SessionUsedParams{ThreadID: uuid(threadID), SessionID: uuid(sessionID)})
+	if err != nil {
+		return false, mapError(err, "reading whether a run used a session")
+	}
+	return used, nil
+}
+
 // AppendStep implements app.Repository. A nil or empty Detail stores "{}", a zero StartedAt the
 // time of the database (the column default of 03 run_steps).
 func (r *Repository) AppendStep(ctx context.Context, s app.StepRow) (app.StepRow, error) {

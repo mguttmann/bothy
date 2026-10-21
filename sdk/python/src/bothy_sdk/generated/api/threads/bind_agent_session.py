@@ -105,6 +105,11 @@ def sync_detailed(
 ) -> Response[AgentSession | Problem]:
     """Bind an existing external session
 
+     Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+    `reason` `session_changed` when `expected_current_session_id` does not name the current session,
+    `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With
+    `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -140,6 +145,11 @@ def sync(
 ) -> AgentSession | Problem | None:
     """Bind an existing external session
 
+     Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+    `reason` `session_changed` when `expected_current_session_id` does not name the current session,
+    `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With
+    `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -169,6 +179,11 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[AgentSession | Problem]:
     """Bind an existing external session
+
+     Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+    `reason` `session_changed` when `expected_current_session_id` does not name the current session,
+    `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With
+    `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -202,6 +217,11 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> AgentSession | Problem | None:
     """Bind an existing external session
+
+     Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+    `reason` `session_changed` when `expected_current_session_id` does not name the current session,
+    `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With
+    `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

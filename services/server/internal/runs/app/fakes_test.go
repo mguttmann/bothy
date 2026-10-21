@@ -162,6 +162,24 @@ func (r *repo) LockActiveRunsByAgent(_ context.Context, agent ids.ID) ([]app.Run
 	return r.lockActive(func(x app.RunRow) bool { return x.AgentID == agent }), nil
 }
 
+func (r *repo) SetRunSession(_ context.Context, runID, sessionID ids.ID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID == runID {
+			r.runs[i].AgentSessionID = sessionID
+			return nil
+		}
+	}
+	return errs.New(errs.CodeNotFound, "")
+}
+
+func (r *repo) SessionUsed(_ context.Context, threadID, sessionID ids.ID) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.ContainsFunc(r.runs, func(x app.RunRow) bool { return x.ThreadID == threadID && x.AgentSessionID == sessionID }), nil
+}
+
 func (r *repo) OrphanCandidates(context.Context) ([]app.RunRow, error) {
 	return r.lockActive(func(x app.RunRow) bool { return x.State != domain.StateQueued }), nil
 }
@@ -453,6 +471,11 @@ func (m msgs) CreateRunAnchor(_ context.Context, cmd messaging.RunAnchorCmd) (me
 	return messaging.AnchorRef{MessageID: ids.New(), ThreadSeq: 1}, nil
 }
 
+func (m msgs) AppendSystemLine(_ context.Context, l messaging.SystemLine) (messaging.Message, error) {
+	m.j.add("system-line", l)
+	return messaging.Message{ID: ids.New(), ThreadID: l.ThreadID, Kind: "system", Origin: "system", SystemCode: l.Code}, nil
+}
+
 // events is the fake appender.
 type events struct{ j *journal }
 
@@ -690,6 +713,8 @@ type world struct {
 	steps               *stepCounter
 	payloadMax          int
 	uow                 txn.UnitOfWork
+	// sessions is the fake agents.Sessions; nil builds the use cases without them.
+	sessions *sessions
 }
 
 // newWorld builds the world.
@@ -731,7 +756,7 @@ func (w *world) build() {
 		Repo: w.repo, UoW: cmp.Or[txn.UnitOfWork](w.uow, uow{}), Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
-		Publisher: w.pub, Steps: w.steps,
+		Publisher: w.pub, Steps: w.steps, Sessions: w.agentSessions(),
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -741,6 +766,15 @@ func (w *world) build() {
 	if err := w.acc.Bind(svc); err != nil {
 		w.t.Fatal(err)
 	}
+}
+
+// agentSessions returns the fake sessions as the port, nil when the world has none (a typed nil
+// pointer would not be a nil interface).
+func (w *world) agentSessions() agents.Sessions {
+	if w.sessions == nil {
+		return nil
+	}
+	return w.sessions
 }
 
 // posted returns a MessagePosted of a text message of Alex in thread.

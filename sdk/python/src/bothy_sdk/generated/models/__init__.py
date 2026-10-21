@@ -29,6 +29,7 @@ from .agent_followup_payload import AgentFollowupPayload
 from .agent_invocation_event import AgentInvocationEvent
 from .agent_invocation_event_type import AgentInvocationEventType
 from .agent_invocation_payload import AgentInvocationPayload
+from .agent_invocation_payload_session_mode import AgentInvocationPayloadSessionMode
 from .agent_invocation_payload_trigger_kind import AgentInvocationPayloadTriggerKind
 from .agent_page import AgentPage
 from .agent_payload import AgentPayload
@@ -48,6 +49,7 @@ from .agent_session_changed_payload import AgentSessionChangedPayload
 from .agent_session_end_reason import AgentSessionEndReason
 from .agent_session_list import AgentSessionList
 from .agent_session_report import AgentSessionReport
+from .agent_session_report_bind_failed import AgentSessionReportBindFailed
 from .agent_status import AgentStatus
 from .agent_triggerers import AgentTriggerers
 from .agent_update import AgentUpdate
@@ -786,6 +788,7 @@ __all__ = (
     "AgentInvocationEvent",
     "AgentInvocationEventType",
     "AgentInvocationPayload",
+    "AgentInvocationPayloadSessionMode",
     "AgentInvocationPayloadTriggerKind",
     "AgentPage",
     "AgentPayload",
@@ -805,6 +808,7 @@ __all__ = (
     "AgentSessionEndReason",
     "AgentSessionList",
     "AgentSessionReport",
+    "AgentSessionReportBindFailed",
     "AgentStatus",
     "AgentTriggerers",
     "AgentUpdate",

@@ -25,7 +25,8 @@ part 'agent_invocation_payload.g.dart';
 /// * [commandInvocationId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggeredBy]
 /// * [billingMode]
-/// * [agentSession]
+/// * [agentSession] - The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`.
+/// * [sessionMode] - `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
 /// * [settingsVersion] - Channel settings version; reload `agent.config.read` when newer than cached.
 @BuiltValue()
 abstract class AgentInvocationPayload
@@ -69,8 +70,14 @@ abstract class AgentInvocationPayload
   BillingMode get billingMode;
   // enum billingModeEnum {  personal,  organization,  };
 
+  /// The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`.
   @BuiltValueField(wireName: r'agent_session')
   AgentSession? get agentSession;
+
+  /// `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+  @BuiltValueField(wireName: r'session_mode')
+  AgentInvocationPayloadSessionModeEnum? get sessionMode;
+  // enum sessionModeEnum {  new,  resume,  bind,  };
 
   /// Channel settings version; reload `agent.config.read` when newer than cached.
   @BuiltValueField(wireName: r'settings_version')
@@ -169,6 +176,13 @@ class _$AgentInvocationPayloadSerializer
       yield serializers.serialize(
         object.agentSession,
         specifiedType: const FullType(AgentSession),
+      );
+    }
+    if (object.sessionMode != null) {
+      yield r'session_mode';
+      yield serializers.serialize(
+        object.sessionMode,
+        specifiedType: const FullType(AgentInvocationPayloadSessionModeEnum),
       );
     }
     if (object.settingsVersion != null) {
@@ -289,6 +303,16 @@ class _$AgentInvocationPayloadSerializer
           if (valueDes == null) continue;
           result.agentSession.replace(valueDes);
           break;
+        case r'session_mode':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(
+              AgentInvocationPayloadSessionModeEnum,
+            ),
+          ) as AgentInvocationPayloadSessionModeEnum?;
+          if (valueDes == null) continue;
+          result.sessionMode = valueDes;
+          break;
         case r'settings_version':
           final valueDes = serializers.deserialize(
             value,
@@ -349,4 +373,30 @@ class AgentInvocationPayloadTriggerKindEnum extends EnumClass {
       _$agentInvocationPayloadTriggerKindEnumValues;
   static AgentInvocationPayloadTriggerKindEnum valueOf(String name) =>
       _$agentInvocationPayloadTriggerKindEnumValueOf(name);
+}
+
+/// `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+class AgentInvocationPayloadSessionModeEnum extends EnumClass {
+  @BuiltValueEnumConst(wireName: r'new')
+  static const AgentInvocationPayloadSessionModeEnum new_ =
+      _$agentInvocationPayloadSessionModeEnum_new_;
+  @BuiltValueEnumConst(wireName: r'resume')
+  static const AgentInvocationPayloadSessionModeEnum resume =
+      _$agentInvocationPayloadSessionModeEnum_resume;
+  @BuiltValueEnumConst(wireName: r'bind')
+  static const AgentInvocationPayloadSessionModeEnum bind =
+      _$agentInvocationPayloadSessionModeEnum_bind;
+  @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
+  static const AgentInvocationPayloadSessionModeEnum unknownDefaultOpenApi =
+      _$agentInvocationPayloadSessionModeEnum_unknownDefaultOpenApi;
+
+  static Serializer<AgentInvocationPayloadSessionModeEnum> get serializer =>
+      _$agentInvocationPayloadSessionModeEnumSerializer;
+
+  const AgentInvocationPayloadSessionModeEnum._(String name) : super(name);
+
+  static BuiltSet<AgentInvocationPayloadSessionModeEnum> get values =>
+      _$agentInvocationPayloadSessionModeEnumValues;
+  static AgentInvocationPayloadSessionModeEnum valueOf(String name) =>
+      _$agentInvocationPayloadSessionModeEnumValueOf(name);
 }

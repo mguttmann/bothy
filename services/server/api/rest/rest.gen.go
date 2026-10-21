@@ -639,6 +639,18 @@ type ServerInterface interface {
 	// GetThread Read a thread
 	// (GET /threads/{thread_id})
 	GetThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// ListAgentSessions List current and earlier agent sessions
+	// (GET /threads/{thread_id}/agent-sessions)
+	ListAgentSessions(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
+	// BindAgentSession Bind an existing external session
+	// (POST /threads/{thread_id}/agent-sessions/bind)
+	BindAgentSession(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params BindAgentSessionParams)
+	// ReportAgentSession Report the external session reference and model
+	// (POST /threads/{thread_id}/agent-sessions/report)
+	ReportAgentSession(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ReportAgentSessionParams)
+	// ResetAgentSession Start a new agent session in the thread
+	// (POST /threads/{thread_id}/agent-sessions/reset)
+	ResetAgentSession(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ResetAgentSessionParams)
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params CloseThreadParams)
@@ -8437,6 +8449,201 @@ func (siw *ServerInterfaceWrapper) GetThread(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ListAgentSessions operation middleware
+func (siw *ServerInterfaceWrapper) ListAgentSessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAgentSessions(w, r, threadId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BindAgentSession operation middleware
+func (siw *ServerInterfaceWrapper) BindAgentSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BindAgentSessionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BindAgentSession(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReportAgentSession operation middleware
+func (siw *ServerInterfaceWrapper) ReportAgentSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReportAgentSessionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchOptional
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReportAgentSession(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResetAgentSession operation middleware
+func (siw *ServerInterfaceWrapper) ResetAgentSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ResetAgentSessionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResetAgentSession(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CloseThread operation middleware
 func (siw *ServerInterfaceWrapper) CloseThread(w http.ResponseWriter, r *http.Request) {
 
@@ -10247,6 +10454,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/reopen", wrapper.ReopenThread)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/move", wrapper.MoveThread)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/tags", wrapper.SetThreadTags)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/agent-sessions", wrapper.ListAgentSessions)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/agent-sessions/reset", wrapper.ResetAgentSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/agent-sessions/bind", wrapper.BindAgentSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/agent-sessions/report", wrapper.ReportAgentSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/runs", wrapper.ListThreadRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/pins", wrapper.ListPins)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/read-state", wrapper.PutReadState)
@@ -11148,6 +11359,18 @@ type StrictServerInterface interface {
 	// GetThread Read a thread
 	// (GET /threads/{thread_id})
 	GetThread(ctx context.Context, request GetThreadRequestObject) (GetThreadResponseObject, error)
+	// ListAgentSessions List current and earlier agent sessions
+	// (GET /threads/{thread_id}/agent-sessions)
+	ListAgentSessions(ctx context.Context, request ListAgentSessionsRequestObject) (ListAgentSessionsResponseObject, error)
+	// BindAgentSession Bind an existing external session
+	// (POST /threads/{thread_id}/agent-sessions/bind)
+	BindAgentSession(ctx context.Context, request BindAgentSessionRequestObject) (BindAgentSessionResponseObject, error)
+	// ReportAgentSession Report the external session reference and model
+	// (POST /threads/{thread_id}/agent-sessions/report)
+	ReportAgentSession(ctx context.Context, request ReportAgentSessionRequestObject) (ReportAgentSessionResponseObject, error)
+	// ResetAgentSession Start a new agent session in the thread
+	// (POST /threads/{thread_id}/agent-sessions/reset)
+	ResetAgentSession(ctx context.Context, request ResetAgentSessionRequestObject) (ResetAgentSessionResponseObject, error)
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(ctx context.Context, request CloseThreadRequestObject) (CloseThreadResponseObject, error)
@@ -17427,6 +17650,127 @@ func (sh *strictHandler) GetThread(w http.ResponseWriter, r *http.Request, threa
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetThreadResponseObject); ok {
 		if err := validResponse.VisitGetThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAgentSessions operation middleware
+func (sh *strictHandler) ListAgentSessions(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request ListAgentSessionsRequestObject
+
+	request.ThreadId = threadId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAgentSessions(ctx, request.(ListAgentSessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAgentSessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAgentSessionsResponseObject); ok {
+		if err := validResponse.VisitListAgentSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BindAgentSession operation middleware
+func (sh *strictHandler) BindAgentSession(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params BindAgentSessionParams) {
+	var request BindAgentSessionRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	var body BindAgentSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BindAgentSession(ctx, request.(BindAgentSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BindAgentSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BindAgentSessionResponseObject); ok {
+		if err := validResponse.VisitBindAgentSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReportAgentSession operation middleware
+func (sh *strictHandler) ReportAgentSession(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ReportAgentSessionParams) {
+	var request ReportAgentSessionRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	var body ReportAgentSessionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReportAgentSession(ctx, request.(ReportAgentSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReportAgentSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReportAgentSessionResponseObject); ok {
+		if err := validResponse.VisitReportAgentSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResetAgentSession operation middleware
+func (sh *strictHandler) ResetAgentSession(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params ResetAgentSessionParams) {
+	var request ResetAgentSessionRequestObject
+
+	request.ThreadId = threadId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResetAgentSession(ctx, request.(ResetAgentSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResetAgentSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResetAgentSessionResponseObject); ok {
+		if err := validResponse.VisitResetAgentSessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

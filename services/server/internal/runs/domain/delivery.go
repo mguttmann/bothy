@@ -225,7 +225,7 @@ type PrincipalRefPayload struct {
 }
 
 // InvocationPayloadInput are the members of AgentInvocationPayload of a message trigger (M2-08
-// design note 14); agent_session comes with M2-12.
+// design note 14) except the session, which InvocationPayload takes as its own required argument.
 type InvocationPayloadInput struct {
 	RunID, ThreadID, ChannelID, SpaceID, MessageID ids.ID
 	// TriggeredBy is the author as the messaging port returns it.
@@ -246,6 +246,8 @@ type invocationPayload struct {
 	MessageID       string              `json:"message_id"`
 	TriggeredBy     PrincipalRefPayload `json:"triggered_by"`
 	BillingMode     string              `json:"billing_mode"`
+	AgentSession    json.RawMessage     `json:"agent_session,omitempty"`
+	SessionMode     string              `json:"session_mode,omitempty"`
 	SettingsVersion int64               `json:"settings_version,omitzero"`
 }
 
@@ -253,17 +255,31 @@ type invocationPayload struct {
 var errPayload = errors.New("runs: incomplete event payload")
 
 // InvocationPayload encodes the payload of agent.invocation for a message trigger: IDs, the
-// trigger kind message, the author, the billing mode and the settings version, never content, a
-// prompt, skills or a project binding (04 2.2 rules 1 and 4), and no JSON null (ADR 0053). Errors:
-// a zero ID or an empty author or billing mode.
-func InvocationPayload(in InvocationPayloadInput) ([]byte, error) {
+// trigger kind message, the author, the billing mode, the session of DecideSession and the
+// settings version, never content, a prompt, skills or a project binding (04 2.2 rules 1 and 4),
+// and no JSON null (ADR 0053). The session decision is a required argument, so every writer of
+// agent.invocation decides it (M2-12 design note 9): an operator run carries session_mode and,
+// where a row exists, agent_session; a guest run carries neither (09 3.6). Errors: a zero ID, an
+// empty author or billing mode, a session without mode, a guest session with a row, or resume or
+// bind without a row.
+//
+// Example:
+//
+//	p, err := domain.InvocationPayload(in, domain.DecideSession(true, nil)) // session_mode new
+func InvocationPayload(in InvocationPayloadInput, session SessionDecision) ([]byte, error) {
 	if in.RunID.IsZero() || in.ThreadID.IsZero() || in.ChannelID.IsZero() || in.MessageID.IsZero() || in.TriggeredBy.ID == "" ||
 		in.TriggeredBy.Kind == "" || in.BillingMode == "" {
 		return nil, errPayload
 	}
+	if err := session.check(); err != nil {
+		return nil, err
+	}
 	p := invocationPayload{
 		RunID: in.RunID.String(), ThreadID: in.ThreadID.String(), ChannelID: in.ChannelID.String(), TriggerKind: string(TriggerMessage),
 		MessageID: in.MessageID.String(), TriggeredBy: in.TriggeredBy, BillingMode: in.BillingMode, SettingsVersion: in.SettingsVersion,
+	}
+	if session.Mode != SessionGuest {
+		p.SessionMode, p.AgentSession = string(session.Mode), session.Row
 	}
 	if !in.SpaceID.IsZero() {
 		p.SpaceID = in.SpaceID.String()

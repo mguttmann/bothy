@@ -1013,13 +1013,23 @@ func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy 
 	if ag == nil {
 		return nil, errors.New("wire: the runs module needs the agents step")
 	}
+	scfg, err := SessionsConfig(s.values)
+	if err != nil {
+		return nil, err
+	}
+	ss, err := NewAgentSessions(scfg, pool, a.UoW(), az, SessionWrites{Audit: a.Recorder(), Events: sy.Appender()}, c.Service, c.Service,
+		s.deps.Clock, s.logger())
+	if err != nil {
+		return nil, err
+	}
 	rn, err := NewRuns(cfg, pool, a.UoW(), az, RunsDeps{
 		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
-		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(),
+		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(), Sessions: ss.Service,
 	}, s.deps.Clock, s.logger())
 	if err != nil {
 		return nil, err
 	}
+	rn.Sessions = ss
 	if err := a.RunsAcceptor().Bind(rn.Service); err != nil {
 		return nil, err
 	}

@@ -283,9 +283,32 @@ The deny entry carries codes as details, never a token or `jti`: `token_verdict`
 `billing_mode_mismatch`; `tool_class` (the claim) and `tool_class_used` for `tool_class_mismatch`.
 A value that is not a code is left out, so the denial is still written.
 
+### Agent sessions (M2-12)
+
+`agent_session.reset` and `agent_session.bind` are no longer deferred. Their row in
+`domain/requirements_table.go` keeps the 05 text "trigger und `agent.invoke`" and is
+`Level(trigger)`; `guards` applies the `agent.invoke` guard to both with the invoke facts of the
+descriptor, and a missing `Resource.Invoke` is an internal error, as for `agent.invoke`. The
+descriptor is the thread with `Invoke: &authorize.InvokeFacts{AgentID: <operator of the thread>,
+TriggerOrigin: "human", MentionsAgent: true}` and `ActiveRunAgentID` zero: a session switch names
+the operator explicitly and starts no run (brief M2-12 design note 5). A thread without operator
+has `AgentID` zero, which the guard refuses with `agent_not_reachable`. A read-only channel is
+`forbidden channel_read_only`; the agents use case maps a guard reason to `403
+agent_invocation_denied`.
+
+`agent_session.bind` has a second target (07 4.2 "Actions with two targets", 09 9.4 point 1):
+`Resource.TargetThreadID`, the thread in which the reference is current, zero when it is current
+nowhere. With a non-zero target, `decideFor` decides the same action again on that thread with the
+same invoke facts, after the first path allowed: an invisible or unknown target is `not_found
+no_grant` like an unknown thread, and level, read-only rule and guard hold on the target's path,
+its operator and its channel settings. Both paths must allow; `Authorize` audits the one final
+denial (R-AZ-04). `agent_session.report` stays `AgentSelf` on the descriptor `{Kind:
+agent_session, ID: <session of the run or zero>, ThreadID: <thread>, OwnerID: <the run's agent>}`;
+the zero ID resolves through `ThreadID`. Tests: `app/session_test.go`.
+
 ### How a module builds a `Resource`
 
-Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `agent_session.reset` and `agent_session.bind`, `TargetThreadID` for `agent_session.bind`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
 
 ### Files (M3-03)
 
