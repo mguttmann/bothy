@@ -6,5 +6,4 @@ command.autocomplete
 command.invoke
 file.transcript.submit
 import.apply
-interaction.create
 run.followup.create

@@ -223,11 +223,16 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	if req.Contains(domain.Token()) && r.Token != nil {
 		in.Invocation = invocationFacts(r.Token)
 	}
-	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
-		var err error
-		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
-			return domain.Input{}, err
+	if triggers(spec.ID) {
+		// interaction.create carries the agent.invoke guard with the facts of the component
+		// (brief M2-15 design note 8 b); agent.invoke carries them at stage deliver (note 8 c).
+		if r.Invoke != nil {
+			var err error
+			if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
+				return domain.Input{}, err
+			}
 		}
+		in.Interaction = interactionFacts(r.Interaction)
 	}
 	if in.Principal.ActingFor {
 		var err error
@@ -496,6 +501,22 @@ func fileOnPath(r authorize.Resource) bool {
 		return r.File.Purpose == purposeAttachment
 	}
 	return !r.ThreadID.IsZero() || !r.ChannelID.IsZero() || !r.SpaceID.IsZero()
+}
+
+// triggers reports the actions that trigger an agent and so take the facts of the agent.invoke
+// guard: agent.invoke and interaction.create (M2-15).
+func triggers(action string) bool {
+	return action == string(authorize.ActionAgentInvoke) || action == string(authorize.ActionInteractionCreate)
+}
+
+// interactionFacts converts the interaction facts of a descriptor (M2-15); nil stays nil.
+func interactionFacts(f *authorize.InteractionFacts) *domain.InteractionFacts {
+	if f == nil {
+		return nil
+	}
+	return &domain.InteractionFacts{Stage: f.Stage, OwnerKind: f.OwnerKind, ComponentState: f.ComponentState, ExpiresAt: f.ExpiresAt,
+		RequiredCapability: f.RequiredCapability, RestrictedTo: f.RestrictedTo, ComponentRunID: f.ComponentRunID,
+		ComponentRunActive: f.ComponentRunActive, RunStarterID: f.RunStarterID}
 }
 
 // invocationFacts converts the token facts of run.start and run.token.renew (M2-09).

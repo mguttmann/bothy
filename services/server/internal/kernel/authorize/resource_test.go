@@ -57,3 +57,16 @@ func TestResourceFromEvent_Audience(t *testing.T) {
 		}
 	}
 }
+
+// TestInteractionStages: the two stages of InteractionFacts carry the codes authz expects
+// (brief M2-15 design note 8 a and c).
+func TestInteractionStages(t *testing.T) {
+	t.Parallel()
+	if authorize.InteractionStageAccept != "accept" || authorize.InteractionStageDeliver != "deliver" {
+		t.Fatalf("stages %q %q", authorize.InteractionStageAccept, authorize.InteractionStageDeliver)
+	}
+	r := authorize.Resource{Kind: authorize.ResourceComponent, Interaction: &authorize.InteractionFacts{Stage: authorize.InteractionStageAccept}}
+	if r.Interaction.Stage != "accept" {
+		t.Fatal("interaction facts not kept")
+	}
+}
