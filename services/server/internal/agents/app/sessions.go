@@ -346,42 +346,64 @@ func (s *SessionService) boundElsewhere(ctx context.Context, op ids.ID, ref stri
 // without a take-over). A current row that changes between the read and the lock is read again.
 func (s *SessionService) lockForBind(ctx context.Context, thread ids.ID, target bindTarget) (agents.Session, *agents.Session, error) {
 	for range maxLockAttempts {
-		cur, found, err := s.d.Store.CurrentSession(ctx, thread)
-		if err != nil {
-			return agents.Session{}, nil, err
+		cur, other, stable, err := s.lockOnce(ctx, thread, target)
+		if err != nil || stable {
+			return cur, other, err
 		}
-		var want []ids.ID
-		if found {
-			want = append(want, cur.ID)
-		}
-		if target.set {
-			want = append(want, target.row.ID)
-		}
-		locked, err := s.d.Store.LockSessions(ctx, want)
-		if err != nil {
-			return agents.Session{}, nil, err
-		}
-		again, foundAgain, err := s.d.Store.CurrentSession(ctx, thread)
-		if err != nil {
-			return agents.Session{}, nil, err
-		}
-		if foundAgain != found || (found && again.ID != cur.ID) {
-			continue
-		}
-		var curRow agents.Session
-		var other *agents.Session
-		for i := range locked {
-			switch {
-			case found && locked[i].ID == cur.ID:
-				curRow = locked[i]
-			case target.set && locked[i].ID == target.row.ID && locked[i].IsCurrent:
-				o := locked[i]
-				other = &o
-			}
-		}
-		return curRow, other, nil
 	}
 	return agents.Session{}, nil, errs.New(errs.CodeUnavailable, errMsgLockedRowsDrift)
+}
+
+// lockOnce is one attempt of lockForBind; stable is false when the current row of thread changed
+// between the read and the lock.
+func (s *SessionService) lockOnce(ctx context.Context, thread ids.ID, target bindTarget) (agents.Session, *agents.Session, bool, error) {
+	cur, found, err := s.d.Store.CurrentSession(ctx, thread)
+	if err != nil {
+		return agents.Session{}, nil, false, err
+	}
+	var want []ids.ID
+	if found {
+		want = append(want, cur.ID)
+	}
+	if target.set {
+		want = append(want, target.row.ID)
+	}
+	locked, err := s.d.Store.LockSessions(ctx, want)
+	if err != nil {
+		return agents.Session{}, nil, false, err
+	}
+	again, foundAgain, err := s.d.Store.CurrentSession(ctx, thread)
+	if err != nil {
+		return agents.Session{}, nil, false, err
+	}
+	if foundAgain != found || (found && again.ID != cur.ID) {
+		return agents.Session{}, nil, false, nil
+	}
+	curRow, other := pickLocked(locked, cur.ID, target)
+	return curRow, other, true, nil
+}
+
+// pickLocked returns the locked row curID (zero Session when curID is zero) and the locked target
+// row while it is still current.
+func pickLocked(locked []agents.Session, curID ids.ID, target bindTarget) (agents.Session, *agents.Session) {
+	var curRow agents.Session
+	var other *agents.Session
+	for i := range locked {
+		switch {
+		case !curID.IsZero() && locked[i].ID == curID:
+			curRow = locked[i]
+		case target.set && locked[i].ID == target.row.ID && locked[i].IsCurrent:
+			o := locked[i]
+			other = &o
+		}
+	}
+	return curRow, other
+}
+
+// endedRow is a row a bind ended, with the routing data of its thread for the event.
+type endedRow struct {
+	row  agents.Session
+	info chat.ThreadInfo
 }
 
 // rebind ends the current row of the thread and, when taking over, the row of the other thread
@@ -389,36 +411,13 @@ func (s *SessionService) lockForBind(ctx context.Context, thread ids.ID, target 
 // note 14, and writes the events and the allow audit entry.
 func (s *SessionService) rebind(ctx context.Context, info chat.ThreadInfo, op ids.ID, cmd agents.BindCmd, cur agents.Session,
 	other *agents.Session) (agents.Session, error) {
-	var latest *domain.Session
-	if prev, found, err := s.d.Store.LatestByRef(ctx, op, cmd.ExternalSessionRef); err != nil {
+	baseline, currency, err := s.bindBaseline(ctx, op, cmd.ExternalSessionRef)
+	if err != nil {
 		return agents.Session{}, err
-	} else if found {
-		d := toDomain(prev)
-		latest = &d
 	}
-	baseline, currency := domain.CostBaseline(latest)
-	type endedRow struct {
-		row  agents.Session
-		info chat.ThreadInfo
-	}
-	var ended []endedRow
-	if !cur.ID.IsZero() {
-		row, err := s.end(ctx, cur, domain.EndRebind)
-		if err != nil {
-			return agents.Session{}, err
-		}
-		ended = append(ended, endedRow{row: row, info: info})
-	}
-	var otherInfo chat.ThreadInfo
-	if other != nil {
-		row, err := s.end(ctx, *other, domain.EndRebind)
-		if err != nil {
-			return agents.Session{}, err
-		}
-		if otherInfo, err = s.thread(ctx, other.ThreadID); err != nil {
-			return agents.Session{}, err
-		}
-		ended = append(ended, endedRow{row: row, info: otherInfo})
+	ended, err := s.endForBind(ctx, info, cur, other)
+	if err != nil {
+		return agents.Session{}, err
 	}
 	row, inserted, err := s.d.Store.InsertSession(ctx, NewSession{
 		ID: ids.New(), ThreadID: info.ID, AgentID: op, ExternalSessionRef: cmd.ExternalSessionRef, Started: true, IsCurrent: true,
@@ -439,14 +438,59 @@ func (s *SessionService) rebind(ctx context.Context, info chat.ThreadInfo, op id
 	if err := s.emitChanged(ctx, info, row); err != nil {
 		return agents.Session{}, err
 	}
-	attrs := auditing.Attrs{attrSessionID: auditing.ID(row.ID), attrTakeOver: auditing.Bool(cmd.TakeOver), attrCause: auditing.Code(causeBind)}
+	return row, s.recordBind(ctx, info.ID, bindAttrs(row, cur, other, cmd.TakeOver))
+}
+
+// bindBaseline is the cost baseline of a bound row: from the most recent row of op and ref in any
+// thread (design note 14).
+func (s *SessionService) bindBaseline(ctx context.Context, op ids.ID, ref string) (int64, string, error) {
+	prev, found, err := s.d.Store.LatestByRef(ctx, op, ref)
+	if err != nil {
+		return 0, "", err
+	}
+	if !found {
+		micros, currency := domain.CostBaseline(nil)
+		return micros, currency, nil
+	}
+	d := toDomain(prev)
+	micros, currency := domain.CostBaseline(&d)
+	return micros, currency, nil
+}
+
+// endForBind ends the current row of the thread and the taken-over row with rebind.
+func (s *SessionService) endForBind(ctx context.Context, info chat.ThreadInfo, cur agents.Session, other *agents.Session) ([]endedRow, error) {
+	var ended []endedRow
+	if !cur.ID.IsZero() {
+		row, err := s.end(ctx, cur, domain.EndRebind)
+		if err != nil {
+			return nil, err
+		}
+		ended = append(ended, endedRow{row: row, info: info})
+	}
+	if other != nil {
+		row, err := s.end(ctx, *other, domain.EndRebind)
+		if err != nil {
+			return nil, err
+		}
+		otherInfo, err := s.thread(ctx, other.ThreadID)
+		if err != nil {
+			return nil, err
+		}
+		ended = append(ended, endedRow{row: row, info: otherInfo})
+	}
+	return ended, nil
+}
+
+// bindAttrs are the details of the allow entry of a bind (SEC-AUD-5: IDs and codes only).
+func bindAttrs(row, cur agents.Session, other *agents.Session, takeOver bool) auditing.Attrs {
+	attrs := auditing.Attrs{attrSessionID: auditing.ID(row.ID), attrTakeOver: auditing.Bool(takeOver), attrCause: auditing.Code(causeBind)}
 	if !cur.ID.IsZero() {
 		attrs[attrEndedSessionID] = auditing.ID(cur.ID)
 	}
 	if other != nil {
 		attrs[attrTakenOverSession], attrs[attrTakenOverThread] = auditing.ID(other.ID), auditing.ID(other.ThreadID)
 	}
-	return row, s.recordBind(ctx, info.ID, attrs)
+	return attrs
 }
 
 // insertConflict tells why an insert of a current row did nothing: the thread got another
@@ -775,13 +819,8 @@ func (s *SessionService) AttachOnStart(ctx context.Context, cmd agents.AttachOnS
 		// A guest run has no session; its reference is ignored (09 3.6, R-AG-04).
 		return ids.ID{}, nil
 	}
-	if cmd.ExternalSessionRef != "" {
-		if err := domain.CheckExternalSessionRef(cmd.ExternalSessionRef, s.cfg.SessionRefMaxBytes); err != nil {
-			return ids.ID{}, err
-		}
-		if err := domain.CheckModel(cmd.Model); err != nil {
-			return ids.ID{}, err
-		}
+	if err := s.checkStart(cmd); err != nil {
+		return ids.ID{}, err
 	}
 	cur, found, err := s.d.Store.LockCurrentSession(ctx, info.ID)
 	if err != nil {
@@ -793,11 +832,30 @@ func (s *SessionService) AttachOnStart(ctx context.Context, cmd agents.AttachOnS
 	if cmd.ExternalSessionRef == "" {
 		return ids.ID{}, nil
 	}
+	return s.createOnStart(ctx, info, cmd)
+}
+
+// checkStart validates the reference and the model of run.start when a reference is given.
+func (s *SessionService) checkStart(cmd agents.AttachOnStartCmd) error {
+	if cmd.ExternalSessionRef == "" {
+		return nil
+	}
+	if err := domain.CheckExternalSessionRef(cmd.ExternalSessionRef, s.cfg.SessionRefMaxBytes); err != nil {
+		return err
+	}
+	return domain.CheckModel(cmd.Model)
+}
+
+// createOnStart attaches the most recent row of the reference in the thread or creates the
+// current row of run.start (design note 10).
+func (s *SessionService) createOnStart(ctx context.Context, info chat.ThreadInfo, cmd agents.AttachOnStartCmd) (ids.ID, error) {
 	// A reset or bind ended the row after the run was queued: the run keeps the row it was
 	// invoked with.
-	if prev, found, err := s.d.Store.LatestInThreadByRef(ctx, info.ID, cmd.AgentID, cmd.ExternalSessionRef); err != nil {
+	prev, found, err := s.d.Store.LatestInThreadByRef(ctx, info.ID, cmd.AgentID, cmd.ExternalSessionRef)
+	if err != nil {
 		return ids.ID{}, err
-	} else if found {
+	}
+	if found {
 		return prev.ID, nil
 	}
 	row, inserted, err := s.d.Store.InsertSession(ctx, NewSession{

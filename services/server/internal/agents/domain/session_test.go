@@ -165,7 +165,7 @@ func TestValidateExternalSessionRef(t *testing.T) {
 		{"white space only", "   ", "required"},
 		{"invalid utf8", "sess-\xff", "invalid_utf8"},
 		{"control character", "sess-\x07", "control_character"},
-		{"bidi control", "sess-‮", "bidi_control"},
+		{"bidi control", "sess-\u202e", "bidi_control"},
 		{"one byte too long", strings.Repeat("a", limit+1), "too_long"},
 	}
 	for _, c := range cases {

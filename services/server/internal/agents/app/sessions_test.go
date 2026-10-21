@@ -88,10 +88,11 @@ func (e *sessEnv) wantEventRows(want ...agents.Session) []eventlog.Event {
 	evs := e.eventsSnapshot()
 	if len(evs) != len(want) {
 		e.t.Fatalf("%d events, want %d", len(evs), len(want))
+		return nil
 	}
 	for i, ev := range evs {
 		c := e.decodeChanged(ev)
-		w := want[i]
+		w := want[i] //nolint:gosec // G602: the lengths were compared above and Fatalf returns
 		if c.AgentSession.ID != w.ID.String() || ev.ThreadID != w.ThreadID || c.AgentSession.Version != w.Version ||
 			c.AgentSession.EndReason != w.EndReason || c.AgentSession.IsCurrent != w.IsCurrent {
 			e.t.Fatalf("event %d: %+v, want row %+v", i, c.AgentSession, w)
@@ -107,10 +108,11 @@ func (e *sessEnv) wantNothingChanged(before []agents.Session) {
 	after := e.store.all()
 	if len(after) != len(before) {
 		e.t.Fatalf("%d rows, want %d", len(after), len(before))
+		return
 	}
 	for i := range after {
-		if after[i] != before[i] {
-			e.t.Fatalf("row %d changed: %+v, was %+v", i, after[i], before[i])
+		if after[i] != before[i] { //nolint:gosec // G602: the lengths were compared above and Fatalf returns
+			e.t.Fatalf("row %d changed: %+v, was %+v", i, after[i], before[i]) //nolint:gosec // G602: as above
 		}
 	}
 	if n, a, p := len(e.eventsSnapshot()), len(e.auditSnapshot()), len(e.attachedSnapshot()); n+a+p != 0 {
@@ -695,7 +697,7 @@ func TestSessionsReportOnRow(t *testing.T) {
 			pointer string
 		}{
 			{agents.ReportCmd{ExternalSessionRef: "", IfMatch: match(2)}, "/external_session_ref"},
-			{agents.ReportCmd{ExternalSessionRef: "sess-‮", IfMatch: match(2)}, "/external_session_ref"},
+			{agents.ReportCmd{ExternalSessionRef: "sess-\u202e", IfMatch: match(2)}, "/external_session_ref"},
 			{agents.ReportCmd{ExternalSessionRef: "sess-a", Model: "model large", IfMatch: match(2)}, "/model"},
 			{agents.ReportCmd{ExternalSessionRef: "sess-a", BindFailed: "gone", IfMatch: match(2)}, "/bind_failed"},
 		} {
