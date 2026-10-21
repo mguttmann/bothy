@@ -557,6 +557,13 @@ func TestHealth_HubStoppedFailsHealthz(t *testing.T) {
 	}
 }
 
+// catchUpHeartbeatMissLimit keeps the heartbeat deadline of a connection that sends no heartbeats
+// (wstest.WithoutHeartbeat) beyond testkit.Patience: sync.heartbeat_interval (30s) times the
+// limit plus one is 300s. The two catch-up race tests read thousands of frames, each validated by
+// gate G9, and on a hosted runner the drain outlasted the default 90s and closed with 4009
+// (docs/DECISIONS.md PL/19).
+const catchUpHeartbeatMissLimit = "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=9"
+
 // TestGateway_TokenRevokedDuringCatchUpCloses4012: an agent token revoked while its connection
 // catches up on a large backlog of a visible channel is closed with 4012 at the next page; the
 // pages after the revocation read the current rights version, not the one memoised when the
@@ -566,7 +573,7 @@ func TestGateway_TokenRevokedDuringCatchUpCloses4012(t *testing.T) {
 	t.Parallel()
 	const backlog = 2000
 	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
-		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000")
+		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", catchUpHeartbeatMissLimit)
 	space := w.newSpace("Engineering")
 	support := w.newChannel(space, "support")
 	other := w.newChannel(space, "other")

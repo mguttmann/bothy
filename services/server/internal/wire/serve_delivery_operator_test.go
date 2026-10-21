@@ -142,7 +142,7 @@ func TestGateway_OperatorNewChannelWhileCatchingUp(t *testing.T) {
 	t.Parallel()
 	const backlog = 2000
 	w := newDeliveryWorld(t, "BOTHY_SYNC__CATCHUP_PAGE_SIZE=50", "BOTHY_SYNC__OUTBOUND_QUEUE_MAX=50",
-		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1")
+		"BOTHY_SYNC__TAIL_BATCH_SIZE=50000", catchUpHeartbeatMissLimit, "BOTHY_SYNC__CURSOR_ADVANCE_EVERY=1")
 	eng := w.newSpace("Engineering")
 	work := w.newChannel(eng, "work")
 	other := w.newChannel(eng, "other")
