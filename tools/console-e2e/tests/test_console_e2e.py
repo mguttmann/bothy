@@ -688,3 +688,33 @@ def test_problem_text_names_code_and_reason_only() -> None:
     assert admin.problem_text(answer) == "conflict billing_mode_not_personal"
     assert admin.problem_text({"json": {"code": "forbidden"}}) == "forbidden"
     assert admin.problem_text({"json": None}) == ""
+
+
+def test_save_results_copies_the_json_files_and_the_screenshots(tmp_path: Path) -> None:
+    results = tmp_path / "results"
+    results.mkdir()
+    for name in ("admin.json", "admin-01-failure.png", "other.txt"):
+        (results / name).write_text("x", encoding="utf-8")
+    e2e.save_results(results, str(tmp_path / "artifacts"))
+    assert {p.name for p in (tmp_path / "artifacts").iterdir()} == {
+        "admin.json",
+        "admin-01-failure.png",
+    }
+
+
+def test_console_log_keeps_test_output_out_of_stderr(capsys: pytest.CaptureFixture[str]) -> None:
+    class Msg:
+        def __init__(self, text: str) -> None:
+            self.text = text
+            self.type = "log"
+
+    lines: list[str] = []
+    listen = admin.console_log(lines)
+    listen(Msg('PATROL_LOG {"type":"test"}'))  # type: ignore[arg-type]
+    for i in range(admin.CONSOLE_KEEP + 5):
+        listen(Msg(f"line {i} " + "x" * 600))  # type: ignore[arg-type]
+    err = capsys.readouterr().err
+    assert err == 'PATROL_LOG {"type":"test"}\n'
+    assert len(lines) == admin.CONSOLE_KEEP
+    assert lines[0].startswith("log: line 5 ")
+    assert all(len(line) <= admin.CONSOLE_LINE_MAX for line in lines)

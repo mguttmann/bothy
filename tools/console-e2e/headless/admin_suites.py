@@ -805,6 +805,12 @@ def run_tests(page: Page) -> list[dict[str, Any]]:
             }
         )
         say(f"{test.name}: {result}")
+        if result != "success":
+            # patrol often reports a failure without details; the picture of the page is the
+            # diagnosis (results/, copied with E2E_ARTIFACTS).
+            shot = RESULTS / f"admin-{len(results):02d}-failure.png"
+            page.screenshot(path=str(shot), full_page=True)
+            results[-1]["screenshot"] = shot.name
     return results
 
 
@@ -835,7 +841,7 @@ def run_admin(pw: Playwright, login: Login, spki: str) -> dict[str, Any]:
     try:
         session.context.grant_permissions(PERMISSIONS, origin=ORIGIN)
         session.context.expose_binding("__patrol__platformHandler", handler)
-        page.on("console", _patrol_log)
+        page.on("console", console_log(result.setdefault("console", [])))
         page.on("download", record_download(handler, downloads))
         add_virtual_authenticator(session)
         page.goto(CONSOLE)
@@ -873,10 +879,24 @@ def run_admin(pw: Playwright, login: Login, spki: str) -> dict[str, Any]:
     return result
 
 
-def _patrol_log(msg: ConsoleMessage) -> None:
-    """Prints patrol's step log (console lines starting with PATROL_LOG) to stderr."""
-    if msg.text.startswith("PATROL_LOG"):
-        print(msg.text, file=sys.stderr, flush=True)
+CONSOLE_KEEP = 400
+CONSOLE_LINE_MAX = 500
+
+
+def console_log(lines: list[str]) -> Callable[[ConsoleMessage], None]:
+    """The page's console listener: patrol's step log (lines starting with PATROL_LOG) goes to
+    stderr; every other line (the output of flutter_test, for example the reason of a failed
+    expectation) goes to ``lines``, the member ``console`` of admin.json, never to stderr, cut to
+    the last CONSOLE_KEEP lines of CONSOLE_LINE_MAX characters."""
+
+    def on_console(msg: ConsoleMessage) -> None:
+        if msg.text.startswith("PATROL_LOG"):
+            print(msg.text, file=sys.stderr, flush=True)
+            return
+        lines.append(f"{msg.type}: {msg.text}"[:CONSOLE_LINE_MAX])
+        del lines[:-CONSOLE_KEEP]
+
+    return on_console
 
 
 def main() -> int:

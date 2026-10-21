@@ -140,8 +140,11 @@ The phase fails on a failed or skipped test, on an empty test list, on an unsupp
 action, on any CSP violation, console CSP error or foreign origin, and when no download ends with
 `.csv` and has `occurred_at` in its first line (the export of A6). The result is
 `out/results/admin.json`: per test its name, result and details (cut to 2000 characters), the
-platform actions called, the downloads (file name and first line), violations, console CSP errors
-and foreign origins. No secret, code or token is printed or written there.
+platform actions called, the downloads (file name and first line), violations, console CSP errors,
+foreign origins and the console output of the page (the reason of a failed expectation; patrol
+itself often reports a failure without details); each failed test also leaves a screenshot
+`out/results/admin-<n>-failure.png`. `E2E_ARTIFACTS` copies the JSON files and the screenshots.
+Only patrol's step log goes to stderr; no secret, code or token is printed.
 
 ## Variables
 
