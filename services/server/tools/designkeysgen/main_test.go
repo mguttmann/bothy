@@ -26,6 +26,9 @@ func TestKeys_Fixture(t *testing.T) {
 	if want := []string{"code", "terminal-window"}; !slices.Equal(k.SpaceIcons, want) {
 		t.Errorf("space icons %v, want %v", k.SpaceIcons, want)
 	}
+	if want := []string{"action.send", "state.warning"}; !slices.Equal(k.Glyphs, want) {
+		t.Errorf("glyphs %v, want %v", k.Glyphs, want)
+	}
 }
 
 func TestRender_Golden(t *testing.T) {
@@ -70,6 +73,8 @@ func TestKeys_Invalid(t *testing.T) {
 		"no-categories": `{"contexts":{"theme":{"light":{},"dark":{}}},"icons":{"space-icons":["code"]}}`,
 		"bad-key":       `{"contexts":{"theme":{"light":{"color.category.Moss.fg":{}},"dark":{"color.category.Moss.fg":{}}}},"icons":{"space-icons":["code"]}}`,
 		"bad-icon":      `{"contexts":{"theme":{"light":{"color.category.moss.fg":{}},"dark":{"color.category.moss.fg":{}}}},"icons":{"space-icons":["Code Icon"]}}`,
+		"no-glyphs":     `{"contexts":{"theme":{"light":{"color.category.moss.fg":{}},"dark":{"color.category.moss.fg":{}}}},"icons":{"space-icons":["code"]}}`,
+		"bad-glyph":     `{"contexts":{"theme":{"light":{"color.category.moss.fg":{}},"dark":{"color.category.moss.fg":{}}}},"icons":{"space-icons":["code"],"glyphs":{"State Warning":{}}}}`,
 	} {
 		path := filepath.Join(dir, name+".json")
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
