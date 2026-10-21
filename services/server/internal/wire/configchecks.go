@@ -14,6 +14,7 @@ import (
 	auditdomain "github.com/OWNER/bothy/services/server/internal/audit/domain"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	identitydomain "github.com/OWNER/bothy/services/server/internal/identity/domain"
+	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fcm"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -69,6 +70,14 @@ var configChecks = []configCheck{
 	{name: "heartbeat_persist_below_orphan_timeout", keys: []string{keyHeartbeatPersistInterval, keyOrphanTimeout}, fn: heartbeatPersistBelowOrphanTimeout},
 	{name: "autocomplete_below_request_timeout", keys: []string{keyAutocompleteTimeout, keyHTTPRequestTimeout}, fn: autocompleteBelowRequestTimeout},
 	{name: "push_apns_complete", keys: apnsCheckKeys, fn: pushAPNsComplete},
+	{name: "push_fcm_project_id", keys: []string{fcm.KeyProjectID}, fn: pushFCMProjectID},
+}
+
+// pushFCMProjectID is the cross-check push_fcm_project_id (02 13 item 4, M3-21): a non-empty
+// push.fcm.project_id holds only lower-case letters, digits and hyphens and starts with a letter,
+// because it becomes a path segment of the FCM send URL. The error names the key.
+func pushFCMProjectID(v *config.Values) error {
+	return fcm.ValidateProjectID(v.String(fcm.KeyProjectID))
 }
 
 // keyHeartbeatPersistInterval is agent.heartbeat_persist_interval, how often the heartbeat is

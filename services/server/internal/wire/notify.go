@@ -133,8 +133,8 @@ type PushDeps struct {
 	Positions notifyapp.ReadPositions
 	// InstanceID is the instance record's ID of every Notification.
 	InstanceID ids.ID
-	// Providers are the registered push providers; production registers none until M3-20 and
-	// M3-21, tests pass fakepush providers.
+	// Providers are the registered push providers: the FCM adapter when FCM is enabled (M3-21);
+	// tests pass fakepush providers.
 	Providers []notifyapp.PushProvider
 	// Presence gives the live connections; nil means presence.None (role worker; role all passes
 	// the gateway's PresenceView, M3-23).

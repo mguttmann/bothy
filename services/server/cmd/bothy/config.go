@@ -244,7 +244,8 @@ func checkSecretRefs(ctx context.Context, s *config.Schema, values *config.Value
 // containers do not get their files (docs/DECISIONS.md M1-12); the keys of the S3 driver are read
 // only with file.storage.driver = s3 (12 "18.", docs/DECISIONS.md M3-02/6), those of the object
 // store sink only with an s3:// audit.checkpoint_sink (M7-22), push.apns.private_key_ref only
-// with APNs enabled (M3-20).
+// with APNs enabled (M3-20), and the FCM service account only with push.fcm.project_id set
+// (D-M3-21-2).
 func skipReason(key string, values *config.Values) string {
 	switch {
 	case strings.HasPrefix(key, migrateSection):
@@ -255,6 +256,8 @@ func skipReason(key string, values *config.Values) string {
 		return "read only with file.storage.driver = s3"
 	case key == apnsKeyRef && !apnsEnabled(values):
 		return "read only with APNs enabled"
+	case key == keyFCMServiceAccount && values.String(keyFCMProjectID) == "":
+		return "read only with push.fcm.project_id set"
 	}
 	return ""
 }
@@ -268,6 +271,13 @@ func apnsEnabled(values *config.Values) bool {
 	return values.String("push.apns.team_id") != "" && values.String("push.apns.key_id") != "" &&
 		len(values.Strings("push.apns.topics")) > 0
 }
+
+// The FCM keys: check --secrets resolves the service account only when FCM is enabled, because
+// the default reference names a file an instance without FCM does not have (M3-21).
+const (
+	keyFCMServiceAccount = "push.fcm.service_account_ref"
+	keyFCMProjectID      = "push.fcm.project_id"
+)
 
 // migrateSection prefixes the keys of bothy migrate; check --secrets does not resolve their
 // references (checkSecretRefs).

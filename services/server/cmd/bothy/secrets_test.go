@@ -169,6 +169,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret privacy.audit_ip_kek_ref: ok\n" +
 		// APNs is off without team ID, key ID and topics; its key is read only with APNs (M3-20).
 		"secret push.apns.private_key_ref: skipped (read only with APNs enabled)\n" +
+		// The FCM service account is read only with FCM enabled (M3-21).
+		"secret push.fcm.service_account_ref: skipped (read only with push.fcm.project_id set)\n" +
 		// An optional reference without a value switches its feature off and reads nothing
 		// (docs/DECISIONS.md M1-21/1).
 		"secret server.tls_cert_ref: not set\n" +
@@ -205,6 +207,17 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	code, stdout, _ = runBothy(t, apnsEnv, "config", "check", "--secrets")
 	if code == 0 || !strings.Contains(stdout, "secret push.apns.private_key_ref: not_found\n") {
 		t.Errorf("check --secrets with APNs and no key file: exit %d, stdout\n%s", code, stdout)
+	}
+	// With FCM enabled the service account is resolved, and a missing file fails the check.
+	fcmEnv := []string{"BOTHY_SECRETS__DIR=" + dir, "BOTHY_PUSH__FCM__PROJECT_ID=example-chat"}
+	code, stdout, _ = runBothy(t, fcmEnv, "config", "check", "--secrets")
+	if code == 0 || !strings.Contains(stdout, "secret push.fcm.service_account_ref: not_found\n") {
+		t.Errorf("check --secrets with FCM and no service account: exit %d, stdout\n%s", code, stdout)
+	}
+	writeSecret(t, dir, "fcm_service_account.json", `{"type":"service_account"}`, 0o600)
+	code, stdout, stderr = runBothy(t, fcmEnv, "config", "check", "--secrets")
+	if code != 0 || !strings.Contains(stdout, "secret push.fcm.service_account_ref: ok\n") {
+		t.Errorf("check --secrets with FCM: exit %d, stdout\n%s\nstderr %s", code, stdout, stderr)
 	}
 }
 
