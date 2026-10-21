@@ -502,9 +502,31 @@ An agent that calls the server API inside a run sends the run's invocation token
 - Nothing is cached: a revocation or the end of a run counts on the next request in every process.
 - Query exception: `GetRunBinding` reads one run by primary key without the visible-channel predicate, on the pool, outside a unit of work and without a lock, during the authentication of a request and before any `authorize`; nothing of the row leaves the server (07 section 7.4 rule 1, exception "resolution for authorize"; category `authorize_resolution` in `tools/lint/sql_visibility.yaml`). It is the port `app.RunBindings`, separate from `Repository`.
 
+## Run context (M2-13)
+
+- Port: `Runs.Context(ctx, runID)` returns `RunContext` (`ContextMessage`, `ContextAuthor`,
+  `ContextAttachment`) for `getRunContext` (`run.context.read`, agent-self, `rl.agent_runtime`);
+  `adapters/httpapi/runcontext.go` converts it to schema `RunContext` without JSON `null`.
+- Use case `app/runcontext.go` (`Context`): `Repository.Run`, `authorize` with the run's agent as
+  owner, the same `404` for unknown, invisible and inactive runs and for a triggering message the
+  agent cannot read; then `chat.Threads.Info` (current channel, kind, parent message, fixed
+  operator), `chat.TriggerFacts.TriggerChannel` (effective operator, `history_backfill_limit`),
+  the session plan, the windows through `messaging.Messages.ContextWindow` and `ContextMessage`,
+  cutting and budget, one `authorize.TriggerHolders.WithTrigger` call for the trust marks and the
+  delivered follow-ups. No unit of work, no lock; logs carry the run id at most.
+- Pure rules in `domain/runcontext.go`: `Classify` (role and trust, origin before author),
+  `PlanContext` (mode through `DecideSession`, floor, own messages, channel context),
+  `CutContent`, `FitBudget`, `TruncatedBeforeSeq`.
+- Collaborators in `app.Deps`: `ContextMessages` (messaging), `TriggerHolders` (authz through
+  `kernel/authorize`), `CurrentSessions` (agents) and `ContextRows` (`adapters/postgres`,
+  queries `EarlierSessionRun` and `DeliveredFollowupsOfSession` in `queries/runcontext.sql`);
+  `internal/wire` takes the first three from the values it already wires.
+- Configuration keys: `agent.context_max_bytes`, `agent.context_message_max_bytes`.
+- Rulings: docs/DECISIONS.md M2-13.
+
 ## Visibility of `runs`, `run_steps` and `run_followups`
 
-The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads the rows of one thread or run whose visibility the use case checked first, or (the active-run lists) the active runs whose threads `chat.Threads.Locate` resolves, kept only when the channel is in `Scope.ChannelIDs` and `run.read` allows each row in filter mode (category `thread_scope` of `tools/lint/sql_visibility.yaml`); the gauge query has no principal.
+The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads the rows of one thread or run whose visibility the use case checked first, or (the active-run lists) the active runs whose threads `chat.Threads.Locate` resolves, kept only when the channel is in `Scope.ChannelIDs` and `run.read` allows each row in filter mode (category `thread_scope` of `tools/lint/sql_visibility.yaml`); the gauge query has no principal. The run-context queries `EarlierSessionRun` and `DeliveredFollowupsOfSession` read rows of the one run, thread and session row whose `run.context.read` the use case authorized first (category `after_authorize`, M2-13).
 
 ## Dependencies
 

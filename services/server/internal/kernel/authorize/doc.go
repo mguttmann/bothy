@@ -21,6 +21,10 @@
 // a registration or a route binding (RouteBinding) breaks the catalogue (05 rules 3 to 5, 10;
 // 07 AZ-P1 and AZ-P2).
 //
+// TriggerHolders (M2-13) answers which people have effective trigger on a channel at decision time,
+// for the trust marks of the run context of runs; authz implements it, and it writes no audit entry
+// and no check-log entry.
+//
 // The check log (WithCheckLog, RecordCheck, Checks; M1-18) is the proof of
 // docs/spec/02-architecture.md 9.3: every implementation of the Authorizer must call RecordCheck
 // once per Authorize and once per Scope call, and the HTTP chain refuses a successful response of

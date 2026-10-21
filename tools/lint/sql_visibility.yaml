@@ -52,7 +52,7 @@ exceptions:
     reason: "listAgentSessions reads the sessions of the one thread whose agent_session.read authorize allowed; agent_sessions has no channel_id, the thread was checked first (M2-12)"
   - query: agents.CurrentSession
     category: after_authorize
-    reason: "the current session of the one thread whose agent_session.bind authorize allowed or whose run invocation agent.invoke decided; nothing of the row leaves before that decision (M2-12)"
+    reason: "the current session of the one thread whose agent_session.bind authorize allowed or whose run invocation agent.invoke decided, or of the run whose run.context.read authorize allowed (the session mode of the run context, M2-13); nothing of the row leaves before that decision (M2-12)"
   - query: agents.LockCurrentSession
     category: after_authorize
     reason: "locks the current session of the one thread whose agent_session.reset or agent_session.bind authorize allowed, or whose run invocation or run.start runs decided (09 9.1, 9.2, 9.4; M2-12)"
@@ -215,6 +215,9 @@ exceptions:
   - query: messaging.GetMessage
     category: authorize_resolution
     reason: "resolves one message (thread, channel) for authorize; the use case returns it only after message.read allowed it"
+  - query: messaging.ListContextWindow
+    category: after_authorize
+    reason: "the run context window of the one thread of the run whose run.context.read authorize allowed, or the main thread of its parent message in the same channel; every row passes message.read in filter mode before it leaves (09 4.6, M2-13)"
   - query: messaging.GetMessageByClientID
     category: after_authorize
     reason: "the idempotency lookup of the author's own message after message.create allowed the write in the thread (04 section 5.1 point 4)"
@@ -287,6 +290,12 @@ exceptions:
   - query: runs.OrphanCandidates
     category: system_job
     reason: "the job runs.stall_check reads the started active runs without a principal and fails the interrupted and stale ones; nothing of the rows leaves the server (09 5.5, M2-09)"
+  - query: runs.EarlierSessionRun
+    category: after_authorize
+    reason: "the run context reads, for the one run whose run.context.read authorize allowed, whether an earlier started run of its thread used its session row and the triggering message of the latest such run; only a boolean and an id leave (09 4.6, M2-13)"
+  - query: runs.DeliveredFollowupsOfSession
+    category: after_authorize
+    reason: "the run context reads which of its already selected messages a run of the same session in the one thread of the run whose run.context.read authorize allowed received as follow-ups; only message ids leave (09 4.6, M2-13)"
   - query: runs.SessionUsed
     category: after_authorize
     reason: "asks whether a run of the one thread whose invocation agent.invoke allowed already used a session row (the session mode of 09 9.1); only the boolean leaves, never a row (M2-12)"

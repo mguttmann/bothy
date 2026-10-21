@@ -714,6 +714,20 @@ behaviour of M1-56.
 Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContextOverride`,
 `TestCreateThread_HashContextOverride`).
 
+## Run context windows (M2-13)
+
+- Port methods `Messages.ContextWindow(ctx, ContextQuery)` (`ContextPage`: items ascending with
+  full content, `HasOlder`) and `Messages.ContextMessage(ctx, id)` (one message with full content,
+  a tombstone as stored; `ok` false for unknown and refused alike) in `app/context.go`, for the run
+  context of `runs`.
+- `ListContextWindow` (`queries/context.sql`) is one statement with `LIMIT` and an `EXISTS` for
+  `HasOlder` over `(thread_id, thread_seq)`; it filters tombstones and the excluded author in SQL,
+  so the limit counts only selectable messages. Neither it nor `GetMessage` of `ContextMessage`
+  carries the visible-channel predicate: `runs` authorized `run.context.read` on the run of the
+  thread first, and every returned row passes `message.read` in filter mode (a refused row of the
+  window is dropped, logged and counted as `filter_mismatch`). Both stand in the allowlist of
+  `TestQueriesCarryVisibleChannelPredicate` and `tools/lint/sql_visibility.yaml`.
+
 ## Agent answers and announcements (M2-19)
 
 - `MessageCreate.run_id` is enabled. The body rule (`domain.CheckRunID`) refuses it for every

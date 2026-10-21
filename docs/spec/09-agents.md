@@ -512,6 +512,46 @@ which authors are how trustworthy. Schema `run_context.v1`:
   agents, apps, imports and system), `origin`, `kind`, `content_md`, `attachments` (`file_id`,
   name, MIME, size, `scan_status`, transcript if available), `reply_to_message_id`, `trust`.
   `role` tells the runtime who is speaking; `trust` tells it how it must treat the content.
+- Every element also carries `channel_id`, the channel of the message (SEC-AI-1, M2-13).
+
+Rules of the run context (M2-13, docs/DECISIONS.md D-M2-13-3 to D-M2-13-12):
+
+- Only an own run in `queued`, `running` or `waiting_input` has a context; an unknown run, a run
+  the agent cannot see, an own run that is no longer active and a triggering message the agent
+  cannot read answer the same `404`. Another agent gets `403 forbidden` with `not_self`, a person
+  or an app `403 forbidden` with `subject_kind_not_allowed`; `authz` audits every denial, a
+  successful read writes no audit entry. A run whose `trigger_kind` is not `message` answers
+  `internal_error` until commands and interactions define their context.
+- Classification: the origin decides before the author. `origin = system` gives `role = other`,
+  `trust = system`; `import` and `app` give `other`, `unverified`; `agent` gives `assistant`,
+  `self` for the run's own agent and `other`, `unverified` for any other agent; `human` gives
+  `user` with `trigger` for the triggering person, `authorized` for another active person with
+  effective `trigger` on C (an active owner counts on every channel that is not a DM) and
+  `unverified` otherwise. `authz` answers who has `trigger` at the time of the request through
+  `authorize.TriggerHolders`; a source error fails the request and never weakens trust.
+- Session mode: the mode of the invocation (9.1) over the current session of T when it belongs to
+  the run's agent. In `new`, `bind` and guest runs `context_floor_seq` is `0`, the agent's own
+  messages are included and `channel_context` is built; in `resume` the own messages are left out,
+  no `channel_context` is built, and the floor is the `thread_seq` of the triggering message of the
+  latest earlier started run of the session that has one, `0` when that message lies outside T
+  (the parent message of an auto thread). `already_delivered` is set only in `resume`.
+- Windows: `thread_context` holds the newest `history_backfill_limit` messages of T strictly
+  between the floor and M; when M is the parent message of T (auto thread, 3.7) it is empty.
+  `channel_context` holds the newest `history_backfill_limit` messages of the main thread of C
+  before the parent message, without the parent itself, and only when the parent lies in the
+  thread's current channel; after a move (`thread.move`) it is absent. Deleted messages are never
+  part of a window and count towards no limit; the triggering message appears as stored.
+- Bytes: each element of `thread_context` and `channel_context` is cut to the longest valid UTF-8
+  prefix within `agent.context_message_max_bytes` (`truncated: true`); then the newest elements
+  are kept, `channel_context` before `thread_context` in time, while the sum of their `content_md`
+  stays within `agent.context_max_bytes`; the first element that does not fit and every older one
+  are dropped. `trigger_message` is never cut and never counted.
+- `truncated_before_seq` refers to T: set when older selectable messages of T are missing (window
+  or budget), to the `thread_seq` of the oldest element of `thread_context`, or of M when
+  `thread_context` is empty.
+- Optional members appear only when they apply (`truncated` and `already_delivered` only when
+  true); `channel_context` is present, possibly empty, exactly when it is built. Each request
+  recomputes every part; the read opens no transaction and takes no lock.
 
 **Trust mark `trust`.** The server sets it at query time:
 
