@@ -18,7 +18,7 @@ from .conftest import World
 pytestmark = pytest.mark.anyio
 
 
-async def test_AZ_P6_runner_never_starts_runtime(world: World) -> None:
+async def test_az_p6_runner_never_starts_runtime(world: World) -> None:
     fake = world.fake
     plan: dict[UUID, asyncio.Future[Any]] = {}
 
@@ -35,7 +35,9 @@ async def test_AZ_P6_runner_never_starts_runtime(world: World) -> None:
     invalid: list[UUID] = []
     for variant in ("missing", "bad_signature", "aud_other_agent"):
         run = await fake.trigger(f"AZ-P6 {variant}", channel_id=world.forum_a)
-        slot(run.run_id).set_result(REMOVE if variant == "missing" else fake.forge_token(run.run_id, variant))
+        slot(run.run_id).set_result(
+            REMOVE if variant == "missing" else fake.forge_token(run.run_id, variant)
+        )
         invalid.append(run.run_id)
     for run_id in invalid:
         assert await world.ended(run_id) == "failed"
@@ -73,7 +75,7 @@ async def test_AZ_P6_runner_never_starts_runtime(world: World) -> None:
     assert world.requests("startRun") == []
 
 
-async def test_AZ_P6_repeated_jti_gives_one_turn(world: World) -> None:
+async def test_az_p6_repeated_jti_gives_one_turn(world: World) -> None:
     world.scenario(fixture="plain")
     recording: dict[str, RecordingSource] = {}
 

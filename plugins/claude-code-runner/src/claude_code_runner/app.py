@@ -50,10 +50,12 @@ from bothy_sdk.errors import (
     InvocationTokenInvalid,
     NotFoundError,
     ProblemError,
+    RateLimitedError,
+    ServerError,
     VersionConflict,
 )
 from bothy_sdk.gateway import CloseReason
-from bothy_sdk.generated.api.agent_runtime import report_agent_session
+from bothy_sdk.generated.api.agent_runtime import finish_run, report_agent_session
 from bothy_sdk.generated.api.me import get_me
 from bothy_sdk.generated.models import (
     AgentSession,
@@ -61,6 +63,8 @@ from bothy_sdk.generated.models import (
     BillingEvidence,
     Me,
     RunContext,
+    RunFinish,
+    RunFinishState,
     RunMetrics,
     ToolClass,
 )
@@ -294,6 +298,14 @@ class RunnerHandler(AgentHandler):
         if self.probe.reasons:
             warn("runtime_degraded", reasons=",".join(self.probe.reasons))
         return self.probe
+
+    async def close(self) -> None:
+        """Cancel a running version probe and wait for it (its process is killed)."""
+        task = self._probing
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
     def _probe_soon(self) -> None:
         if self._probing is not None and not self._probing.done():
@@ -682,12 +694,47 @@ class _Turn:
         await self._finish("completed", metrics=metrics, costs=reports)
 
     async def _finish(self, state: str, **kwargs: Any) -> None:
+        """``finishRun`` through the run handle; a lost answer is sent again with the same body.
+
+        A repeated final state answers ``200`` (M2-09 note 6) and the costs come from the
+        pending record, so a retry never reports a delta twice. Only the call is repeated,
+        never the turn (R-AG-17).
+        """
         try:
             await self.handle.finish(state, **kwargs)
         except ConflictError as err:
             # invalid_state_transition: the server ended the run already; never retried.
             log("finish_refused", code=err.code, **self.ids)
+        except (ServerError, RateLimitedError, httpx.TransportError):
+            await self._finish_again(state, kwargs)
         log("run_finished", state=state, reason=kwargs.get("reason", ""), **self.ids)
+
+    async def _finish_again(self, state: str, kwargs: Mapping[str, Any]) -> None:
+        body = RunFinish(state=RunFinishState(state))
+        if kwargs.get("reason") is not None:
+            body.reason = kwargs["reason"]
+        if kwargs.get("metrics") is not None:
+            body.metrics = kwargs["metrics"]
+        if kwargs.get("costs"):
+            body.costs = list(kwargs["costs"])
+        settings = self.cfg.sdk
+        client = self.handle.client
+        for attempt in range(max(1, settings.retry_max_attempts - 1)):
+            await client.clock.sleep(
+                min(settings.retry_backoff_cap, settings.retry_backoff_base * 2**attempt)
+            )
+            try:
+                await client.call(finish_run.asyncio_detailed, run_id=self.handle.run_id, body=body)
+                return
+            except ConflictError as err:
+                log("finish_refused", code=err.code, **self.ids)
+                return
+            except (ServerError, RateLimitedError, httpx.TransportError):
+                continue
+            except ProblemError as err:
+                log("finish_refused", code=err.code, **self.ids)
+                return
+        warn("finish_not_stored", **self.ids)
 
 
 def _n(value: object) -> int:
@@ -806,7 +853,10 @@ class Runner:
             The SDK's close reason.
         """
         adapter = self.adapter or await self.build()
-        return await adapter.run()
+        try:
+            return await adapter.run()
+        finally:
+            await self.handler.close()
 
     async def stop(self) -> None:
         """Stop the adapter; running turns are cancelled by the SDK's shutdown."""

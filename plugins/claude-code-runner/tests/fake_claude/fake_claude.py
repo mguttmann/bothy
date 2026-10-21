@@ -79,7 +79,11 @@ class Fake:
                 method = "api_key"
             else:
                 base = env.get("CLAUDE_CONFIG_DIR")
-                login = Path(base) / "fake-login" if base else Path(env.get("HOME", "/nonexistent")) / ".claude" / "fake-login"
+                login = (
+                    Path(base) / "fake-login"
+                    if base
+                    else Path(env.get("HOME", "/nonexistent")) / ".claude" / "fake-login"
+                )
                 if login.is_file():
                     method = login.read_text().strip() or "none"
         print(json.dumps({"loggedIn": method != "none", "authMethod": method}))
@@ -88,11 +92,22 @@ class Fake:
     def turn(self) -> int:
         argv = sys.argv[1:]
         prompt_file = _after(argv, "--append-system-prompt-file")
-        system_prompt = Path(prompt_file).read_text() if prompt_file and Path(prompt_file).is_file() else None
+        system_prompt = (
+            Path(prompt_file).read_text() if prompt_file and Path(prompt_file).is_file() else None
+        )
         self.session_id = _after(argv, "--session-id") or _after(argv, "--resume") or ""
         self.model = _after(argv, "--model") or ""
-        self.record("turn_start", program=sys.argv[0], argv=argv, cwd=os.getcwd(), env=dict(os.environ), system_prompt=system_prompt)
-        signal.signal(signal.SIGINT, signal.SIG_IGN if self.scenario.get("ignore_sigint") else self.on_sigint)
+        self.record(
+            "turn_start",
+            program=sys.argv[0],
+            argv=argv,
+            cwd=os.getcwd(),
+            env=dict(os.environ),
+            system_prompt=system_prompt,
+        )
+        signal.signal(
+            signal.SIGINT, signal.SIG_IGN if self.scenario.get("ignore_sigint") else self.on_sigint
+        )
         if self.scenario.get("ignore_sigterm"):
             signal.signal(signal.SIGTERM, signal.SIG_IGN)
         first = sys.stdin.readline()
@@ -101,8 +116,15 @@ class Fake:
         if source is None:
             source = "ANTHROPIC_API_KEY" if os.environ.get("ANTHROPIC_API_KEY") else "none"
         self.emit(
-            {"type": "system", "subtype": "init", "session_id": self.session_id, "model": self.model,
-             "apiKeySource": source, "tools": [], "cwd": os.getcwd()}
+            {
+                "type": "system",
+                "subtype": "init",
+                "session_id": self.session_id,
+                "model": self.model,
+                "apiKeySource": source,
+                "tools": [],
+                "cwd": os.getcwd(),
+            }
         )
         try:
             echo = json.loads(first)
@@ -123,7 +145,12 @@ class Fake:
         if self.scenario.get("hold"):
             self.sleep(600.0)
         if not self.scenario.get("no_result"):
-            final = result or {"type": "result", "subtype": "success", "is_error": False, "result": ""}
+            final = result or {
+                "type": "result",
+                "subtype": "success",
+                "is_error": False,
+                "result": "",
+            }
             final.update(self.scenario.get("result_override", {}))
             self.emit(final)
         exit_code = int(self.scenario.get("exit_code", 0))
@@ -139,8 +166,15 @@ class Fake:
         self.stopping.wait(seconds)
 
     def on_sigint(self, *_: Any) -> None:
-        self.emit({"type": "result", "subtype": "error_during_execution", "is_error": True,
-                   "session_id": self.session_id, "result": ""})
+        self.emit(
+            {
+                "type": "result",
+                "subtype": "error_during_execution",
+                "is_error": True,
+                "session_id": self.session_id,
+                "result": "",
+            }
+        )
         self.record("turn_end", code=130, signal="SIGINT")
         os._exit(130)
 

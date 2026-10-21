@@ -95,6 +95,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     args = _parser().parse_args(argv)
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(message)s")
+    # Frame dumps of the WebSocket library can hold the API token (identify); never log them.
+    logging.getLogger("websockets").setLevel(logging.WARNING)
     try:
         config = load_config(args.config)
     except ConfigError as err:

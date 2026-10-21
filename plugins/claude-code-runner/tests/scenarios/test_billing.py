@@ -27,7 +27,7 @@ async def _refused(world: World, reason: str) -> None:
 
 
 @pytest.mark.parametrize("variant", ["empty", "missing", "empty_file"])
-async def test_BR_12_organization_without_key_no_fallback(world: World, variant: str) -> None:
+async def test_br_12_organization_without_key_no_fallback(world: World, variant: str) -> None:
     ref = {
         "empty": "",
         "missing": f"file:{world.root / 'no_key'}",
@@ -42,7 +42,7 @@ async def test_BR_12_organization_without_key_no_fallback(world: World, variant:
     assert world.turns() == []
 
 
-async def test_BR_12_auth_status_none_and_valid_key(world: World) -> None:
+async def test_br_12_auth_status_none_and_valid_key(world: World) -> None:
     world.scenario(fixture="plain", auth_method="none")
     await world.start(**FORBIDDEN)
     await _refused(world, "runtime_not_authenticated")
@@ -62,7 +62,7 @@ async def test_BR_12_auth_status_none_and_valid_key(world: World) -> None:
 
 
 @pytest.mark.parametrize("variant", ["claude_ai", "non_json", "personal_not_allowed"])
-async def test_AG_11_BR_05_billing_mode_mismatch(world: World, variant: str) -> None:
+async def test_ag_11_br_05_billing_mode_mismatch(world: World, variant: str) -> None:
     if variant == "claude_ai":
         world.scenario(auth_method="claude.ai")
     elif variant == "non_json":
@@ -92,8 +92,14 @@ async def test_personal_allowed_with_subscription_login(world: World) -> None:
 
 
 @pytest.mark.parametrize("stubborn", [False, True])
-async def test_BR_05_counter_check_aborts_turn(world: World, stubborn: bool) -> None:
-    world.scenario(fixture="plain", api_key_source="none", hold=True, ignore_sigint=stubborn, ignore_sigterm=stubborn)
+async def test_br_05_counter_check_aborts_turn(world: World, stubborn: bool) -> None:
+    world.scenario(
+        fixture="plain",
+        api_key_source="none",
+        hold=True,
+        ignore_sigint=stubborn,
+        ignore_sigterm=stubborn,
+    )
     await world.start()
     run = await world.fake.trigger("Hello", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "failed"

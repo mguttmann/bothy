@@ -76,7 +76,8 @@ ignore = [
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "S101", "S105", "S106", "S108", "S603", "PLR0913", "PLC0415"]
+# Scenario tests assert one whole flow each; Fake-Claude reports the cwd as the CLI would.
+"tests/**" = ["D", "S101", "S105", "S106", "S108", "S603", "PLR0913", "PLR0915", "PLR0917", "PLC0415", "PTH109"]
 
 [tool.mypy]
 python_version = "3.11"

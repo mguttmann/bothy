@@ -128,10 +128,11 @@ async def probe_version(  # noqa: PLR0911 - one return per outcome
     try:
         out, _ = await asyncio.wait_for(proc.communicate(), timeout)
     except TimeoutError:
-        with contextlib.suppress(ProcessLookupError):
-            proc.kill()
-        await proc.wait()
+        await _reap(proc)
         return Probe()
+    except asyncio.CancelledError:
+        await _reap(proc)  # a stopping runner leaves no probe process behind
+        raise
     if proc.returncode != 0:
         return Probe()
     parsed = parse_version(out.decode("utf-8", errors="replace"))
@@ -143,6 +144,14 @@ async def probe_version(  # noqa: PLR0911 - one return per outcome
     if parsed != _as_tuple(PINNED_CLAUDE_CODE_VERSION):
         return Probe(version, ("runtime_version_untested",))
     return Probe(version, ())
+
+
+async def _reap(proc: asyncio.subprocess.Process) -> None:
+    """Kill a probe process and wait for it (also when the waiting task is cancelled)."""
+    with contextlib.suppress(ProcessLookupError):
+        proc.kill()
+    with contextlib.suppress(asyncio.CancelledError):
+        await asyncio.shield(proc.wait())
 
 
 def billing_modes_supported(*, has_key_ref: bool, allow_personal: bool) -> tuple[str, ...] | None:

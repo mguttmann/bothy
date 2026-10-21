@@ -146,9 +146,18 @@ async def auth_status(claude_bin: str, env: Mapping[str, str], cwd: Path, timeou
     try:
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout)
     except TimeoutError:
-        with contextlib.suppress(ProcessLookupError):
-            proc.kill()
-        await proc.wait()
+        await _reap(proc)
         _LOG.warning(json.dumps({"event": "auth_status_timeout"}))
         return "unknown"
+    except asyncio.CancelledError:
+        await _reap(proc)  # a cancelled prepare leaves no CLI process behind
+        raise
     return parse_auth_method(stdout)
+
+
+async def _reap(proc: asyncio.subprocess.Process) -> None:
+    """Kill a pre-check process and wait for it (also when the waiting task is cancelled)."""
+    with contextlib.suppress(ProcessLookupError):
+        proc.kill()
+    with contextlib.suppress(asyncio.CancelledError):
+        await asyncio.shield(proc.wait())

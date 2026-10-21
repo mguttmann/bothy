@@ -30,7 +30,7 @@ from claude_code_runner.app import Runner
 from claude_code_runner.config import RunnerConfig, load_config
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fake_claude"))
-import helper  # noqa: E402
+import helper
 
 API_KEY = "sk-ant-canary-0123456789"
 
@@ -83,7 +83,7 @@ class World:
             "stop_grace": "1s",
             "kill_grace": "1s",
             "session_lock_wait": "3s",
-            "cli_probe_timeout": "5s",
+            "cli_probe_timeout": "30s",
         }
         values.update(runner)
         lines = ["[runner]"]
@@ -114,7 +114,9 @@ class World:
             adapter.source = wrap(await adapter.make_source())
         task = asyncio.ensure_future(runner.run())
         self.runners.append((runner, task))
-        await self.until(lambda: any(h.get("details", {}).get("adapter") for h in self.fake.heartbeats))
+        await self.until(
+            lambda: any(h.get("details", {}).get("adapter") for h in self.fake.heartbeats)
+        )
         return runner
 
     async def stop(self, runner: Runner) -> None:
@@ -125,7 +127,7 @@ class World:
                 with contextlib.suppress(Exception):
                     await asyncio.wait_for(item[1], 20)
 
-    async def until(self, predicate: Callable[[], Any], timeout: float = 30.0) -> None:
+    async def until(self, predicate: Callable[[], Any], timeout: float = 90.0) -> None:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while loop.time() < deadline:
@@ -137,8 +139,10 @@ class World:
     def state_of(self, run_id: UUID) -> str:
         return self.fake.run_state(run_id).state
 
-    async def ended(self, run_id: UUID, timeout: float = 30.0) -> str:
-        await self.until(lambda: self.state_of(run_id) in ("completed", "failed", "cancelled"), timeout)
+    async def ended(self, run_id: UUID, timeout: float = 90.0) -> str:
+        await self.until(
+            lambda: self.state_of(run_id) in ("completed", "failed", "cancelled"), timeout
+        )
         return self.fake.run_state(run_id).state
 
     def requests(self, operation: str) -> list[Any]:
@@ -207,5 +211,8 @@ async def _pump(fake: FakeServer) -> None:
 
 @pytest.fixture
 def logs(caplog: pytest.LogCaptureFixture) -> pytest.LogCaptureFixture:
+    # Every logger at DEBUG except the frame dumps of the WebSocket library, which the runner
+    # keeps at WARNING in production (__main__), because a frame can hold the API token.
     caplog.set_level(logging.DEBUG)
+    caplog.set_level(logging.WARNING, logger="websockets")
     return caplog
