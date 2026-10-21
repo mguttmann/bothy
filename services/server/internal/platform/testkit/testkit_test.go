@@ -119,3 +119,31 @@ func TestTimingBound(t *testing.T) {
 		t.Fatalf("TimingBound(20ms) = %v, want %v (race detector %v)", got, want, testkit.RaceEnabled)
 	}
 }
+
+// TestPatientGatewayPutsEveryWindowBeyondPatience: with the windows of PatientGateway a
+// connection that sends no heartbeats, or no identify, is not closed before Patience has passed,
+// whatever the heartbeat interval; the miss limit stays within the bounds of its key (0 to 100).
+func TestPatientGatewayPutsEveryWindowBeyondPatience(t *testing.T) {
+	t.Parallel()
+	for _, interval := range []time.Duration{2 * time.Second, 7 * time.Second, 30 * time.Second, testkit.Patience} {
+		n := testkit.HeartbeatMissLimit(interval)
+		if deadline := interval * time.Duration(n+1); deadline < testkit.Patience || n < 0 || n > 100 {
+			t.Errorf("interval %s: miss limit %d, heartbeat deadline %s; want one beyond Patience", interval, n, deadline)
+		}
+		w := testkit.PatientGateway(interval)
+		want := map[string]string{
+			"sync.heartbeat_interval":   fmt.Sprintf("%dms", interval.Milliseconds()),
+			"sync.heartbeat_miss_limit": fmt.Sprint(n),
+			"sync.identify_timeout":     testkit.PatienceSetting,
+		}
+		if fmt.Sprint(w) != fmt.Sprint(want) {
+			t.Errorf("interval %s: %v, want %v", interval, w, want)
+		}
+	}
+	defer func() {
+		if recover() == nil {
+			t.Error("an interval that needs a miss limit above 100 was accepted")
+		}
+	}()
+	testkit.HeartbeatMissLimit(time.Second)
+}

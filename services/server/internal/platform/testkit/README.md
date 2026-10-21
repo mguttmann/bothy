@@ -30,6 +30,12 @@ _ = conn.SetDeadline(testkit.Deadline())
   it; `make test` and CI never pass `-short`. `pgtest.New` and the SeaweedFS helpers call it, so
   every test that gets a database or an object store carries the mark.
 
+`testkit.PatientGateway(interval)` gives the gateway windows of a test that does not check them
+(heartbeat interval `interval` with `HeartbeatMissLimit(interval)`, identify timeout `Patience`):
+no heartbeat or identify deadline closes a connection before `Patience`. The gateway worlds of
+`internal/wire` and the test server of `gateway/adapters/ws` start with them; the Semgrep rule `bothy-go-test-gateway-window` refuses a window of its own in a `_test.go` file, and a
+test of a deadline carries a `nosemgrep` with its reason (docs/DECISIONS.md PL/22).
+
 The Semgrep rule `bothy-go-test-wall-clock-wait` (`.semgrep/`) refuses literal seconds or minutes
 as the bound of a wait in a `_test.go` file. A bounded give-up or a latency bound under test
 carries `// nosemgrep: bothy-go-test-wall-clock-wait -- <reason>`. The rule does not see a wait
