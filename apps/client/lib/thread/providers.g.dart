@@ -727,26 +727,29 @@ final class TypingInFamily extends $Family
   String toString() => r'typingInProvider';
 }
 
-/// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
-/// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
-/// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
-/// window has no focus).
+/// Whether the app window has the focus: in the foreground (`AppLifecycle`), not `inactive`
+/// for Flutter, which is how macOS and Windows report a window behind another app, and active
+/// for the desktop window (shown, not minimized, the foreground window; brief M4-30 Design
+/// note 3, docs/DECISIONS.md D-M4-30-3). The history marks read and focuses only then, and the
+/// focus reports `idle` otherwise (brief M4-20 Design note 2).
 
 @ProviderFor(windowFocused)
 final windowFocusedProvider = WindowFocusedProvider._();
 
-/// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
-/// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
-/// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
-/// window has no focus).
+/// Whether the app window has the focus: in the foreground (`AppLifecycle`), not `inactive`
+/// for Flutter, which is how macOS and Windows report a window behind another app, and active
+/// for the desktop window (shown, not minimized, the foreground window; brief M4-30 Design
+/// note 3, docs/DECISIONS.md D-M4-30-3). The history marks read and focuses only then, and the
+/// focus reports `idle` otherwise (brief M4-20 Design note 2).
 
 final class WindowFocusedProvider
     extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
     with $FutureModifier<bool>, $StreamProvider<bool> {
-  /// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
-  /// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
-  /// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
-  /// window has no focus).
+  /// Whether the app window has the focus: in the foreground (`AppLifecycle`), not `inactive`
+  /// for Flutter, which is how macOS and Windows report a window behind another app, and active
+  /// for the desktop window (shown, not minimized, the foreground window; brief M4-30 Design
+  /// note 3, docs/DECISIONS.md D-M4-30-3). The history marks read and focuses only then, and the
+  /// focus reports `idle` otherwise (brief M4-20 Design note 2).
   WindowFocusedProvider._()
     : super(
         from: null,
@@ -772,7 +775,7 @@ final class WindowFocusedProvider
   }
 }
 
-String _$windowFocusedHash() => r'a487dc6a1efa30864c26f54c2e657b53ef79f0d5';
+String _$windowFocusedHash() => r'86aad191bbdb5d15bef8d30b7135e95af7571193';
 
 /// The engine's notices to the app (removed targets, an overwritten draft).
 

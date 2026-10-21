@@ -11,7 +11,11 @@ import 'package:client/app/bootstrap.dart';
 import 'package:client/app/branding.dart';
 import 'package:client/app/deep_links.dart';
 import 'package:client/app/discovery.dart';
+import 'package:client/desktop/start_at_login.dart';
+import 'package:client/desktop/tray.dart';
+import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
+import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/platform/device_key_signer.dart';
 import 'package:client/platform/secure_store.dart';
 import 'package:domain/domain.dart';
@@ -177,10 +181,19 @@ AppPorts testPorts({
   BuildBranding branding = testBranding,
   Map<String, String> config = fastConfig,
   FilePorts? files,
+  String platform = 'macos',
+  NotificationPresenter notifications = const NoNotificationPresenter(),
+  DesktopWindow window = const NoDesktopWindow(),
+  TrayPort tray = const NoTray(),
+  Future<StartAtLogin> Function()? startAtLogin,
 }) => AppPorts(
   branding: branding,
   stepUpPrompt: stepUpPrompt,
-  platform: 'macos',
+  platform: platform,
+  notifications: notifications,
+  window: window,
+  tray: tray,
+  startAtLogin: startAtLogin ?? () async => const NoStartAtLogin(),
   deviceName: 'Alex laptop',
   secureBackend: secureBackend ?? MemorySecureBackend(),
   deviceKeys: deviceKeys ?? SoftwareKeyStore(),

@@ -48,6 +48,18 @@ bool ForwardToRunningInstance(const std::string& link) {
   data.cbData = static_cast<DWORD>(link.size());
   data.lpData = const_cast<char*>(link.data());
   ::SendMessageW(window, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data));
+  ::ShowWindow(window, ::IsIconic(window) ? SW_RESTORE : SW_SHOW);
+  ::SetForegroundWindow(window);
+  return true;
+}
+
+bool ActivateRunningInstance() {
+  HWND window = ::FindWindowW(kWindowClassName, BRANDING_APP_NAME_W);
+  if (window == nullptr) {
+    return false;
+  }
+  // A window hidden to the notification area is not visible; a minimized one is iconic.
+  ::ShowWindow(window, ::IsIconic(window) ? SW_RESTORE : SW_SHOW);
   ::SetForegroundWindow(window);
   return true;
 }

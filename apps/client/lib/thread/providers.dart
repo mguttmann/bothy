@@ -16,6 +16,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../composer/draft_sync.dart';
+import '../desktop/providers.dart';
 import '../sidebar/providers.dart';
 import 'thread_reads.dart';
 
@@ -118,21 +119,29 @@ Stream<Set<PrincipalId>> typingIn(Ref ref, String threadId) {
       : engine.ephemeral.watchTyping(ThreadId.parse(threadId));
 }
 
-/// Whether the app window has the focus: in the foreground (`AppLifecycle`) and not
-/// `inactive` for Flutter, which is how macOS and Windows report a window behind another app.
-/// The history marks read and focuses only then (brief M4-20 Design note 2: `idle` while the
-/// window has no focus).
+/// Whether the app window has the focus: in the foreground (`AppLifecycle`), not `inactive`
+/// for Flutter, which is how macOS and Windows report a window behind another app, and active
+/// for the desktop window (shown, not minimized, the foreground window; brief M4-30 Design
+/// note 3, docs/DECISIONS.md D-M4-30-3). The history marks read and focuses only then, and the
+/// focus reports `idle` otherwise (brief M4-20 Design note 2).
 @riverpod
 Stream<bool> windowFocused(Ref ref) {
   final lifecycle = ref.watch(appPortsProvider).lifecycle;
+  final desktop = ref.watch(windowBehaviorProvider);
   final controller = StreamController<bool>();
   bool active(AppLifecycleState? s) =>
       s == null || s == AppLifecycleState.resumed;
   var window = active(WidgetsBinding.instance.lifecycleState);
   var foreground = lifecycle.current == AppActivity.foreground;
+  var shown = desktop.active;
   void emit() {
-    if (!controller.isClosed) controller.add(foreground && window);
+    if (!controller.isClosed) controller.add(foreground && window && shown);
   }
+
+  final shownSub = desktop.activeChanges.listen((a) {
+    shown = a;
+    emit();
+  });
 
   final listener = AppLifecycleListener(
     onStateChange: (s) {
@@ -148,6 +157,7 @@ Stream<bool> windowFocused(Ref ref) {
   ref.onDispose(() {
     listener.dispose();
     unawaited(sub.cancel());
+    unawaited(shownSub.cancel());
     unawaited(controller.close());
   });
   return controller.stream;

@@ -57,3 +57,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # The icon of the notification area on Windows is the runner's icon (tray_manager reads an
+  # asset path; docs/DECISIONS.md D-M4-30-6).
+  assets:
+    - windows/runner/resources/app_icon.ico

@@ -26,6 +26,10 @@ std::optional<std::string> FindLink(const std::vector<std::string>& arguments);
 // instance runs.
 bool ForwardToRunningInstance(const std::string& link);
 
+// Shows the window of a running instance (also when it is hidden in the notification area,
+// docs/DECISIONS.md D-M4-30-6) and brings it to the front; false when no instance runs.
+bool ActivateRunningInstance();
+
 // Registers the scheme under HKEY_CURRENT_USER\Software\Classes for this executable, so the
 // system starts the app with the link as its argument; no administrator rights are needed.
 void RegisterUrlScheme();

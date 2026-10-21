@@ -17,6 +17,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   if (link && deep_link::ForwardToRunningInstance(*link)) {
     return EXIT_SUCCESS;
   }
+  // A second start without a link shows the running app, which may be hidden in the
+  // notification area (15 10.3), instead of a second instance with the same device.
+  if (!link && deep_link::ActivateRunningInstance()) {
+    return EXIT_SUCCESS;
+  }
   deep_link::RegisterUrlScheme();
 
   // Attach to console when present (e.g., 'flutter run') or create a

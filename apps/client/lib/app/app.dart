@@ -14,6 +14,8 @@ import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 
 import '../admin/admin_route.dart';
+import '../desktop/providers.dart';
+import '../notifications/providers.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../settings/settings_providers.dart';
@@ -47,6 +49,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   );
   late final GoRouter _router;
   StreamSubscription<Uri>? _links;
+  StreamSubscription<String>? _notificationTargets;
   String? _kept;
 
   /// Sends the collected app metrics before the app quits (brief M4-31 Design note 2).
@@ -126,6 +129,17 @@ class _ClientAppState extends ConsumerState<ClientApp> {
       errorBuilder: _shell,
     );
     _exit;
+    // A clicked notification opens its thread at the message through the router (15 11,
+    // brief M4-30 Design note 2).
+    _notificationTargets = ref
+        .read(desktopNotificationsProvider)
+        .targets
+        .listen((path) {
+          if (!mounted) return;
+          // The window may be hidden in the notification area; the click brings it back.
+          unawaited(ref.read(windowBehaviorProvider).open());
+          _router.go(path);
+        });
     final deepLinks = ref.read(appPortsProvider).deepLinks;
     _links = deepLinks.links.listen(_open);
     unawaited(
@@ -151,6 +165,7 @@ class _ClientAppState extends ConsumerState<ClientApp> {
   @override
   void dispose() {
     unawaited(_links?.cancel());
+    unawaited(_notificationTargets?.cancel());
     _exit.dispose();
     _router.dispose();
     _step.dispose();
@@ -165,6 +180,8 @@ class _ClientAppState extends ConsumerState<ClientApp> {
     );
     // The sender while signed in and the crash path by the privacy switches (M4-31).
     ref.watch(appTelemetryProvider);
+    // The window in the notification area and the tray icon on Windows (M4-30).
+    ref.watch(desktopShellProvider);
     final instance = ref.watch(currentInstanceProvider);
     final branding = ref.watch(appPortsProvider).branding;
     final media = MediaQuery.maybeOf(context);

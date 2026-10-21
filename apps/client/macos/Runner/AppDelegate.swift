@@ -2,6 +2,7 @@
 
 import Cocoa
 import FlutterMacOS
+import ServiceManagement
 
 /// The application delegate of the desktop app on macOS.
 ///
@@ -59,5 +60,41 @@ final class DeepLinkChannel {
       return
     }
     channel.invokeMethod("open", arguments: link)
+  }
+}
+
+/// "Start at login" over the method channel `bothy/start_at_login` (docs/spec/
+/// 15-client-architektur.md 10.3, docs/DECISIONS.md D-M4-30-4): the login item of the app
+/// (`SMAppService.mainApp`, macOS 13 and later). The system keeps the value; on macOS 12 the
+/// channel reports `isSupported` false and the settings say so.
+enum LoginItemChannel {
+  /// Connects the channel to the engine of the main window.
+  static func attach(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "bothy/start_at_login", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard #available(macOS 13.0, *) else {
+        result(call.method == "isSupported" ? false : FlutterMethodNotImplemented)
+        return
+      }
+      switch call.method {
+      case "isSupported":
+        result(true)
+      case "isEnabled":
+        result(SMAppService.mainApp.status == .enabled)
+      case "setEnabled":
+        do {
+          if (call.arguments as? Bool) == true {
+            try SMAppService.mainApp.register()
+          } else {
+            try SMAppService.mainApp.unregister()
+          }
+          result(nil)
+        } catch {
+          result(FlutterError(code: "login_item", message: nil, details: nil))
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 }

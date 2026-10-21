@@ -59,6 +59,8 @@ SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISION
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
 | `lib/settings/` | Settings (01 5.1 D8): the sections, the personal settings of 01 11 with their defaults, the profile and the devices section hosting `admin_ui` |
+| `lib/notifications/` | local notifications (M4-30): the content of a toast, the router from `notification.created` to a toast or nothing, the presenter over `flutter_local_notifications` and their providers |
+| `lib/desktop/` | the desktop window (M4-30): close to the notification area on Windows, Quit, the window part of `idle`, the tray icon with Open and Quit, "Start at login" |
 | `lib/telemetry/` | app metrics and crash reports (M4-31): the collector, the measurement points, the sender, the scrubbed crash path and their providers |
 | `lib/platform/` | secure storage, device key signers, loopback redirect, browser, lifecycle, network, frames |
 | `macos/`, `windows/` | the runners (`flutter create`), URL scheme registration and the deep link channel |
@@ -200,3 +202,31 @@ native crash handlers and the session pings are off, because they bypass the scr
 (D-M4-31-3). `test/telemetry/canary_test.dart` drives the collector, the sender and the Sentry
 pipeline with a recording transport while a thread with canary content shows and asserts that no
 canary value leaves the device; no test talks to a real Sentry service.
+
+## Notification area and local notifications
+
+On Windows, closing the window hides it to the notification area (`window_manager`): the app keeps
+running and keeps its gateway connection there. The tray icon (`tray_manager`, the runner's icon)
+has the menu Open and Quit; a click on the icon opens the window. Quit closes the services of the
+instance (sync engine and local database) and then ends the app, so the device has no gateway
+connection any more and the server creates no notification for it (13 4.6 item 3). A second start
+of the app shows the running window instead of starting a second instance. On macOS the window
+keeps the system's behaviour; there is no tray icon (docs/DECISIONS.md D-M4-30-5).
+
+Local notifications come only from the gateway event `notification.created` (R-PN-01), on
+Windows and on macOS while the app is connected (13 5.3): title "<Channel> · <Thread title>",
+text "<Author>: <excerpt>" from the preview fields, or the placeholder "New message" with the
+channel name the local database knows (01 10.2). A quiet notification has no sound, each thread
+has one slot that the next notification replaces, `security` and `admin` have one slot per kind,
+and nothing shows for the thread that is open in the focused window. A click opens the thread at
+the message through the router (15 11) and brings a hidden window back. A closed app gets no
+notifications; Settings > Notifications says so and holds "Start at login", a device setting
+kept by the system (the run key of the current user on Windows, the login item on macOS 13 and
+later), off by default.
+
+Limits without package identity (until the MSIX of M7): toasts work with the app user model ID
+of the build branding and a GUID derived from it, but `cancel` and `getActiveNotifications` do
+nothing, so the app replaces a slot by showing the next notification under the same ID and logs
+one line without content instead of removing one (docs/DECISIONS.md D-M4-30-2). The window state
+decides `idle` in the focus: hidden, minimized or behind another window is idle (15 10,
+D-M4-30-3).

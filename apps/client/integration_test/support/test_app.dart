@@ -7,7 +7,9 @@
 
 import 'package:client/app/app.dart';
 import 'package:client/app/providers/ports.dart';
+import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
+import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,16 +36,33 @@ class TestApp {
   /// The fake server, its world and the app's ports.
   final FakeInstance fake;
 
-  /// Starts the fake and pumps the app; the caller calls [stop].
+  /// Starts the fake and pumps the app; the caller calls [stop]. [platform], [window] and
+  /// [notifications] are the desktop ports of M4-30.
   static Future<TestApp> start(
     WidgetTester tester, {
     Map<String, String> config = fastConfig,
     FilePorts? files,
+    String platform = 'macos',
+    DesktopWindow window = const NoDesktopWindow(),
+    NotificationPresenter notifications = const NoNotificationPresenter(),
   }) async {
     tester.view
       ..physicalSize = const Size(1440, 1000)
       ..devicePixelRatio = 1;
-    final fake = await FakeInstance.start(config: config, files: files);
+    final fake = await FakeInstance.start(
+      config: config,
+      files: files,
+      platform: platform,
+      window: window,
+      notifications: notifications,
+    );
+    final app = TestApp._(tester, fake);
+    await app.pumpApp();
+    return app;
+  }
+
+  /// Pumps the app on the same ports and data, as a new start of the app does.
+  Future<void> pumpApp() async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [appPortsProvider.overrideWithValue(fake.ports)],
@@ -51,7 +70,14 @@ class TestApp {
       ),
     );
     await tester.pump();
-    return TestApp._(tester, fake);
+  }
+
+  /// Ends the running app and starts it again on the same ports and data (brief M4-30: a
+  /// restart after Quit).
+  Future<void> restart() async {
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    await pumpApp();
   }
 
   /// The app's providers.

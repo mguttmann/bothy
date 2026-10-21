@@ -3,7 +3,8 @@
 import Cocoa
 import FlutterMacOS
 
-/// The main window: the Flutter view, the plugins and the deep link channel.
+/// The main window: the Flutter view, the plugins, the deep link channel and the channel of
+/// "Start at login" (`LoginItemChannel`).
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -13,6 +14,7 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
     DeepLinkChannel.shared.attach(messenger: flutterViewController.engine.binaryMessenger)
+    LoginItemChannel.attach(messenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
   }
