@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Registers the bundled Atkinson Hyperlegible fonts (OFL-1.1) once per page
- * (docs/spec/25-visualisierung.md section 10 item 4). The files are the copies of
+ * (docs/spec/25-visualization.md section 10 item 4). The files are the copies of
  * design/build/ts/fonts/ that tools/design-tokens keeps; webpack emits them next to module.js
  * and gives their URL, and webpack.config.ts copies the licence texts beside them.
  */

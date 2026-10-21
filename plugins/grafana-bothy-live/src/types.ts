@@ -5,7 +5,7 @@ import type { ViewName } from './queries.gen';
 
 /** Options of one panel. */
 export interface LiveOptions {
-  /** Which of the five views of docs/spec/25-visualisierung.md 8.2 this panel shows. */
+  /** Which of the five views of docs/spec/25-visualization.md 8.2 this panel shows. */
   view: ViewName;
   /**
    * Executive page: below this remaining error budget the traffic light is "budget tight".

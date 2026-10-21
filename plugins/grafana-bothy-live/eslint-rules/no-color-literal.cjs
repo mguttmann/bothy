@@ -2,7 +2,7 @@
 /**
  * ESLint rule bothy/no-color-literal: no colour literal in the plugin's source code.
  *
- * Colours come only from design/build/ts/tokens.gen.ts (docs/spec/25-visualisierung.md
+ * Colours come only from design/build/ts/tokens.gen.ts (docs/spec/25-visualization.md
  * section 10; brief M7-25 requirement 14). The rule reports a string or template literal that
  * holds a hex colour, a CSS colour function (rgb, rgba, hsl, hsla, hwb, lab, lch, oklab, oklch,
  * color), a named CSS colour as the whole value, or a named colour after a colour property in

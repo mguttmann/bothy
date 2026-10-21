@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Entry point of the panel plugin bothy-live-panel: Grafana loads `plugin` from module.js.
- * The options select one of the five views of docs/spec/25-visualisierung.md section 8.2; the
+ * The options select one of the five views of docs/spec/25-visualization.md section 8.2; the
  * dashboard bothy-live.json sets one panel per view with the targets of queries.yaml.
  */
 

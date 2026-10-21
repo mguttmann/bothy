@@ -2,7 +2,7 @@
 
 Grafana panel plugin `bothy-live-panel` ("Live views" in the Grafana panel picker): the live views of the apps for
 operations, from OpenTelemetry metrics in Prometheus only (level b of
-[25-visualisierung.md](../../docs/spec/25-visualisierung.md), section 8). The plugin runs inside
+[25-visualization.md](../../docs/spec/25-visualization.md), section 8). The plugin runs inside
 Grafana, reads only the frames of Grafana's data sources and never talks to the server; metrics
 carry no IDs (17 rule 9), so the views show agents and states, never channels or single runs.
 

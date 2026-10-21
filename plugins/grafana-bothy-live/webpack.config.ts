@@ -2,7 +2,7 @@
 //
 // Extends the webpack configuration of the scaffold (.config/webpack/webpack.config.ts, kept as
 // generated; extension path of .config/README.md). Additions for the bundled fonts of the design
-// tokens (docs/spec/25-visualisierung.md section 10 item 4): the font files land in dist/fonts/
+// tokens (docs/spec/25-visualization.md section 10 item 4): the font files land in dist/fonts/
 // in every mode, and their OFL licence texts are copied next to them, as the OFL requires.
 
 import CopyWebpackPlugin from 'copy-webpack-plugin';

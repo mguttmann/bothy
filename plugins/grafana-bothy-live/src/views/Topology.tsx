@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Live topology (docs/spec/25-visualisierung.md 8.2, mirror of 6.1): one lane per agent with its
+ * Live topology (docs/spec/25-visualization.md 8.2, mirror of 6.1): one lane per agent with its
  * active runs by state, tool steps per minute and costs. Metrics carry no IDs (17 rule 9), so a
  * lane is an agent, never a channel or a single run.
  */

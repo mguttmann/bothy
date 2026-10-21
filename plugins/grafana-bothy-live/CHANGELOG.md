@@ -13,7 +13,7 @@ are documented in this file. The format is based on
 
 - Panel plugin `bothy-live-panel`, scaffolded with `@grafana/create-plugin` 7.13.0 for
   Grafana 13.2.3 (TypeScript, React), unsigned.
-- Five views from metrics only (docs/spec/25-visualisierung.md section 8.2): live topology as
+- Five views from metrics only (docs/spec/25-visualization.md section 8.2): live topology as
   lanes per agent, backend view, delivery and sync, executive page with the SLO traffic light
   from the Sloth recording rules, and the timeline as playback over the dashboard period.
 - Theme adapter: Grafana's light or dark theme selects the token theme of

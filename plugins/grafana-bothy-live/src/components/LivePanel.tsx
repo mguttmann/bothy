@@ -2,7 +2,7 @@
 /**
  * The panel component: picks the view of the panel options and wraps it in the token theme that
  * follows Grafana's light or dark theme. The panel reads only the frames Grafana's data sources
- * return for its targets; it never talks to the product server (docs/spec/25-visualisierung.md 8.1).
+ * return for its targets; it never talks to the product server (docs/spec/25-visualization.md 8.1).
  */
 
 import type { PanelProps } from '@grafana/data';

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Executive page (docs/spec/25-visualisierung.md 8.2, mirror of 6.4): the SLO traffic light from
+ * Executive page (docs/spec/25-visualization.md 8.2, mirror of 6.4): the SLO traffic light from
  * the Sloth recording rules `slo:objective:ratio`, `slo:sli_error:ratio_rate30d` and
  * `slo:period_error_budget_remaining:ratio`. Never colour alone: every state has an icon and a
  * text (docs/design/components.md section 11).

@@ -21,7 +21,7 @@ module.exports = {
   },
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.test.{ts,tsx}'],
   coverageReporters: ['text', 'lcov'],
-  // Named value `quality.coverage.typescript_min_percent` (docs/spec/23-qualitaet.md section 11).
+  // Named value `quality.coverage.typescript_min_percent` (docs/spec/23-quality.md section 11).
   coverageThreshold: {
     global: { lines: 80, functions: 80, branches: 80, statements: 80 },
   },

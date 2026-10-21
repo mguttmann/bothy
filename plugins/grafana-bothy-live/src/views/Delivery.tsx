@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Delivery and sync (docs/spec/25-visualisierung.md 8.2, mirror of 6.3): delivery latency,
+ * Delivery and sync (docs/spec/25-visualization.md 8.2, mirror of 6.3): delivery latency,
  * connecting, catch-up and fan-out lag as tiles with their latest value and a sparkline over the
  * dashboard period.
  */

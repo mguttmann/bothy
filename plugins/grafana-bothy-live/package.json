@@ -2,7 +2,7 @@
   "name": "bothy-live-panel",
   "version": "0.0.0",
   "private": true,
-  "description": "Grafana panel plugin bothy-live-panel: the live views of docs/spec/25-visualisierung.md section 8 from metrics only. Unsigned until V1; never published from this repository.",
+  "description": "Grafana panel plugin bothy-live-panel: the live views of docs/spec/25-visualization.md section 8 from metrics only. Unsigned until V1; never published from this repository.",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=22.18"

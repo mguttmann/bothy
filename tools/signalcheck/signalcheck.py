@@ -73,7 +73,7 @@ RULES_DIR = Path("infra/observability/prometheus/rules")
 SLO_DIR = Path("infra/observability/slo")
 """Sloth SLO files."""
 PANEL_QUERIES = Path("plugins/grafana-bothy-live/queries.yaml")
-"""Queries of the Grafana panel plugin bothy-live-panel (docs/spec/25-visualisierung.md 8.2)."""
+"""Queries of the Grafana panel plugin bothy-live-panel (docs/spec/25-visualization.md 8.2)."""
 
 PROMTOOL_TIMEOUT_S: float = 120
 """Seconds one promtool run may take."""

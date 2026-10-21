@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The lint rule bothy/no-color-literal (eslint-rules/no-color-literal.cjs) keeps colours out of
-// src/: they come only from design/build/ts/tokens.gen.ts (docs/spec/25-visualisierung.md 10).
+// src/: they come only from design/build/ts/tokens.gen.ts (docs/spec/25-visualization.md 10).
 
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';

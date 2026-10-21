@@ -1,7 +1,7 @@
 {
   "uid": "bothy-live",
   "title": "Bothy / Live",
-  "description": "Live views of the panel plugin bothy-live-panel from metrics only (docs/spec/25-visualisierung.md section 8). Grafana shows them once the plugin build is installed (provisioning: M7-26).",
+  "description": "Live views of the panel plugin bothy-live-panel from metrics only (docs/spec/25-visualization.md section 8). Grafana shows them once the plugin build is installed (provisioning: M7-26).",
   "tags": [
     "bothy"
   ],

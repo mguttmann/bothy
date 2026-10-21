@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Backend view (docs/spec/25-visualisierung.md 8.2, mirror of 6.2): per agent the billing modes
+ * Backend view (docs/spec/25-visualization.md 8.2, mirror of 6.2): per agent the billing modes
  * its runs started in, I3 mismatches, I2 denials and costs per mode. Product-neutral: no runtime
  * names, no subscriptions, no credentials (I5); the rate-limit state exists only in level a.
  */

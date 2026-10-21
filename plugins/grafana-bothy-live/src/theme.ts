@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Theme adapter: Grafana's light or dark theme selects the matching theme of the design tokens
- * (docs/spec/25-visualisierung.md section 10 items 3 and 4).
+ * (docs/spec/25-visualization.md section 10 items 3 and 4).
  *
  * Colours, font families, sizes and radii come only from design/build/ts/tokens.gen.ts, the
  * TypeScript output of tools/design-tokens. Grafana's own palette is never used, so the panel

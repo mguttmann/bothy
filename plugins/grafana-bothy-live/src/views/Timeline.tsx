@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Timeline (docs/spec/25-visualisierung.md 8.2, mirror of 6.5): plays the dashboard period back.
+ * Timeline (docs/spec/25-visualization.md 8.2, mirror of 6.5): plays the dashboard period back.
  * The area shows the active runs over the period, the playhead a vertical line; the table below
  * lists every query of the view at the playhead. Controls: play, pause, jump to start or end and
  * the speeds of `viz.timeline_speeds` (seconds of time of day per second).
