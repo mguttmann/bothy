@@ -15,7 +15,7 @@ names (PLAN P-04). The normative sources are [06-api.md](../../../docs/spec/06-a
 | `rest/oapi-codegen.yaml` | settings of oapi-codegen (`std-http-server`, `strict-server`, `models`, `skip-prune`) | yes |
 | `rest/models.gen.go` | Go types of all schemas, parameters and request bodies (the part before `ServerInterface`) | generated |
 | `rest/rest.gen.go` | Server of the enabled operations (from `ServerInterface` on) | generated |
-| `rest/objects.gen.go`, `rest/objects2.gen.go` | Request and response objects of the strict server (from the first `*RequestObject` up to `StrictServerInterface`, INT-W17/4), cut at the operation group nearest the middle (M6-01, M4-31/port) | generated |
+| `rest/objects.gen.go`, `rest/objects2.gen.go` | Request and response objects of the strict server (from the first `*RequestObject` up to `StrictServerInterface`, INT-W17/4), cut at the operation group nearest the middle (`halveObjects`, M2-07) | generated |
 | `rest/openapi.gen.yaml` | byte-identical copy of `docs/api/openapi.yaml`; `rest.Spec` (`rest/spec.go`) embeds it for the request validator of the HTTP chain (M1-18) | generated |
 | `restclient/oapi-codegen.yaml` | settings of the API client (`client`, `models`, `skip-prune`; D-M8-10-1) | yes |
 | `restclient/restclient.gen.go`, `restclient_NN.gen.go` | client and models of every operation of `docs/api/openapi.yaml`, cut below `repo.max_file_kb` (`internal/gosplit`) | generated |
