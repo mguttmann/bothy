@@ -49,6 +49,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/runs"
+	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
@@ -1005,6 +1007,7 @@ func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy 
 	}
 	rn, err := NewRuns(cfg, pool, a.UoW(), az, RunsDeps{
 		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
+		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(),
 	}, s.deps.Clock, s.logger())
 	if err != nil {
 		return nil, err
@@ -1460,15 +1463,19 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 		return err
 	}
 	s.mu.Lock()
-	id, az, reads, pool, a, ch, ag := s.identity, s.authorizer, s.syncReads, s.pool, s.audit, s.chat, s.agents
+	id, az, reads, pool, a, ch, ag, rn := s.identity, s.authorizer, s.syncReads, s.pool, s.audit, s.chat, s.agents, s.runs
 	s.mu.Unlock()
+	var invocations runs.Delivery
+	if rn != nil {
+		invocations = rn.Service
+	}
 	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil || ag == nil {
 		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work, chat and agents")
 	}
 	gw, err := NewGateway(cfg, GatewayDeps{
 		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
 		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers,
-		Presence: ag.Presence, Clock: s.deps.Clock, Log: log,
+		Presence: ag.Presence, Invocations: invocations, Clock: s.deps.Clock, Log: log,
 	})
 	if err != nil {
 		return err
@@ -1651,6 +1658,10 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	var queuedExpiry runsjobs.Expirer
+	if s.runs != nil {
+		queuedExpiry = s.runs.Service
+	}
 	reg, err := NewJobRegistry(&JobModules{
 		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
 		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
@@ -1661,6 +1672,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		Deliveries:  ap.Webhooks,
 		FilesScan:   files.ScanRunner(),
 		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
+		QueuedExpiry: queuedExpiry,
 	})
 	if err != nil {
 		return err
@@ -1671,6 +1683,10 @@ func (s *server) startJobs(ctx context.Context) error {
 	}
 	ap.BindJobs(rt.Inserter())
 	files.BindJobs(rt.Inserter())
+	s.mu.Lock()
+	rn := s.runs
+	s.mu.Unlock()
+	rn.BindJobs(rt.Inserter())
 	s.mu.Lock()
 	s.jobsRT = rt
 	s.mu.Unlock()

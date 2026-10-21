@@ -28,8 +28,8 @@ type RunRow struct {
 	Version     int64
 	// BillingModeExpected is never empty; BillingModeUsed "" for NULL.
 	BillingModeExpected, BillingModeUsed string
-	// InvocationJTI is runs.invocation_jti.
-	InvocationJTI ids.ID
+	// InvocationJTI is runs.invocation_jti; RenewedFromJTI runs.renewed_from_jti (zero for NULL).
+	InvocationJTI, RenewedFromJTI ids.ID
 	// Model, StatusLine, LastTextExcerpt and Summary are "" for NULL.
 	Model, StatusLine, LastTextExcerpt, Summary string
 	// Plan and Metrics are the stored JSON objects.
@@ -89,6 +89,17 @@ type TransitionWrite struct {
 	At time.Time
 }
 
+// DeliveryWrite is the input of Repository.RecordDelivery: the columns an allowed delivery
+// stores (M2-08 design note 3 h). JTI replaces invocation_jti and clears renewed_from_jti; zero
+// keeps both (a delivery that may not start the run).
+type DeliveryWrite struct {
+	ID ids.ID
+	// JTI is the jti of the new token when the matrix records it; zero otherwise.
+	JTI ids.ID
+	// BillingModeExpected is the configured agents.billing_mode now.
+	BillingModeExpected string
+}
+
 // RunKey is the keyset position (queued_at DESC, id DESC) of the run lists.
 type RunKey struct {
 	QueuedAt time.Time
@@ -141,6 +152,13 @@ type Repository interface {
 	Run(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)
 	// ActiveRunOfThread reads the run in queued, running or waiting_input of the thread.
 	ActiveRunOfThread(ctx context.Context, threadID ids.ID) (row RunRow, found bool, err error)
+	// LockRun reads the run id with its row lock for the rest of the unit of work (SELECT ... FOR
+	// UPDATE, M2-08); found is false for an unknown id. It needs a unit of work.
+	LockRun(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)
+	// RecordDelivery stores the columns of an allowed delivery and raises version by one; the
+	// caller holds the row lock and calls it only when a column changes. Errors: not_found for an
+	// unknown run.
+	RecordDelivery(ctx context.Context, w DeliveryWrite) (RunRow, error)
 	// TransitionRun runs the compare-and-swap of w; changed is false when no row has the id, From
 	// and Version (the caller reads the row to tell a missing run from a concurrent change).
 	TransitionRun(ctx context.Context, w TransitionWrite) (row RunRow, changed bool, err error)

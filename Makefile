@@ -25,6 +25,8 @@ MAKEFLAGS += --no-builtin-rules --no-print-directory
 COMPONENTS ?= all
 COVERAGE_GO_MIN ?= 80
 COVERAGE_DART_MIN ?= 80
+# Time limit of each Go test binary in `make test` (named value quality.test.go_timeout).
+GO_TEST_TIMEOUT ?= 20m
 # Time limit of `make perf` per Go module (named value quality.perf.timeout).
 PERF_TIMEOUT ?= 60m
 # Host system of the Dart performance tests: they run in profile mode on macOS only.
@@ -231,9 +233,11 @@ test: ## All tests with coverage data
 	cd tools && uv run --locked --quiet pytest --cov --cov-report=xml:../.cache/coverage/tools.xml --cov-report=term
 	@# Prerequisites first: without a Docker runtime the integration tests fail clearly (P-09).
 	@# The architecture tests of tools/archgen run the pinned go-arch-lint named by GO_ARCH_LINT.
+	@# -timeout: each test binary gets GO_TEST_TIMEOUT instead of the default 10m, because the
+	@# larger packages run longer under -race (PL/2).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -tags contract_validate -covermode=atomic -coverprofile=coverage.out ./...) || exit 1; done; fi
+	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -tags contract_validate -covermode=atomic -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) ./...) || exit 1; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@# The workspace resolves once at the root (one pubspec.lock); then every member runs its tests.

@@ -23,8 +23,8 @@ import (
 
 // DeliveryHook is the outgoing port every dispatch to an agent consumer passes, on the WebSocket
 // and over REST (brief M2-07 note 7, 02 section 10): Prepare returns the envelope to deliver, or
-// false for "do not deliver, treat as checked". passdelivery binds it until M2-08 binds
-// runs.Delivery (fresh invocation tokens). An error closes the connection with 4000 or fails the
+// false for "do not deliver, treat as checked". adapters/rundelivery binds it to runs.Delivery
+// (M2-08: the delivery check and a fresh invocation token). An error closes the connection with 4000 or fails the
 // poll; the event comes again from acked_seq + 1.
 type DeliveryHook interface {
 	Prepare(ctx context.Context, agentID ids.ID, ev sync.Envelope) (sync.Envelope, bool, error)
@@ -80,7 +80,7 @@ type ConsumerDeps struct {
 	CatchUp sync.CatchUp
 	// Position is the hub position.
 	Position Position
-	// Hook is the delivery hook (passdelivery until M2-08).
+	// Hook is the delivery hook (adapters/rundelivery over runs.Delivery, M2-08).
 	Hook DeliveryHook
 	// Epoch reads the sync epoch for REST pages.
 	Epoch EpochSource
@@ -586,7 +586,7 @@ func (e *ConsumerEngine) readPage(ctx context.Context, a actor.Actor, mu *gosync
 	// unauthenticated; the delivery mode of the hub would only learn it from the next event
 	// (docs/DECISIONS.md D-M2-07-7). A REST poll keeps the memo of its request.
 	page, err := e.d.CatchUp.PageEvents(actorCtx(authorize.WithRequestScope(authorize.Filter(ctx)), a),
-		sync.PageInput{After: after, Head: pos, Limit: e.cfg.PageSize})
+		sync.PageInput{After: after, Head: pos, Limit: e.cfg.PageSize, AgentConsumer: true})
 	if err != nil {
 		return true, err
 	}

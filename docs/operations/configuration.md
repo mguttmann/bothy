@@ -416,7 +416,7 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 | `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server |  | `32768` | Inhalt je Kontext-Nachricht, darüber gekürzt | geplant (M2) |
 | `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | duration | `1h` | Cache-Dauer der JWKS; Vorlauf eines `next`-Schlüssels | aktiv |
 | `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | duration | `30d` | planmäßiger Wechsel des Markenschlüssels | aktiv |
-| `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server |  | `48h` | so alt darf ein nicht gestarteter Lauf werden | geplant (M2) |
+| `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server | duration | `48h` | so alt darf ein nicht gestarteter Lauf werden | aktiv |
 | `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server |  | `15m` | ohne Heartbeat bei aktivem Lauf: `stale` | geplant (M2) |
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | danach zeigt die Karte "nicht bestätigt" | geplant (M2) |
 | `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server |  | `2500ms` | Wartezeit auf Vorschläge | geplant (M2) |

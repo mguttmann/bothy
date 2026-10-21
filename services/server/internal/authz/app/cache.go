@@ -14,9 +14,13 @@ import (
 
 // cacheKey identifies one rights snapshot (07 section 7.3): the principal with its credentials and
 // the rights version. Snapshots of "view as" and acting-for persons use zero credential ids.
+// recheck marks the snapshot of the check without a request (R-AZ-29), whose owner status needs
+// no session: it is part of the key, so no request principal of the same person (a personal
+// token, a "view as" or acting-for snapshot) ever gets the owner snapshot (M2-08 design note 4).
 type cacheKey struct {
 	principal, session, device, token ids.ID
 	version                           int64
+	recheck                           bool
 }
 
 // entry is one cached snapshot with the liveness facts read with it.
