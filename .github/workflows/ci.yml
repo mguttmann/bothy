@@ -443,6 +443,7 @@ jobs:
             sdk/python/coverage.xml
             plugins/*/coverage.xml
             sdk/typescript/coverage/lcov.info
+            plugins/*/coverage/lcov.info
             apps/*/coverage/lcov.info
             packages/*/coverage/lcov.info
             packages/*/*/coverage/lcov.info
@@ -539,6 +540,7 @@ jobs:
             sdk/python/coverage.xml
             plugins/*/coverage.xml
             sdk/typescript/coverage/lcov.info
+            plugins/*/coverage/lcov.info
             apps/*/coverage/lcov.info
             packages/*/coverage/lcov.info
             packages/*/*/coverage/lcov.info
@@ -642,6 +644,7 @@ jobs:
             sdk/python/coverage.xml
             plugins/*/coverage.xml
             sdk/typescript/coverage/lcov.info
+            plugins/*/coverage/lcov.info
             apps/*/coverage/lcov.info
             packages/*/coverage/lcov.info
             packages/*/*/coverage/lcov.info

@@ -29,6 +29,15 @@ operated, and the order of the build.
   with ES256 DPoP proofs built with `cryptography`), G8 in `make test` through the build tag
   `contract_validate`, and the named values `quality.contract.max_examples` and
   `quality.contract.timeout`.
+- Grafana panel plugin `bothy-live-panel` (M7-25, `plugins/grafana-bothy-live`, its own
+  `VERSION` and `CHANGELOG.md`): the five live views of docs/spec/25-visualization.md 8.2 from
+  metrics only, in the colours and fonts of `design/build/ts/tokens.gen.ts` with a lint rule
+  against colour literals; `queries.yaml` with the generated `src/queries.gen.ts` and
+  `make -C plugins/grafana-bothy-live generate-check`; the seventh dashboard `bothy-live.json`.
+  `make signal-check` now also checks every metric and label of `queries.yaml` against the
+  signal catalogue; `make bootstrap-ci` installs the plugin's lock, and a change of
+  `design/build/ts/`, of `bothy-live.json` or of the Grafana pin selects the gate component
+  `plugins`. TV mode is Grafana's kiosk mode (`?kiosk`, verified for Grafana 13.2).
 - Local database of the apps: `packages/local_store` is a drift database on
   SQLite3MultipleCiphers (cipher `chacha20`, 256-bit key from a key source port), schema
   version 1 with the mirror tables of the client architecture chapter and the local tables

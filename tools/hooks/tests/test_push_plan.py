@@ -38,7 +38,9 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
         # Docs and infrastructure: no component, the tools gates and every repository gate.
         (["docs/spec/07-permissions.md"], [], ["tools"]),
         (["docs/DECISIONS.md", "README.md"], [], ["tools"]),
-        (["infra/compose/compose.yaml"], [], ["tools"]),
+        (["infra/compose/secrets.yaml"], [], ["tools"]),
+        # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
+        (["infra/compose/compose.yaml"], ["plugins"], ["tools"]),
         # Inputs of generated code outside the component select the component (codegen-check).
         (["docs/spec/actions.yaml"], ["server"], ["tools"]),
         (["pubspec.lock"], ["apps"], ["tools"]),
