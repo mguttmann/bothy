@@ -95,13 +95,13 @@ func TestTriggerChannel(t *testing.T) {
 
 	got, err := e.svc.TriggerChannel(ctx, text.ID)
 	want := chat.TriggerChannel{ChannelID: text.ID, SpaceID: sp.ID, Kind: "text", EffectiveOperatorID: spaceOp, MainThreadID: text.MainThreadID,
-		RequireMention: true, AutoThread: true}
+		RequireMention: true, AutoThread: true, SettingsVersion: e.store.channels[text.ID].SettingsVersion}
 	if err != nil || got != want {
 		t.Fatalf("text %+v, %v; want %+v", got, err, want)
 	}
 	got, err = e.svc.TriggerChannel(ctx, forum.ID)
 	want = chat.TriggerChannel{ChannelID: forum.ID, SpaceID: sp.ID, Kind: "forum", EffectiveOperatorID: ownOp,
-		ThreadRequireMention: true, FreeResponse: true, AllowMentionedAgents: true}
+		ThreadRequireMention: true, FreeResponse: true, AllowMentionedAgents: true, SettingsVersion: f.SettingsVersion}
 	if err != nil || got != want {
 		t.Fatalf("forum %+v, %v; want %+v", got, err, want)
 	}

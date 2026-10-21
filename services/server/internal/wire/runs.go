@@ -8,6 +8,8 @@ import (
 	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
+	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -16,15 +18,19 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
+	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	runsmetrics "github.com/OWNER/bothy/services/server/internal/runs/adapters/otelmetrics"
 	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 )
 
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
-// run.step_detail_max_bytes). The error names the key whose binding failed, never a value.
+// run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
+// agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars). The
+// error names the key whose binding failed, never a value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -44,6 +50,11 @@ type Runs struct {
 	// Invocations issues and verifies the invocation tokens (M2-06); nil until
 	// BindInvocationTokens, which the signing keys step calls.
 	Invocations *runsapp.InvocationTokens
+	// Expiry schedules runs.queued_expiry (M2-08); the jobs step binds its inserter (BindJobs).
+	Expiry *runsjobs.Scheduler
+	// CancelTimeouts schedules runs.cancel_timeout (M2-09); the jobs step binds its inserter
+	// (BindJobs).
+	CancelTimeouts *runsjobs.CancelScheduler
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -58,6 +69,19 @@ type RunsDeps struct {
 	// Metrics records committed transitions; nil means runs/adapters/otelmetrics on the global
 	// meter provider of platform/otel.
 	Metrics runsapp.Metrics
+	// Versions reads the permission version a delivery check pins; Audit writes the audit entry
+	// of a denial at delivery (M2-08). Without them the delivery refuses with an internal error.
+	Versions runsapp.PermissionVersions
+	Audit    runsapp.AuditRecorder
+	// Expiry schedules runs.queued_expiry; nil means the scheduler over the job runtime of the
+	// process (Runs.BindJobs). A test world without jobs passes one that schedules nothing.
+	Expiry runsapp.ExpiryScheduler
+	// CancelTimeouts schedules runs.cancel_timeout (M2-09); nil means the scheduler over the job
+	// runtime of the process (Runs.BindJobs).
+	CancelTimeouts runsapp.CancelTimeoutScheduler
+	// Heartbeats reads the persisted heartbeat for runs.stall_check (M2-09); nil means the reader
+	// of the agents module over pool.
+	Heartbeats runsapp.HeartbeatReader
 }
 
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
@@ -80,14 +104,56 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		}
 		d.Metrics = m
 	}
+	telemetry, err := runsmetrics.NewDelivery(nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	var sched *runsjobs.Scheduler
+	if d.Expiry == nil {
+		sched = &runsjobs.Scheduler{}
+		d.Expiry = sched
+	}
+	var cancels *runsjobs.CancelScheduler
+	if d.CancelTimeouts == nil {
+		cancels = &runsjobs.CancelScheduler{}
+		d.CancelTimeouts = cancels
+	}
+	if d.Heartbeats == nil {
+		hb, err := agentsapp.NewHeartbeatReader(agentspg.NewRepository(pool))
+		if err != nil {
+			return nil, err
+		}
+		d.Heartbeats = hb
+	}
+	mismatches, err := runsmetrics.NewMismatches(nil)
+	if err != nil {
+		return nil, err
+	}
 	svc, err := runsapp.New(cfg, runsapp.Deps{
 		Repo: runspg.NewRepository(pool), UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
+		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
+		Heartbeats: d.Heartbeats, Mismatches: mismatches,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Runs{Service: svc, Handlers: runshttp.New(svc)}, nil
+	return &Runs{Service: svc, Handlers: runshttp.New(svc), Expiry: sched, CancelTimeouts: cancels}, nil
+}
+
+// BindJobs gives the schedulers of runs.queued_expiry and runs.cancel_timeout the inserter of the
+// job runtime; the jobs step calls it once the runtime exists. A Runs built with its own
+// scheduler ignores it for that scheduler.
+func (r *Runs) BindJobs(ins jobs.Inserter) {
+	if r == nil {
+		return
+	}
+	if r.Expiry != nil {
+		r.Expiry.Bind(ins)
+	}
+	if r.CancelTimeouts != nil {
+		r.CancelTimeouts.Bind(ins)
+	}
 }
 
 // RegisterActiveGauge registers the observable gauge bothy.run.active over the runs of r on the
@@ -132,6 +198,12 @@ func (r *Runs) BindInvocationTokens(cfg runsapp.InvocationTokenConfig, keys runs
 		IDs: ids.NewGenerator(clk, rand.Reader)})
 	if err != nil {
 		return err
+	}
+	if r.Service != nil {
+		// The delivery check signs the token of every allowed delivery (M2-08).
+		if err := r.Service.BindTokens(it); err != nil {
+			return err
+		}
 	}
 	r.Invocations = it
 	return nil

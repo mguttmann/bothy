@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
@@ -149,15 +150,18 @@ func (a *Authorizer) Authorize(ctx context.Context, p authorize.Principal, act a
 		d = authorize.Decision{}
 	}
 	authorize.RecordCheck(ctx, authorize.Check{Action: string(act), Kind: authorize.CheckAuthorize, Allowed: err == nil && d.Allowed()})
-	a.audit(ctx, act, string(r.Kind), r.ID, d, err)
+	a.audit(ctx, act, string(r.Kind), r.ID, r.Token, d, err)
 	if err == nil && !authorize.IsFilter(ctx) {
 		a.metrics.Decision(ctx, act, d.Outcome)
 	}
 	return d, err
 }
 
-// audit hands a denial or an error to the recorder; allows and filter mode write nothing.
-func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind string, id ids.ID, d authorize.Decision, failure error) {
+// audit hands a denial or an error to the recorder; allows and filter mode write nothing. A denial
+// on the invocation token or the mode guard of run.start carries the codes of tok as details
+// (denialDetails, M2-09).
+func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind string, id ids.ID, tok *authorize.TokenFacts,
+	d authorize.Decision, failure error) {
 	if authorize.IsFilter(ctx) || (failure == nil && d.Allowed()) {
 		return
 	}
@@ -171,6 +175,7 @@ func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind strin
 		err = a.recorder.RecordDetached(ctx, e)
 	} else {
 		e.Decision, e.Reason = auditing.DecisionDeny, auditing.Reason(d.Reason)
+		e.Attrs = denialDetails(d, tok)
 		err = a.recorder.RecordDenial(ctx, e)
 	}
 	if err != nil {
@@ -179,9 +184,64 @@ func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind strin
 	}
 }
 
+// denialDetails are the details of a denial on the invocation token or the mode guard of run.start
+// (brief M2-09 design note 2c and 2d, 10 section 14): token_verdict for invocation_token_invalid;
+// billing_mode_expected, billing_mode_used and the evidence codes billing_evidence_provider,
+// billing_evidence_key_type and billing_evidence_method for billing_mode_mismatch; tool_class (the
+// claim) and tool_class_used for tool_class_mismatch. Every value is a code; an empty value or one
+// that is no code is left out, so the denial itself is never lost. nil for every other denial.
+func denialDetails(d authorize.Decision, tok *authorize.TokenFacts) auditing.Attrs {
+	attrs := auditing.Attrs{}
+	put := func(key, v string) {
+		if auditCode(v) {
+			attrs[key] = auditing.Code(v)
+		}
+	}
+	switch d.Reason {
+	case authorize.Reason(domain.ReasonInvocationTokenInvalid):
+		put("token_verdict", d.Detail)
+	case authorize.Reason(domain.ReasonBillingModeMismatch):
+		if tok != nil {
+			put("billing_mode_expected", tok.BillingModeExpected)
+			put("billing_mode_used", tok.BillingModeUsed)
+			put("billing_evidence_provider", tok.BillingProvider)
+			put("billing_evidence_key_type", tok.BillingKeyType)
+			put("billing_evidence_method", tok.BillingMethod)
+		}
+	case authorize.Reason(domain.ReasonToolClassMismatch):
+		if tok != nil {
+			put("tool_class", tok.ToolClassClaim)
+			put("tool_class_used", tok.ToolClassUsed)
+		}
+	}
+	if len(attrs) == 0 {
+		return nil
+	}
+	return attrs
+}
+
+// maxAuditCode is the longest code of an audit detail (audit_details.v1, SEC-AUD-5).
+const maxAuditCode = 64
+
+// auditCode reports whether s is a code of SEC-AUD-5: ^[a-z0-9][a-z0-9_.:-]*$, at most
+// maxAuditCode bytes.
+func auditCode(s string) bool {
+	if s == "" || len(s) > maxAuditCode {
+		return false
+	}
+	for i, c := range []byte(s) {
+		lower := c >= 'a' && c <= 'z' || c >= '0' && c <= '9'
+		if !lower && (i == 0 || !strings.ContainsRune("_.:-", rune(c))) {
+			return false
+		}
+	}
+	return true
+}
+
 // outcome converts a domain decision.
 func outcome(d domain.Decision) authorize.Decision {
-	return authorize.Decision{Outcome: authorize.Outcome(d.Outcome), Reason: authorize.Reason(d.Reason), QuickReattach: d.QuickReattach}
+	return authorize.Decision{Outcome: authorize.Outcome(d.Outcome), Reason: authorize.Reason(d.Reason), QuickReattach: d.QuickReattach,
+		Detail: d.Detail}
 }
 
 // internal returns an internal error for a programming error of the caller.
@@ -287,7 +347,13 @@ func (a *Authorizer) principalOf(ctx context.Context, p authorize.Principal, act
 	if s.id.IsZero() {
 		return nil, domain.Decision{Outcome: domain.OutcomeUnauthenticated, Reason: domain.ReasonUnauthenticated}, nil
 	}
-	e, err := a.load(ctx, s.ref, v, t)
+	var e entry
+	var err error
+	if authorize.IsRecheckPrincipal(p) {
+		e, err = a.loadRecheck(ctx, s.ref, v, t)
+	} else {
+		e, err = a.load(ctx, s.ref, v, t)
+	}
 	if err != nil {
 		return nil, domain.Decision{}, err
 	}
@@ -350,6 +416,44 @@ func (a *Authorizer) load(ctx context.Context, ref authz.CredentialRef, v int64,
 	return e, nil
 }
 
+// loadRecheck is load for the principal of the check without a request (R-AZ-29): the snapshot
+// of ref at version v under its own cache key, also in delivery mode, because the caller pins the
+// version it decides with (M2-08 design note 3 d).
+func (a *Authorizer) loadRecheck(ctx context.Context, ref authz.CredentialRef, v int64, t time.Time) (entry, error) {
+	key := cacheKey{principal: ref.PrincipalID, version: v, recheck: true}
+	if txn.InRightsChange(ctx) {
+		return a.build(ctx, key, ref, t)
+	}
+	if e, ok := a.cache.get(key, t); ok {
+		return e, nil
+	}
+	e, err := a.build(ctx, key, ref, t)
+	if err != nil {
+		return entry{}, err
+	}
+	a.cache.put(e)
+	return e, nil
+}
+
+// checkRecheck passes every principal without the marker and refuses the marker of the check
+// without a request (R-AZ-29) outside its one use in
+// this build: only agent.invoke (command.invoke and interaction.create follow with M2-25), only a
+// person, and never with a session, device, token, installation, "view as" or acting for. Each
+// violation is a programming error of the server, never a decision (M2-08 design note 4).
+func checkRecheck(p authorize.Principal, act authorize.Action) error {
+	if !authorize.IsRecheckPrincipal(p) {
+		return nil
+	}
+	if act != authorize.ActionAgentInvoke {
+		return internal("the re-check principal is allowed only with agent.invoke")
+	}
+	if p.PrincipalKind() != domain.KindUser || p.PrincipalID().IsZero() || !p.SessionRef().IsZero() || !p.DeviceRef().IsZero() ||
+		!p.TokenRef().IsZero() || !p.InstallationRef().IsZero() || !p.ViewAsPerson().IsZero() || !p.ActingForPerson().IsZero() {
+		return internal("the re-check principal carries a credential or a binding")
+	}
+	return nil
+}
+
 // build reads the facts of ref and builds its snapshot (07 section 7.2). Grants of a principal
 // that is unknown or not active, and of an app without an active installation, are not read (SR7,
 // 07 section 2.10).
@@ -376,18 +480,20 @@ func (a *Authorizer) build(ctx context.Context, key cacheKey, ref authz.Credenti
 		e.snap = domain.BuildSnapshot(in)
 		return e, nil
 	}
-	if e.snap, err = a.buildLive(ctx, ref, facts, in, t); err != nil {
+	if e.snap, err = a.buildLive(ctx, ref, key.recheck, facts, in, t); err != nil {
 		return entry{}, err
 	}
 	return e, nil
 }
 
 // buildLive builds the snapshot of an active or pending principal: its grants and, for an active
-// human, the terminal state (session users and personal hosts, M2-40).
-func (a *Authorizer) buildLive(ctx context.Context, ref authz.CredentialRef, facts authz.PrincipalFacts, in domain.SnapshotInput, t time.Time) (domain.Snapshot, error) {
+// human, the terminal state (session users and personal hosts, M2-40). The owner role needs a
+// session (R-AZ-14), except for the principal of the check without a request (recheck, R-AZ-29).
+func (a *Authorizer) buildLive(ctx context.Context, ref authz.CredentialRef, recheck bool, facts authz.PrincipalFacts, in domain.SnapshotInput,
+	t time.Time) (domain.Snapshot, error) {
 	human := string(facts.Kind) == domain.KindUser
 	in.Active = facts.Status == authz.PrincipalActive
-	in.Owner = facts.IsOwner && human && !ref.SessionID.IsZero() && in.Active
+	in.Owner = facts.IsOwner && human && (!ref.SessionID.IsZero() || recheck) && in.Active
 	if err := readGrants(ctx, a.store, ref.PrincipalID, human, &in, t); err != nil {
 		return domain.Snapshot{}, err
 	}
@@ -436,8 +542,14 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	return a.decideFor(ctx, s, act, r, spec, req, preview, t)
 }
 
-// acting loads the acting principal at the current rights version (principalOf).
+// acting loads the acting principal at the current rights version (principalOf), after the
+// check of the re-check marker (checkRecheck).
 func (a *Authorizer) acting(ctx context.Context, p authorize.Principal, action string, t time.Time) (*actingPrincipal, domain.Decision, error) {
+	// An unknown action parses to the zero value, which the marker refuses as well.
+	act, _ := authorize.ParseAction(action)
+	if err := checkRecheck(p, act); err != nil {
+		return nil, domain.Decision{}, err
+	}
 	v, err := a.version(ctx)
 	if err != nil {
 		return nil, domain.Decision{}, err

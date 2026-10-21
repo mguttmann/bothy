@@ -93,9 +93,70 @@ func (r *Repository) TransitionRun(ctx context.Context, w app.TransitionWrite) (
 	}
 	row, err := q.TransitionRun(ctx, sqlcgen.TransitionRunParams{
 		ToState: string(w.To), Reason: w.Reason, At: ts(w.At), ID: uuid(w.ID),
-		FromState: string(w.From), Version: w.Version,
+		FromState: string(w.From), Version: w.Version, StartedJti: optionalUUID(w.StartedJTI),
+		BillingModeUsed: optionalText(w.BillingModeUsed), BillingEvidence: w.BillingEvidence, Model: optionalText(w.Model),
+		StatusLine: optionalText(w.StatusLine), Metrics: w.Metrics, Summary: optionalText(w.Summary),
 	})
 	return one(row, err, "changing the state of a run")
+}
+
+// LockRun implements app.Repository: the row of id with its row lock for the rest of the unit of
+// work (SELECT ... FOR UPDATE). Errors: internal outside a unit of work.
+func (r *Repository) LockRun(ctx context.Context, id ids.ID) (app.RunRow, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.RunRow{}, false, err
+	}
+	row, err := q.LockRun(ctx, uuid(id))
+	return one(row, err, "locking a run")
+}
+
+// RecordDelivery implements app.Repository: the columns of an allowed delivery and version + 1.
+// Errors: not_found for an unknown run, internal outside a unit of work.
+func (r *Repository) RecordDelivery(ctx context.Context, w app.DeliveryWrite) (app.RunRow, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return app.RunRow{}, err
+	}
+	row, err := q.RecordDelivery(ctx, sqlcgen.RecordDeliveryParams{
+		Record: !w.JTI.IsZero(), Jti: optionalUUID(w.JTI), RenewedFrom: optionalUUID(w.RenewedFromJTI),
+		BillingModeExpected: w.BillingModeExpected, ID: uuid(w.ID),
+	})
+	out, found, err := one(row, err, "recording a delivery")
+	if err == nil && !found {
+		return app.RunRow{}, errs.New(errs.CodeNotFound, "runs: the run of a delivery is gone")
+	}
+	return out, err
+}
+
+// LockActiveRunsByStarter implements app.Repository. Errors: internal outside a unit of work.
+func (r *Repository) LockActiveRunsByStarter(ctx context.Context, principalIDs []ids.ID) ([]app.RunRow, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return nil, err
+	}
+	in := make([]pgtype.UUID, 0, len(principalIDs))
+	for _, id := range principalIDs {
+		in = append(in, uuid(id))
+	}
+	rows, err := q.LockActiveRunsByStarter(ctx, in)
+	return runs(rows, err, "locking the active runs of starters")
+}
+
+// LockActiveRunsByAgent implements app.Repository. Errors: internal outside a unit of work.
+func (r *Repository) LockActiveRunsByAgent(ctx context.Context, agentID ids.ID) ([]app.RunRow, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.LockActiveRunsByAgent(ctx, uuid(agentID))
+	return runs(rows, err, "locking the active runs of an agent")
+}
+
+// OrphanCandidates implements app.Repository.
+func (r *Repository) OrphanCandidates(ctx context.Context) ([]app.RunRow, error) {
+	rows, err := r.read(ctx).OrphanCandidates(ctx)
+	return runs(rows, err, "reading the orphan candidates")
 }
 
 // AppendStep implements app.Repository. A nil or empty Detail stores "{}", a zero StartedAt the
@@ -260,7 +321,8 @@ func toRun(row sqlcgen.Run) app.RunRow {
 		TriggeringCommandID: idOf(row.TriggeringCommandID), TriggeringInteractionID: idOf(row.TriggeringInteractionID),
 		TriggeredBy: idOf(row.TriggeredBy), State: domain.State(row.State), StateReason: row.StateReason.String,
 		Version: row.Version, BillingModeExpected: row.BillingModeExpected, BillingModeUsed: row.BillingModeUsed.String,
-		InvocationJTI: idOf(row.InvocationJti), Model: row.Model.String, StatusLine: row.StatusLine.String,
+		InvocationJTI: idOf(row.InvocationJti), RenewedFromJTI: idOf(row.RenewedFromJti), StartedJTI: idOf(row.StartedJti),
+		BillingEvidence: row.BillingEvidence, Model: row.Model.String, StatusLine: row.StatusLine.String,
 		LastTextExcerpt: row.LastTextExcerpt.String, Summary: row.Summary.String, Plan: row.Plan, Metrics: row.Metrics,
 		CostMicros: row.CostMicros, Currency: row.Currency, CostIsEstimate: row.CostIsEstimate,
 		QueuedAt: timeOf(row.QueuedAt), StartedAt: timeOf(row.StartedAt), FinishedAt: timeOf(row.FinishedAt),
@@ -288,6 +350,9 @@ func mapError(err error, what string) error {
 	}
 	return errs.Wrap(errs.CodeInternalError, err, "runs: "+what+" failed")
 }
+
+// optionalText is NULL for "".
+func optionalText(v string) pgtype.Text { return pgtype.Text{String: v, Valid: v != ""} }
 
 // uuid converts an id for a parameter.
 func uuid(id ids.ID) pgtype.UUID { return pgtype.UUID{Bytes: id, Valid: true} }

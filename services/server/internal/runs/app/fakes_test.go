@@ -4,6 +4,7 @@ package app_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -65,6 +67,27 @@ func (r *repo) Run(_ context.Context, id ids.ID) (app.RunRow, bool, error) {
 	return app.RunRow{}, false, nil
 }
 
+func (r *repo) LockRun(ctx context.Context, id ids.ID) (app.RunRow, bool, error) {
+	return r.Run(ctx, id)
+}
+
+func (r *repo) RecordDelivery(_ context.Context, w app.DeliveryWrite) (app.RunRow, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID != w.ID {
+			continue
+		}
+		if !w.JTI.IsZero() {
+			x.InvocationJTI, x.RenewedFromJTI = w.JTI, w.RenewedFromJTI
+		}
+		x.BillingModeExpected, x.Version = w.BillingModeExpected, x.Version+1
+		r.runs[i] = x
+		return x, nil
+	}
+	return app.RunRow{}, errs.New(errs.CodeNotFound, "")
+}
+
 func (r *repo) ActiveRunOfThread(_ context.Context, thread ids.ID) (app.RunRow, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -93,10 +116,47 @@ func (r *repo) TransitionRun(_ context.Context, w app.TransitionWrite) (app.RunR
 				x.DurationMS, x.HasDuration = w.At.Sub(x.StartedAt).Milliseconds(), true
 			}
 		}
+		if !w.StartedJTI.IsZero() {
+			x.StartedJTI, x.RenewedFromJTI = w.StartedJTI, ids.ID{}
+		}
+		x.BillingModeUsed = cmp.Or(w.BillingModeUsed, x.BillingModeUsed)
+		x.Model, x.StatusLine, x.Summary = cmp.Or(w.Model, x.Model), cmp.Or(w.StatusLine, x.StatusLine), cmp.Or(w.Summary, x.Summary)
+		if w.BillingEvidence != nil {
+			x.BillingEvidence = w.BillingEvidence
+		}
+		if w.Metrics != nil {
+			x.Metrics = w.Metrics
+		}
 		r.runs[i] = x
 		return x, true, nil
 	}
 	return app.RunRow{}, false, nil
+}
+
+// lockActive returns the active runs that keep holds, ascending by id.
+func (r *repo) lockActive(keep func(app.RunRow) bool) []app.RunRow {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []app.RunRow
+	for _, x := range r.runs {
+		if x.State.Active() && keep(x) {
+			out = append(out, x)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.RunRow) int { return bytes.Compare(a.ID[:], b.ID[:]) })
+	return out
+}
+
+func (r *repo) LockActiveRunsByStarter(_ context.Context, principals []ids.ID) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return slices.Contains(principals, x.TriggeredBy) }), nil
+}
+
+func (r *repo) LockActiveRunsByAgent(_ context.Context, agent ids.ID) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return x.AgentID == agent }), nil
+}
+
+func (r *repo) OrphanCandidates(context.Context) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return x.State != domain.StateQueued }), nil
 }
 
 func (r *repo) AppendStep(_ context.Context, s app.StepRow) (app.StepRow, error) {
@@ -244,12 +304,49 @@ func (j *journal) count(what string) int {
 	return n
 }
 
-// msgs is the fake MessageWriter.
-type msgs struct{ j *journal }
+// msgs is the fake MessageWriter; facts holds the trigger facts of TriggerMessageOf (a missing
+// message reads as a human text message of Alex without mentions in the main thread).
+type msgs struct {
+	j     *journal
+	facts *msgFacts
+}
+
+// msgFacts are the stored trigger facts of the fake messages.
+type msgFacts struct {
+	mu   sync.Mutex
+	m    map[ids.ID]messaging.TriggerMessage
+	dflt messaging.TriggerMessage
+}
 
 func (m msgs) SetTriggerState(_ context.Context, cmd messaging.SetTriggerStateCmd) error {
 	m.j.add("trigger", cmd)
+	if m.facts != nil {
+		m.facts.mu.Lock()
+		f, ok := m.facts.m[cmd.MessageID]
+		if !ok {
+			f = m.facts.dflt
+			f.ID = cmd.MessageID
+		}
+		f.TriggerState, f.TriggerStateReason = cmd.State, cmd.Reason
+		m.facts.m[cmd.MessageID] = f
+		m.facts.mu.Unlock()
+	}
 	return nil
+}
+
+func (m msgs) TriggerMessageOf(_ context.Context, id ids.ID) (messaging.TriggerMessage, error) {
+	m.j.add("read-message", id)
+	if m.facts == nil {
+		return messaging.TriggerMessage{ID: id, Origin: "human", Kind: "text", Author: messaging.PrincipalRef{ID: ids.New(), Kind: "user", Handle: "alex", DisplayName: "Alex"}}, nil
+	}
+	m.facts.mu.Lock()
+	defer m.facts.mu.Unlock()
+	f, ok := m.facts.m[id]
+	if !ok {
+		f = m.facts.dflt
+		f.ID = id
+	}
+	return f, nil
 }
 
 func (m msgs) CreateRunAnchor(_ context.Context, cmd messaging.RunAnchorCmd) (messaging.AnchorRef, error) {
@@ -366,9 +463,17 @@ type authz struct {
 	j      *journal
 	decide func(act authorize.Action, filter bool, r authorize.Resource) decision
 	scope  []ids.ID
+	// mu guards principals and pins: the principal and the pinned version of every call.
+	mu         sync.Mutex
+	principals []authorize.Principal
+	pins       []int64
 }
 
-func (a *authz) Authorize(ctx context.Context, _ authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+func (a *authz) Authorize(ctx context.Context, p authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+	a.mu.Lock()
+	v, _ := authorize.PinnedPermissionVersion(ctx)
+	a.principals, a.pins = append(a.principals, p), append(a.pins, v)
+	a.mu.Unlock()
 	filter := authorize.IsFilter(ctx)
 	mode := "request"
 	if filter {
@@ -473,6 +578,9 @@ type world struct {
 	dmChannel, dmThread ids.ID
 	clk                 *clock.Fake
 	defaultSwitches     chat.TriggerChannel
+	msgFacts            *msgFacts
+	audit               *auditJournal
+	telemetry           *telemetryJournal
 }
 
 // newWorld builds the world.
@@ -481,8 +589,12 @@ func newWorld(t *testing.T) *world {
 	w := &world{
 		t: t, j: &journal{}, repo: &repo{}, errs: &errCounter{}, metrics: &metricsRecorder{}, log: &logBuffer{},
 		space: ids.New(), channel: ids.New(), main: ids.New(), thread: ids.New(), lotse: ids.New(), texter: ids.New(), alex: ids.New(),
-		dmChannel: ids.New(), dmThread: ids.New(), clk: clock.NewFake(t0),
+		dmChannel: ids.New(), dmThread: ids.New(), clk: clock.NewFake(t0), audit: &auditJournal{}, telemetry: &telemetryJournal{},
 	}
+	w.msgFacts = &msgFacts{m: map[ids.ID]messaging.TriggerMessage{}, dflt: messaging.TriggerMessage{
+		Origin: "human", Kind: "text", ThreadID: w.main, ChannelID: w.channel,
+		Author: messaging.PrincipalRef{ID: w.alex, Kind: "user", Handle: "alex", DisplayName: "Alex"},
+	}}
 	w.threads = &threads{j: w.j, infos: map[ids.ID]chat.ThreadInfo{
 		w.main:     {ID: w.main, ChannelID: w.channel, SpaceID: w.space, ChannelKind: "text", Kind: "main", State: "open"},
 		w.thread:   {ID: w.thread, ChannelID: w.channel, SpaceID: w.space, ChannelKind: "text", Kind: "thread", State: "open", OperatorAgentID: w.lotse},
@@ -503,9 +615,11 @@ func newWorld(t *testing.T) *world {
 
 // build (re)creates the use cases over the fakes of w.
 func (w *world) build() {
-	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256}, app.Deps{
-		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j}, Threads: w.threads, Channels: w.channels,
+	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
+		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, app.Deps{
+		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
+		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -553,3 +667,67 @@ func (w *world) triggers() []messaging.SetTriggerStateCmd {
 
 // errVeto is the error a vetoing step of a test returns.
 var errVeto = errors.New("veto")
+
+// queuedMaxAge is run.queued_max_age of the unit tests.
+const queuedMaxAge = 48 * time.Hour
+
+// versions is the fake permission version.
+type versions struct{}
+
+func (versions) PermissionVersion(context.Context) (int64, error) { return 9, nil }
+
+// auditJournal records the audit entries with the actor of their context.
+type auditJournal struct {
+	mu      sync.Mutex
+	entries []auditing.Entry
+	actors  []actor.Actor
+}
+
+func (a *auditJournal) Record(ctx context.Context, e auditing.Entry) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	p, _ := actor.FromContext(ctx)
+	a.entries, a.actors = append(a.entries, e), append(a.actors, p)
+	return nil
+}
+
+func (a *auditJournal) list() ([]auditing.Entry, []actor.Actor) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.Clone(a.entries), slices.Clone(a.actors)
+}
+
+// telemetryJournal records the denial counter and the decisions of the spans.
+type telemetryJournal struct {
+	mu        sync.Mutex
+	denied    []string
+	decisions []string
+}
+
+func (t *telemetryJournal) Denied(_ context.Context, handle, reason string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.denied = append(t.denied, handle+":"+reason)
+}
+
+func (t *telemetryJournal) StartDispatch(ctx context.Context, _ ids.ID, _ string) (context.Context, func(string)) {
+	return ctx, func(d string) {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		t.decisions = append(t.decisions, d)
+	}
+}
+
+// expiryJournal records the scheduled jobs.
+type expiryJournal struct{ j *journal }
+
+func (e expiryJournal) ScheduleQueuedExpiry(_ context.Context, run ids.ID, at time.Time) error {
+	e.j.add("expiry", expiryAt{run, at})
+	return nil
+}
+
+// expiryAt is one scheduled job.
+type expiryAt struct {
+	run ids.ID
+	at  time.Time
+}

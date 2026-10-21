@@ -26,6 +26,18 @@
       "doc": "Without an ack within this time the server delivers again from acked_seq + 1 with redelivered."
     },
     {
+      "name": "agent.cancel_grace",
+      "env": "BOTHY_AGENT__CANCEL_GRACE",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "04-sync-protokoll.md",
+      "doc": "Time for the adapter to report a cancellation; then the server cancels the run with cancel_timeout."
+    },
+    {
       "name": "agent.heartbeat_persist_interval",
       "env": "BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL",
       "kind": "duration",
@@ -3014,6 +3026,30 @@
       "max": "",
       "chapter": "20-datenschutz.md",
       "doc": "How long the audit log is kept before it is trimmed with an anchor."
+    },
+    {
+      "name": "run.orphan_timeout",
+      "env": "BOTHY_RUN__ORPHAN_TIMEOUT",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "09-agenten.md",
+      "doc": "Without a heartbeat for this long while a run is active, the run fails with stale."
+    },
+    {
+      "name": "run.queued_max_age",
+      "env": "BOTHY_RUN__QUEUED_MAX_AGE",
+      "kind": "duration",
+      "default": "48h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "09-agenten.md",
+      "doc": "How old a run that was not started may become; then it fails with agent_unavailable."
     },
     {
       "name": "run.step_detail_max_bytes",

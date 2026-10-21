@@ -157,7 +157,9 @@ Für eine neue Nachricht M eines Prinzipals P im Thread T des Kanals C gilt in d
 7. `authorize(P, agent.invoke, {Ziel, Kandidat, M})` nach 05 Abschnitt 5 (Rechte, Agent aktiv,
    I2, Projekt bereit). Bei `allow`: Lauf `queued`, Live-Box-Anker, Ereignis `agent.invocation`,
    `trigger_state = received`. Bei Ablehnung: M bleibt gespeichert, `trigger_state = failed` mit
-   Grund.
+   Grund. The first successful delivery of `agent.invocation` moves `trigger_state` to `queued`;
+   a denial immediately before the delivery fails the run and sets `trigger_state = failed` with
+   the reason of 5.2 (04 section 15.3 step 2, M2-08).
 
 Order of the check and the auto thread (D-M2-05-2): with `auto_thread` in the main thread the check
 of point 7 names the thread of M, not the new thread, so the mention rule of point 3 and the guard
@@ -252,7 +254,9 @@ und Gäste erlaubt sind; diese Kanäle zählt I1 nicht zu seinen Zielen
 ### 3.7 Auto-Thread aus einer Kanal-Nachricht
 
 Der neue Thread T' bekommt `parent_message_id = M`, `operator_agent_id` = wirksamer Bediener von
-C, `title = ''` und `title_source = 'auto'`. Bis ein Titel gesetzt ist, zeigt der Client die erste
+C, `title = ''` und `title_source = 'auto'`. T' is written only after the `allow` of 3.4 point 7, so
+a denial creates no empty thread; the check before every delivery decides T' with the main-thread
+mention rule of the channel ("for new threads", 05 section 5 point 3; M2-08). Bis ein Titel gesetzt ist, zeigt der Client die erste
 Zeile von M. M bleibt im Hauptverlauf und trägt den `trigger_state`; Lauf, Live-Box-Anker,
 Antworten und Sitzung gehören zu T'.
 
@@ -751,11 +755,11 @@ stateDiagram-v2
 | Grund | Zustand | Gesetzt von | Bedeutung |
 |---|---|---|---|
 | `user_cancelled` | `cancelled` | Server | Mensch hat gestoppt |
-| `access_revoked` | `cancelled` | Server | Auslöser verlor `trigger` (04 Abschnitt 8.3) |
+| `access_revoked` | `cancelled`; `failed` on denial before delivery | Server | Auslöser verlor `trigger` (04 Abschnitt 8.3); at delivery every denial of `agent.invoke` without its own code below (AZ-M51) |
 | `cancel_timeout` | `cancelled` | Server | Adapter meldete den Abbruch nicht in `agent.cancel_grace` |
-| `agent_disabled` | `cancelled` | Server | Agent gesperrt |
+| `agent_disabled` | `cancelled`; `failed` on denial before delivery | Server | Agent gesperrt |
 | `billing_mode_personal_not_holder` | `failed` | Server | I2 bei Zustellung |
-| `channel_read_only` | `cancelled` | Server | Channel became read-only or archived (04 section 8.3) |
+| `channel_read_only` | `cancelled`; `failed` on denial before delivery | Server | Channel became read-only or archived (04 section 8.3) |
 | `billing_mode_mismatch` | `failed` | Adapter oder Server | I3 |
 | `tool_class_owner_only` | `failed` | Server | SR2 at delivery or at `run.token.renew` |
 | `tool_class_mismatch` | `failed` | Adapter or Server | actual tool class higher than the `tool_class` of the token (SR2) |
@@ -767,7 +771,7 @@ stateDiagram-v2
 | `runtime_error` | `failed` | Adapter | Laufzeit meldet einen Fehler; Details im letzten Schritt |
 | `adapter_error` | `failed` | Adapter | Fehler im Adapter selbst |
 | `runtime_not_authenticated` | `failed` | Adapter | Laufzeit hat keine gültige Anmeldung |
-| `user_disabled` | `cancelled` | Server | The triggering person was disabled (`user.disable`, 02 section 4.3) |
+| `user_disabled` | `cancelled`; `failed` on denial before delivery | Server | The triggering person was disabled (`user.disable`, 02 section 4.3): `cancelled` on revocation, `failed` at delivery |
 
 The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
 unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the original code as the detail `original_reason` of a server
@@ -834,6 +838,18 @@ Benachrichtigung aus; "Antwort fertig" hängt am Laufende ([13-push-benachrichti
 | Adapter verschwunden | kein Heartbeat seit `run.orphan_timeout` bei Lauf in `running` oder `waiting_input` | `failed`, Grund `stale` |
 | Agent offline beim Aufruf | Lauf bleibt `queued`, Box zeigt "Agent offline, wartet" | nach `run.queued_max_age`: `failed`, Grund `agent_unavailable` |
 
+The periodic job `runs.stall_check` (every `agent.presence_timeout`, 02 section 12.3) evaluates the
+rows `interrupted` and `stale` on the last persisted heartbeat of the agent (`agents.last_heartbeat_at`
+and `agents.reported_details.active_runs`, stored at most every `agent.heartbeat_persist_interval`):
+a run in `running` or `waiting_input` is `interrupted` when that heartbeat does not list it in
+`active_runs` and lies more than `agent.presence_timeout` after `runs.started_at`; it is `stale`
+when the agent has no heartbeat or its last one is older than `run.orphan_timeout` and
+`runs.started_at` is older than `run.orphan_timeout`. A heartbeat without the member `active_runs`
+gives no `interrupted`. Only the persisted heartbeat is visible to the worker, so the comparison
+"on every heartbeat" of 4.8 happens on the stored one (D-M2-09-20); `agent.heartbeat_persist_interval`
+must be below `run.orphan_timeout` (start check, D-M2-09-21). The row "no progress" is not built yet
+(the core contract keeps no time of the last `run.update`).
+
 Nach `interrupted` und `stale` gibt es keine automatische Wiederholung. Die Box zeigt "Lauf
 unterbrochen" und einen Knopf "Erneut senden", der eine neue Nachricht mit dem Text der
 auslösenden Nachricht in das Ausgangsfach legt. Grund: Die Laufzeit kann vor dem Absturz schon
@@ -880,7 +896,11 @@ keine Emoji ([01-produkt.md](01-produkt.md)).
 ## 7. Nachträge während eines Laufs
 
 Eine Nachricht, die nach 3.4 den Agenten des aktiven Laufs auslösen würde, wird ein Nachtrag
-(`run.followup.create`, 3.4 Punkt 6; 05 Abschnitt 5 Punkt 7 spricht von "der Auslösung"). Eine
+(`run.followup.create`, 3.4 Punkt 6; 05 Abschnitt 5 Punkt 7 spricht von "der Auslösung").
+`agent.followup` passes `agent.invoke` for the author of the follow-up immediately before every
+delivery; a denial sends nothing and sets the follow-up message to `trigger_state = failed` with the
+reason, but leaves the run unchanged, because the run's own trigger was checked for its own
+invocation and another person's follow-up must not end it (M2-08). Eine
 Nachricht ohne Auslösung (kein `trigger`, Erwähnungsregel nicht erfüllt) bleibt eine normale
 Nachricht und erreicht den Agenten nur als Kontext des nächsten Laufs. Grund: Ein Kanal mit
 Erwähnungspflicht soll Gespräche zwischen Menschen nicht in einen laufenden Turn schieben.
@@ -915,8 +935,15 @@ Wege: Knopf "Stopp" in der Box, eingebauter Befehl `/stop`, Rechte-Entzug (04 Ab
 Sperre des Agenten oder des Auslösers.
 
 1. `run.cancel` prüft `trigger` und (Auslöser des Laufs oder `manage`) (R-AZ-07).
-2. Lauf in `queued` ohne Zustellung: sofort `cancelled`. Sonst schreibt der Server
-   `run.cancel_requested` an den Agenten.
+2. A run in `queued` ends `cancelled` with `user_cancelled` at once, and the server writes
+   `run.cancel_requested` to the agent as well, because the core contract keeps no delivery marker
+   on a run: an adapter that never got the invocation ignores the request, one that holds it drops
+   it, and its later `startRun` gets 409 `already_started` (D-M2-09-12). For a run in `running` or
+   `waiting_input` the server writes `run.cancel_requested` to the agent and schedules the job
+   `runs.cancel_timeout` at now plus `agent.cancel_grace`; the state stays until the adapter
+   reports `cancelled` or the job ends the run. A loss of `trigger` by the starter (04 section 8.3)
+   takes the same path with `access_revoked`, `user_disabled` or `channel_read_only`, also for a
+   `queued` run; a disabled agent's runs end `cancelled` with `agent_disabled` at once (2.1).
 3. Der Adapter beendet den Turn (Hermes: `/stop` über `handle_message`, Hermes meldet danach
    `on_processing_complete` mit `CANCELLED` und ruft das Modell nicht weiter; Runner: SIGINT,
    18.6) und meldet `run.finish` mit `cancelled`.

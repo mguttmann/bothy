@@ -444,8 +444,11 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 	}
 	// The running runs of the snapshot come from the runs module (M2-05); the world subscribes no
 	// acceptance, so no message opens a run unless a test writes one.
-	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax, StepDetailMaxBytes: StepDetailMax}, pool, uow, az,
-		wire.RunsDeps{Events: writes.Events, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service}, w.Clock, log)
+	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax, StepDetailMaxBytes: StepDetailMax,
+		QueuedMaxAge: 48 * time.Hour,
+		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
+		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, pool, uow, az,
+		wire.RunsDeps{Events: writes.Events, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Expiry: noExpiry{}}, w.Clock, log)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -896,3 +899,8 @@ func (w *World) Tombstone(id ids.ID) {
 
 // MessagePath is the path of getMessage.
 func MessagePath(id ids.ID) string { return "/api/v1/messages/" + id.String() }
+
+// noExpiry schedules nothing: the world has no job runtime and opens no run by acceptance (M2-08).
+type noExpiry struct{}
+
+func (noExpiry) ScheduleQueuedExpiry(context.Context, ids.ID, time.Time) error { return nil }

@@ -166,6 +166,11 @@ type world struct {
 	metrics *transitions
 	// log captures the log of the modules.
 	log *httpservertest.LogCapture
+	// cancels records the jobs runs.cancel_timeout the runs module schedules (M2-09); keys and
+	// issuer sign and name the invocation tokens.
+	cancels *cancelJobs
+	keys    *testKeys
+	issuer  ids.ID
 
 	owner, alex, sam, robin                    ids.ID
 	support, marketing, engineering, research  ids.ID
@@ -214,7 +219,8 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
 	w := &world{t: t, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
-		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}, log: capture, metrics: &transitions{}}
+		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}, log: capture, metrics: &transitions{},
+		cancels: &cancelJobs{}, issuer: ids.New()}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
 	w.creds = &creds{fake: fake.NewCredentials(), real: identityapp.NewCredentialSource(repo, repo, repo), own: map[ids.ID]bool{}}
@@ -237,8 +243,11 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, txn.Subscribe(reg, mods.SyncSubscribers.OnMessagePosted))
 	must(t, txn.Subscribe(reg, mods.MessagingSubscribers.OnThreadMoved))
 	must(t, txn.Subscribe(reg, mods.SyncSubscribers.OnThreadMoved))
-	// The acceptance of runs after the existing subscribers (M2-05, registerTxn).
+	// The acceptance of runs after the existing subscribers (M2-05, registerTxn), then the
+	// revocation and the disabled agent (M2-09).
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessagePosted))
+	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAccessChanged))
+	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAgentDisabled))
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
 	w.uow = uow
@@ -292,12 +301,18 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	personal, err := wire.NewPersonal(syncapp.PersonalConfig{MaxContentBytes: 4096, MaxAttachments: 3, EventPayloadMaxBytes: 65536},
 		pool, uow, w.az, appender, c.Service, m.Service, w.clk)
 	must(t, err)
-	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256}, pool, uow, w.az, wire.RunsDeps{
+	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
+		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
+		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, pool, uow, w.az, wire.RunsDeps{
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,
+		Expiry: noExpiry{}, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: w.rec, CancelTimeouts: w.cancels,
 	}, w.clk, log)
 	must(t, err)
 	must(t, mods.RunsAcceptor.Bind(rn.Service))
 	w.runs = rn.Service
+	// The invocation tokens of M2-06 over in-memory keys and a fixed issuer (M2-09).
+	w.keys = newTestKeys(t)
+	must(t, rn.BindInvocationTokens(tokenConfig, w.keys, fixedInstance{id: w.issuer}, w.clk))
 	reads, err := wire.NewSyncReads(syncapp.CatchUpConfig{PageSize: 500, MaxEvents: 100000},
 		wire.SyncReadDeps{Pool: pool, UoW: uow, Authorizer: w.az, Chat: c.Service, Messaging: m.Service, Personal: personal.Service, Agents: ag.Service,
 			Directory: w.id.Directory, Flags: settings.Admin, Runs: rn.Service})
@@ -608,3 +623,8 @@ func (w *world) denies(action, reason string) []auditRow {
 func (w *world) mainThread(channel ids.ID) ids.ID {
 	return ids.MustParse(w.text(`SELECT id::text FROM threads WHERE channel_id = $1 AND kind = 'main'`, channel.String()))
 }
+
+// noExpiry schedules nothing: the world has no job runtime (M2-08 tests the job in internal/wire).
+type noExpiry struct{}
+
+func (noExpiry) ScheduleQueuedExpiry(context.Context, ids.ID, time.Time) error { return nil }

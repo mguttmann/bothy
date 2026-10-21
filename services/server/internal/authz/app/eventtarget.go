@@ -48,7 +48,8 @@ func (a *Authorizer) eventTarget(ctx context.Context, act authorize.Action, r au
 }
 
 // eventCandidates returns the objects an event descriptor r may be decided on, in order: the
-// target of its grant (for kind grant), then the thread, channel and space of its scope.
+// target of its grant (for kind grant), then the thread, channel and space of its scope, and last
+// the agent of an audience (EventScope.AudienceID).
 func (a *Authorizer) eventCandidates(ctx context.Context, r authorize.Resource) ([]authorize.Resource, error) {
 	var out []authorize.Resource
 	if r.Kind == authorize.ResourceGrant && !r.ID.IsZero() {
@@ -68,6 +69,12 @@ func (a *Authorizer) eventCandidates(ctx context.Context, r authorize.Resource) 
 		if !c.ID.IsZero() {
 			out = append(out, c)
 		}
+	}
+	if !sc.AudienceID.IsZero() {
+		// A personal event with a receive action on the agent itself (agent.events.consume of
+		// agent.invocation): decided on the audience, which the delivery rule matched with the
+		// receiver (M2-08).
+		out = append(out, authorize.Resource{Kind: authorize.ResourceAgent, ID: sc.AudienceID})
 	}
 	return out, nil
 }

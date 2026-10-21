@@ -11,6 +11,24 @@ documented in this file. The format is based on
 
 ### Added
 
+- Start, renewal, end and cancellation of runs (M2-09, I3, R-SY-10, R-SY-11, R-SY-19): the
+  operations `startRun`, `resumeRun`, `renewInvocationToken`, `awaitRunInput`, `finishRun` and
+  `cancelRun` are enabled. A start checks the invocation token (signature, `kid`, `typ`, `alg`,
+  `iss`, `aud`, run), its currency (`runs.invocation_jti`, not consumed), its expiry with
+  `auth.clock_leeway`, then the reported billing mode and tool class; every token error is 403
+  `invocation_token_invalid` with `reason` `expired`, `superseded` or `invalid`, a repeated start
+  with the same token answers 200 with `Idempotent-Replay: true`, and an I3 mismatch fails the run
+  with 409 `billing_mode_mismatch` or `tool_class_mismatch`. A renewal repeats the checks before a
+  delivery and records `runs.renewed_from_jti`; a refusal fails the run with 403
+  `agent_invocation_denied`. `run.start` and `run.token.renew` are real requirements of authz.
+  `cancelRun` ends a queued run at once and otherwise writes `run.cancel_requested` and the job
+  `runs.cancel_timeout` at `agent.cancel_grace`; a loss of `trigger` by the starter (also
+  `user.disable` and archives) and a disabled agent stop the affected runs in the same
+  transaction; the periodic job `runs.stall_check` (every `agent.presence_timeout`) fails runs as
+  `interrupted` or `stale` from the persisted heartbeat, never retried. New configuration keys
+  `agent.cancel_grace` and `run.orphan_timeout`, the start check
+  `heartbeat_persist_below_orphan_timeout`, the counter `bothy.agent.billing_mode_mismatch`, the
+  port `agents.Heartbeats` and the value `channel_read_only` of `RunCancelRequestedPayload.reason`.
 - Avatar and logo (M3-10): `setMyAvatar` and `deleteMyAvatar` (`self.profile.update`, people
   only), `uploadBrandingLogo` and `deleteBrandingLogo` (`instance.branding.update`, owner with
   fresh step-up, audited) and the public `getBrandingLogo` (`instance.discovery.read`). The image
@@ -27,6 +45,21 @@ documented in this file. The format is based on
   uploader. Events `user.updated` and `instance.updated` (only `branding.logo_file_id`); removing
   the logo stores the empty string and raises the branding version. No new configuration key,
   metric or job.
+- Delivery with I2, guard rules and a fresh token (M2-08, invariant I2 "before every invocation",
+  R-SY-07, ADR 0023): the port `runs.Delivery` runs immediately before every hand-over of
+  `agent.invocation`, `agent.followup`, `interaction.created` and `command.invoked` to an agent,
+  on the WebSocket and in the REST poll (one consumer engine, `gateway/adapters/rundelivery`
+  replaces `passdelivery`). It locks the run, applies the delivery matrix, decides `agent.invoke`
+  in filter mode for the triggering person as the principal of the check without a request
+  (R-AZ-29: no session, device or token; owner status from the owner list) at the pinned
+  permission version, and on a denial sends nothing, fails a queued run with a reason of 09 5.2,
+  sets `trigger_state = failed` and writes one audit entry; on an allow it signs a fresh token,
+  records its `jti` where the run may start with it and moves `trigger_state` from `received` to
+  `queued`. The acceptance appends `agent.invocation` (receive action `agent.events.consume`,
+  decided on the audience) and every new run schedules the job `runs.queued_expiry`, which fails a
+  run still `queued` after the new key `run.queued_max_age` with `agent_unavailable`. New counter
+  `bothy.agent.invocation.denied` and span `agent.dispatch`; `InvokeFacts.NewThread` applies the
+  main-thread mention rule to the auto thread.
 - Invocation tokens (M2-06, invariant I3, ADR 0023): `runs/app.InvocationTokens` issues a compact
   JWS with the header `alg = EdDSA`, `kid` and `typ = agent-invocation+jwt` over exactly the
   claims of 05 section 5 per trigger kind, signed with the active key of purpose `invocation`,

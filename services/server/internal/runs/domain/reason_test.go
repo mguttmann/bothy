@@ -64,6 +64,14 @@ func specTable(t *testing.T, prefix string) [][]string {
 	return rows
 }
 
+// specStates reads the state cell of 09 5.2: the first state, and whether the cell names failed
+// after cancelled ("`cancelled`; `failed` on denial before delivery", M2-08).
+func specStates(cell string) (domain.State, bool) {
+	first, rest, _ := strings.Cut(cell, "`")
+	first = strings.TrimSpace(strings.TrimSuffix(first, ";"))
+	return domain.State(first), strings.Contains(rest, "failed")
+}
+
 // specSetter reads the "set by" cell of 09 5.2 in either language: a cell naming both the adapter
 // and the server ("Adapter or Server", "Adapter oder Server") is SetterBoth.
 func specSetter(t *testing.T, cell string) domain.Setter {
@@ -105,7 +113,7 @@ func TestReasonTable(t *testing.T) {
 	if _, ok := domain.ReasonOf("no_such_reason"); ok {
 		t.Error("ReasonOf accepts an unknown code")
 	}
-	if last := table[len(table)-1]; last != (domain.ReasonRow{Code: domain.RunReasonUserDisabled, State: domain.StateCancelled, Setter: domain.SetterServer}) {
+	if last := table[len(table)-1]; last != (domain.ReasonRow{Code: domain.RunReasonUserDisabled, State: domain.StateCancelled, Setter: domain.SetterServer, AlsoFailed: true}) {
 		t.Errorf("last row = %v, want user_disabled, cancelled, server (D-M2-05-7)", last)
 	}
 	table[0].Code = "mutated"
@@ -119,7 +127,8 @@ func TestReasonTable(t *testing.T) {
 		t.Fatalf("09 5.2 has %d rows, the reason table %d", len(spec), len(table))
 	}
 	for i, cells := range spec {
-		want := domain.ReasonRow{Code: cells[0], State: domain.State(cells[1]), Setter: specSetter(t, cells[2])}
+		state, alsoFailed := specStates(cells[1])
+		want := domain.ReasonRow{Code: cells[0], State: state, Setter: specSetter(t, cells[2]), AlsoFailed: alsoFailed}
 		if table[i] != want {
 			t.Errorf("row %d: table %v, 09 5.2 %v", i, table[i], want)
 		}
@@ -177,6 +186,11 @@ func TestValidateServerReason(t *testing.T) {
 		{domain.StateFailed, domain.RunReasonInterrupted},
 		{domain.StateFailed, "billing_mode_mismatch"}, // both
 		{domain.StateFailed, "tool_class_mismatch"},   // both
+		// A denial before the delivery fails a queued run with these cancelled codes (M2-08).
+		{domain.StateFailed, domain.RunReasonAccessRevoked},
+		{domain.StateFailed, domain.RunReasonAgentDisabled},
+		{domain.StateFailed, domain.RunReasonChannelReadOnly},
+		{domain.StateFailed, domain.RunReasonUserDisabled},
 		{domain.StateQueued, ""},
 		{domain.StateRunning, ""},
 		{domain.StateWaitingInput, ""},
@@ -197,6 +211,7 @@ func TestValidateServerReason(t *testing.T) {
 		{domain.StateFailed, domain.RunReasonAdapterError},  // adapter only
 		{domain.StateFailed, domain.RunReasonUserCancelled}, // state mismatch
 		{domain.StateCancelled, domain.RunReasonStale},      // state mismatch
+		{domain.StateFailed, domain.RunReasonCancelTimeout}, // cancelled only
 		{domain.StateFailed, "quota_exhausted"},             // unknown
 		{domain.StateRunning, domain.RunReasonStale},        // no reason outside failed, cancelled
 		{domain.StateCompleted, domain.RunReasonUserCancelled},

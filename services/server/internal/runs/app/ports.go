@@ -28,8 +28,11 @@ type RunRow struct {
 	Version     int64
 	// BillingModeExpected is never empty; BillingModeUsed "" for NULL.
 	BillingModeExpected, BillingModeUsed string
-	// InvocationJTI is runs.invocation_jti.
-	InvocationJTI ids.ID
+	// InvocationJTI is runs.invocation_jti; RenewedFromJTI runs.renewed_from_jti and StartedJTI
+	// runs.started_jti (zero for NULL).
+	InvocationJTI, RenewedFromJTI, StartedJTI ids.ID
+	// BillingEvidence is the stored object billing_evidence.v1 ("{}" at least).
+	BillingEvidence []byte
 	// Model, StatusLine, LastTextExcerpt and Summary are "" for NULL.
 	Model, StatusLine, LastTextExcerpt, Summary string
 	// Plan and Metrics are the stored JSON objects.
@@ -87,6 +90,27 @@ type TransitionWrite struct {
 	// At is the time of the change: started_at = COALESCE(started_at, At) for running, finished_at
 	// = At and duration_ms = At - started_at (NULL when never started) for an end state.
 	At time.Time
+	// Columns stored with the same swap (M2-09); zero values keep the column. StartedJTI also
+	// clears renewed_from_jti (a start, 09 4.5.1).
+	StartedJTI                                  ids.ID
+	BillingModeUsed, Model, StatusLine, Summary string
+	// BillingEvidence and Metrics are JSON objects; nil keeps the column.
+	BillingEvidence, Metrics []byte
+}
+
+// DeliveryWrite is the input of Repository.RecordDelivery: the columns an allowed delivery
+// stores (M2-08 design note 3 h). JTI replaces invocation_jti and sets renewed_from_jti to
+// RenewedFromJTI (NULL when zero, so a delivery clears it); a zero JTI keeps both (a delivery
+// that may not start the run).
+type DeliveryWrite struct {
+	ID ids.ID
+	// JTI is the jti of the new token when the matrix records it; zero otherwise.
+	JTI ids.ID
+	// RenewedFromJTI is the jti a renewal replaced or kept (M2-09 design note 4 e); zero for a
+	// delivery.
+	RenewedFromJTI ids.ID
+	// BillingModeExpected is the configured agents.billing_mode now.
+	BillingModeExpected string
 }
 
 // RunKey is the keyset position (queued_at DESC, id DESC) of the run lists.
@@ -141,6 +165,13 @@ type Repository interface {
 	Run(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)
 	// ActiveRunOfThread reads the run in queued, running or waiting_input of the thread.
 	ActiveRunOfThread(ctx context.Context, threadID ids.ID) (row RunRow, found bool, err error)
+	// LockRun reads the run id with its row lock for the rest of the unit of work (SELECT ... FOR
+	// UPDATE, M2-08); found is false for an unknown id. It needs a unit of work.
+	LockRun(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)
+	// RecordDelivery stores the columns of an allowed delivery and raises version by one; the
+	// caller holds the row lock and calls it only when a column changes. Errors: not_found for an
+	// unknown run.
+	RecordDelivery(ctx context.Context, w DeliveryWrite) (RunRow, error)
 	// TransitionRun runs the compare-and-swap of w; changed is false when no row has the id, From
 	// and Version (the caller reads the row to tell a missing run from a concurrent change).
 	TransitionRun(ctx context.Context, w TransitionWrite) (row RunRow, changed bool, err error)
@@ -161,4 +192,13 @@ type Repository interface {
 	ActiveRuns(ctx context.Context, q ActiveRunsRead) ([]RunRow, error)
 	// ActiveCounts groups the active runs by agent and state for the gauge bothy.run.active.
 	ActiveCounts(ctx context.Context) ([]ActiveCount, error)
+	// LockActiveRunsByStarter locks the active runs triggered by one of principalIDs in ascending
+	// id (R-SY-11, M2-09). It needs a unit of work.
+	LockActiveRunsByStarter(ctx context.Context, principalIDs []ids.ID) ([]RunRow, error)
+	// LockActiveRunsByAgent locks the active runs of agentID in ascending id (09 2.1, M2-09). It
+	// needs a unit of work.
+	LockActiveRunsByAgent(ctx context.Context, agentID ids.ID) ([]RunRow, error)
+	// OrphanCandidates reads the runs in running or waiting_input, ascending by id, for the job
+	// runs.stall_check (M2-09); a thread has at most one (R-DM-14).
+	OrphanCandidates(ctx context.Context) ([]RunRow, error)
 }

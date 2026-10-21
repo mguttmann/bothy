@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -77,14 +78,28 @@ type TransitionCmd struct {
 	// To is the new state; Reason the reason of failed and cancelled (09 5.2).
 	To     domain.State
 	Reason string
-	// SetBy is the setter of the reason: the server, or the adapter (only for failed until M2-09
-	// defines the rule for an adapter's cancelled).
+	// SetBy is the setter of the reason: the server, or the adapter (failed with the reason rules
+	// of 09 5.2, cancelled with a reason of a cancel request, M2-09 design note 6 c).
 	SetBy domain.Setter
+	// Store are the columns the same swap stores (M2-09); the zero value stores none.
+	Store TransitionStore
+}
+
+// TransitionStore are the columns a transition of M2-09 stores with the swap: the start columns,
+// the status line of a wait, the metrics and the summary of an end. Zero values keep the column.
+type TransitionStore struct {
+	// StartedJTI is the jti of the start token; it also clears renewed_from_jti.
+	StartedJTI ids.ID
+	// BillingModeUsed, Model, StatusLine and Summary are "" to keep.
+	BillingModeUsed, Model, StatusLine, Summary string
+	// BillingEvidence and Metrics are encoded JSON objects; nil keeps.
+	BillingEvidence, Metrics []byte
 }
 
 // Open writes a new run in queued in the caller's unit of work (brief note 5): the run row (ON
 // CONFLICT on the active run of the thread DO NOTHING), the live box anchor in the run's thread,
-// run.state_changed and, with a triggering message, trigger_state received. The lock order is
+// run.state_changed, with a triggering message trigger_state received, and the job
+// runs.queued_expiry at queued_at + run.queued_max_age (M2-08). The lock order is
 // runs before messages; the caller (the acceptance) holds the thread row of the message.
 //
 // Errors: *ActiveRunExistsError when the thread has an active run (nothing written); internal
@@ -132,6 +147,11 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 		if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: row.TriggeringMessageID, State: string(change.State)}); err != nil {
 			return runs.RunSummary{}, err
 		}
+	}
+	// The run fails with agent_unavailable when nobody starts it within run.queued_max_age
+	// (M2-08 design note 11); every run of this creation function gets the job.
+	if err := s.scheduleExpiry(ctx, row); err != nil {
+		return runs.RunSummary{}, err
 	}
 	return sum, nil
 }
@@ -196,6 +216,9 @@ func (s *Service) Transition(ctx context.Context, cmd TransitionCmd) (Transition
 	at := s.now()
 	row, changed, err := s.d.Repo.TransitionRun(ctx, TransitionWrite{
 		ID: cmd.RunID, From: cmd.From, Version: cmd.Version, To: cmd.To, Reason: reason, At: at,
+		StartedJTI: cmd.Store.StartedJTI, BillingModeUsed: cmd.Store.BillingModeUsed, Model: cmd.Store.Model,
+		StatusLine: cmd.Store.StatusLine, Summary: cmd.Store.Summary, BillingEvidence: cmd.Store.BillingEvidence,
+		Metrics: cmd.Store.Metrics,
 	})
 	if err != nil {
 		return Transitioned{}, err
@@ -231,6 +254,9 @@ func (s *Service) reasonOf(cmd TransitionCmd) (reason, original string, err erro
 		return "", "", nil
 	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCompleted && cmd.Reason == "":
 		return "", "", nil
+	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCancelled && slices.Contains(domain.CancelReasons(), cmd.Reason):
+		// The adapter confirms a cancel request with its reason (M2-09 design note 6 c).
+		return cmd.Reason, "", nil
 	}
 	return "", "", errs.New(errs.CodeInternalError, "runs: no reason rule for this setter and state")
 }

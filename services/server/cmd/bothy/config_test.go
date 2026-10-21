@@ -190,6 +190,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	want := "# configuration file: " + path + "\n" +
 		"agent.ack_persist_interval = 1s  # default\n" +
 		"agent.ack_timeout = 30s  # default\n" +
+		"agent.cancel_grace = 30s  # default\n" +
 		"agent.heartbeat_persist_interval = 1m  # default\n" +
 		"agent.invocation_token_ttl = 1m  # default\n" +
 		"agent.jwks_max_age = 1h  # default\n" +
@@ -437,6 +438,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"reaction.emoji_max_bytes = 64  # default\n" +
 		"reaction.max_distinct_per_message = 20  # default\n" +
 		"retention.audit = 365d  # default\n" +
+		"run.orphan_timeout = 15m  # default\n" +
+		"run.queued_max_age = 2d  # default\n" +
 		"run.step_detail_max_bytes = 16384  # default\n" +
 		"search.languages = german, english  # default\n" +
 		"search.locale_map = {\"de\":\"german\",\"en\":\"english\"}  # default\n" +

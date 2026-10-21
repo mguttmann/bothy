@@ -284,7 +284,7 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | int | `100` | unbestätigte Ereignisse je Verbraucher | aktiv |
 | `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server |  | `500ms` | Adapter-Drossel für `run.update` | geplant (M2) |
 | `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server | duration | `90s` | ohne Heartbeat gilt der Agent als `offline` | aktiv |
-| `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server |  | `30s` | Zeit für den Adapter, einen Abbruch zu melden | geplant (M2) |
+| `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server | duration | `30s` | Zeit für den Adapter, einen Abbruch zu melden | aktiv |
 
 ### 05 Aktionskatalog der Autorisierung
 
@@ -416,8 +416,8 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 | `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server |  | `32768` | Inhalt je Kontext-Nachricht, darüber gekürzt | geplant (M2) |
 | `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | duration | `1h` | Cache-Dauer der JWKS; Vorlauf eines `next`-Schlüssels | aktiv |
 | `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | duration | `30d` | planmäßiger Wechsel des Markenschlüssels | aktiv |
-| `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server |  | `48h` | so alt darf ein nicht gestarteter Lauf werden | geplant (M2) |
-| `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server |  | `15m` | ohne Heartbeat bei aktivem Lauf: `stale` | geplant (M2) |
+| `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server | duration | `48h` | so alt darf ein nicht gestarteter Lauf werden | aktiv |
+| `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server | duration | `15m` | ohne Heartbeat bei aktivem Lauf: `stale` | aktiv |
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | danach zeigt die Karte "nicht bestätigt" | geplant (M2) |
 | `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server |  | `2500ms` | Wartezeit auf Vorschläge | geplant (M2) |
 | `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server |  | `25` | Vorschläge je Antwort | geplant (M2) |

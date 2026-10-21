@@ -128,6 +128,30 @@ Tests: `TestAuthzObserve_AccessChangedRaisesFloor`,
 `TestAuthzObserve_StructureEventInvalidates`, `TestAuthzObserve_SettingsChangedAdvancesGeneration`,
 `TestAuthzDelivery_DenialWritesNoAudit`.
 
+## Check without a request (M2-08, R-AZ-29)
+
+`actor.Recheck(person)` builds the principal of a check the server runs for a person without the
+person's request: kind `user`, the marker `RecheckPrincipal` and nothing else. `Authorize` refuses
+the marker with an internal error for any action other than `agent.invoke` (M2-25 adds
+`command.invoke` and `interaction.create`) and when the principal carries a session, device,
+token, installation, "view as" or acting-for binding. Liveness comes only from the principal status
+(`principal_inactive`, `principal_pending`); the owner status comes from the current owner list
+without a session (the exception to R-AZ-14 and 05 2.3 point 1). The snapshot has its own cache key
+(`cacheKey.recheck`), so no request principal of the same person, a personal token included, ever
+gets the owner snapshot; the version is the one the caller pins, also in delivery mode. The
+caller is `runs.Delivery` before every invocation-bearing delivery to an agent (D-M2-08-1).
+
+`InvokeFacts.NewThread` (M2-08): the auto thread of the trigger is decided with the channel's
+main-thread mention rule ("in the main thread and for new threads", 05 section 5 point 3), not
+with `thread_require_mention`.
+
+A personal event whose receive action takes the principal kind `agent` (`agent.events.consume` of
+`agent.invocation`, 05 section 6) is decided on its audience only for the page reads of the agent
+consumer engine (`sync.PageInput.AgentConsumer`), which pass every such event through
+`runs.Delivery`: sync then sets `EventScope.AudienceID` after it matched the audience with the
+receiver, and `eventTarget` adds the agent of the audience as the last candidate. The generic
+catch-up `listEvents` never sets it, so an agent never gets an invocation there (D-M2-08-14).
+
 ## Scope of agent.config.read (M2-02)
 
 `Scope` serves `agent.config.read` besides the read-level list actions and `host.read`: for an
@@ -233,10 +257,34 @@ allowed, with `read` only `forbidden level_insufficient`, without a grant `not_f
 `forbidden subject_kind_not_allowed`. Denials are audited like other `denials` actions; apps turns
 every refusal into the `404` of an unknown webhook. Test: `app/webhookin_test.go`
 (`TestWebhookInPostRequirement`).
+### Invocation token of `run.start` and `run.token.renew` (M2-09)
+
+Both are no longer deferred. `runs` verifies the invocation token and passes its verdict in
+`Resource.Token` (`authorize.TokenFacts`); authz decides on it (05 rule 1.1). The requirements are
+`run.start`: `All(AgentSelf, Token(valid))` ("agent-self und Marke gültig") and `run.token.renew`:
+`All(AgentSelf, Token(valid, expired))` ("agent-self und Marke aktuell"). The resource is the run
+(`Kind` run, `ThreadID` of the run, `OwnerID` the run's agent), so visibility (`not_found`) and
+`AgentSelf` (`not_self`, `subject_kind_not_allowed`) decide first. A verdict outside the allowed
+set is `forbidden invocation_token_invalid` with `Decision.Detail` the verdict (`expired`,
+`superseded`, `invalid`); `Decision.Err()` answers `403 invocation_token_invalid` with that verdict
+as `reason`, while the audit reason stays `invocation_token_invalid`. A missing `Resource.Token`
+or the zero verdict is an internal error on every path.
+
+The guard of `run.start` (07 section 4.2 step 9) runs only when `BillingModeUsed` is set:
+`BillingKeyType = unknown` or a reported mode other than `BillingModeExpected` is
+`invariant_violation billing_mode_mismatch`; then a `ToolClassUsed` above `ToolClassClaim`
+(`chat` < `scoped` < `host`, an unknown class counts as `host`) is `invariant_violation
+tool_class_mismatch`. A token that is not valid never reaches the guard.
+
+The deny entry carries codes as details, never a token or `jti`: `token_verdict` for
+`invocation_token_invalid`; `billing_mode_expected`, `billing_mode_used` and, when present,
+`billing_evidence_provider`, `billing_evidence_key_type`, `billing_evidence_method` for
+`billing_mode_mismatch`; `tool_class` (the claim) and `tool_class_used` for `tool_class_mismatch`.
+A value that is not a code is left out, so the denial is still written.
 
 ### How a module builds a `Resource`
 
-Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
 
 ### Files (M3-03)
 

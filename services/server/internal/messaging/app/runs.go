@@ -114,3 +114,27 @@ func (s *Service) CreateRunAnchor(ctx context.Context, cmd messaging.RunAnchorCm
 	}
 	return messaging.AnchorRef{MessageID: row.ID, ThreadSeq: row.ThreadSeq}, nil
 }
+
+// TriggerMessageOf implements messaging.Messages (M2-08): the stored row, its mentions and its
+// author, without content and without an authorization; runs decides with agent.invoke.
+func (s *Service) TriggerMessageOf(ctx context.Context, messageID ids.ID) (messaging.TriggerMessage, error) {
+	m, found, err := s.d.Store.Message(ctx, messageID)
+	if err != nil {
+		return messaging.TriggerMessage{}, err
+	}
+	if !found {
+		return messaging.TriggerMessage{}, errs.New(errs.CodeNotFound, "")
+	}
+	mentions, err := s.d.Store.Mentions(ctx, m.ID)
+	if err != nil {
+		return messaging.TriggerMessage{}, err
+	}
+	author, err := s.author(ctx, m.AuthorID)
+	if err != nil {
+		return messaging.TriggerMessage{}, err
+	}
+	return messaging.TriggerMessage{
+		ID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, Author: author, Origin: string(m.Origin), Kind: string(m.Kind),
+		MentionedIDs: mentions, TriggerState: m.TriggerState, TriggerStateReason: m.TriggerStateReason,
+	}, nil
+}

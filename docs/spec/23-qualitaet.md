@@ -185,6 +185,7 @@ oder NEIN. Bei NEIN wird behoben und das Delta erneut geprüft; das Bedrohungsmo
 | `quality.contract.max_examples` | `100` | count | examples per operation in G7 | `Makefile` (`CONTRACT_MAX_EXAMPLES`) |
 | `quality.contract.timeout` | `180m` | duration | time limit of `make contract-test` (G7) | `Makefile` (`CONTRACT_TIMEOUT`) |
 | `quality.perf.timeout` | `60m` | Dauer | Zeitlimit von `make perf` je Go-Modul | `Makefile` (`PERF_TIMEOUT`) |
+| `quality.test.go_timeout` | `20m` | duration | Time limit of each Go test binary in `make test` (`go test -timeout`) | `Makefile` (`GO_TEST_TIMEOUT`) |
 | `quality.sonar.new_issues_max` | `0` | Anzahl | Neue Befunde im neuen Code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_hotspots_reviewed_min_percent` | `100` | Prozent | Geprüfte Security Hotspots im neuen Code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_coverage_min_percent` | `80` | Prozent | Abdeckung des neuen Codes | `quality/sonar/quality-gate.json` |

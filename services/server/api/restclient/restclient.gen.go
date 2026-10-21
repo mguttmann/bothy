@@ -3357,10 +3357,11 @@ func (e RunCancelRequestedEventType) Valid() bool {
 
 // Defines values for RunCancelRequestedPayloadReason.
 const (
-	RunCancelRequestedPayloadReasonAccessRevoked RunCancelRequestedPayloadReason = "access_revoked"
-	RunCancelRequestedPayloadReasonAgentDisabled RunCancelRequestedPayloadReason = "agent_disabled"
-	RunCancelRequestedPayloadReasonUserCancelled RunCancelRequestedPayloadReason = "user_cancelled"
-	RunCancelRequestedPayloadReasonUserDisabled  RunCancelRequestedPayloadReason = "user_disabled"
+	RunCancelRequestedPayloadReasonAccessRevoked   RunCancelRequestedPayloadReason = "access_revoked"
+	RunCancelRequestedPayloadReasonAgentDisabled   RunCancelRequestedPayloadReason = "agent_disabled"
+	RunCancelRequestedPayloadReasonChannelReadOnly RunCancelRequestedPayloadReason = "channel_read_only"
+	RunCancelRequestedPayloadReasonUserCancelled   RunCancelRequestedPayloadReason = "user_cancelled"
+	RunCancelRequestedPayloadReasonUserDisabled    RunCancelRequestedPayloadReason = "user_disabled"
 )
 
 // Valid indicates whether the value is a known member of the RunCancelRequestedPayloadReason enum.
@@ -3369,6 +3370,8 @@ func (e RunCancelRequestedPayloadReason) Valid() bool {
 	case RunCancelRequestedPayloadReasonAccessRevoked:
 		return true
 	case RunCancelRequestedPayloadReasonAgentDisabled:
+		return true
+	case RunCancelRequestedPayloadReasonChannelReadOnly:
 		return true
 	case RunCancelRequestedPayloadReasonUserCancelled:
 		return true
@@ -10697,6 +10700,25 @@ type InvariantViolation struct {
 	PrincipalIds []Uuid `json:"principal_ids"`
 }
 
+// InvocationTokenGrant defines model for InvocationTokenGrant.
+type InvocationTokenGrant struct {
+	// ExpiresAt Examples: 2026-10-10T09:31:00.000Z
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// InvocationToken Fresh invocation token with a new `jti`; it replaces the current one of the run.
+	//
+	// Examples: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.signature
+	InvocationToken string `json:"invocation_token"`
+}
+
+// InvocationTokenRenew defines model for InvocationTokenRenew.
+type InvocationTokenRenew struct {
+	// InvocationToken The current invocation token of the run, or on a retry after a lost answer the token the last renewal replaced; it may have expired (09 section 4.5.1).
+	//
+	// Examples: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
+	InvocationToken string `json:"invocation_token"`
+}
+
 // JsonObject Free-form JSON object whose schema is named in the field description.
 type JsonObject map[string]interface{}
 
@@ -12813,6 +12835,9 @@ type RunStart struct {
 
 	// Model Examples: model-large
 	Model *string `json:"model,omitempty"`
+
+	// ToolClassUsed Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
+	ToolClassUsed ToolClass `json:"tool_class_used"`
 }
 
 // RunState defines model for RunState.
@@ -18047,6 +18072,9 @@ type CancelRunJSONRequestBody = RunCancel
 // FinishRunJSONRequestBody defines body for FinishRun for application/json ContentType.
 type FinishRunJSONRequestBody = RunFinish
 
+// RenewInvocationTokenJSONRequestBody defines body for RenewInvocationToken for application/json ContentType.
+type RenewInvocationTokenJSONRequestBody = InvocationTokenRenew
+
 // ResumeRunJSONRequestBody defines body for ResumeRun for application/json ContentType.
 type ResumeRunJSONRequestBody = RunStart
 
@@ -22846,9 +22874,47 @@ type ClientInterface interface {
 	// Corresponds with POST /runs/{run_id}/finish (the `FinishRun` operationId).
 	FinishRun(ctx context.Context, runId RunIdPath, body FinishRunJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RenewInvocationTokenWithBody Get a fresh invocation token for an own waiting run
+	//
+	// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+	// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+	// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+	// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+	// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+	// DISTINCT FROM jti`). A retry with the replaced token issues a
+	// fresh token again; the run still starts at most once. The server repeats every check it runs
+	// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+	// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+	// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+	// run that already started gets 409 `already_started`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+	RenewInvocationTokenWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RenewInvocationToken Get a fresh invocation token for an own waiting run
+	//
+	// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+	// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+	// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+	// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+	// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+	// DISTINCT FROM jti`). A retry with the replaced token issues a
+	// fresh token again; the run still starts at most once. The server repeats every check it runs
+	// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+	// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+	// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+	// run that already started gets 409 `already_started`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+	RenewInvocationToken(ctx context.Context, runId RunIdPath, body RenewInvocationTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ResumeRunWithBody Resume a run that waited for input
 	//
-	// `waiting_input -> running` with the token of the interaction or follow-up delivery.
+	// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -22857,7 +22923,7 @@ type ClientInterface interface {
 
 	// ResumeRun Resume a run that waited for input
 	//
-	// `waiting_input -> running` with the token of the interaction or follow-up delivery.
+	// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -22867,9 +22933,13 @@ type ClientInterface interface {
 	// StartRunWithBody Start a queued run
 	//
 	// Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-	// with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-	// gets 409 `already_started`. A different `billing_mode_used` fails the run with
-	// `billing_mode_mismatch`.
+	// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+	// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+	// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+	// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+	// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+	// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+	// delivery replaced it) or `invalid` (09 section 4.5).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -22879,9 +22949,13 @@ type ClientInterface interface {
 	// StartRun Start a queued run
 	//
 	// Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-	// with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-	// gets 409 `already_started`. A different `billing_mode_used` fails the run with
-	// `billing_mode_mismatch`.
+	// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+	// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+	// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+	// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+	// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+	// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+	// delivery replaced it) or `invalid` (09 section 4.5).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25387,146 +25461,6 @@ func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPat
 // Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
 func (c *Client) InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewInvokeCommandRequestWithBody(c.Server, channelId, commandId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// InvokeCommand Run a command
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
-func (c *Client) InvokeCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, body InvokeCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewInvokeCommandRequest(c.Server, channelId, commandId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// DeleteChannelDraft Delete the draft of a new forum post
-//
-// Corresponds with DELETE /channels/{channel_id}/draft (the `DeleteChannelDraft` operationId).
-func (c *Client) DeleteChannelDraft(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteChannelDraftRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutChannelDraftWithBody Save the draft of a new forum post
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
-func (c *Client) PutChannelDraftWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutChannelDraftRequestWithBody(c.Server, channelId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutChannelDraft Save the draft of a new forum post
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
-func (c *Client) PutChannelDraft(ctx context.Context, channelId ChannelIdPath, body PutChannelDraftJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutChannelDraftRequest(c.Server, channelId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ExportChannel Export the history of a channel
-//
-// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
-//
-// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
-// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
-// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
-// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
-// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
-// revocation ends the stream. An export cut after the first byte ends without a complete
-// response (no final chunk); a range without messages gives `200` with an empty body.
-//
-// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
-func (c *Client) ExportChannel(ctx context.Context, channelId ChannelIdPath, params *ExportChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExportChannelRequest(c.Server, channelId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListIncomingWebhooks List incoming webhooks of a channel
-//
-// Corresponds with GET /channels/{channel_id}/incoming-webhooks (the `ListIncomingWebhooks` operationId).
-func (c *Client) ListIncomingWebhooks(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListIncomingWebhooksRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateIncomingWebhookWithBody Create an incoming webhook
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
-func (c *Client) CreateIncomingWebhookWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateIncomingWebhookRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateIncomingWebhook Create an incoming webhook
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
-func (c *Client) CreateIncomingWebhook(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, body CreateIncomingWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateIncomingWebhookRequest(c.Server, channelId, params, body)
 	if err != nil {
 		return nil, err
 	}

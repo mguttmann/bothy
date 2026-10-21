@@ -16,6 +16,146 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// InvokeCommand Run a command
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
+func (c *Client) InvokeCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, body InvokeCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvokeCommandRequest(c.Server, channelId, commandId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteChannelDraft Delete the draft of a new forum post
+//
+// Corresponds with DELETE /channels/{channel_id}/draft (the `DeleteChannelDraft` operationId).
+func (c *Client) DeleteChannelDraft(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteChannelDraftRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutChannelDraftWithBody Save the draft of a new forum post
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
+func (c *Client) PutChannelDraftWithBody(ctx context.Context, channelId ChannelIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelDraftRequestWithBody(c.Server, channelId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutChannelDraft Save the draft of a new forum post
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/draft (the `PutChannelDraft` operationId).
+func (c *Client) PutChannelDraft(ctx context.Context, channelId ChannelIdPath, body PutChannelDraftJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelDraftRequest(c.Server, channelId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportChannel Export the history of a channel
+//
+// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+//
+// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+// revocation ends the stream. An export cut after the first byte ends without a complete
+// response (no final chunk); a range without messages gives `200` with an empty body.
+//
+// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
+func (c *Client) ExportChannel(ctx context.Context, channelId ChannelIdPath, params *ExportChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportChannelRequest(c.Server, channelId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListIncomingWebhooks List incoming webhooks of a channel
+//
+// Corresponds with GET /channels/{channel_id}/incoming-webhooks (the `ListIncomingWebhooks` operationId).
+func (c *Client) ListIncomingWebhooks(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListIncomingWebhooksRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateIncomingWebhookWithBody Create an incoming webhook
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
+func (c *Client) CreateIncomingWebhookWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateIncomingWebhookRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateIncomingWebhook Create an incoming webhook
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/incoming-webhooks (the `CreateIncomingWebhook` operationId).
+func (c *Client) CreateIncomingWebhook(ctx context.Context, channelId ChannelIdPath, params *CreateIncomingWebhookParams, body CreateIncomingWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateIncomingWebhookRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // LeaveDm Leave a direct message channel
 //
 // Corresponds with POST /channels/{channel_id}/leave (the `LeaveDm` operationId).
@@ -4304,9 +4444,67 @@ func (c *Client) FinishRun(ctx context.Context, runId RunIdPath, body FinishRunJ
 	return c.Client.Do(req)
 }
 
+// RenewInvocationTokenWithBody Get a fresh invocation token for an own waiting run
+//
+// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+// DISTINCT FROM jti`). A retry with the replaced token issues a
+// fresh token again; the run still starts at most once. The server repeats every check it runs
+// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+// run that already started gets 409 `already_started`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+func (c *Client) RenewInvocationTokenWithBody(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenewInvocationTokenRequestWithBody(c.Server, runId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RenewInvocationToken Get a fresh invocation token for an own waiting run
+//
+// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+// DISTINCT FROM jti`). A retry with the replaced token issues a
+// fresh token again; the run still starts at most once. The server repeats every check it runs
+// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+// run that already started gets 409 `already_started`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+func (c *Client) RenewInvocationToken(ctx context.Context, runId RunIdPath, body RenewInvocationTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenewInvocationTokenRequest(c.Server, runId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ResumeRunWithBody Resume a run that waited for input
 //
-// `waiting_input -> running` with the token of the interaction or follow-up delivery.
+// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
 //
 // Takes any type of body and a specified content type.
 //
@@ -4325,7 +4523,7 @@ func (c *Client) ResumeRunWithBody(ctx context.Context, runId RunIdPath, content
 
 // ResumeRun Resume a run that waited for input
 //
-// `waiting_input -> running` with the token of the interaction or follow-up delivery.
+// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -4345,9 +4543,13 @@ func (c *Client) ResumeRun(ctx context.Context, runId RunIdPath, body ResumeRunJ
 // StartRunWithBody Start a queued run
 //
 // Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-// with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-// gets 409 `already_started`. A different `billing_mode_used` fails the run with
-// `billing_mode_mismatch`.
+// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+// delivery replaced it) or `invalid` (09 section 4.5).
 //
 // Takes any type of body and a specified content type.
 //
@@ -4367,9 +4569,13 @@ func (c *Client) StartRunWithBody(ctx context.Context, runId RunIdPath, contentT
 // StartRun Start a queued run
 //
 // Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-// with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-// gets 409 `already_started`. A different `billing_mode_used` fails the run with
-// `billing_mode_mismatch`.
+// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+// delivery replaced it) or `invalid` (09 section 4.5).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17645,6 +17851,53 @@ func NewFinishRunRequestWithBody(server string, runId RunIdPath, contentType str
 	return req, nil
 }
 
+// NewRenewInvocationTokenRequest calls the generic RenewInvocationToken builder with application/json body
+func NewRenewInvocationTokenRequest(server string, runId RunIdPath, body RenewInvocationTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRenewInvocationTokenRequestWithBody(server, runId, "application/json", bodyReader)
+}
+
+// NewRenewInvocationTokenRequestWithBody constructs an http.Request for the RenewInvocationToken method, with any body, and a specified content type
+func NewRenewInvocationTokenRequestWithBody(server string, runId RunIdPath, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "run_id", runId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/runs/%s/invocation-token", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewResumeRunRequest calls the generic ResumeRun builder with application/json body
 func NewResumeRunRequest(server string, runId RunIdPath, body ResumeRunJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -25202,9 +25455,47 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /runs/{run_id}/finish (the `FinishRun` operationId).
 	FinishRunWithResponse(ctx context.Context, runId RunIdPath, body FinishRunJSONRequestBody, reqEditors ...RequestEditorFn) (*FinishRunResponse, error)
 
+	// RenewInvocationTokenWithBodyWithResponse Get a fresh invocation token for an own waiting run
+	//
+	// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+	// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+	// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+	// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+	// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+	// DISTINCT FROM jti`). A retry with the replaced token issues a
+	// fresh token again; the run still starts at most once. The server repeats every check it runs
+	// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+	// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+	// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+	// run that already started gets 409 `already_started`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+	RenewInvocationTokenWithBodyWithResponse(ctx context.Context, runId RunIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RenewInvocationTokenResponse, error)
+
+	// RenewInvocationTokenWithResponse Get a fresh invocation token for an own waiting run
+	//
+	// For a run in `queued` or `waiting_input` whose invocation token expired before the start
+	// (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+	// signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+	// or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+	// it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+	// DISTINCT FROM jti`). A retry with the replaced token issues a
+	// fresh token again; the run still starts at most once. The server repeats every check it runs
+	// before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+	// SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+	// replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+	// run that already started gets 409 `already_started`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /runs/{run_id}/invocation-token (the `RenewInvocationToken` operationId).
+	RenewInvocationTokenWithResponse(ctx context.Context, runId RunIdPath, body RenewInvocationTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*RenewInvocationTokenResponse, error)
+
 	// ResumeRunWithBodyWithResponse Resume a run that waited for input
 	//
-	// `waiting_input -> running` with the token of the interaction or follow-up delivery.
+	// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25213,7 +25504,7 @@ type ClientWithResponsesInterface interface {
 
 	// ResumeRunWithResponse Resume a run that waited for input
 	//
-	// `waiting_input -> running` with the token of the interaction or follow-up delivery.
+	// `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25223,9 +25514,13 @@ type ClientWithResponsesInterface interface {
 	// StartRunWithBodyWithResponse Start a queued run
 	//
 	// Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-	// with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-	// gets 409 `already_started`. A different `billing_mode_used` fails the run with
-	// `billing_mode_mismatch`.
+	// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+	// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+	// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+	// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+	// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+	// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+	// delivery replaced it) or `invalid` (09 section 4.5).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25235,9 +25530,13 @@ type ClientWithResponsesInterface interface {
 	// StartRunWithResponse Start a queued run
 	//
 	// Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-	// with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-	// gets 409 `already_started`. A different `billing_mode_used` fails the run with
-	// `billing_mode_mismatch`.
+	// with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+	// `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+	// token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+	// `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+	// 409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+	// `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+	// delivery replaced it) or `invalid` (09 section 4.5).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26524,417 +26823,5 @@ type GetServedChannelConfigResponse429Headers struct {
 
 // GetServedChannelConfigResponseDefaultHeaders the declared response headers of an HTTP default response for GetServedChannelConfig
 type GetServedChannelConfigResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type GetServedChannelConfigResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *AgentChannelConfig
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *GetServedChannelConfigResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *GetServedChannelConfigResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *GetServedChannelConfigResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *GetServedChannelConfigResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *GetServedChannelConfigResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *GetServedChannelConfigResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *GetServedChannelConfigResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetServedChannelConfigResponse) GetJSON200() *AgentChannelConfig {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r GetServedChannelConfigResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r GetServedChannelConfigResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r GetServedChannelConfigResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetServedChannelConfigResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r GetServedChannelConfigResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetServedChannelConfigResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r GetServedChannelConfigResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetServedChannelConfigResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetServedChannelConfigResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetServedChannelConfigResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// GetConsumerStateResponse200Headers the declared response headers of an HTTP 200 response for GetConsumerState
-type GetConsumerStateResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// GetConsumerStateResponse400Headers the declared response headers of an HTTP 400 response for GetConsumerState
-type GetConsumerStateResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetConsumerStateResponse401Headers the declared response headers of an HTTP 401 response for GetConsumerState
-type GetConsumerStateResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// GetConsumerStateResponse403Headers the declared response headers of an HTTP 403 response for GetConsumerState
-type GetConsumerStateResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetConsumerStateResponse404Headers the declared response headers of an HTTP 404 response for GetConsumerState
-type GetConsumerStateResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetConsumerStateResponse429Headers the declared response headers of an HTTP 429 response for GetConsumerState
-type GetConsumerStateResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// GetConsumerStateResponseDefaultHeaders the declared response headers of an HTTP default response for GetConsumerState
-type GetConsumerStateResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type GetConsumerStateResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ConsumerState
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *GetConsumerStateResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *GetConsumerStateResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *GetConsumerStateResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *GetConsumerStateResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *GetConsumerStateResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *GetConsumerStateResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *GetConsumerStateResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetConsumerStateResponse) GetJSON200() *ConsumerState {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r GetConsumerStateResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r GetConsumerStateResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r GetConsumerStateResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetConsumerStateResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r GetConsumerStateResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetConsumerStateResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r GetConsumerStateResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetConsumerStateResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetConsumerStateResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetConsumerStateResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// AckAgentEventsResponse200Headers the declared response headers of an HTTP 200 response for AckAgentEvents
-type AckAgentEventsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// AckAgentEventsResponse400Headers the declared response headers of an HTTP 400 response for AckAgentEvents
-type AckAgentEventsResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AckAgentEventsResponse401Headers the declared response headers of an HTTP 401 response for AckAgentEvents
-type AckAgentEventsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// AckAgentEventsResponse403Headers the declared response headers of an HTTP 403 response for AckAgentEvents
-type AckAgentEventsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AckAgentEventsResponse404Headers the declared response headers of an HTTP 404 response for AckAgentEvents
-type AckAgentEventsResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// AckAgentEventsResponse429Headers the declared response headers of an HTTP 429 response for AckAgentEvents
-type AckAgentEventsResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// AckAgentEventsResponseDefaultHeaders the declared response headers of an HTTP default response for AckAgentEvents
-type AckAgentEventsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type AckAgentEventsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *ConsumerState
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *AckAgentEventsResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *AckAgentEventsResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *AckAgentEventsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *AckAgentEventsResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *AckAgentEventsResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *AckAgentEventsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *AckAgentEventsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r AckAgentEventsResponse) GetJSON200() *ConsumerState {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r AckAgentEventsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r AckAgentEventsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r AckAgentEventsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r AckAgentEventsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r AckAgentEventsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// PollAgentEventsResponse200Headers the declared response headers of an HTTP 200 response for PollAgentEvents
-type PollAgentEventsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// PollAgentEventsResponse400Headers the declared response headers of an HTTP 400 response for PollAgentEvents
-type PollAgentEventsResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PollAgentEventsResponse401Headers the declared response headers of an HTTP 401 response for PollAgentEvents
-type PollAgentEventsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// PollAgentEventsResponse403Headers the declared response headers of an HTTP 403 response for PollAgentEvents
-type PollAgentEventsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PollAgentEventsResponse404Headers the declared response headers of an HTTP 404 response for PollAgentEvents
-type PollAgentEventsResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PollAgentEventsResponse410Headers the declared response headers of an HTTP 410 response for PollAgentEvents
-type PollAgentEventsResponse410Headers struct {
 	CorrelationId *CorrelationId
 }

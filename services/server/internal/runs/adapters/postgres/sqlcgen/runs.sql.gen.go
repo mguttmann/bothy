@@ -388,18 +388,35 @@ SET state = $1::text,
     finished_at = CASE WHEN $1::text IN ('completed', 'failed', 'cancelled')
         THEN $3::timestamptz ELSE finished_at END,
     duration_ms = CASE WHEN $1::text IN ('completed', 'failed', 'cancelled') AND started_at IS NOT NULL
-        THEN floor(extract(epoch FROM ($3::timestamptz - started_at)) * 1000)::bigint ELSE duration_ms END
-WHERE id = $4 AND state = $5::text AND version = $6
+        THEN floor(extract(epoch FROM ($3::timestamptz - started_at)) * 1000)::bigint ELSE duration_ms END,
+    -- The columns a start, a wait or an end of M2-09 store with the same swap; NULL keeps the
+    -- column. A start stores started_jti and clears renewed_from_jti (09 4.5.1).
+    started_jti = COALESCE($4::uuid, started_jti),
+    renewed_from_jti = CASE WHEN $4::uuid IS NOT NULL THEN NULL ELSE renewed_from_jti END,
+    billing_mode_used = COALESCE($5::text, billing_mode_used),
+    billing_evidence = COALESCE($6::jsonb, billing_evidence),
+    model = COALESCE($7::text, model),
+    status_line = COALESCE($8::text, status_line),
+    metrics = COALESCE($9::jsonb, metrics),
+    summary = COALESCE($10::text, summary)
+WHERE id = $11 AND state = $12::text AND version = $13
 RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms
 `
 
 type TransitionRunParams struct {
-	ToState   string
-	Reason    string
-	At        pgtype.Timestamptz
-	ID        pgtype.UUID
-	FromState string
-	Version   int64
+	ToState         string
+	Reason          string
+	At              pgtype.Timestamptz
+	StartedJti      pgtype.UUID
+	BillingModeUsed pgtype.Text
+	BillingEvidence []byte
+	Model           pgtype.Text
+	StatusLine      pgtype.Text
+	Metrics         []byte
+	Summary         pgtype.Text
+	ID              pgtype.UUID
+	FromState       string
+	Version         int64
 }
 
 // The compare-and-swap of 03 runs: only the row with the expected state and version moves, and
@@ -411,6 +428,13 @@ func (q *Queries) TransitionRun(ctx context.Context, arg TransitionRunParams) (R
 		arg.ToState,
 		arg.Reason,
 		arg.At,
+		arg.StartedJti,
+		arg.BillingModeUsed,
+		arg.BillingEvidence,
+		arg.Model,
+		arg.StatusLine,
+		arg.Metrics,
+		arg.Summary,
 		arg.ID,
 		arg.FromState,
 		arg.Version,
