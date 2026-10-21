@@ -1,0 +1,140 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of the Compose smoke test (brief M1-73, plan P-06). TEST ONLY: never use it for an
+# installation. infra/compose/smoke.sh combines it with the unchanged installation file
+# infra/compose/compose.yaml and the variables of infra/compose/test/smoke.env; relative paths
+# resolve against infra/compose (the project directory). make release-build leaves this directory
+# out of the release bundle.
+#
+# Changes against the installation are removals and the overrides listed here only:
+# - the server services run the local image SMOKE_SERVER_IMAGE (from make image), never pulled;
+# - their environment is the installation's x-server-env without the keys the M1 server rejects
+#   (see x-smoke-env), plus each service's own installation overrides;
+# - api listens on 127.0.0.1:8080 inside its namespace and publishes no port; the probe shares that
+#   namespace (docs/DECISIONS.md M1-73, design note D1);
+# - postgres is the official PostgreSQL 18 image of internal/platform/pg/pgtest, pinned by digest;
+# - backup never starts (bothy-postgres and bothy-backupd arrive with M7);
+# - the collector gets the test overlay "file" and writes its export to a volume.
+
+# The installation's x-server-env (compose.yaml) minus the keys the M1 server rejects as unknown
+# (`docker run --rm <image> config check` with the installation values, 2026-10-19):
+#   BOTHY_FILE__SCAN__CLAMD_ADDRESS  file.scan.clamd_address, planned for M3 (virus scan)
+# The installation file is reconciled with each milestone's schema in M7-14. A test
+# (tools/ci/tests/test_compose_smoke.py) holds this anchor equal to x-server-env minus that list.
+x-smoke-env: &smoke-env
+  BOTHY_INSTANCE__ENVIRONMENT: ${BOTHY_ENVIRONMENT:-prod}
+  BOTHY_SERVER__PUBLIC_URL: ${BOTHY_PUBLIC_URL:?set in test/smoke.env}
+  BOTHY_SERVER__INTERNAL_LISTEN_ADDR: ":8081"
+  BOTHY_SECRETS__DIR: /run/bothy/secrets
+  BOTHY_DATABASE__HOST: postgres
+  BOTHY_DATABASE__NAME: bothy
+  BOTHY_DATABASE__USER: bothy_app
+  BOTHY_DATABASE__SSLMODE: disable
+  BOTHY_FILE__STORAGE__DRIVER: ${BOTHY_STORAGE_DRIVER:-fs}
+  BOTHY_FILE__FS__ROOT: /var/lib/bothy/files
+  BOTHY_FILE__S3__ENDPOINT: ${BOTHY_S3_ENDPOINT:-http://seaweedfs:8333}
+  BOTHY_FILE__S3__BUCKET: ${BOTHY_S3_BUCKET:-bothy-files}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_METRIC_EXPORT_INTERVAL: ${BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS:-15000}
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${BOTHY_ENVIRONMENT:-prod}
+
+x-smoke-hardening: &smoke-hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+
+  secrets-init:
+    image: ${SMOKE_SERVER_IMAGE:?set by smoke.sh}
+    pull_policy: never
+    # An empty owner input: every secret is generated, none of a real installation is read.
+    volumes: !override
+      - ${SMOKE_SECRETS_INPUT:?set by smoke.sh}:/input:ro
+      - secrets:/run/bothy/secrets
+      - signing-keys:/var/lib/bothy/signing-keys:ro
+
+  postgres:
+    # Same reference as internal/platform/pg/pgtest (M1-12); Renovate moves both in one change.
+    image: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+
+  migrate:
+    image: ${SMOKE_SERVER_IMAGE:?set by smoke.sh}
+    pull_policy: never
+    environment: !override
+      <<: *smoke-env
+      BOTHY_DATABASE__USER: bothy_owner
+      BOTHY_DATABASE__PASSWORD_REF: file:/run/bothy/secrets/db_owner_password
+
+  api:
+    image: ${SMOKE_SERVER_IMAGE:?set by smoke.sh}
+    pull_policy: never
+    environment: !override
+      <<: *smoke-env
+      BOTHY_SERVER__LISTEN_ADDR: "127.0.0.1:8080"
+      BOTHY_SERVER__TRUSTED_PROXIES: ${BOTHY_TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
+    ports: !reset []
+
+  worker:
+    image: ${SMOKE_SERVER_IMAGE:?set by smoke.sh}
+    pull_policy: never
+    environment: !override
+      <<: *smoke-env
+
+  backup:
+    profiles: [smoke-disabled]
+
+  otel-collector:
+    command: !override
+      - "--config=/etc/otelcol/collector.yaml"
+      - "--config=/etc/otelcol-smoke/file.yaml"
+    volumes:
+      - ./test/otel:/etc/otelcol-smoke:ro
+      - otel-smoke-out:/var/lib/otelcol-smoke
+    ports: !reset []
+    depends_on:
+      otel-out-init:
+        condition: service_completed_successfully
+
+  # Prepares the writable export directory, so the collector keeps the image's own user.
+  otel-out-init:
+    image: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    user: "0:0"
+    network_mode: none
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["chmod 1777 /out"]
+    volumes:
+      - otel-smoke-out:/out
+
+  # The black-box client (services/server/test/smoke). It shares the network namespace of api and
+  # dials 127.0.0.1:8080, so the server sees a loopback peer (SEC-TLS-1) without a published port.
+  smoke-probe:
+    profiles: [smoke]
+    build:
+      context: ../..
+      dockerfile: services/server/Dockerfile
+      target: smoke
+    image: bothy-smoke:${SMOKE_RUN_ID:?set by smoke.sh}
+    network_mode: service:api
+    <<: *smoke-hardening
+    # SMOKE_CANARY is passed through from smoke.sh; no value in this file.
+    environment:
+      - SMOKE_PUBLIC_URL=${BOTHY_PUBLIC_URL}
+      - SMOKE_CANARY
+    volumes:
+      - ${SMOKE_OUT:?set by smoke.sh}:/out
+
+  # The scanner: the same image without any network, reading the collected files only.
+  smoke-scan:
+    profiles: [smoke]
+    image: bothy-smoke:${SMOKE_RUN_ID:?set by smoke.sh}
+    pull_policy: never
+    network_mode: none
+    <<: *smoke-hardening
+    volumes:
+      - ${SMOKE_TMP:?set by smoke.sh}:/in:ro
+
+volumes:
+  otel-smoke-out: {}

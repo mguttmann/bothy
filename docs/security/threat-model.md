@@ -239,6 +239,7 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | S | First visitor becomes owner | first owner only via server command (08, 4) | T-ID-04 |
 | I | Backup stolen | encryption, keys kept separately (SEC-BAK-*) | T-BK-01 |
 | T | Restore brings back deleted data | deletion journal (SEC-BAK-3) | T-BK-02 |
+| T | The smoke test overlay or its settings end up in an installation (test images, `staging`, disabled backup, file export of telemetry) | overlay only under `infra/compose/test`, excluded from `make release-build`; own project name `bothy-smoke-<run ID>`; no published port; environment `staging` | T-OP-01 |
 
 ### 5.15 Supply chain
 
@@ -339,6 +340,7 @@ Pairing, relay, host service and terminal view ([24-terminal.md](../spec/24-term
 | T-PU-01 | **Push metadata.** Push providers see time, device, app, frequency. | high | low | only IDs and a neutral placeholder (ADR 0031); IDs random | tests in [13-push-notifications.md](../spec/13-push-notifications.md) | low: metadata stays visible; data processing according to 20 |
 | T-BK-01 | **Theft of a backup.** | medium | high | encryption, key kept separately, no secrets in plaintext (SEC-BAK-1, 2) | restore drill | low, as long as the key stays separate |
 | T-BK-02 | **Restore brings back deleted data.** | medium | medium | deletion journal (20, 4.6; SEC-BAK-3) | SEC-T15 | low |
+| T-OP-01 | **Test settings in an installation.** The overlay of the Compose smoke test (test images, a disabled `backup`, telemetry written to a file, environment `staging`) is copied into or combined with an installation. | low | medium | overlay only under `infra/compose/test` with a "test only" header, excluded from the release bundle (`release-build`), own project name per run, no published port, explicit `--env-file` so a real `.env` is never read | `test_release_bundle_excludes_smoke_overlay`, `test_overlay_publishes_no_ports` (M1-73) | low: an operator can still copy the file by hand |
 | T-DB-01 | **Modification of the audit log with database access.** | low | high | permissions of the application role, hash chain, signed and exported checkpoints (ADR 0021) | SEC-T16; the application-role part is proven since M1-24 (`TestSECT16_AppRoleCannotUpdateOrDelete`, `TestAudit_TriggerBlocksOwnerUpdate` in `services/server/migrations`), the detection of a changed row and of a rewritten chain through the checkpoints of the sink is proven since M1-50 (`TestSECT16_ChangedRowIsDetected`, `TestSECT16_RewrittenChainIsDetectedByCheckpoint`, `TestVerifyIgnoresDatabaseCheckpoints` in `services/server/internal/audit/adapters/httpapi`) | medium: whoever controls the database and the export target can change both |
 | T-LG-01 | **Secrets or content in logs and telemetry.** | high | medium | allow lists, type for secrets, route patterns (SEC-LOG-*) | SEC-T10 | low |
 | T-IN-01 | **Input attacks** (injection, parser differences, bidi deception). | medium | medium | SEC-IN-1 to SEC-IN-8 | SEC-T06, SEC-T07 | low |
