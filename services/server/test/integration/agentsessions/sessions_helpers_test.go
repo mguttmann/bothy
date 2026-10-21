@@ -19,11 +19,11 @@ func sessionsWorld(t *testing.T) *world {
 	return runsWorld(t)
 }
 
-// trigger posts a message of name into thread (a thread of Support/Allgemein, operator Lotse)
+// trigger posts a message of Alex into thread (a thread of Support/Allgemein, operator Lotse)
 // and returns the run it opened.
-func (w *world) trigger(name string, thread ids.ID) string {
+func (w *world) trigger(thread ids.ID) string {
 	w.t.Helper()
-	m := w.post(name, thread, "Please look at the export")
+	m := w.post("alex", thread, "Please look at the export")
 	r, ok := w.runOf(m["id"].(string))
 	if !ok {
 		w.t.Fatal("the message opened no run")
@@ -139,10 +139,10 @@ func (w *world) sessionEvents(thread ids.ID) []map[string]any {
 	return out
 }
 
-// finishOK finishes run as completed as the agent handle.
-func (w *world) finishOK(handle, run string) {
+// finishOK finishes run of Lotse as completed.
+func (w *world) finishOK(run string) {
 	w.t.Helper()
-	w.wantOK(w.finish(handle, run, `"state":"completed"`))
+	w.wantOK(w.finish("lotse", run, `"state":"completed"`))
 }
 
 // version reads the member version of a decoded body.

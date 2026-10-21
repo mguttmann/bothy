@@ -22,7 +22,7 @@ func TestListAgentSessions(t *testing.T) {
 		t.Fatalf("empty history %v", empty)
 	}
 	run := w.a6StartedRun(th, `"external_session_ref":"sess-list-1"`, `"model":"model-large"`)
-	w.finishOK("lotse", run)
+	w.finishOK(run)
 	first, _ := w.current(th)
 	second := w.a6Bind("alex", th, "sess-list-2", first.ID, false)
 	r := w.listSessions("alex", th)
@@ -123,7 +123,7 @@ func TestSessionCrashBeforeStarted(t *testing.T) {
 		t.Fatalf("row %+v", row)
 	}
 	w.wantOK(w.finish("lotse", run, `"state":"failed","reason":"runtime_error"`))
-	next := w.trigger("alex", th)
+	next := w.trigger(th)
 	p := w.a6WantMode(next, "new", row.ID)
 	if s := sessionOf(p); s["started"] != false || s["external_session_ref"] != "sess-crash-1" {
 		t.Fatalf("delivered row %v", s)
@@ -146,7 +146,7 @@ func TestSessionSurvivesRename(t *testing.T) {
 	th := w.newThread(w.allgemein)
 	run := w.a6StartedRun(th, `"external_session_ref":"sess-rename-1"`)
 	w.wantOK(w.report("lotse", th, `{"external_session_ref":"sess-rename-1","started":true}`, append(match(1), key()...)...))
-	w.finishOK("lotse", run)
+	w.finishOK(run)
 	before, _ := w.current(th)
 	threadVersion := w.count(`SELECT version FROM threads WHERE id = $1`, th.String())
 	w.wantOK(w.do("owner", http.MethodPut, "/api/v1/threads/"+th.String()+"/title", `{"title":"Invoice export fails for March"}`,
@@ -158,7 +158,7 @@ func TestSessionSurvivesRename(t *testing.T) {
 	if !ok || after != before {
 		t.Fatalf("row after the rename %+v, before %+v", after, before)
 	}
-	next := w.trigger("alex", th)
+	next := w.trigger(th)
 	w.a6WantMode(next, "resume", before.ID)
 }
 
@@ -171,7 +171,7 @@ func TestResetSession(t *testing.T) {
 	th := w.newThread(w.allgemein)
 	run := w.a6StartedRun(th, `"external_session_ref":"sess-reset-1"`)
 	w.wantOK(w.report("lotse", th, `{"external_session_ref":"sess-reset-1","started":true}`, append(match(1), key()...)...))
-	w.finishOK("lotse", run)
+	w.finishOK(run)
 	row, _ := w.current(th)
 	seq := w.maxSeq()
 	r := w.reset("alex", th)
@@ -193,7 +193,7 @@ func TestResetSession(t *testing.T) {
 	if a := w.a6Allows("agent_session.reset"); len(a) != 0 {
 		t.Fatalf("allow audit entries of agent_session.reset: %+v", a)
 	}
-	next := w.trigger("alex", th)
+	next := w.trigger(th)
 	w.a6WantMode(next, "new", "")
 }
 
@@ -223,8 +223,8 @@ func TestResetDuringActiveRun(t *testing.T) {
 	if _, ok := w.current(th); ok {
 		t.Fatal("the report made a current row")
 	}
-	w.finishOK("lotse", run)
-	next := w.trigger("alex", th)
+	w.finishOK(run)
+	next := w.trigger(th)
 	w.a6WantMode(next, "new", "")
 }
 

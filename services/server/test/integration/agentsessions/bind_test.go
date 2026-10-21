@@ -86,7 +86,7 @@ func TestBindTakeOver(t *testing.T) {
 	// Ended rows first in ascending id, then the new row; each in the scope of its thread.
 	ended := []a6Change{{Thread: other.String(), Session: takenID, EndReason: "rebind"}, {Thread: th.String(), Session: ownID, EndReason: "rebind"}}
 	slices.SortFunc(ended, func(x, y a6Change) int { return strings.Compare(x.Session, y.Session) })
-	want := append(ended, a6Change{Thread: th.String(), Session: newID, Current: true})
+	want := append(slices.Clone(ended), a6Change{Thread: th.String(), Session: newID, Current: true})
 	if got := w.a6ChangesAfter(seq); !slices.Equal(got, want) {
 		t.Fatalf("events\n%+v\nwant\n%+v", got, want)
 	}
@@ -110,9 +110,9 @@ func TestBindTakeOver(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'agent_session.bind' AND details::text LIKE '%sess-take%'`); n != 0 {
 		t.Fatalf("%d audit entries carry the reference", n)
 	}
-	next := w.trigger("alex", th)
+	next := w.trigger(th)
 	w.a6WantMode(next, "bind", newID)
-	elsewhere := w.trigger("alex", other)
+	elsewhere := w.trigger(other)
 	w.a6WantMode(elsewhere, "new", "")
 }
 
@@ -221,7 +221,7 @@ func TestExternalSessionInOneThread(t *testing.T) {
 		t.Fatal("t2 kept its current row")
 	}
 	// A run in t3 on the bound row; its report may not move the reference onto one current in t1.
-	run := w.trigger("alex", t3)
+	run := w.trigger(t3)
 	w.a6WantMode(run, "bind", c["id"].(string))
 	w.wantOK(w.start("lotse", run, w.deliver(run)))
 	if w.runSession(run) != c["id"] {
@@ -237,7 +237,7 @@ func TestExternalSessionInOneThread(t *testing.T) {
 		t.Fatalf("report %v", moved)
 	}
 	w.a6OneCurrentPerRef()
-	w.finishOK("lotse", run)
+	w.finishOK(run)
 	// The freed reference binds again elsewhere without a take-over.
 	w.a6Bind("alex", t2, "sess-one-a", "", false)
 	w.a6OneCurrentPerRef()

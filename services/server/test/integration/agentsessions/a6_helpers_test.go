@@ -192,7 +192,7 @@ func (w *world) a6Denials(action string, actor ids.ID) []a6Denial {
 // the extra members of RunStart (for example the reference); it returns the run.
 func (w *world) a6StartedRun(thread ids.ID, extra ...string) string {
 	w.t.Helper()
-	run := w.trigger("alex", thread)
+	run := w.trigger(thread)
 	w.wantOK(w.start("lotse", run, w.deliver(run), extra...))
 	return run
 }

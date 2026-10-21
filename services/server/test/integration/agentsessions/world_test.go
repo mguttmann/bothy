@@ -588,11 +588,6 @@ func (w *world) setChannelOperatorAs(name string, channel ids.ID, body string, h
 	return w.do(name, http.MethodPut, "/api/v1/channels/"+channel.String()+"/operator", body, headers...)
 }
 
-// eventCount returns the number of durable events.
-func (w *world) eventCount() int64 {
-	return w.count(`SELECT count(*) FROM event_log`)
-}
-
 // auditRow is one row of audit_events.
 type auditRow struct {
 	Decision, Reason, ResourceID string
@@ -614,17 +609,6 @@ func (w *world) audits(action string) []auditRow {
 		must(w.t, rs.Scan(&r.Decision, &r.Reason, &r.ResourceID, &raw))
 		must(w.t, json.Unmarshal([]byte(raw), &r.Details))
 		out = append(out, r)
-	}
-	return out
-}
-
-// denies returns the deny rows of action with reason.
-func (w *world) denies(action, reason string) []auditRow {
-	var out []auditRow
-	for _, r := range w.audits(action) {
-		if r.Decision == "deny" && r.Reason == reason {
-			out = append(out, r)
-		}
 	}
 	return out
 }

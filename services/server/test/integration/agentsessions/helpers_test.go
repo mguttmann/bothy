@@ -10,8 +10,6 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
-	"github.com/OWNER/bothy/services/server/internal/runs/app"
-	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
 
 // runsWorld is the world of 07 11.1 with the extensions of the brief M2-05 ("Tests"): Robin with
@@ -108,14 +106,6 @@ func (w *world) runsWhere(cond string, args ...any) []runRow {
 	return out
 }
 
-// triggerOf reads trigger_state, trigger_state_reason and version of a message.
-func (w *world) triggerOf(message string) (state, reason string, version int64) {
-	w.t.Helper()
-	must(w.t, w.db.QueryRow(context.Background(), `SELECT coalesce(trigger_state, ''), coalesce(trigger_state_reason, ''), version
-		FROM messages WHERE id = $1`, message).Scan(&state, &reason, &version))
-	return state, reason, version
-}
-
 // maxSeq is the highest seq of the event log.
 func (w *world) maxSeq() int64 {
 	return w.count(`SELECT coalesce(max(seq), 0) FROM event_log`)
@@ -156,33 +146,4 @@ func types(list []logEvent) []string {
 func (w *world) inUnit(fn func(ctx context.Context) error) error {
 	ctx := actor.WithActor(context.Background(), w.actor("alex"))
 	return w.uow.Do(ctx, fn)
-}
-
-// transition runs Transition of runs in a unit of work.
-func (w *world) transition(cmd app.TransitionCmd) error {
-	return w.inUnit(func(ctx context.Context) error {
-		_, err := w.runs.Transition(ctx, cmd)
-		return err
-	})
-}
-
-// mustTransition is transition that fails the test on an error.
-func (w *world) mustTransition(id string, from, to domain.State, version int64, reason string, by domain.Setter) {
-	w.t.Helper()
-	if err := w.transition(app.TransitionCmd{RunID: ids.MustParse(id), From: from, Version: version, To: to, Reason: reason, SetBy: by}); err != nil {
-		w.t.Fatal(err)
-	}
-}
-
-// openRun opens a run of Lotse for Alex in a new thread of Support/Allgemein through a message
-// and returns the run and the message.
-func (w *world) openRun() (runRow, string) {
-	w.t.Helper()
-	th := w.newThread(w.allgemein)
-	m := w.post("alex", th, "Please look at the export")
-	r, ok := w.runOf(m["id"].(string))
-	if !ok {
-		w.t.Fatal("the message opened no run")
-	}
-	return r, m["id"].(string)
 }

@@ -15,7 +15,7 @@ func TestNewSession_ReferenceAtStart(t *testing.T) {
 	t.Parallel()
 	w := sessionsWorld(t)
 	th := w.newThread(w.allgemein)
-	run := w.trigger("alex", th)
+	run := w.trigger(th)
 	p := w.invocation(run)
 	if p["session_mode"] != "new" || sessionOf(p) != nil {
 		t.Fatalf("first payload %v", p)
@@ -33,8 +33,8 @@ func TestNewSession_ReferenceAtStart(t *testing.T) {
 	if version(rep) != 2 || rep["started"] != true {
 		t.Fatalf("report %v", rep)
 	}
-	w.finishOK("lotse", run)
-	next := w.trigger("alex", th)
+	w.finishOK(run)
+	next := w.trigger(th)
 	p = w.invocation(next)
 	if s := sessionOf(p); p["session_mode"] != "resume" || s == nil || s["id"] != rows[0].ID || version(s) != 2 {
 		t.Fatalf("next payload %v", p)
