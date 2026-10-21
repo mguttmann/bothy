@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -443,22 +444,15 @@ func TestBehaviorRightsAndRequests(t *testing.T) {
 			fmt.Sprint(details["changed"]) != "[free_response skills]" {
 			t.Fatalf("details %s", allows[0].Details)
 		}
-		deadline := time.Now().Add(30 * time.Second)
-		for {
+		testkit.Until(t, "deny audits with capability_missing and step_up_required", func() bool {
 			var reasons []string
 			for _, r := range b.audits(allgemein) {
 				if r.Decision == "deny" {
 					reasons = append(reasons, r.Reason)
 				}
 			}
-			if slices.Contains(reasons, "capability_missing") && slices.Contains(reasons, "step_up_required") {
-				break
-			}
-			if time.Now().After(deadline) {
-				t.Fatalf("deny reasons %v, want capability_missing and step_up_required", reasons)
-			}
-			time.Sleep(200 * time.Millisecond)
-		}
+			return slices.Contains(reasons, "capability_missing") && slices.Contains(reasons, "step_up_required")
+		})
 	})
 
 	t.Run("TestPutChannelBehavior_ArchivedChannel", func(t *testing.T) {
@@ -706,16 +700,15 @@ func TestBehaviorChangesAndEvents(t *testing.T) {
 	})
 }
 
-// frameTypes reads dispatch frames of g until n frames of the channel arrived (or a short quiet
-// period for n == 0) and returns their types.
+// frameTypes reads dispatch frames of g until n frames of the channel arrived (bounded by
+// testkit.Patience) or, for n == 0, for a short quiet period, and returns their types.
 func frameTypes(t *testing.T, g *harness.GatewayConn, channel string, n int) []string {
 	t.Helper()
 	var out []string
-	wait := 10 * time.Second
+	deadline := testkit.Deadline()
 	if n == 0 {
-		wait = 2 * time.Second
+		deadline = time.Now().Add(2 * time.Second) // nosemgrep: bothy-go-test-wall-clock-wait -- a quiet period for frames that must not arrive; a slow host can only make it pass
 	}
-	deadline := time.Now().Add(wait)
 	for time.Now().Before(deadline) && (n == 0 || len(out) < n) {
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		f, err := g.Next(ctx)
