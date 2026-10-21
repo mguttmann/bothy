@@ -175,6 +175,11 @@ var appPrivileges = map[string][]string{
 	// M2-10).
 	"runs":      {"SELECT", "INSERT", "UPDATE"},
 	"run_steps": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 message_components and interactions (M2-15): runs deletes the components of a deleted
+	// message (its tombstone keeps the row, so the cascade never fires); interactions go only with
+	// their component or message (cascade).
+	"message_components": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"interactions":       {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).
