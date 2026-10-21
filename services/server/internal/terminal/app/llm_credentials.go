@@ -67,6 +67,10 @@ func (s *Service) SetLlmCredentials(ctx context.Context, a actor.Actor, cmd term
 		out, err = s.llmWrite(ctx, a, cmd, d, reason)
 		return err
 	}, rightsChange(cmd.HostID, before.HolderID, d.HolderID))
+	if err == nil {
+		// The host service treats every ready as the current declaration (24 section 7.4).
+		s.control().SendReady(cmd.HostID)
+	}
 	return out, err
 }
 

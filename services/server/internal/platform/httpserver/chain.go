@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -113,6 +114,7 @@ type Chain struct {
 	precheck    func(r *http.Request) (settle func(authErr error), err error)
 	gate        func(http.Handler) http.Handler
 	public      bool
+	inBandPats  []string
 
 	// trace, when set by a test of this package, is called with the name of every stage a
 	// request enters; TestChainOrder_Golden reads the order from it.
@@ -246,6 +248,9 @@ func (c *Chain) Order() []string {
 // stage: only the operation in the context (the gateway upgrade, M1-64).
 func (c *Chain) Wrap(op Operation, h http.Handler) http.Handler {
 	if op.AuthorizedInBand {
+		c.mu.Lock()
+		c.inBandPats = append(c.inBandPats, op.Pattern)
+		c.mu.Unlock()
 		return c.enter("handler", inBand(op, h))
 	}
 	c.mu.Lock()
@@ -263,6 +268,13 @@ func (c *Chain) Wrap(op Operation, h http.Handler) http.Handler {
 		next = c.enter(s.String(), next)
 	}
 	return c.enter(StageRoute.String(), c.routeStage(op, next))
+}
+
+// inBandPatterns returns the patterns of the operations with AuthorizedInBand wrapped so far.
+func (c *Chain) inBandPatterns() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.inBandPats)
 }
 
 // inBand is the wrapper of an operation with AuthorizedInBand: it puts the operation into the

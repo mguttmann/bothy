@@ -673,6 +673,7 @@ stateDiagram-v2
     disabled --> active: host.manage (re-enable, not with duplicate_connection)
     disabled --> pairing: re-pairing
     active --> disabled: second control connection (3.4)
+    confirming --> pairing: second control connection (3.4)
     active --> retired: host.manage (retire)
     disabled --> retired: host.manage (retire)
     retired --> [*]
@@ -786,6 +787,122 @@ connection, 03, section 6.6):
 
 Reason: silently displacing the older connection would allow an attacker with copied keys
 to displace the real host and to receive every later session.
+
+Build details (M2-43, docs/DECISIONS.md D-M2-43-6 and D-M2-43-7):
+
+- **Unconfirmed host.** 03 allows `disabled` only after the confirmation. A live duplicate of a
+  host in `confirming` takes the fallback of 3.2 instead: the host returns to `pairing`, its keys
+  are dropped (`key_fingerprint` stays), `host.updated` carries `key_changed = true`, and both
+  connections close with `4112`. For an unconfirmed host `pairing` without keys is the only state
+  from which only a new pairing helps.
+- **Audit of both outcomes.** A dead older connection that is replaced writes one allow entry
+  `host.connect` with `code: stale_connection_replaced`; a live duplicate writes one deny entry
+  `host.connect` with the reason `host_duplicate_connection` (07 4.1) and `code:
+  duplicate_connection`.
+- **One node.** Until M2-47 builds the routing of control connections across nodes, the probe
+  runs only within the node that holds the older connection; the registry sits behind the port
+  `ControlLinks`, so M2-47 adds the path across nodes without changing callers.
+
+### 3.5 Control connection
+
+Built by M2-43 (docs/DECISIONS.md D-M2-43-1 to D-M2-43-15). The host service holds exactly one
+outgoing control connection at `wss://<instance>/api/v1/hosts/connect` (asyncapi `hostControl`):
+JSON text frames `{op, d}` of at most `sync.ws_max_frame_bytes`, decoded strictly (no duplicate
+or unknown member, valid UTF-8, a `d` that matches its schema). Only the host service opens it,
+only outgoing and only over TLS with certificate verification; it opens no listener.
+
+**Login.** Right after the upgrade the server sends `hello` with `protocol_versions`, a
+`challenge` of 32 random bytes (base64url without padding), `server_time`,
+`heartbeat_interval_ms` (`terminal.host_heartbeat_interval`), `heartbeat_miss_limit`
+(`terminal.host_heartbeat_miss_limit`) and the JWKS of purpose `terminal` (keys `next`, `active`
+and `retiring`). The server decides `identify` in this order, the first match wins:
+
+1. No frame within `terminal.host_auth_timeout` after `hello`, or another valid host op first:
+   `4113`. A frame that fails decoding: `4002`.
+2. `protocol_version` not supported: `4114`, before the proof is looked at.
+3. `live_sessions` absent, `session_id` present, or `host_version` not SemVer 2.0.0: `4002`.
+4. The proof: a compact JWS with exactly three parts, header `alg` exactly `EdDSA`, `typ` exactly
+   `host-auth+jwt`, `kid` present, payload exactly the claims `challenge`, `host_id` and `iat`. No
+   host with `identify.host_id`, a host in `pairing` (keys dropped) or a `kid` other than
+   `hosts.auth_jkt` (the RFC 7638 thumbprint of the login key): `4110`, run `bothy-host pair`
+   again. A signature that does not verify with `hosts.auth_public_jwk`, a different `challenge`,
+   a `host_id` claim other than `identify.host_id`, an `iat` before `hello.server_time` minus
+   `auth.clock_leeway` or after now plus `auth.clock_leeway`, or any malformed part: `4113`.
+5. `authorize(host, host.connect)` (right `host-self`, 07): a host `disabled` or `retired` gives
+   `4111`.
+6. The duplicate check of 3.4, then one unit of work: the reconciliation of `live_sessions`
+   (6.2), `reported_host_version` (a change raises `hosts.version` and writes `host.updated`) and
+   `last_seen_at`.
+7. The server registers the connection, reads `state` and `auth_jkt` once more (a change
+   committed meanwhile closes with its code) and sends `ready {host_id, state, llm_credentials}`.
+
+Every later op authorizes `host.connect` again and closes on a denial with the code of the list
+above, so a state change on another node still ends the connection at its next op.
+
+**Frames after the login.** A binary frame, invalid JSON, a frame over the limit (reason
+`frame_too_large`), an unknown op, a server op sent by the host or a second `identify` close with
+`4002` (`hostControl` names no `4001`); a full outbound queue (`sync.outbound_queue_max`) or a
+missed write deadline (`gateway.write_timeout`) with `4014`; a panic or an internal error with
+`4000`.
+
+**Report.** After `ready` the host service sends `report` before it accepts any `session.open`,
+and the server sends `session.open` only after the first applied `report` after `ready`. The
+server checks the report: every check `hd1_user` to `hd11_shared_locations` at least once;
+`check` and `session_user` unique together; `session_user` only on entries with `ok = false`;
+session user names unique without regard to case, each a name of 03 of at most
+`host.os_user_max_chars` characters; profile names unique; display names, working directories and
+`os_version` display texts of at most `terminal.report_label_max_chars` characters; each list at
+most `terminal.report_max_entries` entries. Unlike `host.pair` an empty list of session users is
+allowed, because a refused start must still report HD1. An invalid report gets `error {op:
+report, code: validation_failed}`, stores nothing and keeps the connection. A report equal to the
+stored one writes nothing. Otherwise the server writes the changed `reported_*` columns in one
+unit of work with one `host.updated`, the lists exactly as reported and in their order. A changed
+list of session users is rights state (03 4.3): it raises `permission_version` and ends the
+sessions of every person whose name is no longer reported with `access_revoked` (SR12). A report
+that turns `reported_is_server_host` on ends the sessions of every person who is not an active
+owner with `access_revoked` (SR10), without a new rights version. One allow entry `host.connect`
+is written only when the server-host flag, the check results or the session users changed.
+
+**Connected.** `Host.connected` is true from the first applied `report` after `ready` until the
+connection ends: "connected" means usable for sessions. Each change travels as the ephemeral
+event `host.presence_changed {host_id, connected}` to everyone with `host.read`.
+
+**Heartbeat.** `heartbeat {active_sessions}` is answered with `heartbeat_ack {server_time}`;
+`active_sessions` changes nothing. The server closes with `4009` when no `heartbeat` arrived for
+`terminal.host_heartbeat_interval` times (`terminal.host_heartbeat_miss_limit` + 1) since `ready`
+or the last `heartbeat`. `last_seen_at` is written at the login and on a heartbeat when older than
+`identity.last_active_granularity`, without an event and without a new version.
+
+**Session reports.** `session.started` turns an `opening` session of this host `active`; a
+`closed` one gets `session.close` with its stored reason. `session.ended` accepts from the host
+only `client_closed`, `process_exited` (with `exit_code`), `idle_timeout`, `detach_expired`,
+`open_failed` and `host_policy_violation`; `close_detail` is required exactly for `open_failed`
+(any detail) and `host_policy_violation` (`subscription_login_detected`, `helper_untrusted`,
+`shared_location`). An invalid end gets `error` with `validation_failed`; an unknown session or
+one of another host gets `error` with `not_found` and `session.close` with `access_revoked`; a
+`closed` session is not changed.
+
+**Loss and shutdown.** When the connection ends for any reason other than a close that comes
+with a state change of the host (`4110`, `4111`, `4112`), every `active` session of the host
+becomes `detached` (6.2) unless a newer connection of the host is open on this node, and
+`connected` turns false. At shutdown every connection closes with `4013`.
+
+**Host service.** The host service dials only `wss://` (from an `https` server URL) with the
+system roots, proxy from the environment, and never skips the verification. It picks the highest
+protocol version both sides support (none: it stops and logs "update the host service or the
+server"). It sends `heartbeat` every `heartbeat_interval_ms` and treats `heartbeat_interval_ms`
+times (`heartbeat_miss_limit` + 1) without a frame of the server as a dead connection.
+`is_server_host` is HD5 or the peer of the connection is an address of the host itself (2.3). Its
+reaction per close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any unknown
+code reconnect with exponential backoff with full jitter from
+`host_service.reconnect_backoff_base` to `host_service.reconnect_backoff_cap`, reset after a
+`ready`; `4013` reconnects after a random delay below `host_service.reconnect_backoff_base`;
+`4008` waits the `retry_after` of the close reason, else the cap; `4111` ends all PTYs and waits
+the cap before each attempt; `4110`, `4112` and `4114` end all PTYs and stop the service with the
+exit code of a refused start, which no service definition restarts. On a refused start (2.2) the
+host service logs in with empty `live_sessions`, retrying with the backoff for at most
+`host_service.reconnect_backoff_cap` in total, sends exactly one `report` and closes with `1000`
+over the same connection.
 
 ## 4. Keys
 
@@ -960,6 +1077,12 @@ reported list of `osu` point only to an error or tampering in the server.
 Reason for `cek`: a relay cannot put the token into its own handshake, because the hash
 is bound to the ephemeral key of the device.
 
+JWKS refresh (M2-43, D-M2-43-11): `heartbeat_ack` carries `jwks` whenever the set of purpose
+`terminal` differs from the last set sent on the connection, and the host service replaces its
+set. A scheduled rotation publishes the `next` key `agent.jwks_max_age` before it signs, so a
+long-lived connection learns it in time. Limit: after an emergency rotation a host service may
+refuse new session tokens for at most one heartbeat interval plus `signing_key.cache_ttl`.
+
 ### 5.4 Frames
 
 Every WebSocket binary message is exactly one Noise message. After the handshake, every
@@ -1060,6 +1183,11 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
   restart from a network drop, after which the PTYs keep running.
 - After `terminal.detach_grace` without an attach, the host service ends the PTY, and the server
   closes the session with `detach_expired`.
+- A session listed in `live_sessions` that is `closed` for this host, unknown, or of another host
+  gets `session.close` right after `ready`, with the stored `close_reason`, else `access_revoked`
+  (M2-43, D-M2-43-8): a PTY the server no longer allows ends at the next login, fail closed for IDs
+  the server does not know. Listed sessions in `opening`, `active` or `detached` stay; their end
+  comes with `session.ended`.
 
 ### 6.3 Limits
 
@@ -1554,6 +1682,7 @@ Close codes of the terminal channels (source of the names and client reactions i
 
 | Code | Name | Channel | Meaning and reaction |
 |---|---|---|---|
+| `4000` | `unknown_error` | control and data connection | internal error of the server (a panic, an error without a better code); reconnect with backoff (M2-43) |
 | `4100` | `terminal_closed` | stream, data connection | session ended, reason in `close_reason` (10.3); do not reconnect, the host service ends the PTY |
 | `4101` | `terminal_token_stale` | stream | terminal session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a new step-up (5.3) |
 | `4102` | `terminal_host_unavailable` | stream | counterpart missing (host service disconnected or no counterpart on this node, 9); session `detached`, attach later |
@@ -1689,6 +1818,8 @@ Column "Place": Server = configuration reference of the server; Host service = c
 | `host_service.scrollback_bytes` | Host service | `1048576` | Scrollback buffer per session, only in memory |
 | `host_service.require_local_confirm` | Host service | `false` | every PTY only after consent on the host (6.4) |
 | `host_service.local_confirm_timeout` | Host service | `60s` | Deadline for the consent on the host |
+| `host_service.reconnect_backoff_base` | Host service | `1s` | first delay of the exponential backoff with full jitter before a new control connection (3.5) |
+| `host_service.reconnect_backoff_cap` | Host service | `5m` | largest delay of that backoff; also the total time the login of a refused start keeps trying (3.5) |
 
 Values of other chapters that this chapter refers to: `auth.clock_leeway`
 ([08-identity.md](08-identity.md)), `cluster.mode` ([02-architecture.md](02-architecture.md)),

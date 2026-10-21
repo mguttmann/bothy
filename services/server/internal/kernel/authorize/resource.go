@@ -58,6 +58,9 @@ type Resource struct {
 	// Audience is the audience principal of a personal event to deliver, zero otherwise; used
 	// only by webhook_out.deliver (M2-26).
 	Audience ids.ID
+	// HostAuth carries the verdict of the Ed25519 proof of a host principal (host.connect, M2-43);
+	// required for a host principal, whose liveness it decides, ignored otherwise.
+	HostAuth *HostAuthFacts
 	// Event marks the descriptor of a stored event (ResourceFromEvent) and carries its full
 	// scope. When the stored resource kind is not a resource of the receive action (pin.added
 	// names a message, thread.read takes a thread), authz decides on the object of the scope the
@@ -86,6 +89,36 @@ type TerminalFacts struct {
 // EventScope is the scope of a stored event (event_log.space_id, channel_id, thread_id).
 type EventScope struct {
 	SpaceID, ChannelID, ThreadID ids.ID
+}
+
+// HostAuthVerdict is the result of the proof check of a host service (24 section 3.5): the
+// terminal use case checks the proof, authz turns the verdict into the liveness of the host
+// principal.
+type HostAuthVerdict uint8
+
+// The verdicts of the proof of a host service.
+const (
+	// HostAuthInvalidZero is the zero verdict; authz treats it as an internal error.
+	HostAuthInvalidZero HostAuthVerdict = iota
+	// HostAuthValid is a proof that verified with the registered key of the host.
+	HostAuthValid
+	// HostAuthUnknownKey is a proof of an unknown host, a host without keys or a key other than
+	// the registered one (close code 4110).
+	HostAuthUnknownKey
+	// HostAuthInvalid is a proof that does not verify, names another challenge, host or time, or
+	// is malformed (close code 4113).
+	HostAuthInvalid
+)
+
+// HostAuthFacts describes the authentication of a host principal for host.connect (M2-43).
+//
+// Example:
+//
+//	r := authorize.Resource{Kind: authorize.ResourceHost, ID: hostID,
+//		HostAuth: &authorize.HostAuthFacts{Verdict: authorize.HostAuthValid}}
+type HostAuthFacts struct {
+	// Verdict is the result of the proof check.
+	Verdict HostAuthVerdict
 }
 
 // GrantFacts is the shape of a grant for the delegation rules (07 section 2.6). The strings are

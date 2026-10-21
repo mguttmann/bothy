@@ -17,6 +17,7 @@ part 'host_channel_hello.g.dart';
 /// * [challenge] - Random value; the host signs it with its Ed25519 key in `identify`.
 /// * [serverTime] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [heartbeatIntervalMs]
+/// * [heartbeatMissLimit]
 /// * [jwks] - Public keys with purpose `terminal` for checking session tokens.
 @BuiltValue()
 abstract class HostChannelHello
@@ -34,6 +35,9 @@ abstract class HostChannelHello
 
   @BuiltValueField(wireName: r'heartbeat_interval_ms')
   int get heartbeatIntervalMs;
+
+  @BuiltValueField(wireName: r'heartbeat_miss_limit')
+  int get heartbeatMissLimit;
 
   /// Public keys with purpose `terminal` for checking session tokens.
   @BuiltValueField(wireName: r'jwks')
@@ -83,6 +87,11 @@ class _$HostChannelHelloSerializer
     yield r'heartbeat_interval_ms';
     yield serializers.serialize(
       object.heartbeatIntervalMs,
+      specifiedType: const FullType(int),
+    );
+    yield r'heartbeat_miss_limit';
+    yield serializers.serialize(
+      object.heartbeatMissLimit,
       specifiedType: const FullType(int),
     );
     yield r'jwks';
@@ -144,6 +153,13 @@ class _$HostChannelHelloSerializer
             specifiedType: const FullType(int),
           ) as int;
           result.heartbeatIntervalMs = valueDes;
+          break;
+        case r'heartbeat_miss_limit':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.heartbeatMissLimit = valueDes;
           break;
         case r'jwks':
           final valueDes = serializers.deserialize(

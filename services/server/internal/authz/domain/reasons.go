@@ -61,6 +61,7 @@ const (
 	ReasonTerminalStepUpNotFresh           Reason = "terminal_step_up_not_fresh"
 	ReasonHostNotActive                    Reason = "host_not_active"
 	ReasonHostAuthFailed                   Reason = "host_auth_failed"
+	ReasonHostDuplicateConnection          Reason = "host_duplicate_connection"
 	ReasonUnknownAction                    Reason = "unknown_action"
 	ReasonTrustedHeaderRequiresLoopback    Reason = "trusted_header_requires_loopback"
 )
@@ -118,6 +119,7 @@ var reasons = []Reason{
 	ReasonTerminalStepUpNotFresh,
 	ReasonHostNotActive,
 	ReasonHostAuthFailed,
+	ReasonHostDuplicateConnection,
 	ReasonUnknownAction,
 	ReasonTrustedHeaderRequiresLoopback,
 }

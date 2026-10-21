@@ -46,6 +46,7 @@ const (
 	opAssignee
 	opTerminal
 	opDelivery
+	opHostSelf
 )
 
 // Fact names a fact of the resource descriptor that a conditional capability depends on.
@@ -116,6 +117,9 @@ var (
 	// Terminal is true when the principal holds the effective right terminal on the resource host
 	// (TerminalOn, M2-39).
 	Terminal = Expr{op: opTerminal}
+	// HostSelf is true for a host principal on its own host resource (host.connect, M2-43, 05
+	// section 4.14); every other kind fails with subject_kind_not_allowed.
+	HostSelf = Expr{op: opHostSelf}
 )
 
 // AtLeast is true when the effective level on the path is at least l.
@@ -159,6 +163,10 @@ func HumanGated(e Expr) bool {
 	return e.op == opAll && len(e.args) > 0 && e.args[0].op == opHumanSession
 }
 
+// IsHostSelf reports whether e is exactly HostSelf, the requirement of host.connect: authorize
+// decides it on a path of its own, before any snapshot is read (M2-43).
+func (e Expr) IsHostSelf() bool { return e.op == opHostSelf }
+
 // IsReadLevel reports whether e is exactly AtLeast(LevelRead), the requirement Scope accepts.
 func (e Expr) IsReadLevel() bool { return e.op == opLevel && e.level == LevelRead }
 
@@ -187,7 +195,7 @@ var exprNames = map[op]string{
 	opThreadOperator: "ThreadOperator", opChannelOperator: "ChannelOperator",
 	opReadOnOperatedChannel: "ReadOnOperatedChannel", opGroupMember: "GroupMember", opPreview: "Preview",
 	opSystem: "System", opHumanSession: "HumanSession", opAssignee: "Assignee", opTerminal: "Terminal",
-	opDelivery: "Delivery",
+	opDelivery: "Delivery", opHostSelf: "HostSelf",
 }
 
 // capOpNames are the names of the nodes with a capability.

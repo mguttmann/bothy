@@ -4,14 +4,17 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"io"
 	"log/slog"
+	"net/http"
 	"os/signal"
 	"syscall"
 
 	"github.com/OWNER/bothy/services/host/internal/buildinfo"
 	"github.com/OWNER/bothy/services/host/internal/config"
+	"github.com/OWNER/bothy/services/host/internal/control"
 	"github.com/OWNER/bothy/services/host/internal/startup"
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
@@ -43,6 +46,52 @@ func cmdRun(ctx context.Context, args []string, _, stderr io.Writer) int {
 	return run(ctx, false)
 }
 
+// controlFor returns the control connection of a paired host (M2-43): the client of
+// internal/control over the pairing record and the login key, with RefuseSessions until M2-45
+// binds its session manager. An unpaired host, or one whose state cannot be read, gets
+// startup.NoControl, so the stored declaration decides (24 2.2). It never logs a key.
+func controlFor(c *config.Config, st *state.Dir, log *slog.Logger) startup.Control {
+	p, err := st.ReadPairing()
+	if err != nil {
+		return startup.NoControl{}
+	}
+	keys, err := st.ReadKeys()
+	if err != nil {
+		log.Warn("login key unreadable")
+		return startup.NoControl{}
+	}
+	roots, err := serverRoots(st)
+	if err != nil {
+		log.Warn("server CA unreadable")
+		return startup.NoControl{}
+	}
+	cl, err := control.New(control.Config{ServerURL: p.ServerURL, HostID: p.HostID, AuthKey: keys.AuthPrivate, HostVersion: buildinfo.Version,
+		BackoffBase: c.ReconnectBackoffBase, BackoffCap: c.ReconnectBackoffCap, Log: log, Proxy: http.ProxyFromEnvironment, RootCAs: roots},
+		control.RefuseSessions{})
+	if err != nil {
+		log.Warn("control connection unavailable")
+		return startup.NoControl{}
+	}
+	return cl
+}
+
+// serverRoots returns the system roots plus the CA that `pair --ca-file` stored (M2-43), or nil
+// (the system roots) without one. Errors: an unreadable or malformed stored CA.
+func serverRoots(st *state.Dir) (*x509.CertPool, error) {
+	ca, err := st.ReadServerCA()
+	if err != nil || ca == nil {
+		return nil, err
+	}
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		roots = x509.NewCertPool()
+	}
+	if !roots.AppendCertsFromPEM(ca) {
+		return nil, errors.New("run: the stored server CA is no PEM certificate")
+	}
+	return roots, nil
+}
+
 // runService is the body of run: configuration, state, admin endpoint, then startup.Run or
 // startup.DoctorOnce.
 func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer) int {
@@ -66,7 +115,7 @@ func runService(ctx context.Context, cfgPath string, once bool, stderr io.Writer
 		return exitFailed
 	}
 	defer func() { _ = admin.Close() }()
-	d := startup.Deps{Config: c, State: st, Doctor: sys.doctorEnv(c, st), Control: startup.NoControl{}, Log: log, Admin: admin,
+	d := startup.Deps{Config: c, State: st, Doctor: sys.doctorEnv(c, st), Control: controlFor(c, st, log), Log: log, Admin: admin,
 		AdminUID: adminUID(), OSVersion: sys.osVersion(), Platform: buildinfo.Platform(), HostVersion: buildinfo.Version}
 	if once {
 		return startup.DoctorOnce(ctx, d)

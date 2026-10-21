@@ -179,7 +179,9 @@ modules:
     ephemeral_events: [host.presence_changed]
     ws_ops: []
     depends_on: [instance, identity, authz, agents]
-    adapter_vendors: [pgx]   # sqlc code and the repository (M2-39)
+    # sqlc code and the repository (M2-39); the control connection of the host services and its
+    # test client (adapters/wsrelay and adapters/hosttest, M2-43).
+    adapter_vendors: [pgx, websocket]
   runs:
     tables: [runs, run_steps, run_followups, message_components, interactions]
     actions: [agent.invoke, run.read, run.overview.read, run.context.read, run.start,
@@ -263,8 +265,8 @@ modules:
     ephemeral_events: [typing.started]
     ws_ops: [identify, resume, heartbeat, reauth, focus, typing.start, typing.stop]
     depends_on: [chat, agents, runs, sync, stats]
-    # The only module with github.com/coder/websocket (02 "Layers within a module" rule 4, M1-64);
-    # otel for the span gateway.connect.
+    # github.com/coder/websocket for the client connections (02 "Layers within a module" rule 4,
+    # M1-64; terminal has its own for the host services, M2-43); otel for the span gateway.connect.
     adapter_vendors: [websocket, otel]
 vendors:                    # <group>: [<import path>, <import path>/**]
   age: [filippo.io/age, filippo.io/age/**]
@@ -287,7 +289,7 @@ vendors:                    # <group>: [<import path>, <import path>/**]
                github.com/pb33f/libopenapi-validator/**]
   # JSON Schema 2020-12 validator of api/specschema, the frame check of gate G9 (M1-67).
   jsonschema: [github.com/santhosh-tekuri/jsonschema/v6, github.com/santhosh-tekuri/jsonschema/v6/**]
-  # WebSocket server and test client of the gateway (gateway adapters only, M1-64).
+  # WebSocket servers and test clients of the gateway (M1-64) and of the terminal (M2-43), adapters only.
   websocket: [github.com/coder/websocket, github.com/coder/websocket/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
   goose: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]

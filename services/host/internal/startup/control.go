@@ -45,6 +45,16 @@ type Control interface {
 	Close() error
 }
 
+// Events is the optional part of a Control that keeps its connection after the login (M2-43):
+// every later ready reaches the handler, and Stopped closes when the connection stopped for good
+// (close codes 4110, 4112, 4114), after which run exits like a refused start.
+type Events interface {
+	// SetReadyHandler sets the function every later ready reaches.
+	SetReadyHandler(f func(context.Context, Ready))
+	// Stopped is closed when the connection stopped for good.
+	Stopped() <-chan struct{}
+}
+
 // ErrUnreachable is the answer of NoControl: the host cannot reach the server (24 2.2).
 var ErrUnreachable = errors.New("startup: server unreachable")
 

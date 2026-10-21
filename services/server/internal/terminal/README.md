@@ -1,6 +1,6 @@
 # Module `terminal`
 
-Status: host records (M2-39), terminal rights (M2-40), pairing (M2-41). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); where they differ, the chapter applies.
+Status: host records (M2-39), terminal rights (M2-40), pairing (M2-41), control connection of the host services (M2-43). The normative source is [docs/spec/24-terminal.md](../../../../docs/spec/24-terminal.md); where they differ, the chapter applies.
 
 ## Purpose
 
@@ -114,10 +114,61 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
   `adapters/httpapi/pairing_test.go` (TM-T19, TM-T20, TM-T28 (b) and (e), re-pairing,
   concurrency, no secrets).
 
+## Built in M2-43
+
+- Control connection `GET /api/v1/hosts/connect` (asyncapi `hostControl`, 24 section 3.5) in
+  `adapters/wsrelay`: `Handler` (upgrade with `github.com/coder/websocket`, reader, bounded writer
+  queue of `sync.outbound_queue_max` with `gateway.write_timeout`, the deadlines
+  `terminal.host_auth_timeout` and `terminal.host_heartbeat_interval` times
+  (`terminal.host_heartbeat_miss_limit` + 1)), the strict codec on the generated `Host*` types of
+  `api/rest` (`codec.go`, `FuzzDecodeControlFrame`) and `Links`, the per-process registry of
+  links. `Links` implements `app.ControlLinks` (`OpenSession`, `CloseSession`, `CloseHost`,
+  `Connected`, `SendReady`) and publishes the ephemeral `host.presence_changed {host_id,
+  connected}` through `kernel/eventlog.EphemeralPublisher` (the gateway hub, bound in
+  `internal/wire`). "Connected" means usable for sessions: from the first applied `report` after
+  `ready` until the connection ends; `HostView.Connected` reads it once `Service.BindControl` ran.
+- `domain/control.go`: `CheckHostProof` (compact JWS, `alg` EdDSA, `typ` `host-auth+jwt`, `kid` the
+  RFC 7638 thumbprint, the closed claims `challenge`, `host_id`, `iat` within `auth.clock_leeway`;
+  `FuzzCheckHostProof`), `IdentifyOutcome` (the order of the close codes), `ReconcileLiveSessions`,
+  `ValidateReport`, `DiffReport`, `SessionsEndedByReport`, `ValidateHostSessionEnd`,
+  `HeartbeatDeadline`, `SupportedProtocolVersions`. `Transition` draws `confirming --> pairing` for
+  a second live control connection of an unconfirmed host.
+- `app/control.go`: `Authenticate` (proof and `authorize` of `host.connect` with the right
+  `host-self`; denials are audited by authz), `LoginWrite` (`live_sessions`: every other session in
+  `active` or `detached` ends with `host_restarted`; `reported_host_version`, `last_seen_at`),
+  `Ready`, `Recheck` (every op authorizes again), `Heartbeat`, `ApplyReport` (the reported
+  columns in one unit; a changed list of session users is the rights change `host.connect` through
+  `ApplySessionUserReport`, SR12; the server-host flag turning on ends the sessions of non-owners,
+  SR10; one allow entry `host.connect` on a change of the flag, the checks or the session users),
+  `SessionStarted`, `SessionEnded`, `ConnectionLost`, `StaleReplaced`, `ResolveDuplicate` (24 3.4:
+  disable an active host, an unconfirmed one falls back to `pairing`; deny entry
+  `host_duplicate_connection`). `setHostState`, `issueHostPairingCode`, the fallback of
+  `confirmHost` close the connection after their commit (`4111`, `4110`); `confirmHost` and
+  `setHostLlmCredentials` send `ready` again.
+- `EndSessions` and every other end go through `endSession`: audit `terminal.terminate` (with
+  `close_detail` when the host reported one) and the personal event `terminal_session.changed`.
+- `adapters/hosttest`: the Go test client of the control connection (`Dial`, `Identify`, `Send`,
+  `Next`, `ExpectClose`, `Pause`, `StartHeartbeat`), validating every frame with
+  `api/specschema.ValidateChannelFrame` (G9).
+- Close codes on the connection: `4002` decoding and order, `4009` heartbeat, `4013` shutdown (stop
+  step `host_control_connections`), `4014` slow consumer, `4000` internal error, `4110` to `4114`
+  as in 24 section 13.
+- Configuration keys: `terminal.host_heartbeat_interval`, `terminal.host_heartbeat_miss_limit`,
+  `terminal.host_auth_timeout`, `terminal.host_duplicate_probe_timeout` (`configkeys_terminal.go`),
+  besides `sync.ws_max_frame_bytes`, `sync.outbound_queue_max`, `gateway.write_timeout`,
+  `http.max_json_depth`, `auth.clock_leeway` and `identity.last_active_granularity`.
+- Recordings in both directions: `services/host/testdata/control/server_frames.json` (written here
+  with `go test -update`, `TestServerFramesRecordingCurrent`) and `host_frames.json` (written by the host service, checked
+  here by `TestHostClientFramesValid`).
+- Tests: `domain/control_test.go` and the integration tests of `adapters/wsrelay` over PostgreSQL 18
+  and the real use cases (login, close codes `4110` to `4114`, TM-T23, TM-T16, reports, SR10, SR12,
+  heartbeat, JWKS refresh, loss, shutdown, no secrets).
+
 ## Extension points
 
-- M2-43: control connection; replaces the binding `NoConnections` of `app.Presence` with its register and writes the columns `reported_*` and `last_seen_at`.
 - M2-44: calls `identity.StepUp.ConsumeFresh` in the transactions of `openTerminalSession` and `attachTerminalSession`, sets `Resource.HostID` and `Resource.Terminal` and adds `host_not_active` and `terminal_profile_unknown` after SR12.
+- M2-44: produces `session.open` and `session.close` through `app.ControlLinks` (`ErrHostNotConnected` and `ErrHostNotReady` map to `409 host_unavailable`) and reuses the login of `Authenticate` for `hostData`.
+- M2-47: the duplicate probe and the presence across nodes behind `app.ControlLinks`.
 - M2-44: sessions and relay; adds `terminal_session.changed`, the close code `4100` and `session.close` to the host service to `EndSessions`.
 - M2-46: revocation, limits and metrics (`bothy.terminal.sessions.closed`), job `terminal.sweep`.
 

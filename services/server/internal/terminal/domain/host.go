@@ -33,6 +33,9 @@ type Host struct {
 	NoisePublicKey   []byte
 	// AuthJKT is the RFC 7638 thumbprint of the login key; "" while the host has no keys.
 	AuthJKT string
+	// AuthPublicJWK is hosts.auth_public_jwk, the stored JWK of the login key; nil without keys
+	// (M2-43: the proof of identify verifies with it).
+	AuthPublicJWK []byte
 	// KeyFingerprint is the fingerprint of the stored keys; after the keys are dropped it is kept
 	// as the digest of the dropped keys (M2-41, Design note 9), never shown without keys.
 	KeyFingerprint string
@@ -66,8 +69,8 @@ type SessionUser struct {
 	CreatedAt time.Time
 }
 
-// Session is a row of terminal_sessions as the end of a session reads it (metadata only, never
-// content).
+// Session is a row of terminal_sessions as the end of a session and terminal_session.changed read
+// it (metadata only, never content).
 type Session struct {
 	ID       ids.ID
 	HostID   ids.ID
@@ -76,6 +79,19 @@ type Session struct {
 	OpenedAt time.Time
 	BytesIn  int64
 	BytesOut int64
+	// DeviceID and Profile are the device and the profile of the session (M2-43:
+	// terminal_session.changed carries them).
+	DeviceID ids.ID
+	Profile  string
+	// StartedAt, DetachedAt and ClosedAt are zero when NULL.
+	StartedAt, DetachedAt, ClosedAt time.Time
+	// CloseReason and CloseDetail are "" while the session is open; ExitCode is nil unless the
+	// process exited with a code.
+	CloseReason CloseReason
+	CloseDetail CloseDetail
+	ExitCode    *int
+	// Version is terminal_sessions.version.
+	Version int64
 }
 
 // Apply returns h after the transition r at t: the state, the disabled reason and disabled_at

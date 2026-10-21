@@ -37,7 +37,7 @@ part 'host.g.dart';
 /// * [sessionUsers] - Valid session user assignments (ruling T12), visible like every other member to everyone with `host.read`. Absent when there is none.
 /// * [reportedSessionUsers] - Session users the host service reported at pairing and in its last `report` (24 section 2.2). An assignment works only while its name is in this list (SR12); `confirmHost` and `updateHost` accept only these names. Absent before pairing.
 /// * [requireLocalConfirm] - Report whether `host_service.require_local_confirm` is on.
-/// * [connected] - The control connection of the host service is open (memory of the server).
+/// * [connected] - Usable for sessions, from the first `report` after `ready` to the end of the control connection (24, 3.5).
 /// * [hostVersion]
 /// * [osVersion]
 /// * [lastSeenAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -114,7 +114,7 @@ abstract class Host implements Built<Host, HostBuilder> {
   @BuiltValueField(wireName: r'require_local_confirm')
   bool? get requireLocalConfirm;
 
-  /// The control connection of the host service is open (memory of the server).
+  /// Usable for sessions, from the first `report` after `ready` to the end of the control connection (24, 3.5).
   @BuiltValueField(wireName: r'connected')
   bool get connected;
 

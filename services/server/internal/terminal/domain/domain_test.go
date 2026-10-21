@@ -37,6 +37,7 @@ var allowed = []transition{
 	{domain.StateConfirming, "", domain.CauseConfirm, domain.StateActive, "", ""},
 	{domain.StateConfirming, "", domain.CauseNewPairingCode, domain.StatePairing, "", domain.CloseHostRekeyed},
 	{domain.StateConfirming, "", domain.CauseFingerprintAttemptsExhausted, domain.StatePairing, "", domain.CloseHostRekeyed},
+	{domain.StateConfirming, "", domain.CauseDuplicateConnection, domain.StatePairing, "", domain.CloseHostRekeyed},
 	{domain.StateActive, "", domain.CauseNewPairingCode, domain.StatePairing, "", domain.CloseHostRekeyed},
 	{domain.StateActive, "", domain.CauseDisable, domain.StateDisabled, domain.DisabledOwner, domain.CloseHostDisabled},
 	{domain.StateActive, "", domain.CauseDuplicateConnection, domain.StateDisabled, domain.DisabledDuplicateConnection, domain.CloseHostDisabled},

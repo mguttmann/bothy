@@ -14,8 +14,35 @@ own session user.
 M2-38 built the Noise core. M2-42 adds installation, the configuration file, the state
 directory, the self-checks HD1 to HD11 (`doctor`), the local channel to the PTY helpers with its
 peer check, the start sequence of `run` and `pair`. M2-43 implements the `Control` port (control
-connection, `ready`, `report`), M2-44 the data connections and M2-45 the sessions with PTY,
-profiles and the periodic runs of HD6 and HD11.
+connection, `ready`, `report`) in `internal/control`, M2-44 the data connections and M2-45 the
+sessions with PTY, profiles and the periodic runs of HD6 and HD11.
+
+## Control connection (M2-43)
+
+`internal/control` is the client of the control connection (24 section 3.5): one outgoing
+WebSocket to `wss://<server>/api/v1/hosts/connect`, only from the `https` URL of the pairing
+record, with the system roots and the proxy of the environment, never a listener and never a skip
+of the TLS verification. It signs the proof of `identify` with the login key of the state
+directory (header `alg` EdDSA, `typ` `host-auth+jwt`, `kid` the RFC 7638 thumbprint; claims
+`challenge`, `host_id`, `iat`), sends `report` as the first frame after every `ready`, sends
+`heartbeat` every `heartbeat_interval_ms` and treats `heartbeat_interval_ms` times
+(`heartbeat_miss_limit` + 1) of silence as a dead connection. `is_server_host` is HD5 or-ed with
+whether the server of the connection is this machine. `Client` implements `startup.Control`:
+`run` logs in through it (a stored report goes first after every reconnect, every later `ready`
+reaches `startup.Service.OnReady`), and on a refused start it logs in with empty `live_sessions`,
+retries for at most `host_service.reconnect_backoff_cap`, sends exactly one `report` and closes
+with `1000` over the same connection. Until M2-45 the sessions are `RefuseSessions`: every
+`session.open` is answered with `session.ended {open_failed, pty_failed}`.
+
+Reconnect policy by close code: `1000`, `1001`, `4000`, `4002`, `4009`, `4014`, `4113` and any
+unknown code reconnect with exponential backoff and full jitter from
+`host_service.reconnect_backoff_base` to `host_service.reconnect_backoff_cap` (reset after a
+`ready`); `4013` after a random delay below the base; `4008` after `retry_after` of the close
+reason, else the cap; `4111` ends all PTYs and waits the cap before each attempt; `4110`, `4112`
+and `4114` end all PTYs and stop `run` with exit code `78`, which no service definition restarts.
+The frames are hand-written; `testdata/control/host_frames.json` and `server_frames.json` hold
+them equal to the contract in both directions (`make recordings` rewrites the host recording).
+
 
 ## Commands
 
@@ -48,7 +75,9 @@ definition restarts it, only `bothy-host restart` does.
 | admin endpoint | `<state>/admin.sock` (uid 0 only) | `<state>/admin.sock` (uid 0 only) | pipe `\\.\pipe\bothy-host-admin` (elevated only) |
 
 State directory (`internal/state`): `keys` (both private keys, mode `0600`, on Windows a DPAPI
-blob), `pairing.json`, `bindings.json`, `declaration.json`, `claude_api_key` (only at
+blob), `pairing.json`, `bindings.json`, `declaration.json`, `server_ca.pem` (the CA of
+`pair --ca-file`, which the control connection trusts besides the system roots, M2-43),
+`claude_api_key` (only at
 `organization`, read by the sessions of M2-45). Every file is written atomically.
 
 ## Configuration file
@@ -104,6 +133,7 @@ the server carries codes and, by the rule for names, the names of session users 
 | `internal/helper/` | the `pty-helper` process |
 | `internal/install/` | plans and executors, service definitions in `units/` |
 | `internal/startup/` | `run`, the `Control` port and `NoControl` |
+| `internal/control/` (+ `controltest`) | the control connection (M2-43) and its TLS fake server |
 | `internal/pairing/` | `pair` |
 | `testdata/fakeclaude/` | stand-in for `claude auth status` ([README](testdata/fakeclaude/README.md)) |
 | `test/platform/` | the platform suite (build tag `platform`) |
@@ -119,6 +149,7 @@ step or a failed decryption the object refuses every further call.
 cd services/host
 GOTOOLCHAIN=local go test -race ./...
 GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeMessage -fuzztime=60s ./internal/localchan
+GOTOOLCHAIN=local go test -run='^$' -fuzz=FuzzDecodeServerFrame -fuzztime=60s ./internal/control
 make release-build VERSION=$(cat VERSION) OUT=<dir>   # unsigned binaries for five platforms
 make platform-test                                   # only on a disposable machine, see below
 ```

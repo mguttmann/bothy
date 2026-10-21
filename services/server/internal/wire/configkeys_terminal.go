@@ -67,6 +67,27 @@ func terminalConfigKeys() []config.Key {
 			Doc:     "Reattaching from the same device needs no new step-up within this time after the detachment.",
 			Chapter: chapter24,
 		},
+		// The control connection of the host services (M2-43, 24 section 3.5).
+		{
+			Name: "terminal.host_heartbeat_interval", Kind: config.KindDuration, Default: twentySeconds, Min: minDeadline,
+			Doc:     "Interval of the heartbeats of the control connection of a host service, announced in hello.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.host_heartbeat_miss_limit", Kind: config.KindInt, Default: "3", Min: "1",
+			Doc:     "Missed heartbeats after which the server closes the control connection with 4009.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.host_auth_timeout", Kind: config.KindDuration, Default: defaultTenSeconds, Min: minDeadline,
+			Doc:     "Time between hello and identify on the control and data connections of a host service.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.host_duplicate_probe_timeout", Kind: config.KindDuration, Default: "5s", Min: minDeadline,
+			Doc:     "Time the server waits for the answer of the older control connection of a host (24 section 3.4).",
+			Chapter: chapter24,
+		},
 	}
 }
 
@@ -89,6 +110,9 @@ func fingerprintKeys(v *config.Values) error {
 	}
 	return errors.Join(problems...)
 }
+
+// twentySeconds is the default of terminal.host_heartbeat_interval (24 section 17).
+const twentySeconds = "20s"
 
 // sixtySeconds is the default of the step-up windows of the terminal (24 section 17).
 const sixtySeconds = "60s"

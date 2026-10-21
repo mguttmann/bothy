@@ -86,6 +86,10 @@ func TestEphemeralTypes(t *testing.T) {
 	if et, _ := domain.LookupEphemeral("typing.started"); !et.ExcludeActor {
 		t.Error("typing.started must not reach the typist's own connections (04 section 12 item 1)")
 	}
+	// host.presence_changed (M2-43): no focus, every live connection is a candidate.
+	if et, ok := domain.LookupEphemeral("host.presence_changed"); !ok || et.FocusBound || et.ReceiveAction != want["host.presence_changed"] {
+		t.Errorf("host.presence_changed: %+v %v, want an unbound type with receive action %q", et, ok, want["host.presence_changed"])
+	}
 	if _, ok := domain.LookupEphemeral("message.created"); ok {
 		t.Error("a durable type is no ephemeral type")
 	}

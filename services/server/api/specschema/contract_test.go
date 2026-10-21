@@ -179,3 +179,24 @@ func TestValidate_OversizedFrameFails(t *testing.T) {
 		t.Errorf("frame at the limit: %v", err)
 	}
 }
+
+// TestValidateChannelFrame (M2-43): the frames of hostControl in both directions against their
+// messages; a server op from the host, a host op from the server, an unknown member and an
+// unknown channel fail.
+func TestValidateChannelFrame(t *testing.T) {
+	t.Parallel()
+	c := contract(t)
+	hb := []byte(`{"op":"heartbeat","d":{"active_sessions":0}}`)
+	if err := c.ValidateChannelFrame("hostControl", false, hb); err != nil {
+		t.Fatalf("heartbeat: %v", err)
+	}
+	ack := []byte(`{"op":"heartbeat_ack","d":{"server_time":"2026-10-14T09:00:00.000Z"}}`)
+	if err := c.ValidateChannelFrame("hostControl", true, ack); err != nil {
+		t.Fatalf("heartbeat_ack: %v", err)
+	}
+	mustFail(t, c.ValidateChannelFrame("hostControl", true, hb), "no server-to-host message")
+	mustFail(t, c.ValidateChannelFrame("hostControl", false, ack), "no host-to-server message")
+	mustFail(t, c.ValidateChannelFrame("hostControl", false, []byte(`{"op":"heartbeat","d":{"active_sessions":0,"x":1}}`)), "schema")
+	mustFail(t, c.ValidateChannelFrame("hostControl", false, []byte(`{"op":"heartbeat","d":{"active_sessions":-1}}`)), "schema")
+	mustFail(t, c.ValidateChannelFrame("gateway", false, hb), "no terminal channel")
+}
