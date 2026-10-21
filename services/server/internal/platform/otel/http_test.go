@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/trace"
@@ -381,5 +382,38 @@ func TestHTTPMetric_RouteTemplateAndUnmatched(t *testing.T) {
 	}
 	if len(routes) != 2 || !routes[hookPattern] || !routes["unmatched"] {
 		t.Errorf("http.route values = %v, want exactly %q and unmatched", routes, hookPattern)
+	}
+}
+
+// TestAnnotatePrincipal (DP-T09, signals.md "Spans" row of the server span): the request span
+// carries bothy.principal.kind and, for a person, bothy.principal.pseudo_id; never the clear ID,
+// and an agent gets no pseudonym.
+func TestAnnotatePrincipal(t *testing.T) {
+	tt := setupTest(t, testConfig(), nil, nil, nil)
+	for _, c := range []struct {
+		kind       string
+		wantPseudo bool
+	}{{"user", true}, {"agent", false}, {"anonymous", false}} {
+		ctx, span := otelapi.Tracer("probe").Start(context.Background(), "probe "+c.kind)
+		AnnotatePrincipal(ctx, c.kind, principal)
+		span.End()
+		tt.flush(t)
+		spans := tt.spans.GetSpans()
+		got := map[string]string{}
+		for _, kv := range spans[len(spans)-1].Attributes {
+			got[string(kv.Key)] = kv.Value.String()
+		}
+		if got[attr.PrincipalKind] != c.kind {
+			t.Errorf("%s: kind %q", c.kind, got[attr.PrincipalKind])
+		}
+		pseudo, has := got[attr.PrincipalPseudoID]
+		if has != c.wantPseudo || has && (len(pseudo) != 32 || strings.Contains(pseudo, principal)) {
+			t.Errorf("%s: pseudo_id %q present=%v", c.kind, pseudo, has)
+		}
+		for k, v := range got {
+			if strings.Contains(v, principal) {
+				t.Errorf("%s: clear principal ID in %s", c.kind, k)
+			}
+		}
 	}
 }

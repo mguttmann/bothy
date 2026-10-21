@@ -124,6 +124,8 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 			WriteProblem(w, r, err)
 			return
 		}
+		// The request span names the principal kind and, for a person, its pseudonym (DP-T09).
+		otel.AnnotatePrincipal(r.Context(), string(a.Kind), a.ID.String())
 		next.ServeHTTP(w, r.WithContext(actor.WithActor(r.Context(), a)))
 	})
 }

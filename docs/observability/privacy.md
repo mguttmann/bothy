@@ -92,6 +92,8 @@ and the periods are short.
 4. The secret word must not appear in any output. A match breaks the gate and names the location.
 5. In addition: no principal ID of the test data may appear in plain text.
 
+The in-process part of this gate is `services/server/test/canary` (M1-69); the collector part with the `file` exporter and container stdout is M1-73.
+
 ## 7. Apps
 
 Apps send no telemetry to the collector. Crash reports go only to a target that the

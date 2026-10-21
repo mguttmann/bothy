@@ -1,7 +1,7 @@
 # Package `test/harness`
 
-Status: built (M1-71, M1-72 added `StartProcess`, `DurableDB` and the gateway client); M1-69 and
-M1-70 extend it additively. Component `testsupport`
+Status: built (M1-71, M1-72 added `StartProcess`, `DurableDB` and the gateway client, M1-69 the
+telemetry sinks and the login helpers); M1-70 extends it additively. Component `testsupport`
 (M1-05), never imported by production code.
 
 The shared full-server test harness: the real `internal/wire` graph with role `all` in the test
@@ -21,9 +21,19 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   `docs/operations/configuration.md` with the precedence of an environment variable, so an unknown
   key fails the start; `EgressDenyAll` makes every outgoing client refuse every target before name
   resolution; `RaisedRateLimits()` gives the entries that lift every rate-limit class
-  (23 R-QA-11). `Telemetry` is refused until M1-69 adds the sinks.
-- `Server{PublicURL, APIBase, GatewayURL, InternalURL, SecretsDir, Owner}`, `AdminDB()`
-  (superuser pool, assertions only), `ConfigValue(key)`, `Clock()`.
+  (23 R-QA-11). `Telemetry` (`NewTelemetrySinks`, M1-69) replaces the OTLP exporters with an
+  in-memory span exporter, a `MemoryLogExporter` and a manual metric reader and turns
+  `telemetry.enabled` on unless `Config` sets it; `otel.Setup` installs global providers, so a test
+  that sets it never runs in parallel with another harness start. `SecretFiles` writes extra files
+  into the secrets directory (mode 0400; the client secret of a fake OIDC provider), `OIDCRootCAs`
+  is the TLS root of the OIDC provider requests, `PublicHost` (`localhost`) gives the server a
+  domain name as WebAuthn relying party, `ProofObserver` sees every DPoP proof a client sends and `TokenObserver` every token pair a client
+  takes over and the API token of `NewAgent`.
+- `Server{PublicURL, APIBase, GatewayURL, InternalURL, SecretsDir, SigningKeyDir, Owner}`,
+  `AdminDB()` (superuser pool, assertions only), `ConfigValue(key)`, `Clock()`,
+  `FlushTelemetry(ctx)` (flushes the global tracer and logger providers into the sinks),
+  `NewDevice()` (a client with fresh device keys and no tokens, for login, pairing and enrollment
+  flows the test drives itself).
 - `NewUser(tb, UserSpec)`, `NewAgent(tb, AgentSpec)` (public API only: `createUser` with
   `local_account`, `redeemEnrollmentCode`; `createAgent`, `setAgentBillingMode`, `createToken` with
   `dpop_jkt`), `OwnerSession(ctx)` (recovery code of the setup service), `UserSession(ctx, id)`
@@ -31,7 +41,10 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
 - `Client.Do(ctx, Request) Response`: DPoP proof per RFC 9449 with the newest `DPoP-Nonce`, one
   retry on `use_dpop_nonce`, refresh on `token_expired`, a UUIDv7 `Idempotency-Key` on POST and
   PATCH except the operations with `x-idempotency-exempt`, optional `Observer`; `StepUp(ctx)`
-  (`createStepUpChallenge`, `completeStepUpWithDeviceKey`); `MustDo` and `DoWithStepUp`.
+  (`createStepUpChallenge`, `completeStepUpWithDeviceKey`); `MustDo` and `DoWithStepUp`;
+  `DoAnonymous` (the DPoP proof of the client's key without the access token: refresh, logins),
+  `Adopt(body)` (the token pair of a login answer) and `Registration(name)` (the
+  `DeviceRegistration` of the client's keys).
 - `StartProcess(tb, ProcessOptions{Config, Env, GOMAXPROCS, DBCPUs, DBMemoryBytes}) *Process`:
   builds `./cmd/bothy` once per test binary into a temp directory (removed by `Main`), runs
   `bothy secrets init`, `bothy migrate up --bootstrap` and `bothy setup bootstrap-owner` against a
@@ -49,6 +62,8 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   sends heartbeats every `heartbeat_interval_ms` of `hello` (first after a random share), answers
   `reauth_required` of a person with a refreshed token and `reauth`, counts the acknowledgements
   (`Heartbeats()`), and hands every other frame with its receive time to `Next`.
+  `Client.GatewayResume(ctx, session, cursor)` resumes a gateway session (op `resume`) and
+  `GatewayConn.Reauth()` sends `reauth` without waiting for `reauth_required` (M1-69).
   `Client.ClientIP` sends `X-Forwarded-For` through the trusted loopback proxy path, so load tests
   can give each simulated client its own address.
 - `Server.CreateUser(ctx, UserSpec)`: `NewUser` without a `testing.TB`, for seeding from several

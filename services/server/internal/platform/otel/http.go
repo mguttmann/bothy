@@ -45,12 +45,39 @@ var standardMethods = map[string]bool{
 type httpState struct {
 	trustRemoteParent bool
 	logger            *slog.Logger
+	// pseudo derives bothy.principal.pseudo_id in AnnotatePrincipal; nil before Setup.
+	pseudo *Pseudonymizer
 }
 
 var currentHTTP atomic.Pointer[httpState]
 
-func setHTTPState(trust bool, logger *slog.Logger) {
-	currentHTTP.Store(&httpState{trustRemoteParent: trust, logger: logger})
+func setHTTPState(trust bool, logger *slog.Logger, pseudo *Pseudonymizer) {
+	currentHTTP.Store(&httpState{trustRemoteParent: trust, logger: logger, pseudo: pseudo})
+}
+
+// kindUser is the principal kind of a person; only people get a pseudonym (privacy.md
+// "Pseudonyms" items 1 and 4).
+const kindUser = "user"
+
+// AnnotatePrincipal sets the principal of the request on the span of ctx (signals.md, the server
+// span row): bothy.principal.kind always, and for a person (kind "user") its pseudonym
+// bothy.principal.pseudo_id from the Pseudonymizer of Setup. The clear ID never goes onto the
+// span (SEC-LOG-4, DP-T09); agents and apps appear by handle elsewhere, never by ID. A span that
+// does not record, a missing Setup or a failing pseudonym key leave the span without the
+// pseudonym. The HTTP chain calls it after the authentication.
+func AnnotatePrincipal(ctx context.Context, kind, principalID string) {
+	span := trace.SpanFromContext(ctx)
+	if !span.IsRecording() {
+		return
+	}
+	span.SetAttributes(attribute.String(attr.PrincipalKind, kind))
+	st := currentHTTP.Load()
+	if kind != kindUser || principalID == "" || st == nil || st.pseudo == nil {
+		return
+	}
+	if kv, err := st.pseudo.Attr(ctx, principalID); err == nil {
+		span.SetAttributes(kv)
+	}
 }
 
 // loadHTTPState returns the state of the last Setup. Before any Setup a remote parent is not
