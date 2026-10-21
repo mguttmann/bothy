@@ -326,7 +326,7 @@ or acknowledges a `seq` that process cannot yet deliver.
 
 | Ereignis | Wann | Nutzlast (Schema `<typ>.v1`, Auszug) | Marke |
 |---|---|---|---|
-| `agent.invocation` | neuer Lauf | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, Auslöser), `session` (4.9; fehlt beim Gast-Lauf), `capabilities_effective` | ja |
+| `agent.invocation` | neuer Lauf | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, Auslöser), `session` (9.1; in openapi the members `session_mode` for `session.mode` and `agent_session` for the session row; `agent_session` is missing for `new` without a row; both are missing for a guest run), `capabilities_effective` | ja |
 | `agent.followup` | Nachtrag (Abschnitt 7) | `run_id`, `message_id`, Auslöser | ja |
 | `interaction.created` | Komponente bedient | `interaction_id`, `component` (`custom_id`, Typ), `values`, `run_id`, Bediener | ja |
 | `command.invoked` | Steuerbefehl ausgeführt (10.4) | `command_id`, `name`, `options`, Ort, Auslöser | ja |
@@ -536,7 +536,7 @@ Rate-Limit-Klasse aus 05.
 | Interaktion beantworten | `interaction.respond` | Zustand nur vorwärts | Abschnitt 11.4 |
 | Titel vorschlagen | `thread.title.update` | `If-Match` | nur bei `title_source = auto`; Quelle bleibt `auto` (Abschnitt 12) |
 | Thread schließen | `thread.close` | idempotent | nur auf ausdrücklichen Wunsch eines Menschen |
-| Sitzung melden | `agent_session.report` | `If-Match` (CAS über `agent_sessions.version`) | Abschnitt 9 |
+| Sitzung melden | `agent_session.report` | `If-Match` (CAS über `agent_sessions.version`) | Abschnitt 9. Only for the session of the agent's own active run in the thread. `If-Match` absent means "this run has no session row yet": the report creates it; where a row exists, an absent or different `If-Match` gives `412 version_conflict` with `current`. `started` only moves forward; a different reference replaces the stored one (9.5 point 3). Reasons of `409 conflict`: `session_bound_elsewhere`, `session_changed`, `session_not_bound` (9.5). |
 | Befehle pflegen | `command.register`, `command.remove` | Sammelabgleich | Abschnitt 10 |
 | Heartbeat | `agent.heartbeat` | letzter gewinnt | Abschnitt 4.8 |
 | Transkript liefern | `file.transcript.submit` | `If-Match` | Abschnitt 13 |
@@ -974,11 +974,38 @@ existiert; der Server legt die Zeile bei dieser Meldung an (04 Abschnitt 15.3, 0
 Turn vorher, bleibt `started = false`; der nächste Lauf bekommt wieder `new` mit derselben
 Referenz (Runner: wieder `--session-id` mit derselben UUID).
 
+In the payload of `agent.invocation` (4.4) `session.mode` is the member `session_mode` and the
+session row is `agent_session`; `new` without a row has no `agent_session`. The mode follows from
+the row: no row gives `new`; a row with `started = false` gives `new` with the row; a started row
+that a run already used gives `resume`; a started row that no run used gives `bind`.
+
+Attach at `run.start` (`queued -> running`; `waiting_input -> running` keeps the run's row):
+
+1. A guest run attaches nothing; a reference in `run.start` is ignored.
+2. The thread has a current row of this agent: the run attaches it unchanged, even if the
+   reference or model in `run.start` differ. A change of an existing row comes only through
+   `agent_session.report`, so the `version` the adapter got with the payload stays valid for its
+   first `If-Match`.
+3. No current row of this agent and a reference given: the most recent row of this thread and
+   agent with that reference (a reset or rebind ended it after the run was queued) is attached
+   unchanged; otherwise the server creates a current row with the reference, `model` and
+   `started = false`. A new row starts at version 1 (03).
+4. No reference: nothing is attached; the first `agent_session.report` creates the row.
+
+`runs.agent_session_id` is written in the same transaction. The reference is checked as in 9.4 point 1; an invalid one gives `400 validation_failed` with
+pointer `/external_session_ref`.
+
 ### 9.2 Neue Sitzung (`/new`)
 
 `agent_session.reset` beendet die aktuelle Sitzung (`ended_at`, `end_reason = 'reset'`) und
 schreibt `agent_session.changed`. Der nächste Lauf bekommt `session.mode = new`. Läuft gerade ein
 Lauf, wartet der Reset bis zu dessen Ende (der Befehl antwortet "nach dem Lauf").
+
+Without a current session the answer is `409 conflict` with `reason` `no_current_session`:
+there is nothing to end. A reset during an active run ends the current row at once and leaves
+the run alone: the run keeps `runs.agent_session_id`, its reports still reach that row, and the
+next run gets `new`. This is how "waits until it ends" is built (03 has no column for a pending
+reset); the visible effect is the same.
 
 ### 9.3 Frühere Sitzungen
 
@@ -992,12 +1019,27 @@ Sitzungsspalte ([01-produkt.md](01-produkt.md)).
 `external_session_ref`, `expected_current_session_id` (fehlt, wenn der Thread noch keine Sitzung hat), `take_over` (bool).
 
 1. Prüfung: `trigger` und `agent.invoke` auf diesem Thread; ist die Referenz in einem anderen
-   Thread aktuell, zusätzlich dort, und `take_over` muss gesetzt sein, sonst `409
-   session_bound_elsewhere`.
+   Thread aktuell, zusätzlich dort, und `take_over` muss gesetzt sein, sonst `409 conflict` with
+   `reason` `session_bound_elsewhere`. The other thread is the second target of the action
+   (07 4.2): `authz` checks visibility and the same requirement there; an invisible other thread
+   gives `404 not_found` with exactly the body and headers of an unknown thread ID. Order: load
+   the thread and its operator, find the thread in which the operator's reference is current,
+   authorize on both, check the body, then the `take_over` rule, then the transaction.
+   `external_session_ref` (also in `agent_session.report` and `run.start`) is not empty or only
+   white space (`required`), is display text (`invalid_utf8`, `control_character`,
+   `bidi_control`) and has at most `agent.session_ref_max_bytes` bytes (`too_long`); it is
+   stored exactly as sent. `model` follows the pattern of `default_model` (2.2).
 2. Eine Transaktion, Compare-and-swap über `agent_sessions.version`: alte aktuelle Zeile dieses
    Threads endet (`rebind`); bei Übernahme endet die Zeile im anderen Thread ebenfalls (`rebind`);
    neue Zeile mit `started = true`.
-3. Passt `expected_current_session_id` nicht, `409 version_conflict`; nichts ändert sich.
+3. Passt `expected_current_session_id` nicht, `409 conflict` with `reason` `session_changed`;
+   nichts ändert sich. (`412 version_conflict` belongs to `If-Match`, 06 section 5.) Race: the
+   transaction locks the current rows of both threads in ascending `id`; if the other thread's row
+   is no longer current, the bind continues without a take-over. If the new row cannot be
+   inserted because the thread got another current row or the reference became current in a third
+   thread meanwhile, the answer is `409 conflict` with `session_changed` or
+   `session_bound_elsewhere` and nothing changes. Of two concurrent binds with the same
+   `expected_current_session_id` exactly one succeeds.
 4. Audit-Eintrag (05: `agent_session.bind` mit Audit).
 
 Der nächste Lauf bekommt `session.mode = bind`.
@@ -1021,7 +1063,12 @@ Der Import legt für einen importierten Thread mit früherer Sitzung eine frühe
 4. Fail open: Existiert die alte Sitzung in der Laufzeit nicht, startet der Adapter eine neue und
    meldet sie mit `bind_failed: session_missing`. Der Server beendet die gebundene Zeile
    (`end_reason = 'rebind'`), legt die neue an und schreibt genau einmal eine Systemnachricht in
-   den Thread. Der Lauf geht weiter; die Box zeigt einmal "Frühere Sitzung nicht gefunden, neue
+   den Thread. The system message has `system_code` `agent_session.resume_failed` and the run's
+   agent as author, and it does not reopen a closed thread (03 `messages`, R-DM-42). If a reset or
+   rebind ended the bound row during the run, the new row is created already ended, with the same
+   `end_reason` and `ended_at` now, so that decision stays in force (03 `ended_at`: "or was never
+   current"). `bind_failed` without a started session row of the run gives `409 conflict` with
+   `reason` `session_not_bound`. Der Lauf geht weiter; die Box zeigt einmal "Frühere Sitzung nicht gefunden, neue
    Sitzung begonnen". Grund: Ein fehlender Verlauf darf das Weiterarbeiten nicht blockieren.
 5. Eine Import-Zeile wird nur gebunden, solange der Thread seit dem Import keine aktuelle Sitzung
    hatte; ein späteres `agent_session.reset` bindet nie erneut.
@@ -1817,6 +1864,7 @@ Konfiguration des jeweiligen Programms außerhalb des Servers.
 | `component.custom_id_max_chars` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | Server | `10` | Felder je Formular |
 | `project.binding_text_max_chars` | Server | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) |
+| `agent.session_ref_max_bytes` | Server | `1024` | longest `external_session_ref` in bytes (bind, report, `run.start`; over it `too_long`); the maximum `2048` keeps an entry of the unique index on `(agent_id, external_session_ref)` within the PostgreSQL B-tree entry limit of 8 kB pages, so an over-long reference is a field error, never an internal error |
 | `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | höchstens so oft JWKS neu laden |

@@ -7,7 +7,7 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // agentsConfigKeys returns the keys of the agent consumers from docs/spec/04-sync-protokoll.md
 // "Konfigurationswerte dieses Kapitels" (M2-07): the ack timeout, the save interval of acked_seq
 // and the inflight bound per consumer; the keys of the presence of agents (M2-20); and the grace of
-// a cancel request (M2-09).
+// a cancel request (M2-09); and the longest external session reference (M2-12).
 func agentsConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: "agent.ack_timeout", Kind: config.KindDuration, Default: thirtySeconds, Min: minDeadline, Chapter: chapter04,
@@ -26,6 +26,12 @@ func agentsConfigKeys() []config.Key {
 		// M2-09: a cancel request the adapter does not confirm in time ends the run (09 8).
 		{Name: "agent.cancel_grace", Kind: config.KindDuration, Default: thirtySeconds, Min: minDeadline, Chapter: chapter04,
 			Doc: "Time for the adapter to report a cancellation; then the server cancels the run with cancel_timeout."},
+		// M2-12: external_session_ref of bind, report and run.start (09 9.4, 9.5, 21). The maximum keeps
+		// an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL
+		// B-tree entry limit of 8 kB pages for every configured value, so an over-long reference is
+		// a field error (too_long), never a database error and a 500 (docs/DECISIONS.md D-M2-12-9).
+		{Name: "agent.session_ref_max_bytes", Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: chapter09,
+			Doc: "Longest external_session_ref in bytes; the maximum keeps an entry of the unique index on (agent_id, external_session_ref) within the PostgreSQL B-tree entry limit."},
 	}
 }
 

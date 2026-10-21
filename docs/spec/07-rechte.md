@@ -433,7 +433,9 @@ Passkey der Person mit `revoked_at IS NULL`, bei `local_credential.set` eine Zei
 `local_credentials` mit `totp_enabled_at IS NOT NULL` (ein eingerichteter Passwortweg). Die Regel
 selbst bleibt in `authz` (B7).
 
-Aktionen mit zwei Zielen (`thread.move`: Thread und Zielkanal, Recht "manage auf Quelle und Ziel")
+Aktionen mit zwei Zielen (`thread.move`: Thread und Zielkanal, Recht "manage auf Quelle und Ziel";
+`agent_session.bind`: thread and the thread in which the reference is current, permission "trigger
+and `agent.invoke` here and, when the reference is current in another thread, also there", 09 section 9.4)
 tragen das zweite Ziel im Ressourcen-Verweis (`ref.target`). `resolve` löst beide Pfade auf;
 Sichtbarkeit und Anforderung gelten auf beiden. Ohne Leserecht auf das Ziel ist die Antwort `404`,
 gleich wie bei einer unbekannten ID. Grund: Eine zweite Prüfung im Anwendungsfall wäre Rechte-Logik
