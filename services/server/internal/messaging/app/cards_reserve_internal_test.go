@@ -135,7 +135,7 @@ func TestCardReserveCoversEveryLaterState(t *testing.T) {
 				}
 			}
 			comps := reserveCard(lo)
-			r := rand.New(rand.NewPCG(1, uint64(lo)))
+			r := rand.New(rand.NewPCG(1, uint64(lo))) //nolint:gosec // G404: reproducible states from a fixed seed, not security
 			for i := range 400 {
 				m := laterState(r, cfg, comps, runID, now, i == 0)
 				if _, _, err := s.eventPayload(m); err != nil {
