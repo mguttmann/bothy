@@ -343,9 +343,19 @@ connections carry no binding (D-M2-14). Tests: `app/actingfor_test.go`,
 `app/reference_sr9_test.go` (AZ-P8 dimension, `TestAZP11_ActingForProperty`),
 `domain/actingfor_test.go`, `BenchmarkAuthorizeCachedActingFor`.
 
+### Follow-up `run.followup.create` (M2-11)
+
+No longer deferred (removed from `domain/testdata/deferred_actions.golden`). The requirement is
+`All(AtLeast(write), AtLeast(trigger))` ("write und `agent.invoke`", D-M2-11-9), and the guard of
+`agent.invoke` applies to the descriptor's `Invoke` (a missing `Invoke` is an internal error), so
+SR4, the reachability of the agent, I2, SR2, the project checks, the read-only channel and the
+active run of another agent (`run_active_other_agent`) refuse a follow-up exactly as they refuse a
+trigger. The action has no route; `runs` decides it inside `createMessage`. Denials are audited
+(`denials`). Test: `app/followup_test.go` (`TestRunFollowupCreateRequirement`).
+
 ### How a module builds a `Resource`
 
-Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke` and `run.followup.create`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
 
 ### Slash commands (M2-16)
 
