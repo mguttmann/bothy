@@ -1380,14 +1380,18 @@ arrives first counts; the card then becomes `disabled`.
 
 Rules:
 
-1. A thread has `title_source = 'auto'` as long as no person has set a title. If a
-   person sets a title, the source becomes `manual` and stays so (03).
-2. Placeholder detection at creation: if a person, when creating a forum post, gives a
-   title that is empty or matches a placeholder, the source stays `auto`. Placeholders
+1. A thread has `title_source = 'auto'` until a principal other than its operator agent sets a
+   title (a person, or an app or an agent as creator, 05 `thread.title.update`). Then the source
+   becomes `manual` and stays so (03). Agents and apps always create threads with `auto`.
+2. Placeholder detection at creation: if a person, when creating a forum post or a thread from
+   a message, gives a title that is empty or matches a placeholder, the source stays `auto`. Placeholders
    are the entries of `thread.placeholder_titles` (case-insensitive, whitespace
    normalized) and the same entries with an appended number ("New chat 3"). Otherwise the
    source becomes `manual`. Reason: "New chat" is not a title anyone wants to keep; a real
-   title is never overwritten.
+   title is never overwritten. An appended number is a space and one or more digits 0 to 9; the
+   empty entry has no form with a number. The default of `thread.placeholder_titles` is the union
+   of the word lists per language (German and English) that the module `chat` carries as data
+   files; a test keeps the table and the files equal.
 3. The operator agent may set the title only with source `auto` (`thread.title.update`); the
    source stays `auto`. With `manual` the server answers `409 title_manual`.
 4. Guest agents do not set titles.
@@ -2030,7 +2034,7 @@ configuration of the respective program outside the server.
 | `component.custom_id_max_chars` | Server | `100` | length of `custom_id` |
 | `component.form_max_fields` | Server | `10` | fields per form |
 | `project.binding_text_max_chars` | Server | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) |
-| `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty |
+| `thread.placeholder_titles` | Server | `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | reload JWKS at most this often |
 | `hermes_adapter.platform_key` | Hermes adapter | `bothy` | platform name in Hermes; never change after commissioning |

@@ -8078,7 +8078,7 @@ paths:
       operationId: setThreadTitle
       summary: Set the title
       tags: [Threads]
-      description: People set `title_source = manual`. The operator agent may only replace an `auto` title.
+      description: Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
       x-authz-action: thread.title.update
       x-rate-limit-class: rl.write
       parameters:
