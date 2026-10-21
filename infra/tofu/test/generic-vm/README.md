@@ -41,6 +41,9 @@
    `install.sh` cannot print the enrollment code past the filter of its output.
 8. The setup with `bad-sum` and `bad-sig` in another stack directory: both stop in the step
    `verify` with exit code 1, the directory is never created, and the snapshot stays equal.
+9. A reboot: the unit `bothy-firewall.service` loads the table before the network without an
+   ordering cycle in the journal, and `bothy.service` brings the stack back (discovery answers
+   `200` through the published port).
 
 Everything runs in a `mktemp -d` directory, which is removed at the end with the VM disk; QEMU,
 the SSH forward and the agent are stopped by PID; the trial removes its registry and builder.

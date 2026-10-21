@@ -12,10 +12,10 @@
 #   <dir>/tailscale-auth-key  edge tailscale only: the one-time key, placed by the operator
 #
 # <dir> is BOTHY_SETUP_DIR, default /etc/bothy. Steps: packages and Docker Engine with the
-# Compose plugin from the Docker package repository, the user bothy, the pinned cosign, the
+# Compose plugin from the Docker package repository, the service user, the pinned cosign, the
 # release files (SHA256SUMS, bundle, install.sh, each with its .sigstore.json), their
 # verification before anything is unpacked, the firewall, the setup wizard
-# `install.sh --bundle` as the user bothy, and the system service bothy.service. A second run
+# `install.sh --bundle` as the service user, and the system service bothy.service. A second run
 # changes nothing (16 3.1 rule 1 and every step compares before it writes).
 #
 # Usage: bothy-setup (as root, no arguments). Exit codes: 0 done, 1 a step failed; every
@@ -28,6 +28,8 @@ export LC_ALL
 
 conf_dir=${BOTHY_SETUP_DIR:-/etc/bothy}
 lib_dir=/usr/local/lib/bothy
+# The service user that owns the stack and runs docker compose (group docker).
+svc_user=bothy
 min_engine=26.0.0
 min_compose=2.26.0
 # Signing key of the Docker package repository, from https://docs.docker.com/engine/install/ubuntu/
@@ -89,6 +91,15 @@ put_file() {
 	chmod "$2" "$pf_tmp"
 	mv -f -- "$pf_tmp" "$1"
 	return 0
+}
+
+# api_service prints the Compose service of the API for the edge, as install.sh names it
+# (infra/compose/compose.yaml: api in the profile direct, api-tailscale in the profile tailscale).
+api_service() {
+	case $(cfg SETUP_EDGE) in
+	tailscale) printf 'api-tailscale' ;;
+	*) printf 'api' ;;
+	esac
 }
 
 # detached runs a command in a new session without a controlling terminal and with standard
@@ -192,13 +203,13 @@ step_docker() {
 }
 
 step_user() {
-	if ! id bothy >/dev/null 2>&1; then
-		useradd --system --user-group --create-home --home-dir /var/lib/bothy --shell /usr/sbin/nologin bothy ||
-			die user "cannot create the user bothy"
+	if ! id "$svc_user" >/dev/null 2>&1; then
+		useradd --system --user-group --create-home --home-dir "/var/lib/$svc_user" --shell /usr/sbin/nologin "$svc_user" ||
+			die user "cannot create the user $svc_user"
 	fi
-	case " $(id -nG bothy) " in
+	case " $(id -nG "$svc_user") " in
 	*" docker "*) ;;
-	*) usermod -aG docker bothy || die user "cannot add bothy to the group docker" ;;
+	*) usermod -aG docker "$svc_user" || die user "cannot add $svc_user to the group docker" ;;
 	esac
 }
 
@@ -277,9 +288,11 @@ step_firewall() {
 	sw_changed=0
 	put_file /etc/systemd/system/bothy-firewall.service 0644 <<-'EOF' && sw_changed=1
 		[Unit]
-		Description=Firewall of the Bothy host (only the edge port public)
-		Before=network-pre.target docker.service
+		Description=Firewall of the chat server host (only the edge port public)
+		DefaultDependencies=no
 		Wants=network-pre.target
+		Before=network-pre.target shutdown.target
+		Conflicts=shutdown.target
 
 		[Service]
 		Type=oneshot
@@ -297,7 +310,7 @@ step_firewall() {
 }
 
 step_install() {
-	install -d -o bothy -g bothy -m 0750 "$stack_dir"
+	install -d -o "$svc_user" -g "$svc_user" -m 0750 "$stack_dir"
 	si_ts=
 	if [ "$(cfg SETUP_EDGE)" = tailscale ] && [ ! -f "$stack_dir/.bothy-install" ]; then
 		si_key_file=$conf_dir/tailscale-auth-key
@@ -305,7 +318,7 @@ step_install() {
 			die install "edge tailscale: place the one-time auth key in $si_key_file (mode 0600, root) and run $lib_dir/bothy-setup again"
 		si_ts=$(cat "$si_key_file")
 	fi
-	# install.sh runs as bothy and reads the verified files; nobody but root can change them.
+	# install.sh runs as the service user and reads the verified files; only root can change them.
 	chmod 0711 "$work"
 	chmod 0644 "$work/$bundle" "$work/install.sh"
 	set --
@@ -322,9 +335,9 @@ step_install() {
 			TS_AUTHKEY=$si_ts
 			export TS_AUTHKEY
 		fi
-		detached runuser -u bothy -- /bin/sh "$work/install.sh" --bundle "$work/$bundle" --dir "$stack_dir" "$@"
+		detached runuser -u "$svc_user" -- /bin/sh "$work/install.sh" --bundle "$work/$bundle" --dir "$stack_dir" "$@"
 		echo "$?" >"$work/install.rc"
-	) | sed "s|^Enrollment code (shown once): .*|Enrollment code: withheld from this log; issue one with: cd $stack_dir/infra/compose \\&\\& sudo -u bothy docker compose exec api bothy setup issue-enrollment-code --user $(cfg SETUP_OWNER_HANDLE)|"
+	) | sed "s|^Enrollment code (shown once): .*|Enrollment code: withheld from this log; issue one with: cd $stack_dir/infra/compose \\&\\& sudo -u $svc_user docker compose exec $(api_service) bothy setup issue-enrollment-code --user $(cfg SETUP_OWNER_HANDLE)|"
 	si_ts=
 	si_rc=$(cat "$work/install.rc" 2>/dev/null || echo 1)
 	[ "$si_rc" = 0 ] || die install "install.sh failed with exit code $si_rc"
@@ -337,7 +350,7 @@ step_service() {
 	ss_changed=0
 	put_file /etc/systemd/system/bothy.service 0644 <<-EOF && ss_changed=1
 		[Unit]
-		Description=Bothy chat server (Docker Compose stack in $stack_dir)
+		Description=Chat server (Docker Compose stack in $stack_dir)
 		Requires=docker.service
 		After=docker.service network-online.target bothy-firewall.service
 		Wants=network-online.target
@@ -345,8 +358,8 @@ step_service() {
 		[Service]
 		Type=oneshot
 		RemainAfterExit=yes
-		User=bothy
-		Group=bothy
+		User=$svc_user
+		Group=$svc_user
 		WorkingDirectory=$stack_dir/infra/compose
 		ExecStart=/usr/bin/docker compose up -d
 		ExecStop=/usr/bin/docker compose stop
@@ -378,4 +391,7 @@ main() {
 	step_service
 }
 
-main "$@"
+# BOTHY_SETUP_LIB=1 loads the functions without running the setup (the tests source it).
+if [ "${BOTHY_SETUP_LIB:-0}" != 1 ]; then
+	main "$@"
+fi

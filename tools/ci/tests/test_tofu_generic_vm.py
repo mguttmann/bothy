@@ -24,6 +24,8 @@ ROOT = REPO / "infra" / "tofu" / "test" / "generic-vm"
 CATALOG = REPO / "services/server/internal/platform/secrets/stack/catalog.go"
 LOCK = REPO / "tools" / "bin" / "tools.lock.json"
 SETUP = "/usr/local/lib/bothy/bothy-setup"
+# The default of ssh_user (variables.tf).
+DEFAULT_SSH_USER = "bothy"
 CONFIG = "/etc/bothy/setup.env"
 OPTIONS = "/etc/bothy/install-options"
 FIREWALL = "/etc/bothy/firewall.nft"
@@ -198,7 +200,7 @@ def test_user_data_per_edge_mode(
         for pattern in KEY_MATERIAL:
             assert not pattern.search(text), pattern.pattern
     assert outputs["public_url"] == "https://chat.example.com"
-    assert outputs["ssh_endpoint"] == "bothy@192.0.2.10"
+    assert outputs["ssh_endpoint"] == DEFAULT_SSH_USER + "@192.0.2.10"
     assert outputs["database_endpoint"] == ""
     assert outputs["object_storage_bucket"] == ""
     assert outputs["backup_offsite_location"] == ""
@@ -267,7 +269,7 @@ def test_options_follow_the_inputs(tofu: str, data_dir: Path, tmp_path: Path) ->
     assert cfg["SETUP_SIGNING"] == "key"
     assert cfg["SETUP_BASE_URL"] == "http://127.0.0.1:8000/"
     users = yaml.safe_load(outputs["user_data"])["users"]
-    assert users[0]["name"] == "bothy"
+    assert users[0]["name"] == DEFAULT_SSH_USER
     assert users[0]["ssh_authorized_keys"] == [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample alex@example.com"
     ]
@@ -320,4 +322,48 @@ def test_install_sh_runs_without_a_controlling_terminal(
     outputs, _ = plan(tofu, data_dir, tmp_path)
     script = files(outputs["user_data"])[SETUP]
     assert re.search(r"^detached\(\) \{\n\tsetsid -w \"\$@\" </dev/null\n\}$", script, re.M)
-    assert 'detached runuser -u bothy -- /bin/sh "$work/install.sh"' in script
+    assert 'detached runuser -u "$svc_user" -- /bin/sh "$work/install.sh"' in script
+
+
+def _setup_function(tmp_path: Path, script: str, edge: str, call: str) -> str:
+    """Source the setup script as a library (BOTHY_SETUP_LIB=1) with a setup.env of the edge and
+    print the output of one of its functions."""
+    lib = tmp_path / "bothy-setup"
+    lib.write_text(script, encoding="utf-8")
+    (tmp_path / "setup.env").write_text(f"SETUP_EDGE='{edge}'\n", encoding="utf-8")
+    env = {"PATH": os.environ["PATH"], "BOTHY_SETUP_LIB": "1", "BOTHY_SETUP_DIR": str(tmp_path)}
+    proc = subprocess.run(
+        ["/bin/sh", "-c", f'. "{lib}" && {call}'],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    return proc.stdout
+
+
+@pytest.mark.parametrize(("edge", "service"), [("direct", "api"), ("tailscale", "api-tailscale")])
+def test_enrollment_hint_names_the_api_service_of_the_edge(
+    tofu: str, data_dir: Path, tmp_path: Path, edge: str, service: str
+) -> None:
+    # compose.yaml: the API is the service api in the profile direct and api-tailscale in the
+    # profile tailscale; the hint that replaces the withheld code must name the right one.
+    outputs, _ = plan(tofu, data_dir, tmp_path)
+    script = files(outputs["user_data"])[SETUP]
+    assert _setup_function(tmp_path, script, edge, "api_service") == service
+    assert "docker compose exec $(api_service) " in script
+
+
+def test_firewall_unit_runs_before_the_network_without_a_cycle(
+    tofu: str, data_dir: Path, tmp_path: Path
+) -> None:
+    # Without DefaultDependencies=no the unit is ordered after sysinit.target and before
+    # network-pre.target, a cycle through cloud-init.service on Ubuntu (red team M7-15).
+    outputs, _ = plan(tofu, data_dir, tmp_path)
+    script = files(outputs["user_data"])[SETUP]
+    unit = script[script.index("Description=Firewall") : script.index("WantedBy=multi-user.target")]
+    assert "DefaultDependencies=no" in unit
+    assert "Before=network-pre.target shutdown.target" in unit
+    assert "Conflicts=shutdown.target" in unit
+    assert "docker.service" not in unit
