@@ -347,7 +347,7 @@ func (c *conn) register(ctx context.Context, l app.Login, in app.Identify) bool 
 		return false
 	}
 	unlock()
-	ready, code, err := h.d.UseCases.Ready(ctx, l)
+	code, err := k.sendReady(func() (app.Ready, domain.CloseCode, error) { return h.d.UseCases.Ready(ctx, l) })
 	switch {
 	case err != nil:
 		c.fail(ctx)
@@ -357,7 +357,6 @@ func (c *conn) register(ctx context.Context, l app.Login, in app.Identify) bool 
 		k.close(code)
 		return false
 	}
-	k.send(readyFrame(ready))
 	for _, sc := range closes {
 		k.send(sessionCloseFrame(sc))
 	}
