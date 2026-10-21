@@ -38,7 +38,6 @@ import pytest
         # Shared G5 fixtures of both SDKs (docs/DECISIONS.md M2-23/6).
         (["sdk/testdata/tolerance/unknown_field.json"], ["sdk-python", "sdk-typescript"]),
         (["docs/api/openapi.yaml"], ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]),
-        (["docs/spec/07-permissions.md", "infra/compose/compose.yaml", "README.md"], []),
         # The server generates its route table and action catalogue from the action catalogue
         # (services/server/api/generate.go); `make catalog` also rewrites chapter 05.
         (["docs/spec/actions.yaml"], ["server"]),
@@ -284,7 +283,9 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["plugins/hermes-adapter/pyproject.toml"], {"test-sdk-plugins"}),
         # Documentation needs no conditional job; test (tools) runs on every change.
         (["docs/spec/07-permissions.md"], set()),
-        (["README.md", "infra/compose/compose.yaml"], set()),
+        (["README.md", "infra/compose/secrets.yaml"], set()),
+        # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
+        (["README.md", "infra/compose/compose.yaml"], {"test-sdk-plugins"}),
         (["services/server/internal/x.go", "docs/DECISIONS.md"], TESTS_SERVER | POSTGRES),
         # Shared inputs run every job: the API contract, the Makefile, tools, workflows, root
         # files outside the component map, and an empty or unknown diff.
