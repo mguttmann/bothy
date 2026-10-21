@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Project bindings of forums (M2-03): project_bindings exactly as docs/spec/03-datenmodell.md
+-- Project bindings of forums (M2-03): project_bindings exactly as docs/spec/03-data-model.md
 -- section 4.5 states it. One row per bound forum (PK channel_id); workspace_ref is an opaque
 -- reference the runner resolves and is unique case-insensitively; repository_url is display only;
 -- runner_config follows the schema project_runner_config.v1 (09 section 18.1) and holds no

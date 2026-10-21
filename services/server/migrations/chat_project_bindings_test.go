@@ -11,7 +11,7 @@ import (
 )
 
 // TestChatProjectBindingsMigration_Schema holds project_bindings against
-// docs/spec/03-datenmodell.md section 4.5 column by column, with the primary key, both foreign
+// docs/spec/03-data-model.md section 4.5 column by column, with the primary key, both foreign
 // keys and the unique index on lower(workspace_ref) (M2-03).
 func TestChatProjectBindingsMigration_Schema(t *testing.T) {
 	t.Parallel()

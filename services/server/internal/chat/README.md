@@ -365,7 +365,7 @@ canary class `manage_only` of `test/canary`.
   and `ApplyProjectReadiness` with `ProjectBinding`, `RunnerConfig`, `PutProjectBindingCmd` and
   `ProjectReadiness`; the caller comes from `kernel/actor` in the context. `ChannelBehavior` and
   `ServedChannelConfig` carry `ProjectBinding` for a bound forum.
-- Table `project_bindings` (migration `00047`): PK `channel_id`, unique `lower(workspace_ref)`,
+- Table `project_bindings` (migration `00046`): PK `channel_id`, unique `lower(workspace_ref)`,
   `runner_config` of schema `project_runner_config.v1`, `ready`, `version`. Only forums get a row;
   the use case enforces it (`400 not_a_forum` on `#path/channel_id`).
 - Domain (`domain/project_binding.go`): `ValidateProjectBinding` (limits

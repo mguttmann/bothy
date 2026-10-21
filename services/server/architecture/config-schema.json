@@ -1959,7 +1959,7 @@
       "enum": [],
       "min": "1",
       "max": "600",
-      "chapter": "09-agenten.md",
+      "chapter": "09-agents.md",
       "doc": "Longest workspace_ref, repository_url, default_branch, model and tool name of a project binding in Unicode characters (M2-03)."
     },
     {

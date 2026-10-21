@@ -59,7 +59,7 @@ FOR UPDATE
 `
 
 // SPDX-License-Identifier: Apache-2.0
-// Queries on project_bindings (chat module, M2-03; docs/spec/03-datenmodell.md section 4.5). A
+// Queries on project_bindings (chat module, M2-03; docs/spec/03-data-model.md section 4.5). A
 // change locks the space row FOR SHARE and the channel row FOR UPDATE first (ShareSpace and
 // LockChannel), then the binding row; a readiness report locks the spaces FOR SHARE, the channels
 // FOR SHARE and then the bindings FOR UPDATE, each set in ascending id (03 section 6.3). The
