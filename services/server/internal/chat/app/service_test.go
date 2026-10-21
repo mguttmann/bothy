@@ -349,6 +349,7 @@ func TestSidebar(t *testing.T) {
 	if _, err := e.svc.PutSidebarSpace(ctx, e.owner, research.ID, chat.SidebarPutCmd{Collapsed: true}); err != nil {
 		t.Fatal(err)
 	}
+	e.az.scope = authorize.Scope{InstanceWide: true}
 	list, err := e.svc.ListSidebarStates(ctx, e.owner)
 	if err != nil || len(list) != 2 {
 		t.Fatalf("list %+v, %v", list, err)
@@ -375,6 +376,38 @@ func TestSidebar(t *testing.T) {
 	}
 	_, err = e.svc.PutSidebarSpace(actor.WithActor(ctx, actor.Actor{ID: ids.New(), Kind: actor.KindUser}), e.owner, support.ID, chat.SidebarPutCmd{})
 	wantCode(t, err, errs.CodeInternalError)
+}
+
+// TestSidebarListCarriesScope (M1-70, AZ-P12): the sidebar rows are read with the visible spaces
+// of Scope (07 section 7.4 rule 1), so a row of a space outside the scope never leaves the store,
+// even where authorize would allow it; an instance-wide reader gets every row; a scope error
+// reaches the caller.
+func TestSidebarListCarriesScope(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	support, research := e.create(t, "Support", ids.ID{}), e.create(t, "Research", ids.ID{})
+	for _, sp := range []ids.ID{support.ID, research.ID} {
+		if _, err := e.svc.PutSidebarSpace(ctx, e.owner, sp, chat.SidebarPutCmd{Collapsed: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.az.scope = authorize.Scope{SpaceIDs: []ids.ID{research.ID}}
+	list, err := e.svc.ListSidebarStates(ctx, e.owner)
+	if err != nil || len(list) != 1 || list[0].SpaceID != research.ID {
+		t.Fatalf("scoped %+v, %v", list, err)
+	}
+	e.az.scope = authorize.Scope{}
+	if list, err := e.svc.ListSidebarStates(ctx, e.owner); err != nil || len(list) != 0 {
+		t.Fatalf("empty scope %+v, %v", list, err)
+	}
+	e.az.scope = authorize.Scope{InstanceWide: true}
+	if list, err := e.svc.ListSidebarStates(ctx, e.owner); err != nil || len(list) != 2 {
+		t.Fatalf("instance-wide %+v, %v", list, err)
+	}
+	e.az.err = errors.New("rights down")
+	if _, err := e.svc.ListSidebarStates(ctx, e.owner); err == nil {
+		t.Fatal("scope error swallowed")
+	}
 }
 
 // TestErrorsPass: errors of the store and of authorize reach the caller unchanged, and events

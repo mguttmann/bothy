@@ -65,13 +65,17 @@ func (s *Service) PutSidebarSpace(ctx context.Context, a actor.Actor, spaceID id
 }
 
 // ListSidebarStates implements chat.Structure: the rows of the person a for spaces that are not
-// archived, each kept only when a may read the space (authorize in filter mode). Agents and apps
-// have no rows.
+// archived and in the visible spaces of Scope (07 section 7.4 rule 1), each kept only when a may
+// read the space (authorize in filter mode). Agents and apps have no rows.
 func (s *Service) ListSidebarStates(ctx context.Context, a actor.Actor) ([]chat.SidebarState, error) {
 	if a.Kind != actor.KindUser || a.ID.IsZero() {
 		return []chat.SidebarState{}, nil
 	}
-	rows, err := s.d.Store.SidebarStates(ctx, a.ID)
+	sc, err := s.d.Authorizer.Scope(ctx, a, authorize.ActionSpaceRead)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.d.Store.SidebarStates(ctx, a.ID, sc.InstanceWide, sc.SpaceIDs)
 	if err != nil {
 		return nil, err
 	}

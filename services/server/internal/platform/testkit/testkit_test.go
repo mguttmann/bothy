@@ -109,3 +109,13 @@ func TestIntegrationSkipsOnlyUnderShort(t *testing.T) {
 		t.Fatalf("short %v, skipped %q", testing.Short(), r.skipped)
 	}
 }
+
+func TestTimingBound(t *testing.T) {
+	want := 20 * time.Millisecond
+	if testkit.RaceEnabled {
+		want *= 5
+	}
+	if got := testkit.TimingBound(20 * time.Millisecond); got != want {
+		t.Fatalf("TimingBound(20ms) = %v, want %v (race detector %v)", got, want, testkit.RaceEnabled)
+	}
+}

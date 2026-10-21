@@ -43,19 +43,19 @@ package = false
 minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 testpaths = [
-  "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks",
+  "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks", "lint",
   "observability", "opscheck", "signalcheck", "sonarqube",
 ]
 pythonpath = [
   "api-checks", "arch-check", "bin", "catalog", "catalog/tests", "ci", "configdoc", "contract", "denylist", "doccheck",
-  "docs", "hooks", "observability", "opscheck", "signalcheck", "sonarqube", "sonarqube/tests", "testing",
+  "docs", "hooks", "lint", "observability", "opscheck", "signalcheck", "sonarqube", "sonarqube/tests", "testing",
 ]
 filterwarnings = ["error"]
 
 [tool.coverage.run]
 branch = true
 source = [
-  "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks",
+  "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks", "lint",
   "observability", "opscheck", "signalcheck", "sonarqube",
 ]
 # live_contract.py runs only against a live server (make contract-test), never in unit tests.
@@ -100,7 +100,7 @@ strict = true
 warn_unreachable = true
 # Tool modules only; tests are linted by ruff and executed by pytest.
 files = [
-  "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks",
+  "api-checks", "arch-check", "bin", "catalog", "ci", "configdoc", "contract", "denylist", "doccheck", "docs", "hooks", "lint",
   "observability", "opscheck", "signalcheck", "sonarqube",
 ]
 exclude = ["/tests/"]

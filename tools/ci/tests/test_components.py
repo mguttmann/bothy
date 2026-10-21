@@ -545,6 +545,7 @@ def test_every_tool_folder_is_assigned_or_shared() -> None:
         (["tools/design-tokens/tokens.py"], {"test-apps", "test-server"}),
         (["tools/api-checks/breaking.py"], {"test-server"}),
         (["tools/contract/auth.py"], {"test-server"}),
+        (["tools/lint/sql_visibility.yaml"], {"test-server"}),
         (["tools/catalog/action_catalog.py", "tools/uv.lock"], set(components.CONDITIONAL_JOBS)),
     ],
 )

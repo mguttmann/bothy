@@ -70,3 +70,26 @@ func TestBuildMatrixWorld(t *testing.T) {
 	MustDo(t, w.People["Sam"], Request{Method: http.MethodGet, Path: "/threads/" + w.Threads["Support/Allgemein"]}, http.StatusOK)
 	MustDo(t, w.People["Robin"], Request{Method: http.MethodGet, Path: "/threads/" + w.Threads["Engineering/Projekt-A"]}, http.StatusOK)
 }
+
+// TestGateway (M1-70): a person and an agent open a gateway connection with their DPoP-bound
+// tokens and get ready with their own principal and the snapshot; the world records its owner.
+func TestGateway(t *testing.T) {
+	t.Parallel()
+	s := Start(t, Options{EgressDenyAll: true, Config: RaisedRateLimits()})
+	alex := s.NewUser(t, UserSpec{Handle: "alex", DisplayName: "Alex", Email: "alex@example.com"})
+	agent := s.NewAgent(t, AgentSpec{Handle: "lotse", DisplayName: "Lotse"})
+	for _, c := range []*Client{alex, agent} {
+		g, err := c.Gateway(t.Context())
+		if err != nil {
+			t.Fatalf("%s: %v", c.PrincipalID, err)
+		}
+		r := g.Ready
+		if r.Principal.Id.String() != c.PrincipalID || r.Snapshot.Principal.Id.String() != c.PrincipalID || g.Hello.HeartbeatIntervalMs <= 0 {
+			t.Fatalf("ready %+v", r)
+		}
+		if err := g.Send("heartbeat", map[string]any{"last_seq": r.HeadSeq}); err != nil {
+			t.Fatal(err)
+		}
+		g.Close()
+	}
+}

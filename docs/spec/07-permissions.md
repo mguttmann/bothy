@@ -821,7 +821,9 @@ Rules:
    permission version. A lint in the repository layer rejects reading sqlc queries on these tables
    without this predicate, unless they are on a reviewed exception list (resolution for
    `authorize`, loading a resource that has already been checked, jobs with system permission such as retention,
-   log tail). The list of cost estimates per run for the reconciliation (`cost.reconcile.read`)
+   log tail). The lint is `tools/lint/sql_visibility.py` (gate `sql-visibility`, AZ-P12); the
+   reviewed exception list with a category and a reason per query is
+   `tools/lint/sql_visibility.yaml`. The list of cost estimates per run for the reconciliation (`cost.reconcile.read`)
    stays without this predicate: it checks the action once against the instance, without a check
    per entry (rule 3), reads only `cost_entries` and names neither channel nor thread nor content
    (05, rule 1.2 and R-AZ-28). Writing queries only hit rows of a resource that `authorize` has checked

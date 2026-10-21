@@ -16,9 +16,11 @@ SET collapsed = EXCLUDED.collapsed,
 RETURNING *;
 
 -- name: ListSidebarStates :many
--- The rows of one person for the spaces that are not archived; visibility runs through
--- authorize afterwards.
+-- The rows of one person for the spaces that are not archived, with the predicate of 07 section
+-- 7.4 rule 1: every space for an instance-wide reader, else the visible spaces of Scope;
+-- authorize then checks each row.
 SELECT st.* FROM user_space_states st
 JOIN spaces sp ON sp.id = st.space_id
 WHERE st.user_id = @user_id AND sp.archived_at IS NULL
+  AND (@all_spaces::boolean OR st.space_id = ANY (@visible::uuid[]))
 ORDER BY st.space_id;

@@ -107,6 +107,9 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     # generator and tests read.
     "tools/design-tokens/": ("apps", "server"),
     "tools/doccheck/": (),
+    # `make sql-visibility` (AZ-P12) checks the queries of the server module and runs only when the
+    # component server is selected.
+    "tools/lint/": ("server",),
     "tools/docs/": (),
     "tools/opscheck/": (),
     "tools/scancode/": (),
