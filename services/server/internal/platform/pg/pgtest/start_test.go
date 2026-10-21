@@ -6,9 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 // The two messages Docker gives when the host port it picked for a published container port is
@@ -99,5 +103,36 @@ func TestStartRetryingStopsWhenTheContextEnds(t *testing.T) {
 	_, err := startRetrying(ctx, 5, time.Hour, f.start, discard)
 	if !errors.Is(err, context.Canceled) || !errors.Is(err, busy) || f.calls != 1 {
 		t.Fatalf("startRetrying = %v after %d starts; want the busy port and the end of the context", err, f.calls)
+	}
+}
+
+// TestContainerWaitsForTheStartTimeout: testcontainers.WithWaitStrategy bounds every wait
+// strategy by a deadline of its own of 60 seconds, which a loaded host exceeds while the image
+// initialises its data directory (a child of TestNoContainerSurvivesTheRun failed after 60 s
+// with "context deadline exceeded"). The wait of the pgtest container must last startTimeout.
+func TestContainerWaitsForTheStartTimeout(t *testing.T) {
+	t.Parallel()
+	req := &testcontainers.GenericContainerRequest{}
+	for _, opt := range containerOptions("pgtest-EXAMPLE-x", clusterKey{}) {
+		if err := opt.Customize(req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	all, ok := req.WaitingFor.(*wait.MultiStrategy)
+	if !ok {
+		t.Fatalf("wait strategy %T, want *wait.MultiStrategy", req.WaitingFor)
+	}
+	// The deadline has no accessor; reflect reads the unexported field.
+	deadline := reflect.ValueOf(all).Elem().FieldByName("deadline")
+	if deadline.IsNil() {
+		t.Fatal("the wait has no deadline")
+	}
+	if got := time.Duration(deadline.Elem().Int()); got != startTimeout {
+		t.Errorf("deadline of the wait %s, want startTimeout %s", got, startTimeout)
+	}
+	for _, s := range all.Strategies {
+		if to, ok := s.(interface{ Timeout() *time.Duration }); !ok || to.Timeout() == nil || *to.Timeout() != startTimeout {
+			t.Errorf("strategy %v does not wait startTimeout", s)
+		}
 	}
 }

@@ -561,6 +561,15 @@ const maxConnections = "400"
 // when the lease of this process ends; with the speed flags unless key is durable, and with the
 // CPU and memory limits of key.
 func runContainer(ctx context.Context, superPassword string, key clusterKey) (*testcontainers.DockerContainer, error) {
+	// Docker picks the host port only when the container starts; runRetrying starts again when
+	// another process took it in between. Every start gets a new name.
+	return runRetrying(ctx, func(ctx context.Context) (*testcontainers.DockerContainer, error) {
+		return testcontainers.Run(ctx, Image, containerOptions(superPassword, key)...)
+	})
+}
+
+// containerOptions are the options of the container of runContainer, with a new name each time.
+func containerOptions(superPassword string, key clusterKey) []testcontainers.ContainerCustomizer {
 	port := network.MustParsePort(containerPort)
 	cmd := []string{"postgres", "-c", "max_connections=" + maxConnections}
 	if !key.durable {
@@ -570,32 +579,29 @@ func runContainer(ctx context.Context, superPassword string, key clusterKey) (*t
 	if runLabelValue != "" {
 		labels[runLabel] = runLabelValue
 	}
-	// Docker picks the host port only when the container starts; runRetrying starts again when
-	// another process took it in between.
-	return runRetrying(ctx, func(ctx context.Context) (*testcontainers.DockerContainer, error) {
-		return testcontainers.Run(ctx, Image,
-			testcontainers.WithLogger(tclog.NewNoopLogger()),
-			testcontainers.WithName("bothy-pgtest-"+randomHex(6)),
-			testcontainers.WithLabels(labels),
-			testcontainers.WithEnv(map[string]string{
-				"POSTGRES_USER": superUser, "POSTGRES_PASSWORD": superPassword, "POSTGRES_DB": superDatabase,
-			}),
-			testcontainers.WithEnv(watchdogEnv(leaseMisses, leaseStartGrace, leaseStopWait)),
-			testcontainers.WithEntrypoint("bash", "-c", watchdogScript, "pgtest-watchdog"),
-			testcontainers.WithCmd(cmd...),
-			testcontainers.WithExposedPorts(containerPort),
-			testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
-				hc.PortBindings = network.PortMap{port: {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "0"}}}
-				hc.AutoRemove = true
-				hc.NanoCPUs = int64(key.cpus * 1e9)
-				hc.Memory = key.memoryBytes
-			}),
-			// The image's entry point starts the server once to initialise the data directory and
-			// then for good; only the second line means ready.
-			testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).WithStartupTimeout(startTimeout)),
-		)
-	})
+	return []testcontainers.ContainerCustomizer{
+		testcontainers.WithLogger(tclog.NewNoopLogger()),
+		testcontainers.WithName("bothy-pgtest-" + randomHex(6)),
+		testcontainers.WithLabels(labels),
+		testcontainers.WithEnv(map[string]string{
+			"POSTGRES_USER": superUser, "POSTGRES_PASSWORD": superPassword, "POSTGRES_DB": superDatabase,
+		}),
+		testcontainers.WithEnv(watchdogEnv(leaseMisses, leaseStartGrace, leaseStopWait)),
+		testcontainers.WithEntrypoint("bash", "-c", watchdogScript, "pgtest-watchdog"),
+		testcontainers.WithCmd(cmd...),
+		testcontainers.WithExposedPorts(containerPort),
+		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
+			hc.PortBindings = network.PortMap{port: {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "0"}}}
+			hc.AutoRemove = true
+			hc.NanoCPUs = int64(key.cpus * 1e9)
+			hc.Memory = key.memoryBytes
+		}),
+		// The image's entry point starts the server once to initialise the data directory and
+		// then for good; only the second line means ready. WithWaitStrategy would cut the wait
+		// to a deadline of its own of 60 seconds.
+		testcontainers.WithWaitStrategyAndDeadline(startTimeout, wait.ForLog("database system is ready to accept connections").
+			WithOccurrence(2).WithStartupTimeout(startTimeout)),
+	}
 }
 
 // writePasswords generates the superuser and role passwords and writes them as files of mode
