@@ -98,6 +98,9 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
     "tools/docs/": (),
     "tools/opscheck/": (),
     "tools/scancode/": (),
+    # `make signal-check` (M1-68) reads the catalogue and the dashboards, rules and SLOs, no
+    # component source; it runs in the repository-wide docs and contracts job.
+    "tools/signalcheck/": (),
     "tools/sonarqube/": (),
     # The test of services/server/internal/platform/pg/pgtest reads the image pin of this file.
     "tools/sonarqube/compose.yaml": ("server",),
