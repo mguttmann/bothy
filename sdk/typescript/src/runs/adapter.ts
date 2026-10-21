@@ -207,7 +207,7 @@ export interface Invocation {
   /** The event type. */
   readonly type: string;
   /** The event's `payload` as received. */
-  readonly payload: Payload;
+  readonly payload: Readonly<Record<string, unknown>>;
   /** The verified claims of the event's token. */
   readonly claims: InvocationClaims;
 }

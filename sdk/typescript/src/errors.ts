@@ -135,7 +135,7 @@ export class ProblemError extends Error {
   readonly reason: string | undefined;
   /** The short title. */
   readonly title: string;
-  /** The detail text; never part of {@link Error.message}. */
+  /** The detail text; never part of the error `message`. */
   readonly detail: string | undefined;
   /** The correlation ID for support. */
   readonly correlationId: string | undefined;

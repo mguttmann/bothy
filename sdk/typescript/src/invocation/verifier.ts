@@ -54,7 +54,6 @@ import {
   type StrictObject,
 } from "./json.js";
 
-type AgentTriggerers = components["schemas"]["AgentTriggerers"];
 
 const ALG = "EdDSA";
 const TYP = "agent-invocation+jwt";
@@ -213,7 +212,9 @@ export type JwksFetcher = () => Promise<
  * Loads the allow list of 17.7 (`getAgentTriggerers`); {@link triggererLoader} builds one on a
  * client.
  */
-export type TriggererLoader = () => Promise<AgentTriggerers>;
+export type TriggererLoader = () => Promise<
+  components["schemas"]["AgentTriggerers"]
+>;
 
 /** The `jti` store of point 7; the inbox stores implement it. Times are Unix milliseconds. */
 export interface ReplayStore {

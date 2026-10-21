@@ -514,8 +514,22 @@ export interface FetchResult {
   readonly response: Response;
 }
 
+/** What {@link unwrapDetailed} resolves to. */
+export interface Unwrapped<D> {
+  /** The parsed body of the `2xx` answer. */
+  readonly data: D;
+  /** The raw response, for its headers. */
+  readonly response: Response;
+}
+
 /** The `data` type of the success branch of an openapi-fetch result. */
-export type SuccessData<R> = R extends { data: infer D } ? D : never;
+export type SuccessData<R> = R extends DataOf<infer D> ? D : never;
+
+/** The member `data` of a result; matched by {@link SuccessData}. */
+export interface DataOf<D> {
+  /** The parsed body of the `2xx` answer. */
+  data: D;
+}
 
 /**
  * Resolves an openapi-fetch call to its `data` and the response, or throws the typed
@@ -532,7 +546,7 @@ export type SuccessData<R> = R extends { data: infer D } ? D : never;
 export async function unwrapDetailed<R extends FetchResult>(
   call: Promise<R>,
   operation: string,
-): Promise<{ data: SuccessData<R>; response: Response }> {
+): Promise<Unwrapped<SuccessData<R>>> {
   const result = await call;
   const { response } = result;
   if (response.ok) return { data: result.data as SuccessData<R>, response };

@@ -104,6 +104,7 @@ const KNOWN: ReadonlySet<string> = new Set<string>(KNOWN_EVENT_TYPES);
 
 /** An event whose type this SDK version knows, with its generated type. */
 export interface KnownEvent {
+  /** Discriminator: the type is known. */
   readonly kind: "known";
   /** The event, narrowed further by a check of `event.type`. */
   readonly event: Event;
@@ -114,6 +115,7 @@ export interface KnownEvent {
  * The caller skips it and keeps advancing its cursor (docs/spec/04-sync-protokoll.md 7.1).
  */
 export interface UnknownEvent {
+  /** Discriminator: the type is unknown. */
   readonly kind: "unknown";
   /** The received `type`, or `""` when it is missing or not a string. */
   readonly type: string;
