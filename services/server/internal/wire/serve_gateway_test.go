@@ -195,10 +195,10 @@ func (w *gwWorld) params(p gwPerson) wstest.IdentifyParams {
 	return wstest.IdentifyParams{AccessToken: p.access, DeviceID: p.device.String(), Proof: w.proofFor(p.key, p.access, gwHTU)}
 }
 
-// apiToken stores an API token of kind for principal with the scopes, bound to key when not nil.
-func (w *gwWorld) apiToken(kind apitoken.Kind, principal ids.ID, key *identitytest.Key, expires time.Time, scopes ...string) string {
+// agentToken stores an agent API token for principal without scopes, bound to key when not nil.
+func (w *gwWorld) agentToken(principal ids.ID, key *identitytest.Key, expires time.Time) string {
 	w.t.Helper()
-	tok, err := apitoken.Generate(nil, kind)
+	tok, err := apitoken.Generate(nil, apitoken.KindAgent)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -207,20 +207,19 @@ func (w *gwWorld) apiToken(kind apitoken.Kind, principal ids.ID, key *identityte
 	if key != nil {
 		jkt = key.Thumbprint
 	}
-	if scopes == nil {
-		scopes = []string{}
-	}
 	w.sql(`INSERT INTO api_tokens (id, principal_id, name, token_prefix, token_hash, scopes, dpop_jkt, expires_at, created_by)
-		VALUES ($1, $2, 'x', $3, $4, $5, $6, $7, $2)`, ids.New().String(), principal.String(), pp.Prefix(), apitoken.Hash(w.pepper, tok), scopes, jkt, expires)
+		VALUES ($1, $2, 'x', $3, $4, $5, $6, $7, $2)`, ids.New().String(), principal.String(), pp.Prefix(), apitoken.Hash(w.pepper, tok), []string{}, jkt, expires)
 	w.remember(tok)
 	return tok
 }
 
-// newAgent creates an agent principal.
+// newAgent creates an agent principal with its agents record.
 func (w *gwWorld) newAgent() ids.ID {
 	w.t.Helper()
 	id := ids.New()
 	w.sql(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'agent', 'active', $2, $2)`, id.String(), "agent"+strings.ReplaceAll(id.String()[24:], "-", ""))
+	// Every agent principal has its record (M1-51); the consumer cursor of M2-07 refers to it.
+	w.sql(`INSERT INTO agents (principal_id, adapter_kind) VALUES ($1, 'custom')`, id.String())
 	return id
 }
 
@@ -259,10 +258,10 @@ func (w *gwWorld) expectClose(t *testing.T, c *wstest.Client, code int) string {
 	return reason
 }
 
-// identifyErr identifies on a fresh connection and requires the close code.
-func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int) {
+// identifyErr identifies on a fresh connection dialed with opts and requires the close code.
+func (w *gwWorld) identifyErr(t *testing.T, p wstest.IdentifyParams, code int, opts ...wstest.Option) {
 	t.Helper()
-	c := w.dial(t)
+	c := w.dial(t, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	_, err := c.Identify(ctx, p)
@@ -379,7 +378,7 @@ func TestGateway(t *testing.T) {
 	t.Run("TestIdentifyAgentToken", func(t *testing.T) {
 		agent := w.newAgent()
 		key, _ := identitytest.NewDeviceKey(jose.AlgES256)
-		tok := w.apiToken(apitoken.KindAgent, agent, key, time.Now().Add(time.Hour))
+		tok := w.agentToken(agent, key, time.Now().Add(time.Hour))
 		_, r := w.ready(t, wstest.IdentifyParams{APIToken: tok, Proof: w.proofFor(key, tok, gwHTU)})
 		if r.Principal.Id.String() != agent.String() || r.DeviceId != nil {
 			t.Fatalf("ready %+v", r)
@@ -399,8 +398,8 @@ func TestGateway(t *testing.T) {
 	t.Run("TestGatewayOpsEnableList", func(t *testing.T) {
 		p := w.newPerson("robin", identity.DeviceStateActive)
 		c, _ := w.ready(t, w.params(p))
-		// focus is enabled since M1-66; ack still waits for M2.
-		if err := c.Send("ack", map[string]any{"seq": 1}); err != nil {
+		// focus is enabled since M1-66 and ack since M2-07; stats.subscribe still waits for M6-15.
+		if err := c.Send("stats.subscribe", map[string]any{}); err != nil {
 			t.Fatal(err)
 		}
 		w.expectClose(t, c, 4001)
@@ -594,7 +593,7 @@ func TestGateway(t *testing.T) {
 
 	t.Run("TestClose4011AgentTokenExpired", func(t *testing.T) {
 		agent := w.newAgent()
-		tok := w.apiToken(apitoken.KindAgent, agent, nil, time.Now().Add(3*time.Second))
+		tok := w.agentToken(agent, nil, time.Now().Add(3*time.Second))
 		c, _ := w.ready(t, wstest.IdentifyParams{APIToken: tok})
 		w.expectClose(t, c, 4011)
 	})
@@ -609,7 +608,7 @@ func TestGateway(t *testing.T) {
 
 	t.Run("TestClose4012RevokedAtHeartbeat", func(t *testing.T) {
 		agent := w.newAgent()
-		tok := w.apiToken(apitoken.KindAgent, agent, nil, time.Now().Add(time.Hour))
+		tok := w.agentToken(agent, nil, time.Now().Add(time.Hour))
 		c, _ := w.ready(t, wstest.IdentifyParams{APIToken: tok})
 		w.sql(`UPDATE api_tokens SET revoked_at = now(), revoked_by = principal_id WHERE principal_id = $1`, agent.String())
 		w.expectClose(t, c, 4012)

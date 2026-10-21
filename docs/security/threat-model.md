@@ -200,6 +200,7 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | I | Agent reads foreign channels for the triggering person | acting-for binding SR9, read horizon hint | T-AI-02 |
 | D | Loops, cost explosion | agents never trigger, rate limits, cost limits | T-AI-07 |
 | E | Person with few permissions uses an agent with a shell | SR2 tool class, SR3 dev isolation | T-AI-02, T-DEV-01 |
+| S | Takeover of a consumer with a stolen agent token: an attacker identifies with the same consumer, takes the stream over, and the real adapter is closed with `4015` | DPoP binding of agent tokens (the token alone does not connect), revocation of the token and `agent.disable` close with `4012`, the takeover is logged with both gateway session ids, and `4015` tells the adapter not to reconnect, so the loss is visible (M2-07) | T-TK-02 |
 
 ### 5.11 Apps and webhooks
 

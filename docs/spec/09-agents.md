@@ -242,7 +242,7 @@ replies and session belong to T'.
 | Transport | For | Acknowledgement | Reference |
 |---|---|---|---|
 | Gateway WebSocket | Default for every permanently running adapter | `ack {seq}` (04 section 15.2) | 04 section 15.1 |
-| REST fetch `GET /api/v1/agents/me/consumers/{consumer}/events` | Adapters without a durable connection, tests | durable via the `ack` endpoint | 04 section 7.4 |
+| REST fetch `GET /api/v1/agents/me/consumers/{consumer}/events` | Adapters without a durable connection, tests | durable via the `ack` endpoint | 04 section 7.4; rules in 4.3 "REST fetch" |
 | Webhook (push) | Adapter as a function without a running process | response `2xx` counts as `ack` up to this `seq` | 04 section 15.6 |
 
 Webhook delivery to agents needs a subscription that is bound to an agent instead of an
@@ -269,6 +269,33 @@ Duplicate detection (04 section 15.2): if the same event arrives again with a di
 the run has not yet started at the adapter, the adapter does not process the event a
 second time, but replaces the stored token with the new one. The start always uses the
 newest token.
+
+**REST fetch** (M2-07). A consumer name matches `^[a-z0-9][a-z0-9_-]*$` (path parameter
+`ConsumerPath`, also `GatewayIdentify.consumer`); a name outside it answers `400
+validation_failed` on `#path/consumer`, and an `identify` with it closes with `4002`. Consumers
+exist only for agents; for people and apps the member `consumer` of `identify` is ignored. The
+acknowledgement rules are the same on both transports: `seq` below 0 or above the head of the
+serving process is `validation_failed` on `/seq`, `seq` at or below the acknowledgement changes
+nothing and is no error, a higher `seq` covers every number up to it, also beyond what was
+delivered. The head that consumer operations report and check against is the hub position of the
+serving process (the highest `seq` its log tail has delivered), so a consumer is never told about
+or acknowledges a `seq` that process cannot yet deliver.
+
+- `pollAgentEvents` is a consumer like an `identify`: it takes the consumer over for the REST
+  window of the serving process (newest wins, R-SY-09), and an open gateway connection of the
+  consumer in that process closes with `4015` (in another process the fenced save closes it). The
+  first poll of a consumer creates its cursor at `head_seq` and answers an empty page. At most
+  `agent.max_inflight_events` unacknowledged events are on the way; a larger `limit` is capped.
+  Within `agent.ack_timeout` a poll never repeats an unacknowledged event; after it the window
+  delivers again from `acked_seq + 1` with `redelivered: true`. `next_cursor` is the highest `seq`
+  the window checked, but never covers an event an earlier poll handed out that is still
+  unacknowledged; the adapter acknowledges it after processing, also when `events` is empty.
+  `retention` and `cursor_ahead` move the cursor to `head_seq` and answer `410 resync_required`
+  with the reason. A REST window idle for `sync.resume_window` is dropped; the next poll starts a
+  fresh window from `acked_seq + 1`.
+- `ackAgentEvents` stores the acknowledgement at once and monotonically, without taking the
+  consumer over; `getConsumerState` reads the cursor (`404` for a consumer that never connected).
+  Neither creates a cursor.
 
 ### 4.4 Events to the adapter
 

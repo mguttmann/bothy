@@ -127,7 +127,7 @@ func TestSplitRest_RejectsInvalidGo(t *testing.T) {
 // TestRealRest_BelowMaxFileKB: each half of the real REST package stays below repo.max_file_kb
 // (1024 KiB, docs/spec/23-qualitaet.md), the limit the hook check-added-large-files holds.
 func TestRealRest_BelowMaxFileKB(t *testing.T) {
-	for _, name := range []string{"models.gen.go", "rest.gen.go", "objects.gen.go"} {
+	for _, name := range []string{"models.gen.go", "rest.gen.go", "objects.gen.go", "objects2.gen.go"} {
 		info, err := os.Stat(filepath.Join("..", "..", "rest", name))
 		if err != nil {
 			t.Fatal(err)
@@ -195,5 +195,57 @@ func TestSplitRest_StrictObjects(t *testing.T) {
 	if !strings.Contains(string(objects), "// ListThings200JSONResponse is a response object.") ||
 		!strings.Contains(string(server), "// StrictServerInterface represents all server handlers.") {
 		t.Error("a doc comment did not move with its declaration")
+	}
+}
+
+// splitTwoOpsInput has the objects of two operations before the strict interface, so
+// halveObjects can cut between them.
+var splitTwoOpsInput = strings.Replace(splitStrictInput, "// StrictServerInterface represents", `type GetThingRequestObject struct {
+	ID string
+}
+
+// GetThing200JSONResponse is a response object.
+type GetThing200JSONResponse Thing
+
+func (r GetThing200JSONResponse) VisitGetThingResponse(w http.ResponseWriter) error {
+	return json.NewEncoder(w).Encode(r)
+}
+
+// StrictServerInterface represents`, 1)
+
+// TestHalveObjects (M6-01): objects.gen.go is cut at the start of the operation group nearest its
+// middle into two valid files, each with only the imports it uses, so neither reaches
+// repo.max_file_kb; a file with one group keeps it whole and the second file holds only the
+// package clause.
+func TestHalveObjects(t *testing.T) {
+	_, _, objects, err := splitRest([]byte(splitTwoOpsInput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, second, err := halveObjects(objects)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ft, _ := importsOf(t, "objects.gen.go", first)
+	si, st, _ := importsOf(t, "objects2.gen.go", second)
+	if want := []string{"ListThingsRequestObject", "ListThings200JSONResponse"}; !slices.Equal(ft, want) {
+		t.Errorf("first types = %v, want %v", ft, want)
+	}
+	if want := []string{"GetThingRequestObject", "GetThing200JSONResponse"}; !slices.Equal(st, want) {
+		t.Errorf("second types = %v, want %v", st, want)
+	}
+	if want := []string{"encoding/json", "net/http"}; !slices.Equal(sortedCopy(si), want) {
+		t.Errorf("second imports = %v, want %v", si, want)
+	}
+	_, _, one, err := splitRest([]byte(splitStrictInput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	whole, empty, err := halveObjects(one)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, types, _ := importsOf(t, "objects2.gen.go", empty); len(types) != 0 || len(whole) == 0 {
+		t.Errorf("one group: second types = %v", types)
 	}
 }

@@ -21,6 +21,19 @@ documented in this file. The format is based on
   no redirects, all through `platform/egress`, and no secret in output, log or error. The API
   client `api/restclient` is generated from the whole `docs/api/openapi.yaml` and split below
   `repo.max_file_kb`.
+- The route generator writes the strict response objects to `objects.gen.go` and
+  `objects2.gen.go`, so no generated file reaches `repo.max_file_kb`.
+- Agent consumers (M2-07, 04 section 15): table `agent_consumer_cursors` (migration `00045`) with
+  one durable cursor per agent and consumer name; the first connection starts at `head_seq`,
+  later ones at `acked_seq + 1`. The gateway serves agent connections through a consumer engine:
+  at most `agent.max_inflight_events` unacknowledged events, redelivery from `acked_seq + 1` with
+  `redelivered: true` after `agent.ack_timeout`, the op `ack` (`agent.events.consume`,
+  `rl.agent_runtime`), saves of `acked_seq` every `agent.ack_persist_interval`, on close and at
+  shutdown before `4013`, and the newest connection wins with `4015 consumer_replaced`, fenced by
+  `holder_session_id` across server instances. The REST operations `getConsumerState`,
+  `pollAgentEvents` (`410 resync_required` for `retention` and `cursor_ahead`) and
+  `ackAgentEvents` give adapters without a WebSocket the same stream. New configuration keys
+  `agent.ack_timeout`, `agent.ack_persist_interval`, `agent.max_inflight_events`.
 - Notification levels and quiet hours (M3-18): the module `notify` owns `notification_preferences`
   and `quiet_hours` and serves `listMyNotificationPreferences`, `putNotificationPreference`,
   `deleteNotificationPreference`, `listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`

@@ -56,6 +56,12 @@ type Reauth struct {
 	DPoP        string `json:"dpop"`
 }
 
+// Ack is the body of ack (schema GatewayAck): the acknowledgement of an agent consumer, valid for
+// every number up to Seq (04 section 15.2 item 1).
+type Ack struct {
+	Seq int64 `json:"seq"`
+}
+
 // Focus is the body of focus (schema GatewayFocus): the complete set of the threads on screen,
 // which replaces the previous one, and idle.
 type Focus struct {

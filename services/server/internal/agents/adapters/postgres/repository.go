@@ -2,8 +2,8 @@
 
 // Package postgres is the PostgreSQL adapter of the agents module (M1-51): the sqlc queries in
 // queries/, the generated code in sqlcgen/ and Repository, which implements app.Store over the
-// table agents (docs/spec/03-data-model.md section 4.4). Only this package runs SQL on it (03
-// principle 12).
+// table agents (docs/spec/03-data-model.md section 4.4) and app.ConsumerStore over
+// agent_consumer_cursors (M2-07). Only this package runs SQL on them (03 principle 12).
 //
 // Example:
 //
@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/agents/domain"
@@ -265,4 +266,63 @@ func timeOf(t pgtype.Timestamptz) time.Time {
 		return time.Time{}
 	}
 	return t.Time.UTC()
+}
+
+// Compile-time check: Repository is the consumer store of the agents application layer.
+var _ app.ConsumerStore = (*Repository)(nil)
+
+// TakeConsumer implements app.ConsumerStore.
+func (r *Repository) TakeConsumer(ctx context.Context, key agents.ConsumerKey, holder ids.ID, head int64) (int64, bool, error) {
+	row, err := r.read(ctx).TakeConsumer(ctx, sqlcgen.TakeConsumerParams{
+		AgentID: uuid(key.AgentID), ConsumerName: key.Consumer, HeadSeq: head, HolderSessionID: uuid(holder),
+	})
+	if err != nil {
+		return 0, false, mapError(err, "taking a consumer over")
+	}
+	return row.AckedSeq, row.Created, nil
+}
+
+// SaveConsumerAck implements app.ConsumerStore.
+func (r *Repository) SaveConsumerAck(ctx context.Context, key agents.ConsumerKey, holder ids.ID, acked int64) (bool, error) {
+	n, err := r.read(ctx).SaveConsumerAck(ctx, sqlcgen.SaveConsumerAckParams{
+		AckedSeq: acked, AgentID: uuid(key.AgentID), ConsumerName: key.Consumer, HolderSessionID: uuid(holder),
+	})
+	if err != nil {
+		return false, mapError(err, "saving a consumer acknowledgement")
+	}
+	return n > 0, nil
+}
+
+// RestartConsumer implements app.ConsumerStore.
+func (r *Repository) RestartConsumer(ctx context.Context, key agents.ConsumerKey, holder ids.ID, seq int64) (bool, error) {
+	n, err := r.read(ctx).RestartConsumer(ctx, sqlcgen.RestartConsumerParams{
+		AckedSeq: seq, AgentID: uuid(key.AgentID), ConsumerName: key.Consumer, HolderSessionID: uuid(holder),
+	})
+	if err != nil {
+		return false, mapError(err, "restarting a consumer")
+	}
+	return n > 0, nil
+}
+
+// AckConsumer implements app.ConsumerStore.
+func (r *Repository) AckConsumer(ctx context.Context, key agents.ConsumerKey, seq int64) (int64, bool, error) {
+	acked, err := r.read(ctx).AckConsumer(ctx, sqlcgen.AckConsumerParams{AckedSeq: seq, AgentID: uuid(key.AgentID), ConsumerName: key.Consumer})
+	return consumerRow(acked, err, "acknowledging consumer events")
+}
+
+// GetConsumer implements app.ConsumerStore.
+func (r *Repository) GetConsumer(ctx context.Context, key agents.ConsumerKey) (int64, bool, error) {
+	acked, err := r.read(ctx).GetConsumer(ctx, sqlcgen.GetConsumerParams{AgentID: uuid(key.AgentID), ConsumerName: key.Consumer})
+	return consumerRow(acked, err, "reading a consumer")
+}
+
+// consumerRow maps the result of a one-row consumer query: no row is found false.
+func consumerRow(acked int64, err error, what string) (int64, bool, error) {
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return 0, false, nil
+	case err != nil:
+		return 0, false, mapError(err, what)
+	}
+	return acked, true, nil
 }

@@ -57,7 +57,7 @@ func (h *Hub) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) 
 	if ev.Actor != nil {
 		admit.ActorKind, admit.ActorPrincipalID = string(ev.Actor.Kind), ev.Actor.PrincipalID
 	}
-	frame, err := json.Marshal(outFrame{Op: "dispatch", D: ephemeralEnvelope(admit)})
+	frame, err := json.Marshal(outFrame{Op: opDispatch, D: ephemeralEnvelope(admit)})
 	if err != nil {
 		return fmt.Errorf("gateway: %s cannot be encoded: %w", ev.Type, err)
 	}
@@ -164,8 +164,17 @@ func (h *Hub) offerEphemeral(ctx context.Context, m *member, ev sync.Event, entr
 	}
 }
 
-// live reports whether m is in phase live.
+// live reports whether m is in phase live; an agent consumer connection only once its runner
+// queued catchup.complete or resync_required (INT-W41/1).
 func (h *Hub) live(m *member) bool {
+	if m.consumer {
+		h.mu.Lock()
+		e := h.consumers
+		h.mu.Unlock()
+		if e == nil || !e.Streaming(m.c) {
+			return false
+		}
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.phase == domain.PhaseLive

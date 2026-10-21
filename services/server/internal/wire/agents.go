@@ -38,10 +38,14 @@ func NewAgentPolicySource(pool *pg.Pool) authz.AgentPolicySource {
 }
 
 // Agents is the agents module of the process (M1-51): the use cases of agents.Agents and the REST
-// handlers of the ten agent operations.
+// handlers of the ten agent operations, and the consumer cursors with the three consumer operations
+// (M2-07).
 type Agents struct {
 	// Service implements agents.Agents.
 	Service *agentsapp.Service
+	// Consumers implements agents.Consumers and agents.ConsumerAPI; the gateway binds its engine as
+	// the feed (mountGateway).
+	Consumers *agentsapp.ConsumerService
 	// Handlers are the REST handlers.
 	Handlers *agentshttp.Agents
 }
@@ -64,5 +68,9 @@ func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az autho
 	if err != nil {
 		return nil, err
 	}
-	return &Agents{Service: svc, Handlers: agentshttp.New(svc)}, nil
+	cons, err := agentsapp.NewConsumers(agentspg.NewRepository(pool), az)
+	if err != nil {
+		return nil, err
+	}
+	return &Agents{Service: svc, Consumers: cons, Handlers: agentshttp.New(svc, cons)}, nil
 }

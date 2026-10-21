@@ -161,8 +161,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	env := []string{"BOTHY_CONFIG_FILE=" + path, "BOTHY_MESSAGE__MAX_CONTENT_BYTES=2048"}
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "print", "--role", "worker")
 	want := "# configuration file: " + path + "\n" +
+		"agent.ack_persist_interval = 1s  # default\n" +
+		"agent.ack_timeout = 30s  # default\n" +
 		"agent.invocation_token_ttl = 1m  # default\n" +
 		"agent.jwks_max_age = 1h  # default\n" +
+		"agent.max_inflight_events = 100  # default\n" +
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +

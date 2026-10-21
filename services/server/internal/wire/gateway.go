@@ -13,8 +13,10 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	gatewaymetrics "github.com/OWNER/bothy/services/server/internal/gateway/adapters/otelmetrics"
+	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/passdelivery"
 	gatewayws "github.com/OWNER/bothy/services/server/internal/gateway/adapters/ws"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -78,6 +80,10 @@ type GatewayConfig struct {
 	TypingMinInterval time.Duration `config:"sync.typing_min_interval"`
 	TypingTTL         time.Duration `config:"sync.typing_ttl"`
 	PayloadMax        int           `config:"sync.event_payload_max_bytes"`
+	// The keys of the agent consumers (M2-07).
+	AckTimeout         time.Duration `config:"agent.ack_timeout"`
+	AckPersistInterval time.Duration `config:"agent.ack_persist_interval"`
+	MaxInflightEvents  int           `config:"agent.max_inflight_events"`
 }
 
 // GatewayConfigFrom binds GatewayConfig from v. The error names the key whose binding failed,
@@ -109,6 +115,9 @@ type GatewayDeps struct {
 	// Delivery nil means the hub of M1-65 over the authenticator, the authorizer and catch-up;
 	// tests of the connection pass their own.
 	Delivery gatewayapp.Delivery
+	// Consumers is the cursor port of agents (M2-07); with the hub it gives the consumer engine
+	// and the ack op. Required when Delivery is nil.
+	Consumers agents.Consumers
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
 	Log   *slog.Logger
@@ -131,6 +140,9 @@ type Gateway struct {
 	Handler   *gatewayws.Handler
 	Hub       *gatewayapp.Hub
 	Publisher eventlog.EphemeralPublisher
+	// Engine is the delivery engine of agent consumers over the hub (M2-07); nil with a given
+	// Delivery. It is the agents.ConsumerFeed of the REST consumer operations.
+	Engine *gatewayapp.ConsumerEngine
 }
 
 // The rate-limit classes of the client ops the gateway counts itself (x-rate-limit-class of
@@ -144,10 +156,11 @@ const (
 // GatewayOpClasses returns the rate-limit class of each enabled client op, for the contract tests
 // (TestGatewayOpRateClasses, the register test of G9): identify and resume consume
 // rl.gateway_connect in the handshake; heartbeat and reauth belong to that class but consume
-// nothing from it (05 section 3); focus and typing are counted by the gateway itself.
+// nothing from it (05 section 3); focus and typing are counted by the gateway itself, ack by the
+// agent limiter (M2-07, INT-W42/4).
 func GatewayOpClasses() map[string]string {
 	return map[string]string{"identify": gatewayClass, "resume": gatewayClass, "heartbeat": gatewayClass, "reauth": gatewayClass,
-		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass}
+		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass, "ack": agentRuntimeClass}
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of
@@ -163,9 +176,10 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	var publisher eventlog.EphemeralPublisher = noPublisher{}
-	if hub != nil {
-		publisher = hub
+	publisher := ephemeralPublisher(hub)
+	engine, err := newConsumerEngine(cfg, d, hub)
+	if err != nil {
+		return nil, err
 	}
 	htu, err := gatewayws.HTU(cfg.PublicURL)
 	if err != nil {
@@ -193,6 +207,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Snapshot: d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
+		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter},
 	})
 	if err != nil {
 		return nil, err
@@ -213,7 +228,54 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Gateway{App: gw, Handler: h, Hub: hub, Publisher: publisher}, nil
+	return &Gateway{App: gw, Handler: h, Hub: hub, Publisher: publisher, Engine: engine}, nil
+}
+
+// newConsumerEngine builds the delivery engine of agent consumers over the hub (M2-07) and binds
+// it as the delivery of agent sessions; nil without a hub (a given Delivery). Errors: no
+// consumer port with a hub, or an invalid configuration value.
+func newConsumerEngine(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub) (*gatewayapp.ConsumerEngine, error) {
+	if hub == nil {
+		return nil, nil
+	}
+	if d.Consumers == nil {
+		return nil, errors.New("wire: the gateway needs the consumer cursors of agents")
+	}
+	e, err := gatewayapp.NewConsumerEngine(gatewayapp.ConsumerConfig{
+		MaxInflight: cfg.MaxInflightEvents, AckTimeout: cfg.AckTimeout, PersistInterval: cfg.AckPersistInterval,
+		IdleWindow: cfg.ResumeWindow, PageSize: cfg.CatchUpPageSize, CursorEvery: cfg.CursorAdvanceEvery,
+		RetryBase: cfg.LogPollInterval, RetryCap: cfg.ReconnectBackoffCap,
+	}, gatewayapp.ConsumerDeps{Consumers: d.Consumers, CatchUp: d.Reads.CatchUp, Position: hub, Hook: passdelivery.Hook{},
+		Epoch: epochSource{d.Instance}, Clock: d.Clock, Log: orDiscard(d.Log)})
+	if err != nil {
+		return nil, err
+	}
+	hub.BindConsumers(e)
+	return e, nil
+}
+
+// StartConsumerSaver starts the save ticker and REST window sweeper of the agent consumers
+// (ConsumerEngine.Run) and returns its stop step in the HTTP phase; the shutdown of the gateway
+// flushes every held acknowledgement before the connections close (StopConnections). Without an
+// engine the step does nothing.
+func (g *Gateway) StartConsumerSaver() lifecycle.StopStep {
+	ctx, cancel := context.WithCancel(context.Background()) // NOSONAR: the stop step calls cancel; see D-M2-07-17.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if g.Engine != nil {
+			g.Engine.Run(ctx)
+		}
+	}()
+	return lifecycle.StopStep{Name: "gateway_consumers", Phase: lifecycle.PhaseHTTP, Run: func(stopCtx context.Context) error {
+		cancel()
+		select {
+		case <-done:
+			return nil
+		case <-stopCtx.Done():
+			return stopCtx.Err()
+		}
+	}}
 }
 
 // newMeasuredHub sets the gateway metrics of d (adapters/otelmetrics on the global meter
@@ -364,12 +426,36 @@ func (o opLimiter) AllowTyping(conn ids.ID) (bool, error) {
 	return d.Allowed, err
 }
 
+// ephemeralPublisher returns the hub as the publisher of ephemeral events, or noPublisher when the
+// tests of the connection bring their own delivery (no hub, M1-66/9).
+func ephemeralPublisher(hub *gatewayapp.Hub) eventlog.EphemeralPublisher {
+	if hub == nil {
+		return noPublisher{}
+	}
+	return hub
+}
+
 // noPublisher is the publisher of a gateway whose tests bring their own delivery: it relays
 // nothing.
 type noPublisher struct{}
 
 // PublishEphemeral implements eventlog.EphemeralPublisher.
 func (noPublisher) PublishEphemeral(context.Context, eventlog.EphemeralEvent) error { return nil }
+
+// agentLimiter adapts the limiter to the class rl.agent_runtime of the ack op, keyed by the agent.
+type agentLimiter struct{ l *ratelimit.Limiter }
+
+// agentRuntimeClass is the rate-limit class of agent.events.consume (05 section 4.10).
+const agentRuntimeClass = "rl.agent_runtime"
+
+// AllowAgent implements gatewayapp.AgentLimiter.
+func (c agentLimiter) AllowAgent(a actor.Actor) (bool, int, error) {
+	d, err := c.l.Allow(agentRuntimeClass, ratelimit.KeyForAgent(a.ID))
+	if err != nil {
+		return false, 0, err
+	}
+	return d.Allowed, d.RetryAfterSeconds, nil
+}
 
 // epochSource reads sync_epoch of the instance row.
 type epochSource struct{ i InstanceLoader }
