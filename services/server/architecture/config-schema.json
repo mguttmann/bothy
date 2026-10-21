@@ -2448,6 +2448,66 @@
       "doc": "Whether bothy migrate up refuses pending migrations without a successful backup younger than migrate.recent_backup_max_age."
     },
     {
+      "name": "notify.badge_sync_min_interval",
+      "env": "BOTHY_NOTIFY__BADGE_SYNC_MIN_INTERVAL",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Smallest interval between two badge syncs of one person."
+    },
+    {
+      "name": "notify.coalesce_window",
+      "env": "BOTHY_NOTIFY__COALESCE_WINDOW",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Bundling window per recipient and thread; zero opens no window."
+    },
+    {
+      "name": "notify.default_admin_enabled",
+      "env": "BOTHY_NOTIFY__DEFAULT_ADMIN_ENABLED",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Default of the personal switch notify.admin_enabled."
+    },
+    {
+      "name": "notify.default_input_needed_breaks_quiet_hours",
+      "env": "BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Default of the personal switch notify.input_needed_breaks_quiet_hours."
+    },
+    {
+      "name": "notify.mobile_delay_when_desktop_active",
+      "env": "BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Delay of mobile pushes while a desktop of the person is active; zero delays nothing."
+    },
+    {
       "name": "notify.user_default_level",
       "env": "BOTHY_NOTIFY__USER_DEFAULT_LEVEL",
       "kind": "enum",
@@ -2558,6 +2618,66 @@
       "max": "600",
       "chapter": "09-agenten.md",
       "doc": "Longest workspace_ref, repository_url, default_branch, model and tool name of a project binding in Unicode characters (M2-03)."
+    },
+    {
+      "name": "push.max_age",
+      "env": "BOTHY_PUSH__MAX_AGE",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "A hint not yet accepted by the provider after this age is dropped."
+    },
+    {
+      "name": "push.max_concurrent_requests",
+      "env": "BOTHY_PUSH__MAX_CONCURRENT_REQUESTS",
+      "kind": "int",
+      "default": "32",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Concurrent provider requests per process."
+    },
+    {
+      "name": "push.max_consecutive_failures",
+      "env": "BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100000",
+      "chapter": "03-datenmodell.md",
+      "doc": "Consecutive transient failures after which a push registration is deactivated."
+    },
+    {
+      "name": "push.retry_base",
+      "env": "BOTHY_PUSH__RETRY_BASE",
+      "kind": "duration",
+      "default": "2s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Base of the retry backoff of a push."
+    },
+    {
+      "name": "push.retry_cap",
+      "env": "BOTHY_PUSH__RETRY_CAP",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "13-push-benachrichtigungen.md",
+      "doc": "Largest retry backoff of a push."
     },
     {
       "name": "ratelimit.max_tracked_keys",
