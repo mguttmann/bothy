@@ -13,10 +13,17 @@ VALUES (@id, @user_id, @device_id, 'console', sqlc.narg(identity_id), @auth_meth
 
 -- name: GetConsoleAuthState :one
 -- The authentication lookup of a console request by the HMAC of its cookie: the session with the
--- state of its device and the status of its person, in one indexed query.
+-- state of its device and the status of its person, in one indexed query. step_up_user_verified
+-- reports that the last step-up was a passkey whose challenge (finished at step_up_at) stored a
+-- WebAuthn session with userVerification = required, the fact of the console rule of the fresh
+-- terminal step-up (08 section 6.3 point 3, M6-18).
 SELECT sqlc.embed(s),
        d.state  AS device_state,
-       p.status AS user_status
+       p.status AS user_status,
+       EXISTS (SELECT 1 FROM auth_challenges c
+               WHERE c.session_id = s.id AND c.purpose = 'step_up' AND c.status = 'used'
+                 AND s.step_up_method = 'passkey' AND c.finished_at = s.step_up_at
+                 AND c.webauthn_session ->> 'user_verification' = 'required') AS step_up_user_verified
 FROM auth_sessions s
 JOIN devices d ON d.id = s.device_id
 JOIN principals p ON p.id = s.user_id

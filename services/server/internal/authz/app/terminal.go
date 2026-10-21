@@ -62,6 +62,7 @@ func (a *Authorizer) terminalFacts(s *actingPrincipal, spec domain.ActionSpec, r
 		in.Fresh = domain.FreshFacts{
 			StepUpAt: s.p.StepUpTime(), StepUpConsumedAt: s.p.StepUpConsumedTime(),
 			StepUpMethod: s.p.StepUpMethodName(), ClientComponent: s.p.ClientComponentName(),
+			StepUpUserVerified: s.p.StepUpUserVerifiedFact(),
 		}
 		in.FreshMaxAge, in.ReattachWindow = a.cfg.TerminalStepUpMaxAge, a.cfg.QuickReattachWindow
 	}
@@ -125,9 +126,20 @@ var _ authz.FreshStepUpCheck = FreshCheck{}
 
 // Fresh implements authz.FreshStepUpCheck.
 func (c FreshCheck) Fresh(f authz.FreshStepUpFacts, now time.Time) bool {
-	return domain.FreshStepUp(domain.FreshFacts{
+	return domain.FreshStepUp(freshFacts(f), now, c.MaxAge)
+}
+
+// PasskeyRequired implements authz.FreshStepUpCheck with domain.ConsolePasskeyRequired.
+func (c FreshCheck) PasskeyRequired(f authz.FreshStepUpFacts) bool {
+	return domain.ConsolePasskeyRequired(freshFacts(f))
+}
+
+// freshFacts converts the facts of the port into those of the domain.
+func freshFacts(f authz.FreshStepUpFacts) domain.FreshFacts {
+	return domain.FreshFacts{
 		StepUpAt: f.StepUpAt, StepUpConsumedAt: f.StepUpConsumedAt, StepUpMethod: f.StepUpMethod, ClientComponent: f.ClientComponent,
-	}, now, c.MaxAge)
+		StepUpUserVerified: f.StepUpUserVerified,
+	}
 }
 
 // hostGuardFacts returns the stored facts of h for the guards (domain.HostFacts without the

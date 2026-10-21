@@ -84,22 +84,30 @@ const sessionDetached = "detached"
 
 // FreshFacts are the step-up facts of the session of the request (auth_sessions.step_up_at,
 // step_up_consumed_at, step_up_method and client_component); zero times stand for NULL.
+// StepUpUserVerified reports that the step-up of StepUpAt was a passkey whose stored WebAuthn
+// session (auth_challenges.webauthn_session of its challenge) required userVerification =
+// required; identity supplies it, and only the console rule reads it (08 section 6.3 point 3,
+// M6-18).
 type FreshFacts struct {
 	StepUpAt, StepUpConsumedAt    time.Time
 	StepUpMethod, ClientComponent string
+	StepUpUserVerified            bool
 }
 
-// FreshStepUp reports a fresh step-up (05 section 2.4, 08 section 6.3 points 1, 2, 4): set and
+// FreshStepUp reports a fresh step-up (05 section 2.4, 08 section 6.3 points 1 to 4): set and
 // not older than maxAge (terminal.step_up_max_age; equal is fresh), confirmed with a passkey or a
-// device key, not consumed by another opening (step_up_consumed_at NULL or before step_up_at), and
-// not in the web console, which fails closed until M6-18 adds the passkey rule with user
-// verification (08 section 6.3 point 3).
+// device key, in the web console only with a passkey whose stored WebAuthn session required user
+// verification (08 section 6.3 point 3), and not consumed by another opening
+// (step_up_consumed_at NULL or before step_up_at).
 //
 // Example:
 //
 //	ok := domain.FreshStepUp(domain.FreshFacts{StepUpAt: t, StepUpMethod: "device_key"}, now, maxAge)
 func FreshStepUp(f FreshFacts, now time.Time, maxAge time.Duration) bool {
-	if f.StepUpAt.IsZero() || now.Sub(f.StepUpAt) > maxAge || f.ClientComponent == ComponentConsole {
+	if f.StepUpAt.IsZero() || now.Sub(f.StepUpAt) > maxAge {
+		return false
+	}
+	if f.ClientComponent == ComponentConsole && (f.StepUpMethod != StepUpPasskey || !f.StepUpUserVerified) {
 		return false
 	}
 	if f.StepUpMethod != StepUpPasskey && f.StepUpMethod != StepUpDeviceKey {
@@ -107,6 +115,18 @@ func FreshStepUp(f FreshFacts, now time.Time, maxAge time.Duration) bool {
 	}
 	return f.StepUpConsumedAt.IsZero() || f.StepUpConsumedAt.Before(f.StepUpAt)
 }
+
+// ConsolePasskeyRequired reports whether a refused fresh step-up of f answers with reason
+// passkey_required: every refusal of a request of the web console (client_component console),
+// whether the step-up is missing, not a passkey with user verification (08 section 6.3 point 3),
+// too old or consumed, because the only way on in the console is a new passkey with user
+// verification (ADR 0070 items 1 and 4; TM-T12 after a detach; docs/DECISIONS.md D-M6-18-1).
+// Outside the console it is false and the refusal carries no reason.
+//
+// Example:
+//
+//	if !domain.FreshStepUp(f, now, maxAge) && domain.ConsolePasskeyRequired(f) { /* passkey_required */ }
+func ConsolePasskeyRequired(f FreshFacts) bool { return f.ClientComponent == ComponentConsole }
 
 // TerminalSessionFacts are the facts of a terminal session that the quick reattach needs
 // (terminal_sessions.state, device_id, auth_session_id and detached_at); the domain mirror of

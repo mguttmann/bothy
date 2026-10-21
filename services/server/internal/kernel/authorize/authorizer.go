@@ -38,6 +38,9 @@ type Principal interface {
 	StepUpMethodName() string
 	// StepUpConsumedTime is auth_sessions.step_up_consumed_at; zero when never consumed (M2-40).
 	StepUpConsumedTime() time.Time
+	// StepUpUserVerifiedFact reports that the step-up of StepUpTime was a passkey whose stored
+	// WebAuthn session required user verification (08 section 6.3 point 3, M6-18).
+	StepUpUserVerifiedFact() bool
 	// ClientComponentName is auth_sessions.client_component (app, share_ext, console); "" without
 	// a session (M2-40).
 	ClientComponentName() string

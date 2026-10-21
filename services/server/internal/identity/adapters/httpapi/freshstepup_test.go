@@ -198,7 +198,8 @@ func TestIDT28_ConcurrentOpeningsOneConfirmation(t *testing.T) {
 }
 
 // TestConsumeFresh_Rules (Design note 4): outside a unit of work, a revoked session, a console
-// session and a step-up that aged out between authorize and the lock.
+// session without a passkey step-up (passkey_required, M6-18) and a step-up that aged out between
+// authorize and the lock.
 func TestConsumeFresh_Rules(t *testing.T) {
 	t.Parallel()
 	w := newFreshWorld(t)
@@ -218,8 +219,12 @@ func TestConsumeFresh_Rules(t *testing.T) {
 	w.c.stepUp()
 	a = w.c.actor()
 	w.sql(`UPDATE auth_sessions SET client_component = 'console', cookie_hash = '\x01' WHERE id = $1`, w.c.session.String())
+	// A device key step-up of a console session is not the passkey with user verification the
+	// console needs (08 section 6.3 point 3, M6-18): refused with passkey_required.
 	if err := w.consume(a); errs.KindOf(err) != errs.KindStepUpRequired {
 		t.Fatalf("console session: %v", err)
+	} else if e, _ := errs.As(err); e.Reason != "passkey_required" {
+		t.Fatalf("console session: reason %q, want passkey_required", e.Reason)
 	}
 	w.sql(`UPDATE auth_sessions SET client_component = 'app', cookie_hash = NULL, revoked_at = now(), revoke_reason = 'admin' WHERE id = $1`, w.c.session.String())
 	if err := w.consume(a); errs.KindOf(err) != errs.KindUnauthenticated {

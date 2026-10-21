@@ -30,7 +30,8 @@ var tNow = time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
 
 // TestFreshStepUp (08 section 6.3 points 1, 2, 4, ID-T28): device_key and passkey are fresh,
 // password_totp and oidc_reauth never; the age edge at terminal.step_up_max_age; a consumed
-// step-up only counts again after a newer one; the console fails closed.
+// step-up only counts again after a newer one; in the console only a passkey whose stored WebAuthn
+// session required user verification (08 section 6.3 point 3, M6-18).
 func TestFreshStepUp(t *testing.T) {
 	t.Parallel()
 	at := tNow.Add(-time.Minute)
@@ -38,22 +39,60 @@ func TestFreshStepUp(t *testing.T) {
 		f    domain.FreshFacts
 		want bool
 	}{
-		"device_key fresh":               {domain.FreshFacts{StepUpAt: at, StepUpMethod: "device_key", ClientComponent: "app"}, true},
-		"passkey fresh":                  {domain.FreshFacts{StepUpAt: at, StepUpMethod: "passkey", ClientComponent: "app"}, true},
-		"password_totp fresh":            {domain.FreshFacts{StepUpAt: at, StepUpMethod: "password_totp", ClientComponent: "app"}, false},
-		"oidc_reauth fresh":              {domain.FreshFacts{StepUpAt: at, StepUpMethod: "oidc_reauth", ClientComponent: "app"}, false},
-		"age exactly max":                {domain.FreshFacts{StepUpAt: tNow.Add(-freshAge), StepUpMethod: "device_key"}, true},
-		"one nanosecond older":           {domain.FreshFacts{StepUpAt: tNow.Add(-freshAge - time.Nanosecond), StepUpMethod: "device_key"}, false},
-		"no step-up":                     {domain.FreshFacts{StepUpMethod: "device_key"}, false},
-		"consumed at the step-up":        {domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at, StepUpMethod: "device_key"}, false},
-		"consumed before a newer one":    {domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at.Add(-time.Second), StepUpMethod: "device_key"}, true},
-		"consumed after the step-up":     {domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at.Add(time.Second), StepUpMethod: "device_key"}, false},
-		"console with a fresh passkey":   {domain.FreshFacts{StepUpAt: at, StepUpMethod: "passkey", ClientComponent: "console"}, false},
+		"device_key fresh":            {domain.FreshFacts{StepUpAt: at, StepUpMethod: "device_key", ClientComponent: "app"}, true},
+		"passkey fresh":               {domain.FreshFacts{StepUpAt: at, StepUpMethod: "passkey", ClientComponent: "app"}, true},
+		"password_totp fresh":         {domain.FreshFacts{StepUpAt: at, StepUpMethod: "password_totp", ClientComponent: "app"}, false},
+		"oidc_reauth fresh":           {domain.FreshFacts{StepUpAt: at, StepUpMethod: "oidc_reauth", ClientComponent: "app"}, false},
+		"age exactly max":             {domain.FreshFacts{StepUpAt: tNow.Add(-freshAge), StepUpMethod: "device_key"}, true},
+		"one nanosecond older":        {domain.FreshFacts{StepUpAt: tNow.Add(-freshAge - time.Nanosecond), StepUpMethod: "device_key"}, false},
+		"no step-up":                  {domain.FreshFacts{StepUpMethod: "device_key"}, false},
+		"consumed at the step-up":     {domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at, StepUpMethod: "device_key"}, false},
+		"consumed before a newer one": {domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at.Add(-time.Second), StepUpMethod: "device_key"}, true},
+		"consumed after the step-up":  {domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at.Add(time.Second), StepUpMethod: "device_key"}, false},
+		"console with a fresh passkey without user verification": {domain.FreshFacts{StepUpAt: at, StepUpMethod: "passkey", ClientComponent: "console"}, false},
+		"console with a fresh passkey with user verification": {
+			domain.FreshFacts{StepUpAt: at, StepUpMethod: "passkey", StepUpUserVerified: true, ClientComponent: "console"}, true},
+		"console with a device key": {
+			domain.FreshFacts{StepUpAt: at, StepUpMethod: "device_key", StepUpUserVerified: true, ClientComponent: "console"}, false},
+		"console with password_totp": {domain.FreshFacts{StepUpAt: at, StepUpMethod: "password_totp", ClientComponent: "console"}, false},
+		"console with an old passkey": {
+			domain.FreshFacts{StepUpAt: tNow.Add(-freshAge - time.Second), StepUpMethod: "passkey", StepUpUserVerified: true, ClientComponent: "console"}, false},
+		"console with a consumed passkey": {
+			domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at, StepUpMethod: "passkey", StepUpUserVerified: true, ClientComponent: "console"}, false},
 		"share extension with a passkey": {domain.FreshFacts{StepUpAt: at, StepUpMethod: "passkey", ClientComponent: "share_ext"}, true},
 	}
 	for name, c := range cases {
 		if got := domain.FreshStepUp(c.f, tNow, freshAge); got != c.want {
 			t.Errorf("%s: FreshStepUp = %v, want %v", name, got, c.want)
+		}
+	}
+}
+
+// TestConsolePasskeyRequired (08 section 6.3 point 3, ID-T28, TM-T12, M6-18): in the console every
+// refused fresh step-up answers with reason passkey_required (missing, not a UV passkey, old or
+// consumed: the only way on is a new UV passkey); outside the console never.
+func TestConsolePasskeyRequired(t *testing.T) {
+	t.Parallel()
+	at := tNow.Add(-time.Minute)
+	cases := map[string]struct {
+		f    domain.FreshFacts
+		want bool
+	}{
+		"console without a step-up":         {domain.FreshFacts{ClientComponent: "console"}, true},
+		"console with password_totp":        {domain.FreshFacts{StepUpAt: at, StepUpMethod: "password_totp", ClientComponent: "console"}, true},
+		"console with oidc_reauth":          {domain.FreshFacts{StepUpAt: at, StepUpMethod: "oidc_reauth", ClientComponent: "console"}, true},
+		"console with a passkey without uv": {domain.FreshFacts{StepUpAt: at, StepUpMethod: "passkey", ClientComponent: "console"}, true},
+		"console with a device key":         {domain.FreshFacts{StepUpAt: at, StepUpMethod: "device_key", StepUpUserVerified: true, ClientComponent: "console"}, true},
+		"console with an old uv passkey": {
+			domain.FreshFacts{StepUpAt: tNow.Add(-time.Hour), StepUpMethod: "passkey", StepUpUserVerified: true, ClientComponent: "console"}, true},
+		"console with a consumed uv passkey": {
+			domain.FreshFacts{StepUpAt: at, StepUpConsumedAt: at, StepUpMethod: "passkey", StepUpUserVerified: true, ClientComponent: "console"}, true},
+		"app with password_totp": {domain.FreshFacts{StepUpAt: at, StepUpMethod: "password_totp", ClientComponent: "app"}, false},
+		"app without a step-up":  {domain.FreshFacts{ClientComponent: "app"}, false},
+	}
+	for name, c := range cases {
+		if got := domain.ConsolePasskeyRequired(c.f); got != c.want {
+			t.Errorf("%s: ConsolePasskeyRequired = %v, want %v", name, got, c.want)
 		}
 	}
 }
