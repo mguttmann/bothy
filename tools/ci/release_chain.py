@@ -307,9 +307,10 @@ def sign(
 ) -> None:
     """Sign every image digest, every binary and SHA256SUMS (after checking the SBOMs).
 
-    Writes `images.txt` (`<name> <repo>@<digest>` per image), one `<image>.sigstore.json` per
-    image, a `.sigstore.json` bundle next to every binary and SHA256SUMS. In the private phase
-    the private key comes from COSIGN_PRIVATE_KEY and its password from COSIGN_PASSWORD.
+    Writes `images.txt` (`<name> <repo>@<digest>` per image; not without images), one
+    `<image>.sigstore.json` per image, a `.sigstore.json` bundle next to every binary and
+    SHA256SUMS. In the private phase the private key comes from COSIGN_PRIVATE_KEY and its
+    password from COSIGN_PASSWORD.
 
     Raises:
         ChainError: an SBOM is missing, the mode is unknown, a key is missing, cosign failed or
@@ -332,9 +333,11 @@ def sign(
         for img in images:
             bundle = dist / f"{img.name}{BUNDLE_SUFFIX}"
             tools([tools.cosign, "sign", "--yes", *keys, "--bundle", str(bundle), img.ref])
-        (dist / IMAGES_FILE).write_text(
-            "".join(f"{img.name} {img.ref}\n" for img in images), encoding="utf-8"
-        )
+        # The product release signs files only; an empty list would be a misleading asset.
+        if images:
+            (dist / IMAGES_FILE).write_text(
+                "".join(f"{img.name} {img.ref}\n" for img in images), encoding="utf-8"
+            )
         for blob in binaries:
             bundle = Path(f"{blob}{BUNDLE_SUFFIX}")
             tools([tools.cosign, "sign-blob", "--yes", *keys, "--bundle", str(bundle), str(blob)])

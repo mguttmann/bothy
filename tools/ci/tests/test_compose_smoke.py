@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -332,6 +333,57 @@ def test_dockerfile_production_stage_last_and_smoke_target_exists() -> None:
 # ---- release bundle -----------------------------------------------------------------------
 
 _DROPPED = {"MAKEFLAGS", "MAKELEVEL", "MFLAGS", "VERSION", "OUT"}
+# Registry stub of the product release: every image exists (docs/spec/18-release.md 2.1 rule 4).
+_REGISTRY_STUB = "#!/bin/sh\nexit 0\n"
+
+
+def _bundle_fixture(root: Path) -> Path:
+    """A git repository with this repository's bundle files and a pinned server version.
+
+    `make release-build` refuses the placeholder of the committed template (18 2.1 rule 4), so
+    the bundle is built from a fixture commit, as in test_release_build_bothy.py (brief M7-29
+    requirement 22).
+    """
+    repo = root / "fixture"
+    names = [
+        *subprocess.run(
+            [
+                "git",
+                "-C",
+                str(REPO),
+                "ls-files",
+                "--",
+                "infra/compose",
+                "infra/otel",
+                "infra/observability",
+                "LICENSE",
+                "NOTICE",
+                "CHANGELOG.md",
+                "VERSION",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split(),
+        "infra/compose/install.sh",
+    ]
+    for name in names:
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO / name, repo / name)
+    env_file = repo / "infra" / "compose" / ".env.example"
+    env_file.write_text(
+        re.sub(
+            r"^BOTHY_VERSION=.*$",
+            "BOTHY_VERSION=1.4.0",
+            env_file.read_text(encoding="utf-8"),
+            flags=re.MULTILINE,
+        ),
+        encoding="utf-8",
+    )
+    ident = ["-c", "user.name=Alex", "-c", "user.email=alex@example.com"]
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "test: fixture"]):
+        subprocess.run(["git", "-C", str(repo), *ident, *args], check=True, capture_output=True)
+    return repo
 
 
 def test_release_bundle_excludes_smoke_overlay(tmp_path: Path) -> None:
@@ -342,10 +394,28 @@ def test_release_bundle_excludes_smoke_overlay(tmp_path: Path) -> None:
         check=False,
     )
     assert tracked.returncode == 0, "the overlay is not tracked; the test would pass vacuously"
-    version = (REPO / "VERSION").read_text(encoding="utf-8").strip()
+    repo = _bundle_fixture(tmp_path)
+    version = (repo / "VERSION").read_text(encoding="utf-8").strip()
+    stub = tmp_path / "docker"
+    stub.write_text(_REGISTRY_STUB, encoding="utf-8")
+    stub.chmod(0o755)
     env = {k: v for k, v in os.environ.items() if k not in _DROPPED}
+    env.update({"GITHUB_REPOSITORY_OWNER": "example", "GITHUB_REPOSITORY": "example/bothy"})
+    out = tmp_path / "out"
     result = subprocess.run(
-        ["make", "-s", "-C", str(REPO), "release-build", f"VERSION={version}", f"OUT={tmp_path}"],
+        [
+            sys.executable,
+            str(REPO / "tools" / "ci" / "product_release.py"),
+            "build",
+            "--repo",
+            str(repo),
+            "--version",
+            version,
+            "--out",
+            str(out),
+            "--docker",
+            str(stub),
+        ],
         env=env,
         capture_output=True,
         text=True,
@@ -353,7 +423,7 @@ def test_release_bundle_excludes_smoke_overlay(tmp_path: Path) -> None:
         timeout=300,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    with tarfile.open(tmp_path / f"bothy-compose-{version}.tar.gz") as archive:
+    with tarfile.open(out / f"bothy-compose-{version}.tar.gz") as archive:
         members = archive.getnames()
     prefix = f"bothy-{version}/"
     assert prefix + "infra/compose/compose.yaml" in members

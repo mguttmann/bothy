@@ -144,8 +144,8 @@ TOOLS_SOURCE_TESTS := ci/tests/test_product_name_places.py docs/tests/test_confi
         sonar sonar-scan sonar-up sonar-down sonar-config sonar-config-check sonar-main-branch sonar-visibility sonar-new-code semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check app-config event-catalog contract-documents catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-breaking api-tables api-clients \
-        runners-check release-pins commitlint \
-        review labels-check labels-sync tools-lock release-build release-prep release-trial scancode clean \
+        runners-check release-pins install-options commitlint \
+        review labels-check labels-sync tools-lock release-build release-prep release-trial scancode install-test clean \
         codegen-check arch register-check migrations-lint migrations-lock sql-visibility flag-check perf ops-check signal-check \
         image image-test postgres-image postgres-image-test apps-platform contract-test
 
@@ -192,7 +192,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint sql-visibility flag-check test coverage contract-test commitlint \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check signal-check \
-       api-clients tokens runners-check labels-check release-pins gitleaks semgrep trivy osv licenses
+       api-clients tokens runners-check labels-check release-pins install-options gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
 fmt: ## Format all code in place
@@ -225,6 +225,9 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
 	$(UVRUN) check-jsonschema --schemafile https://coderabbit.ai/integrations/schema.v2.json .coderabbit.yaml
 	$(call tool,actionlint) -shellcheck= -pyflakes= .github/workflows/*.yml
+	@# Shell scripts of the Compose installation and their tests (brief M7-29); each file's shebang
+	@# selects the dialect, install.sh is POSIX sh (docs/spec/16-operations.md 3.1 rule 5).
+	$(call tool,shellcheck) $$(git ls-files -- 'infra/compose/*.sh' 'infra/compose/test/install/*.sh' 'infra/compose/test/install/stubs/*')
 	@if [ -n "$${GH_TOKEN:-}" ]; then $(UVRUN) zizmor --min-severity low .github/workflows; \
 	else echo "  zizmor: offline (set GH_TOKEN for the online audits)"; $(UVRUN) zizmor --offline --min-severity low .github/workflows; fi
 	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
@@ -297,6 +300,9 @@ test: ## All tests with coverage data
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p test; done; fi
+	@# The setup wizard infra/compose/install.sh with stubs, in a pinned container (docs/quality/gates.md).
+	@if [ ! -f infra/compose/test/install/run.sh ]; then $(call skip,install-test,no tests of infra/compose/install.sh); \
+	else $(MAKE) --no-print-directory install-test || exit 1; fi
 
 # G7 (06 "Contract tests and gate"): the Go test starts the server of this tree with a throwaway
 # PostgreSQL and runs tools/contract/live_contract.py (Schemathesis) against it; G8 validates its
@@ -609,6 +615,9 @@ runners-check: ## Workflow policy: GitHub-hosted runners, triggers, SHA pinning,
 release-pins: ## Server version pinned by the product bundle: SemVer, no server pre-release in a stable product (docs/spec/18-release.md 2.1)
 	$(UVRUN) python tools/ci/components.py pins
 
+install-options: ## Options of the portability test equal 16 3.1; documented install command names VERSION (brief M7-29)
+	$(UVRUN) python tools/ci/install_options_check.py check
+
 gitleaks: ## Secret scan of every commit reachable from HEAD (all refs: GITLEAKS_LOG_OPTS=--all)
 	$(call tool,gitleaks) git --config .gitleaks.toml --redact --no-banner --log-opts="$(GITLEAKS_LOG_OPTS)" $(GITLEAKS_FLAGS) .
 
@@ -722,26 +731,30 @@ sonar-new-code: ## Give the SonarQube Cloud project the new code of the last 30 
 	  $(UVRUN) python tools/sonarqube/quality_sync.py new-code
 
 # ---- release support ------------------------------------------------------------------
-release-build: ## Product release bundle (tag v<version>): Compose installation, license, changelog
+# Product release (docs/spec/18-release.md 2.1): the bundle with the server version of the commit and
+# the registry ghcr.io/<owner> (GITHUB_REPOSITORY_OWNER), and install.sh with version, checksum
+# and download address (GITHUB_REPOSITORY). The images are checked with `docker manifest inspect`,
+# so the release job logs in to ghcr.io first. Trial only: RELEASE_TRIAL_REGISTRY and
+# RELEASE_TRIAL_BASE_URL (refused under GitHub Actions; docs/DECISIONS.md D-M7-29-3).
+release-build: ## Product release bundle and install.sh (tag v<version>): make release-build VERSION=<x.y.z> OUT=<dir>
 	@[ -n "$${OUT:-}" ] && [ -n "$${VERSION:-}" ] || { echo "usage: make release-build VERSION=<x.y.z> OUT=<dir>"; exit 2; }
-	@[ -f infra/compose/compose.yaml ] || { echo "release-build: infra/compose/compose.yaml is missing"; exit 1; }
-	@[ "$$(cat VERSION)" = "$$VERSION" ] || { echo "release-build: VERSION file says $$(cat VERSION), not $$VERSION"; exit 1; }
-	mkdir -p "$$OUT"
-	git archive --format=tar.gz --prefix="bothy-$$VERSION/" -o "$$OUT/bothy-compose-$$VERSION.tar.gz" HEAD \
-	  infra/compose ':(exclude)infra/compose/test' LICENSE NOTICE CHANGELOG.md VERSION
+	$(UVRUN) python tools/ci/product_release.py build --version "$$VERSION" --out "$$OUT"
 
-release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPONENT=<name> [CHANNEL=beta]
-	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-prep COMPONENT=<name> [CHANNEL=beta]"; exit 2; }
+# SERVER_VERSION also names the server version of the image targets (from services/server/VERSION);
+# only a value given on the command line is the pin of the product bundle (ADR 0060 item 6).
+release-prep: ## Prepare a component release (ADR 0060): make release-prep COMPONENT=<name> [CHANNEL=beta] [SERVER_VERSION=<v>, product only]
+	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-prep COMPONENT=<name> [CHANNEL=beta] [SERVER_VERSION=<version>]"; exit 2; }
 	@gc=$(call tool,git-cliff) || exit 1; \
-	$(UVRUN) python tools/ci/release_prep.py --component "$$COMPONENT" --channel "$${CHANNEL:-stable}" --git-cliff "$$gc"
+	$(UVRUN) python tools/ci/release_prep.py --component "$$COMPONENT" --channel "$${CHANNEL:-stable}" --git-cliff "$$gc" \
+	  $(if $(filter command line,$(origin SERVER_VERSION)),--server-version '$(SERVER_VERSION)')
 
 # Trial release (D-W-127): the release steps of a component against a local registry on
 # 127.0.0.1, a throwaway cosign key pair and a temporary directory, then the verification an
 # instance operator runs. Never under GitHub Actions; never a tag, a release or a remote push.
 # TRIAL_PLATFORMS narrows the platforms (default: linux/amd64,linux/arm64).
 TRIAL_PLATFORMS ?=
-release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server
-	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=server [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
+release-trial: ## Trial release against local throwaway targets: make release-trial COMPONENT=server or COMPONENT=bothy (product)
+	@[ -n "$${COMPONENT:-}" ] || { echo "usage: make release-trial COMPONENT=<server or the product> [TRIAL_PLATFORMS=linux/amd64,linux/arm64]"; exit 2; }
 	@[ -z "$${GITHUB_ACTIONS:-}" ] || { echo "release-trial: refuses to run under GitHub Actions" >&2; exit 2; }
 	@docker buildx version >/dev/null 2>&1 || { echo "release-trial: docker buildx is required (CONTRIBUTING.md)" >&2; exit 1; }
 	@cosign=$(call tool,cosign) && syft=$(call tool,syft) || exit 1; \
@@ -836,6 +849,16 @@ postgres-image-test: ## Two-container test of bothy-postgres: archive-push, full
 	cd services/server && "$$gl" run --build-tags imagetest ./test/postgresimage/... || exit 1; \
 	BOTHY_TEST_IMAGE='$(or $(POSTGRES_IMAGE),$(POSTGRES_IMAGE_NAME):$(POSTGRES_IMAGE_TAG))' BOTHY_TEST_IMAGE_OCI='$(abspath $(POSTGRES_IMAGE_OCI))' \
 	  go test -tags imagetest -count=1 -v -timeout 20m ./test/postgresimage/... || exit 1
+
+# Tests of the setup wizard (brief M7-29): POSIX shell tests with stubs for docker, curl, cosign
+# and sudo (infra/compose/test/install/README.md). They run in the pinned Debian container, so the
+# shell is dash as on most Linux hosts; INSTALL_TEST_NATIVE=1 runs them on this host instead
+# (macOS /bin/sh). The repository is mounted read-only; the tests write only to their own temp dir.
+INSTALL_TEST_IMAGE := debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+install-test: ## Tests of infra/compose/install.sh with stubs (container; INSTALL_TEST_NATIVE=1 on the host)
+	@if [ "$${INSTALL_TEST_NATIVE:-0}" = 1 ]; then sh infra/compose/test/install/run.sh; \
+	else docker info >/dev/null 2>&1 || { echo "install-test: no Docker runtime reachable; set INSTALL_TEST_NATIVE=1 or start Docker (P-09)" >&2; exit 1; }; \
+	  docker run --rm --network none -v "$(CURDIR):/src:ro" '$(INSTALL_TEST_IMAGE)' sh /src/infra/compose/test/install/run.sh; fi
 
 portability: ## Compose smoke test with the server image (SMOKE_SERVER_IMAGE, default the tag of make image; infra/compose/test/README.md)
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }

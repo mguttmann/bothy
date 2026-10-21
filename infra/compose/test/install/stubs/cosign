@@ -1,0 +1,8 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+#
+# Stub of cosign for the tests of install.sh (README.md next to this folder): appends its
+# arguments to STUB_LOG and exits with STUB_COSIGN_EXIT (default 0, a valid signature).
+
+printf 'cosign %s\n' "$*" >>"${STUB_LOG:?STUB_LOG is not set}"
+exit "${STUB_COSIGN_EXIT:-0}"

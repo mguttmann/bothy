@@ -14,14 +14,26 @@ of the component's CHANGELOG.md becomes `[X.Y.Z] - <date>` under a new empty "Un
 `VERSION` gets the version, and the commits of the component that did not change its
 CHANGELOG.md are printed as a checklist.
 
-Everything is computed before the first write: on any error neither file changes. The script
+For the product `bothy` (ADR 0060 item 6, docs/spec/18-release.md section 2.1 rule 1) the
+same run also writes the server version the bundle installs: `--server-version V`
+(`SERVER_VERSION=` of `make release-prep`) replaces the one line `BOTHY_VERSION=` of
+infra/compose/.env.example with V, if V is SemVer without "v", the tag `server/vV` exists and
+V carries no pre-release identifier unless the channel is beta. Without `--server-version`
+the line stays as it is, unless it still carries the placeholder. The documented
+installation command in README.md and docs/operations/install-compose.md names the product
+version (`.../releases/download/v<version>/install.sh`, held equal to VERSION by
+tools/ci/install_options_check.py); every such URL gets the new version.
+
+Everything is computed before the first write: on any error no file changes. The script
 never commits and never tags; the maintainer reviews, commits `chore(release): ...` and sets the
 signed tag after the merge (ADR 0060 item 4).
 
 Usage:
   release_prep.py --component <name> --git-cliff <path> [--channel stable|beta]
-                  [--repo <dir>] [--config <cliff.toml>] [--date YYYY-MM-DD]
-Exit codes: 0 prepared, 1 nothing written because of an error (named on stderr).
+                  [--server-version <version>] [--repo <dir>] [--config <cliff.toml>]
+                  [--date YYYY-MM-DD]
+Exit codes: 0 prepared, 1 nothing written because of an error (named on stderr), 2 usage
+error (for example `--server-version` for a component other than `bothy`).
 """
 
 from __future__ import annotations
@@ -38,6 +50,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import components
+import install_options_check
 
 CHANNELS = ("stable", "beta")
 # First version of a component that has no stable tag yet.
@@ -48,6 +61,10 @@ _HEADING = re.compile(r"^## ", re.MULTILINE)
 _CONVENTIONAL = re.compile(r"^([A-Za-z]+)(?:\([^)]*\))?!?:")
 # Commit types that give a patch release; other types without a break give none.
 PATCH_KINDS = frozenset({"fix", "perf"})
+# The component whose bundle pins the server version (docs/spec/18-release.md, 2.1).
+PRODUCT = "bothy"
+# The line of the bundle template; the prefix group keeps any indentation as it is.
+_PIN_LINE = re.compile(r"^([ \t]*BOTHY_VERSION=)(.*)$", re.MULTILINE)
 
 
 class ReleasePrepError(Exception):
@@ -73,6 +90,8 @@ class Result:
         changelog: repository-relative path of the changed CHANGELOG.md.
         version_file: repository-relative path of the changed VERSION.
         checklist: commits since the last stable tag that did not change the changelog.
+        other_files: further written files of the product `bothy`: the bundle template and
+            the files with the documented installation command.
     """
 
     component: str
@@ -81,6 +100,7 @@ class Result:
     changelog: str
     version_file: str
     checklist: list[Commit]
+    other_files: tuple[str, ...] = ()
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -255,6 +275,113 @@ def checklist(repo: Path, rev_range: str, paths: tuple[str, ...], changelog: str
     return out
 
 
+def pin_server_version(
+    text: str, server_version: str | None, *, channel: str, server_tags: set[str]
+) -> str:
+    r"""Return the bundle template with the server version pinned (18 section 2.1 rule 1).
+
+    Args:
+        text: infra/compose/.env.example.
+        server_version: the value of `SERVER_VERSION`, None when it was not given.
+        channel: `stable` or `beta` of the product release.
+        server_tags: the existing tags `server/v...` of the repository.
+
+    Returns:
+        The text with exactly the line `BOTHY_VERSION=` replaced by `server_version`, or
+        unchanged without one; every other byte stays.
+
+    Raises:
+        ReleasePrepError: not exactly one such line; without `server_version` the line still
+            carries the placeholder; `server_version` is not SemVer without "v", its tag
+            `server/v<version>` is missing, or it is a pre-release in a stable product.
+
+    Example: `pin_server_version("BOTHY_VERSION=0.0.0-placeholder\n", "1.4.0",
+    channel="stable", server_tags={"server/v1.4.0"})` is `"BOTHY_VERSION=1.4.0\n"`.
+    """
+    template = components.BUNDLE_ENV_TEMPLATE
+    lines = list(_PIN_LINE.finditer(text))
+    if len(lines) != 1:
+        raise ReleasePrepError(
+            f"{template}: expected exactly one line BOTHY_VERSION=, found {len(lines)}"
+        )
+    line = lines[0]
+    if server_version is None:
+        if line.group(2).strip() == components.SERVER_VERSION_PLACEHOLDER:
+            raise ReleasePrepError(
+                f"{template} still pins {components.SERVER_VERSION_PLACEHOLDER}; give the"
+                " server version of the bundle with SERVER_VERSION=<version>"
+            )
+        return text
+    # The private SemVer pattern is the one components.py checks the committed pin with, so
+    # release-prep cannot write a value that release-pins rejects.
+    semver = components._SEMVER.match(server_version)
+    if semver is None:
+        raise ReleasePrepError(
+            f"SERVER_VERSION '{server_version}' is not a SemVer version without 'v'"
+        )
+    if f"server/v{server_version}" not in server_tags:
+        raise ReleasePrepError(
+            f"SERVER_VERSION {server_version}: the tag server/v{server_version} does not exist"
+        )
+    if semver.group(4) and channel != "beta":
+        raise ReleasePrepError(
+            f"SERVER_VERSION {server_version} is a server pre-release: a stable product pins no"
+            " server pre-release; use CHANNEL=beta"
+        )
+    return f"{text[: line.start()]}{line.group(1)}{server_version}{text[line.end() :]}"
+
+
+def documented_command(text: str, name: str, version: str) -> str:
+    """Return a file with every documented installation command naming `version`.
+
+    Only URLs of the form `https://github.com/<owner>/bothy/releases/download/v<X>/install.sh`
+    change (pattern `install_options_check.INSTALL_URL`); X becomes `version`.
+
+    Args:
+        text: README.md or docs/operations/install-compose.md.
+        name: the file's repository path, for the message.
+        version: the new product version.
+
+    Returns:
+        The new text.
+
+    Raises:
+        ReleasePrepError: the text names no such URL.
+    """
+
+    def replace(m: re.Match[str]) -> str:
+        return f"https://github.com/{m['owner']}/bothy/releases/download/v{version}/install.sh"
+
+    new, count = install_options_check.INSTALL_URL.subn(replace, text)
+    if count == 0:
+        raise ReleasePrepError(
+            f"{name} names no installation command"
+            " (https://github.com/OWNER/bothy/releases/download/v<version>/install.sh)"
+        )
+    return new
+
+
+def _product_files(
+    repo: Path, version: str, server_version: str | None, channel: str
+) -> dict[str, str]:
+    """Return the new text of each further file of a product release, keyed by path."""
+    out: dict[str, str] = {}
+    template = repo / components.BUNDLE_ENV_TEMPLATE
+    if not template.is_file():
+        raise ReleasePrepError(f"{components.BUNDLE_ENV_TEMPLATE} is missing")
+    server_tags = set(_git(repo, "tag", "--list", "server/v*").split())
+    text = template.read_text(encoding="utf-8")
+    pinned = pin_server_version(text, server_version, channel=channel, server_tags=server_tags)
+    if pinned != text:
+        out[components.BUNDLE_ENV_TEMPLATE] = pinned
+    for name in install_options_check.DOCUMENTED_COMMAND_FILES:
+        path = repo / name
+        if not path.is_file():
+            raise ReleasePrepError(f"{name} is missing; it names the installation command")
+        out[name] = documented_command(path.read_text(encoding="utf-8"), name, version)
+    return out
+
+
 def _write(path: Path, text: str) -> None:
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -270,8 +397,9 @@ def prepare(
     git_cliff: Path,
     config: Path,
     date: str | None = None,
+    server_version: str | None = None,
 ) -> Result:
-    """Prepare the release of one component (ADR 0060 items 1 to 3).
+    """Prepare the release of one component (ADR 0060 items 1 to 3 and 6).
 
     Args:
         component: a release component of tools/ci/components.py.
@@ -280,13 +408,17 @@ def prepare(
         git_cliff: the pinned git-cliff binary.
         config: cliff.toml.
         date: release date `YYYY-MM-DD`, today (UTC) when None.
+        server_version: `SERVER_VERSION`, the server version the product bundle pins; only
+            for the component `bothy`.
 
     Returns:
         The written version, its tag, the changed files and the checklist.
 
     Raises:
-        ReleasePrepError: unknown component or channel, nothing to release, a tag that git-cliff
-            cannot see, or a changelog problem; nothing is written then.
+        ReleasePrepError: unknown component or channel, `server_version` for another component,
+            nothing to release, a tag that git-cliff cannot see, a changelog problem, or for
+            `bothy` a problem of the server pin or the documented installation command
+            (`pin_server_version`, `documented_command`); nothing is written then.
 
     Example:
         `prepare("server", repo=Path("."), git_cliff=..., config=Path("cliff.toml"))` turns
@@ -294,6 +426,11 @@ def prepare(
     """
     if channel not in CHANNELS:
         raise ReleasePrepError(f"CHANNEL must be stable or beta, not '{channel}'")
+    if server_version is not None and component != PRODUCT:
+        raise ReleasePrepError(
+            f"--server-version (SERVER_VERSION) applies only to the component {PRODUCT},"
+            f" not to '{component}'"
+        )
     try:
         prefix = components.tag_prefix(component)
         paths = components.release_paths(component)
@@ -335,11 +472,20 @@ def prepare(
         date or datetime.datetime.now(datetime.UTC).date().isoformat(),
         stable_of_beta,
     )
+    others = _product_files(repo, version, server_version, channel) if component == PRODUCT else {}
     todo = checklist(repo, rev_range, paths, rel("CHANGELOG.md"))
     _write(changelog_path, new_changelog)
     _write(repo / rel("VERSION"), version + "\n")
+    for name, text in others.items():
+        _write(repo / name, text)
     return Result(
-        component, version, f"{prefix}v{version}", rel("CHANGELOG.md"), rel("VERSION"), todo
+        component,
+        version,
+        f"{prefix}v{version}",
+        rel("CHANGELOG.md"),
+        rel("VERSION"),
+        todo,
+        tuple(others),
     )
 
 
@@ -352,7 +498,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--git-cliff", type=Path, required=True)
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--date", default=None)
+    parser.add_argument("--server-version", default=None)
     args = parser.parse_args(argv)
+    # An empty SERVER_VERSION from make means "not given", like a missing one.
+    server_version = args.server_version or None
+    if server_version is not None and args.component != PRODUCT:
+        parser.error(f"--server-version applies only to the component {PRODUCT}")
     config = args.config or args.repo / "cliff.toml"
     try:
         res = prepare(
@@ -362,12 +513,13 @@ def main(argv: list[str] | None = None) -> int:
             git_cliff=args.git_cliff,
             config=config,
             date=args.date,
+            server_version=server_version,
         )
     except (ReleasePrepError, subprocess.CalledProcessError) as exc:
         print(f"release-prep: {exc}", file=sys.stderr)
         return 1
     print(f"release-prep: {res.component} {res.version} (tag {res.tag})")
-    print(f"  wrote {res.version_file} and {res.changelog}")
+    print(f"  wrote {', '.join((res.version_file, res.changelog, *res.other_files))}")
     if res.checklist:
         print(f"  commits without a change to {res.changelog} (does the section cover them?):")
         for c in res.checklist:

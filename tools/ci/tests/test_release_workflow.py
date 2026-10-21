@@ -122,3 +122,38 @@ def test_publish_takes_the_signed_server_set_by_id() -> None:
     signed = [s for s in publish if s.get("name") == "Signed artifacts of the server"]
     assert signed
     assert signed[0]["with"]["artifact-ids"] == "${{ needs.supply-chain.outputs.dist_id }}"
+
+
+def test_product_build_logs_in_before_release_build_and_signs_bundle_and_install_sh() -> None:
+    """Brief M7-29: release-build of the product checks the images in ghcr.io, so the build job logs
+    in first; the bundle and install.sh are signed and verified like every release file."""
+    build = steps("build")
+    login = [
+        i
+        for i, s in enumerate(build)
+        if str(s.get("uses", "")).startswith("docker/login-action@")
+        and "'bothy'" in str(s.get("if", ""))
+    ]
+    make = index_of("build", "release-build")
+    assert login
+    assert make
+    assert login[0] < make[0]
+    job = jobs()["product-signing"]
+    assert job["environment"] == "release"
+    assert job["if"] == "needs.resolve.outputs.component == 'bothy'"
+    runs = " ".join(str(s.get("run", "")) for s in job["steps"])
+    for needle in (
+        "release_chain.py sbom",
+        "release_chain.py sign --mode private",
+        "release_chain.py verify --mode private",
+        "release_chain.py sign --mode public",
+        "release_chain.py verify --mode public",
+    ):
+        assert needle in runs, needle
+    assert "bothy-compose-${VERSION}.tar.gz" in runs
+    assert "dist/install.sh" in runs
+    assert "refs/tags/v" in runs
+    publish = steps("publish")
+    signed = [s for s in publish if s.get("name") == "Signed artifacts of the product"]
+    assert signed[0]["with"]["artifact-ids"] == "${{ needs.product-signing.outputs.dist_id }}"
+    assert "product-signing" in jobs()["publish"]["needs"]

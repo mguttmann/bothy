@@ -5,7 +5,7 @@ The lock file tools/bin/tools.lock.json names version, release asset and sha256 
 platform. A binary is only installed after its archive matched the pinned sha256;
 a cached binary is re-checked against a stamp of its own hash on every use.
 
-An asset is a raw binary (empty `member`), a gzip-compressed tar archive or a zip
+An asset is a raw binary (empty `member`), a gzip- or xz-compressed tar archive or a zip
 archive (recognised by its signature; Loki publishes only zip assets). In both archive
 forms the `member` must exist and be a regular file; an archive that cannot be read is
 an error (exit 1) like a wrong checksum, not a traceback.
@@ -153,7 +153,7 @@ def _extract(data: bytes, member: str, name: str) -> bytes:
     Returns:
         `data` itself for a raw binary, else the content of `member`. A zip archive
         (signature `PK\x03\x04`, Loki publishes nothing else) is read with zipfile, any
-        other archive as gzip-compressed tar. Nothing is written to disk by member name,
+        other archive as gzip- or xz-compressed tar. Nothing is written to disk by member name,
         so no archive path can reach outside the cache; `load_lock` rejects absolute
         members and `..` anyway.
 
@@ -172,8 +172,9 @@ def _extract(data: bytes, member: str, name: str) -> bytes:
 
 
 def _extract_tar(data: bytes, member: str, name: str) -> bytes:
-    """Read `member` from a gzip-compressed tar archive (see `_extract`)."""
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
+    """Read `member` from a gzip- or xz-compressed tar archive (see `_extract`)."""
+    # "r:*" lets tarfile detect the compression; ShellCheck publishes only .tar.xz assets.
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as tf:
         try:
             info = tf.getmember(member)
         except KeyError as exc:

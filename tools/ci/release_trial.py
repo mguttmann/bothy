@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Trial release on the build host: `make release-trial COMPONENT=server` (D-W-127).
+"""Trial release on the build host: `make release-trial COMPONENT=<name>` (D-W-127).
 
 Runs the release targets of a component against throwaway local targets and verifies the
 result like an instance operator, so the chain has run once for real before the owner sets the
@@ -19,6 +19,20 @@ first tag (RK-57, docs/operations/release.md section 2). For `server`:
 6. three negative probes that must fail: a changed file against SHA256SUMS, an unsigned digest
    against `cosign verify`, a release without one SBOM against `sign`.
 
+For `bothy` (the product, brief M7-29 Design note 3) the trial first runs every step of `server`
+above, then, against the same local registry:
+
+7. a throwaway git repository with the bundle paths of the commit and `BOTHY_VERSION` pinned to
+   the server version of this trial (the committed template carries the placeholder);
+8. `tools/ci/product_release.py` (the code of `make release-build`) with
+   `RELEASE_TRIAL_REGISTRY=<the local registry>` and `RELEASE_TRIAL_BASE_URL` pointing at a static
+   HTTP server on 127.0.0.1 that serves the result;
+9. the check an installation makes: `install.sh` and the bundle downloaded from that address,
+   the bundle's SHA-256 equal to the value built into `install.sh`, `BOTHY_REGISTRY` and
+   `BOTHY_VERSION` of the bundle equal to the trial registry and server version, every image the
+   bundle's `compose.yaml` names present there with the signed digest, and `docker pull` of each
+   by the Docker daemon (as Compose pulls them). The pulled images are removed again.
+
 It never pushes to another registry, never tags the repository, never creates a release, and it
 refuses to run when GITHUB_ACTIONS is set, so it never runs with release credentials. The key
 pair, the registry, the buildx builder and the temporary directory are removed at the end,
@@ -26,23 +40,30 @@ also after a failure. Vulnerability scan and ScanCode are not part of the trial;
 separate targets (`make trivy-image`, `make scancode`) that release.yml runs.
 
 Usage:
-  release_trial.py --component server [--platforms linux/amd64,linux/arm64]
+  release_trial.py --component <name> [--platforms linux/amd64,linux/arm64]
                    [--cosign <path>] [--syft <path>] [--keep]
+  <name> is "server" or "bothy" (the product).
 Exit codes: 0 trial passed, 1 a step failed, 2 refused (GitHub Actions) or bad arguments.
 """
 
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
+import http.server
+import io
 import json
 import os
 import platform
 import re
 import secrets
 import shutil
+import subprocess
 import sys
+import tarfile
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -51,6 +72,7 @@ from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+import product_release
 import release_chain as chain
 import yaml
 
@@ -59,7 +81,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_IMAGE = (
     "registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
 )
-COMPONENTS = ("server",)
+COMPONENTS = ("server", "bothy")
 SUPPORTED_PLATFORMS = ("linux/amd64", "linux/arm64")
 SOURCE_URL = "https://github.com/OWNER/bothy"
 _MANIFEST_TYPES = ", ".join(
@@ -323,6 +345,107 @@ class Trial:
                 )
         return refs
 
+    def product_repo(self) -> Path:
+        """A throwaway repository with the bundle paths of HEAD and the server version pinned.
+
+        The committed template carries the placeholder until the first product release; the
+        trial pins the server version it has just released, as `make release-prep
+        COMPONENT=bothy SERVER_VERSION=<version>` would, and commits it there.
+        """
+        repo = self.workdir / "product-repo"
+        repo.mkdir()
+        paths = [*product_release.BUNDLE_PATHS, product_release.INSTALL_SOURCE]
+        try:
+            raw = subprocess.run(
+                ["git", "-C", str(self.repo), "archive", "--format=tar", "HEAD", *paths],
+                check=True,
+                capture_output=True,
+            ).stdout
+        except subprocess.CalledProcessError as exc:
+            raise TrialError(f"git archive of the bundle paths failed: {exc.stderr!r}") from exc
+        with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
+            archive.extractall(repo, filter="data")
+        env_file = repo / product_release.ENV_TEMPLATE
+        text = env_file.read_text(encoding="utf-8")
+        env_file.write_text(
+            re.sub(r"^BOTHY_VERSION=.*$", f"BOTHY_VERSION={self.version}", text, flags=re.M),
+            encoding="utf-8",
+        )
+        ident = ["-c", "user.name=Release trial", "-c", "user.email=trial@example.com"]
+        for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "trial: pin server"]):
+            self.tools(["git", "-C", str(repo), *ident, *args])
+        return repo
+
+    @contextmanager
+    def static_server(self, root: Path) -> Iterator[str]:
+        """Serve `root` over HTTP on 127.0.0.1 with a random port; yield the base address."""
+        handler = functools.partial(_QuietHandler, directory=str(root))
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_address[1]}/"
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def product(self, images: Sequence[chain.Image]) -> list[Path]:
+        """Build bundle and install.sh against the local registry and check them as installed."""
+        repo = self.product_repo()
+        out = self.workdir / "product"
+        out.mkdir()
+        product_version = (repo / "VERSION").read_text(encoding="utf-8").strip()
+        with self.static_server(out) as base_url:
+            env = {
+                **os.environ,
+                "RELEASE_TRIAL_REGISTRY": self.registry,
+                "RELEASE_TRIAL_BASE_URL": base_url,
+            }
+            env.pop("GITHUB_ACTIONS", None)
+            try:
+                written = product_release.build(
+                    repo, product_version, out, env, docker=self.tools.docker
+                )
+            except product_release.ProductReleaseError as exc:
+                raise TrialError(f"release-build of bothy: {exc}") from exc
+            self.check_product(base_url, product_version, images)
+        return written
+
+    def check_product(
+        self, base_url: str, product_version: str, images: Sequence[chain.Image]
+    ) -> None:
+        """Fetch install.sh and the bundle like an installation and check what they point at.
+
+        Raises:
+            TrialError: checksum, registry, server version or an image does not match.
+        """
+        script = _fetch(base_url + "install.sh").decode("utf-8")
+        bundle = _fetch(base_url + product_release.bundle_name(product_version))
+        built_in = dict(re.findall(r"^(BOTHY_INSTALL_[A-Z0-9_]+)='([^']*)'$", script, re.M))
+        digest = hashlib.sha256(bundle).hexdigest()
+        if built_in.get("BOTHY_INSTALL_BUNDLE_SHA256") != digest:
+            raise TrialError("install.sh names another SHA-256 than the bundle it downloads")
+        if built_in.get("BOTHY_INSTALL_BASE_URL") != base_url:
+            raise TrialError(f"install.sh downloads from {built_in.get('BOTHY_INSTALL_BASE_URL')}")
+        prefix = f"bothy-{product_version}/infra/compose/"
+        with tarfile.open(fileobj=io.BytesIO(bundle)) as archive:
+            env_text = _member(archive, prefix + ".env.example")
+            compose_text = _member(archive, prefix + "compose.yaml")
+        values = dict(re.findall(r"^(BOTHY_REGISTRY|BOTHY_VERSION)=(.*)$", env_text, re.M))
+        if values.get("BOTHY_REGISTRY") != self.registry:
+            raise TrialError(f"bundle pins the registry {values.get('BOTHY_REGISTRY')}")
+        if values.get("BOTHY_VERSION") != self.version:
+            raise TrialError(f"bundle pins the server version {values.get('BOTHY_VERSION')}")
+        signed = {img.name: img.digest for img in images}
+        for ref in product_release.compose_images(compose_text, self.version):
+            name, tag = ref.split(":", 1)
+            if manifest_digest(self.registry, name, tag) != signed.get(name):
+                raise TrialError(f"{name}:{tag} of the bundle is not the signed digest")
+            pulled = f"{self.registry}/{ref}"
+            self.tools([self.tools.docker, "pull", "--quiet", pulled])
+            self.tools([self.tools.docker, "image", "rm", pulled])
+        print(f"  product: install.sh and bundle from {base_url}, images from {self.registry}")
+
     def probes(self, images: Sequence[chain.Image], pub: Path) -> None:
         """Negative probes: each must fail, otherwise the verification proves nothing."""
         probe = self.workdir / "probe"
@@ -363,8 +486,37 @@ class Trial:
         raise TrialError(f"probe passed although it must fail: {what}")
 
 
-def run_trial(tools: chain.Tools, platforms: Sequence[str], keep: bool = False) -> int:
-    """Run the trial of the server component and print what an operator would check."""
+class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+    """Static file handler of the trial download address without a request log on stderr."""
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+def _fetch(url: str) -> bytes:
+    """Download a file of the trial download address (127.0.0.1 only)."""
+    if not url.startswith("http://127.0.0.1:"):
+        raise TrialError(f"refusing a download outside 127.0.0.1: {url}")
+    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310  # nosec B310
+        data: bytes = resp.read()
+    return data
+
+
+def _member(archive: tarfile.TarFile, name: str) -> str:
+    """Return the text of one member of the bundle; raise TrialError if it is missing."""
+    try:
+        handle = archive.extractfile(name)
+    except KeyError:
+        handle = None
+    if handle is None:
+        raise TrialError(f"bundle has no {name}")
+    return handle.read().decode("utf-8")
+
+
+def run_trial(
+    tools: chain.Tools, platforms: Sequence[str], keep: bool = False, component: str = "server"
+) -> int:
+    """Run the trial of a component and print what an operator would check."""
     workdir = Path(tempfile.mkdtemp(prefix="bothy-release-trial-"))
     docker_config = workdir / "docker-config"
     docker_config.mkdir()
@@ -383,6 +535,7 @@ def run_trial(tools: chain.Tools, platforms: Sequence[str], keep: bool = False) 
             pub = trial.sign_and_verify(images)
             refs = trial.tag_and_check(images)
             trial.probes(images, pub)
+            product = trial.product(images) if component == "bothy" else []
             print("release-trial: passed")
             for img in images:
                 print(f"  {img.name}: {img.ref}  tag {refs[img.name]}")
@@ -390,6 +543,8 @@ def run_trial(tools: chain.Tools, platforms: Sequence[str], keep: bool = False) 
             print(
                 f"  {chain.CHECKSUMS}:\n" + "".join(f"    {line}\n" for line in sums.splitlines())
             )
+            for path in product:
+                print(f"  product: {path.name}")
     finally:
         if keep:
             print(f"  kept {workdir}")
@@ -423,7 +578,7 @@ def main(argv: list[str] | None = None, tools: chain.Tools | None = None) -> int
                 cosign=args.cosign or chain.resolve_tool("cosign"),
                 syft=args.syft or chain.resolve_tool("syft"),
             )
-        return run_trial(tools, platforms, args.keep)
+        return run_trial(tools, platforms, args.keep, args.component)
     except (TrialError, chain.ChainError) as exc:
         print(f"release-trial: {exc}", file=sys.stderr)
         return 1

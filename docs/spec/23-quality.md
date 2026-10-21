@@ -43,7 +43,7 @@ The complete list with tool, threshold and where it runs is in
 | Commits | `commitlint` | Conventional Commits and DCO sign-off of the new commits |
 | Docs | `docs`, `config-doc-check`, `linkcheck`, `diagrams`, `catalog-check`, `api-lint`, `api-checks`, `api-clients`, `tokens` | Strict site build, configuration reference against schema and chapters, links and anchors, diagrams, action catalogue and its generated copies, API contracts, copies of the API contracts equal to their sources, generated clients, design tokens |
 | Operations | `ops-check` | collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu; derived values equal their source |
-| CI and release rules | `runners-check`, `labels-check`, `release-pins` | GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions; labels; pinned server version in the product bundle ([18](18-release.md) 2.1) |
+| CI and release rules | `runners-check`, `labels-check`, `release-pins`, `install-options` | GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions; labels; pinned server version in the product bundle ([18](18-release.md) 2.1); options of the portability test and the documented install command ([16](16-operations.md) 3.1) |
 | Security | `gitleaks`, `denylist`, `semgrep`, `trivy`, `osv` | Secrets, white label, project rules, misconfiguration, known vulnerabilities |
 | Legal | `licenses` | License text, SPDX header lines, licenses of the dependencies |
 | Analysis | `sonar` | SonarQube with a shared profile and gate |

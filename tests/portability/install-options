@@ -1,0 +1,8 @@
+# Options of install.sh for the portability test (docs/spec/16-*.md, section 11.1,
+# interface rule 2). This file is the one place of these options: the portability test
+# (M7-14) reads the line below and passes its words to install.sh after `sh -s --`.
+# make check (tools/ci/install_options_check.py) holds the line equal to the options of the
+# second block of section 3.1 of that chapter. The test sets `--storage` per run and adds
+# `--bundle <file>` for the source `release-download`; no other option may differ.
+# One line, plain shell words without quotes.
+--yes --public-url https://chat.example.com --edge direct --scan on --storage s3 --owner-handle alex --owner-name Alex
