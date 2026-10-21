@@ -13,12 +13,12 @@ part 'command_invoke.g.dart';
 /// CommandInvoke
 ///
 /// Properties:
-/// * [threadId] - Absent invokes in the main thread or creates a thread per `auto_thread`.
+/// * [threadId] - Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start.
 /// * [options]
 @BuiltValue()
 abstract class CommandInvoke
     implements Built<CommandInvoke, CommandInvokeBuilder> {
-  /// Absent invokes in the main thread or creates a thread per `auto_thread`.
+  /// Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start.
   @BuiltValueField(wireName: r'thread_id')
   String? get threadId;
 

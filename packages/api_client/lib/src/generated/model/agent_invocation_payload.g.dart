@@ -107,6 +107,12 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
   @override
   final String? commandInvocationId;
   @override
+  final String? commandId;
+  @override
+  final String? commandName;
+  @override
+  final BuiltList<CommandOptionValue>? options;
+  @override
   final PrincipalRef triggeredBy;
   @override
   final BillingMode billingMode;
@@ -128,6 +134,9 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     this.messageId,
     this.interactionId,
     this.commandInvocationId,
+    this.commandId,
+    this.commandName,
+    this.options,
     required this.triggeredBy,
     required this.billingMode,
     this.agentSession,
@@ -154,6 +163,9 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
         messageId == other.messageId &&
         interactionId == other.interactionId &&
         commandInvocationId == other.commandInvocationId &&
+        commandId == other.commandId &&
+        commandName == other.commandName &&
+        options == other.options &&
         triggeredBy == other.triggeredBy &&
         billingMode == other.billingMode &&
         agentSession == other.agentSession &&
@@ -171,6 +183,9 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     _$hash = $jc(_$hash, messageId.hashCode);
     _$hash = $jc(_$hash, interactionId.hashCode);
     _$hash = $jc(_$hash, commandInvocationId.hashCode);
+    _$hash = $jc(_$hash, commandId.hashCode);
+    _$hash = $jc(_$hash, commandName.hashCode);
+    _$hash = $jc(_$hash, options.hashCode);
     _$hash = $jc(_$hash, triggeredBy.hashCode);
     _$hash = $jc(_$hash, billingMode.hashCode);
     _$hash = $jc(_$hash, agentSession.hashCode);
@@ -190,6 +205,9 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
           ..add('messageId', messageId)
           ..add('interactionId', interactionId)
           ..add('commandInvocationId', commandInvocationId)
+          ..add('commandId', commandId)
+          ..add('commandName', commandName)
+          ..add('options', options)
           ..add('triggeredBy', triggeredBy)
           ..add('billingMode', billingMode)
           ..add('agentSession', agentSession)
@@ -237,6 +255,20 @@ class AgentInvocationPayloadBuilder
   set commandInvocationId(String? commandInvocationId) =>
       _$this._commandInvocationId = commandInvocationId;
 
+  String? _commandId;
+  String? get commandId => _$this._commandId;
+  set commandId(String? commandId) => _$this._commandId = commandId;
+
+  String? _commandName;
+  String? get commandName => _$this._commandName;
+  set commandName(String? commandName) => _$this._commandName = commandName;
+
+  ListBuilder<CommandOptionValue>? _options;
+  ListBuilder<CommandOptionValue> get options =>
+      _$this._options ??= ListBuilder<CommandOptionValue>();
+  set options(ListBuilder<CommandOptionValue>? options) =>
+      _$this._options = options;
+
   PrincipalRefBuilder? _triggeredBy;
   PrincipalRefBuilder get triggeredBy =>
       _$this._triggeredBy ??= PrincipalRefBuilder();
@@ -274,6 +306,9 @@ class AgentInvocationPayloadBuilder
       _messageId = $v.messageId;
       _interactionId = $v.interactionId;
       _commandInvocationId = $v.commandInvocationId;
+      _commandId = $v.commandId;
+      _commandName = $v.commandName;
+      _options = $v.options?.toBuilder();
       _triggeredBy = $v.triggeredBy.toBuilder();
       _billingMode = $v.billingMode;
       _agentSession = $v.agentSession?.toBuilder();
@@ -326,6 +361,9 @@ class AgentInvocationPayloadBuilder
             messageId: messageId,
             interactionId: interactionId,
             commandInvocationId: commandInvocationId,
+            commandId: commandId,
+            commandName: commandName,
+            options: _options?.build(),
             triggeredBy: triggeredBy.build(),
             billingMode: BuiltValueNullFieldError.checkNotNull(
               billingMode,
@@ -338,6 +376,8 @@ class AgentInvocationPayloadBuilder
     } catch (_) {
       late String _$failedField;
       try {
+        _$failedField = 'options';
+        _options?.build();
         _$failedField = 'triggeredBy';
         triggeredBy.build();
 

@@ -1222,6 +1222,13 @@ func TestRealTable_Enabled(t *testing.T) {
 		"closeTerminalSession":  {"POST /api/v1/terminal/sessions/{session_id}/close", "terminal.close", "rl.write"},
 		// M6-03
 		"submitCspReport": {"POST /api/v1/csp-reports", "console.csp_report", "rl.public_auth"},
+		// M2-16
+		"registerCommand":     {"POST /api/v1/commands", "command.register", "rl.admin"},
+		"getCommand":          {"GET /api/v1/commands/{command_id}", "command.read", "rl.read"},
+		"updateCommand":       {"PUT /api/v1/commands/{command_id}", "command.register", "rl.admin"},
+		"removeCommand":       {"DELETE /api/v1/commands/{command_id}", "command.remove", "rl.admin"},
+		"listChannelCommands": {"GET /api/v1/channels/{channel_id}/commands", "command.read", "rl.read"},
+		"invokeCommand":       {"POST /api/v1/channels/{channel_id}/commands/{command_id}/invoke", "command.invoke", "rl.trigger"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
@@ -1311,4 +1318,28 @@ func TestSpecCatalog_MatchesActionsYAML(t *testing.T) {
 			t.Errorf("action %s: catalogue gives %q (known %v), actions.yaml %q", a.ID, class, ok, a.RLClass)
 		}
 	}
+}
+
+func (stubServer) RegisterCommand(context.Context, rest.RegisterCommandRequestObject) (rest.RegisterCommandResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateCommand(context.Context, rest.UpdateCommandRequestObject) (rest.UpdateCommandResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RemoveCommand(context.Context, rest.RemoveCommandRequestObject) (rest.RemoveCommandResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetCommand(context.Context, rest.GetCommandRequestObject) (rest.GetCommandResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListChannelCommands(context.Context, rest.ListChannelCommandsRequestObject) (rest.ListChannelCommandsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) InvokeCommand(context.Context, rest.InvokeCommandRequestObject) (rest.InvokeCommandResponseObject, error) {
+	return nil, nil
 }

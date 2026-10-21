@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/command_option_value.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/principal_ref.dart';
@@ -23,6 +24,9 @@ part 'agent_invocation_payload.g.dart';
 /// * [messageId] - Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
 /// * [interactionId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [commandInvocationId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [commandId] - Triggering command; set exactly for `trigger_kind = command`.
+/// * [commandName] - Name of the triggering command; set exactly for `trigger_kind = command`.
+/// * [options] - Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`.
 /// * [triggeredBy]
 /// * [billingMode]
 /// * [agentSession]
@@ -61,6 +65,18 @@ abstract class AgentInvocationPayload
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'command_invocation_id')
   String? get commandInvocationId;
+
+  /// Triggering command; set exactly for `trigger_kind = command`.
+  @BuiltValueField(wireName: r'command_id')
+  String? get commandId;
+
+  /// Name of the triggering command; set exactly for `trigger_kind = command`.
+  @BuiltValueField(wireName: r'command_name')
+  String? get commandName;
+
+  /// Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`.
+  @BuiltValueField(wireName: r'options')
+  BuiltList<CommandOptionValue>? get options;
 
   @BuiltValueField(wireName: r'triggered_by')
   PrincipalRef get triggeredBy;
@@ -152,6 +168,29 @@ class _$AgentInvocationPayloadSerializer
       yield serializers.serialize(
         object.commandInvocationId,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.commandId != null) {
+      yield r'command_id';
+      yield serializers.serialize(
+        object.commandId,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.commandName != null) {
+      yield r'command_name';
+      yield serializers.serialize(
+        object.commandName,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.options != null) {
+      yield r'options';
+      yield serializers.serialize(
+        object.options,
+        specifiedType: const FullType(BuiltList, [
+          FullType(CommandOptionValue),
+        ]),
       );
     }
     yield r'triggered_by';
@@ -266,6 +305,32 @@ class _$AgentInvocationPayloadSerializer
           ) as String?;
           if (valueDes == null) continue;
           result.commandInvocationId = valueDes;
+          break;
+        case r'command_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.commandId = valueDes;
+          break;
+        case r'command_name':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.commandName = valueDes;
+          break;
+        case r'options':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(CommandOptionValue),
+            ]),
+          ) as BuiltList<CommandOptionValue>?;
+          if (valueDes == null) continue;
+          result.options.replace(valueDes);
           break;
         case r'triggered_by':
           final valueDes = serializers.deserialize(

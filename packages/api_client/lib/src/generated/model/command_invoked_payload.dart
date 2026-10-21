@@ -20,7 +20,7 @@ part 'command_invoked_payload.g.dart';
 /// * [control]
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [runId] - Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent.
 /// * [invokedBy]
 /// * [options]
 @BuiltValue()
@@ -48,7 +48,7 @@ abstract class CommandInvokedPayload
   @BuiltValueField(wireName: r'thread_id')
   String? get threadId;
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent.
   @BuiltValueField(wireName: r'run_id')
   String? get runId;
 

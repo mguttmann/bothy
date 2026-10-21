@@ -149,8 +149,8 @@ func (s *CommandService) limits() domain.CommandLimits {
 }
 
 // validate checks a submitted definition (design note 3) including the size rule: the
-// command.changed of the definition must fit sync.event_payload_max_bytes with the longest
-// version, so the rule reads no stored state.
+// command.changed of the definition must be smaller than sync.event_payload_max_bytes (the rule of
+// the appender) with the longest version, so the rule reads no stored state.
 func (s *CommandService) validate(in agents.RegisterCommand) (domain.CommandDefinition, error) {
 	def, err := domain.ValidateCommand(inputOf(in), s.limits())
 	if err != nil {
@@ -161,7 +161,7 @@ func (s *CommandService) validate(in agents.RegisterCommand) (domain.CommandDefi
 	if err != nil {
 		return domain.CommandDefinition{}, err
 	}
-	if len(p) > s.cfg.EventPayloadMaxBytes {
+	if len(p) >= s.cfg.EventPayloadMaxBytes {
 		return domain.CommandDefinition{}, domain.CommandField("", domain.CodeTooLarge, "the command is too large for its change event")
 	}
 	return def, nil
@@ -441,6 +441,7 @@ func (s *CommandService) ListForChannel(ctx context.Context, channelID ids.ID) (
 		if err != nil {
 			return err
 		}
+		list = slices.DeleteFunc(list, func(c domain.Command) bool { return !invocable(c) })
 		kept, err := s.offered(ctx, domain.MostSpecific(covering(list, place)), channelID)
 		if err != nil {
 			return err
@@ -503,6 +504,16 @@ func sortForChannel(list []domain.Command, operator ids.ID) {
 	})
 }
 
+// invocable reports a command whose execution exists: an agent's. App commands are registered and
+// read, but their execution (interactions_url, scope check without agent.invoke) comes with M2-25;
+// until then they are neither listed nor resolved, so a person never gets a command that answers
+// an internal error, and an app command in an invisible channel answers 404 like an unknown one
+// (docs/DECISIONS.md D-M2-16-20).
+func invocable(c domain.Command) bool { return c.OwnerKind == ownerKindAgent }
+
+// ownerKindAgent is the owner kind of an agent's command.
+const ownerKindAgent = "agent"
+
 // placeOf is the place of a channel.
 func placeOf(ch chat.TriggerChannel) domain.ChannelPlace {
 	return domain.ChannelPlace{ChannelID: ch.ChannelID, SpaceID: ch.SpaceID, DM: ch.Kind == channelKindDM}
@@ -517,7 +528,7 @@ func (s *CommandService) Resolve(ctx context.Context, commandID, channelID ids.I
 	if err != nil {
 		return agents.Command{}, err
 	}
-	if !found || c.Removed() {
+	if !found || c.Removed() || !invocable(c) {
 		return agents.Command{}, invisibleCommand()
 	}
 	ch, err := s.d.Channels.TriggerChannel(ctx, channelID)

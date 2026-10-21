@@ -23,8 +23,10 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
+	"github.com/OWNER/bothy/services/server/internal/identity/domain/apitoken"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/runs/adapters/runstest"
 )
 
@@ -1196,6 +1198,34 @@ func TestSlashCommands(t *testing.T) {
 		if n := w.count(`SELECT count(*) FROM event_log WHERE payload::text LIKE '%' || $1 || '%' AND type NOT IN ('command.changed', 'command.invoked')`,
 			value); n != 0 {
 			t.Fatal("the value is in another event")
+		}
+	})
+
+	t.Run("TestAppCommandsNotInvocableBeforeM2_25", func(t *testing.T) {
+		// Red team M2-16: an app command was listed and answered 500, and 500 against 404 told an
+		// outsider that a channel exists. Until M2-25 app commands are neither listed nor resolved.
+		app := ids.New()
+		w.sql(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'app', 'active', $2, $2)`, app.String(),
+			"app"+strings.ReplaceAll(app.String()[24:], "-", ""))
+		w.sql(`INSERT INTO apps (principal_id, slug, manifest, manifest_version, manifest_sha256) VALUES ($1, $2, '{}'::jsonb, '1.0.0', '\x00'::bytea)`,
+			app.String(), "app-"+app.String()[24:])
+		w.sql(`INSERT INTO app_installations (id, app_id, granted_scopes, installed_by) VALUES ($1, $2, '{commands:write}', $3)`,
+			ids.New().String(), app.String(), w.owner.user.String())
+		key, _ := identitytest.NewDeviceKey(jose.AlgES256)
+		ac := consumerAgent{id: app, key: key, tok: w.apiToken(apitoken.KindApp, app, key, time.Now().Add(time.Hour), "commands:write")}
+		w.must(w.owner, http.MethodPost, "/api/v1/grants", map[string]any{
+			"subject_kind": "app", "subject_id": app.String(), "target_kind": "channel", "target_id": w.allgemein.id, "level": "write", "reason": "test"})
+		cmd := w.mustRegister(ac, def("appcmd", "control", true))
+		code, b, _ := w.do(send{person: &w.sam, method: http.MethodGet, path: "/api/v1/channels/" + w.allgemein.id + "/commands"})
+		if code != http.StatusOK || strings.Contains(string(b), cmd.ID) {
+			t.Fatalf("list = %d %s", code, b)
+		}
+		for _, p := range []gwPerson{w.sam, w.outsider} {
+			code, hidden := w.invoke(p, w.allgemein, cmd.ID, map[string]any{})
+			_, unknown := w.invoke(p, w.allgemein, ids.New().String(), map[string]any{})
+			if code != http.StatusNotFound || !sameProblem(hidden, unknown) {
+				t.Fatalf("invoke of an app command = %d %s", code, hidden)
+			}
 		}
 	})
 

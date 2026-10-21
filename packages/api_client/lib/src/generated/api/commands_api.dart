@@ -372,7 +372,7 @@ class CommandsApi {
   }
 
   /// List commands usable in a channel
-  ///
+  /// Lists the registered commands offered in the channel: those of the channel&#39;s effective operator first, then those of guest agents (only with &#x60;allow_mentioned_agents&#x60;) and of apps with &#x60;write&#x60; on the channel, each group ordered by lower-case name, owner and ID. Per owner and name only the most specific scope appears (&#x60;channel&#x60; before &#x60;space&#x60; before &#x60;instance&#x60;). The built-in commands are not part of the list; the client shows them from its own list. A dm channel lists nothing.
   ///
   /// Parameters:
   /// * [channelId]
@@ -464,7 +464,7 @@ class CommandsApi {
   }
 
   /// Register a command
-  ///
+  /// Registers a command of the calling agent or app. A built-in name answers &#x60;409 conflict&#x60; with &#x60;reason: command_name_reserved&#x60;; a name the owner already uses on the same scope target answers &#x60;409 conflict&#x60; without a reason.
   ///
   /// Parameters:
   /// * [commandRegister]
@@ -631,7 +631,7 @@ class CommandsApi {
   }
 
   /// Replace a command definition
-  ///
+  /// Replaces the definition of a command of the caller. A built-in name answers &#x60;409 conflict&#x60; with &#x60;reason: command_name_reserved&#x60;; a name the owner already uses on the same scope target answers &#x60;409 conflict&#x60; without a reason. An identical definition answers the command unchanged.
   ///
   /// Parameters:
   /// * [commandId]
