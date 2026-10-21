@@ -457,7 +457,7 @@ deps:
     mayDependOn: [notify-app, notify, notify-domain, kernel-ports, identity, chat, messaging, sync, authz]
   notify-adapters:
     mayDependOn: [notify-adapters, notify, notify-app, notify-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, messaging, sync, authz]
-    canUse: [v-pgx]
+    canUse: [v-pgx, v-otel]
   apps:
     mayDependOn: [apps, kernel-ports]
   apps-domain:
