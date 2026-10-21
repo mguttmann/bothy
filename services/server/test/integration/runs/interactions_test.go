@@ -737,3 +737,31 @@ func TestSEC_T14_CardHeaderFromServerFields(t *testing.T) {
 		w.want(w.do("lotse", http.MethodPatch, "/api/v1/components/"+id, `{`+member+`}`, ifMatchOnly(1)...), http.StatusBadRequest, "validation_failed")
 	}
 }
+
+// TestCreateInteraction_NewRunCarriesSession: the agent.invocation of a run an interaction opened
+// carries the session of the run like the agent.invocation of a message trigger in the same thread
+// (M2-12 design note 9 on the integration with M2-15, INT-W55/2).
+func TestCreateInteraction_NewRunCarriesSession(t *testing.T) {
+	t.Parallel()
+	w := runsWorld(t)
+	r, _ := w.startedRun()
+	thread := w.threadOf(r.ID)
+	_, byID := w.card("lotse", thread, "", twoButtons)
+	w.wantOK(w.finish("lotse", r.ID, `"state":"completed"`))
+	ix := w.want(w.click("alex", byID["approve"]["id"].(string), ""), http.StatusCreated, "")
+	byMessage := sessionModeOf(t, w.eventPayloadOf("agent.invocation", r.ID))
+	byInteraction := sessionModeOf(t, w.eventPayloadOf("agent.invocation", ix["run_id"].(string)))
+	if byMessage == "" || byInteraction != byMessage {
+		t.Fatalf("session_mode of the interaction trigger %q, of the message trigger %q", byInteraction, byMessage)
+	}
+}
+
+// sessionModeOf reads session_mode of an AgentInvocationPayload ("" when absent).
+func sessionModeOf(t *testing.T, payload json.RawMessage) string {
+	t.Helper()
+	var p struct {
+		SessionMode string `json:"session_mode"`
+	}
+	must(t, json.Unmarshal(payload, &p))
+	return p.SessionMode
+}
