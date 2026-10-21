@@ -3,6 +3,7 @@
 package wire_test
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -31,6 +32,17 @@ func snapshotFollowups(t *testing.T, f lbFrame) map[string]string {
 	return out
 }
 
+// mention returns "@<handle> " of the agent of r: the run lives in the main thread of a channel
+// with require_mention, so a follow-up there names the agent.
+func (w *lbWorld) mention(t *testing.T, r lbRun) string {
+	t.Helper()
+	var handle string
+	if err := w.queryRow(context.Background(), `SELECT handle FROM principals WHERE id = $1`, r.agent.id.String()).Scan(&handle); err != nil {
+		t.Fatal(err)
+	}
+	return "@" + handle + " "
+}
+
 // TestLiveBoxFollowups is the gateway half of M2-11 against one started api process with real
 // modules: a follow-up raises the run version without run.updated, and the adapter's next patch
 // reaches the focused client as a snapshot with the follow-up (design note 10); the follow-up
@@ -47,7 +59,7 @@ func TestLiveBoxFollowups(t *testing.T) {
 		if got := snapshotFollowups(t, snap); len(got) != 0 {
 			t.Fatalf("follow-ups before the follow-up %v", got)
 		}
-		m, state := w.say(w.owner, r.thread, "One more thing")
+		m, state := w.say(w.owner, r.thread, w.mention(t, r)+"one more thing")
 		if state != "received" {
 			t.Fatalf("follow-up trigger_state %q", state)
 		}
@@ -64,7 +76,10 @@ func TestLiveBoxFollowups(t *testing.T) {
 
 	t.Run("TestFollowupStatesOverGateway", func(t *testing.T) {
 		r := w.running(t, "fu-gateway")
-		m, _ := w.say(w.owner, r.thread, "An addition")
+		m, state := w.say(w.owner, r.thread, w.mention(t, r)+"an addition")
+		if state != "received" {
+			t.Fatalf("follow-up trigger_state %q", state)
+		}
 		base := w.version(r.id)
 		runUpdate(t, r.conn, r.id, base, "fu-absorbed", op("replace", "/followups/"+m+"/state", "absorbed"))
 		eventually(t, 15*time.Second, "the absorbed follow-up", func() bool { return w.version(r.id) == base+1 })
