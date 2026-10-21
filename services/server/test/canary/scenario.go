@@ -304,11 +304,12 @@ func NewScenario(ctx context.Context, r *Run) *Scenario {
 	sc.Observers["Sam"], sc.Observers["Robin"] = w.People["Sam"], w.People["Robin"]
 	// Alex reads Support without manage: an observer of the manage_only values (M2-02).
 	sc.Observers["Alex"] = w.People["Alex"]
-	support := map[string]bool{w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true, w.Channels["Support/Eskalation"]: true}
+	support := map[string]bool{w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true, w.Channels["Support/Eskalation"]: true, formScope: true}
 	sc.Readable = map[string]map[string]bool{
 		"Sam":   {w.Spaces["Marketing"]: true, w.Channels["Marketing/Kampagnen"]: true, w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true},
 		"Robin": {w.Spaces["Engineering"]: true, w.Channels["Engineering/Projekt-A"]: true},
-		// Lotse operates Support; its listEvents pages are foreign records of the behaviour step.
+		// Lotse operates Support; its listEvents pages are foreign records of the behaviour and the
+		// components step, and as the card's agent it receives the form values in interaction.created.
 		// Alex is also the uploader of the files step: file.updated of its own upload carries the
 		// canary file name to it alone (docs/DECISIONS.md INT-W48/1).
 		"Alex":  {w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true, w.Channels["Support/Eskalation"]: true, fileScope: true},
