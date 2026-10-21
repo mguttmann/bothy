@@ -169,7 +169,10 @@ func (cs *consoleStream) identify(t *testing.T, cookie string, d map[string]any)
 	if cookie != "" {
 		h.Set("Cookie", actor.ConsoleCookieName+"="+cookie)
 	}
-	ws, _, err := websocket.Dial(ctx, "ws"+cs.srv.URL[len("http"):]+cs.path, &websocket.DialOptions{HTTPHeader: h})
+	ws, resp, err := websocket.Dial(ctx, "ws"+cs.srv.URL[len("http"):]+cs.path, &websocket.DialOptions{HTTPHeader: h})
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

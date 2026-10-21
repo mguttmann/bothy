@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of phase 3 of the console E2E test (brief M6-18 Design notes 5 and 6): the terminal
+# in the browser under the enforced CSP. TEST ONLY: never use it for an installation; make
+# release-build leaves infra/compose/test out of the release bundle. tools/console-e2e/console_e2e.py
+# adds it to the files of phase 1 (compose.console-e2e.yaml) in place of the admin overlay after
+# phase 2 passed, recreates api and the TLS sidecar with it, starts the host service container
+# console-host and runs console-browser with E2E_MODE=terminal. Only existing configuration keys
+# are set (terminal.quick_reattach_window and auth.step_up_max_age keep their defaults, so the
+# attach of the test falls inside the window); no port is published.
+#
+# Topology: the internal network consolehosts carries only api (and with it the TLS sidecar, which
+# shares its network namespace and listens on :8443) and console-host. The host service pairs with
+# https://api:8443, a name the certificate of the test CA names, and trusts that CA; it never talks
+# plaintext to the server (24 2.2, SEC-TLS-1) and reaches nothing else.
+
+services:
+
+  api:
+    environment:
+      # The bundle of integration_test/terminal/terminal_bundle.dart (target
+      # console-e2e-terminal-web of services/server/Dockerfile) in place of the console of the
+      # image, served with the same headers and CSP by the same handler.
+      BOTHY_CONSOLE__ASSETS_DIR: /usr/share/bothy/console-e2e
+    volumes:
+      - ${E2E_TERMINAL_BUNDLE:?set by console_e2e.py}:/usr/share/bothy/console-e2e:ro
+    networks: [consolehosts]
+
+  # The machine of a real host service: the host image of the terminal suite of M2-48
+  # (infra/compose/test/host/Dockerfile, systemd as process 1). The runner copies bothy-host and
+  # the Fake-claude in, runs bothy-host install and pairs it. Privileged and root for the same
+  # reasons as termhost of compose.terminal.yaml: systemd needs a writable cgroup tree and the host
+  # service creates a cgroup per session (24 6.5); only this test service is privileged.
+  console-host:
+    image: ${E2E_HOST_IMAGE:?set by console_e2e.py}
+    pull_policy: never
+    restart: "no"
+    privileged: true
+    user: "0:0"
+    tmpfs: [/run, /run/lock, /tmp]
+    networks: [consolehosts]
+    volumes:
+      # Only the certificate of the test CA of this run; update-ca-certificates adds it.
+      - ${E2E_CERTS:?set by console_e2e.py}/ca.pem:/usr/local/share/ca-certificates/console-e2e-test-ca.crt:ro
+
+  console-browser:
+    environment:
+      # terminal runs the terminal suites (headless/terminal_suites.py).
+      E2E_MODE: ${E2E_MODE:-}
+    volumes:
+      # The test CA for the raw upgrade request of the foreign-origin check.
+      - ${E2E_CERTS:?set by console_e2e.py}/ca.pem:/e2e-ca/ca.pem:ro
+
+networks:
+  consolehosts:
+    internal: true

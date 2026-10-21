@@ -607,6 +607,13 @@ If a condition is not met, the server answers `401 step_up_required` (reason
 met). Other step-up actions do not consume the step-up; a step-up consumed for the terminal
 stays valid for them until `auth.step_up_max_age`.
 
+In the web console every refusal of the fresh step-up carries `reason: passkey_required`: a
+missing step-up, one that is not a passkey with `userVerification = required` (point 3), and also
+one that is too old or consumed, because the only way on in the console is a new passkey (TM-T12
+after a detach); the audit reason stays `terminal_step_up_not_fresh`. identity reads the fact of
+point 3 from `auth_challenges.webauthn_session` of the challenge that confirmed the step-up
+(docs/DECISIONS.md D-M6-18-1).
+
 ### 6.4 Command-line tools
 
 Command-line tools log in as a device with `platform = 'cli'` (03 `devices`).

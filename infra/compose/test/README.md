@@ -19,6 +19,7 @@ together.
 | `compose.console-e2e.yaml` | overlay of the console E2E test (M6-03, `make console-e2e`, `tools/console-e2e/README.md`): the TLS sidecar `tls`, the seed `console-seed` (`bothy-smoke seed`) and the browsers `console-browser`, all in the network namespace of `api`; `server.public_url` `https://localhost:8443` and the WebAuthn relying party `localhost`; the webhook receiver `webhook-receiver` of phase 2 (M6-08) on the Compose network, HTTPS on 8443 with the per-run certificate, no published port |
 | `console-e2e.env`, `console-e2e/Caddyfile`, `console-e2e/receiver.Caddyfile` | the variables of that overlay (read after `smoke.env`), the configuration of the sidecar and of the webhook receiver (every POST answered 200, method, path and headers of each request in the JSON access log) |
 | `compose.console-e2e-admin.yaml` | overlay of phase 2 of the console E2E test (M6-04, M6-08): `api` serves the bundle of the patrol suites with a step-up of 3 s; `api` and `worker` list the receiver in `webhook.allowed_hosts` and `egress.allowed_hosts` (`webhook-receiver:8443;allow_private`) and trust the test CA through `SSL_CERT_FILE` (the system roots of the server image plus the test CA, written by the runner); the release image and the installation bundle stay unchanged |
+| `compose.console-e2e-terminal.yaml` | overlay of phase 3 of the console E2E test (M6-18, section "Console E2E test, phase 3" below): `api` serves the bundle of the terminal test and joins the internal network `consolehosts`; the host service container `console-host` of the host image of M2-48; `E2E_MODE` and the test CA for `console-browser` |
 | `compose.alert-e2e.yaml`, `alert-e2e/rules.yaml` | overlay of the alert path test (M7-20, `make alert-e2e`, `tools/observability/alert_e2e.py`): Prometheus with a configuration derived from the real one plus the test rules (one `page`, one `ticket` alert), Alertmanager unchanged without a published port, the stub `alert-stub` for the external receivers and the metric of the test rules, the probe `alert-probe` in the network namespace of `api` ([alerting.md](../../../docs/observability/alerting.md) 5) |
 | `otel/file.yaml` | collector overlay `file`: the three signals as OTLP JSON lines into the volume `otel-smoke-out`, shorter `tail_sampling` and `batch` waits |
 
@@ -227,3 +228,38 @@ docker image rm termsuite-server:<tag> termsuite-host:<tag>
 ```
 
 The next run of the suite builds a removed image again.
+
+## Console E2E test, phase 3 (M6-18)
+
+Phase 3 of `make console-e2e` ([tools/console-e2e/README.md](../../../tools/console-e2e/README.md),
+brief M6-18 Design notes 5 and 6) opens a terminal in the web console on a real host service.
+`tools/console-e2e/console_e2e.py` adds `compose.console-e2e-terminal.yaml` to the files of phase 1
+(`compose.yaml`, `compose.smoke.yaml`, `compose.console-e2e.yaml`) in place of the admin overlay.
+**Test only, never for an installation.**
+
+- **Host service container.** `console-host` runs the host image of the terminal suite above
+  (`host/Dockerfile`, the tag `termsuite-host:<first 12 hex of the SHA-256 of the Dockerfile>`,
+  built with BuildKit when missing and removed again by the run that built it), privileged, as
+  root and with the same `tmpfs` as `termhost`, for the same reasons. The runner copies
+  `bothy-host` and the Fake-claude in (built from `services/host` by
+  `tools/console-e2e/host-bin.Dockerfile`, the builds of M2-48's `BuildHostBinaries`), adds the test
+  CA of the run, which the overlay mounts read-only as the only file, to the trust store and runs
+  `bothy-host install` and `pair` as an operator would.
+- **Network.** The internal network `consolehosts` carries only `api` and `console-host`. The TLS
+  sidecar of the console test shares the network namespace of `api` and listens on `:8443`; the
+  host service pairs with `https://api:8443`, a name the certificate of the test CA names, so it
+  talks TLS to the sidecar and never plaintext to the server (24 2.2, SEC-TLS-1), and it reaches
+  nothing else. No port is published.
+- **Server keys.** The overlay sets only `console.assets_dir` (the bundle of
+  `apps/console/integration_test/terminal/terminal_bundle.dart`); `terminal.quick_reattach_window`
+  and `auth.step_up_max_age` keep their defaults, so the attach of the test falls inside the
+  window.
+
+| Variable | Read by | Meaning |
+|---|---|---|
+| `E2E_TERMINAL_BUNDLE` | `api` | the exported bundle of the target `console-e2e-terminal-web` of `services/server/Dockerfile`, mounted read-only as `console.assets_dir` |
+| `E2E_HOST_IMAGE` | `console-host` | the tag of the host image |
+| `E2E_CERTS` | `console-host`, `console-browser` | the directory of the test CA of the run; only `ca.pem` is mounted |
+| `E2E_MODE` | `console-browser` | `terminal` runs the terminal suites |
+
+The runner sets them; they are not inputs.

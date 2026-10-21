@@ -232,7 +232,7 @@ func TestTMT12_Console(t *testing.T) {
 	if d := w.decideAttach(w.mustActor(authorize.ActionTerminalAttach), opener.DeviceID, opener.SessionID, detached); !d.Allowed() || d.QuickReattach {
 		t.Fatalf("console attach with a new UV passkey: %+v", d)
 	}
-	phone := w.phone.client.actor()
+	phone := w.phone.actor()
 	if d := w.decideAttach(phone, phone.DeviceID, phone.SessionID, w.clk.Now()); !d.Allowed() || !d.QuickReattach {
 		t.Fatalf("the app's quick reattach: %+v", d)
 	}
