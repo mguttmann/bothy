@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Queries on the behaviour of channels (chat module, M2-02; docs/spec/03-datenmodell.md section
+-- Queries on the behaviour of channels (chat module, M2-02; docs/spec/03-data-model.md section
 -- 4.5 channels and channel_skill_bindings). A behaviour is read in one statement: the switches,
 -- the context window, the prompt, settings_version and the skill references in their order, so a
 -- concurrent change never mixes two states. The locks of a change (the space row FOR SHARE, then
