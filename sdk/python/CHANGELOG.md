@@ -31,6 +31,9 @@ documented in this file. The format is based on
   `trigger_kind` `interaction`, the thread's current agent session in the payload, a context per
   run (`set_context`), `startRun` with `external_session_ref` (M2-12) and `finishRun` with
   `costs` behind the switch `FakeServer(costs=True)` (the server books costs from M2-22 on).
+- FakeServer fault `Fault.problem(code, reason)`: the next calls of an operation answer that
+  problem and store nothing; `trigger(context=...)` serves a given run context and
+  `add_file(transcript=...)` a voice transcript (M2-34).
 - Generated core `bothy_sdk.generated` from `docs/api/openapi.yaml` (openapi-python-client
   0.29.1, standard settings): models and sync and async functions of every REST operation.
 - `make generate` and `make generate-check` (gate G4: drift check, compileall, mypy).

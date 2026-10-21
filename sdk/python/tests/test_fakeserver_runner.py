@@ -22,6 +22,7 @@ import pytest
 from bothy_sdk.auth import DpopAuth
 from bothy_sdk.generated import models
 from bothy_sdk.testing.fakeserver import FakeServer
+from bothy_sdk.testing.faults import Fault
 
 pytestmark = pytest.mark.anyio
 
@@ -266,3 +267,14 @@ async def test_context_given_with_the_trigger(fake: FakeServer) -> None:
     assert ctx.trigger_message.content_md == "now"
     assert ctx.trigger_message.attachments[0].transcript == "spoken words"
     assert [m.content_md for m in ctx.thread_context] == ["before"]
+
+
+async def test_problem_fault_answers_once(fake: FakeServer) -> None:
+    run = await fake.trigger()
+    fake.inject("startRun", Fault.problem("invocation_token_invalid", reason="expired"))
+    async with _api(fake) as api:
+        token = (await _invocation(api, run.run_id))["invocation_token"]
+        refused = await api.post(f"/runs/{run.run_id}/start", json=_start(token))
+        assert (refused.status_code, refused.json()["reason"]) == (403, "expired")
+        assert fake.run_state(run.run_id).state == "queued"
+        assert (await api.post(f"/runs/{run.run_id}/start", json=_start(token))).status_code == 200

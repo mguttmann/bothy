@@ -861,6 +861,8 @@ class FakeServer:
                 if request.transport is not None:
                     request.transport.close()
                 raise asyncio.CancelledError
+            if fault is not None and fault.kind is FaultKind.PROBLEM:
+                raise FakeProblem(fault.code, reason=fault.reason)
             if fault is not None and fault.kind is FaultKind.RATE_LIMITED:
                 raise FakeProblem("rate_limited", headers={"Retry-After": str(fault.retry_after)})
             if fault is not None and fault.kind is FaultKind.STORED_LATE:

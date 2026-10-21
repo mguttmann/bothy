@@ -11,6 +11,8 @@ next ``times`` calls of an ``operationId`` or a gateway op:
 * `Fault.rate_limited`: ``429 rate_limited`` with ``Retry-After``; nothing is stored.
 * `Fault.disconnect`: the connection is dropped without an answer; nothing is stored. On a
   gateway op the WebSocket connection is dropped.
+* `Fault.problem`: the answer is the problem ``code`` (with ``reason``) at its status; nothing is
+  stored (M2-34: a refused renewal, a ``startRun`` that says ``expired``).
 
 Examples:
     >>> fault = Fault.rate_limited(2)
@@ -27,12 +29,13 @@ __all__ = ["Fault", "FaultKind"]
 
 
 class FaultKind(StrEnum):
-    """The four faults of the FakeServer."""
+    """The faults of the FakeServer."""
 
     STORED_THEN_502 = "stored_then_502"
     STORED_LATE = "stored_late"
     RATE_LIMITED = "rate_limited"
     DISCONNECT = "disconnect"
+    PROBLEM = "problem"
 
 
 @dataclass(frozen=True)
@@ -43,11 +46,15 @@ class Fault:
         kind: What goes wrong.
         delay: Seconds of the FakeServer's clock before a `FaultKind.STORED_LATE` answer.
         retry_after: Whole seconds of the ``Retry-After`` header of `FaultKind.RATE_LIMITED`.
+        code: The problem code of `FaultKind.PROBLEM`.
+        reason: The problem ``reason`` of `FaultKind.PROBLEM`, if any.
     """
 
     kind: FaultKind
     delay: float = 0.0
     retry_after: int = 0
+    code: str = ""
+    reason: str | None = None
 
     @classmethod
     def stored_then_502(cls) -> Fault:
@@ -100,3 +107,16 @@ class Fault:
             The fault.
         """
         return cls(FaultKind.DISCONNECT)
+
+    @classmethod
+    def problem(cls, code: str, reason: str | None = None) -> Fault:
+        """Answer with the problem ``code`` at its status and store nothing.
+
+        Args:
+            code: A problem code, for example ``agent_invocation_denied``.
+            reason: The ``reason`` member, for example ``expired``.
+
+        Returns:
+            The fault.
+        """
+        return cls(FaultKind.PROBLEM, code=code, reason=reason)
