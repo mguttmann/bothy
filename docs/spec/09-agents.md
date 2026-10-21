@@ -157,6 +157,23 @@ For a new message M of a principal P in the thread T of the channel C, the follo
    `trigger_state = received`. On rejection: M stays stored, `trigger_state = failed` with
    the reason.
 
+Position of the voice rule (D-M2-04-2): the rejection `voice_unsupported` of section 13 is decided
+after step 4 and before step 5. A voice message without a transcription path
+(`voice.transcription_mode` is `off`, or `agent` and the candidate lacks the effective feature
+`voice_input`) is rejected at acceptance; it creates neither a new thread nor a follow-up. A voice
+message that would not trigger at all stays without trigger.
+
+Mapping of the deny reasons of step 7 to `messages.trigger_state_reason` (D-M2-04-3): the closed
+deny list of 07 4.1 has no `agent_disabled`, and the guard of `agent.invoke` answers
+`agent_not_reachable` for an inactive agent, so the acceptance maps the reason the person sees:
+
+| Deny reason of `authorize` (07 4.1) | `trigger_state_reason` |
+|---|---|
+| `agent_not_reachable`, candidate not active | `agent_disabled` |
+| `agent_not_reachable`, candidate active | `agent_not_allowed_here` |
+| `level_insufficient`, `no_grant` | `no_trigger_right` |
+| every other reason (`billing_mode_personal_not_holder`, `project_not_ready`, `run_active_other_agent`, `tool_class_owner_only`, `dev_environment_not_ready`, `channel_read_only`, ...) | unchanged |
+
 A message with `trigger_state = failed` shows its reason from `messages.trigger_state_reason`
 (03). Reason for the separate field: a rejection at acceptance creates no run on which
 `state_reason` could be stored.
@@ -203,6 +220,11 @@ flowchart TD
 
 The texts are keys in the language catalogue of the apps ([01-product.md](01-product.md)); the table
 names only the meaning.
+
+The codes of this table are the values of `messages.trigger_state_reason` that the acceptance
+writes itself. A deny reason of `authorize` in step 7 appears mapped by the table after step 7 of
+3.4; a deny reason without a row there is stored unchanged. `run_active` answers a command and is
+never stored on a message, because a command has no trigger message.
 
 ### 3.6 Guest agents
 
