@@ -272,7 +272,7 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `sync.reconnect_backoff_cap` | `BOTHY_SYNC__RECONNECT_BACKOFF_CAP` | Server |  | `60s` | largest interval when reconnecting | planned (M2) |
 | `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server | int | `500` | events per catch-up page | active |
 | `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server | int | `50000` | a larger backlog yields `resync_required` | active |
-| `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server |  | `1000` | one `cursor` frame after this many skipped events | planned (M1) |
+| `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server | int | `1000` | one `cursor` frame after this many skipped events | active |
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | int | `10000` | frames in the outbound queue of a connection until `4014` | active |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | retention of `Idempotency-Key` | active |
 | `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server |  | `20` | threads in `focus` per connection | planned (M1) |

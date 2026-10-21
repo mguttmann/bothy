@@ -26,6 +26,9 @@ var revokedReasons = map[authorize.Reason]bool{
 
 // identify is the handler of identify (notes 6 to 13 of the brief).
 func (g *Gateway) identify(ctx context.Context, c *Connection, d any) error {
+	if g.isDraining() {
+		return closeWith(domain.CloseServerRestart)
+	}
 	in, err := g.checkIdentify(d)
 	if err != nil {
 		return err
@@ -45,7 +48,7 @@ func (g *Gateway) identify(ctx context.Context, c *Connection, d any) error {
 		g.sessions.release(s, c, false)
 		return nil
 	}
-	g.d.Delivery.Register(s)
+	g.d.Delivery.Register(ctx, c, s)
 	view, err := g.d.Snapshot.Build(ctx)
 	if err != nil {
 		return setupClose(err)
@@ -55,7 +58,7 @@ func (g *Gateway) identify(ctx context.Context, c *Connection, d any) error {
 	}
 	// The heartbeat deadline runs from ready (note 14), not from the start of identify.
 	c.beat(g.d.Clock.Now())
-	if err := g.attach(ctx, c, s, in.Cursor, in.SyncEpoch, view.HeadSeq); err != nil {
+	if err := g.attach(ctx, c, in.Cursor, in.SyncEpoch, view.HeadSeq); err != nil {
 		return setupClose(err)
 	}
 	return nil
@@ -143,10 +146,8 @@ func (g *Gateway) authorizeConnect(ctx context.Context, a actor.Actor) error {
 		return closeWith(domain.CloseRevoked)
 	case dec.Outcome == authorize.OutcomeUnauthenticated:
 		return closeWith(domain.CloseAuthenticationFailed)
-	case dec.Outcome == authorize.OutcomeForbidden && (dec.Reason == "device_pending" || dec.Reason == "principal_pending"):
-		return closeWith(domain.CloseDevicePending)
 	}
-	return closeWith(domain.CloseForbidden)
+	return closeWith(forbiddenClose(dec))
 }
 
 // authClose maps an error of the Authenticator to its close code: an expired access token 4011, a

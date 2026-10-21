@@ -26,6 +26,9 @@ func (allowAll) Scope(context.Context, authorize.Principal, authorize.Action) (a
 	return authorize.Scope{}, nil
 }
 
+// Observe implements authorize.Authorizer; the fake keeps no cache.
+func (allowAll) Observe(context.Context, authorize.LogEvent) {}
+
 func devicesWith(t *testing.T, f *fixture, az authorize.Authorizer) *app.Devices {
 	t.Helper()
 	d, err := app.NewDevices(app.Config{PageSizeDefault: 50, PageSizeMax: 200}, app.DevicesDeps{

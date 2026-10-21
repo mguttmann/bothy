@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -64,6 +65,13 @@ type PageResult struct {
 	NextCursor int64
 }
 
+// EventPage is one page of catch-up as the gateway reads it (M1-65): the admitted events
+// themselves in seq order, so the gateway knows their scope, and the highest seq checked.
+type EventPage struct {
+	Events     []Event
+	NextCursor int64
+}
+
 // CatchUp is the incoming port of catch-up (04 section 7, M1-63): GET /api/v1/events uses it, and
 // the gateway uses it for ready, resume and the streaming catch-up (M1-64, M1-65), so REST and
 // WebSocket follow the same rules. The caller is the principal in ctx (kernel/actor); errors are
@@ -85,6 +93,20 @@ type CatchUp interface {
 	// its receive action (filter mode, no denial audit). It does not authorize events.catch_up;
 	// the caller ran Check first.
 	Page(ctx context.Context, in PageInput) (PageResult, error)
+	// PageEvents is Page with the admitted events instead of their wire form, for the streaming
+	// catch-up of the gateway (M1-65); ctx in delivery mode (authorize.Delivery) checks against
+	// the rights cache of the log tail.
+	PageEvents(ctx context.Context, in PageInput) (EventPage, error)
+	// Admit is the one admission rule of a stored event for the receiver a at delivery time (07
+	// section 8.1): a personal event only to its audience, any other only when authorize allows
+	// its receive action on the event's resource. It runs in filter mode, so a refusal writes no
+	// audit entry. Errors: an unauthenticated decision (the credential of a was revoked) as a
+	// kernel/errs error of kind unauthenticated, and the errors of authorize.
+	//
+	// Example:
+	//
+	//	ok, err := catchUp.Admit(authorize.Delivery(ctx), recipient, ev)
+	Admit(ctx context.Context, a actor.Actor, ev Event) (bool, error)
 }
 
 // SnapshotPrincipal is the caller in a snapshot (schema PrincipalRef).

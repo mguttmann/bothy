@@ -79,25 +79,23 @@ func (st *Sessions) bind(s *Session, c *Connection) []*Connection {
 }
 
 // release ends the binding of s to c when c is still its connection: a resumable end leaves s
-// detached from now on, any other end closes and removes it. It reports whether s was bound to c,
-// so the caller detaches it from delivery exactly once.
-func (st *Sessions) release(s *Session, c *Connection, resumable bool) bool {
+// detached from now on, any other end closes and removes it.
+func (st *Sessions) release(s *Session, c *Connection, resumable bool) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if !s.DeviceID.IsZero() && st.byDevice[s.DeviceID] == c {
 		delete(st.byDevice, s.DeviceID)
 	}
 	if s.conn != c {
-		return false
+		return
 	}
 	s.conn = nil
 	if resumable && s.state.CanBecome(domain.StateDetached) {
 		s.state, s.detachedAt = domain.StateDetached, st.clk.Now()
-		return true
+		return
 	}
 	s.state = domain.StateClosed
 	delete(st.byID, s.ID)
-	return true
 }
 
 // resumable returns the session id may resume for principal and device at now: known, of the
