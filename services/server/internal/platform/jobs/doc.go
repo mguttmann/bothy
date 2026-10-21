@@ -12,7 +12,8 @@
 //   - Registry, Register, PeriodicJob: the handlers and periodic jobs of a process, checked at
 //     registration (argument type, kind, queue).
 //   - Runtime, New, Inserter: the River client of a role. api inserts only, worker and all also
-//     run jobs; InsertTx joins the ambient transaction of the unit of work (pg.Tx).
+//     run jobs; InsertTx joins the ambient transaction of the unit of work (pg.Tx), and
+//     InsertUniqueTx and PendingTx keep one job per key with River's unique jobs.
 //   - Migrate, MigrationStatus, ValidateMigrations, CheckEmbeddedMigrations: River's tables in
 //     their own schema jobs.schema, run by bothy migrate and checked at the start of bothy serve.
 //
