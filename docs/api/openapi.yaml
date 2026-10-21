@@ -23795,6 +23795,13 @@ components:
         external_session_ref:
           type: string
           examples: [sess-7f3a]
+        expected_current_session_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Current session of the thread as the client saw it; absent when the thread has none. A mismatch answers 409 `conflict` with `reason` `session_changed` (09, 9.4).
+        take_over:
+          type: boolean
+          default: false
+          description: Required when the session is current in another thread; otherwise 409 `conflict` with `reason` `session_bound_elsewhere`.
     AgentSessionReport:
       type: object
       additionalProperties: false
@@ -23864,8 +23871,8 @@ components:
           $ref: '#/components/schemas/MessageKind'
         system_code:
           type: string
-          enum: [thread.reopened]
-          description: Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+          enum: [thread.reopened, agent_session.resume_failed]
+          description: Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
         content_md:
           type: string
           description: Markdown. In lists longer contents are cut at `message.list_content_max_bytes` with `content_truncated`.

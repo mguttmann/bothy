@@ -2652,12 +2652,15 @@ func (e LoginClient) Valid() bool {
 
 // Defines values for MessageSystemCode.
 const (
-	MessageSystemCodeThreadReopened MessageSystemCode = "thread.reopened"
+	MessageSystemCodeAgentSessionResumeFailed MessageSystemCode = "agent_session.resume_failed"
+	MessageSystemCodeThreadReopened           MessageSystemCode = "thread.reopened"
 )
 
 // Valid indicates whether the value is a known member of the MessageSystemCode enum.
 func (e MessageSystemCode) Valid() bool {
 	switch e {
+	case MessageSystemCodeAgentSessionResumeFailed:
+		return true
 	case MessageSystemCodeThreadReopened:
 		return true
 	default:
@@ -6236,8 +6239,14 @@ type AgentSessionEndReason string
 
 // AgentSessionBind defines model for AgentSessionBind.
 type AgentSessionBind struct {
+	// ExpectedCurrentSessionId Current session of the thread as the client saw it; absent when the thread has none. A mismatch answers 409 `conflict` with `reason` `session_changed` (09, 9.4).
+	ExpectedCurrentSessionId *Uuid `json:"expected_current_session_id,omitempty"`
+
 	// ExternalSessionRef Examples: sess-7f3a
 	ExternalSessionRef string `json:"external_session_ref"`
+
+	// TakeOver Required when the session is current in another thread; otherwise 409 `conflict` with `reason` `session_bound_elsewhere`.
+	TakeOver *bool `json:"take_over,omitempty"`
 }
 
 // AgentSessionChangedEvent Durable event `agent_session.changed`.
@@ -10887,7 +10896,7 @@ type Message struct {
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent bool  `json:"silent"`
 
-	// SystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+	// SystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
 	SystemCode *MessageSystemCode `json:"system_code,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -10905,7 +10914,7 @@ type Message struct {
 	Version            int64   `json:"version"`
 }
 
-// MessageSystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+// MessageSystemCode Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
 type MessageSystemCode string
 
 // MessageCreate defines model for MessageCreate.
@@ -25444,23 +25453,6 @@ func (c *Client) AutocompleteCommandWithBody(ctx context.Context, channelId Chan
 // Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
 func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// InvokeCommandWithBody Run a command
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
-func (c *Client) InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewInvokeCommandRequestWithBody(c.Server, channelId, commandId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
