@@ -77,8 +77,9 @@ type StreamDeps struct {
 // StreamHandler is the HTTP handler of GET /api/v1/terminal/sessions/{session_id}/stream (asyncapi
 // channel terminalStream, Design note 8 of M2-44): the Origin check before the upgrade
 // (SEC-CORS-3), hello with the DPoP nonce, exactly one identify within terminal.open_timeout, the
-// access token with its proof of the device, authorize terminal.stream, then the relay. It is
-// safe for concurrent use.
+// access token with its proof of the device or, for the web console, the console session of the
+// upgrade's cookie (M6-18, 08 section 7.5), authorize terminal.stream, then the relay. It is safe
+// for concurrent use.
 type StreamHandler struct {
 	cfg    StreamConfig
 	d      StreamDeps
@@ -149,11 +150,14 @@ func (h *StreamHandler) htu(id ids.ID) string {
 }
 
 // ServeHTTP implements http.Handler: a present Origin other than the origin of server.public_url
-// (several Origin headers included) answers 403 forbidden before the upgrade (SEC-CORS-3); the
-// library's origin verification stays on; compression is off.
+// (several Origin headers included) answers 403 forbidden before the upgrade (SEC-CORS-3), and so
+// does an upgrade with the console cookie without an Origin (a browser always sends one, so the
+// cookie without it is a forged request; 08 section 7.5, M6-18); the library's origin verification
+// stays on; compression is off. The console cookie of the upgrade is kept for identify.
 func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	origins := r.Header.Values("Origin")
-	if len(origins) > 1 || len(origins) == 1 && !h.sameOrigin(origins[0]) {
+	cookie := consoleCookie(r)
+	if len(origins) > 1 || len(origins) == 1 && !h.sameOrigin(origins[0]) || len(origins) == 0 && !cookie.IsZero() {
 		httpserver.WriteProblem(w, r, errs.New(errs.CodeForbidden, ""))
 		return
 	}
@@ -170,8 +174,21 @@ func (h *StreamHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	peer, _ := netip.ParseAddrPort(r.RemoteAddr)
 	ctx := reqmeta.WithTransport(authorize.WithoutRequestScope(context.WithoutCancel(r.Context())),
 		reqmeta.Transport{Peer: peer.Addr().Unmap(), Header: r.Header.Clone(), Action: string(authorize.ActionTerminalStream)})
-	h.serve(ctx, ws, id)
+	h.serve(ctx, ws, id, cookie)
 }
+
+// consoleCookie returns the value of the console cookie of r (the first of that name), zero
+// without one.
+func consoleCookie(r *http.Request) actor.CookieValue {
+	c, err := r.Cookie(actor.ConsoleCookieName)
+	if err != nil || c.Value == "" {
+		return actor.CookieValue{}
+	}
+	return actor.NewCookieValue(c.Value)
+}
+
+// consoleComponent is auth_sessions.client_component of the web console.
+const consoleComponent = "console"
 
 // The ops of the device stream (asyncapi terminalStream).
 const (
@@ -182,8 +199,9 @@ const (
 // closedAlready marks an identify whose connection already ended or was closed by its deadline.
 const closedAlready = -1
 
-// serve runs one device stream: hello, identify, the decision, then the relay.
-func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID) {
+// serve runs one device stream: hello, identify, the decision, then the relay. cookie is the
+// console cookie of the upgrade, zero for a native app.
+func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID, cookie actor.CookieValue) {
 	defer func() {
 		if p := recover(); p != nil {
 			h.d.Log.LogAttrs(ctx, slog.LevelError, msgPanic, slog.String(logErrorType, errorPanic))
@@ -197,7 +215,7 @@ func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID
 		_ = ws.CloseNow()
 		return
 	}
-	a, code, reason := h.identify(ctx, ws, id)
+	a, code, reason := h.identify(ctx, ws, id, cookie)
 	if code == closedAlready {
 		return
 	}
@@ -217,32 +235,42 @@ func (h *StreamHandler) serve(ctx context.Context, ws *websocket.Conn, id ids.ID
 // 8). It returns the principal, or the close code with its reason. Presented credentials reserve
 // one token of rl.public_auth of the client address first and keep it when the check fails (4004
 // or 4012); with the bucket empty the stream closes with 4008 before any check (M2-46 Design note
-// 10 c).
-func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids.ID) (actor.Actor, int, string) {
+// 10 c). One credential per path (M6-01 Design note 4, M6-18): a connection with the console
+// cookie takes the console path, whose identify carries no token; one without it needs the
+// access token with its proof. An identify without a token and without the console session, and a
+// token on a console connection, close with 4004.
+func (h *StreamHandler) identify(ctx context.Context, ws *websocket.Conn, id ids.ID, cookie actor.CookieValue) (actor.Actor, int, string) {
 	in, code, reason := h.readIdentify(ctx, ws, id)
 	if code != 0 {
 		return actor.Actor{}, code, reason
 	}
-	if in.AccessToken == nil || *in.AccessToken == "" || in.Dpop == nil {
-		// The console path (cookie session) is M6-18's; any other identify without a token fails.
+	token := in.AccessToken != nil && *in.AccessToken != "" && in.Dpop != nil
+	anyToken := in.AccessToken != nil || in.Dpop != nil
+	if cookie.IsZero() && !token || !cookie.IsZero() && anyToken {
 		return h.authFailed(ctx, id)
 	}
 	ok, retry, settle := h.d.Limiter.ReserveCredentials(clientIP(ctx))
 	if !ok {
 		return actor.Actor{}, int(domain.CodeRateLimited), retryText(retry)
 	}
-	a, code, reason := h.checkCredentials(ctx, in, id)
+	a, code, reason := h.checkCredentials(ctx, in, id, cookie)
 	settle(code == int(domain.StreamAuthFailed) || code == int(domain.StreamRevoked))
 	return a, code, reason
 }
 
-// checkCredentials verifies the access token and its proof of identify, applies rl.terminal to
-// the human principal (after the credential check, before authorize; 05 section 3) and authorizes
-// terminal.stream.
-func (h *StreamHandler) checkCredentials(ctx context.Context, in rest.TerminalStreamIdentify, id ids.ID) (actor.Actor, int, string) {
+// checkCredentials verifies the credential of identify (the access token and its proof, or the
+// console session of the cookie), applies rl.terminal to the human principal (after the
+// credential check, before authorize; 05 section 3) and authorizes terminal.stream. The console
+// session must be one of the web console and its device the device_id of identify; authorize
+// terminal.stream then admits only the device of the session's current token (M6-18).
+func (h *StreamHandler) checkCredentials(ctx context.Context, in rest.TerminalStreamIdentify, id ids.ID, cookie actor.CookieValue) (actor.Actor, int, string) {
 	ip, _ := reqmeta.ClientIP(ctx)
-	a, err := h.d.Authenticator.Authenticate(ctx, actor.Credentials{Method: http.MethodGet, HTU: h.htu(id),
-		Authorization: "DPoP " + *in.AccessToken, DPoP: *in.Dpop, DPoPProofs: []string{*in.Dpop}, ClientIP: ip})
+	creds := actor.Credentials{ConsoleCookie: cookie, ClientIP: ip}
+	if cookie.IsZero() {
+		creds = actor.Credentials{Method: http.MethodGet, HTU: h.htu(id),
+			Authorization: "DPoP " + *in.AccessToken, DPoP: *in.Dpop, DPoPProofs: []string{*in.Dpop}, ClientIP: ip}
+	}
+	a, err := h.d.Authenticator.Authenticate(ctx, creds)
 	switch {
 	case err != nil && isSessionRevoked(err):
 		_ = h.d.UseCases.StreamAuthFailed(ctx, id)
@@ -250,6 +278,8 @@ func (h *StreamHandler) checkCredentials(ctx context.Context, in rest.TerminalSt
 	case err != nil:
 		return h.authFailed(ctx, id)
 	case a.Kind == actor.KindUser && a.DeviceID != ids.ID(in.DeviceId):
+		return h.authFailed(ctx, id)
+	case !cookie.IsZero() && (a.Kind != actor.KindUser || a.ClientComponent != consoleComponent):
 		return h.authFailed(ctx, id)
 	}
 	if a.Kind == actor.KindUser {
