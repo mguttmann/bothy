@@ -502,31 +502,37 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
                 "--label",
                 LABEL,
                 "--state",
-                "open",
+                "all",
                 "--json",
-                "number,title",
+                "number,title,state",
             ]
         )
     )
-    number = next((int(i["number"]) for i in issues if i.get("title") == TITLE), 0)
-    bodies: list[str] = []
-    if number:
+    issues = [i for i in issues if i.get("title") == TITLE]
+    number = next((int(i["number"]) for i in issues if i.get("state") == "OPEN"), 0)
+    # The runs of every issue, also of a closed one, are reported; the open one lists its own.
+    seen: dict[int, list[Flake]] = {}
+    reported: set[int] = set()
+    for issue in issues:
         listed = gh(
             [
                 "api",
                 "--paginate",
-                f"repos/{args.repo}/issues/{number}/comments",
+                f"repos/{args.repo}/issues/{issue['number']}/comments",
                 "--jq",
                 ".[] | {body, user: .user.login}",
             ]
         )
         # Only the comments of this workflow: anyone can comment on the public issue.
         bodies = [str(c.get("body") or "") for c in _json_lines(listed) if c.get("user") == BOT]
-    seen = parse_comments(bodies)
+        parsed = parse_comments(bodies)
+        reported |= set(parsed)
+        if int(issue["number"]) == number:
+            seen = parsed
     known = {_key(f) for flakes in seen.values() for f in flakes}
     added = 0
     for run in sorted(runs, key=lambda r: int(r["id"])):
-        if int(run["id"]) in seen:
+        if int(run["id"]) in reported:
             continue
         listed = gh(
             [

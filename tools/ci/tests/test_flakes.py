@@ -417,6 +417,41 @@ def test_a_package_that_fails_in_every_attempt_fails_beside_a_later_flake(
     assert found == [{"tool": "go", "package": PKG, "test": "TestTwice", "runs": 3, "failures": 2}]
 
 
+_ORDER_TEST = """package a
+
+import "testing"
+
+var polluted bool
+
+func TestA(t *testing.T) { polluted = true }
+
+// Fails in every run of the whole package (TestA runs first) and passes alone.
+func TestB(t *testing.T) {
+	if polluted {
+		t.Fatal("state left by TestA")
+	}
+}
+"""
+
+
+def test_an_order_dependent_failure_is_a_flake_of_every_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gotestsum: str
+) -> None:
+    # The documented limit (docs/quality/gates.md, section "Flakes"): a rerun runs the failed
+    # test alone, so a failure that needs the other tests of the package passes CI; it is then
+    # recorded as a flake in every run, which puts it at the head of the flake list.
+    module = tmp_path / "mod"
+    (module / "a").mkdir(parents=True)
+    (module / "go.mod").write_text("module example.com/mod\n\ngo 1.26\n", encoding="utf-8")
+    (module / "a" / "a_test.go").write_text(_ORDER_TEST, encoding="utf-8")
+    for _ in range(2):
+        code, found, _ = _run(tmp_path, monkeypatch, gotestsum, {})
+        assert code == 0
+        assert found == [{"tool": "go", "package": PKG, "test": "TestB", "runs": 2, "failures": 1}]
+        for path in (tmp_path / "flakes").iterdir():
+            path.unlink()
+
+
 def test_go_shards_runs_each_go_test_through_flakes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gotestsum: str
 ) -> None:
@@ -475,6 +510,8 @@ class FakeGh:
         self.issues: list[dict[str, Any]] = []
         self.comments: list[str] = []
         self.foreign: list[str] = []
+        # The issue of each comment of `comments` (issue 7 for a comment a test adds itself).
+        self.comment_of: list[int] = []
         self.calls: list[list[str]] = []
 
     def __call__(self, args: Sequence[str]) -> str:
@@ -493,9 +530,18 @@ class FakeGh:
             ]
             return "".join(json.dumps(r) + "\n" for r in runs)
         if args[:2] == ["issue", "list"]:
-            return json.dumps([{"number": i["number"], "title": i["title"]} for i in self.issues])
+            state = args[args.index("--state") + 1]
+            shown = [i for i in self.issues if state == "all" or i["state"] == state.upper()]
+            return json.dumps(
+                [{"number": i["number"], "title": i["title"], "state": i["state"]} for i in shown]
+            )
         if args[:2] == ["api", "--paginate"] and args[2].endswith("/comments"):
-            own = [{"body": b, "user": flakes.BOT} for b in self.comments]
+            number = int(args[2].split("/issues/")[1].split("/")[0])
+            own = [
+                {"body": b, "user": flakes.BOT}
+                for n, b in enumerate(self.comments)
+                if (self.comment_of[n] if n < len(self.comment_of) else 7) == number
+            ]
             other = [{"body": b, "user": "someone"} for b in self.foreign]
             return "".join(json.dumps(c) + "\n" for c in [*other, *own])
         if args[:2] == ["api", "--paginate"] and "/artifacts" in args[2]:
@@ -515,13 +561,18 @@ class FakeGh:
         if args[:2] == ["label", "create"]:
             return ""
         if args[:2] == ["issue", "create"]:
-            self.issues.append({"number": 7, "title": args[args.index("--title") + 1]})
-            return "https://github.com/o/r/issues/7\n"
+            number = 7 + len(self.issues)
+            title = args[args.index("--title") + 1]
+            self.issues.append({"number": number, "title": title, "state": "OPEN"})
+            return f"https://github.com/o/r/issues/{number}\n"
         if args[:2] == ["issue", "comment"]:
+            self.comment_of += [7] * (len(self.comments) - len(self.comment_of))
             self.comments.append(args[args.index("--body") + 1])
+            self.comment_of.append(int(args[2]))
             return ""
         if args[:2] == ["issue", "edit"]:
-            self.issues[0]["body"] = args[args.index("--body") + 1]
+            [issue] = [i for i in self.issues if i["number"] == int(args[2])]
+            issue["body"] = args[args.index("--body") + 1]
             return ""
         raise AssertionError(args)
 
@@ -573,3 +624,20 @@ def test_only_the_bot_comments_count_and_their_flakes_are_checked() -> None:
     assert "TestForged" not in gh.issues[0]["body"]
     assert "`[x](https:`" in gh.comments[1]
     assert "| 1 | 21 | `[x](https:` |" in gh.issues[0]["body"]
+
+
+def test_a_closed_issue_keeps_its_runs_reported() -> None:
+    gh = FakeGh({31: {"flakes-test-apps": [_flake("TestA")]}})
+    assert _issue(gh) == 0
+    gh.issues[0]["state"] = "CLOSED"
+    # The runs of the closed issue are reported: no new issue until a new run has a flake.
+    assert _issue(gh) == 0
+    assert len(gh.issues) == 1
+    assert len(gh.comments) == 1
+    gh.artifacts[32] = {"flakes-test-apps": [_flake("TestA")]}
+    assert _issue(gh) == 0
+    assert [i["state"] for i in gh.issues] == ["CLOSED", "OPEN"]
+    assert gh.comment_of == [7, 8]
+    # The new issue lists only its own runs, and the flake of the closed list counts as new.
+    assert "| new | `go` | `example.com/mod/a` | `TestA` |" in gh.comments[1]
+    assert "| 1 | 32 | `go` |" in gh.issues[1]["body"]

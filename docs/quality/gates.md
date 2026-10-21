@@ -272,10 +272,14 @@ What still fails:
   stops the reruns);
 * a rerun whose package fails in another place (TestMain after the rerun, a new failure).
 
-What a rerun can hide: a failure that only shows when the tests of a package run together (an
-order dependency, a check in TestMain that only the other tests trip) passes when it coincides
-with a flake of a test of the same package; the flake list then names that test, so it stays
-visible.
+What a rerun does not catch: a rerun runs only the failed top-level test, alone in its package
+(the owner's rule: rerun the failed tests only, not the whole package). A test that fails only
+after other tests of its package ran (an order dependency, state that another test leaves behind)
+therefore fails in every full run and passes in every rerun: CI passes, and the test is a flake
+in every run, so it heads the flake list (`test_an_order_dependent_failure_is_a_flake_of_every_run`).
+A check in TestMain that only the other tests trip passes the same way when a test of the same
+package flakes in that run. Local runs without `CI=true` keep failing on both. Fix such a test
+like a flake: the list is the queue.
 
 Where the list is:
 
@@ -287,7 +291,7 @@ Where the list is:
   (title "Flaky tests (reruns that passed in CI)", created with the label when there is none) and
   keeps the issue body as the list of every flaky test, the most frequent first. It uses only
   the `GITHUB_TOKEN` (`actions: read`, `issues: write`). Close the issue when its list is fixed;
-  the next flake opens a new one.
+  the runs it reported stay reported, and the next run with a flake opens a new issue.
 
 ## Performance (`make perf`)
 
