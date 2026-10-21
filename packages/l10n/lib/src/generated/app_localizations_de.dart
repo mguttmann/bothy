@@ -7811,7 +7811,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get consoleTerminalPasskeySetup =>
-      'Ein Terminal öffnet in der Konsole nur mit einem Passkey, und für dich ist keiner eingerichtet. Bitte einen Eigentümer, einen Passkey für dich einzurichten, und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.';
+      'Ein Terminal öffnet in der Konsole nur mit einem Passkey mit Benutzerprüfung, und dein Konto hat noch keinen. Richte zuerst einen Passkey für dein Konto ein und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.';
 
   @override
   String get consoleTerminalPasskeyClose => 'Schließen';

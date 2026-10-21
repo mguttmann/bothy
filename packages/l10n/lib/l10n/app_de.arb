@@ -2061,7 +2061,7 @@
   "sidebarRunningNowCount": "{count, plural, =1{Läuft gerade, 1 aktiver Lauf} other{Läuft gerade, {count} aktive Läufe}}",
   "consoleTerminalPinningNotice": "Im Browser bemerkt diese Prüfung nur einen Schlüsselwechsel, den der Server meldet; gegen den Server selbst schützt sie nicht.",
   "consoleTerminalPasskeyTitle": "Passkey nötig",
-  "consoleTerminalPasskeySetup": "Ein Terminal öffnet in der Konsole nur mit einem Passkey, und für dich ist keiner eingerichtet. Bitte einen Eigentümer, einen Passkey für dich einzurichten, und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.",
+  "consoleTerminalPasskeySetup": "Ein Terminal öffnet in der Konsole nur mit einem Passkey mit Benutzerprüfung, und dein Konto hat noch keinen. Richte zuerst einen Passkey für dein Konto ein und öffne das Terminal danach erneut. In der Desktop- und der Mobil-App öffnet das Terminal stattdessen mit dem Geräteschlüssel.",
   "consoleTerminalPasskeyClose": "Schließen",
   "consoleTerminalOpen": "Terminal öffnen",
   "consoleTerminalBack": "Zurück zum Rechner"
