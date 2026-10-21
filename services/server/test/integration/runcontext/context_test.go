@@ -337,6 +337,9 @@ func TestRunContext_GuestRun(t *testing.T) {
 	if _, ok := body["channel_context"]; !ok {
 		t.Error("no channel_context for a guest")
 	}
+	// The started guest run keeps its context.
+	c.wantOK(c.start("texter", run, c.deliver(run)))
+	wantMark(t, "own after the start", byID(part(c.contextOf("texter", run), "thread_context"))[own], "assistant", "self")
 }
 
 // TestRunContext_AutoThreadFirstRun (09 3.4 point 5, 3.7): Alex mentions Lotse in the main thread

@@ -189,21 +189,6 @@ type world struct {
 	contextMax, contextMessageMax int
 }
 
-// newWorld builds the modules, the harness and the world of 07 section 10 and 11.1.
-func newWorld(t *testing.T) *world {
-	t.Helper()
-	w := newEmptyWorld(t)
-	w.build()
-	return w
-}
-
-// newEmptyWorld builds the modules and the harness with only the owner and the language
-// configuration of the chapter defaults (docs/spec/14-suche.md section 15).
-func newEmptyWorld(t *testing.T) *world {
-	t.Helper()
-	return newEmptyWorldWith(t, chapterSearch(t))
-}
-
 // chapterSearch is the language configuration of the chapter defaults: search.languages german and
 // english, search.locale_map de and en.
 func chapterSearch(t *testing.T) searchlang.Map {
@@ -211,14 +196,6 @@ func chapterSearch(t *testing.T) searchlang.Map {
 	m, err := searchlang.New([]string{"german", "english"}, map[string]string{"de": "german", "en": "english"})
 	must(t, err)
 	return m
-}
-
-// newEmptyWorldWith builds the modules and the harness with only the owner and the language
-// configuration search, which identity answers the language of new messages and threads with
-// (M3-13).
-func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
-	t.Helper()
-	return newLimitedWorld(t, search, defaultContextMax, defaultContextMessageMax)
 }
 
 // The byte bounds of the run context of the world: the defaults of 09 section 21 through the
@@ -446,13 +423,6 @@ func (w *world) setActor(name string, a actor.Actor) {
 	w.acts[name] = a
 	w.actorsMu.Unlock()
 	w.actors.Set(name, a)
-}
-
-// actor returns the principal registered under name.
-func (w *world) actor(name string) actor.Actor {
-	w.actorsMu.Lock()
-	defer w.actorsMu.Unlock()
-	return w.acts[name]
 }
 
 // person inserts an active person, with owner an active owners row, and registers the token name

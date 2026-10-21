@@ -6,28 +6,9 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"testing"
 
-	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
-
-// runsWorld is the world of 07 11.1 with the extensions of the brief M2-05 ("Tests"): Robin with
-// write (no trigger) on Support/Eskalation, Texter with write on Support/Eskalation and
-// allow_mentioned_agents on Support/Eskalation.
-func runsWorld(t *testing.T) *world {
-	t.Helper()
-	w := newWorld(t)
-	// The instance row of bothy migrate up (snapshot and catch-up read head and epoch).
-	w.sql(`INSERT INTO instance (id, instance_id, schema_version, sync_epoch) VALUES (1, $1, 1, $2) ON CONFLICT (id) DO NOTHING`,
-		ids.New().String(), ids.New().String())
-	w.grant(`"subject_kind":"user","subject_id":"` + w.robin.String() + `","target_kind":"channel","target_id":"` + w.eskalation.String() +
-		`","level":"write","reason":"Escalation writer"`)
-	w.grant(`"subject_kind":"agent","subject_id":"` + w.texter.String() + `","target_kind":"channel","target_id":"` + w.eskalation.String() +
-		`","level":"write","reason":"Guest in escalation"`)
-	w.behavior(w.eskalation, `"allow_mentioned_agents":true`)
-	return w
-}
 
 // behavior replaces the behaviour of channel with the defaults of 09 3.3 and the extra members
 // (putChannelBehavior as the owner, with step-up and If-Match).
@@ -104,46 +85,4 @@ func (w *world) runsWhere(cond string, args ...any) []runRow {
 		out = append(out, r)
 	}
 	return out
-}
-
-// maxSeq is the highest seq of the event log.
-func (w *world) maxSeq() int64 {
-	return w.count(`SELECT coalesce(max(seq), 0) FROM event_log`)
-}
-
-// logEvent is one row of event_log after a position.
-type logEvent struct {
-	Type, Resource, Thread string
-	Version                int64
-}
-
-// eventsAfter returns the events after seq in commit order.
-func (w *world) eventsAfter(seq int64) []logEvent {
-	w.t.Helper()
-	rs, err := w.db.Query(context.Background(), `SELECT type, coalesce(resource_id::text, ''), coalesce(thread_id::text, ''), coalesce(resource_version, 0)
-		FROM event_log WHERE seq > $1 ORDER BY seq`, seq)
-	must(w.t, err)
-	defer rs.Close()
-	var out []logEvent
-	for rs.Next() {
-		var e logEvent
-		must(w.t, rs.Scan(&e.Type, &e.Resource, &e.Thread, &e.Version))
-		out = append(out, e)
-	}
-	return out
-}
-
-// types returns the event types of list.
-func types(list []logEvent) []string {
-	out := make([]string, 0, len(list))
-	for _, e := range list {
-		out = append(out, e.Type)
-	}
-	return out
-}
-
-// inUnit runs fn in a unit of work as Alex.
-func (w *world) inUnit(fn func(ctx context.Context) error) error {
-	ctx := actor.WithActor(context.Background(), w.actor("alex"))
-	return w.uow.Do(ctx, fn)
 }
