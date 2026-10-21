@@ -271,7 +271,9 @@ func TestRegisterBeforeHead(t *testing.T) {
 	if _, err := c.Identify(ctx, wstest.IdentifyParams{APIToken: agentToken}); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.o.all(); len(got) < 3 || got[0] != "register" || got[1] != "head" || got[2] != "attach" {
+	// Attach runs after ready is sent, so it may still be under way when Identify returns.
+	testkit.Until(t, "attach after ready", func() bool { return len(s.o.all()) >= 3 })
+	if got := s.o.all(); got[0] != "register" || got[1] != "head" || got[2] != "attach" {
 		t.Errorf("calls %v, want register, head, attach", got)
 	}
 }
