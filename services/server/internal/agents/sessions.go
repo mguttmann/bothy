@@ -4,6 +4,7 @@ package agents
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -167,4 +168,57 @@ type SessionAttached struct {
 	ReplacedSessionID ids.ID
 	// BindFailed marks the fail open of 09 9.5 item 4.
 	BindFailed bool
+}
+
+// sessionJSON is the schema AgentSession of docs/api/openapi.yaml; optional members are left out,
+// never null (ADR 0053). cost_baseline_micros and dev_environment_id are never shown.
+type sessionJSON struct {
+	ID                 string    `json:"id"`
+	ThreadID           string    `json:"thread_id"`
+	AgentID            string    `json:"agent_id"`
+	ExternalSessionRef string    `json:"external_session_ref"`
+	IsCurrent          bool      `json:"is_current"`
+	Started            bool      `json:"started"`
+	Model              string    `json:"model,omitempty"`
+	Cost               moneyJSON `json:"cost"`
+	CreatedAt          string    `json:"created_at"`
+	EndedAt            string    `json:"ended_at,omitempty"`
+	EndReason          string    `json:"end_reason,omitempty"`
+	Version            int64     `json:"version"`
+}
+
+// moneyJSON is the schema Money.
+type moneyJSON struct {
+	AmountMicros int64  `json:"amount_micros"`
+	Currency     string `json:"currency"`
+	IsEstimate   bool   `json:"is_estimate"`
+}
+
+// sessionTimeLayout is the form of every API time (06 section 2): UTC, milliseconds, suffix Z.
+const sessionTimeLayout = "2006-01-02T15:04:05.000Z"
+
+// sessionStamp formats t; the zero time is absent.
+func sessionStamp(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Truncate(time.Millisecond).Format(sessionTimeLayout)
+}
+
+// SessionJSON encodes s in the form of the schema AgentSession (M2-12 design note 4): the one
+// representation of a session row in the payload of agent_session.changed (agents) and in the
+// member agent_session of AgentInvocationPayload (runs), so both carry the same bytes. cost is
+// Money{amount_micros: cumulative_cost_micros, currency, is_estimate: cost_is_estimate}.
+// Errors: none in practice (the encoding of plain values).
+//
+// Example:
+//
+//	raw, err := agents.SessionJSON(row)
+func SessionJSON(s Session) ([]byte, error) {
+	return json.Marshal(sessionJSON{
+		ID: s.ID.String(), ThreadID: s.ThreadID.String(), AgentID: s.AgentID.String(), ExternalSessionRef: s.ExternalSessionRef,
+		IsCurrent: s.IsCurrent, Started: s.Started, Model: s.Model,
+		Cost:      moneyJSON{AmountMicros: s.CumulativeCostMicros, Currency: s.Currency, IsEstimate: s.CostIsEstimate},
+		CreatedAt: sessionStamp(s.CreatedAt), EndedAt: sessionStamp(s.EndedAt), EndReason: s.EndReason, Version: s.Version,
+	})
 }

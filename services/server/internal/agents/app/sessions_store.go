@@ -35,6 +35,10 @@ type NewSession struct {
 	// EndedAt and EndReason are set exactly when IsCurrent is false.
 	EndedAt   time.Time
 	EndReason string
+	// Version is the first version of the row; 0 means 1 (the column default). A row that
+	// replaces another after bind_failed starts above the replaced row's version, so a concurrent
+	// duplicate report with the old If-Match fails its compare-and-swap (M2-12 design note 12).
+	Version int64
 }
 
 // SessionEnd is the input of SessionStore.EndSession: the current row ID at Version ends at At
