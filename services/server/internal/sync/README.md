@@ -327,7 +327,9 @@ through `test/messagingworld` with `NewPersonal`) and
   `too_far_behind` (`domain.ResyncReason`, M1-63/2). Without `epoch` there is no epoch check.
 - **Page.** `CatchUp.Page` takes the visible sets of `Authorizer.Scope` (`channel.read`), runs the
   predicate of 04 section 7.2 point 1 with `seq > after AND seq <= head ORDER BY seq LIMIT limit`
-  (`queries/catchup.sql`), then per row: a personal event only to its audience, any other only
+  (`queries/catchup.sql`), then per row: a personal event only to its audience (one whose receive
+  action is not `self`, `agent.config_changed`, also only while `authorize` allows that action,
+  DECISIONS D-M2-02-7; `TestAdmit_PersonalEventWithReceiveAction`), any other only
   when `authorize(actor, receive_action, authorize.ResourceFromEvent(...))` allows it in filter
   mode (no denial audit); authz decides an event whose stored kind the receive action does not take on the object it takes (M1-63/12). It reads no content table per event. `next_cursor` is the `seq` of the
   last row of a full page, otherwise the head; rows dropped by the audience rule or `authorize`

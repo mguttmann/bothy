@@ -72,6 +72,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getAgent
   - getApp
   - getChannel
+  - getChannelBehavior
   - getConsumerState
   - getDevice
   - getDiscovery
@@ -86,6 +87,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getMySidebar
   - getProblemType
+  - getServedChannelConfig
   - getSnapshot
   - getSpace
   - getThread
@@ -121,6 +123,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listOwners
   - listPins
   - listReactions
+  - listServedChannels
   - listSpaceChannels
   - listSpaces
   - listTemplates
@@ -143,6 +146,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - pinMessage
   - pollAgentEvents
   - previewGrant
+  - putChannelBehavior
   - putChannelDraft
   - putFeatureFlag
   - putInstanceSetting
@@ -312,9 +316,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getBrandingLogo
     milestone: M3
     ticket: M3-10
-  - operation_id: getChannelBehavior
-    milestone: M2
-    ticket: M2-02
   - operation_id: getCommand
     milestone: M2
     ticket: M2-16
@@ -346,9 +347,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getRunStats
     milestone: M6
     ticket: M6-05
-  - operation_id: getServedChannelConfig
-    milestone: M2
-    ticket: M2-02
   - operation_id: getStatsBackends
     milestone: M6
     ticket: M6-14
@@ -422,9 +420,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listRunSteps
     milestone: M2
     ticket: M2-05
-  - operation_id: listServedChannels
-    milestone: M2
-    ticket: M2-02
   - operation_id: listTerminalSessions
     milestone: M2
     ticket: M2-44
@@ -443,9 +438,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: postIncomingWebhook
     milestone: M2
     ticket: M2-27
-  - operation_id: putChannelBehavior
-    milestone: M2
-    ticket: M2-02
   - operation_id: putProjectBinding
     milestone: M2
     ticket: M2-03

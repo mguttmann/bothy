@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package chat
+
+import (
+	"context"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
+
+// BehaviorSettings are the writable behaviour of a channel (schema ChannelBehaviorPut): the
+// mention switches, auto_thread, the context window, the channel prompt and the ordered skill
+// references (03 section 4.5 channels and channel_skill_bindings; 09 "Channel switches").
+type BehaviorSettings struct {
+	RequireMention, ThreadRequireMention, FreeResponse, AutoThread, AllowMentionedAgents bool
+	// HistoryBackfillLimit is the number of earlier messages a run sees (M2-13).
+	HistoryBackfillLimit int
+	// Prompt is the channel prompt; readable only with manage or as the effective operator.
+	Prompt string
+	// Skills are the ordered skill references; the server never interprets them.
+	Skills []string
+}
+
+// ChannelBehavior is the behaviour of a channel with its settings version (schema
+// ChannelBehavior; the member project_binding joins with M2-03).
+type ChannelBehavior struct {
+	BehaviorSettings
+	// SettingsVersion is channels.settings_version, the ETag of the behaviour.
+	SettingsVersion int64
+}
+
+// PutChannelBehaviorCmd is the request of putChannelBehavior: the channel, the If-Match of the
+// request (06 section 8) and the complete new settings.
+type PutChannelBehaviorCmd struct {
+	ChannelID ids.ID
+	// IfMatch is the required precondition on settings_version.
+	IfMatch  Precondition
+	Settings BehaviorSettings
+}
+
+// ServedChannelConfig is the configuration an operator agent loads for a channel it serves
+// (schema AgentChannelConfig).
+type ServedChannelConfig struct {
+	ChannelID, SpaceID ids.ID
+	Behavior           ChannelBehavior
+}
+
+// AgentConfig is the incoming port of channel behaviour and agent configuration (02 section 4.3,
+// M2-02): people with manage read and change the behaviour of a channel, and the effective
+// operator agent reads the configuration of the channels it serves. Every method authorizes the
+// caller a; an unknown and an unreadable channel give the same 404 not_found. Prompt and skills
+// never leave through events, logs, traces, metrics, audit details or error bodies. Errors are
+// kernel/errs errors.
+type AgentConfig interface {
+	// GetChannelBehavior returns the behaviour of the channel (channel.behavior.read, manage);
+	// an archived channel stays readable. Errors: not_found, forbidden capability_missing.
+	GetChannelBehavior(ctx context.Context, a actor.Actor, channelID ids.ID) (ChannelBehavior, error)
+	// PutChannelBehavior replaces the behaviour of the channel (channel.behavior.update, manage,
+	// step-up, If-Match on settings_version) and raises settings_version by one, with
+	// channel.settings_changed and, when prompt or skills changed and the channel has an effective
+	// operator, agent.config_changed to that agent. An unchanged state answers without a new
+	// version. Errors: not_found, forbidden, step_up_required, precondition_required,
+	// version_conflict with the current behaviour, validation_failed, conflict for an archived
+	// channel.
+	PutChannelBehavior(ctx context.Context, a actor.Actor, cmd PutChannelBehaviorCmd) (ChannelBehavior, error)
+	// ListServedChannels returns the configuration of the channels that are not archived and
+	// whose effective operator is the agent a, ascending by channel id (agent.config.read).
+	// Errors: forbidden subject_kind_not_allowed for every other principal.
+	ListServedChannels(ctx context.Context, a actor.Actor) ([]ServedChannelConfig, error)
+	// GetServedChannelConfig returns the configuration of the channel when a is its effective
+	// operator (agent.config.read); an archived channel stays readable. Errors: not_found,
+	// forbidden subject_kind_not_allowed.
+	GetServedChannelConfig(ctx context.Context, a actor.Actor, channelID ids.ID) (ServedChannelConfig, error)
+}

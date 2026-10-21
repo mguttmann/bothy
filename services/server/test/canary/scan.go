@@ -44,6 +44,9 @@ func Report(findings []Finding) string {
 	return strings.Join(lines, "\n")
 }
 
+// opPutChannelBehavior is the operation whose 412 may echo a manage_only value in current.
+const opPutChannelBehavior = "putChannelBehavior"
+
 // minNeedle is the shortest text Scan looks for: shorter forms (six-digit TOTP codes) would match
 // unrelated digits of timestamps and counters. README.md "Not covered" names them.
 const minNeedle = 8
@@ -135,6 +138,10 @@ func allowed(c Canary, r Record, f Field, rules AllowRules) bool {
 		if r.Sink == SinkAudit && f.Location == "/details/reason" {
 			return true
 		}
+	case ClassManageOnly:
+		// The caller of putChannelBehavior passed manage before the version check, so current of
+		// its 412 is a representation it may read; nothing else ever carries the value.
+		return r.Sink == SinkError && f.Echo && r.Operation == opPutChannelBehavior
 	case ClassContent:
 	}
 	if r.Sink == SinkError && f.Echo {
@@ -159,7 +166,7 @@ func forms(c Canary) []string {
 		return ipForms(c.Value)
 	case ClassIdentity:
 		return []string{c.Value, strings.ReplaceAll(c.Value, "-", "")}
-	case ClassContent, ClassAdminReason, ClassSecret:
+	case ClassContent, ClassAdminReason, ClassSecret, ClassManageOnly:
 	}
 	if payload, sig, ok := jwsSegments(c.Value); ok {
 		return []string{payload, sig}

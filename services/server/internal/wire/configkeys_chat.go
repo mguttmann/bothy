@@ -6,7 +6,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // chatConfigKeys returns the keys the module chat reads from docs/spec/03-data-model.md
 // "Configuration values of this chapter": the space name limit (M1-52), the channel and tag text
-// limits and the history backfill limits of a channel (M1-53), the tag limit of a thread (M1-55);
+// limits and the history backfill limits of a channel (M1-53), the tag limit of a thread (M1-55),
+// the prompt limit of a channel (M2-02);
 // and from docs/spec/09-agents.md the placeholder titles (M1-55). thread.title_max_chars is
 // declared with messaging (configkeys_messaging.go), the page sizes with the API keys.
 func chatConfigKeys() []config.Key {
@@ -39,6 +40,11 @@ func chatConfigKeys() []config.Key {
 		{
 			Name: "channel.history_backfill_limit_max", Kind: config.KindInt, Default: "200", Min: "0",
 			Doc:     "Upper bound of history_backfill_limit.",
+			Chapter: chapter03,
+		},
+		{
+			Name: "channel.prompt_max_bytes", Kind: config.KindInt, Default: "32768", Min: "1",
+			Doc:     "Longest channel prompt in bytes of UTF-8 (putChannelBehavior, M2-02).",
 			Chapter: chapter03,
 		},
 		{
