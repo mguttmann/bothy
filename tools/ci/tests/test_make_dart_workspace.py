@@ -354,13 +354,15 @@ def test_docs_runs_dart_api_docs(repo: Repo) -> None:
     result = repo.make("docs", "COMPONENTS=apps")
     assert result.returncode == 0, result.stdout + result.stderr
     scripts = [c[0] for c in repo.python_calls()]
-    # After the site build the docs gate of M7-19 checks it for assets of another origin.
+    # After the site build the docs gate of M7-19 checks it for assets of another origin; the
+    # terminal catalogue check of M2-48 runs right after the ADR index.
     assert scripts == [
         "tools/docs/adr_index.py",
+        "tools/docs/terminal_catalogue.py",
         "tools/docs/dart_api_docs.py",
         "tools/docs/external_assets_check.py",
     ]
-    assert repo.python_calls()[1] == ["tools/docs/dart_api_docs.py", "--out", "docs/api/dart"]
+    assert repo.python_calls()[2] == ["tools/docs/dart_api_docs.py", "--out", "docs/api/dart"]
     uv = [c["args"] for c in repo.calls("uv")]
     assert any("mkdocs" in args for args in uv)  # type: ignore[operator]
     # The site links into the generated pages, so the docs gate builds them for every
