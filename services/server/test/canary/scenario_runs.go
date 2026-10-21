@@ -4,7 +4,8 @@ package canary
 
 import "net/http"
 
-// runs drives the four run reads of M2-05 and the live-box patch of M2-10: the first message of the owner in the thread of
+// runs drives the four run reads of M2-05, the live-box patch of M2-10 and the session operations
+// of M2-12: the first message of the owner in the thread of
 // Support/Allgemein opened a run of Lotse (BuildMatrixWorld); Alex (reads Support) lists the runs
 // of the thread and "Running now", reads the run document and its steps, and Sam, who reads
 // Support/Allgemein through Leser, reads it too, so the pages of both carry the run summaries.
@@ -34,6 +35,7 @@ func (sc *Scenario) runs() {
 		sc.get(alex, "/runs/"+jsonText(foreign[0]["id"]), http.StatusNotFound)
 	}
 	sc.runLifecycle(run)
+	sc.agentSessions(thread)
 }
 
 // runLifecycle drives the six lifecycle operations of M2-09 on the queued run of Lotse without

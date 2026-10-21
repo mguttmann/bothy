@@ -14,9 +14,10 @@ import (
 )
 
 // exceptionRoutes are the operations of the SR9 exceptions and of the bound run context whose
-// end-to-end cases belong to the tickets that enable them (brief M2-14 "Out of scope"): patchRun
-// (M2-10), reportAgentSession (M2-12), respondToInteraction (M2-15) and getRunContext (M2-13).
-var exceptionRoutes = []string{"getRunContext", "patchRun", "reportAgentSession", "respondToInteraction"}
+// end-to-end cases belong to the tickets that enable them (brief M2-14 "Out of scope"): getRunContext
+// (M2-13). patchRun (M2-10), reportAgentSession (M2-12) and respondToInteraction (M2-15) are
+// enabled; TestSR9_ExceptionRoutesEndToEnd holds their cases (INT-W55/6).
+var exceptionRoutes = []string{"getRunContext"}
 
 // TestSR9_ExceptionRoutesEnabled (brief "TestSR9_ExceptionRoutesEnabled"): on this base the routes
 // of exceptionRoutes are not enabled, so their end-to-end cases (own run with T after Alex lost
