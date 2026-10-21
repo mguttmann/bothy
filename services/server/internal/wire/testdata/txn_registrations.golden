@@ -9,6 +9,7 @@ subscribe chat.ThreadMoved -> sync github.com/OWNER/bothy/services/server/intern
 subscribe chat.ChannelArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnChannelArchived-fm
 subscribe chat.SpaceArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnSpaceArchived-fm
 subscribe messaging.MessagePosted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessagePosted-fm
+subscribe messaging.MessagePosted -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnMessagePosted-fm
 subscribe chat.ChannelArchived -> apps github.com/OWNER/bothy/services/server/internal/apps/app.(*ArchiveSubscriber).OnChannelArchived-fm
 subscribe kernel.AccessChanged -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAccessChanged-fm
 subscribe agents.AgentDisabled -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAgentDisabled-fm

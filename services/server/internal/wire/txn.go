@@ -200,10 +200,10 @@ func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 }
 
 // subscribeArchivesAndRuns registers chat.ChannelArchived and chat.SpaceArchived -> notify, then
-// messaging.MessagePosted -> runs after the existing subscribers (M2-05), then
-// chat.ChannelArchived -> apps (the incoming webhooks of the channel, M2-27), then
-// authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09), then kernel.AccessChanged,
-// identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46).
+// messaging.MessagePosted -> runs after the existing subscribers (M2-05) and -> notify (the
+// automatic following, M3-19), then chat.ChannelArchived -> apps (the incoming webhooks of the
+// channel, M2-27), then authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09), then
+// kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -215,6 +215,10 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 		return errNoRunsAcceptor
 	}
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnMessagePosted); err != nil {
+		return err
+	}
+	// The automatic following of notify, after the subscribers of sync and runs (13 3.2, M3-19).
+	if err := txn.Subscribe(reg, m.NotifySubscribers.OnMessagePosted); err != nil {
 		return err
 	}
 	if m.AppsArchive == nil {
