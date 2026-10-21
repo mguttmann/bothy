@@ -312,10 +312,10 @@ func refPayload(r messaging.PrincipalRef) domain.PrincipalRefPayload {
 		AvatarFileID: optionalID(r.AvatarFileID)}
 }
 
-// fits refuses a payload larger than sync.event_payload_max_bytes with /options too_large (design
-// note 10 i).
+// fits refuses a payload that is not smaller than sync.event_payload_max_bytes (the rule of the
+// appender) with /options too_large (design note 10 i).
 func (s *Service) fits(p []byte) error {
-	if len(p) > s.cfg.EventPayloadMaxBytes {
+	if len(p) >= s.cfg.EventPayloadMaxBytes {
 		return domain.OptionField("/options", domain.FieldTooLarge, "the option values are too large for the event")
 	}
 	return nil
