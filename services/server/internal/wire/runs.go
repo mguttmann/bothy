@@ -20,6 +20,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/identity"
+	runsactingfor "github.com/OWNER/bothy/services/server/internal/runs/adapters/actingfor"
 	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	runsmetrics "github.com/OWNER/bothy/services/server/internal/runs/adapters/otelmetrics"
@@ -179,6 +181,26 @@ func InvocationTokenConfigFrom(v *config.Values) (runsapp.InvocationTokenConfig,
 		return runsapp.InvocationTokenConfig{}, err
 	}
 	return c, nil
+}
+
+// Compile-time check (brief M2-14 design note 3h): the acting-for source of runs implements the
+// source port identity declares; it has only kernel types in its signature, so runs does not
+// import identity and no module edge is added.
+var _ identity.ActingForSource = (*runsactingfor.Source)(nil)
+
+// ActingForSource returns the source of the acting-for binding of guard rule SR9 (brief M2-14):
+// the resolution of the Invocation-Token header over the invocation tokens of BindInvocationTokens
+// and the binding read of the runs table on pool, outside any unit of work. Errors: the invocation
+// tokens are not bound yet.
+func (r *Runs) ActingForSource(pool *pg.Pool) (*runsactingfor.Source, error) {
+	if r.Invocations == nil {
+		return nil, errors.New("wire: the acting-for source needs the invocation tokens (BindInvocationTokens)")
+	}
+	uc, err := runsapp.NewActingFor(r.Invocations, runspg.NewRepository(pool))
+	if err != nil {
+		return nil, err
+	}
+	return runsactingfor.NewSource(uc), nil
 }
 
 // BindInvocationTokens builds the invocation tokens of the runs module (M2-06) once per process
