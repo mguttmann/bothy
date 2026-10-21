@@ -374,12 +374,14 @@ jobs:
   # Go tests against PostgreSQL and SeaweedFS (Docker on the runner), in shards that run at the
   # same time: each shard runs `make test` for the packages tools/ci/go_shards.py assigns to it
   # (every package of every Go module in exactly one shard, balanced by the measured durations in
-  # tools/ci/go_test_timings.json), with the flags of the single run. The plan lists test-server
-  # for all shards together, and the one result of the matrix fails when any shard fails.
+  # tools/ci/go_test_timings.json; a package of go_shards.SPLITS runs in parts whose -run and
+  # -skip filters divide its top-level tests), with the flags of the single run. The plan lists
+  # test-server for all shards together, and the one result of the matrix fails when any shard
+  # fails.
   # test-server-coverage merges the profiles and runs the coverage threshold. AREAS=none leaves
   # the tools suite to test-tools.
   test-server:
-    name: test (server, shard ${{ matrix.shard }} of 5)
+    name: test (server, shard ${{ matrix.shard }} of 6)
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-server ')
     runs-on: ubuntu-24.04
@@ -387,7 +389,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -439,7 +441,7 @@ jobs:
           # As every step that reaches `make test` (docs/quality/gates.md, "Individual gates").
           MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: server
-          GO_TEST_SHARD: ${{ matrix.shard }}/5
+          GO_TEST_SHARD: ${{ matrix.shard }}/6
         run: make test COMPONENTS="$COMPONENTS" AREAS=none GO_TEST_SHARD="$GO_TEST_SHARD"
       # The shard's record of the packages it ran and its profiles for test-server-coverage.
       - name: Pack the profiles of the shard
@@ -518,7 +520,8 @@ jobs:
 
   # The coverage of the server tests: the profiles of the shards of test-server merged per module
   # as one `go test ./...` writes them (tools/ci/go_shards.py merge, which also checks that every
-  # shard ran and every package ran in exactly one shard), then the threshold of `make coverage`
+  # shard ran, every package or part ran in exactly one shard and the parts of a package run each
+  # of its top-level tests once), then the threshold of `make coverage`
   # on the merged profile without testing again (`-o test`).
   test-server-coverage:
     name: test (server coverage)

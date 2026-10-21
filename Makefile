@@ -38,11 +38,14 @@ PERF_TIMEOUT ?= 60m
 # Time limit of each Go test binary in `make test` (named value quality.test.go_timeout).
 GO_TEST_TIMEOUT ?= 20m
 # One shard I/N of the Go tests (CI job "test (server)"): `make test` then runs only the packages
-# tools/ci/go_shards.py assigns to shard I and records them in GO_SHARD_RECORD; empty runs all.
+# and package parts tools/ci/go_shards.py assigns to shard I (go_shards.py test runs them) and
+# records them in GO_SHARD_RECORD; empty runs all.
 GO_TEST_SHARD ?=
 GO_SHARD_RECORD ?= .cache/go-shard/go-shard.txt
 # Build tags of `make test` (G8 response validation); the shard split lists packages with them.
 GO_TEST_TAGS := contract_validate
+# The flags of every `go test` of `make test`, in one run or in shards.
+GO_TEST_FLAGS = -race -tags $(GO_TEST_TAGS) -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT)
 # Host system of the Dart performance tests: they run in profile mode on macOS only.
 PERF_HOST ?= $(shell uname -s)
 
@@ -272,11 +275,10 @@ test: ## All tests with coverage data
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
 	  if [ -n "$(GO_TEST_SHARD)" ]; then mkdir -p "$(dir $(GO_SHARD_RECORD))" && : > "$(GO_SHARD_RECORD)" || exit 1; fi; \
-	  for m in $(GO_MODS); do pkgs=./...; \
+	  for m in $(GO_MODS); do \
 	    if [ -n "$(GO_TEST_SHARD)" ]; then \
-	      pkgs=$$($(GO_SHARDS) packages --shard "$(GO_TEST_SHARD)" --record "$(abspath $(GO_SHARD_RECORD))" --tags $(GO_TEST_TAGS) --module $$m $(GO_MODS)) || exit 1; \
-	      [ -n "$$pkgs" ] || { echo "  go-test: no package of $$m in shard $(GO_TEST_SHARD)"; continue; }; fi; \
-	    (cd $$m && GO_ARCH_LINT="$$gal" go test -race -tags $(GO_TEST_TAGS) -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) $$pkgs) || exit 1; done; fi
+	      GO_ARCH_LINT="$$gal" $(GO_SHARDS) test --shard "$(GO_TEST_SHARD)" --record "$(abspath $(GO_SHARD_RECORD))" --tags $(GO_TEST_TAGS) --module $$m $(GO_MODS) -- $(GO_TEST_FLAGS) || exit 1; \
+	    else (cd $$m && GO_ARCH_LINT="$$gal" go test $(GO_TEST_FLAGS) ./...) || exit 1; fi; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@# The workspace resolves once at the root (one pubspec.lock); then every member runs its tests.
