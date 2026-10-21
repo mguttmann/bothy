@@ -908,6 +908,28 @@ of work without changing it; the command register serializes the registrations o
 - Tests: `app/apptokens_test.go` (`TestCreateToken_AppScopes`, `TestAuthenticateAPIToken_AppInstallation`,
   `TestPrincipalWrites`); the HTTP cases run in `apps/adapters/httpapi`.
 
+### Acting-for binding of an agent in a run (M2-14)
+
+- Port (`actingfor.go`): `ActingForSource.ResolveActingFor(ctx, agentID, token)` resolves the
+  `Invocation-Token` header of an agent's request into `actor.ActingFor` with status `bound`,
+  `run_inactive` or `invalid` (07 guard rule SR9). identity declares it because the Authenticator
+  owns the actor (02 section 4.3); the module runs implements it in `runs/adapters/actingfor` with
+  only kernel types, and `internal/wire` binds it (02 section 4.1 rule 4), so identity never imports
+  runs. `NoActingForSource` answers `invalid` for every header (the default without runs, fail
+  closed). An error of the source is reserved for its own failure (database); a token it cannot use
+  is a status.
+- Authentication (`Authenticator.Authenticate`, `AuthenticatorDeps.ActingFor`), after the paths of
+  M1-34, M1-44 and M6-01: no header value leaves `ActingFor` zero; values without an
+  `Authorization` header are `401 unauthenticated` with the usual `WWW-Authenticate`, also next to
+  the console cookie; more than one value, an empty value or a principal that is not an agent
+  (person with a session, personal token, app token) is `invalid` without calling the source;
+  exactly one value of an agent takes the source's result; a failing source is `503 unavailable`
+  (cause `dependency_unavailable`), never the actor without its binding. The Authenticator never
+  rejects because of the status (authorize decides and audits it) and caches nothing, so the end of
+  a run or a revocation counts at the next request. The error never carries the token. The gateway
+  and `AuthenticateAPIToken` called directly carry no binding (SR9 binds REST requests only).
+- Tests: `app/authenticator_actingfor_test.go` (`TestAuthenticator_InvocationHeader`).
+
 ### Search language of new messages and threads (M3-13)
 
 `identity.Directory` has two more reads ([14-search.md](../../../../docs/spec/14-search.md) 3.1,

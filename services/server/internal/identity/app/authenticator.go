@@ -64,6 +64,7 @@ type Authenticator struct {
 	uow     txn.UnitOfWork
 	audit   auditing.Recorder
 	console *Console
+	acting  identity.ActingForSource
 }
 
 // Compile-time check: the Authenticator is the kernel port.
@@ -100,6 +101,9 @@ type AuthenticatorDeps struct {
 	// Console authenticates the console cookie, the second credential kind of people (M6-01);
 	// nil refuses every cookie with 401 unauthenticated.
 	Console *Console
+	// ActingFor resolves the Invocation-Token header of an agent's request (07 guard rule SR9,
+	// brief M2-14 design note 2); nil means identity.NoActingForSource: every header is invalid.
+	ActingFor identity.ActingForSource
 }
 
 // NewAuthenticator returns the Authenticator with identity.last_active_granularity of cfg (not
@@ -124,9 +128,13 @@ func NewAuthenticator(cfg Config, d AuthenticatorDeps) (*Authenticator, error) {
 	if d.Apps == nil {
 		d.Apps = identity.NoAppInstallations{}
 	}
+	if d.ActingFor == nil {
+		d.ActingFor = identity.NoActingForSource{}
+	}
 	return &Authenticator{
 		cfg: cfg, tokens: d.AccessTokens, dpop: d.DPoP, store: d.Sessions, api: d.APITokens, pepper: append([]byte(nil), d.Pepper...),
 		apps: d.Apps, clk: d.Clock, log: d.Log, bind: d.Binding, revoke: d.Revoker, uow: d.UoW, audit: d.Audit, console: d.Console,
+		acting: d.ActingFor,
 	}, nil
 }
 
@@ -136,14 +144,50 @@ func unauthenticated() error {
 }
 
 // Authenticate implements actor.Authenticator in the order of the brief: no credentials are
-// anonymous; an Authorization header together with the console cookie is 400 validation_failed
+// anonymous; Invocation-Token values without an Authorization header are 401 unauthenticated (a
+// run binding needs an authenticated agent, brief M2-14 design note 2 b), even next to the console
+// cookie; an Authorization header together with the console cookie is 400 validation_failed
 // (one credential per request, D-M6-01-4); the cookie alone takes the console path
 // (Console.Authenticate, M6-01); more than one header or another scheme is unauthenticated; a
 // token with the prefix bothy_ takes the API token path under either scheme
 // (AuthenticateAPIToken); otherwise Bearer with this server's access token fails with
 // invalid_dpop_proof (RFC 9449 section 7.2) and DPoP checks the access token, then the proof, then
-// reads session, device and key.
+// reads session, device and key. After a successful path the Invocation-Token header is resolved
+// into actor.ActingFor (actingFor).
 func (a *Authenticator) Authenticate(ctx context.Context, creds actor.Credentials) (actor.Actor, error) {
+	if len(creds.InvocationTokens) > 0 && creds.Authorization == "" {
+		return actor.Actor{}, unauthenticated()
+	}
+	out, err := a.authenticate(ctx, creds)
+	if err != nil || len(creds.InvocationTokens) == 0 {
+		return out, err
+	}
+	return a.actingFor(ctx, out, creds.InvocationTokens)
+}
+
+// actingFor sets out.ActingFor from the values of the Invocation-Token header (07 guard rule SR9,
+// brief M2-14 design note 2 c to e): more than one value, an empty value or a principal that is
+// not an agent is invalid without asking the source, because the token's aud can only name an
+// agent (05 section 5); exactly one value of an agent takes the source's result. A failing source
+// is 503 unavailable, never the actor without its binding (07 section 1 point 5, fail closed); the
+// error carries no token. The status never rejects here, authorize decides and audits it, and
+// nothing is cached, so the end of a run or a revocation counts at the next request.
+func (a *Authenticator) actingFor(ctx context.Context, out actor.Actor, values []string) (actor.Actor, error) {
+	if len(values) != 1 || values[0] == "" || out.Kind != actor.KindAgent {
+		out.ActingFor = actor.ActingFor{Status: actor.ActingForInvalid}
+		return out, nil
+	}
+	af, err := a.acting.ResolveActingFor(ctx, out.ID, values[0])
+	if err != nil {
+		return actor.Actor{}, errs.Wrap(errs.CodeUnavailable, err, "").WithCause(errs.CauseDependencyUnavailable)
+	}
+	out.ActingFor = af
+	return out, nil
+}
+
+// authenticate is Authenticate without the Invocation-Token header: the credential paths of M1-34,
+// M1-44 and M6-01.
+func (a *Authenticator) authenticate(ctx context.Context, creds actor.Credentials) (actor.Actor, error) {
 	if !creds.Present() {
 		return actor.Anonymous(), nil
 	}
