@@ -210,3 +210,47 @@ func TestJobsUniqueRefusals(t *testing.T) {
 		t.Fatalf("%d jobs, want 0", n)
 	}
 }
+
+// TestJobsLatestPendingTx (M3-19, D-M3-19-7): LatestPendingTx compares only the named fields and
+// returns the latest of the standing jobs, so a marker keyed by its end time is found by its owner
+// alone; an unknown field name and a call outside a unit of work are internal errors.
+func TestJobsLatestPendingTx(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	echo := make(chan jobs.Job[fakemodule.Echo], 4)
+	keyed := make(chan jobs.Job[fakemodule.Keyed], 4)
+	rt := e.runtime(t, testConfig(t, time.Second), jobs.RoleWorker, uniqueRegistry(t, echo, keyed))
+	ins := rt.Inserter()
+	later := stamp(time.Now().Add(time.Hour))
+	target := ids.New()
+	for i, at := range []time.Time{later, later.Add(time.Hour)} {
+		if r := e.insertUnique(t, ins, fakemodule.Echo{Target: target, Seq: int64(i + 1)}, at); !r.Inserted {
+			t.Fatalf("unique insert %d = %+v, want inserted", i+1, r)
+		}
+	}
+	latest := func(args jobs.Args, fields ...string) (time.Time, bool, error) {
+		var at time.Time
+		var ok bool
+		err := e.uow.Do(t.Context(), func(ctx context.Context) error {
+			var err error
+			at, ok, err = ins.LatestPendingTx(ctx, args, fields...)
+			return err
+		})
+		return at, ok, err
+	}
+	if at, ok, err := latest(fakemodule.Echo{Target: target}, "target"); err != nil || !ok || !at.Equal(later.Add(time.Hour)) {
+		t.Fatalf("LatestPendingTx(target) = %s %v %v, want %s true", at, ok, err, later.Add(time.Hour))
+	}
+	if _, ok, err := latest(fakemodule.Echo{Target: ids.New()}, "target"); err != nil || ok {
+		t.Fatalf("LatestPendingTx(other target) = %v %v, want none", ok, err)
+	}
+	if _, _, err := latest(fakemodule.Echo{Target: target}, "nope"); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("LatestPendingTx with an unknown field = %v, want kind internal", err)
+	}
+	if _, _, err := latest(fakemodule.Echo{Target: target}); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("LatestPendingTx without a field = %v, want kind internal", err)
+	}
+	if _, _, err := ins.LatestPendingTx(context.Background(), fakemodule.Echo{Target: target}, "target"); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("LatestPendingTx outside a unit = %v, want kind internal", err)
+	}
+}

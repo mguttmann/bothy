@@ -21,7 +21,7 @@ appears in the exported API, so a breaking change of River (0.x) touches this pa
 | `worker.go` | the wrapper around every handler: span, panic, cancellation, retry rule |
 | `runtime.go` | `Config`, `ValidateSchema`, `Role`, `Runtime` (`New`, `Inserter`, `Start`, `Stop`, `Failed`), `Inserter`, `InsertOptions`, `InsertResult` |
 | `insert.go` | `InsertTx` in the ambient transaction and the checks all three operations share |
-| `unique.go` | `InsertUniqueTx` (River unique jobs by args and state) and `PendingTx` |
+| `unique.go` | `InsertUniqueTx` (River unique jobs by args and state), `PendingTx` and `LatestPendingTx` |
 | `migrate.go` | `Migrate`, `MigrationStatus`, `ValidateMigrations`, `CheckEmbeddedMigrations` |
 | `jobstest/` | test helper: River's migrations on a `pgtest` database |
 | `internal/fakemodule/` | stand-in module with the test arguments and handlers |
@@ -78,7 +78,9 @@ delivers an error and `internal/wire` ends the process with exit code 1 (02 "Hea
    are the fields tagged `river:"unique"` when the argument type tags any field, else all fields
    (River's unique jobs by args); queue and time do not count. `Inserter.PendingTx` reads that
    standing job (its `ScheduledAt`, `ok = false` for none) in the ambient transaction with the
-   same comparison. Both have the checks of `InsertTx` (unit of work, phase, kind, type).
+   same comparison. `Inserter.LatestPendingTx` reads the latest such job compared on the named
+   JSON fields only, for marker jobs that carry their own end time (M3-19). All have the checks of
+   `InsertTx` (unit of work, phase, kind, type).
 5. `Work` is idempotent, passes its context on and returns `ctx.Err()` when the context ends.
    `nil` marks the job as done; the wrapper turns a `nil` after the end of the context into
    `ctx.Err()`, because a swallowed cancellation would mark an unfinished job as done.

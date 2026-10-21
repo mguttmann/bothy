@@ -114,11 +114,12 @@ type PushJob struct {
 // method runs in the ambient unit of work of ctx; the window state of 13 4.5 lives only in these
 // jobs (D-M3-19-7).
 type Scheduler interface {
-	// WindowEnd returns the ScheduledAt of the pending notify.coalesce_window of (user, thread);
-	// ok is false when none is pending.
+	// WindowEnd returns the ScheduledAt of the latest pending notify.coalesce_window of (user,
+	// thread); ok is false when none is pending.
 	WindowEnd(ctx context.Context, user, thread ids.ID) (end time.Time, ok bool, err error)
-	// OpenWindow inserts the marker notify.coalesce_window of (user, thread) unique at end.
-	// inserted is false when a marker is still pending; at is then its ScheduledAt.
+	// OpenWindow inserts the marker notify.coalesce_window of (user, thread) unique per end, so a
+	// marker of an earlier window that River still runs never stops it. inserted is false when the
+	// marker of the same end already stands; at is then its ScheduledAt.
 	OpenWindow(ctx context.Context, user, thread ids.ID, end time.Time) (inserted bool, at time.Time, err error)
 	// Collect inserts notify.coalesce_flush of (user, thread) unique at end; inserted is false
 	// when one is pending (the window already collected).
@@ -127,11 +128,12 @@ type Scheduler interface {
 	Send(ctx context.Context, job PushJob, at time.Time) error
 	// BadgeSyncPending reports a pending notify.badge_sync of user.
 	BadgeSyncPending(ctx context.Context, user ids.ID) (bool, error)
-	// HoldEnd returns the ScheduledAt of the pending notify.badge_sync_hold of user.
+	// HoldEnd returns the ScheduledAt of the latest pending notify.badge_sync_hold of user.
 	HoldEnd(ctx context.Context, user ids.ID) (end time.Time, ok bool, err error)
 	// ScheduleBadgeSync inserts notify.badge_sync of user unique at at.
 	ScheduleBadgeSync(ctx context.Context, user ids.ID, afterSeq int64, at time.Time) error
-	// Hold inserts notify.badge_sync_hold of user unique at at.
+	// Hold inserts notify.badge_sync_hold of user unique per end at at, so the hold of an
+	// interval that River still runs never stops it.
 	Hold(ctx context.Context, user ids.ID, at time.Time) error
 }
 

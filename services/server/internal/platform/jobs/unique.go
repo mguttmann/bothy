@@ -58,31 +58,63 @@ func (i inserter) PendingTx(ctx context.Context, args Args) (time.Time, bool, er
 	if err != nil {
 		return time.Time{}, false, err
 	}
-	want, absent, err := comparedArgs(args, e.typ)
+	names := uniqueNames(e.typ)
+	if len(names) == 0 {
+		names = jsonNames(e.typ)
+	}
+	want, absent, err := comparedArgs(args, names)
 	if err != nil {
 		return time.Time{}, false, errs.Wrap(errs.CodeInternalError, err, "jobs: PendingTx of "+args.Kind())
 	}
+	return i.pendingAt(ctx, tx, args.Kind(), want, absent, "ORDER BY scheduled_at, id")
+}
+
+// LatestPendingTx implements Inserter with the read of PendingTx over the named fields only,
+// newest scheduled time first.
+func (i inserter) LatestPendingTx(ctx context.Context, args Args, fields ...string) (time.Time, bool, error) {
+	tx, e, err := i.prepare(ctx, "LatestPendingTx", args)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	known := jsonNames(e.typ)
+	if len(fields) == 0 {
+		return time.Time{}, false, errs.New(errs.CodeInternalError, "jobs: LatestPendingTx of "+args.Kind()+" without a field")
+	}
+	for _, f := range fields {
+		if !slices.Contains(known, f) {
+			return time.Time{}, false, errs.New(errs.CodeInternalError, "jobs: LatestPendingTx of "+args.Kind()+" names an unknown field")
+		}
+	}
+	want, absent, err := comparedArgs(args, fields)
+	if err != nil {
+		return time.Time{}, false, errs.Wrap(errs.CodeInternalError, err, "jobs: LatestPendingTx of "+args.Kind())
+	}
+	return i.pendingAt(ctx, tx, args.Kind(), want, absent, "ORDER BY scheduled_at DESC, id DESC")
+}
+
+// pendingAt reads the scheduled time of the first not finalized job of kind in order whose
+// stored arguments hold every field of want with an equal value and none of absent.
+func (i inserter) pendingAt(ctx context.Context, tx pgx.Tx, kind, want string, absent []string, order string) (time.Time, bool, error) {
 	q := "SELECT scheduled_at FROM " + pgx.Identifier{i.rt.cfg.Schema, "river_job"}.Sanitize() +
 		` WHERE kind = $1 AND state IN ('available', 'pending', 'retryable', 'running', 'scheduled')
 		AND args @> $2::jsonb
 		AND NOT EXISTS (SELECT 1 FROM jsonb_each($2::jsonb) AS w(key, value) WHERE args -> w.key IS DISTINCT FROM w.value)
-		AND NOT (args ?| $3::text[])
-		ORDER BY scheduled_at, id LIMIT 1`
+		AND NOT (args ?| $3::text[]) ` + order + ` LIMIT 1`
 	var at time.Time
-	err = tx.QueryRow(ctx, q, args.Kind(), want, absent).Scan(&at)
+	err := tx.QueryRow(ctx, q, kind, want, absent).Scan(&at)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return time.Time{}, false, nil
 	}
 	if err != nil {
-		return time.Time{}, false, fmt.Errorf("jobs: read the pending %s: %w", args.Kind(), err)
+		return time.Time{}, false, fmt.Errorf("jobs: read the pending %s: %w", kind, err)
 	}
 	return at.UTC(), true, nil
 }
 
-// comparedArgs returns the JSON object of the compared fields of args that its encoding holds,
-// and the JSON names of the compared fields it omits. The compared fields are those tagged
-// river:"unique" when t tags any, else all fields: River's rule for unique jobs by args.
-func comparedArgs(args Args, t reflect.Type) (string, []string, error) {
+// comparedArgs returns the JSON object of the fields names of args that its encoding holds, and
+// the names it omits. PendingTx passes the fields tagged river:"unique" when the type tags any,
+// else all fields: River's rule for unique jobs by args.
+func comparedArgs(args Args, names []string) (string, []string, error) {
 	b, err := json.Marshal(args)
 	if err != nil {
 		return "", nil, err
@@ -90,10 +122,6 @@ func comparedArgs(args Args, t reflect.Type) (string, []string, error) {
 	var encoded map[string]json.RawMessage
 	if err := json.Unmarshal(b, &encoded); err != nil {
 		return "", nil, err
-	}
-	names := uniqueNames(t)
-	if len(names) == 0 {
-		names = jsonNames(t)
 	}
 	want := make(map[string]json.RawMessage, len(names))
 	absent := []string{}

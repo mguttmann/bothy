@@ -128,10 +128,10 @@ Only active humans are recipients. The facts of all candidates of one event are 
 All five run on the queue `delivery` (02 12.2, 12.3):
 
 - `notify.push_send`: arguments `PushSend` (IDs, the kind as `KindCode` 1 to 9, quiet, count, t0 as `DueAtUnixMicro`, attempt). Step 1 in a transaction: registration, age, rights and provider are checked and the badge is counted; step 2 outside any transaction under `push.max_concurrent_requests`: `PushProvider.Send` inside the span `push.send`; step 3 in a transaction: `domain.ApplyResult` on the locked row and, for a retry, the same job with the next attempt at `domain.RetryDelay`. At least once with one `nid`.
-- `notify.coalesce_window`: the marker of an open bundling window of (recipient, thread), scheduled at its end; unique on both fields; its handler does nothing.
+- `notify.coalesce_window`: the marker of an open bundling window of (recipient, thread), scheduled at its end; unique per recipient, thread and end, the open window is the latest pending marker; its handler does nothing.
 - `notify.coalesce_flush`: exists exactly when a `message` hint was collected in the window; arguments recipient, thread and the window end, scheduled at the end; it sends one hint with the unread count, pointing at the newest message, or nothing.
 - `notify.badge_sync`: one pending per person (`UserID` tagged `river:"unique"`); it counts the badge, collects `Cleared`, inserts the hold and one `notify.push_send` of kind `sync` per active `apns` or `fcm` registration of an active `ios` or `android` device.
-- `notify.badge_sync_hold`: scheduled at now plus `notify.badge_sync_min_interval` after a sync; a falling read during the hold schedules the next sync at its end; its handler does nothing.
+- `notify.badge_sync_hold`: scheduled at now plus `notify.badge_sync_min_interval` after a sync, unique per person and end; a falling read during the hold schedules the next sync at its end; its handler does nothing.
 
 ### Automatic following
 

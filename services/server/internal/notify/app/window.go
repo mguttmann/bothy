@@ -14,9 +14,10 @@ import (
 // (brief M3-19 design note 9, D-M3-19-7): notify.coalesce_window marks an open window and is
 // scheduled at its end, notify.coalesce_flush exists exactly when a message hint was collected in
 // that window and is scheduled at the same end. A send that opens a window inserts the marker
-// (Scheduler.OpenWindow); when a late marker of the previous window still stands, the hint goes
-// without a new window. A collect inserts the flush (Scheduler.Collect); a duplicate means the
-// window already collected.
+// (Scheduler.OpenWindow) keyed by its end, so a marker of the ending window that River still runs
+// never keeps the next window from opening (the flush at the window end opens the next one, 13 4.5
+// point 5). A collect inserts the flush (Scheduler.Collect); a duplicate means the window already
+// collected.
 
 // window returns the open bundling window of (user, thread): the ScheduledAt of the pending
 // notify.coalesce_window when it is after now, else none (design note 9 c).

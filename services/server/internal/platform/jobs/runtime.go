@@ -146,6 +146,16 @@ type Inserter interface {
 	// Errors: those of InsertTx (outside a unit of work, phases sync and audit, an unregistered
 	// kind or another type); others are those of the read.
 	PendingTx(ctx context.Context, args Args) (scheduledAt time.Time, ok bool, err error)
+	// LatestPendingTx reads, in the ambient transaction of ctx, the not finalized jobs of the
+	// kind of args whose stored arguments equal those of args on the named JSON fields only, and
+	// returns the latest ScheduledAt and ok true, or ok false when there is none. A marker job
+	// whose arguments carry its own end time (unique per end, so the marker of the next window
+	// inserts while the ending one still runs) is found this way by its owner alone (M3-19,
+	// D-M3-19-7).
+	//
+	// Errors: those of PendingTx, and an internal error when fields is empty or names a field
+	// that the type of args does not encode.
+	LatestPendingTx(ctx context.Context, args Args, fields ...string) (scheduledAt time.Time, ok bool, err error)
 }
 
 // InsertResult is the outcome of Inserter.InsertUniqueTx.

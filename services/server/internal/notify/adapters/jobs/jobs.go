@@ -67,11 +67,15 @@ type PushSend struct {
 // Kind implements jobs.Args.
 func (PushSend) Kind() string { return KindPushSend }
 
-// CoalesceWindow are the arguments of notify.coalesce_window: one pending marker per (recipient,
-// thread), compared on both fields.
+// CoalesceWindow are the arguments of notify.coalesce_window: one marker per (recipient, thread)
+// and window. EndUnixMicro is the window end; it is part of the arguments (beyond the brief's two
+// IDs, docs/DECISIONS.md D-M3-19-7), so the flush at the end of a window opens the next window
+// even while River still runs the marker of the ending one; the open window is the latest pending
+// marker of (recipient, thread).
 type CoalesceWindow struct {
-	UserID   ids.ID `json:"user_id" river:"unique"`
-	ThreadID ids.ID `json:"thread_id" river:"unique"`
+	UserID       ids.ID `json:"user_id"`
+	ThreadID     ids.ID `json:"thread_id"`
+	EndUnixMicro int64  `json:"end"`
 }
 
 // Kind implements jobs.Args.
@@ -100,9 +104,12 @@ type BadgeSync struct {
 // Kind implements jobs.Args.
 func (BadgeSync) Kind() string { return KindBadgeSync }
 
-// BadgeSyncHold are the arguments of notify.badge_sync_hold.
+// BadgeSyncHold are the arguments of notify.badge_sync_hold. EndUnixMicro is the end of the
+// interval (D-M3-19-15), so a deferred sync inserts the next hold even while River still runs the
+// hold that ends at the same moment; the running interval is the latest pending hold of the person.
 type BadgeSyncHold struct {
-	UserID ids.ID `json:"user_id"`
+	UserID       ids.ID `json:"user_id"`
+	EndUnixMicro int64  `json:"end"`
 }
 
 // Kind implements jobs.Args.
@@ -145,7 +152,7 @@ func (s *Scheduler) WindowEnd(ctx context.Context, user, thread ids.ID) (time.Ti
 	if err != nil {
 		return time.Time{}, false, err
 	}
-	return ins.PendingTx(ctx, CoalesceWindow{UserID: user, ThreadID: thread})
+	return ins.LatestPendingTx(ctx, CoalesceWindow{UserID: user, ThreadID: thread}, "user_id", "thread_id")
 }
 
 // OpenWindow implements app.Scheduler.
@@ -154,7 +161,8 @@ func (s *Scheduler) OpenWindow(ctx context.Context, user, thread ids.ID, end tim
 	if err != nil {
 		return false, time.Time{}, err
 	}
-	res, err := ins.InsertUniqueTx(ctx, CoalesceWindow{UserID: user, ThreadID: thread}, &jobs.InsertOptions{ScheduledAt: end})
+	res, err := ins.InsertUniqueTx(ctx, CoalesceWindow{UserID: user, ThreadID: thread, EndUnixMicro: end.UnixMicro()},
+		&jobs.InsertOptions{ScheduledAt: end})
 	return res.Inserted, res.ScheduledAt, err
 }
 
@@ -198,7 +206,7 @@ func (s *Scheduler) HoldEnd(ctx context.Context, user ids.ID) (time.Time, bool, 
 	if err != nil {
 		return time.Time{}, false, err
 	}
-	return ins.PendingTx(ctx, BadgeSyncHold{UserID: user})
+	return ins.LatestPendingTx(ctx, BadgeSyncHold{UserID: user}, "user_id")
 }
 
 // ScheduleBadgeSync implements app.Scheduler.
@@ -217,7 +225,7 @@ func (s *Scheduler) Hold(ctx context.Context, user ids.ID, at time.Time) error {
 	if err != nil {
 		return err
 	}
-	_, err = ins.InsertUniqueTx(ctx, BadgeSyncHold{UserID: user}, &jobs.InsertOptions{ScheduledAt: at})
+	_, err = ins.InsertUniqueTx(ctx, BadgeSyncHold{UserID: user, EndUnixMicro: at.UnixMicro()}, &jobs.InsertOptions{ScheduledAt: at})
 	return err
 }
 

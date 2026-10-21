@@ -239,8 +239,8 @@ func (p *Push) apply(ctx context.Context, h Hint, f domain.RecipientFacts, d dom
 	return internal("notify: a decision with an unknown outcome")
 }
 
-// send opens the window a send opens (unless a late marker of the previous window stands, design
-// note 9 c) and delivers h along the routes of d. One NotificationID per hint and recipient is
+// send opens the window a send opens (design note 9 c, the marker keyed by its end) and delivers
+// h along the routes of d. One NotificationID per hint and recipient is
 // shared by the jobs of its registrations.
 func (p *Push) send(ctx context.Context, h Hint, d domain.Decision) error {
 	if !d.OpensWindowUntil.IsZero() {

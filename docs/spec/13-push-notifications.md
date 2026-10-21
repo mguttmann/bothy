@@ -263,12 +263,13 @@ unique by their arguments and run them at a point in time [Q1, verified].
 
 The window lives only in two unique scheduled jobs on the queue `delivery`
 ([02-architecture.md](02-architecture.md), 12.3): `notify.coalesce_window`, unique per (recipient,
-thread), marks an open window and is scheduled at its end, and its run does nothing;
+thread, window end), marks an open window and is scheduled at its end, and its run does nothing;
 `notify.coalesce_flush`, unique per (recipient, thread, window end), exists exactly when a
 `message` hint was collected in that window and is scheduled at the same end. The
-end of the open window is the scheduled time of the pending marker when that is after now. A hint
-that opens a window inserts the marker; if a late marker of the previous window still stands,
-the hint goes without a new window. A collected hint inserts the flush; when one already stands,
+end of the open window is the scheduled time of the latest pending marker of (recipient, thread)
+when that is after now. A hint that opens a window inserts the marker of the new end; because the
+end is part of the marker, a marker of the ending window that River still runs never keeps the
+flush or a hint from opening the next window. A collected hint inserts the flush; when one already stands,
 the window has already collected (docs/DECISIONS.md D-M3-19-7). The flush runs at the window end
 in one transaction: it reads the unread count with the formula of point 2, decides as point 5
 says, points at the newest message of the thread (no message ID if there is none), and its t0 of
@@ -586,7 +587,8 @@ one; marking a thread unread never lowers it. Then the consumer schedules the jo
 else at the end of a pending `notify.badge_sync_hold` of r or now. The sync job counts the badge,
 collects as `Cleared` the threads of the reads of r since the read that scheduled it that no
 longer count (distinct, in event order, the complete list), inserts `notify.badge_sync_hold` of r
-at now plus `notify.badge_sync_min_interval`, and inserts one `notify.push_send` of the kind
+at now plus `notify.badge_sync_min_interval` (unique per person and end, so a hold that River
+still runs never stops the next one; the running interval is the latest pending hold), and inserts one `notify.push_send` of the kind
 `sync` with a new `nid` per active `apns` or `fcm` registration of an active `ios` or `android`
 device of r. The sync carries no thread, no message, no quiet flag and no count. So a person gets
 at most one sync per `notify.badge_sync_min_interval`, and a read that does not lower the number
