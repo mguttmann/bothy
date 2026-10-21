@@ -562,6 +562,13 @@ sending: [13-push-notifications.md](13-push-notifications.md).
 | Windows | WebSocket | the app in the notification area keeps the connection; local notifications | no push in the M milestones; WNS later (baseline R-Push) |
 | Web (console) | REST, fetch on opening | nothing | none |
 
+**Idle (13 4.4).** A desktop client reports `idle: true` in `focus` (04 6.2) while its window is
+hidden to the notification area, minimized, or not the foreground window of the system, and
+`idle: false` as soon as the window is the foreground window again. There is no timer and no
+idle time of the system: the window state alone decides (docs/DECISIONS.md D-M4-30-3). A thread
+in `focus` of a connection with `idle: true` counts for live box patches and typing, not as
+"Active in the thread".
+
 ### 10.1 iOS and macOS: Notification Service Extension
 
 The NSE runs only for pushes with `mutable-content: 1` and a visible `alert` and has about 30
@@ -616,6 +623,17 @@ MSIX, otherwise `cancel` and `getActiveNotifications` do not work
 (https://pub.dev/packages/flutter_local_notifications, retrieved 2026-10-10 [verified]). Start at
 login is a setting (default off). An app that has quit gets no notifications; the
 settings say so.
+
+**Without package identity (until the MSIX of M7).** The Windows app is unpackaged until M7. Local
+toasts work with an app user model ID (the bundle identifier of the build branding) and an
+activation GUID derived from it; a click reaches the running app through the activation callback
+of `flutter_local_notifications` and opens the thread at the message (section 11). `cancel` and
+`getActiveNotifications` need package identity and are skipped with a log line without content;
+a thread's notification is replaced by showing the next one under the same notification ID.
+"Start at login" is the value `<app name>` under
+`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` on Windows and the login item
+(`SMAppService.mainApp`, macOS 13 and later) on macOS, kept only by the system and off until the
+person turns it on (D-M4-30-4).
 
 ## 11. Deep links and navigation
 
