@@ -88,6 +88,8 @@ type refWorld struct {
 	members    []*refMember
 	grants     []*refGrant
 	expiries   []time.Time
+	// runs are the runs of the SR9 dimension (reference_sr9_test.go).
+	runs []*refRun
 
 	clk        *clock.Fake
 	fPrincipal *fake.Principals
@@ -607,6 +609,9 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 	for range 8 {
 		m.addGrant()
 	}
+	for range 4 {
+		m.addRun()
+	}
 	az, err := app.NewAuthorizer(app.AuthorizerConfig{SnapshotCacheMaxEntries: 4, StepUpMaxAge: 5 * time.Minute, TerminalStepUpMaxAge: time.Minute,
 		QuickReattachWindow: time.Minute}, app.AuthorizerDeps{
 		Catalog: app.NewCatalog(slog.New(slog.DiscardHandler)), Store: m.fStore, Principals: m.fPrincipal, Credentials: m.fCreds,
@@ -623,7 +628,13 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 // mutate applies one random change; rights changes raise the version, structure changes do not.
 func (m *refWorld) mutate() string {
 	ctx := context.Background()
-	if k := m.rnd.IntN(16); k >= 12 {
+	if k := m.rnd.IntN(18); k >= 16 {
+		if k == 16 {
+			m.addRun()
+			return "add run"
+		}
+		return m.endRun()
+	} else if k >= 12 {
 		return m.mutateTerminal(k - 12)
 	}
 	switch m.rnd.IntN(12) {
@@ -799,6 +810,8 @@ func TestAZP8_CacheMatchesReference(t *testing.T) {
 					t.Fatalf("seed %d, world %d, step %d, %s scope: got %v %v, want %v\ntrail %v", ws, w, step, p.kind, sc.ChannelIDs, err, want, trail)
 				}
 			}
+			// The SR9 dimension (M2-14 design note 4i): agents with random Invocation-Token headers.
+			m.checkSR9(t, "seed "+strconv.FormatUint(ws, 10)+" world "+strconv.Itoa(w)+" step "+strconv.Itoa(step), actions, trail)
 		}
 	}
 	t.Logf("seed %d, decisions by outcome %v", seed, outcomes)
