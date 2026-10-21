@@ -27292,6 +27292,15 @@ components:
           description: Absent for a grant on the instance.
         expires_at:
           $ref: '#/components/schemas/Timestamp'
+    DevicePendingPayload:
+      type: object
+      description: A new device of the human waits for approval (R-AZ-31). Carries only IDs and the platform.
+      required: [device_id, platform]
+      properties:
+        device_id:
+          $ref: '#/components/schemas/Uuid'
+        platform:
+          $ref: '#/components/schemas/DevicePlatform'
     SessionRevokedPayload:
       type: object
       required: [session_id, reason]
@@ -28845,6 +28854,18 @@ components:
             enum: [access.expiring]
           payload:
             $ref: '#/components/schemas/AccessExpiringPayload'
+    DevicePendingEvent:
+      description: Durable event `device.pending`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [device.pending]
+          payload:
+            $ref: '#/components/schemas/DevicePendingPayload'
     SessionRevokedEvent:
       description: Durable event `session.revoked`.
       allOf:
@@ -29199,6 +29220,7 @@ components:
       - $ref: '#/components/schemas/GroupChangedEvent'
       - $ref: '#/components/schemas/AccessChangedEvent'
       - $ref: '#/components/schemas/AccessExpiringEvent'
+      - $ref: '#/components/schemas/DevicePendingEvent'
       - $ref: '#/components/schemas/SessionRevokedEvent'
       - $ref: '#/components/schemas/ReadStateUpdatedEvent'
       - $ref: '#/components/schemas/DraftUpdatedEvent'
@@ -29252,6 +29274,7 @@ components:
           group.changed: '#/components/schemas/GroupChangedEvent'
           access.changed: '#/components/schemas/AccessChangedEvent'
           access.expiring: '#/components/schemas/AccessExpiringEvent'
+          device.pending: '#/components/schemas/DevicePendingEvent'
           session.revoked: '#/components/schemas/SessionRevokedEvent'
           read_state.updated: '#/components/schemas/ReadStateUpdatedEvent'
           draft.updated: '#/components/schemas/DraftUpdatedEvent'

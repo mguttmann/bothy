@@ -141,6 +141,8 @@ channels:
         $ref: '#/components/messages/event.access.changed'
       event.access.expiring:
         $ref: '#/components/messages/event.access.expiring'
+      event.device.pending:
+        $ref: '#/components/messages/event.device.pending'
       event.session.revoked:
         $ref: '#/components/messages/event.session.revoked'
       event.read_state.updated:
@@ -705,6 +707,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.group.changed'
     - $ref: '#/channels/gateway/messages/event.access.changed'
     - $ref: '#/channels/gateway/messages/event.access.expiring'
+    - $ref: '#/channels/gateway/messages/event.device.pending'
     - $ref: '#/channels/gateway/messages/event.session.revoked'
     - $ref: '#/channels/gateway/messages/event.read_state.updated'
     - $ref: '#/channels/gateway/messages/event.draft.updated'
@@ -1689,6 +1692,22 @@ components:
             enum: [dispatch]
           d:
             $ref: ./openapi.yaml#/components/schemas/AccessExpiringEvent
+      x-audience: self
+    event.device.pending:
+      name: device.pending
+      title: dispatch device.pending
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/DevicePendingEvent
       x-audience: self
     event.session.revoked:
       name: session.revoked

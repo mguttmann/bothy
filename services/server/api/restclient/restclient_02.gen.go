@@ -16,6 +16,112 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// PutChannelBehaviorWithBody Change prompt, skills and mention rules
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
+func (c *Client) PutChannelBehaviorWithBody(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelBehaviorRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutChannelBehavior Change prompt, skills and mention rules
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
+func (c *Client) PutChannelBehavior(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, body PutChannelBehaviorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelBehaviorRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListChannelCommands List commands usable in a channel
+//
+// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
+func (c *Client) ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListChannelCommandsRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AutocompleteCommandWithBody Get suggestions for an option
+//
+// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+// no choices when the owner does not answer in time.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+func (c *Client) AutocompleteCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAutocompleteCommandRequestWithBody(c.Server, channelId, commandId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AutocompleteCommand Get suggestions for an option
+//
+// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+// no choices when the owner does not answer in time.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InvokeCommandWithBody Run a command
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/invoke (the `InvokeCommand` operationId).
+func (c *Client) InvokeCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, params *InvokeCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInvokeCommandRequestWithBody(c.Server, channelId, commandId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // InvokeCommand Run a command
 //
 // Takes a body of the `application/json` content type.
@@ -26726,102 +26832,4 @@ type ListServedChannelsResponse struct {
 	Headers429 *ListServedChannelsResponse429Headers
 	// HeadersDefault the parsed response headers for an HTTP default response
 	HeadersDefault *ListServedChannelsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListServedChannelsResponse) GetJSON200() *AgentChannelConfigList {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListServedChannelsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListServedChannelsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListServedChannelsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListServedChannelsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// GetServedChannelConfigResponse200Headers the declared response headers of an HTTP 200 response for GetServedChannelConfig
-type GetServedChannelConfigResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// GetServedChannelConfigResponse400Headers the declared response headers of an HTTP 400 response for GetServedChannelConfig
-type GetServedChannelConfigResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse401Headers the declared response headers of an HTTP 401 response for GetServedChannelConfig
-type GetServedChannelConfigResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// GetServedChannelConfigResponse403Headers the declared response headers of an HTTP 403 response for GetServedChannelConfig
-type GetServedChannelConfigResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse404Headers the declared response headers of an HTTP 404 response for GetServedChannelConfig
-type GetServedChannelConfigResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse429Headers the declared response headers of an HTTP 429 response for GetServedChannelConfig
-type GetServedChannelConfigResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// GetServedChannelConfigResponseDefaultHeaders the declared response headers of an HTTP default response for GetServedChannelConfig
-type GetServedChannelConfigResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }

@@ -895,6 +895,8 @@ const (
 	EventCommandChanged EventType = "command.changed"
 	// EventCommandInvoked is the event type command.invoked.
 	EventCommandInvoked EventType = "command.invoked"
+	// EventDevicePending is the event type device.pending.
+	EventDevicePending EventType = "device.pending"
 	// EventDraftDeleted is the event type draft.deleted.
 	EventDraftDeleted EventType = "draft.deleted"
 	// EventDraftUpdated is the event type draft.updated.
@@ -998,6 +1000,7 @@ var eventTypeByID = map[string]EventType{
 	"command.autocomplete_requested": EventCommandAutocompleteRequested,
 	"command.changed":                EventCommandChanged,
 	"command.invoked":                EventCommandInvoked,
+	"device.pending":                 EventDevicePending,
 	"draft.deleted":                  EventDraftDeleted,
 	"draft.updated":                  EventDraftUpdated,
 	"file.updated":                   EventFileUpdated,
@@ -1059,6 +1062,7 @@ var eventTypeList = []EventType{
 	EventCommandAutocompleteRequested,
 	EventCommandChanged,
 	EventCommandInvoked,
+	EventDevicePending,
 	EventDraftDeleted,
 	EventDraftUpdated,
 	EventFileUpdated,

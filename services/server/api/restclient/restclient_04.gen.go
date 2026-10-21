@@ -9,6 +9,121 @@ import (
 	"net/http"
 )
 
+type DeleteNotificationPreferenceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *DeleteNotificationPreferenceResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *DeleteNotificationPreferenceResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteNotificationPreferenceResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *DeleteNotificationPreferenceResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *DeleteNotificationPreferenceResponse404Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *DeleteNotificationPreferenceResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *DeleteNotificationPreferenceResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteNotificationPreferenceResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteNotificationPreferenceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteNotificationPreferenceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteNotificationPreferenceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteNotificationPreferenceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutNotificationPreferenceResponse200Headers the declared response headers of an HTTP 200 response for PutNotificationPreference
+type PutNotificationPreferenceResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// PutNotificationPreferenceResponse400Headers the declared response headers of an HTTP 400 response for PutNotificationPreference
+type PutNotificationPreferenceResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// PutNotificationPreferenceResponse401Headers the declared response headers of an HTTP 401 response for PutNotificationPreference
+type PutNotificationPreferenceResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// PutNotificationPreferenceResponse403Headers the declared response headers of an HTTP 403 response for PutNotificationPreference
+type PutNotificationPreferenceResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // PutNotificationPreferenceResponse404Headers the declared response headers of an HTTP 404 response for PutNotificationPreference
 type PutNotificationPreferenceResponse404Headers struct {
 	CorrelationId *CorrelationId
@@ -23858,95 +23973,4 @@ func (c *ClientWithResponses) CreateStatusComponentWithBodyWithResponse(ctx cont
 		return nil, err
 	}
 	return ParseCreateStatusComponentResponse(rsp)
-}
-
-// CreateStatusComponentWithResponse Add a status component
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /status/components (the `CreateStatusComponent` operationId).
-func (c *ClientWithResponses) CreateStatusComponentWithResponse(ctx context.Context, params *CreateStatusComponentParams, body CreateStatusComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateStatusComponentResponse, error) {
-	rsp, err := c.CreateStatusComponent(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateStatusComponentResponse(rsp)
-}
-
-// DeleteStatusComponentWithResponse Remove a status component
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /status/components/{component_id} (the `DeleteStatusComponent` operationId).
-func (c *ClientWithResponses) DeleteStatusComponentWithResponse(ctx context.Context, componentId ComponentIdPath, reqEditors ...RequestEditorFn) (*DeleteStatusComponentResponse, error) {
-	rsp, err := c.DeleteStatusComponent(ctx, componentId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteStatusComponentResponse(rsp)
-}
-
-// UpdateStatusComponentWithBodyWithResponse Change a status component
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /status/components/{component_id} (the `UpdateStatusComponent` operationId).
-func (c *ClientWithResponses) UpdateStatusComponentWithBodyWithResponse(ctx context.Context, componentId ComponentIdPath, params *UpdateStatusComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateStatusComponentResponse, error) {
-	rsp, err := c.UpdateStatusComponentWithBody(ctx, componentId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateStatusComponentResponse(rsp)
-}
-
-// UpdateStatusComponentWithResponse Change a status component
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /status/components/{component_id} (the `UpdateStatusComponent` operationId).
-func (c *ClientWithResponses) UpdateStatusComponentWithResponse(ctx context.Context, componentId ComponentIdPath, params *UpdateStatusComponentParams, body UpdateStatusComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateStatusComponentResponse, error) {
-	rsp, err := c.UpdateStatusComponent(ctx, componentId, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateStatusComponentResponse(rsp)
-}
-
-// CreateStatusIncidentWithBodyWithResponse Open an incident or maintenance
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /status/incidents (the `CreateStatusIncident` operationId).
-func (c *ClientWithResponses) CreateStatusIncidentWithBodyWithResponse(ctx context.Context, params *CreateStatusIncidentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateStatusIncidentResponse, error) {
-	rsp, err := c.CreateStatusIncidentWithBody(ctx, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateStatusIncidentResponse(rsp)
-}
-
-// CreateStatusIncidentWithResponse Open an incident or maintenance
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /status/incidents (the `CreateStatusIncident` operationId).
-func (c *ClientWithResponses) CreateStatusIncidentWithResponse(ctx context.Context, params *CreateStatusIncidentParams, body CreateStatusIncidentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateStatusIncidentResponse, error) {
-	rsp, err := c.CreateStatusIncident(ctx, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateStatusIncidentResponse(rsp)
-}
-
-// AddStatusIncidentUpdateWithBodyWithResponse Add an update to an incident
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /status/incidents/{incident_id}/updates (the `AddStatusIncidentUpdate` operationId).
-func (c *ClientWithResponses) AddStatusIncidentUpdateWithBodyWithResponse(ctx context.Context, incidentId IncidentIdPath, params *AddStatusIncidentUpdateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddStatusIncidentUpdateResponse, error) {
-	rsp, err := c.AddStatusIncidentUpdateWithBody(ctx, incidentId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseAddStatusIncidentUpdateResponse(rsp)
 }

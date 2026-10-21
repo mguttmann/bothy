@@ -1492,7 +1492,8 @@ actions:
 - id: push.deliver
   section: personal
   description: interne Prüfung vor jedem Push, jedem Hinweis über das Gateway und jedem Abruf über den
-    Vorschau-Endpunkt (P3)
+    Vorschau-Endpunkt (P3); hints without a thread (`security`, `admin`) use the recipient rule of R-AZ-30
+    instead
   resource: thread
   right: read
   owner: false
@@ -2647,6 +2648,14 @@ events:
   audience: self
   note: zusätzlich Schließen mit `4012`
   resource_version: false
+- type: device.pending
+  kind: durable
+  resource: device
+  receive_action: self
+  audience: self
+  note: a new device of the human waits for approval; written by `identity` in the transaction that registers
+    the device with state `pending`; payload only `device_id` and `platform` (R-AZ-31)
+  resource_version: false
 - type: read_state.updated
   kind: durable
   resource: thread
@@ -2802,7 +2811,7 @@ events:
   resource: thread
   receive_action: push.deliver
   audience: self
-  receive_text: self und `push.deliver`
+  receive_text: 'self und `push.deliver`; for a hint without a thread: self and the recipient rule of R-AZ-30'
   note: nur an Verbindungen des Empfängers, statt eines Pushes an dieses Gerät ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md),
     Abschnitt 6.3)
   resource_version: false

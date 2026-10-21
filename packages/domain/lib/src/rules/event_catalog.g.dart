@@ -20,6 +20,7 @@ const Map<String, EventInfo> _catalogue = <String, EventInfo>{
   'command.autocomplete_requested': EventInfo(type: 'command.autocomplete_requested', durable: false, carriesResourceVersion: false, resourceKind: 'command', personal: true),
   'command.changed': EventInfo(type: 'command.changed', durable: true, carriesResourceVersion: true, resourceKind: 'command', personal: false),
   'command.invoked': EventInfo(type: 'command.invoked', durable: true, carriesResourceVersion: false, resourceKind: 'command', personal: true),
+  'device.pending': EventInfo(type: 'device.pending', durable: true, carriesResourceVersion: false, resourceKind: 'device', personal: true),
   'draft.deleted': EventInfo(type: 'draft.deleted', durable: true, carriesResourceVersion: false, resourceKind: 'draft', personal: true),
   'draft.updated': EventInfo(type: 'draft.updated', durable: true, carriesResourceVersion: true, resourceKind: 'draft', personal: true),
   'file.updated': EventInfo(type: 'file.updated', durable: true, carriesResourceVersion: false, resourceKind: 'file', personal: false),
