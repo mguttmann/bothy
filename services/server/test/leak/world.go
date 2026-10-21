@@ -299,7 +299,10 @@ func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 			w.buildChannel(tb, w.Channels[si][ci], c)
 		}
 	}
-	expiry := s.Clock().Now().Add(expiryLead)
+	// Each expiry is taken at its own request: one moment for all of them failed on a loaded
+	// runner, where the build of a world took longer than expiryLead and the server refused a
+	// later grant whose expiry was already before its creation time.
+	exp := &expiries{now: s.Clock().Now}
 	groups := make([]string, len(p.Members))
 	for g := range p.Members {
 		groups[g] = idOf(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/groups",
@@ -307,7 +310,7 @@ func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 		if p.Members[g] {
 			body := map[string]any{"user_id": w.Human.PrincipalID}
 			if p.Expiring[g] {
-				body["expires_at"] = stamp(expiry)
+				body["expires_at"] = stamp(exp.next())
 			}
 			harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/groups/" + groups[g] + "/members", Body: body}, http.StatusCreated)
 		}
@@ -320,14 +323,14 @@ func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 		case g.Subject == ObservedAgent:
 			kind, subject = "agent", w.Agent.PrincipalID
 		}
-		w.grant(tb, kind, subject, g.Target, g.Level, g.Expires, expiry)
+		w.grant(tb, kind, subject, g.Target, g.Level, g.Expires, exp)
 	}
 	// The person writes where it can read: before the expiring grants end and before the lost
 	// channel is revoked, so drafts and read states exist in channels it no longer reads.
-	lost := w.grant(tb, "user", w.Human.PrincipalID, p.Lost, "write", false, expiry)
+	lost := w.grant(tb, "user", w.Human.PrincipalID, p.Lost, "write", false, exp)
 	w.writePersonal(tb)
 	harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/grants/" + lost + "/revoke", Body: map[string]any{"reason": "leak test"}}, http.StatusOK)
-	if d := time.Until(expiry); d > 0 {
+	if d := time.Until(exp.last); d > 0 {
 		time.Sleep(d + time.Second)
 	}
 	return w
@@ -386,8 +389,25 @@ func (w *RandomWorld) Post(tb testing.TB, thread string, mention bool) string {
 	return m.ID
 }
 
+// expiries hands out the expiries of a world build: each ends expiryLead after the moment it is
+// taken (now is the harness clock), and last is the latest one handed out, the moment after which
+// every expiring grant and membership has ended.
+type expiries struct {
+	now  func() time.Time
+	last time.Time
+}
+
+// next returns an expiry expiryLead after now and records it in last when it is the latest.
+func (e *expiries) next() time.Time {
+	t := e.now().Add(expiryLead)
+	if t.After(e.last) {
+		e.last = t
+	}
+	return t
+}
+
 // grant creates a grant of the owner and returns its ID.
-func (w *RandomWorld) grant(tb testing.TB, kind, subject string, t Target, level string, expires bool, expiry time.Time) string {
+func (w *RandomWorld) grant(tb testing.TB, kind, subject string, t Target, level string, expires bool, exp *expiries) string {
 	tb.Helper()
 	body := map[string]any{"subject_kind": kind, "subject_id": subject, "target_kind": t.Kind, "level": level, "reason": "leak test"}
 	switch t.Kind {
@@ -397,7 +417,7 @@ func (w *RandomWorld) grant(tb testing.TB, kind, subject string, t Target, level
 		body["target_id"] = w.Channels[t.Space][t.Channel]
 	}
 	if expires {
-		body["expires_at"] = stamp(expiry)
+		body["expires_at"] = stamp(exp.next())
 	}
 	return idOf(tb, harness.MustDo(tb, w.Owner, harness.Request{Method: http.MethodPost, Path: "/grants", Body: body}, http.StatusCreated))
 }
