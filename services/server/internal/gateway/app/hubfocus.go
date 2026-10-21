@@ -9,6 +9,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -26,16 +27,59 @@ func (h *Hub) Focus(c *Connection, f domain.Focus) {
 	}
 }
 
-// setFocusLocked replaces the focus of m with entries in the thread index; h.mu is held.
+// setFocusLocked replaces the focus of m with entries in the thread index; h.mu is held. The
+// coalescer learns the threads that are new (they get the whole document once, M2-10 design note
+// 10) and the ones that left (their live-box state goes).
 func (h *Hub) setFocusLocked(m *member, entries []domain.FocusEntry) {
+	old := map[ids.ID]bool{}
 	for _, e := range m.focus {
+		old[e.ThreadID] = true
 		removeFrom(h.byThread, e.ThreadID, m)
 	}
 	m.focus = slices.Clone(entries)
 	m.focusGen++
+	var added []ids.ID
 	for _, e := range m.focus {
 		addTo(h.byThread, e.ThreadID, m)
+		if !old[e.ThreadID] {
+			added = append(added, e.ThreadID)
+		}
+		delete(old, e.ThreadID)
 	}
+	if h.livebox != nil && (len(added) > 0 || len(old) > 0) {
+		removed := make([]ids.ID, 0, len(old))
+		for t := range old {
+			removed = append(removed, t)
+		}
+		h.livebox.focusChanged(m, added, removed)
+	}
+}
+
+// focusing returns the connections that focus thread now.
+func (h *Hub) focusing(thread ids.ID) []*member {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]*member, 0, len(h.byThread[thread]))
+	for m := range h.byThread[thread] {
+		out = append(out, m)
+	}
+	return out
+}
+
+// focusEntry returns the focus entry of thread of m; false when m no longer focuses it or left
+// the hub.
+func (h *Hub) focusEntry(m *member, thread ids.ID) (domain.FocusEntry, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.members[m.c] != m {
+		return domain.FocusEntry{}, false
+	}
+	for _, e := range m.focus {
+		if e.ThreadID == thread {
+			return e, true
+		}
+	}
+	return domain.FocusEntry{}, false
 }
 
 // restoreFocus restores the stored focus of the session s on the new connection c (resume): the

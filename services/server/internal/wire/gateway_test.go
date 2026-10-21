@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -84,13 +85,15 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		t.Fatal(err)
 	}
 	gw, err := wire.NewGateway(cfg, wire.GatewayDeps{Authenticator: actor.AnonymousOnly{}, Authorizer: allowAll{}, Nonces: staticNonces{},
-		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}, Threads: noThreads{}, Consumers: noConsumers{}})
+		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}, Threads: noThreads{}, Consumers: noConsumers{},
+		Runs: noRuns{}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	actions := map[string]authorize.Action{
-		"ack":   authorize.ActionAgentEventsConsume,
-		"focus": authorize.ActionGatewayFocus, "heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect,
+		"run.update": authorize.ActionRunUpdate,
+		"ack":        authorize.ActionAgentEventsConsume,
+		"focus":      authorize.ActionGatewayFocus, "heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect,
 		"reauth": authorize.ActionGatewayConnect, "resume": authorize.ActionGatewayConnect, "typing.start": authorize.ActionTypingStart,
 		"typing.stop": authorize.ActionTypingStart,
 	}
@@ -102,7 +105,7 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		}
 	}
 	if got := gw.App.Dispatcher().Ops(); !slices.Equal(got, want) ||
-		!slices.Equal(want, []string{"ack", "focus", "heartbeat", "identify", "reauth", "resume", "typing.start", "typing.stop"}) {
+		!slices.Equal(want, []string{"ack", "focus", "heartbeat", "identify", "reauth", "resume", "run.update", "typing.start", "typing.stop"}) {
 		t.Errorf("registered %v, enabled %v", got, want)
 	}
 	if cfg.HeartbeatInterval != 30*time.Second || cfg.ResumeWindow != 5*time.Minute {
@@ -140,4 +143,17 @@ func TestGatewayOpRateClasses(t *testing.T) {
 	if n := len(wire.GatewayOpClasses()); n != len(routes.GatewayOps()) {
 		t.Errorf("%d ops with a class, want every enabled op", n)
 	}
+}
+
+// noRuns is the runs module of a gateway without runs: no patch succeeds and no run is active.
+type noRuns struct{}
+
+func (noRuns) Patch(context.Context, runs.PatchRun) (runs.PatchResult, error) {
+	return runs.PatchResult{}, errs.New(errs.CodeNotFound, "")
+}
+
+func (noRuns) Documents(context.Context, []ids.ID) ([]runs.Run, error) { return nil, nil }
+
+func (noRuns) Document(context.Context, ids.ID) (runs.Run, bool, error) {
+	return runs.Run{}, false, nil
 }

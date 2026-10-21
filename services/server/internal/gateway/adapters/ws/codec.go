@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -128,6 +129,8 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 		return app.Reauth{AccessToken: f.AccessToken, DPoP: f.Dpop}, nil
 	case "focus":
 		return decodeFocus(raw)
+	case "run.update":
+		return decodeRunUpdate(raw)
 	case "typing.start", "typing.stop":
 		var f rest.GatewayTyping
 		if err := strictUnmarshal(raw, &f); err != nil {
@@ -162,6 +165,29 @@ func decodeAck(raw json.RawMessage) (app.Ack, error) {
 		return app.Ack{}, err
 	}
 	return app.Ack{Seq: f.Seq}, nil
+}
+
+// decodeRunUpdate decodes the body of run.update strictly into its frame. The values of the ops
+// stay raw JSON, because the generated type decodes a JSON null and an absent value both to nil
+// and numbers to float64, and the checks of runs need the difference (M2-10).
+func decodeRunUpdate(raw json.RawMessage) (app.RunUpdate, error) {
+	var f rest.GatewayRunUpdate
+	if err := strictUnmarshal(raw, &f); err != nil {
+		return app.RunUpdate{}, err
+	}
+	var values struct {
+		Ops []struct {
+			Value json.RawMessage `json:"value"`
+		} `json:"ops"`
+	}
+	if err := json.Unmarshal(raw, &values); err != nil || len(values.Ops) != len(f.Ops) {
+		return app.RunUpdate{}, &frameError{reasonDecodeError}
+	}
+	out := app.RunUpdate{RunID: ids.ID(f.RunId), BaseVersion: f.BaseVersion, Ops: make([]runs.PatchOp, 0, len(f.Ops)), Ref: deref(f.Ref)}
+	for i, o := range f.Ops {
+		out.Ops = append(out.Ops, runs.PatchOp{Op: string(o.Op), Path: o.Path, Value: values.Ops[i].Value})
+	}
+	return out, nil
 }
 
 // decodeFocus decodes the body of focus strictly into its frame.

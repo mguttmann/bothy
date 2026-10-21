@@ -275,6 +275,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.client_metrics.discarded",
 		// M2-20: the presence gauges of 4.3.
 		"bothy.agent.heartbeat.age", "bothy.agent.billing_mode.mismatch_age",
+		// M2-10: the steps adapters add through live-box patches (4.3).
+		"bothy.run.steps",
 	}
 	slices.Sort(want)
 	var got []string

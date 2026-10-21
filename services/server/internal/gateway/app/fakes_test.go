@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -314,6 +315,25 @@ func (jsonDecoder) Decode(op string, d json.RawMessage) (any, error) {
 			return nil, err
 		}
 		v = f
+	case "run.update":
+		var f struct {
+			RunID       ids.ID `json:"run_id"`
+			BaseVersion int64  `json:"base_version"`
+			Ops         []struct {
+				Op    string          `json:"op"`
+				Path  string          `json:"path"`
+				Value json.RawMessage `json:"value"`
+			} `json:"ops"`
+			Ref string `json:"ref"`
+		}
+		if err := json.Unmarshal(d, &f); err != nil {
+			return nil, err
+		}
+		u := app.RunUpdate{RunID: f.RunID, BaseVersion: f.BaseVersion, Ref: f.Ref}
+		for _, o := range f.Ops {
+			u.Ops = append(u.Ops, runs.PatchOp{Op: o.Op, Path: o.Path, Value: o.Value})
+		}
+		v = u
 	default:
 		return d, nil
 	}

@@ -113,6 +113,12 @@ type DeliveryWrite struct {
 	BillingModeExpected string
 }
 
+// PatchWrite is the input of Repository.WritePatch: the run and the change domain.Apply computed.
+type PatchWrite struct {
+	ID     ids.ID
+	Change domain.Change
+}
+
 // RunKey is the keyset position (queued_at DESC, id DESC) of the run lists.
 type RunKey struct {
 	QueuedAt time.Time
@@ -198,6 +204,19 @@ type Repository interface {
 	// LockActiveRunsByAgent locks the active runs of agentID in ascending id (09 2.1, M2-09). It
 	// needs a unit of work.
 	LockActiveRunsByAgent(ctx context.Context, agentID ids.ID) ([]RunRow, error)
+	// PatchSteps reads every step of a run in ordinal order for a patch (M2-10): the caller holds
+	// the row lock of the run (LockRun). Detail is loaded only for the summary step
+	// (domain.IsSummaryStep), nil for every other step, so a run with many large details is not
+	// read in full on every patch.
+	PatchSteps(ctx context.Context, runID ids.ID) ([]StepRow, error)
+	// WritePatch stores the change of one patch in the lock order of 03 (M2-10 design note 1 f):
+	// one UPDATE of the run row with version = version + 1 and stall_warned_at = NULL, then the
+	// deletes, updates and inserts of run_steps; it returns the run row as stored. The caller holds
+	// the row lock. Errors: not_found for an unknown run, internal outside a unit of work.
+	WritePatch(ctx context.Context, w PatchWrite) (RunRow, error)
+	// ActiveRunsOfThreads reads the active runs of threadIDs (at most one per thread, R-DM-14) for
+	// the delivery reads of runs.LiveBox, whose recipients the gateway admitted.
+	ActiveRunsOfThreads(ctx context.Context, threadIDs []ids.ID) ([]RunRow, error)
 	// OrphanCandidates reads the runs in running or waiting_input, ascending by id, for the job
 	// runs.stall_check (M2-09); a thread has at most one (R-DM-14).
 	OrphanCandidates(ctx context.Context) ([]RunRow, error)

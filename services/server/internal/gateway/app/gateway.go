@@ -115,6 +115,9 @@ type Deps struct {
 	// AgentLimiter is rl.agent_runtime of the ack op and of the member agent of heartbeat; nil
 	// applies no limit (tests).
 	AgentLimiter AgentLimiter
+	// Runs patches live boxes for the op run.update (runs, M2-10); without it run.update ends
+	// the connection with 4000 (tests of the connection that never send it).
+	Runs RunPatcher
 	// Presence takes the member agent of heartbeat (agents, M2-20); nil leaves the member without
 	// effect (tests of the connection).
 	Presence agents.Presence
@@ -170,6 +173,7 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 	if d.Consumers != nil {
 		g.handlers["ack"] = g.ack
 	}
+	g.handlers[opRunUpdate] = g.runUpdate
 	return g, nil
 }
 

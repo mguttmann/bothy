@@ -77,8 +77,6 @@ rules:
     etappe: M2
   - match: sync.reconnect_backoff_cap  # M2-29
     etappe: M2
-  - match: sync.run_patch_coalesce_interval  # M2-10
-    etappe: M2
   - match: telemetry.dashboard_url  # M6-06
     etappe: M6
   - match: "voice."  # M3-09

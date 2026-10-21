@@ -23065,8 +23065,14 @@ type ClientInterface interface {
 
 	// PatchRunWithBody Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23075,8 +23081,14 @@ type ClientInterface interface {
 
 	// PatchRun Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25534,40 +25546,6 @@ func (c *Client) GetChannel(ctx context.Context, channelId ChannelIdPath, reqEdi
 // Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
 func (c *Client) UpdateChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateChannelRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateChannel Change name or topic
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
-func (c *Client) UpdateChannel(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, body UpdateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateChannelRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ExplainChannelAccess Who has access to a channel
-//
-// Every principal with access and the chain of sources (direct, group, inherited, operator, direct-message participant, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).
-//
-// Corresponds with GET /channels/{channel_id}/access (the `ExplainChannelAccess` operationId).
-func (c *Client) ExplainChannelAccess(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExplainChannelAccessRequest(c.Server, channelId)
 	if err != nil {
 		return nil, err
 	}

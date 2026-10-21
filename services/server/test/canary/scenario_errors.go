@@ -121,6 +121,16 @@ func (sc *Scenario) gatewayOps() {
 	} else {
 		sc.GatewaySent["ack"]++
 	}
+	// A live-box patch over the gateway (M2-10) on the run of Support/Allgemein; a stale base or
+	// an ended run answers an error frame and keeps the connection.
+	if runs := items(sc.get(sc.W.Owner, "/threads/"+sc.W.Threads["Support/Allgemein"]+"/runs", ok...)); len(runs) > 0 {
+		if err := a.Send("run.update", map[string]any{"run_id": jsonText(runs[0]["id"]), "base_version": runs[0]["version"],
+			"ops": []any{map[string]any{"op": "replace", "path": "/status_line", "value": "Reading the export log"}}, "ref": "canary"}); err != nil {
+			sc.T.Errorf("run.update: %v", err)
+		} else {
+			sc.GatewaySent["run.update"]++
+		}
+	}
 	sc.drain(a, "Lotse")
 	a.Close()
 }

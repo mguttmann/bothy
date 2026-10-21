@@ -802,7 +802,7 @@ class AgentRuntimeApi {
   }
 
   /// Apply a live-box patch
-  /// Same as gateway op &#x60;run.update&#x60;. Paths outside the allowed set and &#x60;state&#x60; are rejected. A wrong &#x60;base_version&#x60; gives 409 &#x60;base_version_conflict&#x60; with the current document in &#x60;current&#x60;.
+  /// Same as gateway op &#x60;run.update&#x60; (one use case). Only the run&#39;s own agent patches, only while the run is &#x60;queued&#x60;, &#x60;running&#x60; or &#x60;waiting_input&#x60;. A path or op outside the allowed set of 09 section 5.3 (for example &#x60;/state&#x60;) gives 400 &#x60;validation_failed&#x60; with &#x60;errors[].code&#x60; &#x60;patch_path_forbidden&#x60; and the &#x60;pointer&#x60; of the op. An ended run gives 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;run_not_active&#x60;, checked before the version. A wrong &#x60;base_version&#x60; gives 409 &#x60;base_version_conflict&#x60; with the current document in &#x60;current&#x60;, exactly as &#x60;getRun&#x60; answers it. Set semantics: &#x60;add&#x60; and &#x60;replace&#x60; set a member also when it is absent, &#x60;remove&#x60; of an absent member is a no-op, and one stored patch raises the version by one.
   ///
   /// Parameters:
   /// * [runId]

@@ -20,6 +20,10 @@ func TestRegister_Events(t *testing.T) {
 		ev[1].Type != authorize.EventRunCancelRequested || ev[2].Type != authorize.EventRunStateChanged {
 		t.Fatalf("events %+v", ev)
 	}
+	// M2-10: runs serves the gateway op run.update.
+	if ops := r.Ops(); len(ops) != 1 || ops[0].Module != "runs" || ops[0].Op != authorize.OpRunUpdate {
+		t.Fatalf("ops %+v", ops)
+	}
 }
 
 // TestInvocationBearing: the four types of 04 15.3 and nothing else.

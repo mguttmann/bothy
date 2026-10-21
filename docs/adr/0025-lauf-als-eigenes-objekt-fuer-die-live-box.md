@@ -54,8 +54,9 @@ Sitzung und Marke macht.
 
 - Tests zur Zustandsmaschine: jeder nicht erlaubte Übergang wird abgelehnt (docs/spec/03-datenmodell.md
   `runs`; docs/spec/09-agenten.md Abschnitt 5.1).
-- Test AG-12: Patch auf verbotenen Pfad ergibt `422`, alte `base_version` ergibt `409` mit
-  Dokument.
+- Test AG-12: Patch auf verbotenen Pfad ergibt `400 validation_failed` mit `errors[].code`
+  `patch_path_forbidden` (ADR 0015; corrected by M2-10, D-M2-10-15), alte `base_version` ergibt
+  `409` mit Dokument.
 - Lasttest: Anzahl dauerhafter Ereignisse je Lauf bleibt unabhängig von der Patch-Rate.
 - Test, dass Live-Box-Anker keine Revisionen erzeugen (03 `message_revisions`).
 - M2-05 names the tests of the state machine and the run object: `TestCanTransition_AllPairs`,

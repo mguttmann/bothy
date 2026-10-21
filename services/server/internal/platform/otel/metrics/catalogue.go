@@ -425,6 +425,16 @@ var (
 		},
 		Buckets: BucketsLong,
 	}
+	// RunSteps is bothy.run.steps (4.3, M2-10): one per step an adapter added through a stored
+	// live-box patch, after the commit; the summary steps of the server are not counted.
+	RunSteps = Spec{
+		Name: "bothy.run.steps", Kind: KindCounter, Unit: "{step}",
+		Description: "Steps adapters added to runs.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: "bothy.step.kind", Values: []string{"tool_call", "status", "subagent", "workflow", "background_job"}},
+		},
+	}
 	// RunFinished is bothy.run.finished (4.3, M2-05): one per run that reached an end state.
 	// bothy.reason is absent for completed, which has no state_reason.
 	RunFinished = Spec{
@@ -504,7 +514,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
-		RunActive, RunStartLatency, RunDuration, RunFinished, AgentInvocationDenied, AgentBillingModeMismatch,
+		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,

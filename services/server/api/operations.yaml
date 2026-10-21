@@ -175,6 +175,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - moveThread
   - openTerminalSession
   - pairHost
+  - patchRun
   - pinMessage
   - pollAgentEvents
   - postIncomingWebhook
@@ -388,9 +389,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listPrices
     etappe: M2
     ticket: M2-22
-  - operation_id: patchRun
-    etappe: M2
-    ticket: M2-10
   - operation_id: pauseImport
     etappe: M8
     ticket: M8-03
@@ -466,12 +464,11 @@ gateway_ops:
     - identify
     - reauth
     - resume
+    - run.update
     - typing.start
     - typing.stop
   later:             # sorted by op
     - op: command.autocomplete_result
-      etappe: M2
-    - op: run.update
       etappe: M2
     - op: stats.subscribe
       etappe: M6

@@ -16,6 +16,40 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// UpdateChannel Change name or topic
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
+func (c *Client) UpdateChannel(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, body UpdateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateChannelRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExplainChannelAccess Who has access to a channel
+//
+// Every principal with access and the chain of sources (direct, group, inherited, operator, direct-message participant, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).
+//
+// Corresponds with GET /channels/{channel_id}/access (the `ExplainChannelAccess` operationId).
+func (c *Client) ExplainChannelAccess(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExplainChannelAccessRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ArchiveChannelWithBody Archive a channel
 //
 // Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a rights change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).
@@ -4438,8 +4472,14 @@ func (c *Client) GetRun(ctx context.Context, runId RunIdPath, reqEditors ...Requ
 
 // PatchRunWithBody Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes any type of body and a specified content type.
 //
@@ -4458,8 +4498,14 @@ func (c *Client) PatchRunWithBody(ctx context.Context, runId RunIdPath, contentT
 
 // PatchRun Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -25537,8 +25583,14 @@ type ClientWithResponsesInterface interface {
 
 	// PatchRunWithBodyWithResponse Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25547,8 +25599,14 @@ type ClientWithResponsesInterface interface {
 
 	// PatchRunWithResponse Apply a live-box patch
 	//
-	// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-	// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+	// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+	// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+	// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+	// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+	// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26723,110 +26781,4 @@ type CreateAgentResponse429Headers struct {
 // CreateAgentResponseDefaultHeaders the declared response headers of an HTTP default response for CreateAgent
 type CreateAgentResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type CreateAgentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CreateAgentResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CreateAgentResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CreateAgentResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CreateAgentResponse403Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *CreateAgentResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *CreateAgentResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreateAgentResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CreateAgentResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateAgentResponse) GetJSON201() *Agent {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CreateAgentResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateAgentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateAgentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateAgentResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
 }

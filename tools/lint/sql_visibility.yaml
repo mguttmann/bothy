@@ -254,3 +254,9 @@ exceptions:
   - query: runs.AllSteps
     category: after_authorize
     reason: "every step of the one run whose run.read authorize allowed (getRun); run_steps has no channel_id (D-M2-05-9)"
+  - query: runs.PatchSteps
+    category: after_authorize
+    reason: "the steps of the one run whose run.update authorize allowed and whose row the patch locked; the details stay in the server apart from the summary step (M2-10)"
+  - query: runs.ActiveRunsOfThreads
+    category: after_authorize
+    reason: "the delivery reads of the live box: the active runs of threads the gateway checked with gateway.focus; every recipient passes run.read before a frame is sent (07 7.4 rule 1, loading a checked resource; M2-10)"

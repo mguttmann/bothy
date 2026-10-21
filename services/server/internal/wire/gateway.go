@@ -4,6 +4,7 @@ package wire
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -31,6 +32,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/runs"
+	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
 )
@@ -81,6 +83,8 @@ type GatewayConfig struct {
 	TypingMinInterval time.Duration `config:"sync.typing_min_interval"`
 	TypingTTL         time.Duration `config:"sync.typing_ttl"`
 	PayloadMax        int           `config:"sync.event_payload_max_bytes"`
+	// The window of the live-box coalescer (M2-10).
+	CoalesceInterval time.Duration `config:"sync.run_patch_coalesce_interval"`
 	// The keys of the agent consumers (M2-07).
 	AckTimeout         time.Duration `config:"agent.ack_timeout"`
 	AckPersistInterval time.Duration `config:"agent.ack_persist_interval"`
@@ -121,6 +125,11 @@ type GatewayDeps struct {
 	Consumers agents.Consumers
 	// Presence takes the member agent of the op heartbeat (M2-20); nil leaves it without effect.
 	Presence agents.Presence
+	// Runs is the runs module for the live box (M2-10): the use case of the op run.update
+	// (runs.Runs.Patch) and the delivery reads of the coalescer (runs.LiveBox); nil leaves
+	// run.updated on the immediate path and run.update ends the connection with 4000 (tests of the
+	// connection that never send it).
+	Runs LiveBoxRuns
 	// Invocations is the port runs.Delivery (M2-08), which the consumer engine calls before every
 	// invocation-bearing event on the WebSocket and in the REST poll; nil refuses such events
 	// with an error (fail closed).
@@ -131,6 +140,13 @@ type GatewayDeps struct {
 	// Metrics records the gateway and delivery metrics; nil means gateway/adapters/otelmetrics
 	// on the global meter provider of platform/otel (M1-68).
 	Metrics gatewayapp.Metrics
+}
+
+// LiveBoxRuns is what the gateway needs of runs for the live box: the patch use case and the
+// delivery reads (runs/app.Service implements both).
+type LiveBoxRuns interface {
+	gatewayapp.RunPatcher
+	runs.LiveBox
 }
 
 // InstanceLoader loads the instance row (instance.State), the source of the sync epoch.
@@ -150,6 +166,9 @@ type Gateway struct {
 	// Engine is the delivery engine of agent consumers over the hub (M2-07); nil with a given
 	// Delivery. It is the agents.ConsumerFeed of the REST consumer operations.
 	Engine *gatewayapp.ConsumerEngine
+	// LiveBox is the coalescer of run.updated over the hub (M2-10); nil without a hub or without
+	// GatewayDeps.Runs.
+	LiveBox *gatewayapp.Coalescer
 }
 
 // The rate-limit classes of the client ops the gateway counts itself (x-rate-limit-class of
@@ -167,7 +186,8 @@ const (
 // agent limiter (M2-07, INT-W42/4).
 func GatewayOpClasses() map[string]string {
 	return map[string]string{"identify": gatewayClass, "resume": gatewayClass, "heartbeat": gatewayClass, "reauth": gatewayClass,
-		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass, "ack": agentRuntimeClass}
+		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass, "ack": agentRuntimeClass,
+		"run.update": agentRuntimeClass}
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of
@@ -188,15 +208,16 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
+	liveBox, patcher, err := newLiveBox(cfg, d, hub)
+	if err != nil {
+		return nil, err
+	}
 	htu, err := gatewayws.HTU(cfg.PublicURL)
 	if err != nil {
 		return nil, err
 	}
 	ops := routes.GatewayOps()
-	schemas := map[string]string{}
-	for _, op := range ops {
-		schemas[op.Op] = op.Schema
-	}
+	schemas := opSchemas(ops)
 	check, err := frameValidator()
 	if err != nil {
 		return nil, err
@@ -214,7 +235,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Snapshot: d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
-		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence,
+		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence, Runs: patcher,
 	})
 	if err != nil {
 		return nil, err
@@ -235,7 +256,62 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Gateway{App: gw, Handler: h, Hub: hub, Publisher: publisher, Engine: engine}, nil
+	return &Gateway{App: gw, Handler: h, Hub: hub, Publisher: publisher, Engine: engine, LiveBox: liveBox}, nil
+}
+
+// opSchemas maps every enabled op to the schema of its body.
+func opSchemas(ops []routes.GatewayOp) map[string]string {
+	schemas := make(map[string]string, len(ops))
+	for _, op := range ops {
+		schemas[op.Op] = op.Schema
+	}
+	return schemas
+}
+
+// newLiveBox binds the coalescer of run.updated to the hub (M2-10 design note 9) over the delivery
+// reads of runs and the REST form of the run document (runs/adapters/httpapi.RunREST), so the
+// snapshot equals getRun; nil without a hub or without runs. The patcher of the op run.update is
+// d.Runs, an untyped nil without runs.
+func newLiveBox(cfg GatewayConfig, d GatewayDeps, hub *gatewayapp.Hub) (*gatewayapp.Coalescer, gatewayapp.RunPatcher, error) {
+	if d.Runs == nil {
+		return nil, nil, nil
+	}
+	if hub == nil {
+		return nil, d.Runs, nil
+	}
+	lb, err := hub.BindLiveBox(gatewayapp.LiveBoxConfig{Interval: cfg.CoalesceInterval}, gatewayapp.LiveBoxDeps{Documents: d.Runs, Encode: encodeRun})
+	return lb, d.Runs, err
+}
+
+// encodeRun encodes a run document in the schema Run exactly as getRun answers it.
+func encodeRun(r runs.Run) (json.RawMessage, error) {
+	body, err := runshttp.RunREST(r)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(body)
+}
+
+// StartLiveBox runs the coalescer of run.updated (Coalescer.Run) for the life of the process and
+// returns its stop step in the HTTP phase. Without a coalescer the step does nothing.
+func (g *Gateway) StartLiveBox() lifecycle.StopStep {
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if g.LiveBox != nil {
+			g.LiveBox.Run(ctx)
+		}
+	}()
+	return lifecycle.StopStep{Name: "gateway_live_box", Phase: lifecycle.PhaseHTTP, Run: func(stopCtx context.Context) error {
+		cancel()
+		select {
+		case <-done:
+			return nil
+		case <-stopCtx.Done():
+			return stopCtx.Err()
+		}
+	}}
 }
 
 // newConsumerEngine builds the delivery engine of agent consumers over the hub (M2-07) and binds

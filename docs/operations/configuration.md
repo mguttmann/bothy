@@ -238,9 +238,9 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Vorlagennamens in Unicode-Zeichen | aktiv |
 | `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | int | `100` | Vorlagen je Person bzw. je Kanal; `listTemplates` ist nicht seitenweise | aktiv |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | Größe einer Datei | aktiv |
-| `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server |  | `500` | Länge von `last_text_excerpt` | geplant (M2) |
+| `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server | int | `500` | Länge von `last_text_excerpt` | aktiv |
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | int | `16384` | Größe von `run_steps.detail` | aktiv |
-| `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server |  | `2000` | gespeicherte Schritte je Lauf | geplant (M2) |
+| `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | int | `2000` | gespeicherte Schritte je Lauf | aktiv |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | ohne Fortschritt: Stillstandshinweis | geplant (M2) |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | Ablauf einer Komponente ohne eigene Angabe | geplant (M2) |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server |  | `5` | danach wird eine Push-Registrierung deaktiviert | geplant (M3) |
@@ -272,7 +272,7 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | int | `10000` | Rahmen im Ausgang einer Verbindung bis `4014` | aktiv |
 | `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | Aufbewahrung von `Idempotency-Key` | aktiv |
 | `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server | int | `20` | Threads im `focus` je Verbindung | aktiv |
-| `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server |  | `250ms` | Sammelfenster für `run.updated` | geplant (M2) |
+| `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server | duration | `250ms` | Sammelfenster für `run.updated` | aktiv |
 | `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server | duration | `5s` | höchstens so oft `typing.start` | aktiv |
 | `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server | duration | `8s` | Tipp-Anzeige ohne Erneuerung | aktiv |
 | `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server | duration | `30d` | ungenutzte Cache-Einträge | aktiv |

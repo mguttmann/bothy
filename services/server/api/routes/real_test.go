@@ -665,6 +665,10 @@ func (stubServer) StartRun(context.Context, rest.StartRunRequestObject) (rest.St
 	return nil, nil
 }
 
+func (stubServer) PatchRun(context.Context, rest.PatchRunRequestObject) (rest.PatchRunResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ResumeRun(context.Context, rest.ResumeRunRequestObject) (rest.ResumeRunResponseObject, error) {
 	return nil, nil
 }
@@ -1180,6 +1184,7 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M2-09
 		"startRun":             {"POST /api/v1/runs/{run_id}/start", "run.start", "rl.agent_runtime"},
 		"resumeRun":            {"POST /api/v1/runs/{run_id}/resume", "run.start", "rl.agent_runtime"},
+		"patchRun":             {"PATCH /api/v1/runs/{run_id}", "run.update", "rl.agent_runtime"},
 		"renewInvocationToken": {"POST /api/v1/runs/{run_id}/invocation-token", "run.token.renew", "rl.agent_runtime"},
 		"awaitRunInput":        {"POST /api/v1/runs/{run_id}/await-input", "run.finish", "rl.agent_runtime"},
 		"finishRun":            {"POST /api/v1/runs/{run_id}/finish", "run.finish", "rl.agent_runtime"},

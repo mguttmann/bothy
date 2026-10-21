@@ -26,6 +26,10 @@ func gatewayConfigKeys() []config.Key {
 			Doc: "Frames in the outbound queue of a gateway connection before it closes with 4014."},
 		{Name: "sync.max_focused_threads", Kind: config.KindInt, Default: "20", Min: "1", Max: "1000", Chapter: chapter04,
 			Doc: "Threads a gateway connection may focus; a focus with more answers validation_failed."},
+		// M2-10: the window in which the gateway gathers the patches of a run into one run.updated
+		// per connection (04 section 11.3 point 3).
+		{Name: "sync.run_patch_coalesce_interval", Kind: config.KindDuration, Default: "250ms", Min: minDeadline, Chapter: chapter04,
+			Doc: "Window in which the gateway gathers the live-box patches of a run into one run.updated per connection."},
 		{Name: "sync.typing_min_interval", Kind: config.KindDuration, Default: "5s", Min: minDeadline, Chapter: chapter04,
 			Doc: "Shortest interval between two typing.started fan-outs of one connection and thread."},
 		{Name: "sync.typing_ttl", Kind: config.KindDuration, Default: "8s", Min: minDeadline, Chapter: chapter04,

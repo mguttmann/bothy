@@ -9,6 +9,118 @@ import (
 	"net/http"
 )
 
+// ListMyNotificationPreferencesResponse429Headers the declared response headers of an HTTP 429 response for ListMyNotificationPreferences
+type ListMyNotificationPreferencesResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// ListMyNotificationPreferencesResponseDefaultHeaders the declared response headers of an HTTP default response for ListMyNotificationPreferences
+type ListMyNotificationPreferencesResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type ListMyNotificationPreferencesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NotificationPreferenceList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListMyNotificationPreferencesResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMyNotificationPreferencesResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *ListMyNotificationPreferencesResponse403Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ListMyNotificationPreferencesResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *ListMyNotificationPreferencesResponseDefaultHeaders
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMyNotificationPreferencesResponse) GetJSON200() *NotificationPreferenceList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMyNotificationPreferencesResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMyNotificationPreferencesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ListMyNotificationPreferencesResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListMyNotificationPreferencesResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMyNotificationPreferencesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMyNotificationPreferencesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMyNotificationPreferencesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMyNotificationPreferencesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteNotificationPreferenceResponse204Headers the declared response headers of an HTTP 204 response for DeleteNotificationPreference
+type DeleteNotificationPreferenceResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// DeleteNotificationPreferenceResponse400Headers the declared response headers of an HTTP 400 response for DeleteNotificationPreference
+type DeleteNotificationPreferenceResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// DeleteNotificationPreferenceResponse401Headers the declared response headers of an HTTP 401 response for DeleteNotificationPreference
+type DeleteNotificationPreferenceResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
 // DeleteNotificationPreferenceResponse403Headers the declared response headers of an HTTP 403 response for DeleteNotificationPreference
 type DeleteNotificationPreferenceResponse403Headers struct {
 	CorrelationId *CorrelationId
@@ -23279,8 +23391,14 @@ func (c *ClientWithResponses) GetRunWithResponse(ctx context.Context, runId RunI
 
 // PatchRunWithBodyWithResponse Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23295,8 +23413,14 @@ func (c *ClientWithResponses) PatchRunWithBodyWithResponse(ctx context.Context, 
 
 // PatchRunWithResponse Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -23850,124 +23974,4 @@ func (c *ClientWithResponses) GetStatsBackendsWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseGetStatsBackendsResponse(rsp)
-}
-
-// GetCostStatsWithResponse Costs per space, agent or instance
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/costs (the `GetCostStats` operationId).
-func (c *ClientWithResponses) GetCostStatsWithResponse(ctx context.Context, params *GetCostStatsParams, reqEditors ...RequestEditorFn) (*GetCostStatsResponse, error) {
-	rsp, err := c.GetCostStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetCostStatsResponse(rsp)
-}
-
-// GetErrorStatsWithResponse Error rates of runs and deliveries
-//
-// Metrics: `run_failure_rate`, `invocation_denials`, `webhook_failure_rate`, `push_failure_rate`.
-// HTTP error rates come from telemetry, not from this API.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/errors (the `GetErrorStats` operationId).
-func (c *ClientWithResponses) GetErrorStatsWithResponse(ctx context.Context, params *GetErrorStatsParams, reqEditors ...RequestEditorFn) (*GetErrorStatsResponse, error) {
-	rsp, err := c.GetErrorStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetErrorStatsResponse(rsp)
-}
-
-// GetStatsLiveWithResponse Current live frame
-//
-// The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualisierung.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/live (the `GetStatsLive` operationId).
-func (c *ClientWithResponses) GetStatsLiveWithResponse(ctx context.Context, params *GetStatsLiveParams, reqEditors ...RequestEditorFn) (*GetStatsLiveResponse, error) {
-	rsp, err := c.GetStatsLive(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetStatsLiveResponse(rsp)
-}
-
-// GetRunStatsWithResponse Runs per agent
-//
-// Metrics: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95`.
-// Grouped by agent.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/runs (the `GetRunStats` operationId).
-func (c *ClientWithResponses) GetRunStatsWithResponse(ctx context.Context, params *GetRunStatsParams, reqEditors ...RequestEditorFn) (*GetRunStatsResponse, error) {
-	rsp, err := c.GetRunStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetRunStatsResponse(rsp)
-}
-
-// GetStatsSloWithResponse SLO traffic light from own measurement
-//
-// One entry per SLO of the Sloth files, computed from `stats_minutes` over the SLO period (docs/spec/25-visualisierung.md, section 6.4). Label "own measurement": values may differ from Prometheus. Requires `stats.read` on the instance (owner); a space manager gets `403 forbidden`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/slo (the `GetStatsSlo` operationId).
-func (c *ClientWithResponses) GetStatsSloWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetStatsSloResponse, error) {
-	rsp, err := c.GetStatsSlo(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetStatsSloResponse(rsp)
-}
-
-// GetStatsTimelineWithResponse Minute buckets and runs for playback
-//
-// Minute aggregates from `stats_minutes` and run intervals for a range of at most `stats.timeline_max_range` inside `retention.stats_minutes` (docs/spec/25-visualisierung.md, section 6.5). Filtered to the channels visible to the caller. Rows without a channel (`sli.*`, gateway metrics) only with `stats.read` on the instance; `cost` only with `cost.read.aggregate`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/timeline (the `GetStatsTimeline` operationId).
-func (c *ClientWithResponses) GetStatsTimelineWithResponse(ctx context.Context, params *GetStatsTimelineParams, reqEditors ...RequestEditorFn) (*GetStatsTimelineResponse, error) {
-	rsp, err := c.GetStatsTimeline(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetStatsTimelineResponse(rsp)
-}
-
-// GetToolCallStatsWithResponse Tool calls by tool name
-//
-// Metrics: `calls`, `failed`, `duration_ms_p50`. Grouped by tool name from `run_steps`.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/tool-calls (the `GetToolCallStats` operationId).
-func (c *ClientWithResponses) GetToolCallStatsWithResponse(ctx context.Context, params *GetToolCallStatsParams, reqEditors ...RequestEditorFn) (*GetToolCallStatsResponse, error) {
-	rsp, err := c.GetToolCallStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetToolCallStatsResponse(rsp)
-}
-
-// GetUsageStatsWithResponse Usage per space
-//
-// Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /stats/usage (the `GetUsageStats` operationId).
-func (c *ClientWithResponses) GetUsageStatsWithResponse(ctx context.Context, params *GetUsageStatsParams, reqEditors ...RequestEditorFn) (*GetUsageStatsResponse, error) {
-	rsp, err := c.GetUsageStats(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetUsageStatsResponse(rsp)
 }
