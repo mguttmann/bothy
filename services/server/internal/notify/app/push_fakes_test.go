@@ -616,8 +616,8 @@ type fakeScheduler struct {
 	// gateways are the inserted notify.gateway_send jobs, unique per hint and recipient.
 	gateways []app.GatewayJob
 	syncs    map[ids.ID]time.Time
-	syncArg map[ids.ID]int64
-	holds   map[ids.ID]time.Time
+	syncArg  map[ids.ID]int64
+	holds    map[ids.ID]time.Time
 }
 
 func newFakeScheduler() *fakeScheduler {
