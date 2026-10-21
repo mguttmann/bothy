@@ -115,6 +115,7 @@ type pushWorld struct {
 	routes    []domain.Route
 	skips     []string
 	sent      []string
+	metricsMu stdsync.Mutex // the send jobs of the semaphore test record in parallel
 	store     *fakeRegStore
 	providers []app.PushProvider
 	presence  presence.View
@@ -561,12 +562,18 @@ func (m pushMentions) CountUnread(_ context.Context, q messaging.UnreadMentionQu
 type pushMetrics struct{ w *pushWorld }
 
 func (m pushMetrics) Sent(_ context.Context, provider, outcome string) {
+	m.w.metricsMu.Lock()
+	defer m.w.metricsMu.Unlock()
 	m.w.sent = append(m.w.sent, provider+"/"+outcome)
 }
 
 func (pushMetrics) SendDuration(context.Context, string, time.Duration) {}
 
-func (m pushMetrics) Skipped(_ context.Context, reason string) { m.w.skips = append(m.w.skips, reason) }
+func (m pushMetrics) Skipped(_ context.Context, reason string) {
+	m.w.metricsMu.Lock()
+	defer m.w.metricsMu.Unlock()
+	m.w.skips = append(m.w.skips, reason)
+}
 
 // recordRoutes records the live routes and accepts them.
 type recordRoutes struct{ w *pushWorld }
