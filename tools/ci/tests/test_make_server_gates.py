@@ -36,7 +36,7 @@ _SKIP = re.compile(r"^\s*SKIP\s+(\S+)\s+(.*)$", re.MULTILINE)
 # configuration the Makefile reads with `?=`; neither may leak into the make runs below.
 _DROPPED = {"MAKEFLAGS", "MAKELEVEL", "MFLAGS", "COMPONENTS", "COVERAGE_GO_MIN", "PERF_TIMEOUT"}
 _DROPPED |= {"GO_TEST_TIMEOUT"}
-_DROPPED |= {"GO_ARCH_LINT"}
+_DROPPED |= {"GO_ARCH_LINT", "GO_TEST_SHARD", "GO_SHARD_RECORD"}
 
 _FAKE = """#!{python}
 import json, os, sys
@@ -942,3 +942,65 @@ def test_a_failing_pin_lookup_stops_the_gate(
     assert result.returncode != 0
     assert pin in [c["args"][1] for c in fakes.calls("fetch")]
     assert [c["tool"] for c in fakes.calls() if c["tool"] not in ("prereqs", "fetch")] == []
+
+
+_SHARDS_FAKE = """#!{python}
+import json, os, sys
+args = sys.argv[1:]
+with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as fh:
+    fh.write(json.dumps({{"tool": "shards", "args": args, "cwd": os.getcwd()}}) + "\\n")
+module = args[args.index("--module") + 1]
+print(os.environ.get("FAKE_SHARD_" + os.path.basename(module), ""))
+sys.exit(int(os.environ.get("FAKE_SHARDS_EXIT", "0")))
+"""
+
+
+@pytest.mark.parametrize("shell", SHELLS, ids=SHELL_IDS)
+def test_a_go_test_shard_runs_exactly_the_packages_of_the_shard(
+    fakes: Fakes, shell: list[str], tmp_path: Path
+) -> None:
+    # CI splits the Go tests into shards (tools/ci/go_shards.py): each runs the same command for
+    # the packages go_shards.py prints; a module without a package in the shard is left out.
+    other = tmp_path / "other"
+    other.mkdir()
+    shards = _executable(fakes.bin / "shards", _SHARDS_FAKE.format(python=sys.executable))
+    modules = f"{fakes.module} {other}"
+    record = tmp_path / "rec" / "go-shard.txt"
+    flags = ("GO_TEST_SHARD=2/4", f"GO_SHARDS={shards}", f"GO_SHARD_RECORD={record}")
+    command = _recipe_command("test", "'go-test'", fakes, *flags, modules=modules)
+    result = _bash(command, fakes, shell, FAKE_SHARD_svc="example.com/svc/a\nexample.com/svc/b")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert record.exists()
+    [first, second] = fakes.calls("shards")
+    assert first["args"][:5] == ["packages", "--shard", "2/4", "--record", str(record)]
+    # The packages of `go test -tags`: a package of tagged files only exists with the tags.
+    assert first["args"][5:7] == ["--tags", "contract_validate"]
+    assert first["args"][7:] == ["--module", str(fakes.module), str(fakes.module), str(other)]
+    assert second["args"][8] == str(other)
+    [go] = fakes.calls("go")
+    assert go["cwd"] == str(fakes.module.resolve())
+    assert go["args"] == [
+        "test",
+        "-race",
+        "-tags",
+        "contract_validate",
+        "-covermode=atomic",
+        "-coverpkg=./...",
+        "-coverprofile=coverage.out",
+        "-timeout=20m",
+        "example.com/svc/a",
+        "example.com/svc/b",
+    ]
+    assert f"no package of {other} in shard 2/4" in result.stdout
+
+
+@pytest.mark.parametrize("shell", SHELLS, ids=SHELL_IDS)
+def test_a_go_test_shard_stops_when_the_split_fails(
+    fakes: Fakes, shell: list[str], tmp_path: Path
+) -> None:
+    shards = _executable(fakes.bin / "shards", _SHARDS_FAKE.format(python=sys.executable))
+    flags = ("GO_TEST_SHARD=1/4", f"GO_SHARDS={shards}", f"GO_SHARD_RECORD={tmp_path / 'r.txt'}")
+    command = _recipe_command("test", "'go-test'", fakes, *flags)
+    result = _bash(command, fakes, shell, FAKE_SHARD_svc="example.com/svc/a", FAKE_SHARDS_EXIT="1")
+    assert result.returncode != 0
+    assert fakes.calls("go") == []

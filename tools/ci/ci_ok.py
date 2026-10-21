@@ -10,7 +10,9 @@ job plan) and fails when a job did not pass:
 - the plan must succeed, and the plan and every conditional job (components.CONDITIONAL_JOBS)
   must be among the results;
 - a conditional job may end skipped only when the plan did not list it; a job that ran must pass,
-  listed or not;
+  listed or not; a job that follows a conditional job (FOLLOWS: test-server-coverage merges the
+  shards of test-server, test-server-contract runs the contract tests beside them) is needed
+  exactly when the plan lists that job;
 - `sonar` (MAY_SKIP) may end skipped: without the secrets, on main without SONAR_MAIN_ANALYSIS,
   and after a failed or cancelled test job, which fails through that job;
 - of the deny-list pair (ONE_OF) exactly the one that ran must pass; both skipped fails;
@@ -38,8 +40,10 @@ import components
 MAY_SKIP = frozenset({"sonar"})
 # Groups of jobs of which exactly one runs; that one must pass.
 ONE_OF: tuple[frozenset[str], ...] = (frozenset({"denylist", "denylist-fork"}),)
+# Jobs that run after a conditional job and only when the plan lists it (job -> that job).
+FOLLOWS = {"test-server-coverage": "test-server", "test-server-contract": "test-server"}
 # Jobs that must be among the results of every run.
-REQUIRED = ("plan", *components.CONDITIONAL_JOBS)
+REQUIRED = ("plan", *components.CONDITIONAL_JOBS, *FOLLOWS)
 
 
 def parse_jobs(value: str) -> frozenset[str]:
@@ -59,7 +63,13 @@ def parse_jobs(value: str) -> frozenset[str]:
     return frozenset(names)
 
 
+def _needed(job: str, needed: frozenset[str]) -> bool:
+    return job in needed or FOLLOWS.get(job) in needed
+
+
 def _skip_allowed(job: str, results: dict[str, str], needed: frozenset[str]) -> bool:
+    if job in FOLLOWS:
+        return not _needed(job, needed)
     if job in components.CONDITIONAL_JOBS:
         return job not in needed
     if job in MAY_SKIP:
@@ -78,7 +88,7 @@ def check_needs(results: dict[str, str], needed: frozenset[str]) -> list[str]:
             continue
         if result == "skipped" and _skip_allowed(job, results, needed):
             continue
-        if result == "skipped" and job in needed:
+        if result == "skipped" and _needed(job, needed):
             problems.append(f"{job}: skipped, but the plan needs it")
         else:
             problems.append(f"{job}: {result}")

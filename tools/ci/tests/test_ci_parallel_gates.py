@@ -26,6 +26,8 @@ GATE_JOBS = (
     "gates-security",
     "test-tools",
     "test-server",
+    "test-server-coverage",
+    "test-server-contract",
     "test-apps",
     "test-sdk-plugins",
 )
@@ -58,7 +60,12 @@ def _make_args(job: str) -> list[list[str]]:
 
 
 def _targets(job: str) -> list[str]:
-    return [a for args in _make_args(job) for a in args if re.fullmatch(r"[a-z][a-z0-9-]*", a)]
+    # `-o test` names a target make does not run (the merged coverage of the Go shards).
+    out = []
+    for args in _make_args(job):
+        old = {args[i + 1] for i, a in enumerate(args[:-1]) if a == "-o"}
+        out += [a for a in args if re.fullmatch(r"[a-z][a-z0-9-]*", a) and a not in old]
+    return out
 
 
 def _gates_prerequisites() -> set[str]:
@@ -97,11 +104,31 @@ def test_the_tools_tests_run_with_no_component_and_every_area() -> None:
     assert step["env"]["COMPONENTS"] == "none"
 
 
-@pytest.mark.parametrize("job", sorted(COMPONENT_TESTS))
+@pytest.mark.parametrize("job", sorted(set(COMPONENT_TESTS) - {"test-server"}))
 def test_component_tests_leave_the_tools_suite_to_its_job(job: str) -> None:
     [args] = _make_args(job)
     assert args[:2] == ["test", "coverage"]
     assert "AREAS=none" in args
+
+
+def test_the_server_tests_run_in_shards_and_their_coverage_after_them() -> None:
+    # Each shard runs `make test` for its packages (tools/ci/go_shards.py); the coverage
+    # threshold reads the merged profile in test-server-coverage without testing again.
+    [shard] = _make_args("test-server")
+    assert shard == [
+        "test",
+        'COMPONENTS="$COMPONENTS"',
+        "AREAS=none",
+        'GO_TEST_SHARD="$GO_TEST_SHARD"',
+    ]
+    [coverage] = _make_args("test-server-coverage")
+    assert coverage == ["-o", "test", "coverage", 'COMPONENTS="$COMPONENTS"', "AREAS=none"]
+    [step] = [s for s in _jobs()["test-server-coverage"]["steps"] if "make " in str(s.get("run"))]
+    assert step["env"]["COMPONENTS"] == "server"
+    # The contract tests G7 run beside the shards, not after them.
+    assert _make_args("test-server-contract") == [
+        ["contract-test", 'COMPONENTS="$COMPONENTS"', "AREAS=none"]
+    ]
 
 
 @pytest.mark.parametrize(("job", "components"), sorted(COMPONENT_TESTS.items()))
@@ -124,7 +151,8 @@ def test_repository_gates_follow_the_plan(job: str) -> None:
     assert step["env"]["COMPONENTS"] == "${{ needs.plan.outputs.components }}"
 
 
-@pytest.mark.parametrize("job", GATE_JOBS)
+# test-server-coverage only merges profiles and reads them with `go tool cover`.
+@pytest.mark.parametrize("job", sorted(set(GATE_JOBS) - {"test-server-coverage"}))
 def test_gate_jobs_install_every_toolchain_with_caches(job: str) -> None:
     steps = _jobs()[job]["steps"]
 

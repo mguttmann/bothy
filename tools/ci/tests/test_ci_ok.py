@@ -38,6 +38,7 @@ GREEN = {
     "denylist-fork": "skipped",
     "sonar": "success",
     **dict.fromkeys(components.CONDITIONAL_JOBS, "success"),
+    **dict.fromkeys(ci_ok.FOLLOWS, "success"),
 }
 # The results of the `needs` of build-verify-ok in a green run.
 GREEN_BUILD = {
@@ -48,6 +49,7 @@ GREEN_BUILD = {
     "security": "success",
     "denylist": "success",
     **dict.fromkeys(components.CONDITIONAL_JOBS, "success"),
+    **dict.fromkeys(ci_ok.FOLLOWS, "success"),
 }
 
 
@@ -78,6 +80,32 @@ def test_a_skipped_job_passes_only_when_the_plan_left_it_out(
         ran = {**green, job: result}
         assert ci_ok.check_needs(ran, ALL - {job}) == [f"{job}: {result}"]
         assert ci_ok.check_needs(ran, ALL) == [f"{job}: {result}"]
+
+
+@pytest.mark.parametrize("green", [GREEN, GREEN_BUILD])
+def test_a_follower_is_needed_exactly_when_the_plan_needs_its_job(green: dict[str, str]) -> None:
+    """test-server-coverage merges the shards of test-server and test-server-contract runs the
+    contract tests beside them: the plan decides all of them together."""
+    assert ci_ok.FOLLOWS == {
+        "test-server-coverage": "test-server",
+        "test-server-contract": "test-server",
+    }
+    for job in ci_ok.FOLLOWS:
+        every = {**green, "test-server": "skipped", **dict.fromkeys(ci_ok.FOLLOWS, "skipped")}
+        assert ci_ok.check_needs(every, ALL - {"test-server"}) == []
+        alone = {**green, job: "skipped"}
+        assert ci_ok.check_needs(alone, ALL) == [f"{job}: skipped, but the plan needs it"]
+        for result in ("failure", "cancelled"):
+            ran = {**green, job: result}
+            assert ci_ok.check_needs(ran, ALL - {"test-server"}) == [f"{job}: {result}"]
+        missing = {k: v for k, v in green.items() if k != job}
+        assert ci_ok.check_needs(missing, ALL) == [f"{job}: missing"]
+    # A failed shard skips the merge; both fail the run.
+    failed = {**green, "test-server": "failure", "test-server-coverage": "skipped"}
+    assert ci_ok.check_needs(failed, ALL) == [
+        "test-server: failure",
+        "test-server-coverage: skipped, but the plan needs it",
+    ]
 
 
 def test_a_plan_without_conditional_jobs_accepts_their_skips() -> None:
@@ -263,6 +291,7 @@ def test_every_job_of_ci_yml_without_a_fixed_rule_must_succeed() -> None:
     """Only the conditional jobs, sonar and the deny-list pair may end skipped."""
     jobs = set(_load(CI)["jobs"]) - {"ci-ok"}
     lenient = ALL | ci_ok.MAY_SKIP | {j for group in ci_ok.ONE_OF for j in group}
+    lenient |= set(ci_ok.FOLLOWS)
     assert lenient <= jobs
     assert {"sonar"} == ci_ok.MAY_SKIP
     assert (frozenset({"denylist", "denylist-fork"}),) == ci_ok.ONE_OF
@@ -339,7 +368,12 @@ def test_each_conditional_job_runs_exactly_when_the_plan_lists_it(path: Path) ->
     for job in components.CONDITIONAL_JOBS:
         assert workflow[job]["if"] == _condition(job), job
         assert workflow[job]["needs"] == "plan", job
-    others = {job for job, spec in workflow.items() if "if" in spec} - ALL
+    for job, parent in ci_ok.FOLLOWS.items():
+        assert workflow[job]["if"] == _condition(parent), job
+    # The merge needs the shards; the contract tests run beside them.
+    assert workflow["test-server-coverage"]["needs"] == ["plan", "test-server"]
+    assert workflow["test-server-contract"]["needs"] == "plan"
+    others = {job for job, spec in workflow.items() if "if" in spec} - ALL - set(ci_ok.FOLLOWS)
     expected = (
         {"denylist", "denylist-fork", "sonar", "ci-ok"} if path == CI else {"build-verify-ok"}
     )

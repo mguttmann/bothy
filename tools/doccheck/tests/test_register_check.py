@@ -1921,10 +1921,14 @@ def _starts_chromium(call: str) -> bool:
     words = call.split()
     if any(word.startswith("-C") for word in words):
         return False  # another Makefile
-    todo = [w for w in words if not w.startswith("-") and "=" not in w] or [""]
+    # `-o <target>` names a target make treats as up to date and does not run.
+    old = {words[i + 1] for i, w in enumerate(words[:-1]) if w == "-o"}
+    todo = [w for w in words if not w.startswith("-") and "=" not in w and w not in old] or [""]
     seen: set[str] = set()
     while todo:
         target = todo.pop()
+        if target in old:
+            continue
         if target in _CHROMIUM_TARGETS:
             return True
         if target not in seen:
