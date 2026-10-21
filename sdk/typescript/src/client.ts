@@ -69,7 +69,8 @@ export const SDK_VERSION = "0.0.0";
 
 const ID_SEGMENT =
   /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d+)$/i;
-const RANDOM_RANGE = 2 ** 48;
+// `randomInt` takes at most 2^48 - 1 as its exclusive bound.
+const RANDOM_RANGE = 2 ** 48 - 1;
 
 /** Retry options of {@link ApiClientOptions}; each default is a key of {@link SdkSettings}. */
 export interface RetryOptions {

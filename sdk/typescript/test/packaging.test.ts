@@ -11,7 +11,7 @@
  * `invocation`, `gateway`, `webhooks`, `outbox`).
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -68,16 +68,17 @@ function graph(entry: string): { files: string[]; external: string[] } {
 
 /** Whether `spec` names a Node.js built-in module (with or without `node:`). */
 function isBuiltin(spec: string): boolean {
-  return (
-    spec.startsWith("node:") || BUILTINS.has(spec.split("/")[0] ?? spec)
-  );
+  return spec.startsWith("node:") || BUILTINS.has(spec.split("/")[0] ?? spec);
 }
 
 beforeAll(() => {
-  execFileSync("npm", ["run", "--silent", "build"], {
+  const build = spawnSync("npm", ["run", "--silent", "build"], {
     cwd: PACKAGE,
-    stdio: "pipe",
+    encoding: "utf8",
   });
+  // tsc reports its errors on stdout; they name files and types, never data.
+  if (build.status !== 0)
+    throw new Error(`npm run build failed:\n${build.stdout}${build.stderr}`);
 }, 180_000);
 
 describe("package.json", () => {
@@ -125,8 +126,7 @@ describe("entry points", () => {
     );
     const counts = JSON.parse(output) as Record<string, number>;
     expect(Object.keys(counts)).toHaveLength(3);
-    for (const count of Object.values(counts))
-      expect(count).toBeGreaterThan(0);
+    for (const count of Object.values(counts)) expect(count).toBeGreaterThan(0);
   });
 });
 

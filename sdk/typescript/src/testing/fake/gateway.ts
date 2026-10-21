@@ -220,7 +220,10 @@ export class Gateway {
     ws.on("close", (code: number) => {
       stopped = true;
       chain = chain
-        .then(() => this.end(state, state.sentCode ?? code))
+        // A close frame without a status (1005) counts as a drop, as `close_code or 1006` in Python.
+        .then(() =>
+          this.end(state, state.sentCode ?? (code === 1005 ? 1006 : code)),
+        )
         .finally(() => this.sockets.delete(ws));
     });
     ws.on("error", () => undefined);
@@ -332,7 +335,7 @@ export class Gateway {
     send: Send,
     close: Close,
   ): Promise<void> {
-    const consumer = d.consumer ?? "default";
+    const consumer = "consumer" in d ? d.consumer : "default";
     if (
       !hasOnly(d, IDENTIFY) ||
       typeof consumer !== "string" ||

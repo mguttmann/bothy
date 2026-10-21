@@ -12,6 +12,20 @@ documented in this file. The format is based on
 ### Added
 
 - `KNOWN_EVENT_TYPES` lists the personal event `gdpr.request_due` (R-AZ-35).
+- Hand layer of docs/spec/11-erweiterungen.md 11.2 (M2-30) with the behaviour of the Python SDK:
+  `client` (token or DPoP with nonce retry, `sdk.http_timeout`, retries of idempotent requests,
+  deprecation warnings, `bindRun` for `Invocation-Token`), `auth`, `retry`, `errors`, `config`,
+  `pages`, `gateway`, `invocation` (token check and inbox), `runs` (`Adapter`, `RunHandle`,
+  `RunPatcher`, `renderContext`), `components`, `commands`, `outbox`, `heartbeat`.
+- `webhooks`: Standard Webhooks verification of `v1a` and `v1` over the raw body within
+  `webhook.receiver_tolerance`, also for `interactions_url`, proven on every case of
+  `docs/api/webhook-test-vectors.json`.
+- `testing`: FakeServer with faults and restart, `signWebhook`, the shared scenario functions and
+  doubles; live runs of the scenarios against the real server in `test/live/`.
+- Entry points `.`, `./core` (browser-safe) and `./testing`; `npm run build` writes `dist/`.
+- typedoc 0.28.17: `npm run lint` fails on an undocumented export, `npm run docs` writes the
+  reference to `build/reference/`.
+- Dependencies `jose` and `ws`, dev dependencies `typedoc` and `@types/ws`.
 - Generated types `src/generated/openapi.ts` from `docs/api/openapi.yaml` (openapi-typescript
   7.13.0, standard settings).
 - `make generate` and `make generate-check` (gate G4: drift check, `tsc --noEmit` with

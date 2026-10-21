@@ -4,7 +4,8 @@ Status: built (M2-29). Component `testsupport` (M1-05), build tag `sdkserver`: n
 `go test ./...`; `make lint` vets and lints it with the tag.
 
 The real-server tests of the Python SDK (`sdk/python/tests/realserver`) run the scenarios AG-08
-(adapter side), AG-09, AG-12, AG-28 and AZ-P6 against the server of this tree. sdkserver is that
+(adapter side), AG-09, AG-12, AG-28 and AZ-P6 against the server of this tree. The live files of the TypeScript SDK
+(`sdk/typescript/test/live/`, M2-30) drive it the same way over its stdin protocol. sdkserver is that
 server: the test `TestSDKServer` of a test binary, because `pgtest` and the harness need a
 `testing.TB` (brief M2-29 Design note 16).
 

@@ -1331,7 +1331,9 @@ export class World {
       state: body.state,
       last_heartbeat_at: this.nowIso(),
       billing_mode_matches:
-        (body.reported_billing_mode ?? this.billingMode) === this.billingMode,
+        ("reported_billing_mode" in body
+          ? body.reported_billing_mode
+          : this.billingMode) === this.billingMode,
     };
     if ("reported_billing_mode" in body)
       presence.reported_billing_mode =

@@ -34,7 +34,6 @@ def _git_status() -> str:
             str(REPO),
             "status",
             "--porcelain",
-            "--ignored",
             "--untracked-files=all",
             "--",
             "sdk/typescript",

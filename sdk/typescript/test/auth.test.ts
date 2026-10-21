@@ -111,7 +111,9 @@ describe("DpopKey", () => {
     const key = await DpopKey.generate({ path });
     expect(key.alg).toBe("ES256");
     expect(statSync(path).mode & 0o777).toBe(0o600);
-    expect(readFileSync(path, "utf8")).toContain(["BEGIN", "PRIVATE", "KEY"].join(" "));
+    expect(readFileSync(path, "utf8")).toContain(
+      ["BEGIN", "PRIVATE", "KEY"].join(" "),
+    );
     await expect(DpopKey.generate({ path })).rejects.toThrow(/EEXIST|exists/);
     const loaded = await DpopKey.load(path);
     expect(loaded.jkt).toBe(key.jkt);

@@ -113,7 +113,9 @@ and a body with `truncated: true`.
    `webhook.receiver_tolerance`.
 3. Check the signatures: try every signature of the list against the trusted keys; one valid
    signature is enough. Fetch the `v1a` keys once and keep them as a trust list; do not take them
-   from the request [verified, W1]. Compare HMAC in constant time.
+   from the request [verified, W1]. Compare HMAC in constant time. Reload the list after the
+   `max-age` of the response of `getWebhookKeys`; new keys appear in it beforehand as `next`. An
+   incoming request never triggers a reload, so a forged request cannot make the receiver fetch.
 4. Detect duplicates: remember `webhook-id`, at least for the duration of the retries
    (`webhook.retry_max_age`).
 5. Respond quickly with `2xx`, within `webhook.delivery_timeout`
@@ -121,6 +123,10 @@ and a body with `truncated: true`.
 6. Establish the order through `seq` and the object state through `resource.version` (04, 9). If
    `sync_epoch` changes, the instance was restored: discard the state remembered by `seq` and
    continue with the new timeline, otherwise its smaller numbers would count as old.
+
+The TypeScript SDK verifies these steps 1 to 3 for apps, also for requests to `interactions_url`
+(`verifyWebhook`, `verifyWebhookRequest` and `WebhookKeyCache` in `sdk/typescript/src/webhooks/`,
+M2-30); step 4 stays the app's duty.
 
 ## 4. Retries and disabling
 

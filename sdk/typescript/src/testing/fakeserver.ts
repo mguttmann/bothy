@@ -74,7 +74,7 @@ import type {
 } from "./scenario-server.js";
 import { signWebhook, webhookPublicKey } from "./webhooks.js";
 
-export type { TimingKey, Timings } from "./fake/base.js";
+export { TIMING_KEYS, type TimingKey, type Timings } from "./fake/base.js";
 
 type S = components["schemas"];
 
@@ -285,7 +285,7 @@ export class FakeServer implements ScenarioServer {
     [string, Answer | undefined]
   >();
   private readonly fixedTokens = new Map<number, string>();
-  private readonly tasks = new AbortController();
+  private tasks = new AbortController();
   private readonly webhookSeed = new Uint8Array(randomBytes(32));
   private server: Server | undefined;
 
@@ -422,6 +422,7 @@ export class FakeServer implements ScenarioServer {
    * @returns A promise that resolves when the server listens.
    */
   async start(): Promise<void> {
+    this.tasks = new AbortController();
     const server = createServer((request, response) => {
       void this.http(request, response);
     });

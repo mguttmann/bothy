@@ -22,7 +22,9 @@ import { WebSocket } from "ws";
 import { Secret } from "../src/auth/secret.js";
 import type { components } from "../src/generated/openapi.js";
 import { uuidv7 } from "../src/ids.js";
+import { FakeProblem } from "../src/testing/fake/base.js";
 import { FIXTURES } from "../src/testing/fake/fixtures.js";
+import { applyOps, parseOps } from "../src/testing/fake/patch.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
 import { Fault, FaultKind } from "../src/testing/faults.js";
 import type { ScenarioServer } from "../src/testing/scenario-server.js";
@@ -1338,6 +1340,15 @@ describe("gateway sessions", () => {
     second.close();
   });
 
+  it("keeps a session resumable after a client close without a status code", async () => {
+    const first = await connect(fake, "c8");
+    first.ws.close();
+    expect(await first.closeCode()).toBe(1005);
+    const again = await resume(fake, first.sessionId);
+    expect((await again.recv()).op).toBe("resumed");
+    again.close();
+  });
+
   it("continues a dropped session with resume", async () => {
     const first = await connect(fake, "c3");
     fake.inject("heartbeat", Fault.disconnect());
@@ -1554,4 +1565,537 @@ describe("records, deprecation, settings, webhooks", () => {
       "run_context",
     ]);
   });
+});
+
+// Every case with the answer the Python FakeServer's `parse_ops` and `apply_ops` gave for it
+// (`excerpt_max` 5, a fixed time): the path table of 09 5.3 answers alike in both SDKs.
+const PATCH_CASES: readonly {
+  ops: unknown;
+  errors?: unknown;
+  box?: unknown;
+}[] = [
+  {
+    ops: [{ op: "add", path: "/status_line", value: "a\u0007b" }],
+    errors: [{ pointer: "/ops/0/value", code: "control_character" }],
+  },
+  {
+    ops: [{ op: "add", path: "/status_line", value: "a\u202eb" }],
+    errors: [{ pointer: "/ops/0/value", code: "bidi_control" }],
+  },
+  {
+    ops: [{ op: "remove", path: "/status_line" }],
+    box: { metrics: {}, steps: {} },
+  },
+  {
+    ops: [{ op: "add", path: "/last_text_excerpt", value: "abcdefgh" }],
+    box: { metrics: {}, steps: {}, last_text_excerpt: "defgh" },
+  },
+  {
+    ops: [{ op: "remove", path: "/last_text_excerpt" }],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  {
+    ops: [{ op: "replace", path: "/model", value: 5 }],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_type" }],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/cost",
+        value: {
+          amount_micros: 1.5,
+          currency: "EUR",
+          is_estimate: false,
+          extra: 1,
+        },
+      },
+    ],
+    errors: [
+      { pointer: "/ops/0/value/extra", code: "unknown_member" },
+      { pointer: "/ops/0/value/amount_micros", code: "invalid_type" },
+      { pointer: "/ops/0/value/is_estimate", code: "invalid" },
+    ],
+  },
+  {
+    ops: [{ op: "replace", path: "/cost", value: {} }],
+    errors: [
+      { pointer: "/ops/0/value/amount_micros", code: "required" },
+      { pointer: "/ops/0/value/currency", code: "required" },
+      { pointer: "/ops/0/value/is_estimate", code: "required" },
+    ],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/cost",
+        value: { amount_micros: 12, currency: "EUR", is_estimate: true },
+      },
+    ],
+    box: {
+      metrics: {},
+      steps: {},
+      cost: { amount_micros: 12, currency: "EUR", is_estimate: true },
+    },
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/plan",
+        value: {
+          items: [
+            { id: "a", text: "One", status: "pending" },
+            { id: "a", text: "x\u0001", status: "done" },
+            5,
+            {},
+          ],
+        },
+      },
+    ],
+    errors: [
+      { pointer: "/ops/0/value/items/1/id", code: "invalid" },
+      { pointer: "/ops/0/value/items/1/text", code: "control_character" },
+      { pointer: "/ops/0/value/items/1/status", code: "invalid_enum" },
+      { pointer: "/ops/0/value/items/2", code: "invalid_type" },
+      { pointer: "/ops/0/value/items/3/id", code: "required" },
+      { pointer: "/ops/0/value/items/3/text", code: "required" },
+      { pointer: "/ops/0/value/items/3/status", code: "required" },
+    ],
+  },
+  {
+    ops: [{ op: "add", path: "/plan", value: { items: [] } }],
+    box: { metrics: {}, steps: {} },
+  },
+  {
+    ops: [{ op: "add", path: "/plan", value: [] }],
+    errors: [{ pointer: "/ops/0/value/items", code: "invalid_type" }],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/plan",
+        value: { items: [{ id: "a", text: "One", status: "pending" }] },
+      },
+    ],
+    box: {
+      metrics: {},
+      steps: {},
+      plan: { items: [{ id: "a", text: "One", status: "pending" }] },
+    },
+  },
+  { ops: [{ op: "remove", path: "/plan" }], box: { metrics: {}, steps: {} } },
+  {
+    ops: [{ op: "add", path: "/metrics/context_pct", value: 101 }],
+    errors: [{ pointer: "/ops/0/value", code: "too_large" }],
+  },
+  {
+    ops: [{ op: "add", path: "/metrics/context_pct", value: -1 }],
+    errors: [{ pointer: "/ops/0/value", code: "too_small" }],
+  },
+  {
+    ops: [{ op: "add", path: "/metrics/context_pct", value: "x" }],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_type" }],
+  },
+  {
+    ops: [{ op: "add", path: "/metrics/tokens_in", value: 1.5 }],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_type" }],
+  },
+  {
+    ops: [{ op: "add", path: "/metrics/tokens_in", value: 9007199254740992 }],
+    errors: [{ pointer: "/ops/0/value", code: "too_large" }],
+  },
+  {
+    ops: [{ op: "add", path: "/metrics/tokens_in", value: 7 }],
+    box: { metrics: { tokens_in: 7 }, steps: {} },
+  },
+  {
+    ops: [{ op: "remove", path: "/metrics/tokens_in" }],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  {
+    ops: [{ op: "add", path: "/metrics/other", value: 7 }],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/metrics/last_api_retry",
+        value: { max_retries: 1.5, error: "e\u0002", x: 1 },
+      },
+    ],
+    errors: [
+      { pointer: "/ops/0/value/x", code: "unknown_member" },
+      { pointer: "/ops/0/value/attempt", code: "required" },
+      { pointer: "/ops/0/value/max_retries", code: "invalid_type" },
+      { pointer: "/ops/0/value/error", code: "control_character" },
+    ],
+  },
+  {
+    ops: [{ op: "add", path: "/metrics/last_api_retry", value: 5 }],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_type" }],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/metrics/last_api_retry",
+        value: { attempt: 2, error: "timeout" },
+      },
+    ],
+    box: {
+      metrics: { last_api_retry: { attempt: 2, error: "timeout" } },
+      steps: {},
+    },
+  },
+  {
+    ops: [{ op: "remove", path: "/metrics/last_api_retry" }],
+    box: { metrics: {}, steps: {} },
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd",
+        value: {
+          id: "01900000-0000-7000-8000-00000000abce",
+          kind: "nope",
+          title: "t\u0003",
+          status: "x",
+          detail: [],
+          parent_step_id: "zz",
+          started_at: "yesterday",
+          extra: 1,
+        },
+      },
+    ],
+    errors: [
+      { pointer: "/ops/0/value/extra", code: "unknown_member" },
+      { pointer: "/ops/0/value/id", code: "invalid" },
+      { pointer: "/ops/0/value/kind", code: "invalid_enum" },
+      { pointer: "/ops/0/value/name", code: "required" },
+      { pointer: "/ops/0/value/title", code: "control_character" },
+      { pointer: "/ops/0/value/status", code: "invalid_enum" },
+      { pointer: "/ops/0/value/detail", code: "invalid_type" },
+      { pointer: "/ops/0/value/parent_step_id", code: "invalid_format" },
+      { pointer: "/ops/0/value/started_at", code: "invalid_format" },
+    ],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd",
+        value: 5,
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_type" }],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd",
+        value: { name: "n" },
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value/kind", code: "required" }],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd",
+        value: {
+          kind: "status",
+          name: "n",
+          parent_step_id: "01900000-0000-7000-8000-00000000abce",
+        },
+      },
+    ],
+    errors: [
+      { pointer: "/ops/0/value/parent_step_id", code: "patch_target_missing" },
+    ],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd",
+        value: {
+          kind: "status",
+          name: "n",
+          started_at: "2026-01-01T00:00:00Z",
+          finished_at: "2026-01-01T00:00:01.5+00:00",
+        },
+      },
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abce",
+        value: {
+          kind: "tool_call",
+          name: "m",
+          parent_step_id: "01900000-0000-7000-8000-00000000abcd",
+          title: "T",
+          status: "pending",
+          detail: { a: 1 },
+        },
+      },
+    ],
+    box: {
+      metrics: {},
+      steps: {
+        "01900000-0000-7000-8000-00000000abcd": {
+          id: "01900000-0000-7000-8000-00000000abcd",
+          ordinal: 1,
+          kind: "status",
+          name: "n",
+          title: "",
+          status: "running",
+          detail: {},
+          started_at: "2026-01-01T00:00:00Z",
+          finished_at: "2026-01-01T00:00:01.5+00:00",
+        },
+        "01900000-0000-7000-8000-00000000abce": {
+          id: "01900000-0000-7000-8000-00000000abce",
+          ordinal: 2,
+          kind: "tool_call",
+          name: "m",
+          title: "T",
+          status: "pending",
+          detail: { a: 1 },
+          started_at: "2026-01-01T00:00:00.000Z",
+          parent_step_id: "01900000-0000-7000-8000-00000000abcd",
+        },
+      },
+    },
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd",
+        value: { kind: "status", name: "n" },
+      },
+      {
+        op: "add",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd",
+        value: { kind: "status", name: "n" },
+      },
+    ],
+    errors: [{ pointer: "/ops/1", code: "patch_target_exists" }],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd/status",
+        value: "bogus",
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_enum" }],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd/title",
+        value: "a\u0085",
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value", code: "control_character" }],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd/detail",
+        value: "x",
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_type" }],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd/finished_at",
+        value: "2026-01-01",
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_format" }],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/steps/01900000-0000-7000-8000-00000000abcd/name",
+        value: "x",
+      },
+    ],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  {
+    ops: [
+      { op: "remove", path: "/steps/01900000-0000-7000-8000-00000000abcd" },
+    ],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/followups/01900000-0000-7000-8000-00000000abcd/state",
+        value: "delivered",
+      },
+    ],
+    errors: [{ pointer: "/ops/0", code: "patch_target_missing" }],
+  },
+  {
+    ops: [
+      {
+        op: "replace",
+        path: "/followups/01900000-0000-7000-8000-00000000abcd/state",
+        value: "other",
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_enum" }],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/followups/01900000-0000-7000-8000-00000000abcd/state",
+        value: "delivered",
+      },
+    ],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  {
+    ops: [{ op: "add", path: "/steps/not-a-uuid", value: {} }],
+    errors: [{ pointer: "/ops/0/path", code: "invalid_format" }],
+  },
+  {
+    ops: [{ op: "add", path: "status_line", value: "x" }],
+    errors: [{ pointer: "/ops/0/path", code: "invalid_format" }],
+  },
+  {
+    ops: [{ op: "add", path: "/a~2b", value: "x" }],
+    errors: [{ pointer: "/ops/0/path", code: "invalid_format" }],
+  },
+  {
+    ops: [{ op: "move", path: "/status_line" }],
+    errors: [{ pointer: "/ops/0/op", code: "invalid_enum" }],
+  },
+  {
+    ops: [5, { op: "add" }],
+    errors: [
+      { pointer: "/ops/0", code: "invalid_type" },
+      { pointer: "/ops/1", code: "invalid_type" },
+    ],
+  },
+  {
+    ops: [{ op: "add", path: "/status_line" }],
+    errors: [{ pointer: "/ops/0/value", code: "required" }],
+  },
+  {
+    ops: [{ op: "add", path: "/status_line", value: null }],
+    errors: [{ pointer: "/ops/0/value", code: "invalid_type" }],
+  },
+  {
+    ops: [
+      {
+        op: "add",
+        path: "/plan",
+        value: { items: [{ id: "a", text: null, status: "pending" }] },
+      },
+    ],
+    errors: [{ pointer: "/ops/0/value/items/0/text", code: "invalid_type" }],
+  },
+  {
+    ops: [{ op: "add", path: "", value: {} }],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  {
+    ops: [
+      { op: "add", path: "/metrics~1last_api_retry", value: { attempt: 1 } },
+    ],
+    errors: [
+      {
+        pointer: "/ops/0",
+        code: "patch_path_forbidden",
+        detail: "this path is not patchable with this operation",
+      },
+    ],
+  },
+  { ops: "not-a-list", errors: [{ pointer: "/ops", code: "invalid_type" }] },
+];
+
+describe("patch table parity with the Python FakeServer", () => {
+  it.each(PATCH_CASES.map((c, i) => [i, c] as const))(
+    "case %i",
+    (_index, c) => {
+      let got: unknown;
+      try {
+        const parsed = parseOps(c.ops);
+        got = {
+          box: applyOps({ metrics: {}, steps: {} }, parsed, {
+            nowIso: () => "2026-01-01T00:00:00.000Z",
+            excerptMax: 5,
+          }),
+        };
+      } catch (error) {
+        if (!(error instanceof FakeProblem)) throw error;
+        got = { errors: error.errors };
+      }
+      expect(got).toEqual(
+        c.errors !== undefined ? { errors: c.errors } : { box: c.box },
+      );
+    },
+  );
 });

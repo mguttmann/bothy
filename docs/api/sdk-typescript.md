@@ -46,7 +46,7 @@ name is decided (OQ-17).
 | `pages` | Iterator over `next_cursor` pages. |
 | `gateway` | Gateway consumer (`hello`, `identify`, `resume`, heartbeat, reconnect per close code) and the polling consumer. |
 | `invocation` | Check of the invocation token with the JWKS cache, the `jti` store and the inbox. |
-| `runs` | The agent loop, the run handle, the run patcher and `renderContext` with trust marks. |
+| `runs` | The agent loop `Adapter`, the run handle, the run patcher and `renderContext` with trust marks. |
 | `components` | Builders of buttons, selects, forms, approval cards and questions within the component limits. |
 | `commands` | Declared commands reconciled on connect, autocomplete with a guard against late answers. |
 | `outbox` | Messages and writes stored before sending, resent with the same `client_msg_id` or `Idempotency-Key`. |
@@ -105,8 +105,8 @@ the app keeps the IDs it has seen for `webhook.retry_max_age` in its own storage
 gateway. It models the server rules the SDK depends on (agents and API tokens with DPoP, consumer
 cursors with acknowledgement and redelivery, a fresh invocation token per delivery, the run
 operations with their answers, patches with the path table and `base_version`) and injects
-faults per operation (`store_then_502`, `store_late`, `rate_limit`, `drop_connection`, a
-restart). `signWebhook` builds the `webhook-signature` value of a delivery for an app's own
+faults per operation (`stored_then_502`, `stored_late`, `rate_limited` and `disconnect`, the
+names of the Python FakeServer) and restarts on the same state. `signWebhook` builds the `webhook-signature` value of a delivery for an app's own
 tests.
 
 ## Live runs against the real server
