@@ -93,9 +93,10 @@ func SessionUserRemove(t Target, name string, configured []string) ([]Step, erro
 	case hostos.Darwin:
 		label := hostos.HelperServiceName(hostos.Darwin, name)
 		// SIGTERM is no crash, so KeepAlive {Crashed: true} does not start it again before the
-		// kickstart of Restart.
+		// kickstart of Restart. The kill is tolerant: a host service that is not running (a
+		// refused start exits 78 and stays down) has no process to signal, and launchctl exits 3.
 		steps = append(steps,
-			run("/bin/launchctl", "kill", "SIGTERM", "system/bothy-host"),
+			Step{Kind: KindRunTolerant, Argv: []string{"/bin/launchctl", "kill", "SIGTERM", "system/bothy-host"}},
 			run("/bin/launchctl", "bootout", "system/"+label),
 			Step{Kind: KindRemove, Path: filepath.Join(LaunchDaemonsDir, label+".plist")},
 			Step{Kind: KindChmod, Path: "~" + name, Mode: 0o700, Owner: name})
