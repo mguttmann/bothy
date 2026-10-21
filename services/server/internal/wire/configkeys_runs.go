@@ -9,7 +9,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // detail of the adapter_reason step is cut (D-M2-05-8); and from 09 section 21 the largest age of
 // a queued run (M2-08) and the window of a run without heartbeat (M2-09); the limits of the
 // components of cards from 03 and 09 section 21 (M2-15); the length of last_text_excerpt and the
-// number of stored steps of a live-box patch (M2-10).
+// number of stored steps of a live-box patch (M2-10); the byte bounds of the run
+// context (M2-13).
 func runsConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: "run.step_detail_max_bytes", Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: chapter03,
@@ -23,6 +24,12 @@ func runsConfigKeys() []config.Key {
 		// M2-08: a run nobody starts within this age fails with agent_unavailable (09 5.5, D-AG-16).
 		{Name: "run.queued_max_age", Kind: config.KindDuration, Default: "48h", Min: "1s", Chapter: chapter09,
 			Doc: "How old a run that was not started may become; then it fails with agent_unavailable."},
+		// M2-13: the byte bounds of the run context (09 4.6 and 21; AG-21): per element, and the
+		// sum of thread_context and channel_context without the triggering message.
+		{Name: "agent.context_max_bytes", Kind: config.KindInt, Default: "262144", Min: "1", Chapter: chapter09,
+			Doc: "Sum of the contents in a run context without the triggering message, in bytes; older elements are dropped first."},
+		{Name: "agent.context_message_max_bytes", Kind: config.KindInt, Default: "32768", Min: "1", Chapter: chapter09,
+			Doc: "Content of one run-context element in bytes; a longer content is cut at a UTF-8 boundary with truncated true."},
 		// M2-09: a started run whose agent sends no heartbeat this long fails with stale (09 5.5).
 		{Name: keyOrphanTimeout, Kind: config.KindDuration, Default: "15m", Min: minDeadline, Chapter: chapter09,
 			Doc: "Without a heartbeat for this long while a run is active, the run fails with stale."},

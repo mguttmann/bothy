@@ -52,7 +52,9 @@ func TestClassify(t *testing.T) {
 // context (ruling D-M2-13-5).
 func TestPlanContext(t *testing.T) {
 	t.Parallel()
-	inT := func(seq int64) domain.EarlierRun { return domain.EarlierRun{HasTrigger: true, TriggerInThread: true, TriggerSeq: seq} }
+	inT := func(seq int64) domain.EarlierRun {
+		return domain.EarlierRun{HasTrigger: true, TriggerInThread: true, TriggerSeq: seq}
+	}
 	cases := []struct {
 		name string
 		f    domain.PlanFacts
@@ -98,10 +100,10 @@ func TestCutContent(t *testing.T) {
 		{"abc", 4, "abc", false},
 		{"abcd", 4, "abcd", false},
 		{"abcde", 4, "abcd", true},
-		{"abé", 3, "ab", true},         // é is two bytes: 'a','b' then 0xC3 0xA9
-		{"a€b", 3, "a", true},          // € is three bytes and does not fit after 'a'
-		{"a€b", 4, "a€", true},    // it fits exactly
-		{"\U0001F600", 3, "", true},         // a four-byte rune never splits
+		{"abé", 3, "ab", true},      // é is two bytes: 'a','b' then 0xC3 0xA9
+		{"a€b", 3, "a", true},       // € is three bytes and does not fit after 'a'
+		{"a€b", 4, "a€", true},      // it fits exactly
+		{"\U0001F600", 3, "", true}, // a four-byte rune never splits
 		{"", 0, "", false},
 		{"x", 0, "", true},
 	}

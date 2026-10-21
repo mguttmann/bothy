@@ -666,6 +666,9 @@ type ServerInterface interface {
 	// CancelRun Cancel a run
 	// (POST /runs/{run_id}/cancel)
 	CancelRun(w http.ResponseWriter, r *http.Request, runId RunIdPath, params CancelRunParams)
+	// GetRunContext Load the context of an own active run
+	// (GET /runs/{run_id}/context)
+	GetRunContext(w http.ResponseWriter, r *http.Request, runId RunIdPath)
 	// FinishRun End a run
 	// (POST /runs/{run_id}/finish)
 	FinishRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
@@ -9037,6 +9040,32 @@ func (siw *ServerInterfaceWrapper) CancelRun(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetRunContext operation middleware
+func (siw *ServerInterfaceWrapper) GetRunContext(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRunContext(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // FinishRun operation middleware
 func (siw *ServerInterfaceWrapper) FinishRun(w http.ResponseWriter, r *http.Request) {
 
@@ -12381,6 +12410,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/runs/{run_id}", wrapper.PatchRun)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}/steps", wrapper.ListRunSteps)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}/context", wrapper.GetRunContext)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/start", wrapper.StartRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/resume", wrapper.ResumeRun)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/invocation-token", wrapper.RenewInvocationToken)
@@ -13271,6 +13301,9 @@ type StrictServerInterface interface {
 	// CancelRun Cancel a run
 	// (POST /runs/{run_id}/cancel)
 	CancelRun(ctx context.Context, request CancelRunRequestObject) (CancelRunResponseObject, error)
+	// GetRunContext Load the context of an own active run
+	// (GET /runs/{run_id}/context)
+	GetRunContext(ctx context.Context, request GetRunContextRequestObject) (GetRunContextResponseObject, error)
 	// FinishRun End a run
 	// (POST /runs/{run_id}/finish)
 	FinishRun(ctx context.Context, request FinishRunRequestObject) (FinishRunResponseObject, error)
@@ -19920,6 +19953,32 @@ func (sh *strictHandler) CancelRun(w http.ResponseWriter, r *http.Request, runId
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CancelRunResponseObject); ok {
 		if err := validResponse.VisitCancelRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRunContext operation middleware
+func (sh *strictHandler) GetRunContext(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request GetRunContextRequestObject
+
+	request.RunId = runId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRunContext(ctx, request.(GetRunContextRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRunContext")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRunContextResponseObject); ok {
+		if err := validResponse.VisitGetRunContextResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

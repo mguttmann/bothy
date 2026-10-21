@@ -37,8 +37,9 @@ import (
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
 // run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
 // agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars, and for
-// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, and for M3-07
-// file.invocation_hold_max). The error names the key whose binding failed, never a value.
+// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, for M3-07
+// file.invocation_hold_max, and for M2-13 agent.context_max_bytes and
+// agent.context_message_max_bytes). The error names the key whose binding failed, never a value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -183,8 +184,10 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
 		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions, Costs: d.Costs,
-		Files: d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
+		ContextRows: repo,
+		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
 	}
+	withContext(&deps, az, d)
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
 		return nil, err
@@ -232,6 +235,23 @@ func componentDeps(deps *runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*ru
 	}
 	deps.Components, deps.Cards, deps.ThreadLocks, deps.ComponentExpiry = repo, d.Cards, d.ThreadLocks, d.ComponentExpiry
 	return sched, nil
+}
+
+// withContext adds the collaborators of the run context to deps (M2-13): the context reads of the
+// messaging use cases behind d.Messages, the TriggerHolders of the authz Authorizer az (02 section
+// 4.5, kernel/authorize) and the current-session read of the agent sessions d.Sessions. Each is
+// taken from the value the process already wires, so no second instance exists; a collaborator
+// that does not implement its port stays nil and getRunContext answers internal_error.
+func withContext(out *runsapp.Deps, az authorize.Authorizer, d RunsDeps) {
+	if cm, ok := d.Messages.(runsapp.ContextMessages); ok {
+		out.ContextMessages = cm
+	}
+	if th, ok := az.(authorize.TriggerHolders); ok {
+		out.TriggerHolders = th
+	}
+	if cs, ok := d.Sessions.(agents.CurrentSessions); ok {
+		out.CurrentSessions = cs
+	}
 }
 
 // stepMetrics returns m as the counter of bothy.run.steps when it is one (runs/adapters/otelmetrics

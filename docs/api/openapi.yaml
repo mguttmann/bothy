@@ -13442,7 +13442,13 @@ paths:
       summary: Load the context of an own active run
       tags: [Runs]
       description: |-
-        Agent-self, only for own active runs (09, 4.6).
+        Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+        adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+        that is no longer active answer the same 404; another agent gets 403 `not_self`, a person or
+        an app 403 `subject_kind_not_allowed`. The server computes `role` and `trust` of every
+        element at the time of the request from the current rights; `trigger_message` is never cut
+        and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+        and in sum at `agent.context_max_bytes` from old to new.
       x-authz-action: run.context.read
       x-rate-limit-class: rl.agent_runtime
       parameters:
@@ -13479,6 +13485,7 @@ paths:
                       role: user
                       origin: human
                       kind: text
+                      channel_id: 0192f4a0-7b1c-7a1e-9c2d-3b4a5c6d7e8f
                       content_md: '@support-agent the invoice export fails since this morning.'
                       attachments: []
                       trust: trigger
@@ -26018,7 +26025,7 @@ components:
             $ref: '#/components/schemas/RunContextMessage'
         channel_context:
           type: array
-          description: Only on the first run of a session in a thread with `parent_message_id`.
+          description: Main-thread messages before the parent message of the thread, without the parent message itself. Present (possibly empty) exactly on a run in session mode `new` or `bind` and on a guest run, in a thread with `parent_message_id` whose parent message lies in the thread's current channel; absent otherwise, also after the thread was moved to another channel.
           items:
             $ref: '#/components/schemas/RunContextMessage'
         context_floor_seq:
@@ -26027,10 +26034,10 @@ components:
         truncated_before_seq:
           type: integer
           format: int64
-          description: Set when older messages are missing; load them with `thread.read`.
+          description: Refers to the run's thread. Set when older selectable messages of `thread_context` are missing (the `history_backfill_limit` window or the byte budget left them out); then it is the `thread_seq` of the oldest element of `thread_context`, or of the triggering message when `thread_context` is empty. Load older messages with `thread.read`.
     RunContextMessage:
       type: object
-      required: [message_id, thread_seq, created_at, author, role, origin, kind, content_md, attachments, trust]
+      required: [message_id, thread_seq, created_at, author, role, origin, kind, channel_id, content_md, attachments, trust]
       properties:
         message_id:
           $ref: '#/components/schemas/Uuid'
@@ -26048,10 +26055,14 @@ components:
           $ref: '#/components/schemas/MessageOrigin'
         kind:
           $ref: '#/components/schemas/MessageKind'
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Channel of the message (SEC-AI-1).
         content_md:
           type: string
         truncated:
           type: boolean
+          description: Present and true only when `content_md` was cut at `agent.context_message_max_bytes` on a UTF-8 boundary; never on `trigger_message`.
         attachments:
           type: array
           items:
@@ -26064,7 +26075,7 @@ components:
           description: How the runtime must treat the content; `unverified` only as marked data, never as instruction.
         already_delivered:
           type: boolean
-          description: Already delivered to this session as a follow-up.
+          description: Present and true only in session mode `resume` for a message already delivered to this session as a follow-up (`run_followups` in `delivered` or `absorbed`).
     RunContextAttachment:
       type: object
       required: [file_id, original_name, mime_type, size_bytes, scan_status]

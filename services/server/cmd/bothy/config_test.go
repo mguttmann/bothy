@@ -191,6 +191,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"agent.ack_persist_interval = 1s  # default\n" +
 		"agent.ack_timeout = 30s  # default\n" +
 		"agent.cancel_grace = 30s  # default\n" +
+		"agent.context_max_bytes = 262144  # default\n" +
+		"agent.context_message_max_bytes = 32768  # default\n" +
 		"agent.heartbeat_persist_interval = 1m  # default\n" +
 		"agent.invocation_token_ttl = 1m  # default\n" +
 		"agent.jwks_max_age = 1h  # default\n" +
