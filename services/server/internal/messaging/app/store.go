@@ -73,6 +73,14 @@ type Store interface {
 	// (07 section 7.4 rule 1): a message outside them reads like a missing one; they read with
 	// VisibleMessage above (INT-W22/4).
 
+	// LockCard reads the message id without a visibility predicate and locks its row until the
+	// end of the unit of work (M2-15, Messages.LockCard): runs authorized the change on the card's
+	// path before, or a job or the end of a run names the card.
+	LockCard(ctx context.Context, id ids.ID) (m domain.Message, found bool, err error)
+	// RaiseVersion raises the version of the locked message id by one and returns the row
+	// (M2-15, Messages.ComponentsChanged).
+	RaiseVersion(ctx context.Context, id ids.ID) (domain.Message, error)
+
 	// LockMessage reads the message id like VisibleMessage and locks its row until the end of
 	// the unit of work.
 	LockMessage(ctx context.Context, id ids.ID, visible []ids.ID) (m domain.Message, found bool, err error)

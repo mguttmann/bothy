@@ -152,3 +152,9 @@ func (s *Service) TriggerMessageOf(ctx context.Context, messageID ids.ID) (messa
 		MentionedIDs: mentions, TriggerState: m.TriggerState, TriggerStateReason: m.TriggerStateReason,
 	}, nil
 }
+
+// PrincipalOf implements messaging.Messages (M2-15): the PrincipalRef of a principal as the author
+// of a message shows it, without an authorization; runs puts it into agent.invocation.
+func (s *Service) PrincipalOf(ctx context.Context, principalID ids.ID) (messaging.PrincipalRef, error) {
+	return s.author(ctx, principalID)
+}

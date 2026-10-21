@@ -117,8 +117,8 @@ type PrincipalRef struct {
 	AvatarFileID ids.ID
 }
 
-// Message is a message as the API shows it (schema Message) without attachments and components,
-// which later tickets add. Zero values are absent members. It is the one message DTO of the port
+// Message is a message as the API shows it (schema Message) without attachments, which M3-07
+// adds. Zero values are absent members. It is the one message DTO of the port
 // (the MessageView of brief M1-57): Create, CreateThread, History and Get return it. A deleted
 // message is a tombstone: empty content, no mentions, no reactions, not pinned, DeletedAt set.
 type Message struct {
@@ -152,8 +152,11 @@ type Message struct {
 	// never nil. Only REST responses carry them, never events (schema Message).
 	MyReactions []string
 	// Pinned reports a pin of the message.
-	Pinned  bool
-	Version int64
+	Pinned bool
+	// Components are the components of a card in position order, read through ComponentReader
+	// (M2-15); never nil. A tombstone has none.
+	Components []Component
+	Version    int64
 	// EditedAt and DeletedAt are zero while not edited or deleted.
 	EditedAt, DeletedAt, CreatedAt time.Time
 }
@@ -168,10 +171,12 @@ type CreateMessageCmd struct {
 	ContentMD *string
 	// ReplyToID is the quoted message; nil for none.
 	ReplyToID *ids.ID
-	// AttachmentIDs, Components and RunID are refused in M1 (brief D2) when not empty.
+	// AttachmentIDs are refused until M3-07 (brief D2) when not empty.
 	AttachmentIDs []ids.ID
-	Components    int
-	RunID         *ids.ID
+	// Components are the members of components in request order; nil when absent (M2-15).
+	Components []ComponentInput
+	// RunID is run_id; accepted only with kind card (M2-15), not_enabled otherwise (M2-19).
+	RunID *ids.ID
 	// MentionIDs is the optional check of the resolved set; nil when absent.
 	MentionIDs []ids.ID
 	Silent     bool
@@ -382,4 +387,18 @@ type Messages interface {
 	//
 	//	refs, err := msgs.PrincipalRefs(ctx, []ids.ID{alex})
 	PrincipalRefs(ctx context.Context, principalIDs []ids.ID) (map[ids.ID]PrincipalRef, error)
+	// LockCard locks the row of a card message in the ambient unit of work for runs (M2-15 design
+	// note 2 b) and returns its facts; it never authorizes, runs decided. Errors: internal outside
+	// a unit of work; not_found for an unknown message (a tombstone is returned with Deleted).
+	LockCard(ctx context.Context, messageID ids.ID) (CardFacts, error)
+	// ComponentsChanged raises messages.version of the card by one and appends message.updated
+	// with the representation of the message, its current components included, in the ambient
+	// unit of work (M2-15 design note 2 b; 05 section 6 "component state"). The caller holds the
+	// lock of LockCard. It returns the new version. Errors: internal outside a unit of work or for
+	// a deleted or unknown message.
+	ComponentsChanged(ctx context.Context, messageID ids.ID) (int64, error)
+	// PrincipalOf returns the public reference of a principal the way TriggerMessageOf returns
+	// the author of a message (M2-15 design note 11 c: triggered_by of a run an interaction
+	// opened). It never authorizes. Errors: internal for an unknown principal.
+	PrincipalOf(ctx context.Context, principalID ids.ID) (PrincipalRef, error)
 }

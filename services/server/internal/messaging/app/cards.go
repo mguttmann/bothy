@@ -1,0 +1,256 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app
+
+import (
+	"context"
+	"encoding/json"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
+	"github.com/OWNER/bothy/services/server/internal/messaging/domain"
+)
+
+// The field codes of the card rules (M2-15 design note 6 a).
+const (
+	fieldRequired = "required"
+	fieldTooLong  = "too_long"
+)
+
+// cardRules applies the body rules of a card after the decoder (M2-15 design note 6 a) to the kind
+// of the request and returns whether it is a card: components require kind card, a card requires
+// a component, only agents send cards (people: invalid; apps: not_enabled until M2-25), and
+// run_id is accepted only with kind card (not_enabled otherwise until M2-19).
+func cardRules(a actor.Actor, kind string, cmd messaging.CreateMessageCmd) (bool, error) {
+	card := kind == string(domain.KindCard)
+	switch {
+	case len(cmd.Components) > 0 && !card:
+		return false, cardField("/kind", domain.FieldInvalid, "components need kind card")
+	case card && len(cmd.Components) == 0:
+		return false, cardField("/components", fieldRequired, "a card needs at least one component")
+	case cmd.RunID != nil && !card:
+		return false, domain.NotEnabled("/run_id")
+	}
+	if !card {
+		return false, nil
+	}
+	switch a.Kind {
+	case actor.KindAgent:
+		return true, nil
+	case actor.KindApp:
+		// App components come with M2-25 (R-AZ-18).
+		return false, domain.NotEnabled("/components")
+	case actor.KindUser, actor.KindHost, actor.KindAnonymous:
+	}
+	return false, cardField("/components", domain.FieldInvalid, "only agents send cards")
+}
+
+// cardField is a validation_failed with one field error.
+func cardField(pointer, code, detail string) error {
+	return errs.New(errs.CodeValidationFailed, detail).WithFields(errs.FieldError{Pointer: pointer, Code: code, Detail: detail})
+}
+
+// checkCard checks the components of a card through the source port of runs and the size rule
+// (M2-15 design note 6 a): the message.created payload of the card with every component must fit
+// sync.event_payload_max_bytes even after the content cut of M1-56 D7, because components cannot
+// be cut (04 2.2 rule 2). handles are the mention handles of the content, each of which may become
+// a mention. Errors: 400 validation_failed (not_enabled without the port, the findings of Check,
+// too_long on /components), the errors of the author lookup.
+func (s *Service) checkCard(ctx context.Context, a actor.Actor, cmd messaging.CreateMessageCmd, thread ids.ID, handles []string) (*messaging.CheckedCard, error) {
+	if s.d.Cards == nil {
+		return nil, domain.NotEnabled("/components")
+	}
+	in := messaging.CardInput{AuthorID: a.ID, AuthorKind: string(a.Kind), ThreadID: thread, Components: cmd.Components, Now: s.now()}
+	if cmd.RunID != nil {
+		in.RunID = *cmd.RunID
+	}
+	checked, err := s.d.Cards.Check(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	author, err := s.author(ctx, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !s.cardFits(author, in, checked.Components, len(handles)) {
+		return nil, cardField("/components", fieldTooLong, "the card does not fit sync.event_payload_max_bytes")
+	}
+	return &checked, nil
+}
+
+// cardFits reports whether the message.created payload of a card with the components comps fits
+// sync.event_payload_max_bytes with an empty content (the content cut of M1-56 D7 can shorten
+// everything else): every ID and number of the payload takes its longest form, and every handle
+// of the content counts as a mention.
+func (s *Service) cardFits(author messaging.PrincipalRef, in messaging.CardInput, comps []messaging.Component, mentions int) bool {
+	placeholder := ids.New()
+	now := in.Now
+	m := messaging.Message{
+		ID: placeholder, ThreadID: placeholder, ChannelID: placeholder, ThreadSeq: maxSafeInteger, Author: author, ClientMsgID: placeholder,
+		Origin: string(domain.OriginAgent), Kind: string(domain.KindCard), ContentFormat: domain.ContentFormat, Version: maxSafeInteger,
+		CreatedAt: now, MentionIDs: make([]ids.ID, mentions), Reactions: []messaging.ReactionCount{}, MyReactions: []string{},
+		ContentTruncated: true,
+	}
+	for i := range m.MentionIDs {
+		m.MentionIDs[i] = placeholder
+	}
+	m.Components = make([]messaging.Component, len(comps))
+	for i, c := range comps {
+		c.ID, c.Version = placeholder, maxSafeInteger
+		if !in.RunID.IsZero() {
+			c.RunID = in.RunID
+		}
+		m.Components[i] = c
+	}
+	p, err := payload(messageBody(m))
+	return err == nil && len(p) < s.cfg.EventPayloadMaxBytes
+}
+
+// maxSafeInteger is the largest integer the API carries (2^53 - 1, 06 section 2), the longest
+// form of a sequence or version number in a payload.
+const maxSafeInteger = 1<<53 - 1
+
+// attachComponents fills the components of the live cards of list with one ComponentReader call
+// for the whole list (M2-15 design note 7); every other message, tombstones included, keeps none.
+func (s *Service) attachComponents(ctx context.Context, list []messaging.Message) error {
+	var cards []ids.ID
+	for i := range list {
+		list[i].Components = []messaging.Component{}
+		if list[i].Kind == string(domain.KindCard) && list[i].DeletedAt.IsZero() {
+			cards = append(cards, list[i].ID)
+		}
+	}
+	if len(cards) == 0 || s.d.Components == nil {
+		return nil
+	}
+	got, err := s.d.Components.ForMessages(ctx, cards)
+	if err != nil {
+		return err
+	}
+	for i := range list {
+		if c, ok := got[list[i].ID]; ok && list[i].DeletedAt.IsZero() {
+			list[i].Components = c
+		}
+	}
+	return nil
+}
+
+// LockCard implements messaging.Messages (M2-15 design note 2 b): the row of the card locked in the
+// unit of work of runs, without a visibility predicate (runs authorized on the card's path) and
+// without an authorization. Errors: internal outside a unit of work; not_found for an unknown
+// message.
+func (s *Service) LockCard(ctx context.Context, messageID ids.ID) (messaging.CardFacts, error) {
+	if !txn.InUnit(ctx) {
+		return messaging.CardFacts{}, errs.New(errs.CodeInternalError, "messaging: LockCard runs only inside a unit of work")
+	}
+	m, found, err := s.d.Store.LockCard(ctx, messageID)
+	if err != nil {
+		return messaging.CardFacts{}, err
+	}
+	if !found {
+		return messaging.CardFacts{}, errs.New(errs.CodeNotFound, "")
+	}
+	info, err := s.d.Threads.Info(ctx, m.ThreadID)
+	if err != nil {
+		return messaging.CardFacts{}, err
+	}
+	author, err := s.author(ctx, m.AuthorID)
+	if err != nil {
+		return messaging.CardFacts{}, err
+	}
+	return messaging.CardFacts{
+		MessageID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, SpaceID: info.SpaceID, AuthorID: m.AuthorID,
+		AuthorKind: author.Kind, Kind: string(m.Kind), Deleted: !m.DeletedAt.IsZero(), Version: m.Version,
+	}, nil
+}
+
+// ComponentsChanged implements messaging.Messages (M2-15 design note 2 b): the version of the card
+// locked by LockCard rises by one and message.updated is appended with the stored representation,
+// its components read now (05 section 6 "component state"; one producer of message.updated, 02
+// 4.7). Errors: internal outside a unit of work, for a missing or deleted card.
+func (s *Service) ComponentsChanged(ctx context.Context, messageID ids.ID) (int64, error) {
+	if !txn.InUnit(ctx) {
+		return 0, errs.New(errs.CodeInternalError, "messaging: ComponentsChanged runs only inside a unit of work")
+	}
+	cur, found, err := s.d.Store.Message(ctx, messageID)
+	if err != nil {
+		return 0, err
+	}
+	if !found || !cur.DeletedAt.IsZero() {
+		return 0, errs.New(errs.CodeInternalError, "messaging: a component change of a missing or deleted card")
+	}
+	row, err := s.d.Store.RaiseVersion(ctx, messageID)
+	if err != nil {
+		return 0, err
+	}
+	info, err := s.d.Threads.Info(ctx, row.ThreadID)
+	if err != nil {
+		return 0, err
+	}
+	v, err := s.base(ctx, row)
+	if err != nil {
+		return 0, err
+	}
+	list := []messaging.Message{v}
+	if err := s.decorate(ctx, []ids.ID{row.ChannelID}, list); err != nil {
+		return 0, err
+	}
+	if err := s.emitMessage(ctx, authorize.EventMessageUpdated, info, list[0], false); err != nil {
+		return 0, err
+	}
+	return row.Version, nil
+}
+
+// componentJSON is the schema Component in an event and in a version_conflict body: optional
+// members left out, never null (ADR 0053).
+type componentJSON struct {
+	ID                 string          `json:"id"`
+	CustomID           string          `json:"custom_id"`
+	Type               string          `json:"type"`
+	Definition         json.RawMessage `json:"definition"`
+	Position           int             `json:"position"`
+	SingleUse          bool            `json:"single_use"`
+	RequiredCapability string          `json:"required_capability,omitempty"`
+	RestrictedTo       string          `json:"restricted_to"`
+	RunID              string          `json:"run_id,omitempty"`
+	State              string          `json:"state"`
+	ExpiresAt          string          `json:"expires_at,omitempty"`
+	UsedBy             string          `json:"used_by,omitempty"`
+	UsedAt             string          `json:"used_at,omitempty"`
+	Version            int64           `json:"version"`
+}
+
+// componentsBody converts the components of a message; never nil.
+func componentsBody(list []messaging.Component) []componentJSON {
+	out := make([]componentJSON, 0, len(list))
+	for _, c := range list {
+		def := c.Definition
+		if len(def) == 0 {
+			def = json.RawMessage("{}")
+		}
+		out = append(out, componentJSON{
+			ID: c.ID.String(), CustomID: c.CustomID, Type: c.Type, Definition: def, Position: c.Position, SingleUse: c.SingleUse,
+			RequiredCapability: c.RequiredCapability, RestrictedTo: c.RestrictedTo, RunID: optionalID(c.RunID), State: c.State,
+			ExpiresAt: stamp(c.ExpiresAt), UsedBy: optionalID(c.UsedBy), UsedAt: stamp(c.UsedAt), Version: c.Version,
+		})
+	}
+	return out
+}
+
+// cardPrepared is the card part of a prepared request.
+type cardPrepared struct {
+	checked *messaging.CheckedCard
+}
+
+// attach stores the components of the card row through the source port inside the unit of work
+// and returns them (M2-15 design note 6 b and d).
+func (s *Service) attach(ctx context.Context, row domain.Message, c cardPrepared) ([]messaging.Component, error) {
+	if c.checked == nil {
+		return []messaging.Component{}, nil
+	}
+	return s.d.Cards.Attach(ctx, row.ID, *c.checked)
+}

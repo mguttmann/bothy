@@ -139,8 +139,9 @@ func (s *Service) edit(ctx context.Context, a actor.Actor, c messaging.UpdateCom
 		return messaging.Message{}, err
 	}
 	out := view(updated, cur.Author, mentions)
-	// The row lock serialises reactions and pins with the edit, so those of cur are current.
-	out.Reactions, out.MyReactions, out.Pinned = cur.Reactions, cur.MyReactions, cur.Pinned
+	// The row lock serialises reactions, pins and component changes (runs locks the card through
+	// LockCard, M2-15) with the edit, so those of cur are current.
+	out.Reactions, out.MyReactions, out.Pinned, out.Components = cur.Reactions, cur.MyReactions, cur.Pinned, cur.Components
 	return out, s.emitMessage(ctx, authorize.EventMessageUpdated, info, out, false)
 }
 

@@ -66,9 +66,13 @@ func (s *Service) stored(ctx context.Context, m domain.Message, visible []ids.ID
 }
 
 // decorate fills reactions, my_reactions (for the principal of the request) and pinned of the
-// live messages of list with one statement each for the whole list (brief M1-59 design note 7);
-// a tombstone keeps empty reactions and pinned false.
+// live messages of list with one statement each for the whole list (brief M1-59 design note 7),
+// and the components of the live cards with one ComponentReader call (M2-15 design note 7); a
+// tombstone keeps empty reactions, no components and pinned false.
 func (s *Service) decorate(ctx context.Context, visible []ids.ID, list []messaging.Message) error {
+	if err := s.attachComponents(ctx, list); err != nil {
+		return err
+	}
 	live := make([]ids.ID, 0, len(list))
 	for _, m := range list {
 		if m.DeletedAt.IsZero() {
@@ -110,10 +114,10 @@ func (s *Service) decorate(ctx context.Context, visible []ids.ID, list []messagi
 
 // view converts a row into the port DTO; the mentions are never nil. It is the one representation
 // of a message (brief M1-57 note 6, also for M1-58 and M1-59): a deleted message is a tombstone
-// with empty content, no mentions, no reactions and not pinned, every other field as stored
-// (attachments and components stay empty in the REST and event forms); run_id and the trigger
-// state are not content, so a tombstone keeps them (03 messages, M2-05). Reactions and the pin
-// start empty; decorate fills them for a stored message.
+// with empty content, no mentions, no reactions, no components and not pinned, every other field
+// as stored (attachments stay empty until M3-07); run_id and the trigger state are not content, so
+// a tombstone keeps them (03 messages, M2-05). Reactions, the pin and the components start empty;
+// decorate fills them for a stored message.
 func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) messaging.Message {
 	if mentions == nil || !m.DeletedAt.IsZero() {
 		mentions = []ids.ID{}
@@ -126,7 +130,7 @@ func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) me
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: m.SystemCode, ContentMD: m.ContentMD,
 		ContentFormat: int(m.ContentFormat), ReplyToID: m.ReplyToID, RunID: m.RunID, TriggerState: m.TriggerState,
 		TriggerStateReason: m.TriggerStateReason, TriggerStateAt: m.TriggerStateAt, Silent: m.Silent, MentionIDs: mentions,
-		Reactions: []messaging.ReactionCount{}, MyReactions: []string{}, Version: m.Version,
+		Reactions: []messaging.ReactionCount{}, MyReactions: []string{}, Components: []messaging.Component{}, Version: m.Version,
 		EditedAt: m.EditedAt, DeletedAt: m.DeletedAt, CreatedAt: m.CreatedAt,
 	}
 }
@@ -159,9 +163,9 @@ type reactionCountJSON struct {
 	Count int    `json:"count"`
 }
 
-// messageJSON is the schema Message in an event (brief D7): attachments and components empty, the
-// reaction summary and pinned as decorated (M1-59), never my_reactions, which only REST responses
-// carry. Optional members are left out, never null (ADR 0053).
+// messageJSON is the schema Message in an event (brief D7): attachments empty, the reaction summary,
+// pinned (M1-59) and the components (M2-15) as decorated, never my_reactions, which only REST
+// responses carry. Optional members are left out, never null (ADR 0053).
 type messageJSON struct {
 	ID               string              `json:"id"`
 	ThreadID         string              `json:"thread_id"`
@@ -185,7 +189,7 @@ type messageJSON struct {
 	MentionIDs       []string            `json:"mention_ids"`
 	Reactions        []reactionCountJSON `json:"reactions"`
 	Pinned           bool                `json:"pinned"`
-	Components       []struct{}          `json:"components"`
+	Components       []componentJSON     `json:"components"`
 	Version          int64               `json:"version"`
 	EditedAt         string              `json:"edited_at,omitempty"`
 	DeletedAt        string              `json:"deleted_at,omitempty"`
@@ -211,7 +215,7 @@ func messageBody(m messaging.Message) messageJSON {
 		ClientMsgID: m.ClientMsgID.String(), Origin: m.Origin, Kind: m.Kind, SystemCode: m.SystemCode, ContentMD: m.ContentMD,
 		ContentFormat: m.ContentFormat, ReplyToMessageID: optionalID(m.ReplyToID), RunID: optionalID(m.RunID), TriggerState: m.TriggerState,
 		TriggerStateAt: stamp(m.TriggerStateAt), TriggerReason: m.TriggerStateReason, Silent: m.Silent, Attachments: []struct{}{},
-		MentionIDs: mentions, Reactions: reactions, Pinned: m.Pinned, Components: []struct{}{}, Version: m.Version, EditedAt: stamp(m.EditedAt),
+		MentionIDs: mentions, Reactions: reactions, Pinned: m.Pinned, Components: componentsBody(m.Components), Version: m.Version, EditedAt: stamp(m.EditedAt),
 		DeletedAt: stamp(m.DeletedAt), CreatedAt: stamp(m.CreatedAt),
 	}
 }

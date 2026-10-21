@@ -111,6 +111,13 @@ type Deps struct {
 	Clock clock.Clock
 	// Metrics counts the created messages (bothy.message.created); nil counts nothing.
 	Metrics Metrics
+	// Components reads the components of card messages for every representation (M2-15, the
+	// source port runs implements); nil shows every message without components (a role or a test
+	// without runs).
+	Components messaging.ComponentReader
+	// Cards checks and stores the components of a new card (M2-15, the source port runs
+	// implements); nil answers a card with 400 not_enabled.
+	Cards messaging.ComponentWriter
 }
 
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06

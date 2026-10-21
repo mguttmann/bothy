@@ -16,6 +16,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
@@ -122,7 +123,7 @@ func messageCmd(b rest.MessageCreate) messaging.CreateMessageCmd {
 		cmd.AttachmentIDs = idList(*b.AttachmentFileIds)
 	}
 	if b.Components != nil {
-		cmd.Components = len(*b.Components)
+		cmd.Components = componentInputs(*b.Components)
 	}
 	if b.RunId != nil {
 		r := ids.ID(*b.RunId)
@@ -136,6 +137,58 @@ func messageCmd(b rest.MessageCreate) messaging.CreateMessageCmd {
 	return cmd
 }
 
+// componentInputs converts the members of MessageCreate.components (M2-15); the definition is
+// encoded again from the decoded object, so the source port checks one JSON object per member.
+// Never nil.
+func componentInputs(list []rest.ComponentCreate) []messaging.ComponentInput {
+	out := make([]messaging.ComponentInput, 0, len(list))
+	for _, c := range list {
+		in := messaging.ComponentInput{CustomID: c.CustomId, Type: string(c.Type), SingleUse: c.SingleUse, ExpiresAt: c.ExpiresAt}
+		if c.Definition != nil {
+			// A decoded JSON object always encodes again.
+			in.Definition, _ = json.Marshal(c.Definition)
+		}
+		if c.RequiredCapability != nil {
+			in.RequiredCapability = string(*c.RequiredCapability)
+		}
+		if c.RestrictedTo != nil {
+			in.RestrictedTo = string(*c.RestrictedTo)
+		}
+		out = append(out, in)
+	}
+	return out
+}
+
+// ComponentsREST converts the components of a message (schema Component, M2-15): empty values
+// become absent members, never null (ADR 0053); never nil.
+func ComponentsREST(list []messaging.Component) []rest.Component {
+	out := make([]rest.Component, 0, len(list))
+	for _, c := range list {
+		out = append(out, ComponentREST(c))
+	}
+	return out
+}
+
+// ComponentREST converts one component (schema Component); a definition that does not decode as
+// an object becomes the empty object, which never happens for a stored row (runs checks it).
+func ComponentREST(c messaging.Component) rest.Component {
+	def := rest.JsonObject{}
+	if len(c.Definition) > 0 {
+		_ = json.Unmarshal(c.Definition, &def)
+	}
+	out := rest.Component{
+		Id: rest.Uuid(c.ID), CustomId: c.CustomID, Type: rest.ComponentType(c.Type), Definition: def, Position: c.Position,
+		SingleUse: c.SingleUse, RestrictedTo: rest.ComponentRestriction(c.RestrictedTo), RunId: optionalID(c.RunID),
+		State: rest.ComponentState(c.State), ExpiresAt: optionalTime(c.ExpiresAt), UsedBy: optionalID(c.UsedBy),
+		UsedAt: optionalTime(c.UsedAt), Version: c.Version,
+	}
+	if c.RequiredCapability != "" {
+		rc := rest.Capability(c.RequiredCapability)
+		out.RequiredCapability = &rc
+	}
+	return out
+}
+
 // idList converts a list of ids; never nil.
 func idList(list []rest.Uuid) []ids.ID {
 	out := make([]ids.ID, 0, len(list))
@@ -146,7 +199,8 @@ func idList(list []rest.Uuid) []ids.ID {
 }
 
 // MessageREST converts a message (schema Message): empty values become absent members, never
-// null (ADR 0053), run_id and the trigger state included (M2-05); attachments and components are empty until their tickets (M3-07, M2-15). The
+// null (ADR 0053), run_id and the trigger state included (M2-05), the components of a card included
+// (M2-15); attachments are empty until M3-07. The
 // reaction summary, my_reactions (always present in REST, possibly empty) and pinned come from
 // the message (M1-59).
 func MessageREST(m messaging.Message) rest.Message {
@@ -163,7 +217,7 @@ func MessageREST(m messaging.Message) rest.Message {
 		ClientMsgId: rest.Uuid(m.ClientMsgID), Origin: rest.MessageOrigin(m.Origin), Kind: rest.MessageKind(m.Kind),
 		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageId: optionalID(m.ReplyToID), RunId: optionalID(m.RunID),
 		TriggerStateAt: optionalTime(m.TriggerStateAt), Silent: m.Silent,
-		Attachments: []rest.Attachment{}, MentionIds: mentions, Reactions: reactionsREST(m.Reactions), Components: []rest.Component{},
+		Attachments: []rest.Attachment{}, MentionIds: mentions, Reactions: reactionsREST(m.Reactions), Components: ComponentsREST(m.Components),
 		MyReactions: myReactions(m.MyReactions), Pinned: m.Pinned,
 		Version: m.Version, EditedAt: optionalTime(m.EditedAt), DeletedAt: optionalTime(m.DeletedAt),
 		CreatedAt: m.CreatedAt.UTC().Truncate(time.Millisecond),

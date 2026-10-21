@@ -25,6 +25,10 @@ var visiblePredicateAllowlist = map[string]string{
 	"SetTriggerState": "the trigger state of runs (M2-05, 09 section 6): runs calls it without a reader for a message it " +
 		"accepted or whose run it changed in the same unit of work; it returns the row only to append message.updated, " +
 		"whose receive action message.read sync checks per reader",
+	"LockCardMessage": "the card of a component change (M2-15, Messages.LockCard): runs authorized interaction.create or " +
+		"component.update on the card's path, or a job or the end of a run names the card; it returns facts, no content",
+	"RaiseMessageVersion": "the version of the card LockCardMessage locked in the same unit of work (M2-15, " +
+		"Messages.ComponentsChanged); the row goes only into message.updated, whose receive action message.read sync checks per reader",
 	// The template statements of M1-60 (INT-W22/5): personal templates belong to no channel, and the
 	// writes follow the locked visible read GetVisibleTemplate.
 	"ListPersonalTemplates": "the personal templates of the caller (owner_user_id), which belong to no channel; " +
