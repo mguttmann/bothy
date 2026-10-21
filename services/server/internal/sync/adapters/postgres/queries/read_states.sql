@@ -38,3 +38,14 @@ SELECT * FROM read_states WHERE user_id = sqlc.arg(user_id) AND channel_id = sql
 -- The rows of the person in the given channels (the visible set), for the unread counters of the
 -- snapshot (M1-63).
 SELECT * FROM read_states WHERE user_id = sqlc.arg(user_id) AND channel_id = ANY(sqlc.arg(channel_ids)::uuid[]) ORDER BY thread_id;
+
+-- name: ReadPositionsOfThread :many
+-- The positions of the given people in one thread (primary key (user_id, thread_id)), for the
+-- worker consumer push and the jobs of notify (sync.ReadPositions, M3-19); people without a row
+-- are absent.
+SELECT user_id, last_read_seq FROM read_states WHERE thread_id = sqlc.arg(thread_id) AND user_id = ANY(sqlc.arg(user_ids)::uuid[]);
+
+-- name: ReadPositionsOfUser :many
+-- The positions of one person in the given threads (primary key (user_id, thread_id)), for the
+-- badge of notify (sync.ReadPositions, M3-19); threads without a row are absent.
+SELECT thread_id, last_read_seq FROM read_states WHERE user_id = sqlc.arg(user_id) AND thread_id = ANY(sqlc.arg(thread_ids)::uuid[]);

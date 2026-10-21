@@ -186,6 +186,79 @@ func (q *Queries) LockReadState(ctx context.Context, arg LockReadStateParams) (R
 	return i, err
 }
 
+const readPositionsOfThread = `-- name: ReadPositionsOfThread :many
+SELECT user_id, last_read_seq FROM read_states WHERE thread_id = $1 AND user_id = ANY($2::uuid[])
+`
+
+type ReadPositionsOfThreadParams struct {
+	ThreadID pgtype.UUID
+	UserIds  []pgtype.UUID
+}
+
+type ReadPositionsOfThreadRow struct {
+	UserID      pgtype.UUID
+	LastReadSeq int64
+}
+
+// The positions of the given people in one thread (primary key (user_id, thread_id)), for the
+// worker consumer push and the jobs of notify (sync.ReadPositions, M3-19); people without a row
+// are absent.
+func (q *Queries) ReadPositionsOfThread(ctx context.Context, arg ReadPositionsOfThreadParams) ([]ReadPositionsOfThreadRow, error) {
+	rows, err := q.db.Query(ctx, readPositionsOfThread, arg.ThreadID, arg.UserIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadPositionsOfThreadRow
+	for rows.Next() {
+		var i ReadPositionsOfThreadRow
+		if err := rows.Scan(&i.UserID, &i.LastReadSeq); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const readPositionsOfUser = `-- name: ReadPositionsOfUser :many
+SELECT thread_id, last_read_seq FROM read_states WHERE user_id = $1 AND thread_id = ANY($2::uuid[])
+`
+
+type ReadPositionsOfUserParams struct {
+	UserID    pgtype.UUID
+	ThreadIds []pgtype.UUID
+}
+
+type ReadPositionsOfUserRow struct {
+	ThreadID    pgtype.UUID
+	LastReadSeq int64
+}
+
+// The positions of one person in the given threads (primary key (user_id, thread_id)), for the
+// badge of notify (sync.ReadPositions, M3-19); threads without a row are absent.
+func (q *Queries) ReadPositionsOfUser(ctx context.Context, arg ReadPositionsOfUserParams) ([]ReadPositionsOfUserRow, error) {
+	rows, err := q.db.Query(ctx, readPositionsOfUser, arg.UserID, arg.ThreadIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReadPositionsOfUserRow
+	for rows.Next() {
+		var i ReadPositionsOfUserRow
+		if err := rows.Scan(&i.ThreadID, &i.LastReadSeq); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setReadState = `-- name: SetReadState :one
 UPDATE read_states
 SET last_read_seq = $1, version = version + 1, updated_by_device_id = $2,
