@@ -16166,6 +16166,9 @@ type IncidentIdPath = Uuid
 // InteractionIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type InteractionIdPath = Uuid
 
+// InvocationToken defines model for InvocationToken.
+type InvocationToken = string
+
 // KeyPath Examples: locale.default
 type KeyPath = string
 
