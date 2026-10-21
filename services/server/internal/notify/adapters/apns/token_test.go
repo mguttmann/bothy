@@ -317,6 +317,28 @@ func TestConfigErrorPausesEnvironment(t *testing.T) {
 			t.Fatalf("the next pause must hold: %+v", res)
 		}
 	})
+	t.Run("probe answered ExpiredProviderToken", func(t *testing.T) {
+		t.Parallel()
+		w := newWorld(t)
+		w.prod.Script(w.phone.Token, apnstest.Response{Status: 403, Reason: "InvalidProviderToken"})
+		w.send(w.phone, w.hint())
+		w.clk.Advance(interval)
+		w.prod.Script(w.phone.Token, apnstest.Response{Status: 403, Reason: "ExpiredProviderToken"})
+		if res := w.send(w.phone, w.hint()); res.Class != domain.ResultConfigError {
+			t.Fatalf("probe: %+v", res)
+		}
+		if n := len(errorsOf(w.log)); n != 2 {
+			t.Fatalf("%d Error records, want 2 (the probe starts the next pause)", n)
+		}
+		before := len(w.prod.Requests())
+		if res := w.send(w.phone, w.hint()); res.Class != domain.ResultConfigError || len(w.prod.Requests()) != before {
+			t.Fatalf("the next pause must hold: %+v", res)
+		}
+		w.clk.Advance(interval)
+		if res := w.send(w.phone, w.hint()); res.Class != domain.ResultAccepted || len(w.prod.Requests()) != before+1 {
+			t.Fatalf("the probe after the next pause: %+v, %d requests", res, len(w.prod.Requests())-before)
+		}
+	})
 	t.Run("resolve error", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t)

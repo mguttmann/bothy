@@ -176,6 +176,11 @@ func (a *Adapter) Send(ctx context.Context, reg app.Registration, n app.Notifica
 	if v.renew {
 		next, ok := st.renew(ctx, tok, a.clock.Now())
 		if !ok {
+			if probe {
+				// The fresh token of the probe expired: a configuration error that starts the
+				// next pause (Design note 4 c), never a pause without end.
+				st.settle(ctx, true, true, reasonExpiredProviderToken, a.clock.Now())
+			}
 			return domain.SendResult{Class: domain.ResultConfigError}, nil
 		}
 		v, err = a.do(ctx, reg, n, body, next)
