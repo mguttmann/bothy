@@ -1229,6 +1229,9 @@ export class Adapter {
     if (evidence !== undefined) body.billing_evidence = evidence;
     const started = await this.startCall(state, token, body);
     if (started === undefined) return;
+    // A stop during startRun leaves the entry accepted: the runtime never ran here, so the
+    // next process starts it again and the server answers with the idempotent replay (09 4.9).
+    if (this.stopping) return;
     const [run, used] = started;
     await this.inbox.setState(state.eventId, EntryState.STARTED);
     state.handle.started(run, storedClaims(used).jti);

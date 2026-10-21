@@ -1147,6 +1147,57 @@ describe("restart", () => {
   );
 });
 
+describe("stop while startRun is in flight", () => {
+  it(
+    "leaves the entry for the next process, which executes the run exactly once",
+    async () => {
+      const stateDir = await mkdtemp(join(tmpdir(), "bothy-loop-"));
+      dirs.push(stateDir);
+      const hold = new Gate();
+      let startSeen = false;
+      const holdingFetch = async (request: Request): Promise<Response> => {
+        const response = await globalThis.fetch(request);
+        if (
+          request.method === "POST" &&
+          new URL(request.url).pathname.endsWith("/start")
+        ) {
+          startSeen = true;
+          await hold.opened;
+        }
+        return response;
+      };
+      const first = new RecordingHandler();
+      const adapter = makeAdapter(
+        first,
+        "stop-start",
+        { stateDir },
+        { fetch: holdingFetch },
+      );
+      const source = new RecordingSource(await adapter.makeSource());
+      adapter.source = source;
+      const done = adapter.run();
+      done.catch(() => undefined);
+      await until(fake, () => source.ready);
+      const { runId } = await fake.trigger("held start @Lotse");
+      await until(fake, () => startSeen);
+      const stopping = adapter.stop();
+      hold.open();
+      await stopping;
+      await Promise.race([done.catch(() => undefined), sleep(10_000)]);
+      expect(first.count("execute")).toBe(0);
+
+      const second = new RecordingHandler();
+      const restarted = makeAdapter(second, "stop-start", { stateDir });
+      await running(restarted, async () => {
+        await until(fake, () => second.count("execute", runId) === 1);
+      });
+      expect(second.count("execute", runId)).toBe(1);
+      expect((await fake.runState(runId)).starts).toBe(1);
+    },
+    TEST_TIMEOUT,
+  );
+});
+
 describe("Invocation-Token of the run's requests (07 SR9)", () => {
   it(
     "binds every request of prepare and execute to the run's token, nothing else",
