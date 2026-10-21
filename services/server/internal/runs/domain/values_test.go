@@ -58,6 +58,8 @@ func TestCheckValues(t *testing.T) {
 		{"unknown option", "select", valSelect, `{"selected":["xl"]}`, "/values/selected/0"},
 		{"duplicate selection", "select", valSelect, `{"selected":["s","s"]}`, "/values/selected/1"},
 		{"form with unknown key", "form", valForm, `{"subject":"Hi","password":"Alex"}`, "/values"},
+		{"form value with NUL", "form", valForm, `{"subject":"Hi","body":"a\u0000b"}`, "/values"},
+		{"form value with an unpaired surrogate", "form", valForm, `{"subject":"Hi","body":"a\ud800"}`, "/values"},
 		{"missing required field", "form", valForm, `{"body":"Hello"}`, "/values/subject"},
 		{"white-space-only required text", "form", valForm, `{"subject":" \t "}`, "/values/subject"},
 		{"line break in text", "form", valForm, `{"subject":"a\nb"}`, "/values/subject"},

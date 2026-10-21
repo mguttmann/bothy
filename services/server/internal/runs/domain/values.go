@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 )
 
 // CheckValues checks the values of createInteraction (Design note 9) against the normalized
@@ -20,6 +21,7 @@ import (
 //   - button: {} only.
 //   - select: {"selected": [<option value>, ...]} with known, unique entries and a count between
 //     min_values and max_values; with min_values zero an absent selected is an empty list.
+//   - every type: no escape of NUL or of an unpaired surrogate anywhere (/values).
 //   - form: an object keyed by field name without unknown keys; required fields present (text
 //     and textarea with a character that is not white space); text and textarea strings, text
 //     without a line break, at most max_length code points when set; number a finite JSON
@@ -48,6 +50,11 @@ func CheckValues(typ string, definition, values json.RawMessage) error {
 	doc, ok := valuesObject(values)
 	if !ok {
 		v.add("/values", "the values are not one JSON object")
+		return v.err()
+	}
+	if !textcheck.StorableJSON(values) {
+		// PostgreSQL refuses NUL and an unpaired surrogate in jsonb (D-M2-15-27).
+		v.add("/values", "the values hold NUL or an unpaired surrogate")
 		return v.err()
 	}
 	switch d := normalizeDefinition(parsed).(type) {

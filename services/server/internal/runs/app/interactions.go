@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -615,7 +616,7 @@ func (s *Service) Respond(ctx context.Context, cmd runs.RespondInteraction) (run
 
 // respondBody checks the body of respondToInteraction and returns the stored response object (nil
 // without a response member): the state is a final one, response.text at most
-// message.max_content_bytes (textcheck is not applied, the hint is content).
+// message.max_content_bytes and without U+0000 (textcheck is not applied, the hint is content).
 func (s *Service) respondBody(cmd runs.RespondInteraction) ([]byte, error) {
 	switch cmd.State {
 	case interactionAcknowledged, interactionFailed, interactionRejected:
@@ -624,6 +625,10 @@ func (s *Service) respondBody(cmd runs.RespondInteraction) ([]byte, error) {
 	}
 	if cmd.ResponseText != nil && len(*cmd.ResponseText) > s.cfg.MaxContentBytes {
 		return nil, fieldError("/response/text", "too_long", "response.text is larger than message.max_content_bytes")
+	}
+	if cmd.ResponseText != nil && strings.ContainsRune(*cmd.ResponseText, 0) {
+		// PostgreSQL cannot store U+0000 in jsonb (D-M2-15-27).
+		return nil, fieldError("/response/text", "invalid_characters", "response.text holds U+0000")
 	}
 	if !cmd.HasResponse {
 		return nil, nil
