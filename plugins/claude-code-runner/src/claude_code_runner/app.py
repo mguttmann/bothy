@@ -578,7 +578,8 @@ class _Turn:
 
     async def _follow(self, own_uuid: str) -> None:
         turn = self.turn
-        assert turn is not None  # noqa: S101 - started above
+        if turn is None:  # pragma: no cover - run() starts it first
+            return
         usage = UsageStore(self.cfg.state_dir / "sessions" / self.session.ref)
         live = LiveBox(
             self.handle.patch,

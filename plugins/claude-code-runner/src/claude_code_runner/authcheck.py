@@ -44,7 +44,8 @@ _START = {
     "organization": frozenset({"api_key"}),
     "personal": frozenset({"claude.ai", "oauth_token"}),
 }
-_KEY_TYPE = {
+# Key types of billing_evidence, not secrets.
+_KEY_TYPE = {  # nosec B105
     "api_key": "api_key",
     "api_key_helper": "api_key",
     "claude.ai": "oauth",
