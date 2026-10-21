@@ -148,6 +148,16 @@ void main() {
     expect(h.confirmed, 1);
   });
 
+  test('two requests that need a step-up at once share one prompt', () async {
+    final h = Harness(TestBrowser(), FakePrompt(const StepUpWithPasskey()));
+    stepUpFirst(h.b.server, 'POST /api/v1/groups', times: 2);
+    final both = await Future.wait([h.createGroup(), h.createGroup()]);
+    expect(both.map((r) => r.statusCode), [201, 201]);
+    expect(h.prompt.purposes, hasLength(1));
+    expect(h.b.server.to('POST', '/api/v1/auth/step-up/passkey'), hasLength(1));
+    expect(h.b.server.to('POST', '/api/v1/groups'), hasLength(4));
+  });
+
   test('without a passkey the prompt offers the password with TOTP', () async {
     final h = Harness(
       TestBrowser(),

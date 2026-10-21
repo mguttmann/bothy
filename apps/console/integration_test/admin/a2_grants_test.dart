@@ -57,6 +57,10 @@ void main() {
     await waitFor($, find.textContaining('Kampagnen'));
     await waitFor($, find.textContaining('Texter'));
     final text = _previewText($);
+    // ignore: avoid_print
+    print(
+      'PATROL_LOG {"type":"e2e","message":"preview text: ${text.replaceAll('"', "'").replaceAll('\n', ' / ')}"}',
+    );
     if (day == '2026-12-31') {
       expect(
         text == _golden['en'] || text == _golden['de'],
