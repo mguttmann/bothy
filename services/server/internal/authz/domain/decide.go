@@ -370,8 +370,15 @@ func decideRequirement(in *Input) (Decision, bool, error) {
 	if !ok {
 		reason = notSelfForPersonalToken(in, reason)
 		if in.Principal.ActingFor {
-			if base, _, _ := evaluate(in, in.Req, in.BaseEff, false); base {
-				reason = ReasonActingForInsufficient
+			// Only the intersection fails: acting_for_insufficient. If the agent alone already
+			// fails, the agent's own reason stays (brief M2-14 design note 4f).
+			base, baseReason, err := evaluate(in, in.Req, in.BaseEff, false)
+			if err != nil {
+				return Decision{}, true, err
+			}
+			reason = ReasonActingForInsufficient
+			if !base {
+				reason = notSelfForPersonalToken(in, baseReason)
 			}
 		}
 		return tokenDetail(in, deny(OutcomeForbidden, reason)), true, nil

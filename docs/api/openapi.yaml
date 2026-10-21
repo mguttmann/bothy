@@ -20215,14 +20215,16 @@ components:
       description: |-
         Access token of a person, bound to the device key (RFC 9449). Send `Authorization: DPoP <token>`
         and a `DPoP` proof header with `htm`, `htu`, `iat`, `jti`, `ath` and the latest server nonce.
-        Also used by API tokens that were created with `dpop_jkt`.
+        Also used by API tokens that were created with `dpop_jkt`. Inside a run an agent also sends
+        the header `Invocation-Token` (`#/components/parameters/InvocationToken`, 07 guard rule SR9).
     bearerAuth:
       type: http
       scheme: bearer
       description: |-
         API token of an agent, app or personal tool without key binding (`Authorization: Bearer
         <token>`). On `postIncomingWebhookWithBearer` only, the token of an incoming webhook
-        (`bothy_whi_...`) instead.
+        (`bothy_whi_...`) instead. Inside a run an agent also sends the header `Invocation-Token`
+        (`#/components/parameters/InvocationToken`, 07 guard rule SR9).
     consoleSession:
       type: apiKey
       in: cookie
@@ -20254,6 +20256,13 @@ components:
       description: UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
       schema:
         $ref: '#/components/schemas/Uuid'
+    InvocationToken:
+      name: Invocation-Token
+      in: header
+      required: false
+      description: 'The compact JWS of `EventEnvelope.invocation_token` of the run, sent on every request an agent makes inside a run (07 guard rule SR9). The server checks it on every request (signature, audience, run active) and binds the request to the person who triggered the run, so the agent has at most that person''s rights; it never adds a right. The DPoP proof does not cover it. Declared once for every route like `Authorization`, not as a parameter of each operation; an invalid token gives 403 `invocation_token_invalid` with `reason: invalid`, a token of an ended run `reason: run_inactive`.'
+      schema:
+        type: string
     IfMatchRequired:
       name: If-Match
       in: header
@@ -21307,8 +21316,8 @@ components:
       - code: invocation_token_invalid
         status: 403
         title: 'Invocation token invalid'
-        description: 'The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong).'
-        client_action: '`expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`.'
+        description: 'The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong). Also every request with the header `Invocation-Token` (07 guard rule SR9): `reason` is `invalid` (signature, audience, run, agent or triggering person wrong, or the header is repeated, empty or sent by a principal that is not an agent) or `run_inactive` (the token is valid, but its run has ended).'
+        client_action: '`expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`; on any other request with `Invocation-Token`, stop using the token, the request is refused. `run_inactive`: the run has ended; end the work on it.'
       - code: not_found
         status: 404
         title: 'Not found'

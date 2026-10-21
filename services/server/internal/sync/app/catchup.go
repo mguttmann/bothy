@@ -218,7 +218,7 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 			return false, authorize.Decision{}, nil
 		}
 		if ev.ReceiveAction == receiveSelf {
-			return true, authorize.Decision{}, nil
+			return agentConsumer || !ownSelfEventInRun(a), authorize.Decision{}, nil
 		}
 		// A personal event with a receive action (agent.config_changed, M2-02) also needs that
 		// action at delivery time: an agent that stopped operating the channel gets nothing.
@@ -239,4 +239,16 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 		return false, authorize.Decision{}, err
 	}
 	return d.Allowed(), d, nil
+}
+
+// ownSelfEventInRun reports a personal event with receive action self of an agent whose request
+// is bound to a run of a person (07 guard rule SR9, brief M2-14 requirement 14). Such events are
+// judged by the agent's own rights alone: access.changed and access.expiring name the targets of
+// the agent's grants, sidebar.updated and read_state.updated its spaces and threads, which the
+// triggering person may not read. So a bound catch-up leaves every one of them out (the cursor
+// still passes it). The agent consumer is judged by the agent's own grants (07 section 8.1) and
+// gets them.
+func ownSelfEventInRun(a actor.Actor) bool {
+	status, _, _, _ := a.ActingForBinding()
+	return status == string(actor.ActingForBound)
 }

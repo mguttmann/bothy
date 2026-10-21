@@ -73,6 +73,37 @@ func IsRecheckPrincipal(p Principal) bool {
 	return ok && r.IsRecheckPrincipal()
 }
 
+// ActingForBinder is implemented by a principal that can carry the acting-for binding of its
+// request (07 guard rule SR9, brief M2-14; kernel/actor.Actor). ActingForBinding returns the
+// outcome of the check of the Invocation-Token header and the triggering person, the run and its
+// thread: status is "" without the header, else "bound", "run_inactive" or "invalid" (then the IDs
+// are zero). authz treats a principal without this method whose ActingForPerson is set as bound.
+type ActingForBinder interface {
+	ActingForBinding() (status string, userID, runID, threadID ids.ID)
+}
+
+// The statuses of ActingForBinder (kernel/actor.ActingForStatus).
+const (
+	ActingForBound       = "bound"
+	ActingForRunInactive = "run_inactive"
+	ActingForInvalid     = "invalid"
+)
+
+// ActingForOf returns the acting-for binding of p: the binding of an ActingForBinder, else bound
+// to ActingForPerson when it is set, else none (status ""). nil has none.
+func ActingForOf(p Principal) (status string, userID, runID, threadID ids.ID) {
+	if p == nil {
+		return "", ids.ID{}, ids.ID{}, ids.ID{}
+	}
+	if b, ok := p.(ActingForBinder); ok {
+		return b.ActingForBinding()
+	}
+	if id := p.ActingForPerson(); !id.IsZero() {
+		return ActingForBound, id, ids.ID{}, ids.ID{}
+	}
+	return "", ids.ID{}, ids.ID{}, ids.ID{}
+}
+
 // CredentialObserver is implemented by a principal whose authenticator read the state of its
 // session, device and device key for the request (kernel/actor.Actor, M1-34). observed is false
 // when it read none. authz uses these facts in check_active instead of its cached ones, so a

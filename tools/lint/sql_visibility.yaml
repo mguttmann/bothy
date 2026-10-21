@@ -242,6 +242,9 @@ exceptions:
   - query: runs.GetRun
     category: authorize_resolution
     reason: "getRun loads the one run first, because its thread and triggered_by form the descriptor of authorize run.read; a denied run gives the same not_found as a missing one (02 9.2, M2-05)"
+  - query: runs.GetRunBinding
+    category: authorize_resolution
+    reason: "the authentication of a request with the Invocation-Token header loads the one run named by the verified token by primary key, before any authorize, to bind the request to the person who triggered it (07 SR9, 07 7.4 rule 1 exception resolution for authorize); nothing of the row leaves the server (M2-14)"
   - query: runs.LockRun
     category: system_job
     reason: "the delivery check and the job runs.queued_expiry lock the one run named by the event or the job before agent.invoke decides for its trigger; nothing of the row leaves before that decision (M2-08)"

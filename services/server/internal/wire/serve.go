@@ -162,6 +162,10 @@ type Deps struct {
 	// sessions.active, hosts.connected), so a test counts them per process. nil creates the
 	// OpenTelemetry adapter.
 	TerminalSessionMetrics terminalapp.SessionMetrics
+	// ScopeObserver sees every Scope call of the process's Authorizer with its context and action
+	// (authzapp.Authorizer.SetScopeObserver, M2-14): the test of SR9 records which operation lists
+	// through Scope. nil in production.
+	ScopeObserver func(ctx context.Context, act authorize.Action)
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -758,6 +762,9 @@ func (s *server) startAuthz(context.Context) error {
 	if err != nil {
 		return err
 	}
+	if s.deps.ScopeObserver != nil {
+		az.SetScopeObserver(s.deps.ScopeObserver)
+	}
 	if sy == nil {
 		return errors.New("wire: the authz step needs the event log of the sync step")
 	}
@@ -1170,10 +1177,19 @@ func (s *server) startApps(ctx context.Context) error {
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
 func (s *server) startSessions(context.Context) error {
 	s.mu.Lock()
-	id, keys, rec, admin, box := s.identity, s.signingKeys, s.instance, s.authzAdmin, s.totpBox
+	id, keys, rec, admin, box, rn, pool := s.identity, s.signingKeys, s.instance, s.authzAdmin, s.totpBox, s.runs, s.pool
 	s.mu.Unlock()
 	if id == nil || keys == nil || admin == nil {
 		return errors.New("wire: the sessions need the identity step, the signing keys and the authz admin")
+	}
+	if rn != nil {
+		// The Invocation-Token header of an agent's request resolves through runs (SR9, M2-14);
+		// the signing keys step bound the invocation tokens before this step.
+		src, err := rn.ActingForSource(pool)
+		if err != nil {
+			return err
+		}
+		id.BindActingFor(src)
 	}
 	if err := id.BindSessions(keys.Keys, rec.InstanceID); err != nil {
 		return err

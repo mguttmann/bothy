@@ -11,6 +11,24 @@ documented in this file. The format is based on
 
 ### Added
 
+- Acting-for binding of agents in a run (M2-14, 07 SR9, SEC-AI-3, AZ-M44, AZ-M45, AZ-P11): the
+  request header `Invocation-Token` (`components.parameters.InvocationToken`) carries the run's
+  invocation token on every request an agent makes inside a run. The server checks it on every
+  request (signature, `aud`, run of this agent triggered by the token's person in the claimed
+  thread, run active; not expiry or `jti` currency) and binds the request to the triggering
+  person: every action that reads content or writes into a channel is decided on the
+  intersection of the agent's and the person's current rights, and `Scope` gives every list,
+  counter, snapshot and catch-up only channels both may read. A target invisible only by the
+  intersection answers 404 like an unknown ID, a requirement failing only by it 403 `forbidden`
+  with `reason: acting_for_insufficient`. Replies in the run's thread, patches of the own run,
+  `run.finish`, `interaction.respond` and `agent_session.report` keep the agent's own rights on
+  the own thread and run; `run.start` and `run.token.renew` answer as without the header;
+  deliveries to an agent consumer ignore it. An invalid token gives 403
+  `invocation_token_invalid` with `reason: invalid`, a token of an ended run the new `reason:
+  run_inactive`; the header without `Authorization` gives 401 `unauthenticated`. Denials carry
+  the audit details `acting_for_user_id`, `run_id` and `token_verdict`; the token never appears in
+  logs, audit details or problems. New source port `identity.ActingForSource`, implemented by
+  `runs` in `adapters/actingfor`.
 - Agent sessions per thread (M2-12, AG-17, AG-18, R-AG-02, R-AG-04, R-DM-42): the module
   `agents` keeps the table `agent_sessions` (migration `00057`, with the FK
   `runs.agent_session_id -> agent_sessions(id) ON DELETE SET NULL` validated by `00058`) and

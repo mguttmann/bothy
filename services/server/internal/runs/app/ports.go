@@ -230,3 +230,14 @@ type Repository interface {
 	// thread, so the thread bounds the lookup.
 	SessionUsed(ctx context.Context, threadID, sessionID ids.ID) (bool, error)
 }
+
+// RunBindings is the outgoing port of the acting-for resolution (07 guard rule SR9, M2-14 Design
+// note 3): one run by primary key with the columns that bind a request to its triggering person.
+// It is separate from Repository because it runs during the authentication of a request, before
+// any unit of work and without a lock (Design note 3g), and reads runs without the visible-channel
+// predicate (Design note 3f); adapters/postgres implements both.
+type RunBindings interface {
+	// RunBinding reads the run id; found is false for an unknown id. Errors are kernel/errs
+	// errors (internal for a failed read).
+	RunBinding(ctx context.Context, id ids.ID) (binding domain.RunBinding, found bool, err error)
+}

@@ -261,6 +261,17 @@ one unit of work, so a document is never torn by a concurrent patch.
 - **Never stored or logged:** `app.InvocationToken` renders as `[redacted]` through `fmt`, `slog`, JSON and text; only `Reveal` returns the compact JWS, for the envelope (SEC-LOG-2, SEC-SEC-3). Logs and errors may name `kid` and `jti`, never the token or a segment of it.
 - **Reference verifier:** `adapters/runstest.ReferenceVerifier` performs the adapter check of 09 4.5 with the standard library only (independent of `kernel/jose`), fetches the JWKS through a client the caller passes and honours its `max-age`, reloads once per `adapter.jwks_refresh_min_interval` for an unknown `kid` and reports the results in the precedence of D-M2-06-9 (`ErrRefInvalid`, `ErrRefUnknownKey`, `ErrRefBillingModeMismatch`, `ErrRefToolClassMismatch`, `ErrRefExpired`, `ErrRefReplay`). It never enters the binary. M2-08 and M2-09 check delivered tokens with it; the SDK verifiers of M2-29 and M2-30 must agree with it on the cases of the M2-06 tests.
 
+## Acting-for resolution (M2-14, SR9)
+
+An agent that calls the server API inside a run sends the run's invocation token in the header `Invocation-Token`; the authenticator of `identity` resolves it through `adapters/actingfor.Source` (only `kernel` types in the signature, so it implements `identity.ActingForSource` structurally; `internal/wire` holds the assertion) over the use case `app.ActingFor.ResolveActingFor` and the pure `domain.ActingForVerdict`:
+
+- `InvocationTokens.Verify` with the agent of the request as audience, `IgnoreExpiry` and no run: every verdict (`invocation_token_invalid`) gives `invalid`. A failure of the key store or the instance row, and of the run read, is returned as an error (the authenticator answers 503, never an actor without the binding).
+- Claims without a `run_id` (autocomplete, a command without an active run) give `invalid`: SR9 binds a run.
+- `GetRunBinding(run_id)`: no row, another agent, `sub` not `triggered_by` or the claim `thread_id` not the run's `thread_id` give `invalid`; `queued`, `running`, `waiting_input` give `bound`, `completed`, `failed`, `cancelled` give `run_inactive`, both with `UserID = triggered_by`, the run, its current thread and the `jti`; any other stored state gives `invalid` (fail closed). `invalid` carries zero IDs.
+- Expiry and the currency of the `jti` are not checked: a run outlives `agent.invocation_token_ttl`, every token of a run names the same person, and the binding only narrows the agent's rights.
+- Nothing is cached: a revocation or the end of a run counts on the next request in every process.
+- Query exception: `GetRunBinding` reads one run by primary key without the visible-channel predicate, on the pool, outside a unit of work and without a lock, during the authentication of a request and before any `authorize`; nothing of the row leaves the server (07 section 7.4 rule 1, exception "resolution for authorize"; category `authorize_resolution` in `tools/lint/sql_visibility.yaml`). It is the port `app.RunBindings`, separate from `Repository`.
+
 ## Visibility of `runs` and `run_steps`
 
 The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads the rows of one thread or run whose visibility the use case checked first, or (the active-run lists) the active runs whose threads `chat.Threads.Locate` resolves, kept only when the channel is in `Scope.ChannelIDs` and `run.read` allows each row in filter mode (category `thread_scope` of `tools/lint/sql_visibility.yaml`); the gauge query has no principal.

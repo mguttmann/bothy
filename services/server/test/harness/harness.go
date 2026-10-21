@@ -45,6 +45,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -134,6 +135,9 @@ type Options struct {
 	// TerminalModule receives the use cases of the terminal module (wire.Deps.TerminalModule,
 	// M2-47).
 	TerminalModule func(*terminalapp.Service)
+	// ScopeObserver sees every Scope call of the server's Authorizer with its context and action
+	// (wire.Deps.ScopeObserver, M2-14).
+	ScopeObserver func(ctx context.Context, act authorize.Action)
 	// OnListen, when set, receives the origin of the own public listener before the server starts
 	// (an edge in front of several nodes routes to it, M2-47).
 	OnListen func(listenURL string)
@@ -307,6 +311,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		FilesImageHooks: opts.FilesImageHooks,
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
 		TerminalModule: opts.TerminalModule, JobModules: opts.JobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
+		ScopeObserver: opts.ScopeObserver,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

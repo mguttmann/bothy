@@ -403,3 +403,33 @@ func runIDs(rows []app.RunRow) []ids.ID {
 func compareID(x, y ids.ID) int {
 	return slices.Compare(x[:], y[:])
 }
+
+// TestRepository_RunBinding: the acting-for read of M2-14 (Design note 3c and 3g) works outside
+// a unit of work, returns the run, its agent, the triggering person, the thread and the stored
+// state, follows a state change and reports an unknown run as not found without an error.
+func TestRepository_RunBinding(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	w := e.world(t)
+	ctx := context.Background()
+	t0 := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	n := newRun(w, w.thread, w.robin, t0)
+	e.insert(t, n, true)
+
+	got, found, err := e.repo.RunBinding(ctx, n.ID)
+	want := domain.RunBinding{ID: n.ID, AgentID: w.robin, TriggeredBy: w.alex, ThreadID: w.thread, State: string(domain.StateQueued)}
+	if err != nil || !found || got != want {
+		t.Fatalf("RunBinding = %+v, %v, %v; want %+v", got, found, err, want)
+	}
+	e.transition(t, app.TransitionWrite{ID: n.ID, From: domain.StateQueued, Version: 1, To: domain.StateCancelled,
+		Reason: "user_cancelled", At: t0.Add(time.Second)}, true)
+	got, found, err = e.repo.RunBinding(ctx, n.ID)
+	want.State = string(domain.StateCancelled)
+	if err != nil || !found || got != want {
+		t.Errorf("RunBinding after the end = %+v, %v, %v; want %+v", got, found, err, want)
+	}
+	got, found, err = e.repo.RunBinding(ctx, ids.New())
+	if err != nil || found || got != (domain.RunBinding{}) {
+		t.Errorf("RunBinding of an unknown run = %+v, %v, %v; want not found", got, found, err)
+	}
+}
