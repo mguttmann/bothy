@@ -91,8 +91,9 @@ type Actor struct {
 	// ViewAs is the "view as" of an owner (07 section 9.2); nil for none. Only authz sets it, for
 	// an owner session inside viewAsUser (M1-49); it is never parsed from client input in M1.
 	ViewAs *ViewAs
-	// ActingFor is the checked invocation token of the run an agent acts in (SR9); the zero value
-	// for none. Filled from M2 on.
+	// ActingFor is the result of the check of the Invocation-Token header of the request (SR9,
+	// brief M2-14 design note 2); the zero value when the request carried none. Only the
+	// authenticator sets it.
 	ActingFor ActingFor
 	// RecheckPrincipal marks the principal of the check without a request (05 section 5, R-AZ-29):
 	// a person evaluated by the server itself, without a request of the person, for example
@@ -125,12 +126,46 @@ const (
 	DeviceUnknown = "unknown"
 )
 
-// ActingFor names the run an agent acts in (07 section 3, SR9): the triggering person, the run,
-// its thread and the jti of the invocation token.
+// ActingFor is the acting-for binding of a request (07 section 3 row acting_for, guard rule SR9):
+// the result of the check of the Invocation-Token header that the authenticator made for this very
+// request (brief M2-14 design note 2). Status tells the three outcomes of the check; with
+// ActingForBound and ActingForRunInactive UserID is the triggering person (runs.triggered_by),
+// RunID the run, ThreadID its thread and JTI the jti of the presented token; with ActingForInvalid
+// the IDs are zero. The zero value (empty Status) means the request carried no header: the agent
+// acts with its own rights (07 section 6, hint H1). authorize decides on the status (an invalid
+// token or an ended run is forbidden invocation_token_invalid) and, when bound, intersects the
+// agent's rights with the person's current rights; the binding itself never adds a right.
+//
+// Example:
+//
+//	a.ActingFor = actor.ActingFor{Status: actor.ActingForBound, UserID: alex, RunID: run, ThreadID: thread, JTI: jti}
 type ActingFor struct {
+	// Status is the outcome of the check; "" for no header.
+	Status ActingForStatus
+	// UserID, RunID and ThreadID are the triggering person, the run and its thread.
 	UserID, RunID, ThreadID ids.ID
-	JTI                     string
+	// JTI is the jti claim of the presented token (never the token itself).
+	JTI string
 }
+
+// ActingForStatus is the outcome of the check of the Invocation-Token header (brief M2-14 design
+// note 2 and 3).
+type ActingForStatus string
+
+// The statuses of ActingFor.
+const (
+	// ActingForBound: the token is valid for the agent and its run is active; SR9 binds.
+	ActingForBound ActingForStatus = "bound"
+	// ActingForRunInactive: the token is valid for the agent, but its run has ended.
+	ActingForRunInactive ActingForStatus = "run_inactive"
+	// ActingForInvalid: the header could not be used (more than one value, an empty value, a
+	// principal that is no agent, a bad token, or a token that names no run of this agent).
+	ActingForInvalid ActingForStatus = "invalid"
+)
+
+// Present reports whether the request carried the Invocation-Token header, that is whether f is
+// not the zero value.
+func (f ActingFor) Present() bool { return f != ActingFor{} }
 
 // ViewAs is the state of "view as" (07 section 3 field view_as, section 9.2): the person whose
 // view an owner looks at and the start of the view. authorize intersects the owner's rights with
@@ -217,6 +252,23 @@ func (a Actor) ViewAsStart() time.Time {
 
 // ActingForPerson returns a.ActingFor.UserID (kernel/authorize.Principal).
 func (a Actor) ActingForPerson() ids.ID { return a.ActingFor.UserID }
+
+// ActingForBinding returns the acting-for binding as kernel/authorize reads it
+// (authorize.ActingForBinder; plain values, because kernel ports never import each other): the
+// status and the person, run and thread. status is "" without the Invocation-Token header. A
+// binding with a person but without a status counts as bound, so a narrowing is never lost (fail
+// closed).
+func (a Actor) ActingForBinding() (status string, userID, runID, threadID ids.ID) {
+	f := a.ActingFor
+	if !f.Present() {
+		return "", ids.ID{}, ids.ID{}, ids.ID{}
+	}
+	status = string(f.Status)
+	if status == "" {
+		status = string(ActingForBound)
+	}
+	return status, f.UserID, f.RunID, f.ThreadID
+}
 
 // Anonymous returns the actor of a request without credentials. Anonymous requests still run
 // through authorize with this principal (06 section 3, 05 section 2.1).
@@ -318,12 +370,20 @@ type Credentials struct {
 	// ConsoleCookie is the value of the cookie ConsoleCookieName, the second credential kind of a
 	// person in the web console (M6-01); zero without the cookie.
 	ConsoleCookie CookieValue
+	// InvocationTokens are all values of the Invocation-Token header in order (07 guard rule SR9,
+	// brief M2-14 design note 1): the invocation token of the run an agent acts in. nil when the
+	// request has none. The values are secrets: they never reach a log, span, audit entry or
+	// problem body.
+	InvocationTokens []string
 }
 
-// Present reports whether the request carries credentials: an Authorization header or the console
-// cookie. A request without either is anonymous; a DPoP header alone is not a credential.
+// Present reports whether the request carries credentials: an Authorization header, the console
+// cookie or the Invocation-Token header. A request without any is anonymous; a DPoP header alone is
+// not a credential. The Invocation-Token header counts, so a request that sends it without an
+// Authorization header is refused with 401 instead of passing as anonymous (brief M2-14 design
+// note 2b).
 func (c Credentials) Present() bool {
-	return c.Authorization != "" || !c.ConsoleCookie.IsZero()
+	return c.Authorization != "" || !c.ConsoleCookie.IsZero() || len(c.InvocationTokens) > 0
 }
 
 // Authenticator checks the credentials of a request and the principal behind them. The identity
