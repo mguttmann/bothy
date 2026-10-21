@@ -40,6 +40,10 @@ dependencies:
     sdk: flutter
   l10n:
     path: ../../packages/l10n
+  # The terminal view of the apps with the console's ports: browser WebSocket, IndexedDB pins
+  # and the passkey step-up (ADR 0070, brief M6-18 Design note 3).
+  terminal_ui:
+    path: ../../packages/terminal_ui
   # Browser interop of the web adapters (sessionStorage, navigator.credentials, location).
   web: ^1.1.1
 

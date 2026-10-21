@@ -12018,6 +12018,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose at least one day.'**
   String get quietHoursNoDays;
+
+  /// Web console terminal (24 section 5.1, 15 section 23.3, ADR 0070): the sentence below the dialog 'Open terminal' and the key change warning; the console's code comes from the server, so the pin cannot protect against it.
+  ///
+  /// In en, this message translates to:
+  /// **'In the browser this check only notices a key change that the server reports; it does not protect against the server itself.'**
+  String get consoleTerminalPinningNotice;
+
+  /// Web console terminal (ADR 0070 item 1): title of the notice when the person has no passkey.
+  ///
+  /// In en, this message translates to:
+  /// **'A passkey is needed'**
+  String get consoleTerminalPasskeyTitle;
+
+  /// Web console terminal (ADR 0070 item 1, 08 section 6.3 item 3): the way to a passkey for a person without one; no other step-up opens a terminal in the console.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening a terminal in the console needs a passkey, and none is set up for you. Ask an owner to set up a passkey for you, then open the terminal again. In the desktop and mobile apps the terminal opens with the device key instead.'**
+  String get consoleTerminalPasskeySetup;
+
+  /// Web console terminal: button that closes the passkey notice.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get consoleTerminalPasskeyClose;
+
+  /// Web console page 'Hosts and terminal' (01 section 5.5): button on the page of a host that opens the terminal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open terminal'**
+  String get consoleTerminalOpen;
+
+  /// Web console terminal: button that closes the view of a session that no longer runs and shows the host again.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to host'**
+  String get consoleTerminalBack;
 }
 
 class _AppLocalizationsDelegate

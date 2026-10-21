@@ -7,18 +7,25 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'app.dart';
 import 'platform/browser.dart';
 import 'routes.dart';
+import 'terminal/ports.dart';
 
 /// Kept for the life of the page, so the semantics stay on.
 SemanticsHandle? _semantics;
 
 /// Starts the console in [environment]: semantics on before the first frame (ADR 0028
 /// "Confirmation"; the console does not wait for a screen reader to ask), path URLs below
-/// [consoleBasePath] instead of `#` fragments (the OIDC callbacks are paths), then the app.
+/// [consoleBasePath] instead of `#` fragments (the OIDC callbacks are paths), then the app with
+/// the terminal's browser seams (WebSocket, IndexedDB of the pins; brief M6-18).
 void runConsole(ConsoleEnvironment environment) {
   WidgetsFlutterBinding.ensureInitialized();
   _semantics ??= SemanticsBinding.instance.ensureSemantics();
   setUrlStrategy(PathUrlStrategy(ConsolePlatformLocation()));
-  runApp(ConsoleApp(environment: environment));
+  runApp(
+    ConsoleApp(
+      environment: environment,
+      terminalPorts: ConsoleTerminalPorts.browser(),
+    ),
+  );
 }
 
 /// The location of the browser tab with [consoleBasePath] as its base. `index.html` has no
