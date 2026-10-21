@@ -328,15 +328,17 @@ def report_seen(logs: str) -> bool:
 def save_results(results: Path, target: str | None) -> None:
     """Copies the result files of the browsers to ``target`` (the CI artifact of a failure).
 
-    The result files hold violations, foreign origins, policy names and versions, never the
-    login of the seed, which stays in out/ and is removed with the temp directory.
+    The result files hold violations, foreign origins, policy names and versions, and of phase 2
+    the test results, the console output of the page and a screenshot of each failed test; never
+    the login of the seed, which stays in out/ and is removed with the temp directory.
     """
     if not target or not results.is_dir():
         return
     dest = Path(target)
     dest.mkdir(parents=True, exist_ok=True)
-    for f in results.glob("*.json"):
-        shutil.copy2(f, dest / f.name)
+    for pattern in ("*.json", "*.png"):
+        for f in results.glob(pattern):
+            shutil.copy2(f, dest / f.name)
 
 
 def bundle_build_args(tmp: Path, version: str) -> list[str]:
