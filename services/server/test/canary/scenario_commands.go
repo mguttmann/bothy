@@ -38,7 +38,7 @@ func (sc *Scenario) commands() {
 	invoke := "/channels/" + allgemein + "/commands/" + id + "/invoke"
 	value := sc.Reg.New(ClassContent, allgemein, "command option value")
 	sc.post(alex, invoke, map[string]any{"options": []any{map[string]any{"name": "ticket", "value": value}}}, http.StatusAccepted)
-	sc.post(alex, invoke, map[string]any{"options": []any{map[string]any{"name": "ticket", "value": value + "‮"}}},
+	sc.post(alex, invoke, map[string]any{"options": []any{map[string]any{"name": "ticket", "value": value + "\u202e"}}},
 		http.StatusBadRequest)
 	sc.del(lotse, path, http.StatusNoContent)
 }

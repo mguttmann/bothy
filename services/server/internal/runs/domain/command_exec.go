@@ -4,6 +4,7 @@ package domain
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -120,18 +121,7 @@ func valueCode(d OptionDef, v string) string {
 			return fieldInvalidEnum
 		}
 	case optionChoice:
-		if d.Autocomplete {
-			if textcheck.DisplayText(v) != nil {
-				return fieldInvalidEnum
-			}
-			return ""
-		}
-		for _, c := range d.Choices {
-			if c == v {
-				return ""
-			}
-		}
-		return fieldInvalidEnum
+		return choiceCode(d, v)
 	case optionUser:
 		if id, err := ids.Parse(v); err != nil || id.String() != v || strings.ToLower(v) != v {
 			return fieldInvalidFormat
@@ -142,6 +132,21 @@ func valueCode(d OptionDef, v string) string {
 		return fieldInvalid
 	}
 	return ""
+}
+
+// choiceCode is the rule of a choice value: one of the static values, or with autocomplete any
+// display text.
+func choiceCode(d OptionDef, v string) string {
+	if d.Autocomplete {
+		if textcheck.DisplayText(v) != nil {
+			return fieldInvalidEnum
+		}
+		return ""
+	}
+	if slices.Contains(d.Choices, v) {
+		return ""
+	}
+	return fieldInvalidEnum
 }
 
 // optionField returns validation_failed with one field error on pointer.

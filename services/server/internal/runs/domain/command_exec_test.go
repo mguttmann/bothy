@@ -43,14 +43,14 @@ func TestValidateOptionValues(t *testing.T) {
 		{"required missing", []domain.OptionValue{ov("count", "1")}, "/options", "required"},
 		{"unknown option", []domain.OptionValue{ov("ticket", "a"), ov("nope", secret)}, "/options/1/name", "unknown_member"},
 		{"option twice", []domain.OptionValue{ov("ticket", "a"), ov("ticket", "b")}, "/options/1/name", "invalid"},
-		{"string bidi", []domain.OptionValue{ov("ticket", secret+"‮")}, "/options/0/value", "invalid"},
+		{"string bidi", []domain.OptionValue{ov("ticket", secret+"\u202e")}, "/options/0/value", "invalid"},
 		{"string control", []domain.OptionValue{ov("ticket", secret+"\x07")}, "/options/0/value", "invalid"},
 		{"integer leading zero", []domain.OptionValue{ov("ticket", "a"), ov("count", "007")}, "/options/1/value", "invalid_format"},
 		{"integer plus", []domain.OptionValue{ov("ticket", "a"), ov("count", "+7")}, "/options/1/value", "invalid_format"},
 		{"integer overflow", []domain.OptionValue{ov("ticket", "a"), ov("count", "1"+strings.Repeat("0", 19))}, "/options/1/value", "invalid_format"},
 		{"boolean", []domain.OptionValue{ov("ticket", "a"), ov("urgent", "yes")}, "/options/1/value", "invalid_enum"},
 		{"choice", []domain.OptionValue{ov("ticket", "a"), ov("prio", secret)}, "/options/1/value", "invalid_enum"},
-		{"autocomplete choice bidi", []domain.OptionValue{ov("ticket", "a"), ov("team", "⁧")}, "/options/1/value", "invalid_enum"},
+		{"autocomplete choice bidi", []domain.OptionValue{ov("ticket", "a"), ov("team", "\u2067")}, "/options/1/value", "invalid_enum"},
 		{"user", []domain.OptionValue{ov("ticket", "a"), ov("owner", "0192F4A0-7B1C-7BEB-80FC-F336F4FE79AA")}, "/options/1/value", "invalid_format"},
 		{"file", []domain.OptionValue{ov("ticket", "a"), ov("file", ids.New().String())}, "/options/1/value", "not_enabled"},
 	}
@@ -90,7 +90,7 @@ func TestValidateOptionValues(t *testing.T) {
 // FuzzValidateOptionValues: no panic, and a value with a control or bidi character is never
 // accepted for a string or an autocomplete choice.
 func FuzzValidateOptionValues(f *testing.F) {
-	for _, s := range []string{"", "a", "‮", "\x00", "07", "-0", "true", ids.New().String(), "ä‍"} {
+	for _, s := range []string{"", "a", "\u202e", "\x00", "07", "-0", "true", ids.New().String(), "ä\u200d"} {
 		f.Add(s, s)
 	}
 	f.Fuzz(func(t *testing.T, a, b string) {

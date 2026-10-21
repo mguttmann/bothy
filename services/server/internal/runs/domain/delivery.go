@@ -296,6 +296,9 @@ func InvocationPayload(in InvocationPayloadInput) ([]byte, error) {
 		opts := optionPayloads(in.Options)
 		p.TriggerKind, p.CommandInvocationID, p.CommandID, p.CommandName, p.Options = string(TriggerCommand),
 			in.CommandInvocationID.String(), in.CommandID.String(), in.CommandName, &opts
+	case TriggerFollowup, TriggerInteraction, TriggerAutocomplete:
+		// agent.invocation carries message and command runs; interaction runs come with M2-15.
+		return nil, errPayload
 	default:
 		return nil, errPayload
 	}

@@ -98,7 +98,7 @@ func TestValidateDefinition(t *testing.T) {
 	}{
 		{"name pattern", func(c *domain.CommandInput) { c.Name = "Bad" + secret }, "/name", "pattern_mismatch"},
 		{"description blank", func(c *domain.CommandInput) { c.Description = "   " }, "/description", "too_short"},
-		{"description bidi", func(c *domain.CommandInput) { c.Description = secret + "‮" }, "/description", "invalid"},
+		{"description bidi", func(c *domain.CommandInput) { c.Description = secret + "\u202e" }, "/description", "invalid"},
 		{"description control", func(c *domain.CommandInput) { c.Description = secret + "\n" }, "/description", "invalid"},
 		{"description too long", func(c *domain.CommandInput) { c.Description = strings.Repeat("ä", 21) }, "/description", "too_long"},
 		{"scope host", func(c *domain.CommandInput) { c.ScopeKind = "host" }, "/scope_kind", "invalid_enum"},
@@ -140,7 +140,7 @@ func TestValidateDefinition(t *testing.T) {
 		}, "/options/0/choices", "too_many_items"},
 		{"choice name", func(c *domain.CommandInput) {
 			o := opt("a")
-			o.Choices = []domain.CommandChoice{choice(secret+"⁦", "x")}
+			o.Choices = []domain.CommandChoice{choice(secret+"\u2066", "x")}
 			c.Options = []domain.CommandOption{o}
 		}, "/options/0/choices/0/name", "invalid"},
 		{"integer choice value", func(c *domain.CommandInput) {

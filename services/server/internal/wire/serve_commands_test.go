@@ -232,9 +232,9 @@ func (w *cmdWorld) changed(id, change string) int {
 	return w.count(`SELECT count(*) FROM event_log WHERE type = 'command.changed' AND resource_id = $1 AND payload->>'change' = $2`, id, change)
 }
 
-// audits counts the audit entries of action on the command id with decision.
-func (w *cmdWorld) audits(action, id, decision string) int {
-	return w.count(`SELECT count(*) FROM audit_events WHERE action = $1 AND resource_id = $2 AND decision = $3`, action, id, decision)
+// audits counts the allow entries of action on the command id.
+func (w *cmdWorld) audits(action, id string) int {
+	return w.count(`SELECT count(*) FROM audit_events WHERE action = $1 AND resource_id = $2 AND decision = 'allow'`, action, id)
 }
 
 // invoke invokes the command id in channel ch as p with body and returns status and body.
@@ -442,7 +442,7 @@ func TestSlashCommands(t *testing.T) {
 		if space != nil || channelID != nil || version != 1 || receive != "command.read" || pl.Change != "registered" {
 			t.Fatalf("event %v %v %d %s %s", space, channelID, version, receive, payload)
 		}
-		if w.changed(c.ID, "registered") != 1 || w.audits("command.register", c.ID, "allow") != 1 {
+		if w.changed(c.ID, "registered") != 1 || w.audits("command.register", c.ID) != 1 {
 			t.Fatal("event or audit missing")
 		}
 		var details []byte
@@ -594,12 +594,12 @@ func TestSlashCommands(t *testing.T) {
 		if code != http.StatusOK || got.Version != 2 || h.Get("ETag") != `"2"` {
 			t.Fatalf("update = %d %s etag %s", code, b, h.Get("ETag"))
 		}
-		if w.changed(c.ID, "updated") != 1 || w.audits("command.register", c.ID, "allow") != 2 {
+		if w.changed(c.ID, "updated") != 1 || w.audits("command.register", c.ID) != 2 {
 			t.Fatal("event or audit of the update")
 		}
 		code, b, _ = put(w.lotse, path, def("upd", "description", "New text"), `"2"`)
 		if _ = json.Unmarshal(b, &got); code != http.StatusOK || got.Version != 2 || w.changed(c.ID, "updated") != 1 ||
-			w.audits("command.register", c.ID, "allow") != 2 {
+			w.audits("command.register", c.ID) != 2 {
 			t.Fatalf("identical update = %d %s", code, b)
 		}
 		code, b, _ = put(w.texter, path, def("upd"), `"2"`)
@@ -635,11 +635,11 @@ func TestSlashCommands(t *testing.T) {
 		if n := w.count(`SELECT count(*) FROM commands WHERE id = $1 AND removed_at IS NOT NULL AND version = 2`, c.ID); n != 1 {
 			t.Fatal("not removed")
 		}
-		if w.changed(c.ID, "removed") != 1 || w.audits("command.remove", c.ID, "allow") != 1 {
+		if w.changed(c.ID, "removed") != 1 || w.audits("command.remove", c.ID) != 1 {
 			t.Fatal("event or audit of the removal")
 		}
 		if code, _, _ := w.do(send{agent: &w.lotse, method: http.MethodDelete, path: path}); code != http.StatusNoContent ||
-			w.changed(c.ID, "removed") != 1 || w.audits("command.remove", c.ID, "allow") != 1 {
+			w.changed(c.ID, "removed") != 1 || w.audits("command.remove", c.ID) != 1 {
 			t.Fatalf("second remove = %d", code)
 		}
 		if code, _, _ := w.do(send{agent: &w.lotse, method: http.MethodGet, path: path}); code != http.StatusNotFound {
