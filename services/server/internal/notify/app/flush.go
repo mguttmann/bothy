@@ -40,7 +40,7 @@ func (p *Push) Flush(ctx context.Context, user, thread ids.ID, end time.Time) er
 		}
 		h := Hint{RecipientID: user, ThreadID: thread, Kind: domain.KindMessage, DueAt: end}
 		if d.Outcome == domain.OutcomeSend {
-			if h.MessageID, err = p.newestMessage(ctx, thread); err != nil {
+			if h.MessageID, h.MessageSeq, err = p.newestMessage(ctx, thread); err != nil {
 				return err
 			}
 		}
@@ -66,12 +66,12 @@ func (p *Push) flushDecision(ctx context.Context, user ids.ID, users []ids.ID, i
 	return facts[user], d, err
 }
 
-// newestMessage returns the newest message of thread a bundled hint points at, or the zero ID
-// when the thread has none.
-func (p *Push) newestMessage(ctx context.Context, thread ids.ID) (ids.ID, error) {
+// newestMessage returns the newest message of thread a bundled hint points at and its thread_seq
+// (the release sequence of a delayed push, M3-23), or the zero ID and 0 when the thread has none.
+func (p *Push) newestMessage(ctx context.Context, thread ids.ID) (ids.ID, int64, error) {
 	newest, found, err := p.d.Messages.Newest(ctx, thread)
 	if err != nil || !found {
-		return ids.ID{}, err
+		return ids.ID{}, 0, err
 	}
-	return newest.ID, nil
+	return newest.ID, newest.ThreadSeq, nil
 }

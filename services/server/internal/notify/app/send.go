@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
@@ -94,6 +95,9 @@ func (p *Push) prepare(ctx context.Context, job PushJob) (prepared, error) {
 	if err != nil || !ok {
 		return prepared{skip: skipReasonNoAccess}, err
 	}
+	if release, err := p.released(ctx, job); err != nil || !release {
+		return prepared{skip: skipReasonRead}, err
+	}
 	provider, ok := p.providers[reg.Provider]
 	if !ok {
 		return prepared{skip: skipReasonNoProvider}, nil
@@ -113,6 +117,26 @@ func (p *Push) prepare(ctx context.Context, job PushJob) (prepared, error) {
 	return prepared{reg: reg, provider: provider, n: n}, nil
 }
 
+// released is the release check of a push delayed while a desktop was active (13 4.4, M3-17
+// ReleaseDelayed, M3-23 design note 5): with ReleaseSeq above zero it reads the recipient's read
+// position max(read_states.last_read_seq, threads.unread_floor_seq), an absent row read as 0, and
+// reports false when it reached ReleaseSeq. An immediate push (ReleaseSeq zero) reads nothing.
+// Nothing else is evaluated again at the end of the delay.
+func (p *Push) released(ctx context.Context, job PushJob) (bool, error) {
+	if job.ReleaseSeq <= 0 || !job.Kind.HasThread() {
+		return true, nil
+	}
+	pos, err := p.d.Positions.PositionsFor(ctx, job.ThreadID, []ids.ID{job.RecipientID})
+	if err != nil {
+		return false, err
+	}
+	info, err := p.d.Threads.Info(ctx, job.ThreadID)
+	if err != nil {
+		return false, err
+	}
+	return domain.ReleaseDelayed(job.ReleaseSeq, max(pos[job.RecipientID], info.UnreadFloorSeq)), nil
+}
+
 // deviceActive reports whether device is an active device of user.
 func (p *Push) deviceActive(ctx context.Context, user, device ids.ID) (bool, error) {
 	refs, err := p.d.Devices.ActiveForUsers(ctx, []ids.ID{user})
@@ -127,30 +151,42 @@ func (p *Push) deviceActive(ctx context.Context, user, device ids.ID) (bool, err
 	return false, nil
 }
 
-// mayReceive applies the check at send time (04 7.6, R-AZ-11, R-AZ-30, design note 7): an active
-// human always; push.deliver on the thread for kinds with thread; for security the registration's
-// device is not the pending device of the hint.
+// mayReceive applies the check at send time of a push to reg (04 7.6, R-AZ-11, R-AZ-30, design
+// note 7): mayDeliver for the registration's device; the badge sync only to an active human.
 func (p *Push) mayReceive(ctx context.Context, job PushJob, reg Registration) (bool, error) {
-	users, err := p.activeHumans(ctx, []ids.ID{job.RecipientID})
+	ok, _, err := p.mayDeliver(ctx, job.RecipientID, job.Kind, job.ThreadID, reg.DeviceID, job.TargetID)
+	return ok, err
+}
+
+// mayDeliver is the check at send time of a hint of kind for recipient, shared by
+// notify.push_send and notify.gateway_send (04 7.6, R-AZ-11, R-AZ-29 to R-AZ-31): an active human
+// always; push.deliver on the thread with the rights of now for kinds with thread (a thread that
+// no longer exists denies), returning the thread's current place; the recipient rule of R-AZ-30
+// for security (not to the pending device target itself; device is zero for the gateway, whose
+// connections the hub matches to the recipient) and admin; the badge sync (KindSync) to an active
+// human.
+func (p *Push) mayDeliver(ctx context.Context, recipient ids.ID, kind domain.Kind, thread, device, target ids.ID) (bool, chat.ThreadInfo, error) {
+	users, err := p.activeHumans(ctx, []ids.ID{recipient})
 	if err != nil || len(users) == 0 {
-		return false, err
+		return false, chat.ThreadInfo{}, err
 	}
 	switch {
-	case job.Kind == domain.KindSync, job.Kind == domain.KindAdmin:
-		return true, nil
-	case job.Kind == domain.KindSecurity:
-		return reg.DeviceID != job.TargetID, nil
-	case job.Kind.HasThread():
-		info, err := p.d.Threads.Info(ctx, job.ThreadID)
+	case kind == domain.KindSync, kind == domain.KindAdmin:
+		return true, chat.ThreadInfo{}, nil
+	case kind == domain.KindSecurity:
+		return device.IsZero() || device != target, chat.ThreadInfo{}, nil
+	case kind.HasThread():
+		info, err := p.d.Threads.Info(ctx, thread)
 		if err != nil {
 			if errs.KindOf(err) == errs.KindNotFound {
-				return false, nil
+				return false, chat.ThreadInfo{}, nil
 			}
-			return false, err
+			return false, chat.ThreadInfo{}, err
 		}
-		return p.canRead(ctx, job.RecipientID, job.ThreadID, info.ChannelID, info.SpaceID)
+		ok, err := p.canRead(ctx, recipient, thread, info.ChannelID, info.SpaceID)
+		return ok, info, err
 	}
-	return false, internal("notify: a push job with an unknown kind")
+	return false, chat.ThreadInfo{}, internal("notify: a hint with an unknown kind")
 }
 
 // call is step 2 of Send: the provider request outside any transaction, under the semaphore.
