@@ -71,7 +71,7 @@ func (c *Client) gateway(ctx context.Context, cursor *int64) (*GatewayConn, erro
 	if c.ClientIP != "" {
 		opts = append(opts, wstest.WithHeader("X-Forwarded-For", c.ClientIP))
 	}
-	ws, err := wstest.Dial(ctx, c.publicURL, opts...)
+	ws, err := wstest.Dial(c.tb, ctx, c.publicURL, opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -85,6 +86,8 @@ type Client struct {
 	http      *http.Client
 	key       *deviceKey
 	stepKey   *deviceKey
+	// tb is the test of the server: gateway connections report their frame violations to it (G9).
+	tb testing.TB
 
 	mu      sync.Mutex
 	access  string
