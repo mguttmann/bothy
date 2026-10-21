@@ -119,7 +119,7 @@ func TestPlatform_TMT24(t *testing.T) {
 		t.Fatalf("remove %d %s", c, out)
 	}
 	openHome(t, home(userA)) // the long runner of A reopens it
-	out, c := doctor(t)
+	out, c := doctorAnswer(t)
 	if c != 1 || !strings.Contains(out, "HD9 FAIL foreign_home_listable") || !strings.Contains(out, "user="+userA) {
 		t.Errorf("reopened home:\n%s", out)
 	}
