@@ -411,8 +411,11 @@ func (a *Authorizer) guardFacts(ctx context.Context, s *actingPrincipal, action 
 // whose descriptor carries the invoke facts of the thread's operator. Without them Decide refuses
 // the call as an internal error.
 func invokeGuarded(action string) bool {
-	return slices.Contains([]authorize.Action{authorize.ActionAgentInvoke, authorize.ActionAgentSessionReset,
-		authorize.ActionAgentSessionBind}, authorize.Action(action))
+	switch action {
+	case string(authorize.ActionAgentInvoke), string(authorize.ActionAgentSessionReset), string(authorize.ActionAgentSessionBind):
+		return true
+	}
+	return false
 }
 
 // invokeFacts gathers the facts of the agent.invoke guard; inside a structure scope the project

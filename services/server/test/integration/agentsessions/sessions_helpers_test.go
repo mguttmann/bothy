@@ -84,8 +84,8 @@ func match(version int64) []string {
 // sessionRow is one row of agent_sessions as the tests read it.
 type sessionRow struct {
 	ID, Thread, Agent, Ref, Model, EndReason, Currency string
-	Current, Started                                  bool
-	Baseline, Cumulative, Version                     int64
+	Current, Started                                   bool
+	Baseline, Cumulative, Version                      int64
 }
 
 // sessionRows returns the rows of agent_sessions of thread, oldest first.
