@@ -697,10 +697,12 @@ func TestGateway(t *testing.T) {
 }
 
 // TestGatewayTokenExpiry: reauth and the expiry of a person's access token, with
-// auth.access_token_ttl 6s, auth.clock_leeway 0s and sync.reauth_lead_time 4s.
+// auth.access_token_ttl 20s, auth.clock_leeway 0s and sync.reauth_lead_time 18s. The token must
+// outlive the setup and identify of a connection on a loaded CI runner (with 6s it expired
+// before identify there, closing with 4011); reauth_required still comes 2s after the issue.
 func TestGatewayTokenExpiry(t *testing.T) {
 	t.Parallel()
-	w := newGatewayWorld(t, "BOTHY_AUTH__ACCESS_TOKEN_TTL=6s", "BOTHY_AUTH__CLOCK_LEEWAY=0s", "BOTHY_SYNC__REAUTH_LEAD_TIME=4s",
+	w := newGatewayWorld(t, "BOTHY_AUTH__ACCESS_TOKEN_TTL=20s", "BOTHY_AUTH__CLOCK_LEEWAY=0s", "BOTHY_SYNC__REAUTH_LEAD_TIME=18s",
 		"BOTHY_SYNC__HEARTBEAT_INTERVAL=1s", "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=1")
 	ctx := context.Background()
 	next := func(t *testing.T, c *wstest.Client) (string, []byte) {
