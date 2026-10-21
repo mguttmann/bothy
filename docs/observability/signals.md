@@ -130,11 +130,11 @@ Betriebswerte der eigenen Messung ([25-visualisierung.md](../spec/25-visualisier
 
 | Name | Typ | Einheit | Attribute | Quelle | Prometheus |
 |---|---|---|---|---|---|
-| `bothy.push.sent` | Zähler | `{notification}` | `bothy.push.provider`, `bothy.outcome` (`accepted`, `rejected_token`, `rejected_other`, `throttled`, `provider_error`) | worker | `bothy_push_sent_total` |
-| `bothy.push.send.duration` | Histogramm | `s` | `bothy.push.provider` | worker | `bothy_push_send_duration_seconds` |
-| `bothy.push.skipped` | Zähler | `{notification}` | `bothy.reason` (`quiet_hours`, `preference`, `no_access`, `no_registration`) | worker | `bothy_push_skipped_total` |
+| `bothy.push.sent` | Zähler | `{notification}` | `bothy.push.provider`, `bothy.outcome` (`accepted`, `rejected_token`, `rejected_other`, `throttled`, `provider_error`) | worker: one per provider answer of the job `notify.push_send`, the outcome of its result class ([13-push-benachrichtigungen.md](../spec/13-push-benachrichtigungen.md) 7.3), recorded after the commit (M3-19) | `bothy_push_sent_total` |
+| `bothy.push.send.duration` | Histogramm | `s` | `bothy.push.provider` | worker: one provider request of the job `notify.push_send`, outside any transaction (M3-19) | `bothy_push_send_duration_seconds` |
+| `bothy.push.skipped` | Zähler | `{notification}` | `bothy.reason` (`no_access`, `preference`, `active_in_thread`, `no_registration`, `read`, `expired`, `no_provider`) | worker: one per recipient and hint the consumer `push` or a flush decides without a hint, and one per job `notify.push_send` that ends without sending; quiet hours make a hint quiet and never drop it (R-PN-05), so they are no reason (M3-19) | `bothy_push_skipped_total` |
 | `bothy.push.fetch` | Zähler | `{notification}` | `bothy.push.provider` | api: Abruf durch Notification Service Extension bzw. Android-Handler | `bothy_push_fetch_total` |
-| `bothy.push.registrations.active` | Gauge | `{registration}` | `bothy.push.provider` | worker | `bothy_push_registrations_active` |
+| `bothy.push.registrations.active` | Gauge | `{registration}` | `bothy.push.provider` | worker: the rows of `push_registrations` with `disabled_at IS NULL` per provider, observed at each collection (M3-19) | `bothy_push_registrations_active` |
 | `bothy.file.upload.size` | Histogramm | `By` | keine | api | `bothy_file_upload_size_bytes` |
 | `bothy.file.scan` | Zähler | `{file}` | `bothy.outcome` (`clean`, `infected`, `error`, `skipped`) | worker | `bothy_file_scan_total` |
 | `bothy.file.scan.duration` | Histogramm | `s` | `bothy.outcome` | worker | `bothy_file_scan_duration_seconds` |
