@@ -16,10 +16,12 @@ import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 
 import 'access_fake.dart';
+import 'agents_fake.dart';
 import 'hosts_fake.dart';
 
 export '../self/support.dart' show pumpInApp, testClock, testNow;
 export 'access_fake.dart';
+export 'agents_fake.dart';
 export 'hosts_fake.dart';
 
 /// The changing calls of this fake and whether 05 gives their action step-up.
@@ -46,6 +48,7 @@ const Map<String, bool> stepUpOf = {
   'exportAudit': true,
   'verifyAuditChain': true,
   ...hostsStepUpOf,
+  ...agentsStepUpOf,
 };
 
 /// The audit entries of the fake: Alex created a grant, Sam was denied an agent run, Alex
@@ -132,7 +135,7 @@ AdminPerson _p(
 /// Robin until the end of the year. The grant calls come from [FakeAccess], the host calls
 /// from [FakeHosts].
 class FakeAdminRepository
-    with FakeAccess, FakeHosts
+    with FakeAccess, FakeHosts, FakeAgents
     implements AdminRepository {
   /// Creates the fake; [prompt] is asked as the step-up interceptor would.
   FakeAdminRepository({required this.prompt});
@@ -301,6 +304,9 @@ class FakeAdminRepository
   @override
   Future<void> change(String op, String args, String purpose) =>
       _change(op, args, purpose);
+
+  @override
+  Future<void> read(String op, String purpose) => _read(op, purpose);
 
   @override
   String nameOf(String userId) => peopleById[userId]?.displayName ?? userId;
@@ -695,8 +701,10 @@ class FakeAdminRepository
     String userId, {
     required String reason,
     required String purpose,
+    I1Resolution? resolveI1,
   }) async {
     await _change('addOwner', '$userId $reason', purpose);
+    i1Guard('addOwner', resolveI1);
     ownerIds.add(userId);
     peopleById[userId] = _with(peopleById[userId]!, owner: true);
   }
@@ -791,12 +799,14 @@ class FakeAdminRepository
     String userId, {
     DateTime? expiresAt,
     required String purpose,
+    I1Resolution? resolveI1,
   }) async {
     await _change(
       'addMember',
       '$groupId $userId ${expiresAt?.toIso8601String() ?? ''}',
       purpose,
     );
+    i1Guard('addMember', resolveI1);
     membersById[groupId]!.add(
       AdminGroupMember(
         userId: userId,

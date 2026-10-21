@@ -11,10 +11,13 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/guided_flow.dart';
+import '../agents/i1_explanation.dart';
 import '../common/admin_action.dart';
 import '../common/problem_banner.dart';
 import '../data/access_repository.dart';
 import '../data/admin_repository.dart';
+import '../data/self_repository.dart' show SelfActionFailed;
 import '../groups/member_editor.dart' show parseDay;
 import '../self/self_feedback.dart';
 import 'grant_labels.dart';
@@ -47,6 +50,12 @@ final class GrantSubjectChoice {
 /// is enabled only when the shown preview belongs to the current request, the server answered
 /// `allowed = true` and the reason is set; it calls `createGrant`, and the step-up follows from
 /// the interceptor. The wizard derives no permission of its own (15 1 principle 1).
+///
+/// When the preview reports an I1 conflict (10 11), "Confirm" stays disabled and the preview
+/// offers the guided option instead: it asks the reason of the switch and sends ONE
+/// `createGrant` with `resolve_i1`, so the server switches the agents and creates the grant in
+/// one transaction (BR-07). Success shows [GuidedResult] and then [onCreated]; a failure
+/// changed nothing and shows the problem, with the conflicts that remain.
 ///
 /// [target], [subject] and [level] preselect parts of the request and [step] opens a step
 /// (0 to 2), for example from "Who has access?" or the grants of a target. [onCreated]
@@ -152,6 +161,7 @@ class _GrantWizardState extends State<GrantWizard>
   String? _shownFor;
   GrantPreviewResult? _preview;
   SelfFailure? _previewFailure;
+  List<InvariantFinding> _remaining = const [];
 
   /// Sets [target] and, when its kind changes between a host and any other target, the parts
   /// that depend on it: a host has no level and exactly `terminal` (07 2.12), the others have a
@@ -307,16 +317,18 @@ class _GrantWizardState extends State<GrantWizard>
     }
   }
 
-  bool get _canConfirm {
+  /// Whether the shown preview belongs to the current request with its reason set: the
+  /// condition of both "Confirm" and the guided option.
+  bool get _previewCurrent {
     final request = _request();
-    final preview = _preview;
     return !busy &&
         request != null &&
         request.reason.isNotEmpty &&
-        preview != null &&
-        preview.allowed &&
+        _preview != null &&
         _shownFor == _keyOf(request);
   }
+
+  bool get _canConfirm => _previewCurrent && _preview!.allowed;
 
   Future<void> _confirm() async {
     final l = AppLocalizations.of(context);
@@ -334,6 +346,51 @@ class _GrantWizardState extends State<GrantWizard>
       return SelfNotice(l.adminGrantCreated(_subjectName));
     });
     if (created case final grant?) widget.onCreated?.call(grant);
+  }
+
+  /// The guided option of 10 11 for the I1 [findings] of the preview: the reason, then one
+  /// `createGrant` with `resolve_i1` (05 rule 1.6), never a switch on its own.
+  Future<void> _guided(List<InvariantFinding> findings) async {
+    final l = AppLocalizations.of(context);
+    final request = _request();
+    final names = _names;
+    if (request == null || names == null || !_previewCurrent) return;
+    final ids = guidedAgentIds(findings);
+    final reason = await GuidedFlow.askReason(
+      context,
+      agents: guidedAgentNames(names, findings),
+    );
+    if (reason == null || !mounted) return;
+    setState(() => _remaining = const []);
+    AdminGrant? created;
+    await runChange('guided', () async {
+      try {
+        created = await widget.repository.createGrant(
+          request,
+          purpose: l.stepUpPurposeCreateGrant(
+            _subjectName,
+            targetLabel(l, request.target),
+          ),
+          resolveI1: I1Resolution(ids, reason: reason),
+        );
+      } on SelfActionFailed catch (e) {
+        // The server's transaction changed nothing; a conflict it still finds (an agent the
+        // preview did not name) is explained with its principals (10 5.4).
+        if (mounted && e.conflicts.isNotEmpty) {
+          setState(() => _remaining = e.conflicts);
+        }
+        rethrow;
+      }
+      return SelfNotice(l.adminGrantCreated(_subjectName));
+    });
+    final grant = created;
+    if (grant == null || !mounted) return;
+    await GuidedResult.show(
+      context,
+      repository: widget.repository,
+      agentIds: ids,
+    );
+    widget.onCreated?.call(grant);
   }
 
   bool get _stepReady => switch (_step) {
@@ -436,10 +493,21 @@ class _GrantWizardState extends State<GrantWizard>
               text: failure.text,
             )
           else
-            PreviewPanel(preview: _preview, names: names),
+            PreviewPanel(
+              preview: _preview,
+              names: names,
+              person: _subjectName,
+              // A refused guided request (403) hides the option (15 1 principle 1).
+              onGuided: denied.contains('guided') ? null : _guided,
+              guidedReady: _previewCurrent,
+            ),
         ],
         const SizedBox(height: DsSpace.s12),
         noticeBanner(),
+        if (_remaining.isNotEmpty && names != null) ...[
+          const SizedBox(height: DsSpace.s8),
+          I1Explanation(conflicts: _remaining, names: names),
+        ],
         const SizedBox(height: DsSpace.s12),
         Wrap(
           alignment: WrapAlignment.end,

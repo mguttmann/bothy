@@ -20,8 +20,8 @@ enum AdminSection {
   /// The queue of waiting devices.
   devices('devices', hasScreen: true),
 
-  /// Agents (M4-28).
-  agents('agents'),
+  /// Agents with their backend switch and tokens (M4-28).
+  agents('agents', hasScreen: true),
 
   /// Apps (M6-08).
   apps('apps'),
@@ -70,7 +70,8 @@ final class AdminLocation {
   final AdminSection section;
 
   /// The person (in [AdminSection.people]), group (in [AdminSection.groups]), target key
-  /// (in [AdminSection.grants]) or host (in [AdminSection.hosts]), or null for the list.
+  /// (in [AdminSection.grants]), agent (in [AdminSection.agents]) or host (in
+  /// [AdminSection.hosts]), or null for the list.
   final String? id;
 
   /// Parses the path [segments] below the administration's root; null for a path that names no
