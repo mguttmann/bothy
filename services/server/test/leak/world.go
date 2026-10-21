@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
@@ -35,8 +36,8 @@ const (
 	worldGroups = 2
 	// worldNoiseMessages is the number of noise messages per channel the principal cannot read.
 	worldNoiseMessages = 2
-	// expiryLead is how far ahead of the harness clock an expiring grant or membership ends; the
-	// build writes what needs access before it and waits for it after.
+	// expiryLead is how far ahead of the harness clock, at its own creation, an expiring grant or
+	// membership ends; the build writes what needs access before it and waits for the latest one.
 	expiryLead = 4 * time.Second
 )
 
@@ -229,6 +230,19 @@ type RandomWorld struct {
 	Drafts     map[string]string
 
 	humanHandle string
+	clk         clock.Clock
+	build       buildOptions
+	// lastExpiry is the latest expires_at the build sent; BuildWorld waits until it has passed.
+	lastExpiry time.Time
+}
+
+// buildOptions change how BuildWorld builds; the zero value is the build of the AZ-P5 tests.
+type buildOptions struct {
+	// lead replaces expiryLead when positive.
+	lead time.Duration
+	// beforeExpiring runs before each request that carries an expires_at (a test slows the build
+	// with it, as a loaded CI runner does).
+	beforeExpiring func()
 }
 
 // Principal returns the client of o.
@@ -245,10 +259,18 @@ func (w *RandomWorld) Principal(o Observed) *harness.Client {
 // drafts of the person, the lost channel; then it waits until every expiry has passed.
 func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 	tb.Helper()
+	return buildWorld(tb, s, p, buildOptions{})
+}
+
+// buildWorld is BuildWorld with opts. Every expires_at is taken from the harness clock when its
+// request is built, so it is after the request however slow the build runs (field code in_past,
+// DECISIONS M1-48/11).
+func buildWorld(tb testing.TB, s *harness.Server, p *Plan, opts buildOptions) *RandomWorld {
+	tb.Helper()
 	tag := strconv.FormatUint(p.Seed%1_000_000, 36)
 	w := &RandomWorld{
 		Plan: p, Owner: s.Owner, Forum: map[string]bool{}, Threads: map[string]string{}, Main: map[string]string{},
-		ReadStates: map[string]int64{}, Drafts: map[string]string{},
+		ReadStates: map[string]int64{}, Drafts: map[string]string{}, clk: s.Clock(), build: opts,
 	}
 	o := s.Owner
 	w.humanHandle = "p" + tag
@@ -299,7 +321,6 @@ func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 			w.buildChannel(tb, w.Channels[si][ci], c)
 		}
 	}
-	expiry := s.Clock().Now().Add(expiryLead)
 	groups := make([]string, len(p.Members))
 	for g := range p.Members {
 		groups[g] = idOf(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/groups",
@@ -307,7 +328,7 @@ func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 		if p.Members[g] {
 			body := map[string]any{"user_id": w.Human.PrincipalID}
 			if p.Expiring[g] {
-				body["expires_at"] = stamp(expiry)
+				body["expires_at"] = w.expiresAt()
 			}
 			harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/groups/" + groups[g] + "/members", Body: body}, http.StatusCreated)
 		}
@@ -320,17 +341,34 @@ func BuildWorld(tb testing.TB, s *harness.Server, p *Plan) *RandomWorld {
 		case g.Subject == ObservedAgent:
 			kind, subject = "agent", w.Agent.PrincipalID
 		}
-		w.grant(tb, kind, subject, g.Target, g.Level, g.Expires, expiry)
+		w.grant(tb, kind, subject, g.Target, g.Level, g.Expires)
 	}
 	// The person writes where it can read: before the expiring grants end and before the lost
 	// channel is revoked, so drafts and read states exist in channels it no longer reads.
-	lost := w.grant(tb, "user", w.Human.PrincipalID, p.Lost, "write", false, expiry)
+	lost := w.grant(tb, "user", w.Human.PrincipalID, p.Lost, "write", false)
 	w.writePersonal(tb)
 	harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/grants/" + lost + "/revoke", Body: map[string]any{"reason": "leak test"}}, http.StatusOK)
-	if d := time.Until(expiry); d > 0 {
+	if d := w.lastExpiry.Sub(w.clk.Now()); !w.lastExpiry.IsZero() && d > 0 {
 		time.Sleep(d + time.Second)
 	}
 	return w
+}
+
+// expiresAt returns the expires_at of a grant or membership created now: lead after the harness
+// clock at this moment, recorded as the latest expiry of the build.
+func (w *RandomWorld) expiresAt() string {
+	if w.build.beforeExpiring != nil {
+		w.build.beforeExpiring()
+	}
+	lead := expiryLead
+	if w.build.lead > 0 {
+		lead = w.build.lead
+	}
+	t := w.clk.Now().Add(lead)
+	if t.After(w.lastExpiry) {
+		w.lastExpiry = t
+	}
+	return stamp(t)
 }
 
 // buildChannel writes the threads and messages of c into channel id as the owner: a text channel
@@ -387,7 +425,7 @@ func (w *RandomWorld) Post(tb testing.TB, thread string, mention bool) string {
 }
 
 // grant creates a grant of the owner and returns its ID.
-func (w *RandomWorld) grant(tb testing.TB, kind, subject string, t Target, level string, expires bool, expiry time.Time) string {
+func (w *RandomWorld) grant(tb testing.TB, kind, subject string, t Target, level string, expires bool) string {
 	tb.Helper()
 	body := map[string]any{"subject_kind": kind, "subject_id": subject, "target_kind": t.Kind, "level": level, "reason": "leak test"}
 	switch t.Kind {
@@ -397,7 +435,7 @@ func (w *RandomWorld) grant(tb testing.TB, kind, subject string, t Target, level
 		body["target_id"] = w.Channels[t.Space][t.Channel]
 	}
 	if expires {
-		body["expires_at"] = stamp(expiry)
+		body["expires_at"] = w.expiresAt()
 	}
 	return idOf(tb, harness.MustDo(tb, w.Owner, harness.Request{Method: http.MethodPost, Path: "/grants", Body: body}, http.StatusCreated))
 }

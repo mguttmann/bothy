@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
@@ -572,5 +573,42 @@ func TestWorldPlanReproducible(t *testing.T) {
 	}
 	if fmt.Sprint(ObservedHuman, ObservedAgent) != "human agent" {
 		t.Fatal("names")
+	}
+}
+
+// regressionSeed is the seed of a failed main CI run (in hex; the log prints it in decimal): its
+// build took longer than expiryLead on a loaded runner, so a grant created late carried an
+// expires_at already in the past and the harness itself got 400 validation_failed (in_past) from
+// POST /grants.
+const regressionSeed = 0x18e08ea3ed821246
+
+// TestAZ_P5_SlowBuildRegression replays regressionSeed with every expiring request delayed past
+// the lead: each expires_at is still after its request, every expiry has passed before the
+// checks, and property 1 holds for both observed principals.
+func TestAZ_P5_SlowBuildRegression(t *testing.T) {
+	t.Parallel()
+	p := NewPlan(regressionSeed)
+	expiring := 0
+	for _, g := range p.Grants {
+		if g.Expires {
+			expiring++
+		}
+	}
+	for g := range p.Members {
+		if p.Members[g] && p.Expiring[g] {
+			expiring++
+		}
+	}
+	if expiring < 2 {
+		t.Fatalf("seed %d plans %d expiring grants or memberships, want at least 2", regressionSeed, expiring)
+	}
+	const lead = time.Second
+	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: p5Config()})
+	w := buildWorld(t, s, p, buildOptions{lead: lead, beforeExpiring: func() { time.Sleep(lead + 500*time.Millisecond) }})
+	if now := s.Clock().Now(); !now.After(w.lastExpiry) {
+		t.Fatalf("build returned at %v, before the last expiry %v", now, w.lastExpiry)
+	}
+	for _, o := range []Observed{ObservedHuman, ObservedAgent} {
+		t.Run(o.String(), func(t *testing.T) { checkProperty1(t, w, o) })
 	}
 }

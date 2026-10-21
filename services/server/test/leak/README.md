@@ -13,6 +13,7 @@ reveals a foreign channel, thread, message, space or agent.
 | `TestAZ_P4_TimingMedian` | AZ-P4 | same subtests: after a warm-up, interleaved samples of both IDs have medians within `authz.not_found_timing_tolerance` (read from `docs/operations/configuration.md`) |
 | `TestAZ_M52_ForeignMessageEqualsUnknown` | AZ-M52 | Alex reading a message of Marketing/Kampagnen gets the answer of a random ID |
 | `TestAZ_P5_ListsAndCountersMatchAuthorize` | AZ-P5 property 1 | on random worlds, for a person and an agent: every ID a surface names is readable by the per-item truth, events have a visible scope or `audience` self, unread and mention counts equal the model, no totals |
+| `TestAZ_P5_SlowBuildRegression` | AZ-P5 property 1 | the seed of a CI failure, with every expiring request delayed past the lead: each `expires_at` is still after its request, every expiry has passed before the checks, property 1 holds |
 | `TestAZ_P5_NoiseInvariance` | AZ-P5 property 2 | threads, messages, mentions, reactions and pins in unreadable channels leave every surface equal (without `head_seq`, `next_cursor`, cursor frames) |
 
 Unit tests: `TestNormalize*`, `TestSelectRoutes*`, `TestToleranceFromReference`,
@@ -29,7 +30,9 @@ Unit tests: `TestNormalize*`, `TestSelectRoutes*`, `TestToleranceFromReference`,
   `RateLimit`, drops `correlation_id` and replaces the requested IDs in `instance` of a problem
   body; `Diff` lists every remaining difference.
 - `world.go`: `NewPlan(seed)` (pure, reproducible), `BuildWorld` through the public API, sizes and
-  `WorldsPerRun` as named constants.
+  `WorldsPerRun` as named constants. Every `expires_at` is read from the harness clock when its
+  request is built (never one instant for the whole build), so a slow build never sends an expiry
+  the API rejects as `in_past`; the build waits until the latest expiry has passed.
 
 ## Running
 
