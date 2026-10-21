@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/runs/app"
@@ -19,7 +20,14 @@ import (
 // allow_mentioned_agents on Support/Eskalation.
 func runsWorld(t *testing.T) *world {
 	t.Helper()
-	w := newWorld(t)
+	return runsWorldWith(t, chatConfig)
+}
+
+// runsWorldWith is runsWorld with the chat configuration chatCfg (M2-18).
+func runsWorldWith(t *testing.T, chatCfg chatapp.Config) *world {
+	t.Helper()
+	w := newEmptyWorldWithChat(t, chapterSearch(t), chatCfg)
+	w.build()
 	// The instance row of bothy migrate up (snapshot and catch-up read head and epoch).
 	w.sql(`INSERT INTO instance (id, instance_id, schema_version, sync_epoch) VALUES (1, $1, 1, $2) ON CONFLICT (id) DO NOTHING`,
 		ids.New().String(), ids.New().String())
