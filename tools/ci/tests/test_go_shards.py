@@ -341,8 +341,9 @@ def test_the_checked_in_timings_are_package_and_test_durations() -> None:
     assert all(
         isinstance(k, str) and isinstance(v, int | float) and v >= 0 for k, v in data.items()
     )
-    # A test of a split package is `<package>#<test>`.
+    # A test of a split package is `<package>#<test>`, a part of it `<package>@<J>/<K>`.
     assert all(k.split("#")[0] in go_shards.SPLITS for k in data if "#" in k)
+    assert all(k.split("@")[0] in go_shards.SPLITS for k in data if "@" in k)
 
 
 # --- the workflows -------------------------------------------------------------------------
@@ -954,7 +955,12 @@ def test_timings_count_a_part_as_its_share_of_the_package(tmp_path: Path) -> Non
         f"2026-10-21T01:48:30.0Z ok  \t{WIRE}\t300.000s\tcoverage: 1.0% of ...\n",
     )
     other = _write(tmp_path / "b.log", f"go-shard: part 1/2 of {WIRE}\nFAIL\t{WIRE}\t200.000s\n")
-    assert go_shards.parse_timings([log, other]) == {"example.com/a": 1.0, WIRE: 500.0}
+    assert go_shards.parse_timings([log, other]) == {
+        "example.com/a": 1.0,
+        WIRE: 500.0,
+        f"{WIRE}@1/2": 200.0,
+        f"{WIRE}@2/2": 300.0,
+    }
 
 
 @pytest.mark.parametrize(("package", "parts"), sorted(go_shards.SPLITS.items()))
@@ -995,6 +1001,7 @@ def test_timings_keep_the_top_level_tests_of_a_part(tmp_path: Path) -> None:
     )
     assert go_shards.parse_timings([log]) == {
         WIRE: 40.0,
+        f"{WIRE}@1/2": 20.0,
         f"{WIRE}#TestA": 12.5,
         f"{WIRE}#TestB": 3.0,
         f"{WIRE}#TestC": 0.0,
@@ -1013,3 +1020,24 @@ def test_packages_balances_the_parts_by_the_test_timings(
     assert go_shards.main([*args, "--module", "services/server", *MODULES]) == 0
     lines = [ln.split("\t") for ln in capsys.readouterr().out.splitlines() if "\t" in ln]
     assert sorted(ln[1:] for ln in lines) == [["-run", "^(TestE)$"], ["-skip", "^(TestE)$"]]
+
+
+def test_a_measured_part_weighs_its_own_duration() -> None:
+    # A part with the one long test of the package runs much longer than its share; its own
+    # measured duration lets the other packages go to the other shards.
+    timings = {**TIMINGS, f"{WIRE}@1/2": 900.0, f"{WIRE}@2/2": 100.0}
+    shards = go_shards.assign(go_shards.expand(_units(), SPLITS), timings, 3)
+    [first] = [s for s in shards if go_shards.Unit("services/server", WIRE, "1/2") in s]
+    assert first == [go_shards.Unit("services/server", WIRE, "1/2")]
+
+
+def test_timings_keep_the_duration_of_each_part(tmp_path: Path) -> None:
+    log = _write(
+        tmp_path / "a.log",
+        f"go-shard: part 1/2 of {WIRE}\nok  \t{WIRE}\t300.000s\n"
+        f"go-shard: part 2/2 of {WIRE}\nok  \t{WIRE}\t100.000s\n",
+    )
+    timings = go_shards.parse_timings([log])
+    assert timings[f"{WIRE}@1/2"] == 300.0
+    assert timings[f"{WIRE}@2/2"] == 100.0
+    assert timings[WIRE] == 400.0

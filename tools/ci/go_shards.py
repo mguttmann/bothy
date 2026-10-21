@@ -199,7 +199,13 @@ def assign(units: Iterable[Unit], timings: dict[str, float], total: int) -> list
     units = list(units)
     known = [timings[u.package] for u in units if u.package in timings]
     default = statistics.median(known) if known else 1.0
-    weighted = sorted({(-timings.get(u.package, default) / _parts(u), u) for u in units})
+
+    def weight(unit: Unit) -> float:
+        # A part weighs its own measured duration, else its share of the package.
+        own = timings.get(f"{unit.package}@{unit.part}") if unit.part else None
+        return own if own is not None else timings.get(unit.package, default) / _parts(unit)
+
+    weighted = sorted({(-weight(u), u) for u in units})
     shards: list[list[Unit]] = [[] for _ in range(total)]
     loads = [0.0] * total
     for negative, unit in weighted:
@@ -212,17 +218,18 @@ def assign(units: Iterable[Unit], timings: dict[str, float], total: int) -> list
 def parse_timings(logs: Sequence[Path]) -> dict[str, float]:
     """The mean durations of the `go test` logs.
 
-    Per package from its `ok`/`FAIL` result lines, and per top-level test of a part (from the
-    `-v` output of the part) as `<package>#<test>`.
+    Per package from its `ok`/`FAIL` result lines, per part of a split package as
+    `<package>@<J>/<K>` and per top-level test of a part (from its `-v` output) as
+    `<package>#<test>`.
     """
     seen: dict[str, list[float]] = {}
     for log in logs:
-        parts: dict[str, int] = {}
+        parts: dict[str, str] = {}  # the part J/K whose output follows, per split package
         current = ""  # the split package whose part output this is
         for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
             marker = _MARKER.match(line)
             if marker:
-                parts[marker[3]] = int(marker[2])
+                parts[marker[3]] = f"{marker[1]}/{marker[2]}"
                 current = marker[3]
             test = _TEST_RESULT.match(line)
             if test and current:
@@ -230,10 +237,14 @@ def parse_timings(logs: Sequence[Path]) -> dict[str, float]:
             match = _RESULT.match(line)
             if match and match[1] == current:
                 current = ""
-            if match:
-                # A part of K ran about 1/K of the package: K times it estimates the whole.
-                share = parts.pop(match[1], 1)
-                seen.setdefault(match[1], []).append(float(match[2]) * share)
+            if match and match[1] in parts:
+                # The part itself, and K times it as an estimate of the whole package.
+                seen.setdefault(f"{match[1]}@{parts[match[1]]}", []).append(float(match[2]))
+                seen.setdefault(match[1], []).append(
+                    float(match[2]) * int(parts.pop(match[1]).split("/")[1])
+                )
+            elif match:
+                seen.setdefault(match[1], []).append(float(match[2]))
     return {pkg: round(statistics.fmean(v), 3) for pkg, v in sorted(seen.items())}
 
 
