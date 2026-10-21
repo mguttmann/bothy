@@ -62,12 +62,17 @@ func toolRank(c string) int {
 // The actions with a guard.
 const (
 	actionAgentInvoke = "agent.invoke"
-	actionGrantCreate = "grant.create"
-	actionGrantRevoke = "grant.revoke"
-	actionTokenCreate = "token.create"
+	// The session switches carry the agent.invoke guard (05 section 4.6, brief M2-12 design note
+	// 5).
+	actionAgentSessionReset = "agent_session.reset"
+	actionAgentSessionBind  = "agent_session.bind"
+	actionGrantCreate       = "grant.create"
+	actionGrantRevoke       = "grant.revoke"
+	actionTokenCreate       = "token.create"
 )
 
-// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke, token.create,
+// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke and the session
+// switches agent_session.reset and agent_session.bind with its facts (brief M2-12), token.create,
 // the mode guard of run.start (M2-09) and the terminal guards SR10, SR11 and SR12 of terminal.open
 // and terminal.attach (M2-40). The
 // delegation limits of grant.create and grant.revoke belong to the requirement (decideDelegation).
@@ -80,9 +85,9 @@ func guards(in *Input) (Decision, error) {
 			return Decision{}, internalError("token.create without the holder")
 		}
 		return tokenCreateGuard(in, in.Token), nil
-	case actionAgentInvoke:
+	case actionAgentInvoke, actionAgentSessionReset, actionAgentSessionBind:
 		if in.Invoke == nil {
-			return Decision{}, internalError("agent.invoke without its trigger")
+			return Decision{}, internalError(in.Action + " without its trigger")
 		}
 		return invokeGuard(in, in.Invoke), nil
 	case actionRunStart:
