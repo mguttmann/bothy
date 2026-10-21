@@ -154,28 +154,36 @@ func (s *Service) contextFacts(ctx context.Context, row RunRow) (contextBuild, e
 // earlier started runs in that session.
 func (s *Service) contextPlan(ctx context.Context, row RunRow, operator ids.ID) (domain.ContextPlan, ids.ID, error) {
 	f := domain.PlanFacts{Operator: !operator.IsZero() && operator == row.AgentID}
-	var session ids.ID
-	if f.Operator && s.d.CurrentSessions != nil {
-		cur, found, err := s.d.CurrentSessions.CurrentSession(ctx, row.ThreadID)
-		if err != nil {
-			return domain.ContextPlan{}, ids.ID{}, err
-		}
-		if found && cur.AgentID == row.AgentID {
-			f.HasSession, f.Started, session = true, cur.Started, cur.ID
-			used, trigger, err := s.d.ContextRows.EarlierSessionRun(ctx, row, cur.ID)
-			if err != nil {
-				return domain.ContextPlan{}, ids.ID{}, err
-			}
-			if used {
-				e, err := s.earlierTrigger(ctx, row.ThreadID, trigger)
-				if err != nil {
-					return domain.ContextPlan{}, ids.ID{}, err
-				}
-				f.Earlier = []domain.EarlierRun{e}
-			}
-		}
+	if !f.Operator || s.d.CurrentSessions == nil {
+		return domain.PlanContext(f), ids.ID{}, nil
 	}
-	return domain.PlanContext(f), session, nil
+	cur, found, err := s.d.CurrentSessions.CurrentSession(ctx, row.ThreadID)
+	if err != nil {
+		return domain.ContextPlan{}, ids.ID{}, err
+	}
+	if !found || cur.AgentID != row.AgentID {
+		return domain.PlanContext(f), ids.ID{}, nil
+	}
+	f.HasSession, f.Started = true, cur.Started
+	if f.Earlier, err = s.earlierRuns(ctx, row, cur.ID); err != nil {
+		return domain.ContextPlan{}, ids.ID{}, err
+	}
+	return domain.PlanContext(f), cur.ID, nil
+}
+
+// earlierRuns returns the earlier started runs of row's agent in the session row, as PlanFacts
+// needs them: none, or the latest one with a triggering message (or one without, when no earlier
+// run has one).
+func (s *Service) earlierRuns(ctx context.Context, row RunRow, sessionID ids.ID) ([]domain.EarlierRun, error) {
+	used, trigger, err := s.d.ContextRows.EarlierSessionRun(ctx, row, sessionID)
+	if err != nil || !used {
+		return nil, err
+	}
+	e, err := s.earlierTrigger(ctx, row.ThreadID, trigger)
+	if err != nil {
+		return nil, err
+	}
+	return []domain.EarlierRun{e}, nil
 }
 
 // earlierTrigger describes the triggering message of the latest earlier run of the session: its
