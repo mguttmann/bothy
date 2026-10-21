@@ -631,7 +631,7 @@ func TestGateway(t *testing.T) {
 		if err := wstest.Strict(d, &rr); err != nil || rr.Reason != "epoch_changed" || rr.HeadSeq != r.HeadSeq || rr.SyncEpoch != r.SyncEpoch {
 			t.Fatalf("resync_required %+v, %v", rr, err)
 		}
-		// The connection stays open: heartbeats keep it past the heartbeat deadline.
+		// The connection stays open after resync_required.
 		time.Sleep(2500 * time.Millisecond)
 		if err := c.Send("heartbeat", map[string]any{"last_seq": r.HeadSeq}); err != nil {
 			t.Fatalf("connection closed after resync_required: %v", err)
@@ -695,10 +695,11 @@ func TestGatewayDeadlines(t *testing.T) {
 	t.Run("TestClose4003IdentifyTimeout", func(t *testing.T) {
 		t.Parallel()
 		w := newGatewayWorld(t, "BOTHY_SYNC__IDENTIFY_TIMEOUT=2s") // nosemgrep: bothy-go-test-gateway-window -- the deadline under test; the client only dials
-		c := w.dial(t)
+		// The stopwatch starts before the dial, so it measures at least the server's window.
 		start := time.Now()
+		c := w.dial(t)
 		w.expectClose(t, c, 4003)
-		if d := time.Since(start); d < time.Second {
+		if d := time.Since(start); d < 2*time.Second {
 			t.Errorf("closed after %v, before sync.identify_timeout", d)
 		}
 	})
@@ -707,22 +708,25 @@ func TestGatewayDeadlines(t *testing.T) {
 		t.Parallel()
 		w := newGatewayWorld(t, "BOTHY_SYNC__HEARTBEAT_INTERVAL=1s", "BOTHY_SYNC__HEARTBEAT_MISS_LIMIT=1") // nosemgrep: bothy-go-test-gateway-window -- the deadline under test; the client sends no heartbeat
 		p := w.newPerson("alex", identity.DeviceStateActive)
-		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
+		// The stopwatch starts before identify, so it measures at least the server's deadline.
 		start := time.Now()
+		c, _ := w.ready(t, w.params(p), wstest.WithoutHeartbeat())
 		w.expectClose(t, c, 4009)
-		if d := time.Since(start); d < 1500*time.Millisecond {
+		if d := time.Since(start); d < 2*time.Second {
 			t.Errorf("closed after %v, before the heartbeat deadline", d)
 		}
 	})
 
 	t.Run("TestClose4006ResumeAfterWindow", func(t *testing.T) {
 		t.Parallel()
-		w := newGatewayWorld(t, "BOTHY_SYNC__RESUME_WINDOW=3s") // nosemgrep: bothy-go-test-gateway-window -- the window under test; the resume comes after it on purpose
+		w := newGatewayWorld(t, "BOTHY_SYNC__RESUME_WINDOW=1s") // nosemgrep: bothy-go-test-gateway-window -- the window under test; the resume comes after it on purpose
 		ctx := context.Background()
 		p := w.newPerson("alex", identity.DeviceStateActive)
 		c, r := w.ready(t, w.params(p))
 		c.Abort()
-		time.Sleep(3500 * time.Millisecond)
+		// The window starts when the server sees the connection end; the wait leaves it ten
+		// seconds for that beyond the window of one second.
+		time.Sleep(11 * time.Second)
 		n := w.dial(t)
 		cctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 		defer cancel()

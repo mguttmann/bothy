@@ -105,9 +105,9 @@ func Integration(t testing.TB) {
 // maxMissLimit is the largest value of sync.heartbeat_miss_limit.
 const maxMissLimit = 100
 
-// HeartbeatMissLimit returns the smallest sync.heartbeat_miss_limit that, with the heartbeat
-// interval interval, puts the heartbeat deadline of the gateway (interval times the limit plus
-// one) at or beyond Patience. It panics when that limit exceeds the largest value of the key
+// HeartbeatMissLimit returns a sync.heartbeat_miss_limit that, with the heartbeat interval
+// interval, puts the heartbeat deadline of the gateway (interval times the limit plus one) beyond
+// Patience by at least one interval. It panics when that limit exceeds the largest value of the key
 // (an interval below Patience/100).
 func HeartbeatMissLimit(interval time.Duration) int {
 	n := int((Patience + interval - 1) / interval)
