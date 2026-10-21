@@ -77,7 +77,7 @@ type req struct {
 
 // consoleServed reports whether this tree serves the console surface (/console, the console form
 // of loginWithPassword); M6-01 adds it and sets this to true (M1-69/10).
-const consoleServed = false
+const consoleServed = true
 
 // enabledOps are the enabled operations of api/operations.yaml, read once.
 var enabledOps = sync.OnceValue(func() map[string]bool {
