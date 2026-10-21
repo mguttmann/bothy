@@ -226,6 +226,16 @@ class FakePasskeys implements PasskeyPort {
   }
 }
 
+/// Records the files the console offers as downloads.
+class FakeDownloads implements FileDownloads {
+  /// The saved files: name, media type and bytes.
+  final List<({String name, String type, Uint8List bytes})> saved = [];
+
+  @override
+  void save(String name, String type, Uint8List bytes) =>
+      saved.add((name: name, type: type, bytes: bytes));
+}
+
 /// The browser environment of a test: the fake server and the fake ports.
 class TestBrowser {
   /// Creates the environment; pass [flows] to keep sessionStorage across a reload.
@@ -245,12 +255,16 @@ class TestBrowser {
   /// The passkey authenticator.
   final FakePasskeys passkeys = FakePasskeys();
 
+  /// The downloads of the tab.
+  final FakeDownloads downloads = FakeDownloads();
+
   /// The console environment over these fakes, at the origin of the harness.
   ConsoleEnvironment get environment => ConsoleEnvironment(
     origin: Uri.parse('https://chat.example.com'),
     flowStore: flows,
     navigation: navigation,
     passkeys: passkeys,
+    downloads: downloads,
     adapter: server,
   );
 }
