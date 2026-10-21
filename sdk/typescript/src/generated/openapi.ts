@@ -3503,9 +3503,13 @@ export interface paths {
         /**
          * Start a queued run
          * @description Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-         *     with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-         *     gets 409 `already_started`. A different `billing_mode_used` fails the run with
-         *     `billing_mode_mismatch`.
+         *     with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+         *     `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+         *     token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+         *     `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+         *     409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+         *     `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+         *     delivery replaced it) or `invalid` (09 section 4.5).
          */
         post: operations["startRun"];
         delete?: never;
@@ -3525,9 +3529,39 @@ export interface paths {
         put?: never;
         /**
          * Resume a run that waited for input
-         * @description `waiting_input -> running` with the token of the interaction or follow-up delivery.
+         * @description `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
          */
         post: operations["resumeRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/invocation-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get a fresh invocation token for an own waiting run
+         * @description For a run in `queued` or `waiting_input` whose invocation token expired before the start
+         *     (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+         *     signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+         *     or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+         *     it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+         *     DISTINCT FROM jti`). A retry with the replaced token issues a
+         *     fresh token again; the run still starts at most once. The server repeats every check it runs
+         *     before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+         *     SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+         *     replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+         *     run that already started gets 409 `already_started`.
+         */
+        post: operations["renewInvocationToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7828,6 +7862,7 @@ export interface components {
              */
             invocation_token: string;
             billing_mode_used: components["schemas"]["BillingMode"];
+            tool_class_used: components["schemas"]["ToolClass"];
             /**
              * @description Absent when the runtime creates the reference only during the run; then the first `reportAgentSession` creates the session row.
              * @example sess-7f3a
@@ -7836,6 +7871,25 @@ export interface components {
             /** @example model-large */
             model?: string;
             billing_evidence?: components["schemas"]["BillingEvidence"];
+        };
+        InvocationTokenRenew: {
+            /**
+             * @description The current invocation token of the run, or on a retry after a lost answer the token the last renewal replaced; it may have expired (09 section 4.5.1).
+             * @example eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
+             */
+            invocation_token: string;
+        };
+        InvocationTokenGrant: {
+            /**
+             * @description Fresh invocation token with a new `jti`; it replaces the current one of the run.
+             * @example eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.signature
+             */
+            invocation_token: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T09:31:00.000Z
+             */
+            expires_at: string;
         };
         RunAwaitInput: {
             /** @example Waiting for approval */
@@ -8886,7 +8940,7 @@ export interface components {
             run_id: components["schemas"]["Uuid"];
             thread_id: components["schemas"]["Uuid"];
             /** @enum {string} */
-            reason: "user_cancelled" | "access_revoked" | "agent_disabled" | "user_disabled";
+            reason: "user_cancelled" | "access_revoked" | "agent_disabled" | "user_disabled" | "channel_read_only";
             requested_by?: components["schemas"]["Uuid"];
         };
         InteractionCreatedPayload: {
@@ -10858,6 +10912,8 @@ export interface components {
         Limit: components["schemas"]["PageLimit"];
         /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
         IdempotencyKey: components["schemas"]["Uuid"];
+        /** @description The compact JWS of `EventEnvelope.invocation_token` of the run, sent on every request an agent makes inside a run (07 guard rule SR9). The server checks it on every request (signature, audience, run active) and binds the request to the person who triggered the run, so the agent has at most that person's rights; it never adds a right. The DPoP proof does not cover it. Declared once for every route like `Authorization`, not as a parameter of each operation; an invalid token gives 403 `invocation_token_invalid` with `reason: invalid`, a token of an ended run `reason: run_inactive`. */
+        InvocationToken: string;
         /** @description ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`. */
         IfMatchRequired: string;
         /** @description Optional ETag; when given, a mismatch gives 412 `version_conflict`. */
@@ -18938,10 +18994,11 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK. */
+            /** @description OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5). */
             200: {
                 headers: {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
                     [name: string]: unknown;
@@ -18974,6 +19031,43 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5). */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    renewInvocationToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: components["parameters"]["RunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvocationTokenRenew"];
+            };
+        };
+        responses: {
             /** @description OK. */
             200: {
                 headers: {
@@ -18983,7 +19077,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Run"];
+                    "application/json": components["schemas"]["InvocationTokenGrant"];
                 };
             };
             400: components["responses"]["BadRequest"];

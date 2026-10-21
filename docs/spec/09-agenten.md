@@ -520,7 +520,9 @@ Marke ihrer Nachricht, weil es die Worte ihres Autors sind ([ADR 0054](../adr/00
 ### 4.7 Operationen des Adapters
 
 Alle Operationen nutzen das Agenten-Token (bei `dpop_jkt` DPoP-gebunden) und die
-Rate-Limit-Klasse aus 05.
+Rate-Limit-Klasse aus 05. Every request of the adapter inside a run also carries the header
+`Invocation-Token` with the invocation token of the run, which binds it to the rights of the
+triggering person ([07-rechte.md](07-rechte.md), SR9; [06-api.md](06-api.md), section 4 point 8).
 
 | Zweck | Aktion | Idempotenz | Regel |
 |---|---|---|---|

@@ -245,7 +245,7 @@ Authentisierung ([08-identitaet.md](08-identitaet.md)) baut ihn; `authz` vertrau
 | `step_up_at` | letzte frische Bestätigung der Sitzung | `auth_sessions.step_up_at` |
 | `token_id`, `token_scopes` | API-Token und seine Scopes (Agenten, Apps, persönliche Tokens) | `api_tokens` |
 | `installation_id`, `granted_scopes` | nur Apps | `app_installations` |
-| `acting_for` | auslösender Mensch, Lauf, Thread und `jti`, wenn ein Agent im Rahmen eines Laufs handelt | geprüfte Aufruf-Marke in der Kopfzeile der Anfrage (Schutzregel SR9) |
+| `acting_for` | auslösender Mensch, Lauf, Thread und `jti`, wenn ein Agent im Rahmen eines Laufs handelt | geprüfte Aufruf-Marke in der Kopfzeile der Anfrage (Schutzregel SR9); the header is `Invocation-Token` ([06-api.md](06-api.md), sections 3 and 4) |
 | `view_as` | Mensch, dessen Sicht der Owner gerade ansieht | Sitzung mit aktivem "Als Person ansehen" (Abschnitt 9.2) |
 | `request_time` | eine Server-Zeit je Aufruf | Uhr |
 
@@ -297,12 +297,12 @@ verrät (bei `404` nie).
 | `run_active` | `forbidden` | Modell-Befehl bei aktivem Lauf (05 `command.invoke`) |
 | `billing_mode_mismatch` | `invariant_violation` | `run.start` mit Ist-Modus ungleich Soll (I3); Problem-Code `billing_mode_mismatch` (`409`) |
 | `tool_class_mismatch` | `invariant_violation` | Adapter meldet eine höhere Werkzeugklasse als die Marke; Problem-Code `tool_class_mismatch` (`409`) |
-| `invocation_token_invalid` | `forbidden` | Aufruf-Marke ungültig, abgelaufen oder nicht die aktuelle (`run.start`) |
+| `invocation_token_invalid` | `forbidden` | Aufruf-Marke ungültig, abgelaufen oder nicht die aktuelle (`run.start`); also every request with `Invocation-Token` (SR9), with `reason` `invalid` (token, run, agent or person wrong, or the header repeated, empty or sent by a principal that is not an agent) or `run_inactive` (the run of the token has ended) |
 | `import_not_running` | `forbidden` | `import.apply` ohne laufende Quelle oder mit Ziel außerhalb ihrer Kanäle |
 | `malware_detected` | kein `authorize`-Ergebnis | Grund des Audit-Eintrags zu `file.upload` bei einem Malware-Fund ([12-dateien.md](12-dateien.md), Abschnitt 5.2) |
 | `component_inactive` | `forbidden` | Komponente benutzt, abgelaufen oder deaktiviert |
 | `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` und Prinzipal ist weder Auslöser noch Owner |
-| `acting_for_insufficient` | `not_found` bzw. `forbidden` | Auftragsbindung: der auslösende Mensch hat das Recht nicht |
+| `acting_for_insufficient` | `not_found` bzw. `forbidden` | Auftragsbindung: der auslösende Mensch hat das Recht nicht; `not_found` when the target is visible with the agent's own rights but not with the intersection (answered like an unknown ID), `forbidden` (problem `forbidden` with `reason: acting_for_insufficient`) when the requirement holds with the agent's own rights but fails with the intersection; if the agent alone already fails, the agent's own reason stays |
 | `terminal_not_host_assignee` | `forbidden` | SR10: Nicht-Owner auf einem Rechner, dessen Inhaber er nicht ist; Problem-Code `terminal_denied` mit `reason: not_host_assignee` |
 | `terminal_server_host_owner_only` | `forbidden` | SR10: Server-Host nur für Owner; Problem-Code `terminal_denied` mit `reason: server_host_owner_only` |
 | `i6_holder_only` | `forbidden` | SR11: Rechner mit persönlicher LLM-Anmeldung, Prinzipal ist nicht ihr Inhaber; Problem-Code `terminal_denied` mit `reason: i6_holder_only` |
@@ -334,6 +334,10 @@ authorize(p, action, ref) -> Decision:
       return DENY(forbidden, principal_pending)      # bereitgestellt, 05 Abschnitt 2.5
   if p.device_state == pending and action nicht in PENDING_ALLOWED:
       return DENY(forbidden, device_pending)         # 05, Abschnitt 2.5
+  if p.acting_for.status == invalid:                 # SR9, before resolve: unknown and invisible IDs alike
+      return DENY(forbidden, invocation_token_invalid, detail invalid)
+  if p.acting_for.status == run_inactive and action not in SR9_UNBOUND:
+      return DENY(forbidden, invocation_token_invalid, detail run_inactive)   # SR9
 
   # 2. Rechte-Stand (Abschnitt 7)
   snap := snapshot(p, t)                             # Cache je (p, permission_version), gültig bis snap.valid_until
@@ -346,7 +350,8 @@ authorize(p, action, ref) -> Decision:
   eff := effective(snap, res.path)                   # Owner, DM, Freigaben, Gruppen, Bediener-Regel,
                                                      # höchste Stufe, Vereinigung der Zusatzrechte,
                                                      # Begrenzung für Agenten und Apps
-  if p.acting_for:   eff := eff ∩ effective(snapshot(p.acting_for.user, t), res.path)   # SR9
+  if p.acting_for.status == bound and sr9_applies(action, p.acting_for, res) and not delivery_mode:
+                     eff := eff ∩ effective(snapshot(p.acting_for.user, t), res.path)   # SR9
   if p.view_as:      eff := eff ∩ effective(snapshot(p.view_as, t), res.path)            # Abschnitt 9.2
 
   # 5. Sichtbarkeit: kein Leserecht ergibt 404
@@ -376,6 +381,17 @@ authorize(p, action, ref) -> Decision:
 
   return ALLOW
 ```
+
+SR9 in steps 1 and 4: `SR9_UNBOUND` is `run.start` (also `resumeRun`) and `run.token.renew`; they
+answer with the header exactly as without it, also when the run has ended. `sr9_applies` is false
+for these two actions and for the own exceptions of SR9 (`message.create`, `run.update`,
+`run.finish`, `interaction.respond`, `agent_session.report`) when the resolved thread of the
+resource is the run's thread and, for a resource of kind `run`, the resource is the run itself;
+for every other action it is true (fail closed). In delivery mode (`authorize.Delivery(ctx)`, the
+REST poll and the gateway delivery to an agent consumer) decisions and `Scope` ignore `acting_for`,
+because an agent consumer receives by its own grants (8.1 row "Agent consumers"); the filter mode
+(`authorize.Filter(ctx)`) stays bound. `Scope` with status `invalid` or `run_inactive` returns the
+same `invocation_token_invalid` decision.
 
 While a view is stored on a console session, `access.view_as.end`, `auth.logout` and
 `auth.step_up` on the person's own session and `self.read` on the person themselves are decided
@@ -636,6 +652,30 @@ API-Aufruf. Was die Laufzeit außerhalb der Server-API weiß (eigener Speicher, 
 deckt die Regel nicht; dafür gibt es den Lesehorizont-Hinweis (Abschnitt 6) und die Bedrohung
 T-AI-02 im Bedrohungsmodell.
 
+The header is `Invocation-Token` with the compact JWS of `EventEnvelope.invocation_token` of the
+run ([06-api.md](06-api.md), section 4 point 8). The binding check on every request: the
+signature, `typ`, `kid` and `iss` of the token, `aud` equal to the authenticated agent, then the
+run of the claim `run_id`, which must exist, belong to this agent, be triggered by `sub` and lie in
+the claimed thread; a token without `run_id` (autocomplete, a command without an active run) is
+invalid, because SR9 binds a run. An active run (`queued`, `running`, `waiting_input`) binds; an
+ended one answers `invocation_token_invalid` with `reason: run_inactive`, every other failure
+`reason: invalid`, also for the header sent by a principal that is not an agent. Expiry and the
+currency of the `jti` are not checked: a run outlives `agent.invocation_token_ttl`, every token of
+a run names the same person, and the token never adds a right, so a leaked or older token gives its
+holder nothing the agent token alone would not give (docs/DECISIONS.md D-M2-14-3). The exceptions
+above hold only for the own thread and run: the resolved thread of the resource is the run's
+thread, and for a resource of kind `run` it is the run itself, so `run.finish` of an earlier run in
+the same thread is bound; `run.start` and `run.token.renew` are not bound at all, every other action
+is (section 4.2). The rights of the triggering person are computed at the request like the re-check
+of R-AZ-29: a principal of kind `user` with the person's ID and no session, device, token,
+`view_as` or `acting_for`, liveness from the principal status only (a `disabled`, `deleted` or
+`pending` person has no rights, SR7, so every bound action ends with `acting_for_insufficient`),
+owner status from the current owner list without a session. What SR9 does not cover: the server
+cannot tell a request inside a run that omits the header from one outside a run (AZ-M45, hint H1
+of section 6; the SDKs and reference adapters always send it); knowledge a runtime keeps across
+runs is outside the API (section 6, T-AI-01); an owner who triggered with a personal API token is
+intersected as owner (R-AZ-29).
+
 ### SR10 Terminal nur auf eigenem Rechner
 
 Ein Mensch, der nicht aktiver Owner ist, bekommt `terminal.open` und `terminal.attach` nur auf einem
@@ -849,7 +889,7 @@ Regeln:
 |---|---|---|
 | Dauerhafte Ereignisse (Gateway, `GET /api/v1/events`) | `authorize(empfänger, receive_action, resource)`; persönliche Ereignisse nur an `audience_principal_id` | 05, Abschnitt 6; 04, Abschnitt 7 |
 | Kurzlebige Ereignisse (Tippen, `run.updated`, Präsenz) | Empfangs-Aktion und Fokus | 05, Abschnitt 6; 04, Abschnitte 11, 12 |
-| Agenten-Verbraucher | wie Menschen nach eigenen Freigaben, plus persönliche Ereignisse an den Agenten; vor `agent.invocation`, `agent.followup`, `interaction.created`, `command.invoked` zusätzlich `agent.invoke` für den Auslöser | 04, Abschnitt 15 |
+| Agenten-Verbraucher | wie Menschen nach eigenen Freigaben, plus persönliche Ereignisse an den Agenten; vor `agent.invocation`, `agent.followup`, `interaction.created`, `command.invoked` zusätzlich `agent.invoke` für den Auslöser; the header `Invocation-Token` (SR9) does not narrow these decisions (delivery mode, 4.2) | 04, Abschnitt 15 |
 | Push | `push.deliver` (Leserecht auf den Thread), Benachrichtigungs-Einstellung, Ruhezeiten, nicht der Autor; Erwähnungen ohne Leserecht erzeugen nichts | 05; [13-push-benachrichtigungen.md](13-push-benachrichtigungen.md) |
 | Ausgehende Webhooks | `webhook_out.deliver`: Empfangs-Aktion des Ereignisses für die App nach Freigaben und Scope, Abo des Typs | 05 |
 | Datei-Abruf | `file.read` bei jedem Abruf über den Server, auch mit Abruf-Ticket; keine dauerhaften Links an Clients | [12-dateien.md](12-dateien.md), [ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md) |

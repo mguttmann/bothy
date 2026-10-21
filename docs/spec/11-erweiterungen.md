@@ -467,7 +467,7 @@ Er wird nicht von Hand geändert. Gateway messages take their types from the sch
 | `auth` | Token, optional DPoP-Beweise mit Schlüssel aus Datei oder Schlüsselspeicher, Nonce-Behandlung |
 | `gateway` | Verbindung nach 04: `hello`, `identify`, `resume`, Heartbeat mit Zufallsversatz, `ack`-Fenster, Wiederverbinden mit Full Jitter, Reaktion je Schließ-Code (bei `4015` beenden, nicht neu verbinden) |
 | `invocation` | Prüfung der Aufruf-Marke nach [09-agenten.md](09-agenten.md) 4.5: JWKS-Cache mit gedrosseltem Neuladen, Erlaubnisliste `EdDSA`, `typ`, `iss`, `aud`, Zeit mit Toleranz, `jti`-Speicher, Rückruf für den Ist-Modus |
-| `runs` | Lauf-Helfer: `run.start`, Kontext holen, Patches sammeln und drosseln (`agent.run_update_min_interval`), `base_version` führen, bei `409` neu aufsetzen, Schritte, Nachtrags-Zustände, `run.finish` mit `usage`, Abbruch-Rückruf |
+| `runs` | Lauf-Helfer: `run.start`, Kontext holen, Patches sammeln und drosseln (`agent.run_update_min_interval`), `base_version` führen, bei `409` neu aufsetzen, Schritte, Nachtrags-Zustände, `run.finish` mit `usage`, Abbruch-Rückruf; sets `Invocation-Token` on every request during a run (07 SR9); `403 invocation_token_invalid` with `reason: run_inactive` ends the work on the run |
 | `components` | Bausteine für Knopf, Auswahl, Formular mit den Grenzen aus 09; fertige Freigabe-Karte (09 Abschnitt 11.5) und Rückfrage |
 | `commands` | deklarative Befehlsliste mit Abgleich beim Verbinden; Autovervollständigung mit Zeitwächter |
 | `outbox` | Senden mit `client_msg_id`, die vor dem Senden gespeichert wird (austauschbarer Speicher); `Idempotency-Key` für andere Schreibvorgänge |

@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+import datetime
+from collections.abc import Mapping
+from typing import Any, Self, TypeVar
+
+from attrs import define as _attrs_define
+from attrs import field as _attrs_field
+
+T = TypeVar("T", bound="InvocationTokenGrant")
+
+
+@_attrs_define
+class InvocationTokenGrant:
+    """
+    Attributes:
+        invocation_token (str): Fresh invocation token with a new `jti`; it replaces the current one of the run.
+        expires_at (datetime.datetime):
+    """
+
+    invocation_token: str
+    expires_at: datetime.datetime
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        invocation_token = self.invocation_token
+
+        expires_at = self.expires_at.isoformat()
+
+        field_dict: dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
+        field_dict.update(
+            {
+                "invocation_token": invocation_token,
+                "expires_at": expires_at,
+            }
+        )
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
+        d = dict(src_dict)
+        invocation_token = d.pop("invocation_token")
+
+        expires_at = datetime.datetime.fromisoformat(d.pop("expires_at"))
+
+        invocation_token_grant = cls(
+            invocation_token=invocation_token,
+            expires_at=expires_at,
+        )
+
+        invocation_token_grant.additional_properties = d
+        return invocation_token_grant
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

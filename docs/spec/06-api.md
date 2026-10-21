@@ -80,7 +80,7 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 |---|---|---|---|---|---|
 | Mensch in einer App | OIDC, Header eines vertrauenswürdigen Reverse-Proxys, lokales Konto mit Passkey oder Passwort plus TOTP; Ergebnis ist ein Token-Paar | `Authorization: DPoP <access_token>` und `DPoP: <Beweis>` | Geräteschlüssel (`cnf.jkt`), RFC 9449 | Zugriffstoken `auth.access_token_ttl` (Kapitel 08), Refresh `auth.refresh_token_ttl` | Passkey oder Geräteschlüssel mit Nutzerbestätigung |
 | Mensch in der Web-Konsole | wie oben; Ergebnis ist eine Cookie-Sitzung nach dem BFF-Muster, keine Tokens im Browser ([08-identitaet.md](08-identitaet.md), Abschnitt 7.5) | Cookie `__Host-console_session` and the CSRF header `X-Console-Request: 1` with the own `Origin` on every request except `GET`, `HEAD`, `OPTIONS` (security scheme `consoleSession`, parameter `ConsoleRequest`) | Cookie, als HMAC an der Sitzung | `auth.console_session_max_age`, Leerlauf `auth.console_session_idle_timeout` | Passkey, sonst erneute OIDC-Anmeldung bzw. Passwort mit TOTP |
-| Agent | API-Token, vom Owner erzeugt (`token.create`) | `Authorization: Bearer <token>`; bei Token mit `dpop_jkt` `Authorization: DPoP` plus `DPoP` | optional `dpop_jkt` | bis Widerruf oder `expires_at` | nie (R-AZ-03) |
+| Agent | API-Token, vom Owner erzeugt (`token.create`) | `Authorization: Bearer <token>`; bei Token mit `dpop_jkt` `Authorization: DPoP` plus `DPoP`; within a run additionally `Invocation-Token: <invocation_token>` (07 SR9) | optional `dpop_jkt` | bis Widerruf oder `expires_at` | nie (R-AZ-03) |
 | App | API-Token mit Scopes (05, 2.6) | wie Agent | optional | wie Agent | nie |
 | Eingangs-Webhook | secret token of `createIncomingWebhook`, verified by the token check of `apps`, not by the authenticator (02 section 9.1) | none with the token in the path (`postIncomingWebhook`); `Authorization: Bearer <token>` on `postIncomingWebhookWithBearer` | keine | bis Widerruf | nie |
 | Anonym | keine | keine | keine | | nie |
@@ -206,6 +206,18 @@ Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solche
    setup issue-enrollment-code`), `grant.expire`, `group.member.expire`, `signing_key.transition`
    und `device.expire` (Jobs), `group.member.sync` (Abgleich bei der OIDC-Anmeldung) sowie
    `dev_environment.*` (Routen entstehen mit der Etappe Dev-Umgebung, 05 Abschnitt 4.13).
+8. Acting-for binding: the server checks the header `Invocation-Token` on every request
+   (signature, audience, run of this agent triggered by the token's person, run active); the header
+   from a principal that is not an agent, repeated or empty, or an invalid token gives
+   `403 invocation_token_invalid` with `reason: invalid`, a token of an ended run `reason:
+   run_inactive`, except on `run.start` (also `resumeRun`) and `run.token.renew`, which answer with
+   `run_inactive` exactly as without the header. With a bound token every other action is decided
+   on the intersection of the agent's rights and the current rights of the person who triggered the
+   run: a target invisible only by the intersection answers `404` like an unknown ID, a requirement
+   that fails only by it `403 forbidden` with `reason: acting_for_insufficient`, and every list,
+   counter, snapshot and catch-up contains only channels both may read. Only replies in the run's
+   thread, patches of the own run, `run.finish`, `interaction.respond` and `agent_session.report`
+   on the own thread and run keep the agent's own rights ([07-rechte.md](07-rechte.md), SR9).
 
 ## 5. Fehler
 
@@ -260,7 +272,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `feature_disabled` | 403 | The feature is switched off (for example personal tokens). | Do not retry. |
 | `agent_invocation_denied` | 403 | `agent.invoke` denies; `reason` for example `billing_mode_personal_not_holder`, `project_not_ready`. | Show the reason; do not retry. |
 | `terminal_denied` | 403 | The `terminal` right exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `session_limit` or `profile_unknown` (24 section 13). | Show the reason; do not retry. |
-| `invocation_token_invalid` | 403 | The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong). | `expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`. |
+| `invocation_token_invalid` | 403 | The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong). Also every request with the header `Invocation-Token` (07 guard rule SR9): `reason` is `invalid` (signature, audience, run, agent or triggering person wrong, or the header is repeated, empty or sent by a principal that is not an agent) or `run_inactive` (the token is valid, but its run has ended). | `expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`; on any other request with `Invocation-Token`, stop using the token, the request is refused. `run_inactive`: the run has ended; end the work on it. |
 | `not_found` | 404 | The resource does not exist or is not visible; both answer the same (R-AZ-01). | Mark the outbox entry as failed. |
 | `method_not_allowed` | 405 | The method is not defined on this path. | Programming error. |
 | `conflict` | 409 | The state prevents the change (for example a name is taken); `reason` names the cause where one is defined. | Reload the state; a person decides. |
