@@ -74,6 +74,13 @@ Geheimnisse; ein ungültiger Wert ergibt `400 validation_failed` mit JSON Pointe
 Ein fehlender Schlüssel erlaubt, weil der Owner Fähigkeiten abschaltet und der Adapter ohnehin nur
 meldet, was er kann; ein leeres Objekt heißt "alles erlaubt, was der Adapter meldet".
 
+The server enforces the owner's part of the capability "Komponenten" (M2-15): a card
+(`kind = card`, section 11) of an agent whose `operator_config` sets `supports_components` to
+`false` is refused with `403 feature_disabled`, and nothing of the request is stored. `runs` reads
+the switch through the agents port (`agents.RunFacts.ComponentsAllowed`). The adapter's part, the
+report `components: true` in the heartbeat, is checked with M2-20; until then a card of an agent
+whose owner allows components is accepted whatever the adapter reports.
+
 ### 2.3 Freigaben eines Agenten
 
 Ein Agent hat höchstens `write` und als Zusatzrecht höchstens `upload` (R-DM-08, R-DM-20). Auf
@@ -1108,7 +1115,82 @@ Apps beantworten Autovervollständigung über ihre Interaktions-Adresse
 
 Grenzen: `component.max_per_message` je Nachricht, `custom_id` bis
 `component.custom_id_max_chars`, Formulare bis `component.form_max_fields` Felder. Der Server
-prüft eingereichte Werte gegen die Definition (`422 interaction_values_invalid`).
+prüft eingereichte Werte gegen die Definition (`400 validation_failed` mit `errors[].code`
+`interaction_values_invalid`, siehe "Values" unten).
+
+**Definition rules (M2-15).** The server checks every component of a card before the card's
+message exists (`messaging.ComponentWriter.Check`, implemented by `runs`, 02 section 4.3). The
+definition is one JSON object with a closed member set per type; a member outside the set, a
+wrong JSON type (JSON `null` included) and a repeated key are refused.
+
+| Type | Members (closed set) | Rules and defaults |
+|---|---|---|
+| `button` | `label`, `style`, `icon`, `value` | `label` and `value` required; `style` one of `primary`, `secondary`, `success`, `danger`, `ghost`, default `secondary`; `icon` optional and only a semantic icon name of `ds.icons.glyphs` (the list in `kernel/designkeys`), so an emoji, a glyph file name or a free name is refused ([docs/design/icons.md](../design/icons.md) "Rules") |
+| `select` | `placeholder`, `options`, `min_values`, `max_values` | `placeholder` optional; `options` required with at least one option, each with the members `label` (required), `value` (required, unique within the select) and `description` (optional); `min_values` and `max_values` optional integers, defaults `1` and `1`, with `0 <= min_values <= max_values`, `max_values >= 1` and `max_values` at most the number of options |
+| `form` | `title`, `submit_label`, `fields` | `title` required; `submit_label` optional; `fields` required with at least one and at most `component.form_max_fields` fields, each with the members `name` (required, `^[a-z][a-z0-9_]*$`, unique within the form), `label` (required), `type` (required, one of `text`, `textarea`, `number`, `boolean`, `choice`), `required` (boolean, default `false`), `max_length` (an integer of at least one, only for `text` and `textarea`) and `choices` (required for `choice` and only there: a non-empty list of unique, non-empty strings) |
+
+- Every display text of a definition (`label`, `placeholder`, option `label` and `description`,
+  `title`, `submit_label`, field `label`, every entry of `choices`) and every `value` passes the
+  text check of SEC-IN-4 (no control or bidi characters), because these texts are drawn as
+  controls next to the header the server sets (T-AI-05). A required text that is empty counts as
+  missing.
+- `custom_id` is required, passes the same check, has at most `component.custom_id_max_chars`
+  characters and is unique within the card.
+- The fields of a component outside its definition are set by the server (03
+  `message_components`): `position` is the index in the request plus one; `single_use` defaults to
+  `true`; `required_capability` is one of `approve_actions`, `upload`, `export`, `manage`
+  (`terminal` exists only on the target `host`, 07 section 2.4, and is refused); `restricted_to`
+  defaults to `run_starter` when `required_capability = approve_actions` (SEC-AI-4) and to `any`
+  otherwise; `expires_at` must lie after the request time and defaults to the request time plus
+  `component.default_ttl`; `run_id` is `MessageCreate.run_id` (section 11.4); `state` is `active`
+  and `version` is `1`. `ComponentCreate` has no member for `position`, `run_id`, `state`,
+  `used_by` or `version`; the decoder refuses them as unknown members.
+- No length limit per member exists besides the keys of section 21. The whole card is bounded by
+  its event: when the `message.created` payload with every component would not fit
+  `sync.event_payload_max_bytes` even after the cut of `content_md`, the request fails with
+  `too_long` on `/components`, because components cannot be cut (04 section 2.2 rule 2).
+
+Errors are `400 validation_failed` with one `errors[]` entry per finding, the `pointer` below
+`/components/<index>/...` (below `/definition` for `updateComponent`) and these codes; `detail`
+names the rule, never the offending text, and the pointer of a member outside the closed set names
+the object, never the member:
+
+| Code | Finding |
+|---|---|
+| `required` | a required member is missing or empty, an empty required list, a card without components (`/components`) |
+| `too_long` | `custom_id` above `component.custom_id_max_chars`; a card whose `message.created` payload does not fit `sync.event_payload_max_bytes` (`/components`) |
+| `limit_reached` | more components than `component.max_per_message` (`/components`), more fields than `component.form_max_fields` |
+| `invalid` | every other rule: a member outside the set, a wrong JSON type, JSON `null`, a repeated key, a value outside its list (style, icon, type, capability, restriction, field type), a duplicate `custom_id`, option value, field name or choice, bad bounds, `expires_at` not after the request time, a rejected character |
+
+An empty card and a card with more than `component.max_per_message` components give only that
+one finding on `/components`; otherwise every finding of every component is reported.
+
+The stored form (`Component.definition`) is the normalized definition: the typed form re-encoded
+in a fixed member order, with the defaults applied (button `style`, select `min_values` and
+`max_values`, field `required`) and without empty optional texts (`placeholder`, option
+`description`, `submit_label`). The request hash of the card uses the form as received, without
+defaults (section 11.4). `updateComponent` checks a new definition with the same rules for the
+component's type and stores it in the same normalized form.
+
+**Values (M2-15).** `InteractionCreate.values` is checked against the stored definition; absent
+values (and JSON `null`) mean `{}`:
+
+| Type | Shape | Rules |
+|---|---|---|
+| `button` | `{}` | no member |
+| `select` | `{"selected": [<option value>, ...]}` | `selected` is the only member; every entry is a `value` of the options and appears once; the count lies between `min_values` and `max_values`; with `min_values = 0` an absent `selected` is the empty list |
+| `form` | an object keyed by field `name` | no key that is not a field name; every `required` field present, `text` and `textarea` with at least one character that is not white space; `text` and `textarea` strings, `text` without a line break, at most `max_length` characters when set; `number` a finite JSON number within the range of a 64-bit float; `boolean` a JSON boolean; `choice` one of `choices` |
+
+Every finding is `400 validation_failed` with `errors[].code` `interaction_values_invalid` and
+the `pointer` `/values/<name>` (a form field), `/values/selected/<index>` (an unknown or repeated
+entry), `/values/selected` (a missing selection, a wrong type, a count outside the bounds) or
+`/values` (a button with values, a member other than `selected`, a key that is not a field name,
+a values document that is not one JSON object); the pointer never names a key the person typed,
+and `detail` names the rule, never the value (SEC-T10). Values are content: the text check of
+SEC-IN-4 does not apply to them, and they are stored exactly as sent after the check. The
+`interaction.created` payload that carries them must fit `sync.event_payload_max_bytes`, otherwise
+`400 validation_failed` with `too_long` on `/values`, because the agent has no other way to read
+them (04 section 2.2 rule 2).
 
 ### 11.2 Wer darf bedienen
 
@@ -1121,6 +1203,43 @@ prüft eingereichte Werte gegen die Definition (`422 interaction_values_invalid`
 
 Wer nicht bedienen darf, sieht die Komponente deaktiviert mit Hinweis. Wer die Nachricht nicht
 lesen darf, sieht sie nicht (404-Regel).
+
+**How the server decides (M2-15).** `interaction.create` needs `trigger` on the channel of the
+card and runs the guard of `agent.invoke` (05 section 5) for the card's agent with the facts of
+the component as read under its row lock, in this order: points 1 to 5 (origin, reachability,
+I2, SR2), then point 6 with the rules of this section, then point 7 (project binding), then
+point 8. The reasons and their answers (07 section 4.1):
+
+- The mention rule of point 3 counts as met: the card is the agent's own address to the person.
+  A guest agent still needs `allow_mentioned_agents`, its own `write` and billing mode
+  `organization`.
+- `component_inactive`: a state other than `active`, an `expires_at` at or before the request
+  time (whether or not the expiry job has run), or a component bound to a run that is no longer
+  `queued`, `running` or `waiting_input`; a component of an ended run is inactive. It is answered
+  `409 component_used`; the reason stays in the audit, so a lost race answers the same whether
+  `authorize` or the single-use lock of section 11.3 decided it.
+- `capability_missing`: `required_capability` is not among the effective capabilities of the
+  person on the path; `403 forbidden` with `reason`.
+- `component_restricted`: `restricted_to = run_starter` and the person is neither the starter of
+  the component's run (`runs.triggered_by`) nor an effective owner, or `restricted_to = owner` and
+  the person is not an effective owner; `403 forbidden` with `reason`. Effective owners hold every
+  capability and meet every restriction.
+- `run_active_other_agent`: the thread's active run belongs to another agent. `run_active`: the
+  component has no run while the card's agent has an active run in the thread; it would need a
+  second run, which cannot exist (R-DM-14), and the person answers the active run with a
+  follow-up message (section 7). Both, like the reasons of points 1 to 5 and 7, answer
+  `403 agent_invocation_denied` with `reason`.
+- A person without read on the channel gets `404`, identical to an unknown component; every
+  denial is audited (07 section 4.2).
+
+Until apps post cards (M2-25) every card has an agent as its author.
+
+**Check at delivery.** Before `interaction.created`, and `agent.invocation` of a run that an
+interaction opened, are handed to the agent, `runs.Delivery` decides `agent.invoke` again for the
+person with the rights of that moment (07 section 8.1) and the component as it is then (stage
+`deliver`). This check evaluates `required_capability` and `restricted_to`, but neither the state
+of the component nor the rule `run_active`: the component is `used` by this very interaction, and
+the run is the one the event goes to. A denial is described in section 11.4.
 
 ### 11.3 Einmal-Regel je Nachricht
 
@@ -1135,6 +1254,13 @@ Komponente dabei ist, dann `used` bzw. `disabled` setzen. Wer die gewählte Komp
 `active` vorfindet, verliert (`409 component_used`). Die Regel steht so in 03
 (`message_components`).
 
+Components without `single_use` (M2-15) stay `active` and unchanged when they are used: the
+component row keeps its state and version, and no `message.updated` follows; the interaction row
+records who used it and when. Such a component is locked alone (`FOR UPDATE` of its row), not with
+the single-use group, and it can be used again until it expires, is disabled or its run ends.
+`updateComponent` reactivates a `single_use` component only while no `single_use` component of
+the same message is `used`, so the rule never allows a second decision (section 11.4).
+
 ### 11.4 Ablauf einer Interaktion
 
 ```mermaid
@@ -1146,7 +1272,7 @@ sequenceDiagram
     participant L as Laufzeit
     C->>S: interaction.create (client_interaction_id, values)
     S->>S: authorize, Einmal-Regel, interactions received
-    S-->>C: 200 (Komponente used, andere disabled)
+    S-->>C: 201 (Komponente used, andere disabled)
     S-->>A: dispatch interaction.created + Marke
     A->>A: Marke prüfen
     A->>L: Entscheidung übergeben
@@ -1163,6 +1289,99 @@ Wiederholt der Client mit derselben `client_interaction_id`, bekommt er die gesp
 die Karte "nicht bestätigt"; die Komponente wird nicht wieder aktiv. Grund: Die Zustellung ist
 dauerhaft und kommt an, sobald der Adapter zurück ist; eine zweite Entscheidung wäre gefährlicher
 als eine späte.
+
+**A card and its run (M2-15).** An agent posts a card with `createMessage` (`kind = card`, at
+least one component); `components` require `kind = card`, people get `400` with code `invalid`,
+and apps `not_enabled` until M2-25. `MessageCreate.run_id` binds the components of the card to the
+author's own active run: it is accepted only with `kind = card` (every other kind keeps
+`not_enabled` until M2-19), and it must name a run of the author in the thread of the message in
+state `queued`, `running` or `waiting_input`, else `400` with code `invalid` on `/run_id`, one
+code for every case, so nothing about the runs of other agents leaks. The run lives in
+`message_components.run_id`; `messages.run_id` stays empty for a card, because 03 allows it only
+for `kind = 'run'`. The card's message row is written first, then the components under a share
+lock on the run, so a concurrent end of the run either comes first (the card is refused) or
+disables the new components (section 11.6). The request hash of a card is `bothy-msg-v2` (04
+section 5.1): the fields of `bothy-msg-v1`, then `run_id` and the components as received; a
+request with neither `components` nor `run_id` keeps `bothy-msg-v1`.
+
+**Flow of `createInteraction`.** An unknown component gives `404`. One unit of work locks, in
+this order, the thread, the component's run and the thread's active run (ascending id), the card
+message (a deleted one gives `404`) and the single-use group of section 11.3 (or the component
+alone without `single_use`); then it answers a repetition (below), decides `interaction.create`
+(section 11.2), checks the values (section 11.1) and writes:
+
+1. the single-use rule (the chosen component `used` with `used_by` and `used_at`, the rest of
+   the group `disabled`, each with `version + 1`);
+2. the interaction in state `received`;
+3. the run: a component with a run goes to that run (it is active, section 11.2). A component
+   without a run in a thread without an active run opens a new run in `queued` with
+   `trigger_kind = interaction`, `triggering_interaction_id` the new interaction, `triggered_by`
+   the person, the card's agent and the card's thread (section 5.1);
+4. the events, in this order: `message.updated` of the card when the single-use rule changed a
+   component; the events of the new run (`run.state_changed`); `interaction.created` to the
+   card's agent (audience, receive action `agent.events.consume`, resource the interaction
+   without `version`, payload `InteractionCreatedPayload` with the values and without
+   `response`); for a new run `agent.invocation` last (`trigger_kind = interaction`,
+   `interaction_id`, no `message_id`, `triggered_by` the person). The values reach the agent only
+   through `interaction.created`, so it comes before the start-bearing event (ADR 0023);
+5. the audit entry of an approval (section 11.5).
+
+The answer is `201` with the `Interaction`: `custom_id` of the component, `thread_id` of the
+card, `run_id` the component's run or the run opened for it, the values and `state = received`,
+never `response`.
+
+**Repetition.** The same person with the same `client_interaction_id` is looked up under the locks,
+so a concurrent twin finds the committed row. The person must still be allowed to read the card,
+else `404` like an unknown component; the same `component_id` with values equal as JSON (key
+order ignored, numbers compared by value) answers `200` with the current interaction and
+`Idempotent-Replay: true`, without a write or an event; anything else is
+`422 idempotency_key_reuse`. 03 `interactions` stores no request hash, so the comparison uses the
+stored `component_id` and `values`.
+
+**Delivery.** When `runs.Delivery` hands `interaction.created` to a transport after the check of
+section 11.2, the interaction goes from `received` to `dispatched`; a denial at delivery sets it
+`failed`, leaves the run as it is and is audited with stage `delivery`. An interaction the agent
+already answered keeps its state. The token delivered with `interaction.created` to a run in
+`waiting_input` resumes it (`resumeRun`, section 5.1). An `interaction.created` whose interaction
+no longer exists (its card was deleted) is not sent, without a check or an audit entry; an
+`agent.invocation` of a run whose interaction was deleted is still checked for the person (points
+1 to 5, 7 and 8 of 05 section 5), without the component. `renewInvocationToken` checks an
+interaction token again like the delivery it came with (`agent.invocation` for the interaction that
+opened the run, and for any interaction once `runs.triggering_interaction_id` is empty,
+`interaction.created` for any other interaction of the run). An `interaction.created` token whose
+interaction was deleted is not renewed (`403 invocation_token_invalid` with `reason` `invalid`);
+the token of the run a deleted interaction opened is checked for the person without the component
+and renewed on allow.
+
+**Answer of the agent (`respondToInteraction`).** Only the agent that owns the card, with
+`state` `acknowledged`, `failed` or `rejected` and an optional `response.text` of at most
+`message.max_content_bytes` UTF-8 bytes (`400` with `too_long` on `/response/text`; the hint is
+content, so the text check of SEC-IN-4 does not apply). From `received` or `dispatched` the state
+and the response are stored; the same final state again answers `200` with the current
+interaction and writes nothing; every other transition is `409 invalid_state_transition`. No
+event: the card shows the result through `updateComponent`.
+
+**Changing a component (`updateComponent`).** Only the author of the card, with `If-Match` on the
+component version (`428` without it, `412 version_conflict` with the current `Component` when it
+is stale). Transitions: `used` and `expired` are final (an `active` component past `expires_at`
+counts as `expired`); `active -> disabled` is allowed; `disabled -> active` only before
+`expires_at` and, for a `single_use` component, only while no `single_use` component of the same
+message is `used`; every other change of `state` is `409 invalid_state_transition`. `definition`
+may change in every state and follows section 11.1 for the component's type; `type`,
+`custom_id`, `single_use`, `required_capability`, `restricted_to` and `run_id` cannot change
+(`ComponentUpdate` has no such members, so they give `400`), so the header fields stay the
+server's (SEC-OUT-4). A request without a change answers `200` with the current component and
+writes nothing; a change raises the component version, and a reactivation schedules the expiry
+again.
+
+**Visibility of changes.** Every change of the state or the definition of a component raises
+`messages.version` of the card by one and appends one `message.updated` with the card and its
+current components, produced by `messaging` (`Messages.ComponentsChanged`, 02 section 4.7). The
+components appear in every representation of a message; a deleted message shows
+`components: []`. `Component` never carries form values; they live only in `interactions` and
+leave the server only in the answers of `createInteraction` to the person, in
+`interaction.created` to the card's agent and in the answer of `respondToInteraction` to that
+agent (SEC-T10).
 
 ### 11.5 Freigabe-Knöpfe
 
@@ -1182,11 +1401,40 @@ weglassen (Adapter-Konfiguration). Die Karte zeigt nach der Entscheidung, wer wa
 das Audit-Log hält die Interaktion fest (05: `interaction.create` mit Audit bei
 `approve_actions`).
 
+The allowed `interaction.create` on a component with `required_capability = approve_actions`
+writes one audit entry in its transaction (M2-15): action `interaction.create`, decision `allow`,
+resource the component, and the details `interaction_id`, `message_id`, `run_id` (when set),
+`component_type`, `required_capability`, `restricted_to` and `choice` only for a button whose
+`value` is one of `once`, `session`, `always`, `deny`. It never names `custom_id`, a label, another
+value or a form value, because they are agent or human text (SEC-AUD-5). Denials are audited by
+`authorize` (07 section 4.2); other allowed interactions write no allow entry.
+
 ### 11.6 Rückfragen
 
 Eine Rückfrage ist eine Karte mit Knöpfen oder Auswahl, oder ein Formular. Der Lauf geht auf
 `waiting_input`. Antworten: Komponente bedienen oder einen Nachtrag schreiben (Abschnitt 7). Was
 zuerst ankommt, gilt; die Karte wird danach `disabled`.
+
+A follow-up answer disables the card (M2-15): `runs` provides `DisableRunComponents`, which
+disables the active components of a run in the transaction that accepts a follow-up for the run in
+`waiting_input`; the follow-up acceptance of M2-11 wires it, and until then only the end of the
+run disables them. A later click on a disabled component gives `409 component_used`.
+
+Lifecycle of components (M2-15):
+
+- **End of the run.** The open components of a run are disabled at every end of the run, not only
+  after a stop: `completed`, `failed` and `cancelled`, also a `queued` run that is denied at
+  delivery or that `runs.queued_expiry` fails, because a card can be bound to a `queued` run.
+  They are disabled in the transaction of the end, grouped by card, with one `message.updated`
+  per card (section 8 point 5).
+- **Expiry.** A component expires at its `expires_at` (default `component.default_ttl`). The job
+  `runs.component_expiry` is scheduled per card at its earliest `expires_at` and sets the due
+  components `expired` with one `message.updated`; correctness never depends on the job, because
+  `interaction.create` treats a passed `expires_at` as expired (section 11.2).
+- **Deletion.** Deleting the card deletes its components and their interactions in the deleting
+  transaction (03 `messages`); `runs.triggering_interaction_id` of a run the interaction opened
+  becomes empty. No event of its own: `message.deleted` and the tombstone with `components: []`
+  cover it.
 
 ## 12. Auto-Titel
 

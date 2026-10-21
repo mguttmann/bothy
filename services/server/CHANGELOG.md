@@ -11,6 +11,36 @@ documented in this file. The format is based on
 
 ### Added
 
+- Components and interactions (M2-15, AG-15, AG-16, AG-31, AZ-M42, AZ-M43, SEC-OUT-4, SEC-T10):
+  agents post cards (`kind = card`) with buttons, selects and forms through `createMessage`,
+  optionally bound to their own active run through `MessageCreate.run_id`; the operations
+  `createInteraction`, `updateComponent` and `respondToInteraction` are enabled, and
+  `interaction.create` is no longer deferred. New tables `message_components` and `interactions`
+  (migrations `00057` to `00059`, the last validating the foreign key of
+  `runs.triggering_interaction_id`). Definitions are checked against `component.v1` with closed
+  member sets, semantic icon names of `ds.icons.glyphs`, the text check of display texts and the
+  keys `component.max_per_message`, `component.custom_id_max_chars` and `component.form_max_fields`
+  (`400 validation_failed` with `required`, `too_long`, `limit_reached` or `invalid`); a card whose
+  `message.created` would not fit `sync.event_payload_max_bytes` gives `too_long`, a card of an
+  agent whose owner switched `supports_components` off `403 feature_disabled`, and a card from an
+  app `not_enabled` until M2-25. Cards hash with `bothy-msg-v2`; other messages keep
+  `bothy-msg-v1`. `interaction.create` runs the `agent.invoke` guard with the component rules
+  (`component_inactive` answered `409 component_used`, `capability_missing`,
+  `component_restricted`, `run_active`), the single-use rule per message under row locks, values
+  checked against the definition (`interaction_values_invalid`), idempotency by
+  `client_interaction_id` and a new run with `trigger_kind = interaction` when no run waits; it
+  writes `message.updated`, `interaction.created` for the card's agent and, for a new run,
+  `agent.invocation`, and audits allowed approvals. The delivery re-checks `agent.invoke` before
+  `interaction.created` and sets the interaction `dispatched` or `failed`; tokens of interactions
+  are renewed. Components appear in every representation of a message (tombstones `[]`), expire
+  through the job `runs.component_expiry` scheduled per card, are disabled at every end of their
+  run and are deleted with their message. New port `runs.Interactions`, source ports
+  `messaging.ComponentReader` and `messaging.ComponentWriter` (implemented in
+  `runs/adapters/messagingsource`), port methods `Messages.LockCard`, `Messages.ComponentsChanged`
+  and `Messages.PrincipalOf`, the field `agents.RunFacts.ComponentsAllowed`, and `409` responses of
+  `updateComponent` and `respondToInteraction`. The configuration keys `component.default_ttl`,
+  `component.max_per_message`, `component.custom_id_max_chars` and `component.form_max_fields`
+  are now active. No new metric.
 - Start, renewal, end and cancellation of runs (M2-09, I3, R-SY-10, R-SY-11, R-SY-19): the
   operations `startRun`, `resumeRun`, `renewInvocationToken`, `awaitRunInput`, `finishRun` and
   `cancelRun` are enabled. A start checks the invocation token (signature, `kid`, `typ`, `alg`,

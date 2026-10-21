@@ -294,14 +294,14 @@ verrät (bei `404` nie).
 | `channel_read_only` | `forbidden` | Kanal schreibgeschützt; schreibende und auslösende Aktionen gesperrt, auch für Owner (05, Regel 1.8); Problem-Code `channel_read_only` |
 | `channel_archived` | `forbidden` | Kanal oder sein Bereich archiviert; schreibende und auslösende Aktionen gesperrt, auch für Owner (Abschnitt 4.5); Problem-Code `channel_read_only` mit `reason` |
 | `run_active_other_agent` | `forbidden` | Thread hat einen aktiven Lauf eines anderen Agenten (05, Abschnitt 5, Punkt 8) |
-| `run_active` | `forbidden` | Modell-Befehl bei aktivem Lauf (05 `command.invoke`) |
+| `run_active` | `forbidden` | Modell-Befehl bei aktivem Lauf (05 `command.invoke`); also `interaction.create` on a component without run while the card's agent has an active run in the thread, which would need a second run (R-DM-14, [09-agenten.md](09-agenten.md) section 11.2, M2-15); problem code `agent_invocation_denied` with `reason` |
 | `billing_mode_mismatch` | `invariant_violation` | `run.start` mit Ist-Modus ungleich Soll (I3); Problem-Code `billing_mode_mismatch` (`409`) |
 | `tool_class_mismatch` | `invariant_violation` | Adapter meldet eine höhere Werkzeugklasse als die Marke; Problem-Code `tool_class_mismatch` (`409`) |
 | `invocation_token_invalid` | `forbidden` | Aufruf-Marke ungültig, abgelaufen oder nicht die aktuelle (`run.start`) |
 | `import_not_running` | `forbidden` | `import.apply` ohne laufende Quelle oder mit Ziel außerhalb ihrer Kanäle |
 | `malware_detected` | kein `authorize`-Ergebnis | Grund des Audit-Eintrags zu `file.upload` bei einem Malware-Fund ([12-dateien.md](12-dateien.md), Abschnitt 5.2) |
-| `component_inactive` | `forbidden` | Komponente benutzt, abgelaufen oder deaktiviert |
-| `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` und Prinzipal ist weder Auslöser noch Owner |
+| `component_inactive` | `forbidden` | Komponente benutzt, abgelaufen oder deaktiviert; also a component whose run has ended. Answered `409 component_used` without the reason, which stays in the audit, so a lost race answers the same whether `authorize` or the single-use lock decided it (09 section 11.2, M2-15) |
+| `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` und Prinzipal ist weder Auslöser noch Owner; also `restricted_to = 'owner'` and the principal is not an effective owner ("Always allow", 09 section 11.5, M2-15); problem code `forbidden` with `reason` |
 | `acting_for_insufficient` | `not_found` bzw. `forbidden` | Auftragsbindung: der auslösende Mensch hat das Recht nicht |
 | `terminal_not_host_assignee` | `forbidden` | SR10: Nicht-Owner auf einem Rechner, dessen Inhaber er nicht ist; Problem-Code `terminal_denied` mit `reason: not_host_assignee` |
 | `terminal_server_host_owner_only` | `forbidden` | SR10: Server-Host nur für Owner; Problem-Code `terminal_denied` mit `reason: server_host_owner_only` |
