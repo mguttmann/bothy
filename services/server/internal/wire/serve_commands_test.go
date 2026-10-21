@@ -49,6 +49,11 @@ type cmdWorld struct {
 	lotse, texter         consumerAgent
 	lotseHandle           string
 	samGrant              string
+
+	// seen is the highest seq nextOf read per consumer: a frame at or below it is a redelivery
+	// after agent.ack_timeout (2s here) of a frame the test already handled, not a new event.
+	seenMu sync.Mutex
+	seen   map[*wstest.Client]int64
 }
 
 // newCmdWorld starts the command world.
@@ -58,7 +63,7 @@ func newCmdWorld(t *testing.T) *cmdWorld {
 		"BOTHY_SYNC__EVENT_PAYLOAD_MAX_BYTES="+strconv.Itoa(cmdPayloadMax),
 		"BOTHY_RATELIMIT__RL__TRIGGER__BURST=1000", "BOTHY_RATELIMIT__RL__READ__BURST=1000")
 	iw := &invocationWorld{consumerWorld: cw, sam: cw.newPerson("sam", identity.DeviceStateActive)}
-	w := &cmdWorld{invocationWorld: iw, robin: cw.newPerson("robin", identity.DeviceStateActive),
+	w := &cmdWorld{invocationWorld: iw, seen: map[*wstest.Client]int64{}, robin: cw.newPerson("robin", identity.DeviceStateActive),
 		outsider: cw.newPerson("robin", identity.DeviceStateActive)}
 	w.marketing = w.newSpace("Marketing")
 	w.lotse, w.texter = w.agent(), w.agent()
@@ -327,7 +332,13 @@ func (w *cmdWorld) nextOf(c *wstest.Client, typ string, d time.Duration) (dispat
 		if f.InvocationToken != "" {
 			w.remember(f.InvocationToken)
 		}
-		if f.Type != typ {
+		w.seenMu.Lock()
+		dup := f.Seq <= w.seen[c]
+		if !dup {
+			w.seen[c] = f.Seq
+		}
+		w.seenMu.Unlock()
+		if dup || f.Type != typ {
 			sendAck(w.t, c, f.Seq)
 			continue
 		}
