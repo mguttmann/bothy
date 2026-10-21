@@ -177,6 +177,9 @@ type server struct {
 	agents *Agents
 	// chat is the chat module (M1-52): spaces, the sidebar and their REST handlers.
 	chat *Chat
+	// files is the files module (M3-03): the upload sessions over the object store, built in the
+	// files step after chat.
+	files *Files
 	// terminal is the terminal module (M2-39): the host records and their REST handlers.
 	terminal *Terminal
 	// apps is the module apps (M2-24): the app use cases and their REST handlers.
@@ -241,6 +244,9 @@ type server struct {
 //     hook and the identity module (startAgents),
 //     6f. chat (M1-52): build the spaces and the sidebar over the unit of work, the Authorizer,
 //     the recorder and the appender, then messaging over the threads of chat (M1-56; startChat),
+//     6f'. files (M3-03): open the object store of file.storage.driver and build the upload
+//     sessions over the unit of work, the Authorizer, the appender and the structure of chat
+//     (startFiles); a root the file system driver refuses ends the start,
 //     6g. terminal (M2-39): build the host records over the unit of work, the Authorizer, the
 //     recorder, the appender and the identity module (startTerminal),
 //     6h. apps (M2-24): build the app use cases and their handlers over identity, the rights hook
@@ -414,6 +420,7 @@ func (s *server) components() []lifecycle.Component {
 		step("identity", s.startIdentity),
 		step("agents", s.startAgents),
 		step("chat", s.startChat),
+		step("files", s.startFiles),
 		step("terminal", s.startTerminal),
 		step("apps", s.startApps),
 		step("signing_keys", s.startSigningKeys),
@@ -1003,6 +1010,7 @@ func (s *server) handlers() Handlers {
 	s.syncReads.fillHandlers(&h)
 	s.notify.fillHandlers(&h)
 	s.stats.fillHandlers(&h)
+	s.files.fillHandlers(&h)
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers
 	}
@@ -1489,10 +1497,44 @@ func shutdownServer(ctx context.Context, srv *http.Server) error {
 
 func (s *server) stopDatabase(context.Context) error {
 	s.mu.Lock()
-	pool := s.pool
+	pool, files := s.pool, s.files
 	s.mu.Unlock()
 	if pool != nil {
 		pool.Close()
 	}
+	// The object store of the files module goes with the database: no request uses it any more.
+	return files.Close()
+}
+
+// startFiles is start step 6f' (M3-03): it opens the object store of file.storage.driver
+// (FilesObjectStore: the driver fs checks file.fs.root, the driver s3 its keys, secrets and egress)
+// and builds the files module over the pool, the unit of work of the audit step, the Authorizer,
+// the appender of sync and the structure of chat. A root that fs.Open refuses ends the start.
+func (s *server) startFiles(ctx context.Context) error {
+	cfg, err := FilesConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az, sy, c := s.pool, s.audit, s.authorizer, s.sync, s.chat
+	s.mu.Unlock()
+	if a == nil || az == nil || sy == nil || c == nil {
+		return errors.New("wire: the files step needs audit, the Authorizer, sync and chat")
+	}
+	store, err := FilesObjectStore(ctx, s.values, FilesDeps{Secrets: s.sp, Egress: s.egressDeps()})
+	if err != nil {
+		return err
+	}
+	f, err := NewFiles(cfg, s.values.String(keyStorageDriver), store, pool, a.UoW(), az, FilesWrites{Events: sy.Appender()},
+		c.Service, s.deps.Clock, s.logger())
+	if err != nil {
+		if cl, ok := store.(io.Closer); ok {
+			_ = cl.Close()
+		}
+		return err
+	}
+	s.mu.Lock()
+	s.files = f
+	s.mu.Unlock()
 	return nil
 }

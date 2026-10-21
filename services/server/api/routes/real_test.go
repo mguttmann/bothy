@@ -801,6 +801,30 @@ func (stubServer) SubmitClientMetrics(context.Context, rest.SubmitClientMetricsR
 	return nil, nil
 }
 
+func (stubServer) CreateUpload(context.Context, rest.CreateUploadRequestObject) (rest.CreateUploadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UploadPart(context.Context, rest.UploadPartRequestObject) (rest.UploadPartResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetUpload(context.Context, rest.GetUploadRequestObject) (rest.GetUploadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteUpload(context.Context, rest.CompleteUploadRequestObject) (rest.CompleteUploadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AbortUpload(context.Context, rest.AbortUploadRequestObject) (rest.AbortUploadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetFile(context.Context, rest.GetFileRequestObject) (rest.GetFileResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
@@ -808,13 +832,20 @@ func (stubServer) SubmitClientMetrics(context.Context, rest.SubmitClientMetricsR
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
 // records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), sending (M1-56),
-// editing and deleting (M1-58), the preferences (M3-18) and the client metrics (M4-31). A handler
+// editing and deleting (M1-58), the preferences (M3-18), the client metrics (M4-31) and the upload
+// sessions with getFile (M3-03). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
 	want := map[string]entry{
 		"getDevice":        {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
+		"createUpload":     {"POST /api/v1/channels/{channel_id}/uploads", "file.upload", "rl.upload"},
+		"uploadPart":       {"PUT /api/v1/uploads/{file_id}/parts/{part_number}", "file.upload", "rl.upload"},
+		"getUpload":        {"GET /api/v1/uploads/{file_id}", "file.upload", "rl.upload"},
+		"completeUpload":   {"POST /api/v1/uploads/{file_id}/complete", "file.upload", "rl.upload"},
+		"abortUpload":      {"DELETE /api/v1/uploads/{file_id}", "file.delete", "rl.write"},
+		"getFile":          {"GET /api/v1/files/{file_id}", "file.read", "rl.read"},
 		"listMyDevices":    {"GET /api/v1/me/devices", "device.list", "rl.read"},
 		"listUserDevices":  {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
 		"listUsers":        {"GET /api/v1/users", "user.read", "rl.read"},
@@ -1077,7 +1108,7 @@ func TestRealTable_Enabled(t *testing.T) {
 	if err := routes.Verify([]string{"GET /api/v1/discovery"}, routes.SpecCatalog()); err == nil {
 		t.Error("Verify accepted a pattern of no enabled operation")
 	}
-	if _, ok := routes.ByID("abortUpload"); ok {
+	if _, ok := routes.ByID("deleteFile"); ok {
 		t.Error("ByID found an operation that is not enabled")
 	}
 	if _, ok := routes.ByPattern("GET /api/v1/discovery"); ok {

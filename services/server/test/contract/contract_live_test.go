@@ -24,7 +24,12 @@ import (
 // rate limits are raised (23 R-QA-11: G7 checks conformance, M1-19 owns throttling). It fails when
 // pytest exits non-zero; the output streams to the test log.
 func TestG7_SchemathesisAllEnabledOperations(t *testing.T) {
-	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: harness.RaisedRateLimits()})
+	cfg := harness.RaisedRateLimits()
+	// Every positive case of an upload operation opens a session (live_contract.py
+	// _prepare_upload); the default of 20 open sessions per principal would turn later cases into
+	// a 429 at preparation and leave them on the 404 of an unknown upload.
+	cfg["file.upload_max_open_sessions"] = "100000"
+	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: cfg})
 	w := harness.BuildMatrixWorld(t, s)
 	b, err := StartBroker(s, w.People["Alex"].PrincipalID)
 	if err != nil {
@@ -58,6 +63,8 @@ func TestG7_SchemathesisAllEnabledOperations(t *testing.T) {
 		"BOTHY_CONTRACT_BROKER_URL="+b.URL(),
 		"BOTHY_CONTRACT_OPERATIONS="+filepath.Join(root, "services", "server", "api", "operations.yaml"),
 		"BOTHY_CONTRACT_SPEC="+filepath.Join(root, "docs", "api", "openapi.yaml"),
+		// The channel where Alex uploads, so the upload operations reach a real session (M3-03).
+		"BOTHY_CONTRACT_UPLOAD_CHANNEL="+w.Channels["Support/Allgemein"],
 		"CONTRACT_MAX_EXAMPLES="+examples,
 		"CONTRACT_SEED="+seed,
 		"BOTHY_CONTRACT_STEP_UP_MAX_AGE_S="+seconds(t, s.ConfigValue("auth.step_up_max_age")),

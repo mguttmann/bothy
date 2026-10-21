@@ -72,6 +72,13 @@ Every change of `upload_state`, `scan_status`, thumbnails or transcript writes t
 durable event `file.updated` (receive action `file.read`, [05-actions.md](05-actions.md)
 section 6). Content never appears in the event.
 
+Before attachment the event goes only to the uploader: it carries `audience_principal_id` =
+`uploaded_by` in the scope of the scope channel, because the scope alone would hand the file name
+to every reader of the channel, while before attachment only the uploader reads the file (05 2.2;
+docs/DECISIONS.md D-M3-03-16). An attached file is written without audience in the scope of its
+message (M3-07). Creating and completing an upload write no event: neither `upload_state` nor
+`scan_status` changes.
+
 ## 3. Upload flow
 
 ### 3.1 Creating an upload session
@@ -79,14 +86,15 @@ section 6). Content never appears in the event.
 The client declares the file upfront. The server checks everything that can be checked without
 bytes and rejects early, before bandwidth is used.
 
-Request (`file.upload` on the channel, `Idempotency-Key` required):
+Request (`file.upload` on the channel; `Idempotency-Key` is the optional parameter of openapi,
+a repeat answers the stored response):
 
 | Field | Required | Rule |
 |---|---|---|
 | `name` | yes | is sanitized (section 6.2) and stored as `original_name` |
 | `size_bytes` | yes | `1 ..= file.max_upload_bytes`; otherwise `413 payload_too_large` |
-| `sha256` | yes | SHA-256 of the whole file, Base64; checked at the end |
-| `declared_mime_type` | yes | hint only; stored in `declared_mime_type`; the server detects the type itself |
+| `sha256` | yes | SHA-256 of the whole file as lowercase hex (`^[0-9a-f]{64}$`); the verify pass checks it |
+| `declared_mime_type` | no | hint only; stored without parameters in lower case in `declared_mime_type`; the server detects the type itself |
 | `purpose` | no | default `attachment`; further values in 3.7 |
 | `poster` | no | video only: small JPEG or PNG as thumbnail, at most `file.poster_max_bytes` |
 
@@ -95,12 +103,22 @@ The server checks in this order:
 1. `authorize(principal, file.upload, channel)`. No read permission: `404`. Read permission, but
    `write` or `upload` missing: `403`.
 2. Size against `file.max_upload_bytes`.
-3. Quota: the sum of `size_bytes` of the principal's non-deleted files plus the new size is
-   at most `file.quota_bytes_per_principal` (0 = off). Otherwise `409 conflict` with `reason`
-   `quota_exceeded`.
-4. Open sessions of the principal below `file.upload_max_open_sessions`. Otherwise `429`.
-5. File system driver only: free space after the upload at least `file.fs.min_free_bytes`.
+3. Early type check (section 6.1): the name is cleaned (6.2); a denied declared type or an
+   extension of the cleaned name that belongs to a denied type gives `415
+   unsupported_media_type` with `reason` `file_type_denied`. It needs no database, so it comes
+   before the counts (docs/DECISIONS.md D-M3-03-4, D-M3-03-5).
+4. Quota: the sum of `size_bytes` of the principal's files that are neither deleted nor failed
+   plus the new size is at most `file.quota_bytes_per_principal` (0 = off). Otherwise `409
+   conflict` with `reason` `quota_exceeded`. Failed files count as deleted: their objects go at
+   once (section 12), so an aborted upload frees its quota (D-M3-03-6).
+5. Open sessions of the principal below `file.upload_max_open_sessions`. Otherwise `429
+   rate_limited` with `Retry-After` until the earliest expiry of the open sessions, in whole
+   seconds and at least one (D-M3-03-8).
+6. File system driver only: free space after the upload at least `file.fs.min_free_bytes`.
    Otherwise `503 unavailable` with `reason` `storage_full` and a warning to the status page.
+
+Steps 4 to 6 run under a transaction-level advisory lock of the principal, so two parallel
+announcements cannot both pass a limit (D-M3-03-7).
 
 Then it creates in one transaction: a row in `files` (`upload_state = 'pending'`,
 `scan_status = 'pending'`, `mime_type = 'application/octet-stream'` until detection,
@@ -130,8 +148,15 @@ except the last, at most 10,000 parts [Q1, verified]). At startup the server che
 5. `GET /api/v1/uploads/{file_id}` returns the parts already confirmed. After an interruption
    a client resumes from there.
 
-The S3 driver passes each part through as a multipart part (no buffering in the server).
-The file system driver writes parts to `uploads/<file_id>/<n>` under `file.fs.root`.
+The S3 driver passes each part through as a multipart part (no buffering in the server). The
+multipart upload is created at the first part, outside any transaction; its ID goes to
+`file_upload_sessions.storage_upload_id`, and a request that loses this race aborts its own
+upload and uses the stored one. The ETag of an S3 part is the one the service returns, kept in
+`file_upload_parts.etag`. The file system driver writes part `n` as the object
+`uploads/<file_id>/<n>` under `file.fs.root`; its ETag is the lowercase hex SHA-256 of the part in
+double quotes, derived from `file_upload_parts.sha256`, whose `etag` stays NULL
+(D-M3-03-2, D-M3-03-3). A part is never written again once it is confirmed; an object store call
+never runs inside a database transaction (02 8.5).
 
 ### 3.3 Presigned PUT (mode `presigned`, optional)
 
@@ -162,12 +187,18 @@ needs no public reachability of the storage.
 
 1. All parts present (otherwise `409 conflict` with `reason` `upload_incomplete` and the
    missing numbers in `detail`).
-2. S3: `CompleteMultipartUpload`. With exactly one part the driver may have used a simple PUT
-   instead.
-3. Session `state = 'completed'`, job `file_verify` into the queue (River), response `200`
-   with the file object. From now on the client may attach the file to a message.
+2. `parts` of the request is checked against the confirmed parts: a duplicate or out-of-range
+   number gives `400 validation_failed`, a listed `etag` that differs from the confirmed one
+   `409 conflict` with `reason` `part_conflict`; the list may name fewer parts than exist
+   (D-M3-03-12). No object store call runs here: the S3 driver's `CompleteMultipartUpload` runs
+   in the verify pass, because a keyed request runs inside a transaction (02 8.4, 8.5;
+   D-M3-03-2).
+3. Session `state = 'completed'`, job `files.scan` into the queue (River, M3-04), response
+   `200` with the file object. A completed session answers `200` with the file again. From now
+   on the client may attach the file to a message.
 
-The job `file_verify` reads the bytes **exactly once** and splits the stream into:
+The job `files.scan` reads the bytes **exactly once** (on S3 after `CompleteMultipartUpload`)
+and splits the stream into:
 
 - SHA-256 and byte counter. If they differ from the declaration: `upload_state = 'failed'`,
   reason `checksum_mismatch` or `size_mismatch` respectively in the session, delete the
@@ -183,7 +214,7 @@ errors during joining and in presigned mode.
 
 If all is well: `upload_state = 'complete'`, `mime_type` = detected type, `scan_status` per
 section 5.2, `scanned_at`, `scan_engine`, event `file.updated`. If the file is servable,
-the job `file_process` follows (sections 7 and 8) and, if supported, the text extraction
+the processing of sections 7 and 8 follows and, if supported, the text extraction
 ([14-search.md](14-search.md)).
 
 ### 3.5 Sequence (direct upload with scan)
@@ -205,11 +236,11 @@ sequenceDiagram
         C->>API: PUT /api/v1/uploads/{file_id}/parts/{n} (Content-Digest)
         API->>API: check length and digest
         API->>OS: write part
-        API-->>C: 204
+        API-->>C: 200 part_number, etag
     end
     C->>API: POST /api/v1/uploads/{file_id}/complete
-    API->>DB: session completed, job file_verify
-    API-->>C: 202 (being checked)
+    API->>DB: session completed, job files.scan
+    API-->>C: 200 file (pending, being checked)
     W->>OS: read bytes, one pass
     W->>W: SHA-256, size, type detection
     W->>AV: INSTREAM in chunks
@@ -540,7 +571,10 @@ Sanitizing on declaration, result in `original_name`:
 2. Only the last path segment; `/` and `\` are removed [Q15, verified].
 3. Remove control characters, bidi control characters (for example U+202E, which can disguise
    "exe" as "pdf") and zero-width characters; trim whitespace at the start and end [Q15, verified].
-4. `.` and `..` alone are invalid [Q15, verified]. An empty remainder yields `file`.
+4. `.` and `..` alone are invalid [Q15, verified]. An empty remainder yields `file`. A name that is
+   `.` or `..` after steps 1 to 3 also becomes `file`: the name is only a label, and a `400` for
+   an already cleaned name would give the client nothing to correct (D-M3-03-9). Names are
+   cleaned, never rejected.
 5. Length at most `file.name_max_bytes` UTF-8 bytes; truncation happens before the extension.
 
 ## 7. Images: metadata and thumbnails
@@ -770,7 +804,7 @@ lower priority, so that a large import does not delay live uploads; no quota; th
 
 | Case | Effect |
 |---|---|
-| Message deleted | In the same transaction: `message_attachments` removed ([03-data-model.md](03-data-model.md)), `files.deleted_at` set, job `file_delete` queued. The job deletes the original and the variants via their known keys. |
+| Message deleted | In the same transaction: `message_attachments` removed ([03-data-model.md](03-data-model.md)), `files.deleted_at` set, job `files.purge_objects` queued (02 12.3). The job deletes the original and the variants via their known keys. |
 | `file.delete` | only own files that are not attached (or with `manage`); same path |
 | Never attached | Files with `purpose = 'attachment'`, `upload_state = 'complete'`, without an attachment and without a reference from a draft of the uploader (`drafts.file_ids` with `drafts.user_id = files.uploaded_by`), older than `file.unattached_ttl`: delete. Reason for "of the uploader": a draft checks `file_ids` on saving only for their form (04 section 14); a foreign ID in it must not keep a file alive |
 | Session open and expired | after `file.upload_session_ttl`: delete the parts, abort the multipart upload, `upload_state = 'failed'`, session `expired` |

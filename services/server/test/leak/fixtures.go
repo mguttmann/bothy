@@ -60,6 +60,9 @@ var Fixtures = map[string]ParamFixture{
 	"app_id":      extraFixture(func(e *Extras) string { return e.AppID }),
 	// The subscription of the app (05 webhook.read, owner only; the routes are enabled since M2-26).
 	"subscription_id": extraFixture(func(e *Extras) string { return e.SubscriptionID }),
+	// A file Sam uploads into Marketing/Kampagnen: before attachment only its uploader reads it
+	// (05 file.read, M3-03), and its upload session only its principal (getUpload).
+	"file_id": extraFixture(func(e *Extras) string { return e.FileID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -77,9 +80,10 @@ func isHuman(w *harness.World, r *harness.Client) bool {
 // assignee (05 host.read, owner or assignee) and an installed app (05 app.read, owner only; the
 // app routes are enabled since M2-24) with a webhook subscription (05 webhook.read, owner only; the
 // routes are enabled since M2-26, M1-70/11). PrepareExtras creates them through the public API as
-// the owner.
+// the owner, and an upload of Sam (05 file.read: only the uploader reads an unattached file,
+// M3-03).
 type Extras struct {
-	ProviderID, HostID, AppID, SubscriptionID string
+	ProviderID, HostID, AppID, SubscriptionID, FileID string
 }
 
 // extrasWebhookHost is the host of the webhook subscription of the Extras; the server must allow it
@@ -108,7 +112,8 @@ func extraFixture(get func(*Extras) string) ParamFixture {
 
 // PrepareExtras creates the Extras of w through the public API as the owner: a disabled
 // trusted-header login driver (createIdentityProvider), a host without assignee (createHost), an
-// app (installApp) and a webhook subscription of the app (createWebhookSubscription).
+// app (installApp) and a webhook subscription of the app (createWebhookSubscription) and, as Sam, an upload
+// (createUpload).
 func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	tb.Helper()
 	o := w.Owner
@@ -131,8 +136,26 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 	e.SubscriptionID = createdID(tb, harness.MustDo(tb, o, harness.Request{Method: http.MethodPost, Path: "/apps/" + e.AppID + "/webhooks", Body: map[string]any{
 		"url": "https://" + extrasWebhookHost + "/leak", "event_types": []string{"message.created"},
 	}}, http.StatusCreated))
+	e.FileID = uploadOfSam(tb, w)
 	extras.Store(w, e)
 	return e
+}
+
+// uploadOfSam announces an upload of Sam in Marketing/Kampagnen (G-2 gives Sam trigger and upload
+// there) and returns its file ID.
+func uploadOfSam(tb testing.TB, w *harness.World) string {
+	tb.Helper()
+	r := harness.MustDo(tb, w.People["Sam"], harness.Request{Method: http.MethodPost, Path: "/channels/" + w.Channels["Marketing/Kampagnen"] + "/uploads",
+		Body: map[string]any{"name": "plan.txt", "size_bytes": 4, "sha256": "88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589"}},
+		http.StatusCreated)
+	var body struct {
+		FileID string `json:"file_id"`
+	}
+	r.JSON(tb, &body)
+	if body.FileID == "" {
+		tb.Fatalf("leak: no file_id in %s", r.Body)
+	}
+	return body.FileID
 }
 
 // createdID returns the member id (or host_id) of a creation response, or the id of its member

@@ -83,3 +83,13 @@ func TestDisplayTextErrorNeverEchoesText(t *testing.T) {
 		t.Fatalf("error text %q, want %q", err.Error(), want)
 	}
 }
+
+func TestIsBidiControlMatchesDisplayText(t *testing.T) {
+	for r := rune(0); r <= 0x2FFF; r++ {
+		var te *textcheck.Error
+		rejected := errors.As(textcheck.DisplayText(string(r)), &te) && te.Rule == textcheck.RuleBidiControl
+		if textcheck.IsBidiControl(r) != rejected {
+			t.Fatalf("IsBidiControl(%U) = %v, DisplayText rejects it as bidi: %v", r, textcheck.IsBidiControl(r), rejected)
+		}
+	}
+}

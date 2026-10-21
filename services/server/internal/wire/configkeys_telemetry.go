@@ -21,7 +21,7 @@ func telemetryConfigKeys() []config.Key {
 			Chapter: chapter17,
 		},
 		{
-			Name: "telemetry.traces.trust_remote_parent", Kind: config.KindBool, Default: "false",
+			Name: "telemetry.traces.trust_remote_parent", Kind: config.KindBool, Default: defaultFalse,
 			Doc:     "With true an incoming traceparent becomes the parent of the server span, otherwise only a span link.",
 			Chapter: chapter17,
 		},

@@ -36,6 +36,8 @@ const (
 	defaultQuarterHour = "15m"
 	// defaultTenSeconds is a default of 10 seconds.
 	defaultTenSeconds = "10s"
+	// defaultFalse is the default of a switch that is off.
+	defaultFalse = "false"
 	// defaultDay is a default of 24 hours.
 	defaultDay = "24h"
 )

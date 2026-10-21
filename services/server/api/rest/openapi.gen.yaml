@@ -9607,6 +9607,7 @@ paths:
                 value:
                   name: screenshot.png
                   size_bytes: 48213
+                  sha256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
                   declared_mime_type: image/png
       responses:
         '201':
@@ -9669,6 +9670,12 @@ paths:
       parameters:
       - $ref: '#/components/parameters/FileIdPath'
       - $ref: '#/components/parameters/PartNumberPath'
+      - name: Content-Digest
+        in: header
+        required: true
+        description: 'RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.'
+        schema:
+          type: string
       requestBody:
         required: true
         content:
@@ -9721,8 +9728,8 @@ paths:
       summary: Finish an upload
       tags: [Files]
       description: |-
-        Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-        downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+        Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+        downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
       x-authz-action: file.upload
       x-rate-limit-class: rl.upload
       parameters:
@@ -9800,7 +9807,7 @@ paths:
       summary: Read the state of an own upload
       tags: [Files]
       description: |-
-        Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+        Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
       x-authz-action: file.upload
       x-rate-limit-class: rl.upload
       parameters:
@@ -9846,6 +9853,8 @@ paths:
       operationId: abortUpload
       summary: Abort an upload
       tags: [Files]
+      description: |-
+        Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
       x-authz-action: file.delete
       x-rate-limit-class: rl.write
       parameters:
@@ -9868,6 +9877,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -23858,7 +23869,7 @@ components:
     UploadCreate:
       type: object
       additionalProperties: false
-      required: [name, size_bytes]
+      required: [name, size_bytes, sha256]
       properties:
         name:
           type: string
@@ -23873,7 +23884,8 @@ components:
           examples: [image/png]
         sha256:
           type: string
-          description: Hex SHA-256; the server verifies it on completion when given.
+          pattern: '^[0-9a-f]{64}$'
+          description: Lowercase hex SHA-256 of the whole file; the verify pass checks it.
     UploadSession:
       type: object
       description: |

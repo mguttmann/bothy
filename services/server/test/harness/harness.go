@@ -122,6 +122,8 @@ type Server struct {
 	// SigningKeyDir is secrets.signing_key_dir of the server, the store of its private signing
 	// keys.
 	SigningKeyDir string
+	// FilesRoot is file.fs.root of the server, the root of the file system driver (M3-03).
+	FilesRoot string
 	// Owner is the first owner, enrolled with fresh device keys.
 	Owner *Client
 
@@ -179,10 +181,15 @@ func Start(tb testing.TB, opts Options) *Server {
 	if err := os.Mkdir(keys, 0o700); err != nil {
 		tb.Fatal(err)
 	}
+	// file.fs.root of the file system driver (M3-03): a directory of the test with mode 0700.
+	files := filepath.Join(tb.TempDir(), "files")
+	if err := os.Mkdir(files, 0o700); err != nil {
+		tb.Fatal(err)
+	}
 	var lastErr error
 	code := ""
 	for range portAttempts {
-		s, err := start(tb, db, opts, clk, secretsDir, keys, &code)
+		s, err := start(tb, db, opts, clk, secretsDir, keys, files, &code)
 		if err == nil {
 			return s
 		}
@@ -200,7 +207,7 @@ var errPortTaken = errors.New("harness: the reserved public port was taken")
 
 // start starts one server process; the public port is reserved first, because server.public_url
 // must name it before the listener exists.
-func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsDir, keys string, code *string) (*Server, error) {
+func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsDir, keys, files string, code *string) (*Server, error) {
 	port, err := freePort()
 	if err != nil {
 		return nil, err
@@ -210,7 +217,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		host = "127.0.0.1"
 	}
 	public := "http://" + host + ":" + strconv.Itoa(port)
-	env := environment(db, opts, public, secretsDir, keys, port)
+	env := environment(db, opts, public, secretsDir, keys, files, port)
 	schema, err := wire.ConfigSchema()
 	if err != nil {
 		return nil, err
@@ -252,7 +259,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	}
 	s := &Server{
 		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: "ws://" + host + ":" + strconv.Itoa(port) + apiPrefix + "/gateway",
-		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, proofs: opts.ProofObserver, tokens: opts.TokenObserver, db: db, tb: tb, clk: clk, values: values, env: env,
+		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, FilesRoot: files, proofs: opts.ProofObserver, tokens: opts.TokenObserver, db: db, tb: tb, clk: clk, values: values, env: env,
 		http: &http.Client{Timeout: 60 * time.Second},
 	}
 	owner, err := s.redeem(tb.Context(), *code, "Owner device")
@@ -274,12 +281,14 @@ func freePort() (int, error) {
 }
 
 // environment builds the process environment of the server: the database of db as
-// bothy_app, the secrets and the key store, both listeners on 127.0.0.1, then Options.Config.
-func environment(db *pgtest.DB, opts Options, public, secretsDir, keys string, port int) []string {
+// bothy_app, the secrets, the key store and the root of the file system driver, both listeners
+// on 127.0.0.1, then Options.Config.
+func environment(db *pgtest.DB, opts Options, public, secretsDir, keys, files string, port int) []string {
 	cfg := db.Config(pg.RoleApp)
 	set := map[string]string{
 		"secrets.dir":                 secretsDir,
 		"secrets.signing_key_dir":     keys,
+		"file.fs.root":                files,
 		"database.host":               cfg.Host,
 		"database.port":               strconv.Itoa(cfg.Port),
 		"database.name":               db.Name(),

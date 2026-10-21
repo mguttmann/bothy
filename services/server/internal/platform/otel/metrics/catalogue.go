@@ -11,6 +11,8 @@ var (
 	BucketsSeconds = []float64{0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10}
 	// BucketsLong is the row "long durations".
 	BucketsLong = []float64{1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600, 7200}
+	// BucketsSizes is the row "sizes" (bothy.file.upload.size, M3-03).
+	BucketsSizes = []float64{1024, 16384, 131072, 1048576, 8388608, 67108864, 536870912}
 )
 
 // LibraryOtelHTTP is the instrumentation scope of otelhttp
@@ -175,6 +177,13 @@ var (
 		},
 		Buckets: BucketsSeconds,
 	}
+	// FileUploadSize is bothy.file.upload.size (4.4): the declared size of every completed
+	// upload, recorded after the commit of completeUpload; no attributes (M3-03).
+	FileUploadSize = Spec{
+		Name: "bothy.file.upload.size", Kind: KindHistogram, Unit: "By",
+		Description: "Declared size of completed uploads.",
+		Buckets:     BucketsSizes,
+	}
 	// JobDuration is bothy.job.duration (4.4).
 	JobDuration = Spec{
 		Name: "bothy.job.duration", Kind: KindHistogram, Unit: "s",
@@ -249,7 +258,7 @@ func All() []Spec {
 		GatewayClose, GatewayOutboundDropped,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration,
-		JobDuration, JobQueue, EgressBlocked,
+		JobDuration, JobQueue, EgressBlocked, FileUploadSize,
 		DBClientOperationDuration, DBPoolConnections,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
 		ClientMetricsDiscarded,

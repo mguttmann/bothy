@@ -377,15 +377,12 @@ func TestVerifyRegistrations_DeferredActions(t *testing.T) {
 		re.Violations[0].Action != "command.invoke" {
 		t.Fatalf("route: %v", err)
 	}
-	// Since M2-43 no channel op names a deferred action (host.connect is HostSelf).
-	for name, register := range map[string]func(*authorize.Registry){
-		"event type": func(r *authorize.Registry) { r.Event("files", authorize.EventFileUpdated) },
-	} {
-		r := authorize.NewRegistry()
-		register(r)
-		err := cat.VerifyRegistrations(nil, r)
-		if !errors.As(err, &re) || len(re.Violations) != 1 || re.Violations[0].Kind != app.ViolationDeferredAction {
-			t.Errorf("%s: %v", name, err)
-		}
+	// Since M2-43 no channel op names a deferred action (host.connect is HostSelf), and since M3-03
+	// no event type does (file.updated receives with file.read): the registry of file.updated
+	// verifies.
+	r := authorize.NewRegistry()
+	r.Event("files", authorize.EventFileUpdated)
+	if err := cat.VerifyRegistrations(nil, r); err != nil {
+		t.Errorf("file.updated: %v", err)
 	}
 }

@@ -147,7 +147,9 @@ modules:
     depends_on: [identity, chat]
     # The S3 driver (M3-02); depguard in .golangci.yml narrows the SDK to adapters/s3, because
     # go-arch-lint grants a vendor to all adapters of a module (docs/DECISIONS.md M3-02/12).
-    adapter_vendors: [awssdk]
+    # M3-03: sqlc code and the repository (pgx), NFC of file names (xtext, adapters/unicode), the
+    # extensions of denied types (mimetype, adapters/mimetype) and bothy.file.upload.size (otel).
+    adapter_vendors: [awssdk, pgx, xtext, mimetype, otel]
   messaging:
     tables: [messages, message_revisions, mentions, reactions, pins, message_templates]
     actions: [thread.create, message.read, message.create, message.update, message.delete,
@@ -284,6 +286,9 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   # Extended grapheme clusters (UAX #29) of the reaction symbol rule (messaging adapters/unicode,
   # M1-59).
   uniseg: [github.com/rivo/uniseg]
+  # The type table of file formats: the extensions of file.denied_mime_types (files
+  # adapters/mimetype, M3-03); the detection of the verify pass follows with M3-04.
+  mimetype: [github.com/gabriel-vasile/mimetype]
   # Argon2id password hashes of local accounts (identity adapters/passwordhash, M1-39).
   xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,

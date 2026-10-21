@@ -14,7 +14,7 @@ part 'upload_create.g.dart';
 /// * [name]
 /// * [sizeBytes]
 /// * [declaredMimeType]
-/// * [sha256] - Hex SHA-256; the server verifies it on completion when given.
+/// * [sha256] - Lowercase hex SHA-256 of the whole file; the verify pass checks it.
 @BuiltValue()
 abstract class UploadCreate
     implements Built<UploadCreate, UploadCreateBuilder> {
@@ -27,9 +27,9 @@ abstract class UploadCreate
   @BuiltValueField(wireName: r'declared_mime_type')
   String? get declaredMimeType;
 
-  /// Hex SHA-256; the server verifies it on completion when given.
+  /// Lowercase hex SHA-256 of the whole file; the verify pass checks it.
   @BuiltValueField(wireName: r'sha256')
-  String? get sha256;
+  String get sha256;
 
   UploadCreate._();
 
@@ -71,13 +71,11 @@ class _$UploadCreateSerializer implements PrimitiveSerializer<UploadCreate> {
         specifiedType: const FullType(String),
       );
     }
-    if (object.sha256 != null) {
-      yield r'sha256';
-      yield serializers.serialize(
-        object.sha256,
-        specifiedType: const FullType(String),
-      );
-    }
+    yield r'sha256';
+    yield serializers.serialize(
+      object.sha256,
+      specifiedType: const FullType(String),
+    );
   }
 
   @override
@@ -130,9 +128,8 @@ class _$UploadCreateSerializer implements PrimitiveSerializer<UploadCreate> {
         case r'sha256':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType.nullable(String),
-          ) as String?;
-          if (valueDes == null) continue;
+            specifiedType: const FullType(String),
+          ) as String;
           result.sha256 = valueDes;
           break;
         default:

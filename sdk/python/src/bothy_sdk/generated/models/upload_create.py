@@ -16,23 +16,23 @@ class UploadCreate:
     Attributes:
         name (str):
         size_bytes (int):
+        sha256 (str): Lowercase hex SHA-256 of the whole file; the verify pass checks it.
         declared_mime_type (str | Unset):
-        sha256 (str | Unset): Hex SHA-256; the server verifies it on completion when given.
     """
 
     name: str
     size_bytes: int
+    sha256: str
     declared_mime_type: str | Unset = UNSET
-    sha256: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
         size_bytes = self.size_bytes
 
-        declared_mime_type = self.declared_mime_type
-
         sha256 = self.sha256
+
+        declared_mime_type = self.declared_mime_type
 
         field_dict: dict[str, Any] = {}
 
@@ -40,12 +40,11 @@ class UploadCreate:
             {
                 "name": name,
                 "size_bytes": size_bytes,
+                "sha256": sha256,
             }
         )
         if declared_mime_type is not UNSET:
             field_dict["declared_mime_type"] = declared_mime_type
-        if sha256 is not UNSET:
-            field_dict["sha256"] = sha256
 
         return field_dict
 
@@ -56,15 +55,15 @@ class UploadCreate:
 
         size_bytes = d.pop("size_bytes")
 
-        declared_mime_type = d.pop("declared_mime_type", UNSET)
+        sha256 = d.pop("sha256")
 
-        sha256 = d.pop("sha256", UNSET)
+        declared_mime_type = d.pop("declared_mime_type", UNSET)
 
         upload_create = cls(
             name=name,
             size_bytes=size_bytes,
-            declared_mime_type=declared_mime_type,
             sha256=sha256,
+            declared_mime_type=declared_mime_type,
         )
 
         return upload_create

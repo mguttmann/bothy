@@ -14,7 +14,7 @@ class _$UploadCreate extends UploadCreate {
   @override
   final String? declaredMimeType;
   @override
-  final String? sha256;
+  final String sha256;
 
   factory _$UploadCreate([void Function(UploadCreateBuilder)? updates]) =>
       (UploadCreateBuilder()..update(updates))._build();
@@ -23,7 +23,7 @@ class _$UploadCreate extends UploadCreate {
     required this.name,
     required this.sizeBytes,
     this.declaredMimeType,
-    this.sha256,
+    required this.sha256,
   }) : super._();
   @override
   UploadCreate rebuild(void Function(UploadCreateBuilder) updates) =>
@@ -129,7 +129,11 @@ class UploadCreateBuilder
             'sizeBytes',
           ),
           declaredMimeType: declaredMimeType,
-          sha256: sha256,
+          sha256: BuiltValueNullFieldError.checkNotNull(
+            sha256,
+            r'UploadCreate',
+            'sha256',
+          ),
         );
     replace(_$result);
     return _$result;

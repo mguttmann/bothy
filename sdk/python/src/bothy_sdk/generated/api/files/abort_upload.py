@@ -51,6 +51,11 @@ def _parse_response(
 
         return response_404
 
+    if response.status_code == 409:
+        response_409 = Problem.from_dict(response.json())
+
+        return response_409
+
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
 
@@ -78,6 +83,10 @@ def sync_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[Any | Problem]:
     """Abort an upload
+
+     Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and
+    `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed
+    one 409 `invalid_state_transition`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -108,6 +117,10 @@ def sync(
 ) -> Any | Problem | None:
     """Abort an upload
 
+     Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and
+    `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed
+    one 409 `invalid_state_transition`.
+
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -131,6 +144,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[Any | Problem]:
     """Abort an upload
+
+     Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and
+    `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed
+    one 409 `invalid_state_transition`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -158,6 +175,10 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> Any | Problem | None:
     """Abort an upload
+
+     Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and
+    `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed
+    one 409 `invalid_state_transition`.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
