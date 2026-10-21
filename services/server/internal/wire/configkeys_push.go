@@ -28,7 +28,7 @@ func pushConfigKeys() []config.Key {
 // server does not start.
 func apnsConfigKeys() []config.Key {
 	return []config.Key{
-		{Name: "push.ttl", Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: chapter13,
+		{Name: "push.ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1s", Chapter: chapter13,
 			Doc: "Lifetime of a push at the provider (apns-expiration, android.ttl)."},
 		{Name: "push.apns.team_id", Kind: config.KindString, Default: "", Chapter: chapter13,
 			Doc: "Apple team ID of the APNs key; APNs is enabled when team ID, key ID and topics are set."},
@@ -40,9 +40,9 @@ func apnsConfigKeys() []config.Key {
 			Doc: "Allowed bundle IDs (apns-topic) of the apps of this instance."},
 		{Name: "push.apns.jwt_refresh_interval", Kind: config.KindDuration, Default: "40m", Min: "20m", Max: "60m", Chapter: chapter13,
 			Doc: "Renewal interval of the APNs provider JWT; Apple requires 20 to 60 minutes."},
-		{Name: "push.apns.retry_5xx_delay", Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: chapter13,
+		{Name: "push.apns.retry_5xx_delay", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s", Chapter: chapter13,
 			Doc: "Wait before a push is retried after an APNs 500 or 503."},
-		{Name: "push.apns.time_sensitive_enabled", Kind: config.KindBool, Default: "false", Chapter: chapter13,
+		{Name: "push.apns.time_sensitive_enabled", Kind: config.KindBool, Default: defaultFalse, Chapter: chapter13,
 			Doc: "Send input_needed hints with interruption-level time-sensitive."},
 	}
 }

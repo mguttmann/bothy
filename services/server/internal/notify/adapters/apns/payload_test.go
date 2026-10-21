@@ -208,10 +208,12 @@ var allowedStrings = []string{"TitleLocKey", "LocKey", "ThreadID", "Category", "
 // allowed string fields: no map, no interface, no slice.
 func walk(t *testing.T, typ reflect.Type, path string) {
 	t.Helper()
-	switch typ.Kind() {
-	case reflect.Pointer:
+	k := typ.Kind()
+	if k == reflect.Pointer {
 		walk(t, typ.Elem(), path)
-	case reflect.Struct:
+		return
+	}
+	if k == reflect.Struct {
 		for i := range typ.NumField() {
 			f := typ.Field(i)
 			if f.Type.Kind() == reflect.String && !slices.Contains(allowedStrings, f.Name) {
@@ -219,9 +221,10 @@ func walk(t *testing.T, typ reflect.Type, path string) {
 			}
 			walk(t, f.Type, path+"."+f.Name)
 		}
-	case reflect.String, reflect.Int, reflect.Int64:
-	default:
-		t.Errorf("%s: kind %s is not allowed in the payload", path, typ.Kind())
+		return
+	}
+	if k != reflect.String && k != reflect.Int && k != reflect.Int64 {
+		t.Errorf("%s: kind %s is not allowed in the payload", path, k)
 	}
 }
 
@@ -256,7 +259,7 @@ func chapterExample(t *testing.T) []byte {
 	}
 	for {
 		for _, name := range []string{"13-push-notifications.md", "13-push-benachrichtigungen.md"} {
-			b, err := os.ReadFile(filepath.Join(dir, "docs", "spec", name))
+			b, err := os.ReadFile(filepath.Join(dir, "docs", "spec", name)) // #nosec G304 -- a chapter of the repository's specification
 			if err != nil {
 				continue
 			}
@@ -313,7 +316,7 @@ func TestPayloadMatchesChapterExample(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	g, err := os.ReadFile(golden)
+	g, err := os.ReadFile(golden) // #nosec G304 -- the golden file of this package
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,14 +7,6 @@ import (
 	"time"
 )
 
-// The configuration keys of the adapter (13 17); error texts name them, never a value.
-const (
-	keyTeamID        = "push.apns.team_id"
-	keyKeyID         = "push.apns.key_id"
-	keyPrivateKeyRef = "push.apns.private_key_ref"
-	keyTopics        = "push.apns.topics"
-)
-
 // Config holds the keys push.ttl and push.apns.* (13 17); internal/wire binds it from the
 // loaded configuration.
 type Config struct {

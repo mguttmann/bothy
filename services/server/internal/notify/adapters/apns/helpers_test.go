@@ -123,9 +123,6 @@ func (s *switchable) setFail(err error) {
 // option changes the world before the adapter is built.
 type option func(*world)
 
-// withConfig changes the adapter configuration.
-func withConfig(f func(*apns.Config)) option { return func(w *world) { f(&w.cfg) } }
-
 // withoutRules leaves the Fakes out of egress.allowed_hosts.
 func withoutRules() option { return func(w *world) { w.egressCfg.AllowedHosts = nil } }
 
@@ -196,14 +193,6 @@ func (w *world) send(reg app.Registration, n app.Notification) domain.SendResult
 		w.t.Fatalf("Send: %v", err)
 	}
 	return res
-}
-
-// fakeOf returns the Fake of the registration's environment.
-func (w *world) fakeOf(reg app.Registration) *apnstest.Server {
-	if reg.Environment == "sandbox" {
-		return w.sand
-	}
-	return w.prod
 }
 
 func startFake(t *testing.T, pub *ecdsa.PublicKey) *apnstest.Server {

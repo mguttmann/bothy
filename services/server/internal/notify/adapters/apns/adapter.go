@@ -278,7 +278,11 @@ func (a *Adapter) do(ctx context.Context, reg app.Registration, n app.Notificati
 func (a *Adapter) record(ctx context.Context, v verdict, env string) {
 	switch v.log {
 	case logWarnBadToken:
-		a.log.WarnContext(ctx, msgBadTokenPrefix+env, slog.String(attr.PushProvider, providerName))
+		if env == envSandbox {
+			a.log.WarnContext(ctx, msgBadTokenSandbox, slog.String(attr.PushProvider, providerName))
+			return
+		}
+		a.log.WarnContext(ctx, msgBadTokenProd, slog.String(attr.PushProvider, providerName))
 	case logErrorProgram:
 		a.log.ErrorContext(ctx, msgProgramError, slog.String(attr.PushProvider, providerName), slog.String(attr.ErrorType, v.errType))
 	case logNone, logErrorConfig:

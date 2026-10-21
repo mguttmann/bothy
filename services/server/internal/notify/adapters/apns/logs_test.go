@@ -111,8 +111,8 @@ func TestNoSecretsInLogsOrErrors(t *testing.T) {
 }
 
 // errFailingResolver stands for a failing secret provider; its text names nothing secret.
-var errFailingResolver = errFailing{}
+var errFailingResolver = failingError{}
 
-type errFailing struct{}
+type failingError struct{}
 
-func (errFailing) Error() string { return "secret provider unavailable" }
+func (failingError) Error() string { return "secret provider unavailable" }

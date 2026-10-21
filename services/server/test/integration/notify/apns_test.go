@@ -191,7 +191,7 @@ func TestHintReachesFakeAPNs(t *testing.T) {
 	w := newWorld(t, withAPNs())
 	canary := "canary-" + ids.New().String()
 	th := w.newThread(w.allgemein)
-	w.setLevel("alex", "thread", th, "all")
+	w.setLevel("alex", th, "all")
 	m := w.post("owner", th, "Quarterly numbers "+canary)
 	w.consume()
 	var job pushJob
@@ -240,7 +240,7 @@ func TestBadgeSyncThroughAPNs(t *testing.T) {
 	w := newWorld(t, withAPNs())
 	mac := w.mac(w.alex)
 	th := w.newThread(w.allgemein)
-	w.setLevel("alex", "thread", th, "all")
+	w.setLevel("alex", th, "all")
 	m := w.post("owner", th, "Export numbers are in")
 	w.consume()
 	w.sendAll(w.alex)

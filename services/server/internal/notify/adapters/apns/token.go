@@ -19,11 +19,12 @@ import (
 // The log messages of the adapter (Design note 7 of brief M3-20). They are fixed texts: no
 // record carries a token, a JWT, a key, a topic, an ID, a name or a text.
 const (
-	msgConfigError    = "apns configuration error"
-	msgKeyUnavailable = "apns configuration error: push.apns.private_key_ref cannot be used"
-	msgProgramError   = "apns program error"
-	msgResumed        = "apns sending resumed"
-	msgBadTokenPrefix = "apns bad device token in "
+	msgConfigError     = "apns configuration error"
+	msgKeyUnavailable  = "apns configuration error: push.apns.private_key_ref cannot be used"
+	msgProgramError    = "apns program error"
+	msgResumed         = "apns sending resumed"
+	msgBadTokenProd    = "apns bad device token in production" // #nosec G101 -- a log message, not a credential
+	msgBadTokenSandbox = "apns bad device token in sandbox"    // #nosec G101 -- a log message, not a credential
 )
 
 // errorTypeInvalidKey is error.type of a key that resolved but does not parse.
@@ -114,7 +115,7 @@ func (s *envState) acquire(ctx context.Context, now time.Time) (tok string, prob
 func (s *envState) createLocked(ctx context.Context, now time.Time) error {
 	tok, errType, err := s.mint.mint(ctx, now)
 	if err != nil {
-		s.pauseLocked(ctx, now, msgKeyUnavailable, errType)
+		s.pauseLocked(ctx, now, true, errType)
 		return err
 	}
 	s.jwt, s.created = tok, now
@@ -138,7 +139,7 @@ func (s *envState) renew(ctx context.Context, used string, now time.Time) (tok s
 		return s.jwt, true
 	case !s.forcedAt.IsZero() && now.Before(s.forcedAt.Add(s.interval)):
 		// A fresh token did not help within this interval: the clock or the key is wrong.
-		s.pauseLocked(ctx, now, msgConfigError, reasonExpiredProviderToken)
+		s.pauseLocked(ctx, now, false, reasonExpiredProviderToken)
 		return "", false
 	}
 	if err := s.createLocked(ctx, now); err != nil {
@@ -158,7 +159,7 @@ func (s *envState) settle(ctx context.Context, probe, configErr bool, errType st
 	}
 	if configErr {
 		if s.pausedUntil.IsZero() || probe || !now.Before(s.pausedUntil) {
-			s.pauseLocked(ctx, now, msgConfigError, errType)
+			s.pauseLocked(ctx, now, false, errType)
 		}
 		return
 	}
@@ -176,10 +177,16 @@ func (s *envState) abandonProbe() {
 	s.probing = false
 }
 
-// pauseLocked starts a pause of one interval, drops the JWT and writes one Error record.
-func (s *envState) pauseLocked(ctx context.Context, now time.Time, msg, errType string) {
+// pauseLocked starts a pause of one interval, drops the JWT and writes one Error record; keyErr
+// selects the message that names push.apns.private_key_ref.
+func (s *envState) pauseLocked(ctx context.Context, now time.Time, keyErr bool, errType string) {
 	s.pausedUntil, s.jwt, s.probing = now.Add(s.interval), "", false
-	s.log.ErrorContext(ctx, msg, slog.String(attr.PushProvider, providerName), slog.String(attr.ErrorType, errType))
+	attrs := []any{slog.String(attr.PushProvider, providerName), slog.String(attr.ErrorType, errType)}
+	if keyErr {
+		s.log.ErrorContext(ctx, msgKeyUnavailable, attrs...)
+		return
+	}
+	s.log.ErrorContext(ctx, msgConfigError, attrs...)
 }
 
 // count returns the creations so far, for tests through export_test.go.
