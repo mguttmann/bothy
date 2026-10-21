@@ -23,6 +23,7 @@ const (
 // String returns the code of v as the problem body names it in reason ("valid", "expired",
 // "superseded", "invalid"), and "" for the zero verdict and a value outside the list.
 func (v TokenVerdict) String() string {
+	//exhaustive:ignore // The zero verdict and values outside the list have no code ("").
 	switch v {
 	case TokenValid:
 		return "valid"

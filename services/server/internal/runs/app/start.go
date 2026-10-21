@@ -91,6 +91,7 @@ func (s *Service) startTx(ctx context.Context, a actor.Actor, cmd runs.StartRun,
 	if !d.Allowed() {
 		return s.refuseStart(ctx, row, d)
 	}
+	//exhaustive:ignore // Every other next step after an allow is an internal error (default, fail closed).
 	switch check.Next {
 	case domain.NextReplay:
 		doc, err := s.documentOf(ctx, row)

@@ -26,6 +26,7 @@ const (
 // String returns the code of v ("valid", "expired", "superseded", "invalid"), "" for the zero
 // verdict and a value outside the list.
 func (v InvocationVerdict) String() string {
+	//exhaustive:ignore // The zero verdict and values outside the list have no code ("").
 	switch v {
 	case InvocationValid:
 		return "valid"

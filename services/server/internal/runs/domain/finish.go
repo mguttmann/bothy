@@ -106,6 +106,7 @@ func FinishDecision(current State, req FinishRequest) (FinishOutcome, error) {
 		// Out of an end state, and completed from queued or waiting_input (03 runs).
 		return FinishOutcome{}, errs.New(errs.CodeInvalidStateTransition, "runs: the run cannot reach this end state")
 	}
+	//exhaustive:ignore // completed carries no reason; FinishDecision allows no other target here.
 	switch req.Target {
 	case StateFailed:
 		reason, original, err := NormalizeAdapterReason(req.Reason)

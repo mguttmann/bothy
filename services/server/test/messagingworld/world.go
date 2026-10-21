@@ -446,7 +446,7 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 	// acceptance, so no message opens a run unless a test writes one.
 	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax, StepDetailMaxBytes: StepDetailMax,
 		QueuedMaxAge: 48 * time.Hour,
-		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
+		ClockLeeway:  30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
 		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, pool, uow, az,
 		wire.RunsDeps{Events: writes.Events, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Expiry: noExpiry{}}, w.Clock, log)
 	if err != nil {

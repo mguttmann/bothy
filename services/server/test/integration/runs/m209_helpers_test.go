@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -159,28 +158,28 @@ func (w *world) start(handle, run, token string, extra ...string) *httpservertes
 }
 
 // startWith sends startRun with the mode and the tool class.
-func (w *world) startWith(handle, run, token, mode, tool string, extra ...string) *httpservertest.Response {
+func (w *world) startWith(handle, run, token, mode, tool string, extra ...string) *httpservertest.Response { //nolint:unparam // the request helpers name the agent handle like start and cancel do.
 	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/start", startBody(token, mode, tool, extra...))
 }
 
 // resume sends resumeRun as the agent handle.
-func (w *world) resume(handle, run, token string) *httpservertest.Response {
+func (w *world) resume(handle, run, token string) *httpservertest.Response { //nolint:unparam // the request helpers name the agent handle like start and cancel do.
 	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/resume", startBody(token, "organization", "chat"))
 }
 
 // renew sends renewInvocationToken as the agent handle.
-func (w *world) renew(handle, run, token string) *httpservertest.Response {
+func (w *world) renew(handle, run, token string) *httpservertest.Response { //nolint:unparam // the request helpers name the agent handle like start and cancel do.
 	b, _ := json.Marshal(token)
 	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/invocation-token", `{"invocation_token":`+string(b)+`}`)
 }
 
 // await sends awaitRunInput as the agent handle.
-func (w *world) await(handle, run, line string) *httpservertest.Response {
+func (w *world) await(handle, run, line string) *httpservertest.Response { //nolint:unparam // the request helpers name the agent handle like start and cancel do.
 	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/await-input", `{"status_line":"`+line+`"}`)
 }
 
 // finish sends finishRun as the agent handle with the JSON members body.
-func (w *world) finish(handle, run, body string) *httpservertest.Response {
+func (w *world) finish(handle, run, body string) *httpservertest.Response { //nolint:unparam // the request helpers name the agent handle like start and cancel do.
 	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/finish", "{"+body+"}")
 }
 
@@ -190,7 +189,7 @@ func (w *world) cancel(name, run string) *httpservertest.Response {
 }
 
 // wantReason checks a problem with code and reason.
-func (w *world) wantReason(r *httpservertest.Response, status int, code, reason string) {
+func (w *world) wantReason(r *httpservertest.Response, status int, code, reason string) { //nolint:unparam // the status stays explicit next to the code at each call.
 	w.t.Helper()
 	p := w.want(r, status, code)
 	if p["reason"] != reason {
@@ -287,7 +286,7 @@ func (w *world) headerOf() map[string]any {
 }
 
 // eventsOf returns the payloads of the events of typ about run.
-func (w *world) eventsOf(typ, run string) []map[string]any {
+func (w *world) eventsOf(typ, run string) []map[string]any { //nolint:unparam // the event type stays explicit at each call.
 	w.t.Helper()
 	rs, err := w.db.Query(context.Background(), `SELECT payload::text FROM event_log WHERE type = $1 AND resource_id = $2 ORDER BY seq`, typ, run)
 	must(w.t, err)
@@ -321,9 +320,6 @@ func (w *world) noTokenAnywhere(tokens ...string) {
 		}
 	}
 }
-
-// contains reports whether list holds s.
-func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // deliveryInput is the input of runs.Delivery for an event of typ about run with payload.
 func deliveryInput(agent ids.ID, run, typ string, payload []byte) runs.DeliveryInput {

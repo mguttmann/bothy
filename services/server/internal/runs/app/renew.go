@@ -83,6 +83,7 @@ func (s *Service) renewTx(ctx context.Context, a actor.Actor, cmd runs.RenewToke
 	if !d.Allowed() {
 		return renewResult{}, d.Err()
 	}
+	//exhaustive:ignore // Every other next step after an allow is an internal error (default, fail closed).
 	switch check.Next {
 	case domain.NextAlreadyStarted:
 		return renewResult{}, errs.New(errs.CodeAlreadyStarted, "the run has already started or ended")
@@ -181,6 +182,7 @@ func (s *Service) refuseRenewal(ctx context.Context, row RunRow, eventType strin
 // their tokens are not renewed (internal error, nothing issued).
 func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, error) {
 	in := runs.DeliveryInput{AgentID: row.AgentID, ResourceKind: resourceRun, ResourceID: row.ID}
+	//exhaustive:ignore // interaction, command and autocomplete are not renewed until M2-15 and M2-16 (default).
 	switch domain.TriggerKind(c.TriggerKind) {
 	case domain.TriggerMessage:
 		in.Type = domain.EventAgentInvocation

@@ -29,6 +29,7 @@ const (
 // CancelDecision returns the outcome of cancelRun for a run in state current. An unknown state is
 // CancelInvalid, so nothing is written for a row outside the state machine.
 func CancelDecision(current State) CancelOutcome {
+	//exhaustive:ignore // Every other state is outside the cancel rules (CancelInvalid after the switch).
 	switch current {
 	case StateQueued:
 		return CancelImmediate

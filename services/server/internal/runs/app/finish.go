@@ -36,6 +36,7 @@ func (s *Service) AwaitInput(ctx context.Context, cmd runs.AwaitInput) (runs.Run
 		if err != nil {
 			return err
 		}
+		//exhaustive:ignore // Every other state cannot wait for input (default).
 		switch row.State {
 		case domain.StateWaitingInput:
 			doc, err = s.documentOf(ctx, row)
@@ -78,47 +79,62 @@ func (s *Service) Finish(ctx context.Context, cmd runs.FinishRun) (runs.Run, err
 		return runs.Run{}, err
 	}
 	a := caller(ctx)
-	var doc runs.Run
-	var mismatchHandle string
-	var mismatch bool
+	var f finished
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		mismatch = false
-		row, err := s.lockAgentRun(ctx, a, cmd.RunID)
-		if err != nil {
-			return err
-		}
-		out, err := domain.FinishDecision(row.State, req)
-		if err != nil {
-			return finishError(err)
-		}
-		if out.Kind == domain.FinishNoChange {
-			doc, err = s.documentOf(ctx, row)
-			return err
-		}
-		reason := cmd.Reason
-		if req.Target == domain.StateCompleted {
-			reason = ""
-		}
-		t, err := s.endRun(ctx, row, req.Target, reason, domain.SetterAdapter, TransitionStore{Metrics: metrics, Summary: cmd.Summary})
-		if err != nil {
-			return err
-		}
-		if out.Reason == domain.RunReasonBillingModeMismatch || out.Reason == domain.RunReasonToolClassMismatch {
-			if err := s.auditReportedMismatch(ctx, a, row, out.Reason); err != nil {
-				return err
-			}
-			mismatch, mismatchHandle = true, t.AgentHandle
-		}
-		doc, err = s.documentByID(ctx, row.ID)
+		var err error
+		f, err = s.finishLocked(ctx, a, cmd, req, metrics)
 		return err
 	})
 	if err != nil {
 		return runs.Run{}, err
 	}
-	if mismatch {
-		s.d.Mismatches.BillingModeMismatch(context.WithoutCancel(ctx), mismatchHandle)
+	if f.mismatch {
+		s.d.Mismatches.BillingModeMismatch(context.WithoutCancel(ctx), f.mismatchHandle)
 	}
-	return doc, nil
+	return f.doc, nil
+}
+
+// finished is the result of finishLocked: the run document and, for an adapter-reported I3
+// mismatch, the handle of the agent whose counter Finish raises after the commit.
+type finished struct {
+	doc            runs.Run
+	mismatch       bool
+	mismatchHandle string
+}
+
+// finishLocked is the unit of work of Finish: it locks and authorizes the run, applies
+// FinishDecision and ends the run, with the audit entry of a reported I3 mismatch.
+func (s *Service) finishLocked(ctx context.Context, a actor.Actor, cmd runs.FinishRun, req domain.FinishRequest,
+	metrics []byte) (finished, error) {
+	row, err := s.lockAgentRun(ctx, a, cmd.RunID)
+	if err != nil {
+		return finished{}, err
+	}
+	out, err := domain.FinishDecision(row.State, req)
+	if err != nil {
+		return finished{}, finishError(err)
+	}
+	if out.Kind == domain.FinishNoChange {
+		doc, err := s.documentOf(ctx, row)
+		return finished{doc: doc}, err
+	}
+	reason := cmd.Reason
+	if req.Target == domain.StateCompleted {
+		reason = ""
+	}
+	t, err := s.endRun(ctx, row, req.Target, reason, domain.SetterAdapter, TransitionStore{Metrics: metrics, Summary: cmd.Summary})
+	if err != nil {
+		return finished{}, err
+	}
+	var f finished
+	if out.Reason == domain.RunReasonBillingModeMismatch || out.Reason == domain.RunReasonToolClassMismatch {
+		if err := s.auditReportedMismatch(ctx, a, row, out.Reason); err != nil {
+			return finished{}, err
+		}
+		f.mismatch, f.mismatchHandle = true, t.AgentHandle
+	}
+	f.doc, err = s.documentByID(ctx, row.ID)
+	return f, err
 }
 
 // finishError maps the request errors of FinishDecision to 400 validation_failed with the field

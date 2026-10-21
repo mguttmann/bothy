@@ -109,6 +109,7 @@ type StartCheck struct {
 //	// c.Verdict goes to authorize; after an allow, c.Next says what to do.
 func StartVerdict(c TokenClaims, r RunTokenState, op StartOp, now time.Time, leeway time.Duration) StartCheck {
 	if !r.StartedJTI.IsZero() && c.JTI == r.StartedJTI {
+		//exhaustive:ignore // A replay is decided only for running and waiting_input; the checks below cover the rest.
 		switch r.State {
 		case StateRunning:
 			return StartCheck{Verdict: VerdictValid, Next: NextReplay}

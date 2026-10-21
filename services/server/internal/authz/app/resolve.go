@@ -179,6 +179,29 @@ func (a *Authorizer) resolveGrant(ctx context.Context, id ids.ID, revoked bool) 
 	return res, true, nil
 }
 
+// tokenAndInvokeFacts adds the facts of token.create (the holder), of a requirement on the
+// invocation token (run.start, run.token.renew) and of agent.invoke to in.
+func (a *Authorizer) tokenAndInvokeFacts(ctx context.Context, s *actingPrincipal, spec domain.ActionSpec, req domain.Expr,
+	r authorize.Resource, res resolved, t time.Time, in *domain.Input) error {
+	if spec.ID == string(authorize.ActionTokenCreate) {
+		pf, found, err := a.principal.Principal(ctx, r.ID)
+		if err != nil {
+			return sourceError("principal source", err)
+		}
+		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
+	}
+	if req.Contains(domain.Token()) && r.Token != nil {
+		in.Invocation = invocationFacts(r.Token)
+	}
+	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
+		var err error
+		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // gather builds the fact bundle of domain.Decide for one call: the effective rights on the path
 // with the "view as" and acting-for intersections and the facts the action and the resource kind
 // need (brief M1-28: decide.go stays pure).
@@ -213,21 +236,8 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	if err := a.grantFacts(spec.ID, r, res, &in); err != nil {
 		return domain.Input{}, err
 	}
-	if spec.ID == string(authorize.ActionTokenCreate) {
-		pf, found, err := a.principal.Principal(ctx, r.ID)
-		if err != nil {
-			return domain.Input{}, sourceError("principal source", err)
-		}
-		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
-	}
-	if req.Contains(domain.Token()) && r.Token != nil {
-		in.Invocation = invocationFacts(r.Token)
-	}
-	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
-		var err error
-		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
-			return domain.Input{}, err
-		}
+	if err := a.tokenAndInvokeFacts(ctx, s, spec, req, r, res, t, &in); err != nil {
+		return domain.Input{}, err
 	}
 	if in.Principal.ActingFor {
 		var err error

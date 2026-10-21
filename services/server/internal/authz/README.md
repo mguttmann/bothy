@@ -257,6 +257,7 @@ allowed, with `read` only `forbidden level_insufficient`, without a grant `not_f
 `forbidden subject_kind_not_allowed`. Denials are audited like other `denials` actions; apps turns
 every refusal into the `404` of an unknown webhook. Test: `app/webhookin_test.go`
 (`TestWebhookInPostRequirement`).
+
 ### Invocation token of `run.start` and `run.token.renew` (M2-09)
 
 Both are no longer deferred. `runs` verifies the invocation token and passes its verdict in
