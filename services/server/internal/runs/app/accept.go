@@ -23,7 +23,10 @@ import (
 // The values of MessagePosted that can trigger (09 section 3.2).
 const (
 	originHuman = "human"
+	originAgent = "agent"
 	kindText    = "text"
+	kindRun     = "run"
+	kindSystem  = "system"
 	channelDM   = "dm"
 	agentActive = "active"
 )
@@ -80,8 +83,21 @@ func (a *Acceptor) OnMessagePosted(ctx context.Context, ev messaging.MessagePost
 	return s.accept(ctx, ev)
 }
 
-// accept is the acceptance of one new message.
+// accept is the acceptance of one new message. Its first branch is the answer check of M2-19
+// (design note 2 f): an agent message that names a run is checked and may veto the unit; then
+// every message whose origin is not human returns without trigger work (AG-01, 07 SR4).
 func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error {
+	if ev.RunID != nil && ev.Kind != kindRun {
+		if ev.Origin != originAgent {
+			// messaging never builds this event; a run_id of another origin is a defect.
+			return errs.New(errs.CodeInternalError, "runs: a run_id on a message that is not an agent's answer")
+		}
+		if ev.Kind != kindSystem {
+			if err := s.checkAnswer(ctx, ev); err != nil {
+				return err
+			}
+		}
+	}
 	if ev.Origin != originHuman || ev.Kind != kindText {
 		return nil
 	}

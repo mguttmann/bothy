@@ -37,6 +37,10 @@ func (s *Service) CreateThread(ctx context.Context, a actor.Actor, cmd messaging
 	}
 	var p *prepared
 	if cmd.FirstMessage != nil {
+		// A thread created by this request has no run (M2-19 design note 5).
+		if err := domain.CheckFirstMessageRunID(cmd.FirstMessage.RunID); err != nil {
+			return messaging.ThreadCreated{}, err
+		}
 		first, err := s.prepare(ctx, a, *cmd.FirstMessage, ids.ID{}, newThreadContext(cmd))
 		if err != nil {
 			return messaging.ThreadCreated{}, err

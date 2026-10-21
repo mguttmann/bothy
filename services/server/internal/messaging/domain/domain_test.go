@@ -191,3 +191,34 @@ func TestSystemLine(t *testing.T) {
 		t.Fatalf("system line %+v", m)
 	}
 }
+
+// TestCreateRules_RunID: the body rules of run_id (M2-19 design notes 3 and 5): absent passes,
+// an agent carries it to runs, a person and an app get run_mismatch on /run_id, and
+// first_message.run_id is run_mismatch on /first_message/run_id for every principal kind.
+func TestCreateRules_RunID(t *testing.T) {
+	t.Parallel()
+	run := ids.New()
+	for _, kind := range []string{"user", "agent", "app"} {
+		if err := domain.CheckRunID(kind, nil); err != nil {
+			t.Errorf("%s without run_id: %v", kind, err)
+		}
+		if err := domain.CheckFirstMessageRunID(nil); err != nil {
+			t.Errorf("first_message without run_id: %v", err)
+		}
+		wantField(t, domain.CheckFirstMessageRunID(&run), "/first_message/run_id", domain.FieldRunMismatch)
+	}
+	if err := domain.CheckRunID("agent", &run); err != nil {
+		t.Fatalf("an agent's run_id is refused in the body rules: %v", err)
+	}
+	var details []string
+	for _, kind := range []string{"user", "app"} {
+		err := domain.CheckRunID(kind, &run)
+		wantField(t, err, "/run_id", domain.FieldRunMismatch)
+		e, _ := errs.As(err)
+		details = append(details, e.Detail)
+	}
+	if details[0] != details[1] || details[0] != domain.RunMismatchDetail {
+		t.Fatalf("details %q differ from %q", details, domain.RunMismatchDetail)
+	}
+	_ = actor.KindAgent
+}

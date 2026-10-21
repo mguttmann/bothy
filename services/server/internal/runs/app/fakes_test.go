@@ -37,6 +37,20 @@ type repo struct {
 	mu    sync.Mutex
 	runs  []app.RunRow
 	steps []app.StepRow
+	// answerLocks counts LockRunForAnswer (M2-19).
+	answerLocks int
+}
+
+// LockRunForAnswer implements app.Repository: the four columns of the answer check (M2-19).
+func (r *repo) LockRunForAnswer(ctx context.Context, id ids.ID) (domain.AnswerRun, bool, error) {
+	r.mu.Lock()
+	r.answerLocks++
+	r.mu.Unlock()
+	row, found, err := r.Run(ctx, id)
+	if err != nil || !found {
+		return domain.AnswerRun{}, found, err
+	}
+	return domain.AnswerRun{ID: row.ID, ThreadID: row.ThreadID, AgentID: row.AgentID, State: row.State}, true, nil
 }
 
 func (r *repo) InsertRun(_ context.Context, n app.NewRun) (app.RunRow, bool, error) {

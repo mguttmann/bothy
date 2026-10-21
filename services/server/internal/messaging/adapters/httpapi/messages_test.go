@@ -70,25 +70,26 @@ func TestCreateMessage_MaxContentBytes(t *testing.T) {
 	}
 }
 
-// TestCreateMessage_NotEnabledMembers400 (brief D2): kind voice and card, attachments, components
-// and run_id are refused with not_enabled; nothing is written.
+// TestCreateMessage_NotEnabledMembers400 (brief D2): kind voice and card, attachments and
+// components are refused with not_enabled; run_id of a person is run_mismatch since M2-19 (design
+// note 3); nothing is written.
 func TestCreateMessage_NotEnabledMembers400(t *testing.T) {
 	t.Parallel()
 	w := mw.New(t, subscribe)
 	_, _, main := w.TextChannel()
-	for _, c := range []struct{ extra, pointer string }{
-		{`"kind":"voice"`, "/kind"},
-		{`"kind":"card"`, "/kind"},
-		{`"attachment_file_ids":["` + ids.New().String() + `"]`, "/attachment_file_ids"},
-		{`"components":[{"custom_id":"ok","type":"button","definition":{}}]`, "/components"},
-		{`"run_id":"` + ids.New().String() + `"`, "/run_id"},
+	for _, c := range []struct{ extra, pointer, code string }{
+		{`"kind":"voice"`, "/kind", "not_enabled"},
+		{`"kind":"card"`, "/kind", "not_enabled"},
+		{`"attachment_file_ids":["` + ids.New().String() + `"]`, "/attachment_file_ids", "not_enabled"},
+		{`"components":[{"custom_id":"ok","type":"button","definition":{}}]`, "/components", "not_enabled"},
+		{`"run_id":"` + ids.New().String() + `"`, "/run_id", "run_mismatch"},
 	} {
 		r := w.Do("owner", http.MethodPost, mw.MessagesPath(main), mw.Body(ids.New(), "x", c.extra))
 		if r.StatusCode != http.StatusBadRequest {
 			t.Fatalf("%s: %d %s", c.extra, r.StatusCode, r.Body)
 		}
 		p := r.Problem(t)
-		if ptr, code := mw.Field(p); ptr != c.pointer || (code != "not_enabled" && c.pointer != "/components") {
+		if ptr, code := mw.Field(p); ptr != c.pointer || (code != c.code && c.pointer != "/components") {
 			t.Errorf("%s: %s %s", c.extra, ptr, code)
 		}
 	}

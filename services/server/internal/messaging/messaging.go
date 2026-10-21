@@ -92,6 +92,11 @@ type MessagePosted struct {
 	AuthorDeviceID *ids.ID
 	// ReplyToID is the quoted message; nil for none.
 	ReplyToID *ids.ID
+	// RunID is the run this message belongs to: for kind run the anchored run (messages.run_id);
+	// for an agent message of any other kind the run the request named in run_id, after the body
+	// rules (M2-19 design note 3), which runs checks before the commit (design note 4); nil
+	// otherwise. It is never stored for an agent message.
+	RunID *ids.ID
 	// MentionedIDs are the resolved mentions, sorted, without duplicates.
 	MentionedIDs []ids.ID
 	// Silent suppresses notifications.
@@ -168,10 +173,12 @@ type CreateMessageCmd struct {
 	ContentMD *string
 	// ReplyToID is the quoted message; nil for none.
 	ReplyToID *ids.ID
-	// AttachmentIDs, Components and RunID are refused in M1 (brief D2) when not empty.
+	// AttachmentIDs and Components are refused in M1 (brief D2) when not empty.
 	AttachmentIDs []ids.ID
 	Components    int
-	RunID         *ids.ID
+	// RunID is the run an agent's answer belongs to (M2-19): refused for every other principal,
+	// checked by runs, never stored and not part of the request hash; nil when absent.
+	RunID *ids.ID
 	// MentionIDs is the optional check of the resolved set; nil when absent.
 	MentionIDs []ids.ID
 	Silent     bool

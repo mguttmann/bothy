@@ -112,6 +112,24 @@ func (r *Repository) LockRun(ctx context.Context, id ids.ID) (app.RunRow, bool, 
 	return one(row, err, "locking a run")
 }
 
+// LockRunForAnswer implements app.Repository (M2-19): thread, agent and state of the run id with
+// a shared row lock (FOR SHARE) for the rest of the unit of work. Errors: internal outside a unit
+// of work.
+func (r *Repository) LockRunForAnswer(ctx context.Context, id ids.ID) (domain.AnswerRun, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.AnswerRun{}, false, err
+	}
+	row, err := q.LockRunForAnswer(ctx, uuid(id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.AnswerRun{}, false, nil
+	}
+	if err != nil {
+		return domain.AnswerRun{}, false, mapError(err, "locking a run for an answer")
+	}
+	return domain.AnswerRun{ID: idOf(row.ID), ThreadID: idOf(row.ThreadID), AgentID: idOf(row.AgentID), State: domain.State(row.State)}, true, nil
+}
+
 // RecordDelivery implements app.Repository: the columns of an allowed delivery and version + 1.
 // Errors: not_found for an unknown run, internal outside a unit of work.
 func (r *Repository) RecordDelivery(ctx context.Context, w app.DeliveryWrite) (app.RunRow, error) {
