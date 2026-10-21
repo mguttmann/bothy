@@ -45,7 +45,11 @@ func (q *Queries) ClearConsoleView(ctx context.Context, arg ClearConsoleViewPara
 const getConsoleAuthState = `-- name: GetConsoleAuthState :one
 SELECT s.id, s.user_id, s.device_id, s.client_component, s.parent_session_id, s.identity_id, s.auth_method, s.cookie_hash, s.created_at, s.expires_at, s.step_up_at, s.step_up_method, s.step_up_consumed_at, s.last_seen_at, s.last_ip, s.revoked_at, s.revoke_reason, s.view_as_user_id, s.view_as_started_at,
        d.state  AS device_state,
-       p.status AS user_status
+       p.status AS user_status,
+       EXISTS (SELECT 1 FROM auth_challenges c
+               WHERE c.session_id = s.id AND c.purpose = 'step_up' AND c.status = 'used'
+                 AND s.step_up_method = 'passkey' AND c.finished_at = s.step_up_at
+                 AND c.webauthn_session ->> 'user_verification' = 'required') AS step_up_user_verified
 FROM auth_sessions s
 JOIN devices d ON d.id = s.device_id
 JOIN principals p ON p.id = s.user_id
@@ -53,13 +57,17 @@ WHERE s.cookie_hash = $1
 `
 
 type GetConsoleAuthStateRow struct {
-	AuthSession AuthSession
-	DeviceState string
-	UserStatus  string
+	AuthSession        AuthSession
+	DeviceState        string
+	UserStatus         string
+	StepUpUserVerified bool
 }
 
 // The authentication lookup of a console request by the HMAC of its cookie: the session with the
-// state of its device and the status of its person, in one indexed query.
+// state of its device and the status of its person, in one indexed query. step_up_user_verified
+// reports that the last step-up was a passkey whose challenge (finished at step_up_at) stored a
+// WebAuthn session with userVerification = required, the fact of the console rule of the fresh
+// terminal step-up (08 section 6.3 point 3, M6-18).
 func (q *Queries) GetConsoleAuthState(ctx context.Context, cookieHash []byte) (GetConsoleAuthStateRow, error) {
 	row := q.db.QueryRow(ctx, getConsoleAuthState, cookieHash)
 	var i GetConsoleAuthStateRow
@@ -85,6 +93,7 @@ func (q *Queries) GetConsoleAuthState(ctx context.Context, cookieHash []byte) (G
 		&i.AuthSession.ViewAsStartedAt,
 		&i.DeviceState,
 		&i.UserStatus,
+		&i.StepUpUserVerified,
 	)
 	return i, err
 }

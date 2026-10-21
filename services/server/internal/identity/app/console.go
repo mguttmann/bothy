@@ -309,7 +309,8 @@ func (c *Console) Authenticate(ctx context.Context, creds actor.Credentials) (ac
 	out := actor.Actor{
 		ID: s.UserID, Kind: actor.KindUser, SessionID: s.ID, DeviceID: s.DeviceID, SessionActive: true,
 		DeviceState: actor.DeviceActive, DeviceKeyActive: true, StepUpAt: s.StepUpAt, StepUpMethod: s.StepUpMethod,
-		StepUpConsumedAt: s.StepUpConsumedAt, AuthMethod: string(s.AuthMethod), ClientComponent: string(identity.ComponentConsole),
+		StepUpConsumedAt: s.StepUpConsumedAt, StepUpUserVerified: s.StepUpUserVerified, AuthMethod: string(s.AuthMethod),
+		ClientComponent:     string(identity.ComponentConsole),
 		CredentialExpiresAt: s.ExpiresAt,
 	}
 	if !s.ViewAsUserID.IsZero() {

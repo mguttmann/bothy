@@ -523,3 +523,80 @@ func TestRecheck_PassesStepUpOnly(t *testing.T) {
 		t.Fatalf("%d deny entries, want only the one outside the recheck", after-before)
 	}
 }
+
+// console is who in a session of the web console with a fresh passkey step-up whose stored
+// WebAuthn session required user verification (08 section 6.3 point 3, M6-18).
+func (w *termWorld) console(who ids.ID) actor.Actor {
+	a := w.user(who)
+	a.StepUpMethod, a.StepUpUserVerified, a.ClientComponent = "passkey", true, "console"
+	return a
+}
+
+// expectPasskeyRequired checks a decision step_up_required with terminal_step_up_not_fresh and
+// the mark of reason passkey_required, which the problem body carries.
+func (w *termWorld) expectPasskeyRequired(t *testing.T, p actor.Actor, a authorize.Action, r authorize.Resource) {
+	t.Helper()
+	d := w.decide(t, context.Background(), p, a, r)
+	if d.Outcome != authorize.OutcomeStepUpRequired || d.Reason != "terminal_step_up_not_fresh" || !d.PasskeyRequired {
+		t.Fatalf("%s: %+v, want step_up_required/terminal_step_up_not_fresh with passkey_required", a, d)
+	}
+	if e, _ := errs.As(d.Err()); e == nil || e.Reason != "passkey_required" {
+		t.Fatalf("%s: problem %v, want reason passkey_required", a, d.Err())
+	}
+}
+
+// TestTerminalConsole_PasskeyRule (ID-T28 and TM-T07 console part, 08 section 6.3 points 3 and 5,
+// M6-18): from the console terminal.open and terminal.attach pass only with a fresh, unconsumed
+// passkey step-up with user verification; password with TOTP, a new OIDC login, a passkey without
+// user verification, a device key, no step-up and an old or consumed UV passkey give
+// passkey_required (D-M6-18-1); the quick reattach never applies.
+func TestTerminalConsole_PasskeyRule(t *testing.T) {
+	t.Parallel()
+	w := newTermWorld(t)
+	attach := authorize.ActionTerminalAttach
+	w.allow(t, w.console(w.alex), actOpen, hostOpen(w.r1))
+	for name, edit := range map[string]func(*actor.Actor){
+		"password_totp":   func(a *actor.Actor) { a.StepUpMethod, a.StepUpUserVerified = "password_totp", false },
+		"oidc_reauth":     func(a *actor.Actor) { a.StepUpMethod, a.StepUpUserVerified = "oidc_reauth", false },
+		"passkey, no uv":  func(a *actor.Actor) { a.StepUpUserVerified = false },
+		"device_key":      func(a *actor.Actor) { a.StepUpMethod = "device_key" },
+		"without step-up": func(a *actor.Actor) { a.StepUpAt, a.StepUpMethod, a.StepUpUserVerified = time.Time{}, "", false },
+		"password, old": func(a *actor.Actor) {
+			a.StepUpMethod, a.StepUpUserVerified, a.StepUpAt = "password_totp", false, a.StepUpAt.Add(-time.Hour)
+		},
+	} {
+		a := w.console(w.alex)
+		edit(&a)
+		t.Run(name, func(t *testing.T) {
+			w.expectPasskeyRequired(t, a, actOpen, hostOpen(w.r1))
+			w.expectPasskeyRequired(t, a, attach, w.session(w.alex, w.r1, "active", time.Time{}))
+		})
+	}
+	old := w.console(w.alex)
+	old.StepUpAt = old.StepUpAt.Add(-termFresh - time.Second)
+	w.expectPasskeyRequired(t, old, actOpen, hostOpen(w.r1))
+	consumed := w.console(w.alex)
+	consumed.StepUpConsumedAt = consumed.StepUpAt
+	w.expectPasskeyRequired(t, consumed, actOpen, hostOpen(w.r1))
+	// Outside the console a stale step-up carries no reason in the problem.
+	stale := w.person(w.alex)
+	stale.StepUpConsumedAt = stale.StepUpAt
+	if d := w.decide(t, context.Background(), stale, actOpen, hostOpen(w.r1)); d.PasskeyRequired {
+		t.Fatalf("an app with a consumed step-up: %+v", d)
+	}
+	// TM-T12 console part: within terminal.quick_reattach_window from the same console session
+	// and device without a new passkey: passkey_required, never the quick reattach.
+	detached := w.session(w.alex, w.r1, "detached", w.clk.Now().Add(-termReattach))
+	noPasskey := w.console(w.alex)
+	noPasskey.StepUpAt, noPasskey.StepUpMethod, noPasskey.StepUpUserVerified = time.Time{}, "", false
+	w.expectPasskeyRequired(t, noPasskey, attach, detached)
+	if d := w.decide(t, context.Background(), w.console(w.alex), attach, detached); !d.Allowed() || d.QuickReattach {
+		t.Fatalf("a console attach with a fresh UV passkey: %+v", d)
+	}
+	// The app device within the window stays allowed (regression of TM-T12).
+	app := w.person(w.alex)
+	app.StepUpAt = time.Time{}
+	if d := w.decide(t, context.Background(), app, attach, detached); !d.Allowed() || !d.QuickReattach {
+		t.Fatalf("the quick reattach of the app: %+v", d)
+	}
+}

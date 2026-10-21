@@ -44,8 +44,10 @@ func (r *Repository) ConsoleAuthState(ctx context.Context, cookieHash []byte) (a
 	if err != nil {
 		return app.ConsoleAuthState{}, false, mapError(err, "reading the console session of a request")
 	}
+	s := toSession(row.AuthSession)
+	s.StepUpUserVerified = row.StepUpUserVerified
 	return app.ConsoleAuthState{
-		Session: toSession(row.AuthSession), DeviceState: identity.DeviceState(row.DeviceState),
+		Session: s, DeviceState: identity.DeviceState(row.DeviceState),
 		UserActive: domain.Status(row.UserStatus) == domain.StatusActive,
 	}, true, nil
 }

@@ -28,11 +28,15 @@ const (
 //
 // Detail is the sub-reason of a decision whose problem reason differs from the audit reason: the
 // token verdict of invocation_token_invalid (M2-09); empty otherwise.
+//
+// PasskeyRequired marks a stale fresh step-up of the console that was no passkey with user
+// verification (ConsolePasskeyRequired, M6-18); the problem body then carries passkey_required.
 type Decision struct {
-	Outcome       Outcome
-	Reason        Reason
-	QuickReattach bool
-	Detail        string
+	Outcome         Outcome
+	Reason          Reason
+	QuickReattach   bool
+	Detail          string
+	PasskeyRequired bool
 }
 
 // Allow is the allowing decision.
@@ -464,8 +468,10 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 
 // decideFresh is step 8 for an action with fresh step-up (05 section 2.4, 08 section 6.3; M2-40):
 // only this branch, never the one of auth.step_up_max_age. The quick reattach of terminal.attach
-// passes without step-up and is recorded for the decision; otherwise the step-up must be fresh and
-// unconsumed (FreshStepUp), else step_up_required with terminal_step_up_not_fresh.
+// passes without step-up and is recorded for the decision (never in the console); otherwise the
+// step-up must be fresh and unconsumed (FreshStepUp), else step_up_required with
+// terminal_step_up_not_fresh, marked PasskeyRequired when a console request had no passkey with
+// user verification (08 section 6.3 point 3, M6-18).
 func decideFresh(in *Input) (Decision, bool) {
 	if in.Recheck {
 		// The check after the commit of the decision that consumed the step-up (M2-44, Design
@@ -479,7 +485,9 @@ func decideFresh(in *Input) (Decision, bool) {
 	if FreshStepUp(in.Fresh, in.Now, in.FreshMaxAge) {
 		return Decision{}, false
 	}
-	return deny(OutcomeStepUpRequired, ReasonTerminalStepUpNotFresh), true
+	d := deny(OutcomeStepUpRequired, ReasonTerminalStepUpNotFresh)
+	d.PasskeyRequired = ConsolePasskeyRequired(in.Fresh)
+	return d, true
 }
 
 // evaluator evaluates a requirement with the rights eff. noWrite forces Level(write) and
