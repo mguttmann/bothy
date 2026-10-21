@@ -83,7 +83,9 @@ def test_installed_version_equals_pin() -> None:
 def test_help_lists_contract_flags() -> None:
     text = run(["--help"]).stdout
     for flag in CONTRACT_FLAGS:
-        assert flag in text, flag
+        # The help of 2.1.259 names the file variants only as "--append-system-prompt[-file]".
+        short = flag.removesuffix("-file") + "[-file]"
+        assert flag in text or (flag.endswith("-file") and short in text), flag
 
 
 @turn
