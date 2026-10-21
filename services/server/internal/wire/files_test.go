@@ -44,6 +44,39 @@ func TestFileFSRootAbsolute(t *testing.T) {
 	}
 }
 
+// TestFilesConfigChecks holds the cross-checks of M3-03 (docs/DECISIONS.md D-M3-03-19):
+// upload_part_plan, upload_part_size_s3 and presigned_mode_unavailable. Their messages name keys,
+// never values.
+func TestFilesConfigChecks(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name  string
+		env   []string
+		check string
+	}{
+		{"too many parts", []string{"BOTHY_FILE__MAX_UPLOAD_BYTES=10001", "BOTHY_FILE__UPLOAD_PART_BYTES=1"}, "upload_part_plan"},
+		{"s3 part below the minimum", append(s3Env("https://s3.example.com"), "BOTHY_FILE__UPLOAD_PART_BYTES=5242879"), "upload_part_size_s3"},
+		{"presigned mode", []string{"BOTHY_FILE__S3__PRESIGNED_UPLOAD=true"}, "presigned_mode_unavailable"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := load(t, c.env...)
+			if len(got) != 1 || !strings.Contains(got[0].String(), ": "+c.check+": ") {
+				t.Fatalf("problems %v, want exactly %s", got, c.check)
+			}
+			noValues(t, got, "5242879")
+		})
+	}
+	for name, env := range map[string][]string{
+		"exactly the part limit":   {"BOTHY_FILE__MAX_UPLOAD_BYTES=10000", "BOTHY_FILE__UPLOAD_PART_BYTES=1"},
+		"small parts with fs":      {"BOTHY_FILE__MAX_UPLOAD_BYTES=1024000", "BOTHY_FILE__UPLOAD_PART_BYTES=1024"},
+		"s3 with the minimum part": append(s3Env("https://s3.example.com"), "BOTHY_FILE__UPLOAD_PART_BYTES=5242880"),
+	} {
+		if got := load(t, env...); got != nil {
+			t.Errorf("%s: problems %v, want none", name, got)
+		}
+	}
+}
+
 // filesValues loads the server schema with env added to the smallest working environment.
 func filesValues(t *testing.T, env ...string) *config.Values {
 	t.Helper()

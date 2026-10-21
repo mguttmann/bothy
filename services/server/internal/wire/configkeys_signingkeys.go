@@ -30,7 +30,7 @@ func signingKeyConfigKeys() []config.Key {
 			Chapter: chapter19,
 		},
 		{
-			Name: "signing_key.accept_lost_keys", Kind: config.KindBool, Default: "false",
+			Name: "signing_key.accept_lost_keys", Kind: config.KindBool, Default: defaultFalse,
 			Doc:     "Lets a start whose key store holds none of the unretired signing keys retire them and create fresh ones.",
 			Chapter: chapter19,
 		},

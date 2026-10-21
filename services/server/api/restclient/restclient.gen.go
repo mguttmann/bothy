@@ -15112,8 +15112,8 @@ type UploadCreate struct {
 	// Name Examples: screenshot.png
 	Name string `json:"name"`
 
-	// Sha256 Hex SHA-256; the server verifies it on completion when given.
-	Sha256 *string `json:"sha256,omitempty"`
+	// Sha256 Lowercase hex SHA-256 of the whole file; the verify pass checks it.
+	Sha256 string `json:"sha256"`
 
 	// SizeBytes Examples: 48213
 	SizeBytes int64 `json:"size_bytes"`
@@ -16903,6 +16903,12 @@ type SetThreadTitleParams struct {
 type CompleteUploadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UploadPartParams defines parameters for UploadPart.
+type UploadPartParams struct {
+	// ContentDigest RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.
+	ContentDigest string `json:"Content-Digest"`
 }
 
 // ListUsersParams defines parameters for ListUsers.
@@ -23062,20 +23068,22 @@ type ClientInterface interface {
 
 	// AbortUpload Abort an upload
 	//
+	// Ends an open own session: its parts are deleted, the file becomes `upload_state` `failed` and `file.updated` goes to the uploader. An aborted or expired session answers 204 again; a completed one 409 `invalid_state_transition`.
+	//
 	// Corresponds with DELETE /uploads/{file_id} (the `AbortUpload` operationId).
 	AbortUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUpload Read the state of an own upload
 	//
-	// Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+	// Confirmed parts of an own upload, so a client can resume after a network loss (12, 3.2). `upload_state` is `pending` for an open session without a confirmed part, `uploading` with at least one, `complete` once completed. An aborted or expired session answers 410 `gone`.
 	//
 	// Corresponds with GET /uploads/{file_id} (the `GetUpload` operationId).
 	GetUpload(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CompleteUploadWithBody Finish an upload
 	//
-	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23084,8 +23092,8 @@ type ClientInterface interface {
 
 	// CompleteUpload Finish an upload
 	//
-	// Checks size and optional SHA-256, detects the MIME type and queues the malware scan. The file is
-	// downloadable after `scan_status` is `clean` or `skipped`. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
+	// Closes the session; the verify pass then checks size and SHA-256, detects the MIME type and runs the malware scan. The file is
+	// downloadable after `scan_status` is `clean` or `skipped`. `parts` is checked against the confirmed parts: a duplicate or out-of-range number gives 400, another `etag` 409 `conflict` with `reason` `part_conflict`. A completed session answers 200 with the file again. Missing parts answer 409 `conflict` with `reason` `upload_incomplete`; an expired session answers 410 `gone` (12, 3.4 and 3.6).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23099,7 +23107,7 @@ type ClientInterface interface {
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /uploads/{file_id}/parts/{part_number} (the `UploadPart` operationId).
-	UploadPartWithBody(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UploadPartWithBody(ctx context.Context, fileId FileIdPath, partNumber PartNumberPath, params *UploadPartParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListUsers List people
 	//
@@ -25928,38 +25936,6 @@ func (c *Client) CreateDmWithBody(ctx context.Context, params *CreateDmParams, c
 // Corresponds with POST /dms (the `CreateDm` operationId).
 func (c *Client) CreateDm(ctx context.Context, params *CreateDmParams, body CreateDmJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateDmRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListEvents Catch up on events after a sequence
-//
-// Same filtering as the gateway. 410 `resync_required` with `reason` when catch-up is impossible.
-//
-// Corresponds with GET /events (the `ListEvents` operationId).
-func (c *Client) ListEvents(ctx context.Context, params *ListEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListEventsRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListFeatureFlags List feature flags
-//
-// Corresponds with GET /feature-flags (the `ListFeatureFlags` operationId).
-func (c *Client) ListFeatureFlags(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListFeatureFlagsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}

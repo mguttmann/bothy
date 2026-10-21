@@ -116,6 +116,24 @@ exceptions:
   - query: chat.ListThreadsByCreated
     category: after_authorize
     reason: "the threads of the one channel channel.read allowed (listChannelThreads); a thread is visible exactly when its channel is (07 section 7.2, limit)"
+  - query: files.GetFile
+    category: authorize_resolution
+    reason: "resolves one file by its id (scope channel, uploader, purpose) for authorize; getFile returns it only after file.read allowed it (M3-03)"
+  - query: files.QuotaUsedBytes
+    category: after_authorize
+    reason: "the sum of the sizes of the caller's own files for file.quota_bytes_per_principal after file.upload was allowed; keyed by the uploader, only a number (M3-03)"
+  - query: files.CountOpenSessions
+    category: after_authorize
+    reason: "the number and earliest expiry of the caller's own open upload sessions for file.upload_max_open_sessions after file.upload was allowed; keyed by the uploader (M3-03)"
+  - query: files.GetSession
+    category: authorize_resolution
+    reason: "resolves the caller's own upload session by file id and uploader for authorize on its scope channel; an unknown and a foreign id answer the same 404 (M3-03)"
+  - query: files.LockSessionForUpdate
+    category: after_authorize
+    reason: "locks the caller's own upload session by file id and uploader for abort and completion (03 section 6.3, M3-03)"
+  - query: files.LockSessionForShare
+    category: after_authorize
+    reason: "holds the caller's own upload session by file id and uploader while a part is confirmed (M3-03)"
   - query: messaging.ListMentions
     category: after_authorize
     reason: "the mentioned principals of the one message authorize allowed (Message.mention_ids)"

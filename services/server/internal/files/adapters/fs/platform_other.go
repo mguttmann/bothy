@@ -25,3 +25,5 @@ func notDir(error) bool { return false }
 func notEmpty(err error) bool { return errors.Is(err, iofs.ErrExist) }
 
 func renameRaced(error) bool { return false }
+
+func freeBytes(string) (int64, error) { return 0, errors.ErrUnsupported }

@@ -142,6 +142,10 @@ var appPrivileges = map[string][]string{
 	// M3-18: the notification levels and quiet hours of a person.
 	"notification_preferences": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"quiet_hours":              {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 section 4.7 (M3-03): the cleanup of M3-08 deletes sessions, parts and files.
+	"files":                {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"file_upload_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"file_upload_parts":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},

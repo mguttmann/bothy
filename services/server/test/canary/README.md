@@ -44,6 +44,9 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
 - `secretfiles.go`: the forms of a secret file, the redirection of the standard loggers.
 - `ops.go`: operation IDs of requests, the enabled list, `Coverage`.
 - `scenario*.go`, `drive.go`: `StartRun`, `NewScenario` and the steps; `Exempt` (empty).
+  `scenario_files.go` is the path "file name" (M3-03): an upload of Alex whose name is a canary
+  of a scope no observer reads (before attachment only the uploader reads a file), with a part,
+  completion, `getUpload`, `getFile`, an aborted second upload and a `413` and a `400` with it.
 
 ## Sinks
 
@@ -94,7 +97,7 @@ UUID text and as 32 hex digits. Texts shorter than `minNeedle` (`scan.go`) are n
 ## Adding an operation
 
 Call the new operation in the step of its area (`scenario_chat.go`, `scenario_admin.go`,
-`scenario_auth.go`, `scenario_apps.go`) with `sc.Reg.New(...)` in every free-text input, the
+`scenario_auth.go`, `scenario_apps.go`, `scenario_files.go`) with `sc.Reg.New(...)` in every free-text input, the
 scope of the channel or space it belongs to, and the expected status. An operation the scenario
 cannot call goes into `Exempt` with its reason; the expected list is empty.
 

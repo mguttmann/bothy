@@ -302,7 +302,10 @@ func NewScenario(ctx context.Context, r *Run) *Scenario {
 		"Sam":   {w.Spaces["Marketing"]: true, w.Channels["Marketing/Kampagnen"]: true, w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true},
 		"Robin": {w.Spaces["Engineering"]: true, w.Channels["Engineering/Projekt-A"]: true},
 		// Lotse operates Support; its listEvents pages are foreign records of the behaviour step.
-		"Alex": support, "Lotse": support,
+		// Alex is also the uploader of the files step: file.updated of its own upload carries the
+		// canary file name to it alone (docs/DECISIONS.md INT-W48/1).
+		"Alex":  {w.Spaces["Support"]: true, w.Channels["Support/Allgemein"]: true, w.Channels["Support/Eskalation"]: true, fileScope: true},
+		"Lotse": support,
 	}
 	for name, c := range sc.Observers {
 		g, err := c.Gateway(ctx)

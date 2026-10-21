@@ -57,6 +57,8 @@ type Process struct {
 	opts     ProcessOptions
 	secrets  string // the secret volume of bothy secrets init
 	signKeys string
+	// files is file.fs.root of the server (M3-03).
+	files    string
 	public   int
 	internal int
 
@@ -124,9 +126,11 @@ func StartProcess(tb testing.TB, opts ProcessOptions) *Process {
 	db := pgtest.New(tb, dbOpts...)
 	dir := tb.TempDir()
 	p := &Process{DB: db, LogPath: filepath.Join(dir, "serve.log"), tb: tb, bin: bin, opts: opts,
-		secrets: filepath.Join(dir, "secrets"), signKeys: filepath.Join(dir, "signing-keys")}
-	if err := os.Mkdir(p.signKeys, 0o700); err != nil {
-		tb.Fatal(err)
+		secrets: filepath.Join(dir, "secrets"), signKeys: filepath.Join(dir, "signing-keys"), files: filepath.Join(dir, "files")}
+	for _, d := range []string{p.signKeys, p.files} {
+		if err := os.Mkdir(d, 0o700); err != nil {
+			tb.Fatal(err)
+		}
 	}
 	tb.Cleanup(func() { p.stop(); makeRemovable(p.secrets) })
 	if err := p.pickPorts(); err != nil {
@@ -217,6 +221,7 @@ func (p *Process) env(secretsDir, user string) []string {
 	set := map[string]string{
 		"secrets.dir":                 secretsDir,
 		"secrets.signing_key_dir":     p.signKeys,
+		"file.fs.root":                p.files,
 		"database.host":               cfg.Host,
 		"database.port":               strconv.Itoa(cfg.Port),
 		"database.name":               p.DB.Name(),
