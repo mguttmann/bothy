@@ -147,6 +147,17 @@ func (o OperatorConfig) Map() map[string]any {
 	return m
 }
 
+// Permission returns the owner's stored value of capability k; nil when the key is absent, which
+// allows (09 section 2.2). The caller gets a copy.
+func (o OperatorConfig) Permission(k Capability) *bool {
+	f := o.c.flag(k)
+	if f == nil || *f == nil {
+		return nil
+	}
+	v := **f
+	return &v
+}
+
 // Allows reports whether the owner allows capability k: a missing key allows (09 section 2.2).
 func (o OperatorConfig) Allows(k Capability) bool {
 	c := o.c

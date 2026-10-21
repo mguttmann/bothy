@@ -229,12 +229,16 @@ func (s *Service) limits() domain.Limits {
 		MaxStepsPersisted: s.cfg.MaxStepsPersisted}
 }
 
-// followups returns the bound follow-up port, NoFollowups without one.
+// followups returns the follow-up port of a patch: Deps.Followups when set, else the Followups
+// service, else NoFollowups.
 func (s *Service) followups() FollowupStates {
-	if s.d.Followups == nil {
-		return NoFollowups{}
+	switch {
+	case s.d.Followups != nil:
+		return s.d.Followups
+	case s.fu != nil:
+		return s.fu
 	}
-	return s.d.Followups
+	return NoFollowups{}
 }
 
 // jsonObject returns raw, or the empty object for an empty column value.

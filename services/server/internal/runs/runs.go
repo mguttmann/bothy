@@ -96,6 +96,16 @@ type Run struct {
 	Plan map[string]any
 	// Steps are all steps of the run in ordinal order; never nil. The REST form keys them by ID.
 	Steps []RunStep
+	// Followups are the follow-ups of the run in ascending message id (M2-11); never nil. The
+	// REST form keys them by message id (schema RunFollowup).
+	Followups []Followup
+}
+
+// Followup is one follow-up of a run in the run document (schema RunFollowup): the message and
+// its state queued, delivered, absorbed, deferred or discarded (09 section 7).
+type Followup struct {
+	MessageID ids.ID
+	State     string
 }
 
 // RunSummaryPage is one page of runs; NextCursor is "" on the last page. There is no total

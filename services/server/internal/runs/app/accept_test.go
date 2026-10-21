@@ -92,21 +92,6 @@ func TestAccept_Outcomes(t *testing.T) {
 			}
 		}
 	})
-	t.Run("follow-up writes nothing", func(t *testing.T) {
-		t.Parallel()
-		w := newWorld(t)
-		w.mustPost(w.posted(w.thread))
-		if len(w.repo.runs) != 1 {
-			t.Fatalf("first message opened %d runs", len(w.repo.runs))
-		}
-		before := len(w.j.list())
-		w.mustPost(w.posted(w.thread))
-		for _, c := range w.j.list()[before:] {
-			if slices.Contains(writes, c.what) {
-				t.Fatalf("follow-up wrote %s", c.what)
-			}
-		}
-	})
 	t.Run("allow opens the run in the thread", func(t *testing.T) {
 		t.Parallel()
 		w := newWorld(t)

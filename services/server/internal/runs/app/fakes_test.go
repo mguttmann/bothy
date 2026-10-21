@@ -120,6 +120,124 @@ func (r *repo) ActiveRunOfThread(_ context.Context, thread ids.ID) (app.RunRow, 
 	return app.RunRow{}, false, nil
 }
 
+func (r *repo) LockActiveRunOfThread(ctx context.Context, thread ids.ID) (app.RunRow, bool, error) {
+	return r.ActiveRunOfThread(ctx, thread)
+}
+
+func (r *repo) RaiseRunVersion(_ context.Context, id ids.ID) (int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID == id {
+			r.runs[i].Version++
+			return r.runs[i].Version, nil
+		}
+	}
+	return 0, errs.New(errs.CodeNotFound, "")
+}
+
+// followupRepo is the in-memory app.FollowupRepository; the writes are journaled as
+// "followup:insert", "followup:set" and "followup:move".
+type followupRepo struct {
+	j    *journal
+	mu   sync.Mutex
+	rows []app.FollowupRow
+}
+
+func (f *followupRepo) InsertFollowup(_ context.Context, run, message ids.ID) error {
+	f.j.add("followup:insert", app.FollowupRow{RunID: run, MessageID: message, State: domain.FollowupQueued})
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, r := range f.rows {
+		if r.MessageID == message {
+			return errs.New(errs.CodeInternalError, "unique message_id")
+		}
+	}
+	f.rows = append(f.rows, app.FollowupRow{RunID: run, MessageID: message, State: domain.FollowupQueued})
+	return nil
+}
+
+func (f *followupRepo) of(run ids.ID, keep func(app.FollowupRow) bool) []app.FollowupRow {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []app.FollowupRow
+	for _, r := range f.rows {
+		if r.RunID == run && keep(r) {
+			out = append(out, r)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.FollowupRow) int { return bytes.Compare(a.MessageID[:], b.MessageID[:]) })
+	return out
+}
+
+func (f *followupRepo) LockOpenFollowups(_ context.Context, run ids.ID) ([]app.FollowupRow, error) {
+	return f.of(run, func(r app.FollowupRow) bool { return r.State.Open() }), nil
+}
+
+func (f *followupRepo) RunFollowups(_ context.Context, run ids.ID) ([]app.FollowupRow, error) {
+	return f.of(run, func(app.FollowupRow) bool { return true }), nil
+}
+
+func (f *followupRepo) FollowupStatesOf(_ context.Context, run ids.ID, list []ids.ID) ([]app.FollowupRow, error) {
+	return f.of(run, func(r app.FollowupRow) bool { return slices.Contains(list, r.MessageID) }), nil
+}
+
+func (f *followupRepo) LockFollowup(_ context.Context, run, message ids.ID) (app.FollowupRow, bool, error) {
+	rows := f.of(run, func(r app.FollowupRow) bool { return r.MessageID == message })
+	if len(rows) == 0 {
+		return app.FollowupRow{}, false, nil
+	}
+	return rows[0], true, nil
+}
+
+func (f *followupRepo) SetFollowupStates(_ context.Context, run ids.ID, list []ids.ID, st domain.FollowupState) error {
+	if len(list) == 0 {
+		return nil
+	}
+	f.j.add("followup:set", followupSet{Run: run, Messages: slices.Clone(list), State: st})
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, r := range f.rows {
+		if r.RunID == run && slices.Contains(list, r.MessageID) {
+			f.rows[i].State = st
+		}
+	}
+	return nil
+}
+
+func (f *followupRepo) MoveFollowups(_ context.Context, from, to ids.ID, list []ids.ID) error {
+	if len(list) == 0 {
+		return nil
+	}
+	f.j.add("followup:move", followupSet{Run: to, Messages: slices.Clone(list), State: domain.FollowupQueued})
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, r := range f.rows {
+		if r.RunID == from && slices.Contains(list, r.MessageID) {
+			f.rows[i].RunID, f.rows[i].State = to, domain.FollowupQueued
+		}
+	}
+	return nil
+}
+
+func (f *followupRepo) FollowupOfMessage(_ context.Context, message ids.ID) (app.FollowupRow, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, r := range f.rows {
+		if r.MessageID == message {
+			return r, true, nil
+		}
+	}
+	return app.FollowupRow{}, false, nil
+}
+
+// followupSet is the journaled argument of a follow-up state write or move.
+type followupSet struct {
+	Run      ids.ID
+	Messages []ids.ID
+	State    domain.FollowupState
+}
+
 func (r *repo) TransitionRun(_ context.Context, w app.TransitionWrite) (app.RunRow, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -719,6 +837,7 @@ type world struct {
 	steps               *stepCounter
 	payloadMax          int
 	uow                 txn.UnitOfWork
+	fus                 *followupRepo
 }
 
 // newWorld builds the world.
@@ -730,6 +849,7 @@ func newWorld(t *testing.T) *world {
 		dmChannel: ids.New(), dmThread: ids.New(), clk: clock.NewFake(t0), audit: &auditJournal{}, telemetry: &telemetryJournal{},
 		pub: &publisher{}, steps: &stepCounter{}, payloadMax: 65536,
 	}
+	w.fus = &followupRepo{j: w.j}
 	w.msgFacts = &msgFacts{m: map[ids.ID]messaging.TriggerMessage{}, dflt: messaging.TriggerMessage{
 		Origin: "human", Kind: "text", ThreadID: w.main, ChannelID: w.channel,
 		Author: messaging.PrincipalRef{ID: w.alex, Kind: "user", Handle: "alex", DisplayName: "Alex"},
@@ -760,7 +880,7 @@ func (w *world) build() {
 		Repo: w.repo, UoW: cmp.Or[txn.UnitOfWork](w.uow, uow{}), Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
-		Publisher: w.pub, Steps: w.steps,
+		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus,
 	})
 	if err != nil {
 		w.t.Fatal(err)

@@ -5,4 +5,3 @@ agent_session.reset
 file.transcript.submit
 import.apply
 interaction.create
-run.followup.create

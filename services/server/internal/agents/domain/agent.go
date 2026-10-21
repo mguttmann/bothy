@@ -27,6 +27,9 @@ type Reported struct {
 	BillingModesSupported []BillingMode
 	// Evidence comes from reported_details.billing_evidence; nil when not reported.
 	Evidence *Evidence
+	// Followups is reported_details.capabilities.followups (steer or queue); "" when not
+	// reported. The effective capability also needs the owner's supports_followups (09 2.2).
+	Followups string
 }
 
 // Agent is the operating record of an agent principal, a row of agents (03 section 4.4). The
