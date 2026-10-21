@@ -2,7 +2,10 @@
 
 package wire
 
-import "github.com/OWNER/bothy/services/server/internal/platform/config"
+import (
+	"github.com/OWNER/bothy/services/server/internal/chat/domain/title"
+	"github.com/OWNER/bothy/services/server/internal/platform/config"
+)
 
 // chatConfigKeys returns the keys the module chat owns from docs/spec/03-datenmodell.md
 // "Konfigurationswerte dieses Kapitels": the space name limit (M1-52), the channel and tag text
@@ -62,11 +65,13 @@ func chatConfigKeys() []config.Key {
 			Chapter: chapter03,
 		},
 		{
-			// The empty title is a placeholder by the rule itself (09 section 12), and a list
-			// element is never empty, so the default has no empty entry (docs/DECISIONS.md M1-55/2).
+			// The default is rendered from the word lists of package title, so the words exist
+			// once (docs/DECISIONS.md D-M2-18-1). The empty title is a placeholder by the rule
+			// itself (09 section 12), and a list element is never empty, so the default has no
+			// empty entry (D-M2-18-2).
 			Name: "thread.placeholder_titles", Kind: config.KindStringList,
-			Default: `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]`,
-			Doc:     "Placeholder titles: a new thread with such a title keeps title_source auto.",
+			Default: title.DefaultConfigText(),
+			Doc:     "Placeholder titles: a person's new thread with such a title, also with an appended number, keeps title_source auto; the configured list replaces the default.",
 			Chapter: chapter09,
 		},
 	}

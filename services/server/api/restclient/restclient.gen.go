@@ -23504,7 +23504,7 @@ type ClientInterface interface {
 
 	// SetThreadTitleWithBody Set the title
 	//
-	// People set `title_source = manual`. The operator agent may only replace an `auto` title.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23513,7 +23513,7 @@ type ClientInterface interface {
 
 	// SetThreadTitle Set the title
 	//
-	// People set `title_source = manual`. The operator agent may only replace an `auto` title.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
 	//
 	// Takes a body of the `application/json` content type.
 	//

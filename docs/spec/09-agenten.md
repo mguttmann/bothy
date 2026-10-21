@@ -1192,14 +1192,19 @@ zuerst ankommt, gilt; die Karte wird danach `disabled`.
 
 Regeln:
 
-1. Ein Thread hat `title_source = 'auto'`, solange kein Mensch einen Titel gesetzt hat. Setzt ein
-   Mensch einen Titel, wird die Quelle `manual` und bleibt es (03).
-2. Platzhalter-Erkennung bei der Anlage: Gibt ein Mensch beim Anlegen eines Forum-Beitrags einen
+1. A thread has `title_source = 'auto'` until a principal other than its operator agent sets a
+   title (a person, or an app or an agent as creator, 05 `thread.title.update`). Then the source
+   becomes `manual` and stays so (03). Agents and apps always create threads with `auto`.
+2. Platzhalter-Erkennung bei der Anlage: Gibt ein Mensch beim Anlegen eines Forum-Beitrags oder
+   eines Threads aus einer Nachricht einen
    Titel an, der leer ist oder einem Platzhalter entspricht, bleibt die Quelle `auto`. Platzhalter
    sind die Einträge von `thread.placeholder_titles` (ohne Groß- und Kleinschreibung, Leerraum
    normalisiert) und dieselben Einträge mit angehängter Zahl ("Neuer Chat 3"). Sonst wird die
    Quelle `manual`. Grund: "Neuer Chat" ist kein Titel, den jemand behalten will; ein echter
-   Titel wird nie überschrieben.
+   Titel wird nie überschrieben. An appended number is a space and one or more digits 0 to 9; the
+   empty entry has no form with a number. The default of `thread.placeholder_titles` is the union
+   of the word lists per language (German and English) that the module `chat` carries as data
+   files; a test keeps the table and the files equal.
 3. Der Bediener-Agent darf den Titel nur bei Quelle `auto` setzen (`thread.title.update`); die
    Quelle bleibt `auto`. Bei `manual` antwortet der Server `409 title_manual`.
 4. Gast-Agenten setzen keine Titel.
@@ -1817,7 +1822,7 @@ Konfiguration des jeweiligen Programms außerhalb des Servers.
 | `component.custom_id_max_chars` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | Server | `10` | Felder je Formular |
 | `project.binding_text_max_chars` | Server | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) |
-| `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer |
+| `thread.placeholder_titles` | Server | `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]` | Platzhalter für die Titel-Erkennung; der leere Titel gilt immer als Platzhalter (12 Punkt 2), ein Listeneintrag ist nie leer |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | höchstens so oft JWKS neu laden |
 | `hermes_adapter.platform_key` | Hermes-Adapter | `bothy` | Plattformname in Hermes; nach Inbetriebnahme nie ändern |

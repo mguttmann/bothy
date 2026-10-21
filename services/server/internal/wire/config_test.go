@@ -142,7 +142,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"channel.topic_max_chars":              {Kind: config.KindInt, Default: "1024", Min: "1", Chapter: "03-datenmodell.md"},
 		"forum_tag.name_max_chars":             {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "03-datenmodell.md"},
 		"thread.max_tags":                      {Kind: config.KindInt, Default: "5", Min: "1", Chapter: "03-datenmodell.md"},
-		"thread.placeholder_titles": {Kind: config.KindStringList, Default: `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]`,
+		"thread.placeholder_titles": {Kind: config.KindStringList, Default: `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]`,
 			Chapter: "09-agenten.md"},
 		"channel.history_backfill_limit_default": {Kind: config.KindInt, Default: "20", Min: "0", Chapter: "03-datenmodell.md"},
 		"channel.history_backfill_limit_max":     {Kind: config.KindInt, Default: "200", Min: "0", Chapter: "03-datenmodell.md"},
