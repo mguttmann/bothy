@@ -2189,7 +2189,7 @@ Reason: the runner locks sessions and runs with secrets of the instance operator
 |---|---|---|
 | Desktop (macOS, Windows) | M4 | hardware keyboard, keyboard shortcuts without conflict with the shell (app shortcuts only with the platform modifier) |
 | Mobile (iOS, Android) | M5 | extra keys bar: Esc, Tab, Ctrl, Alt, arrows, `\|`, `~`, `/`, `-`; hardware keyboard |
-| Web console | M6 | step-up only by passkey with `userVerification = required` ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)); same CSP (19, section 5) |
+| Web console | M6 | step-up only by passkey with `userVerification = required` ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)); same CSP (19, section 5); ports and measured state below (M6-18) |
 
 One Flutter widget for all clients. Renderer: package `xterm` by TerminalStudio, MIT, version
 4.0.0, for Android, iOS, Linux, macOS, Web and Windows (https://pub.dev/packages/xterm, retrieved
@@ -2210,6 +2210,22 @@ One Flutter widget for all clients. Renderer: package `xterm` by TerminalStudio,
 
 The package is taken as is; the blocks of 11.2 live in `terminal_ui` in front of the renderer and
 hold with own tests (TM-T14), independent of the renderer version (docs/decisions.d/M4-35.md).
+
+Web console (M6-18, ADR 0070): the console runs the same view with its own ports (15-client-architecture.md
+section 23.1): the browser WebSocket on the same origin, authenticated by the cookie of the upgrade
+with an `identify` without token; pinned host keys in IndexedDB of the origin (database
+`bothy.terminal.pins`), deleted at logout and on the clearing cookie; the step-up only by passkey
+with `userVerification = required`, without a passkey a notice; no `HostEvents` (reload through
+REST). The view says that pinning in the browser does not protect against the server itself
+(section 5.1). Measured on 2026-10-21 by phase 3 of `make console-e2e` in headless Chromium 156
+with the CSP enforced, which prints these values on every run (a measurement, no gate,
+D-M6-18-6 in docs/decisions.d/M6-18.md): `xterm` 4.0.0 renders under Flutter Web without a CSP exception
+and without HTML from terminal output; frame-to-paint p95 about 20 ms from the write into the
+model to the end of the next frame (desktop target `client.perf.terminal_frame_to_paint_p95`),
+throughput between about 2.1 and 3.3 MiB/s in two runs for an unthrottled burst of 4 MiB (desktop minimum
+`client.perf.terminal_throughput_min`). `cryptography` 2.9.0 runs the handshake in the tab. OSV
+(https://api.osv.dev, ecosystem `Pub`) listed no vulnerability for `xterm` or `cryptography` on
+2026-10-21 [verified].
 
 Every client shows: session list per host with state, reattach, fingerprint of the
 host, badge of the LLM login ("Personal", "Organization", "None"), remaining time until the
