@@ -40,7 +40,7 @@ flowchart TB
     instance["<b>instance</b><br/>Settings, switches,<br/>keys, counters"]:::base
   end
 
-  kernel["<b>internal/kernel</b><br/>Cross-cutting ports: authorize, txn, eventlog,<br/>auditing, idempotency, actor, personaldata,<br/>measure"]:::shared
+  kernel["<b>internal/kernel</b><br/>Cross-cutting ports: authorize, txn, eventlog,<br/>auditing, idempotency, actor, personaldata,<br/>measure, presence"]:::shared
   platform["<b>internal/platform</b><br/>pg, httpserver, jobs, otel, config,<br/>secrets, ratelimit, lifecycle"]:::shared
 
   gateway --> chat
@@ -52,6 +52,7 @@ flowchart TB
   notify --> chat
   notify --> messaging
   notify --> sync
+  notify --> authz
   apps --> instance
   apps --> identity
   apps --> authz

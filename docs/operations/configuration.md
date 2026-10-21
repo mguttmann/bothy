@@ -247,7 +247,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | int | `2000` | stored steps per run | active |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | without progress: stall notice | planned (M2) |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | expiry of a component without its own value | planned (M2) |
-| `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server |  | `5` | after that, a push registration is deactivated | planned (M3) |
+| `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server | int | `5` | after that, a push registration is deactivated | active |
 | `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | empty | allowed target hosts for outgoing webhooks | active |
 | `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | int | `20` | after that, a subscription is deactivated | active |
 | `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server | duration | `10s` | base of the backoff | active |
@@ -547,10 +547,10 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
 | `push.ttl` | `BOTHY_PUSH__TTL` | Server |  | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`) | planned (M3) |
-| `push.max_age` | `BOTHY_PUSH__MAX_AGE` | Server |  | `1h` | a notification not yet sent that is older than this is discarded | planned (M3) |
-| `push.retry_base` | `BOTHY_PUSH__RETRY_BASE` | Server |  | `2s` | base of the backoff | planned (M3) |
-| `push.retry_cap` | `BOTHY_PUSH__RETRY_CAP` | Server |  | `5m` | largest backoff interval | planned (M3) |
-| `push.max_concurrent_requests` | `BOTHY_PUSH__MAX_CONCURRENT_REQUESTS` | Server |  | `32` | concurrent requests to providers per process | planned (M3) |
+| `push.max_age` | `BOTHY_PUSH__MAX_AGE` | Server | duration | `1h` | a notification not yet sent that is older than this is discarded | active |
+| `push.retry_base` | `BOTHY_PUSH__RETRY_BASE` | Server | duration | `2s` | base of the backoff | active |
+| `push.retry_cap` | `BOTHY_PUSH__RETRY_CAP` | Server | duration | `5m` | largest backoff interval | active |
+| `push.max_concurrent_requests` | `BOTHY_PUSH__MAX_CONCURRENT_REQUESTS` | Server | int | `32` | concurrent requests to providers per process | active |
 | `push.apns.team_id` | `BOTHY_PUSH__APNS__TEAM_ID` | Server |  | empty | Apple team ID | planned (M3) |
 | `push.apns.key_id` | `BOTHY_PUSH__APNS__KEY_ID` | Server |  | empty | key ID of the `.p8` key | planned (M3) |
 | `push.apns.private_key_ref` | `BOTHY_PUSH__APNS__PRIVATE_KEY_REF` | Server |  | empty | reference to the key in the secret provider | planned (M3) |
@@ -562,12 +562,12 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 | `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server |  | empty | reference to the service account key | planned (M3) |
 | `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server | enum(all, mentions, mute) | `mentions` | level without any setting | active |
 | `notify.default_preview_mode` | `BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE` | Server |  | `full` | default for `notify.preview_mode` | planned (M3) |
-| `notify.default_input_needed_breaks_quiet_hours` | `BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS` | Server |  | `false` | default for the switch of the same name | planned (M3) |
-| `notify.default_admin_enabled` | `BOTHY_NOTIFY__DEFAULT_ADMIN_ENABLED` | Server |  | `true` | default for `notify.admin_enabled` | planned (M3) |
-| `notify.coalesce_window` | `BOTHY_NOTIFY__COALESCE_WINDOW` | Server |  | `60s` | coalescing window per recipient and thread | planned (M3) |
-| `notify.mobile_delay_when_desktop_active` | `BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE` | Server |  | `60s` | delay of mobile pushes while the desktop is active | planned (M3) |
+| `notify.default_input_needed_breaks_quiet_hours` | `BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS` | Server | bool | `false` | default for the switch of the same name | active |
+| `notify.default_admin_enabled` | `BOTHY_NOTIFY__DEFAULT_ADMIN_ENABLED` | Server | bool | `true` | default for `notify.admin_enabled` | active |
+| `notify.coalesce_window` | `BOTHY_NOTIFY__COALESCE_WINDOW` | Server | duration | `60s` | coalescing window per recipient and thread | active |
+| `notify.mobile_delay_when_desktop_active` | `BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE` | Server | duration | `60s` | delay of mobile pushes while the desktop is active | active |
 | `notify.preview_max_chars` | `BOTHY_NOTIFY__PREVIEW_MAX_CHARS` | Server |  | `240` | length of the excerpt in the preview | planned (M3) |
-| `notify.badge_sync_min_interval` | `BOTHY_NOTIFY__BADGE_SYNC_MIN_INTERVAL` | Server |  | `60s` | smallest interval between badge syncs per person | planned (M3) |
+| `notify.badge_sync_min_interval` | `BOTHY_NOTIFY__BADGE_SYNC_MIN_INTERVAL` | Server | duration | `60s` | smallest interval between badge syncs per person | active |
 
 ### 14 Search
 
