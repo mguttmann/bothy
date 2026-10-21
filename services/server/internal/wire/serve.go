@@ -154,6 +154,10 @@ type Deps struct {
 	// TerminalModule receives the use cases of the terminal module once they are built (M2-47): a
 	// test commits an end in a worker process through them. nil in production.
 	TerminalModule func(*terminalapp.Service)
+	// ScopeObserver sees every Scope call of the process's Authorizer with its context and action
+	// (authzapp.Authorizer.SetScopeObserver, M2-14): the test of SR9 records which operation lists
+	// through Scope. nil in production.
+	ScopeObserver func(ctx context.Context, act authorize.Action)
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -749,6 +753,9 @@ func (s *server) startAuthz(context.Context) error {
 	az, err := NewAuthorizer(pool, cfg, cat, a.Recorder(), s.deps.Clock, log)
 	if err != nil {
 		return err
+	}
+	if s.deps.ScopeObserver != nil {
+		az.SetScopeObserver(s.deps.ScopeObserver)
 	}
 	if sy == nil {
 		return errors.New("wire: the authz step needs the event log of the sync step")
