@@ -11,4 +11,5 @@ subscribe chat.SpaceArchived -> notify github.com/OWNER/bothy/services/server/in
 subscribe messaging.MessagePosted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessagePosted-fm
 subscribe kernel.AccessChanged -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAccessChanged-fm
 subscribe agents.AgentDisabled -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAgentDisabled-fm
+subscribe agents.SessionAttached -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnSessionAttached-fm
 subscribe chat.ChannelArchived -> apps github.com/OWNER/bothy/services/server/internal/apps/app.(*ArchiveSubscriber).OnChannelArchived-fm

@@ -254,6 +254,12 @@ exceptions:
   - query: runs.OrphanCandidates
     category: system_job
     reason: "the job runs.stall_check reads the started active runs without a principal and fails the interrupted and stale ones; nothing of the rows leaves the server (09 5.5, M2-09)"
+  - query: runs.SessionUsed
+    category: after_authorize
+    reason: "asks whether a run of the one thread whose invocation agent.invoke allowed already used a session row (the session mode of 09 9.1); only the boolean leaves, never a row (M2-12)"
+  - query: runs.LockActiveRunOfThread
+    category: authorize_resolution
+    reason: "the declared source agents.RunSource locks the active run of the one thread of agent_session.report; its agent and session row form the descriptor that authorize decides agent-self on, and a run of another agent gives the not_found of an unknown thread (09 4.7, M2-12)"
   - query: runs.ActiveRunOfThread
     category: after_authorize
     reason: "the active run of the one thread whose message the acceptance handles (09 3.4) or whose run Open found taken; runs has no channel_id, the thread was checked first (D-M2-05-9)"

@@ -26,6 +26,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPasskeyLogin
   - beginPasskeyRegistration
   - beginStepUpOidcReauth
+  - bindAgentSession
   - cancelRun
   - closeTerminalSession
   - closeThread
@@ -124,6 +125,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - installApp
   - issueHostPairingCode
   - listActiveRuns
+  - listAgentSessions
   - listAgents
   - listApps
   - listAuditEvents
@@ -198,6 +200,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - removeReaction
   - renewInvocationToken
   - reopenThread
+  - reportAgentSession
+  - resetAgentSession
   - resumeApp
   - resumeRun
   - revokeDevice
@@ -262,9 +266,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: autocompleteCommand
     etappe: M2
     ticket: M2-17
-  - operation_id: bindAgentSession
-    etappe: M2
-    ticket: M2-12
   - operation_id: cancelImport
     etappe: M8
     ticket: M8-03
@@ -366,9 +367,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: leaveDm
     etappe: V3
     ticket: V3-01
-  - operation_id: listAgentSessions
-    etappe: M2
-    ticket: M2-12
   - operation_id: listAgentWebhookSubscriptions
     etappe: M2
   - operation_id: listChannelCommands
@@ -406,15 +404,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: removeCommand
     etappe: M2
     ticket: M2-16
-  - operation_id: reportAgentSession
-    etappe: M2
-    ticket: M2-12
   - operation_id: requestTranscription
     etappe: M3
     ticket: M3-09
-  - operation_id: resetAgentSession
-    etappe: M2
-    ticket: M2-12
   - operation_id: respondToInteraction
     etappe: M2
     ticket: M2-15

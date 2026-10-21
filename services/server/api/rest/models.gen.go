@@ -16739,6 +16739,27 @@ type CloseTerminalSessionParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// BindAgentSessionParams defines parameters for BindAgentSession.
+type BindAgentSessionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ReportAgentSessionParams defines parameters for ReportAgentSession.
+type ReportAgentSessionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
+// ResetAgentSessionParams defines parameters for ResetAgentSession.
+type ResetAgentSessionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // CloseThreadParams defines parameters for CloseThread.
 type CloseThreadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -17217,6 +17238,12 @@ type AttachTerminalSessionJSONRequestBody = TerminalSessionAttach
 
 // CloseTerminalSessionJSONRequestBody defines body for CloseTerminalSession for application/json ContentType.
 type CloseTerminalSessionJSONRequestBody = ReasonBody
+
+// BindAgentSessionJSONRequestBody defines body for BindAgentSession for application/json ContentType.
+type BindAgentSessionJSONRequestBody = AgentSessionBind
+
+// ReportAgentSessionJSONRequestBody defines body for ReportAgentSession for application/json ContentType.
+type ReportAgentSessionJSONRequestBody = AgentSessionReport
 
 // PutThreadDraftJSONRequestBody defines body for PutThreadDraft for application/json ContentType.
 type PutThreadDraftJSONRequestBody = DraftPut
