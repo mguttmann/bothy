@@ -73,6 +73,11 @@ func (s *Service) decorate(ctx context.Context, visible []ids.ID, list []messagi
 	if err := s.attachComponents(ctx, list); err != nil {
 		return err
 	}
+	return s.decorateReactions(ctx, visible, list)
+}
+
+// decorateReactions is the reaction and pin part of decorate (brief M1-59 design note 7).
+func (s *Service) decorateReactions(ctx context.Context, visible []ids.ID, list []messaging.Message) error {
 	live := make([]ids.ID, 0, len(list))
 	for _, m := range list {
 		if m.DeletedAt.IsZero() {

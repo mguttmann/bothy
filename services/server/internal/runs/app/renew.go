@@ -182,6 +182,32 @@ func (s *Service) refuseRenewal(ctx context.Context, row RunRow, eventType strin
 	return renewResult{committed: errs.New(errs.CodeAgentInvocationDenied, "").WithReason(reason), handle: handle, reason: reason}, nil
 }
 
+// renewalInteraction is the delivery an interaction token came with (M2-15, D-M2-15-22):
+// agent.invocation for the interaction that opened the run (its payload names the interaction,
+// also once the card was deleted), interaction.created with its interaction and run otherwise.
+func renewalInteraction(in runs.DeliveryInput, row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, error) {
+	ix, err := ids.Parse(c.InteractionID)
+	if err != nil || ix.IsZero() {
+		return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: an interaction token without its interaction")
+	}
+	if row.TriggerKind == triggerKindInteraction && (row.TriggeringInteractionID == ix || row.TriggeringInteractionID.IsZero()) {
+		p, err := json.Marshal(struct {
+			InteractionID string `json:"interaction_id"`
+		}{ix.String()})
+		if err != nil {
+			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
+		}
+		in.Type, in.Payload = domain.EventAgentInvocation, p
+		return in, nil
+	}
+	p, err := json.Marshal(map[string]map[string]string{"interaction": {"id": ix.String(), "run_id": row.ID.String()}})
+	if err != nil {
+		return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
+	}
+	in.Type, in.ResourceKind, in.ResourceID, in.Payload = domain.EventInteractionCreated, resourceInteraction, ix, p
+	return in, nil
+}
+
 // renewalInput is the delivery the presented token came with, rebuilt from its claims for the
 // resolver of the delivery check: trigger_kind message is agent.invocation, followup is
 // agent.followup with its message; interaction (M2-15) is agent.invocation for the interaction
@@ -203,25 +229,7 @@ func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, er
 		}
 		in.Type, in.Payload = domain.EventAgentFollowup, p
 	case domain.TriggerInteraction:
-		ix, err := ids.Parse(c.InteractionID)
-		if err != nil || ix.IsZero() {
-			return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: an interaction token without its interaction")
-		}
-		if row.TriggerKind == triggerKindInteraction && (row.TriggeringInteractionID == ix || row.TriggeringInteractionID.IsZero()) {
-			p, err := json.Marshal(struct {
-				InteractionID string `json:"interaction_id"`
-			}{ix.String()})
-			if err != nil {
-				return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
-			}
-			in.Type, in.Payload = domain.EventAgentInvocation, p
-			return in, nil
-		}
-		p, err := json.Marshal(map[string]map[string]string{"interaction": {"id": ix.String(), "run_id": row.ID.String()}})
-		if err != nil {
-			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
-		}
-		in.Type, in.ResourceKind, in.ResourceID, in.Payload = domain.EventInteractionCreated, resourceInteraction, ix, p
+		return renewalInteraction(in, row, c)
 	default:
 		return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: no renewal for the trigger kind of this token yet")
 	}

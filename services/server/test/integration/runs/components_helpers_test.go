@@ -56,21 +56,21 @@ func (e *expiryJobs) of(message string) []expiryJob {
 }
 
 // startedRun opens a run of Lotse for Alex in a new thread of Support/Allgemein, delivers it and
-// starts it; it returns the run, the triggering message and the start token.
-func (w *world) startedRun() (runRow, string, string) {
+// starts it; it returns the run and the start token.
+func (w *world) startedRun() (runRow, string) {
 	w.t.Helper()
-	r, m := w.openRun()
+	r, _ := w.openRun()
 	tok := w.deliver(r.ID)
 	w.wantOK(w.start("lotse", r.ID, tok))
-	return r, m, tok
+	return r, tok
 }
 
-// waitingRun is startedRun with awaitRunInput.
-func (w *world) waitingRun() (runRow, string, string) {
+// waitingRun is startedRun with awaitRunInput; it returns the run.
+func (w *world) waitingRun() runRow {
 	w.t.Helper()
-	r, m, tok := w.startedRun()
+	r, _ := w.startedRun()
 	w.wantOK(w.await("lotse", r.ID, "Waiting for approval"))
-	return r, m, tok
+	return r
 }
 
 // cardBody is the body of a card message: kind card, the content, run_id when not "" and the

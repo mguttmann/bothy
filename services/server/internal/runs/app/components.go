@@ -121,14 +121,8 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 	if err != nil {
 		return nil, err
 	}
-	if !in.RunID.IsZero() {
-		run, found, err := s.d.Components.LockRunShared(ctx, in.RunID)
-		if err != nil {
-			return nil, err
-		}
-		if !found || run.AgentID != in.AuthorID || run.ThreadID != in.ThreadID || !run.State.Active() {
-			return nil, fieldError("/run_id", domain.FieldInvalid, "run_id is not an active run of the author in this thread")
-		}
+	if err := s.checkCardRun(ctx, in); err != nil {
+		return nil, err
 	}
 	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{in.AuthorID})
 	if err != nil {
@@ -138,18 +132,7 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 		// The owner switched the capability off (09 2.2, R-AG-01; ruling D-M2-15-5).
 		return nil, errs.New(errs.CodeFeatureDisabled, "the owner switched components off for this agent")
 	}
-	rows := make([]ComponentRow, len(checked))
-	var earliest time.Time
-	for i, c := range checked {
-		rows[i] = ComponentRow{
-			ID: ids.New(), MessageID: messageID, CustomID: c.CustomID, Type: c.Type, Definition: c.Definition, Position: c.Position,
-			SingleUse: c.SingleUse, RequiredCapability: c.RequiredCapability, RestrictedTo: c.RestrictedTo, RunID: in.RunID,
-			State: domain.ComponentActive, ExpiresAt: c.ExpiresAt, Version: 1,
-		}
-		if earliest.IsZero() || c.ExpiresAt.Before(earliest) {
-			earliest = c.ExpiresAt
-		}
-	}
+	rows, earliest := componentRows(messageID, in.RunID, checked)
 	if err := s.d.Components.InsertComponents(ctx, rows); err != nil {
 		return nil, err
 	}
@@ -161,6 +144,41 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 		out[i] = messagingComponent(r)
 	}
 	return out, nil
+}
+
+// checkCardRun share-locks the run of a card's run_id and checks that it is an active run of the
+// author in the message's thread; one 400 invalid on /run_id for every failing case (design note
+// 6 b). A card without run_id passes.
+func (s *Service) checkCardRun(ctx context.Context, in messaging.CardInput) error {
+	if in.RunID.IsZero() {
+		return nil
+	}
+	run, found, err := s.d.Components.LockRunShared(ctx, in.RunID)
+	if err != nil {
+		return err
+	}
+	if !found || run.AgentID != in.AuthorID || run.ThreadID != in.ThreadID || !run.State.Active() {
+		return fieldError("/run_id", domain.FieldInvalid, "run_id is not an active run of the author in this thread")
+	}
+	return nil
+}
+
+// componentRows returns the rows of the checked components of a new card (design note 5: state
+// active, version 1, the card's run) and the earliest expires_at.
+func componentRows(messageID, run ids.ID, checked []domain.CheckedComponent) ([]ComponentRow, time.Time) {
+	rows := make([]ComponentRow, len(checked))
+	var earliest time.Time
+	for i, c := range checked {
+		rows[i] = ComponentRow{
+			ID: ids.New(), MessageID: messageID, CustomID: c.CustomID, Type: c.Type, Definition: c.Definition, Position: c.Position,
+			SingleUse: c.SingleUse, RequiredCapability: c.RequiredCapability, RestrictedTo: c.RestrictedTo, RunID: run,
+			State: domain.ComponentActive, ExpiresAt: c.ExpiresAt, Version: 1,
+		}
+		if earliest.IsZero() || c.ExpiresAt.Before(earliest) {
+			earliest = c.ExpiresAt
+		}
+	}
+	return rows, earliest
 }
 
 // scheduleComponentExpiry inserts runs.component_expiry for the card at at; without a scheduler
@@ -282,26 +300,9 @@ func (s *Service) updateComponent(ctx context.Context, row ComponentRow, cmd run
 	if cur.Version != cmd.IfMatch {
 		return runs.Component{}, errs.VersionConflict(componentBody(portComponent(cur)))
 	}
-	to := ""
-	if cmd.State != nil {
-		to = *cmd.State
-	}
-	groupUsed := slices.ContainsFunc(set, func(c ComponentRow) bool { return c.ID != cur.ID && c.State == domain.ComponentUsed })
-	now := s.now()
-	stateChanged, err := domain.StateTransition(cur.State, cur.ExpiresAt, now, to, cur.SingleUse, groupUsed)
-	if err != nil {
-		return runs.Component{}, err
-	}
-	defChanged := def != nil && !domain.SameDefinition(def, cur.Definition)
-	if !stateChanged && !defChanged {
-		return portComponent(cur), nil
-	}
-	w := ComponentWrite{ID: cur.ID, State: cur.State, Definition: cur.Definition, UsedBy: cur.UsedBy, UsedAt: cur.UsedAt}
-	if stateChanged {
-		w.State = to
-	}
-	if defChanged {
-		w.Definition = def
+	w, changed, err := componentChange(cur, set, cmd.State, def, s.now())
+	if err != nil || !changed {
+		return portComponent(cur), err
 	}
 	updated, err := s.d.Components.SetComponent(ctx, w)
 	if err != nil {
@@ -310,13 +311,38 @@ func (s *Service) updateComponent(ctx context.Context, row ComponentRow, cmd run
 	if _, err := s.d.Cards.ComponentsChanged(ctx, row.MessageID); err != nil {
 		return runs.Component{}, err
 	}
-	if stateChanged && to == domain.ComponentActive {
+	if w.State == domain.ComponentActive && cur.State != domain.ComponentActive {
 		// A reactivated component must expire again (design note 15 a).
 		if err := s.scheduleComponentExpiry(ctx, row.MessageID, updated.ExpiresAt); err != nil {
 			return runs.Component{}, err
 		}
 	}
 	return portComponent(updated), nil
+}
+
+// componentChange decides the write of updateComponent for the locked component cur and the
+// locked single-use set (design note 13 c and d): the state through domain.StateTransition (a
+// single_use component may not come back while another one of its card is used), the definition
+// when it differs as JSON. changed is false for no change. Errors: 409 invalid_state_transition.
+func componentChange(cur ComponentRow, set []ComponentRow, state *string, def json.RawMessage, now time.Time) (ComponentWrite, bool, error) {
+	to := ""
+	if state != nil {
+		to = *state
+	}
+	groupUsed := slices.ContainsFunc(set, func(c ComponentRow) bool { return c.ID != cur.ID && c.State == domain.ComponentUsed })
+	stateChanged, err := domain.StateTransition(cur.State, cur.ExpiresAt, now, to, cur.SingleUse, groupUsed)
+	if err != nil {
+		return ComponentWrite{}, false, err
+	}
+	defChanged := def != nil && !domain.SameDefinition(def, cur.Definition)
+	w := ComponentWrite{ID: cur.ID, State: cur.State, Definition: cur.Definition, UsedBy: cur.UsedBy, UsedAt: cur.UsedAt}
+	if stateChanged {
+		w.State = to
+	}
+	if defChanged {
+		w.Definition = def
+	}
+	return w, stateChanged || defChanged, nil
 }
 
 // lockForUpdate locks the component of row for updateComponent: for a state change of a single_use

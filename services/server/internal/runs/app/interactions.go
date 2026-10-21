@@ -131,8 +131,7 @@ func (s *Service) interactionAfterRace(ctx context.Context, a actor.Actor, cmd r
 // same component and the same values as JSON (key order ignored) are the original with
 // Idempotent-Replay; anything else is 422 idempotency_key_reuse. found is false without a stored
 // interaction.
-func (s *Service) interactionReplay(ctx context.Context, a actor.Actor, cmd runs.CreateInteraction, values json.RawMessage,
-	card messaging.TriggerMessage) (runs.InteractionResult, bool, error) {
+func (s *Service) interactionReplay(ctx context.Context, a actor.Actor, cmd runs.CreateInteraction, values json.RawMessage) (runs.InteractionResult, bool, error) {
 	ix, found, err := s.d.Components.InteractionByClientID(ctx, a.ID, cmd.ClientInteractionID)
 	if err != nil || !found {
 		return runs.InteractionResult{}, false, err
@@ -161,68 +160,95 @@ func (s *Service) interactionReplay(ctx context.Context, a actor.Actor, cmd runs
 	return runs.InteractionResult{Interaction: view, Replay: true}, true, nil
 }
 
+// lockedCard are the rows createInteraction locked in the order of design note 16: the
+// component's run and the thread's active run, the card, the chosen component and its locked
+// single-use group.
+type lockedCard struct {
+	compRun, activeRun RunRow
+	facts              messaging.CardFacts
+	cur                ComponentRow
+	group              []ComponentRow
+}
+
 // createInteraction is the unit of work of Create.
 func (s *Service) createInteraction(ctx context.Context, a actor.Actor, cmd runs.CreateInteraction, values json.RawMessage,
 	row ComponentRow, card messaging.TriggerMessage) (runs.InteractionResult, error) {
-	if err := s.d.ThreadLocks.LockForMessageChange(ctx, card.ThreadID); err != nil {
-		return runs.InteractionResult{}, err
-	}
-	compRun, activeRun, err := s.lockInteractionRuns(ctx, row.RunID, card.ThreadID)
+	l, err := s.lockInteraction(ctx, row, card)
 	if err != nil {
 		return runs.InteractionResult{}, err
 	}
-	facts, err := s.d.Cards.LockCard(ctx, row.MessageID)
-	if errs.KindOf(err) == errs.KindNotFound || (err == nil && facts.Deleted) {
-		return runs.InteractionResult{}, invisible()
-	}
-	if err != nil {
-		return runs.InteractionResult{}, err
-	}
-	cur, group, err := s.lockForInteraction(ctx, row)
-	if err != nil {
-		return runs.InteractionResult{}, err
-	}
-	if res, found, err := s.interactionReplay(ctx, a, cmd, values, card); err != nil || found {
+	if res, found, err := s.interactionReplay(ctx, a, cmd, values); err != nil || found {
 		if err == nil {
 			// The repetition is decided by message.read (design note 10 d); the proof of the HTTP
 			// chain (02 9.3) still needs a check of the route's action, which filter mode records
 			// without an audit entry and whose outcome the repetition does not use.
-			err = s.proveInteraction(ctx, a, cur, facts, compRun, activeRun)
+			err = s.proveInteraction(ctx, a, l)
 		}
 		return res, err
 	}
-	if err := s.authorizeInteraction(ctx, a, cur, facts, compRun, activeRun); err != nil {
+	if err := s.authorizeErr(ctx, a, authorize.ActionInteractionCreate, interactionResource(l)); err != nil {
 		return runs.InteractionResult{}, err
 	}
-	if err := domain.CheckValues(cur.Type, cur.Definition, values); err != nil {
+	if err := domain.CheckValues(l.cur.Type, l.cur.Definition, values); err != nil {
 		return runs.InteractionResult{}, err
 	}
 	now := s.now()
-	if err := s.payloadFits(cur, card, values, now, a.ID); err != nil {
+	if err := s.payloadFits(l.cur, card, values, now, a.ID); err != nil {
 		return runs.InteractionResult{}, err
 	}
-	changed, err := s.applySingleUse(ctx, a, cur, group, now)
+	return s.writeInteraction(ctx, a, cmd, values, l, now)
+}
+
+// lockInteraction takes the locks of createInteraction in the order of design note 16: the thread
+// (an interaction may open a run in it), the runs in ascending id, the card (a deleted or missing
+// card is 404), then the single-use group or the component.
+func (s *Service) lockInteraction(ctx context.Context, row ComponentRow, card messaging.TriggerMessage) (lockedCard, error) {
+	var l lockedCard
+	if err := s.d.ThreadLocks.LockForMessageChange(ctx, card.ThreadID); err != nil {
+		return l, err
+	}
+	var err error
+	if l.compRun, l.activeRun, err = s.lockInteractionRuns(ctx, row.RunID, card.ThreadID); err != nil {
+		return l, err
+	}
+	l.facts, err = s.d.Cards.LockCard(ctx, row.MessageID)
+	if errs.KindOf(err) == errs.KindNotFound || (err == nil && l.facts.Deleted) {
+		return l, invisible()
+	}
+	if err != nil {
+		return l, err
+	}
+	l.cur, l.group, err = s.lockForInteraction(ctx, row)
+	return l, err
+}
+
+// writeInteraction applies an allowed interaction (design note 10 g to i): the single-use rule,
+// the interaction row, message.updated through messaging, the run (the component's or a new one),
+// interaction.created, agent.invocation of a new run and the allow audit of an approval.
+func (s *Service) writeInteraction(ctx context.Context, a actor.Actor, cmd runs.CreateInteraction, values json.RawMessage, l lockedCard,
+	now time.Time) (runs.InteractionResult, error) {
+	changed, err := s.applySingleUse(ctx, a, l.cur, l.group, now)
 	if err != nil {
 		return runs.InteractionResult{}, err
 	}
 	ix, err := s.d.Components.InsertInteraction(ctx, NewInteraction{
-		ID: ids.New(), ComponentID: cur.ID, MessageID: cur.MessageID, PrincipalID: a.ID, ClientInteractionID: cmd.ClientInteractionID,
+		ID: ids.New(), ComponentID: l.cur.ID, MessageID: l.cur.MessageID, PrincipalID: a.ID, ClientInteractionID: cmd.ClientInteractionID,
 		Values: values, At: now,
 	})
 	if err != nil {
 		return runs.InteractionResult{}, err
 	}
 	if changed {
-		if _, err := s.d.Cards.ComponentsChanged(ctx, cur.MessageID); err != nil {
+		if _, err := s.d.Cards.ComponentsChanged(ctx, l.cur.MessageID); err != nil {
 			return runs.InteractionResult{}, err
 		}
 	}
-	runID, opened, mode, err := s.interactionRun(ctx, a, cur, facts, compRun, activeRun, ix.ID)
+	runID, opened, mode, err := s.interactionRun(ctx, a, l, ix.ID)
 	if err != nil {
 		return runs.InteractionResult{}, err
 	}
-	view := interactionPortView(ix, cur.CustomID, card.ThreadID, runID)
-	if err := s.emitInteractionCreated(ctx, a, view, facts); err != nil {
+	view := interactionPortView(ix, l.cur.CustomID, l.facts.ThreadID, runID)
+	if err := s.emitInteractionCreated(ctx, a, view, l.facts); err != nil {
 		return runs.InteractionResult{}, err
 	}
 	if opened != nil {
@@ -230,7 +256,7 @@ func (s *Service) createInteraction(ctx context.Context, a actor.Actor, cmd runs
 			return runs.InteractionResult{}, err
 		}
 	}
-	if err := s.auditApproval(ctx, a, cur, ix.ID, runID); err != nil {
+	if err := s.auditApproval(ctx, a, l.cur, ix.ID, runID); err != nil {
 		return runs.InteractionResult{}, err
 	}
 	return runs.InteractionResult{Interaction: view}, nil
@@ -310,37 +336,28 @@ func (s *Service) lockForInteraction(ctx context.Context, row ComponentRow) (Com
 	return cur, group, nil
 }
 
-// authorizeInteraction decides interaction.create for a on the locked component cur (design note
-// 8 b) and returns the mapped error of a denial; authz audits the denial (R-AZ-04).
-func (s *Service) authorizeInteraction(ctx context.Context, a actor.Actor, cur ComponentRow, card messaging.CardFacts,
-	compRun, activeRun RunRow) error {
-	return s.authorizeErr(ctx, a, authorize.ActionInteractionCreate, interactionResource(cur, card, compRun, activeRun))
-}
-
 // proveInteraction decides interaction.create in filter mode and ignores the outcome: the proof
 // of the check for a repetition (see createInteraction). Errors: those of the authorizer.
-func (s *Service) proveInteraction(ctx context.Context, a actor.Actor, cur ComponentRow, card messaging.CardFacts,
-	compRun, activeRun RunRow) error {
-	_, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), a, authorize.ActionInteractionCreate,
-		interactionResource(cur, card, compRun, activeRun))
+func (s *Service) proveInteraction(ctx context.Context, a actor.Actor, l lockedCard) error {
+	_, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), a, authorize.ActionInteractionCreate, interactionResource(l))
 	return err
 }
 
-// interactionResource is the descriptor of interaction.create for the locked component cur
-// (design note 8 b): the component on the card's thread, the card's author as owner and as the
-// agent of agent.invoke, the human origin, the agent of the thread's active run and the facts of
-// the component and its run.
-func interactionResource(cur ComponentRow, card messaging.CardFacts, compRun, activeRun RunRow) authorize.Resource {
+// interactionResource is the descriptor of interaction.create for the locked component (design note
+// 8 b): the component on the card's thread, the card's author as owner and as the agent of
+// agent.invoke, the human origin, the agent of the thread's active run and the facts of the
+// component and its run. authz audits a denial (R-AZ-04).
+func interactionResource(l lockedCard) authorize.Resource {
 	ix := &authorize.InteractionFacts{
-		Stage: authorize.InteractionStageAccept, OwnerKind: card.AuthorKind, ComponentState: cur.State, ExpiresAt: cur.ExpiresAt,
-		RequiredCapability: cur.RequiredCapability, RestrictedTo: cur.RestrictedTo, ComponentRunID: cur.RunID,
+		Stage: authorize.InteractionStageAccept, OwnerKind: l.facts.AuthorKind, ComponentState: l.cur.State, ExpiresAt: l.cur.ExpiresAt,
+		RequiredCapability: l.cur.RequiredCapability, RestrictedTo: l.cur.RestrictedTo, ComponentRunID: l.cur.RunID,
 	}
-	if !cur.RunID.IsZero() && compRun.ID == cur.RunID {
-		ix.ComponentRunActive, ix.RunStarterID = compRun.State.Active(), compRun.TriggeredBy
+	if !l.cur.RunID.IsZero() && l.compRun.ID == l.cur.RunID {
+		ix.ComponentRunActive, ix.RunStarterID = l.compRun.State.Active(), l.compRun.TriggeredBy
 	}
 	return authorize.Resource{
-		Kind: authorize.ResourceComponent, ID: cur.ID, ThreadID: card.ThreadID, OwnerID: card.AuthorID,
-		Invoke:      &authorize.InvokeFacts{AgentID: card.AuthorID, TriggerOrigin: originHuman, ActiveRunAgentID: activeRun.AgentID},
+		Kind: authorize.ResourceComponent, ID: l.cur.ID, ThreadID: l.facts.ThreadID, OwnerID: l.facts.AuthorID,
+		Invoke:      &authorize.InvokeFacts{AgentID: l.facts.AuthorID, TriggerOrigin: originHuman, ActiveRunAgentID: l.activeRun.AgentID},
 		Interaction: ix,
 	}
 }
@@ -389,11 +406,11 @@ func (s *Service) applySingleUse(ctx context.Context, a actor.Actor, cur Compone
 // interaction. opened is the summary of a new run with the configured billing mode. Under the
 // thread lock no other run can appear; should Open still meet one, the refusal of design note 8 b
 // is answered.
-func (s *Service) interactionRun(ctx context.Context, a actor.Actor, cur ComponentRow, card messaging.CardFacts, compRun, activeRun RunRow,
-	interaction ids.ID) (ids.ID, *runs.RunSummary, string, error) {
+func (s *Service) interactionRun(ctx context.Context, a actor.Actor, l lockedCard, interaction ids.ID) (ids.ID, *runs.RunSummary, string, error) {
+	cur, card := l.cur, l.facts
 	route := domain.RouteInteraction(domain.RouteFacts{
-		CardAgentID: card.AuthorID, ComponentRunID: cur.RunID, ComponentRunActive: compRun.ID == cur.RunID && compRun.State.Active(),
-		ActiveRunAgentID: activeRun.AgentID,
+		CardAgentID: card.AuthorID, ComponentRunID: cur.RunID, ComponentRunActive: l.compRun.ID == cur.RunID && l.compRun.State.Active(),
+		ActiveRunAgentID: l.activeRun.AgentID,
 	})
 	switch route.Kind {
 	case domain.RouteComponentRun:
@@ -579,62 +596,92 @@ func (s *Service) Respond(ctx context.Context, cmd runs.RespondInteraction) (run
 	if err := s.componentsReady(); err != nil {
 		return runs.Interaction{}, err
 	}
+	response, err := s.respondBody(cmd)
+	if err != nil {
+		return runs.Interaction{}, err
+	}
+	ix, thread, err := s.respondTarget(ctx, caller(ctx), cmd.InteractionID)
+	if err != nil {
+		return runs.Interaction{}, err
+	}
+	var out runs.Interaction
+	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		var err error
+		out, err = s.respondLocked(ctx, ix.ID, cmd.State, response, thread)
+		return err
+	})
+	return out, err
+}
+
+// respondBody checks the body of respondToInteraction and returns the stored response object (nil
+// without a response member): the state is a final one, response.text at most
+// message.max_content_bytes (textcheck is not applied, the hint is content).
+func (s *Service) respondBody(cmd runs.RespondInteraction) ([]byte, error) {
 	switch cmd.State {
 	case interactionAcknowledged, interactionFailed, interactionRejected:
 	default:
-		return runs.Interaction{}, fieldError("/state", "invalid_enum", "the state is not a final state of an interaction")
+		return nil, fieldError("/state", "invalid_enum", "the state is not a final state of an interaction")
 	}
 	if cmd.ResponseText != nil && len(*cmd.ResponseText) > s.cfg.MaxContentBytes {
-		return runs.Interaction{}, fieldError("/response/text", "too_long", "response.text is larger than message.max_content_bytes")
+		return nil, fieldError("/response/text", "too_long", "response.text is larger than message.max_content_bytes")
 	}
-	a := caller(ctx)
-	ix, found, err := s.d.Components.Interaction(ctx, cmd.InteractionID)
+	if !cmd.HasResponse {
+		return nil, nil
+	}
+	response, err := json.Marshal(struct {
+		Text *string `json:"text,omitempty"`
+	}{cmd.ResponseText})
+	if err != nil {
+		return nil, errs.Wrap(errs.CodeInternalError, err, "runs: encoding a response")
+	}
+	return response, nil
+}
+
+// respondTarget reads the interaction id and its card and authorizes interaction.respond for a on
+// the interaction path with the card's author as owner; an unknown interaction or card is 404. It
+// returns the interaction and the thread of its card.
+func (s *Service) respondTarget(ctx context.Context, a actor.Actor, id ids.ID) (InteractionRow, ids.ID, error) {
+	ix, found, err := s.d.Components.Interaction(ctx, id)
+	if err != nil {
+		return InteractionRow{}, ids.ID{}, err
+	}
+	if !found {
+		return InteractionRow{}, ids.ID{}, invisible()
+	}
+	card, err := s.d.Messages.TriggerMessageOf(ctx, ix.MessageID)
+	if errs.KindOf(err) == errs.KindNotFound {
+		return InteractionRow{}, ids.ID{}, invisible()
+	}
+	if err != nil {
+		return InteractionRow{}, ids.ID{}, err
+	}
+	if err := s.authorizeErr(ctx, a, authorize.ActionInteractionRespond, authorize.Resource{
+		Kind: authorize.ResourceInteraction, ID: ix.ID, ThreadID: card.ThreadID, OwnerID: card.Author.ID,
+	}); err != nil {
+		return InteractionRow{}, ids.ID{}, err
+	}
+	return ix, card.ThreadID, nil
+}
+
+// respondLocked is the unit of work of Respond under the row lock of the interaction: from
+// received or dispatched the final state and the response; the same final state again is no change;
+// every other transition is 409 invalid_state_transition.
+func (s *Service) respondLocked(ctx context.Context, id ids.ID, state string, response []byte, thread ids.ID) (runs.Interaction, error) {
+	cur, found, err := s.d.Components.LockInteraction(ctx, id)
 	if err != nil {
 		return runs.Interaction{}, err
 	}
 	if !found {
 		return runs.Interaction{}, invisible()
 	}
-	card, err := s.d.Messages.TriggerMessageOf(ctx, ix.MessageID)
-	if errs.KindOf(err) == errs.KindNotFound {
-		return runs.Interaction{}, invisible()
-	}
-	if err != nil {
-		return runs.Interaction{}, err
-	}
-	if err := s.authorizeErr(ctx, a, authorize.ActionInteractionRespond, authorize.Resource{
-		Kind: authorize.ResourceInteraction, ID: ix.ID, ThreadID: card.ThreadID, OwnerID: card.Author.ID,
-	}); err != nil {
-		return runs.Interaction{}, err
-	}
-	var response []byte
-	if cmd.HasResponse {
-		if response, err = json.Marshal(struct {
-			Text *string `json:"text,omitempty"`
-		}{cmd.ResponseText}); err != nil {
-			return runs.Interaction{}, errs.Wrap(errs.CodeInternalError, err, "runs: encoding a response")
+	switch cur.State {
+	case interactionReceived, interactionDispatched:
+		if cur, err = s.d.Components.SetInteractionState(ctx, cur.ID, state, response, s.now()); err != nil {
+			return runs.Interaction{}, err
 		}
+	case state:
+	default:
+		return runs.Interaction{}, errs.New(errs.CodeInvalidStateTransition, "an answered interaction keeps its state")
 	}
-	var out runs.Interaction
-	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		cur, found, err := s.d.Components.LockInteraction(ctx, ix.ID)
-		if err != nil {
-			return err
-		}
-		if !found {
-			return invisible()
-		}
-		switch {
-		case cur.State == interactionReceived || cur.State == interactionDispatched:
-			if cur, err = s.d.Components.SetInteractionState(ctx, cur.ID, cmd.State, response, s.now()); err != nil {
-				return err
-			}
-		case cur.State == cmd.State:
-		default:
-			return errs.New(errs.CodeInvalidStateTransition, "an answered interaction keeps its state")
-		}
-		out, err = s.interactionView(ctx, cur, card.ThreadID)
-		return err
-	})
-	return out, err
+	return s.interactionView(ctx, cur, thread)
 }

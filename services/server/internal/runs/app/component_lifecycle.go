@@ -35,35 +35,40 @@ func (s *Service) DisableRunComponents(ctx context.Context, runID ids.ID) error 
 		return err
 	}
 	for _, card := range cards {
-		facts, err := s.d.Cards.LockCard(ctx, card)
-		if errs.KindOf(err) == errs.KindNotFound {
-			continue
-		}
+		live, err := s.lockLiveCard(ctx, card)
 		if err != nil {
 			return err
 		}
-		if facts.Deleted {
+		if !live {
 			continue
 		}
 		list, err := s.d.Components.LockActiveRunComponents(ctx, runID, card)
 		if err != nil {
 			return err
 		}
-		if err := s.setStates(ctx, list, domain.ComponentDisabled); err != nil {
-			return err
-		}
-		if len(list) == 0 {
-			continue
-		}
-		if _, err := s.d.Cards.ComponentsChanged(ctx, card); err != nil {
+		if err := s.changeStates(ctx, card, list, domain.ComponentDisabled); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// setStates writes state to every locked component of list with version + 1.
-func (s *Service) setStates(ctx context.Context, list []ComponentRow, state string) error {
+// lockLiveCard locks the card message (Messages.LockCard) and reports whether it still exists and
+// is not deleted.
+func (s *Service) lockLiveCard(ctx context.Context, card ids.ID) (bool, error) {
+	facts, err := s.d.Cards.LockCard(ctx, card)
+	if errs.KindOf(err) == errs.KindNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return !facts.Deleted, nil
+}
+
+// changeStates writes state to every locked component of list on card with version + 1 and, when
+// any changed, announces the change once through messaging (message.updated).
+func (s *Service) changeStates(ctx context.Context, card ids.ID, list []ComponentRow, state string) error {
 	for _, c := range list {
 		if _, err := s.d.Components.SetComponent(ctx, ComponentWrite{
 			ID: c.ID, State: state, Definition: c.Definition, UsedBy: c.UsedBy, UsedAt: c.UsedAt,
@@ -71,7 +76,11 @@ func (s *Service) setStates(ctx context.Context, list []ComponentRow, state stri
 			return err
 		}
 	}
-	return nil
+	if len(list) == 0 {
+		return nil
+	}
+	_, err := s.d.Cards.ComponentsChanged(ctx, card)
+	return err
 }
 
 // OnMessageDeleted is the in-transaction subscriber of messaging.MessageDeleted (M2-15 design note
@@ -107,24 +116,16 @@ func (s *Service) ExpireComponents(ctx context.Context, messageID ids.ID) error 
 		return err
 	}
 	return s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		facts, err := s.d.Cards.LockCard(ctx, messageID)
-		if errs.KindOf(err) == errs.KindNotFound {
-			return nil
-		}
-		if err != nil || facts.Deleted {
+		live, err := s.lockLiveCard(ctx, messageID)
+		if err != nil || !live {
 			return err
 		}
 		due, err := s.d.Components.LockDueComponents(ctx, messageID, s.now())
 		if err != nil {
 			return err
 		}
-		if err := s.setStates(ctx, due, domain.ComponentExpired); err != nil {
+		if err := s.changeStates(ctx, messageID, due, domain.ComponentExpired); err != nil {
 			return err
-		}
-		if len(due) > 0 {
-			if _, err := s.d.Cards.ComponentsChanged(ctx, messageID); err != nil {
-				return err
-			}
 		}
 		next, found, err := s.d.Components.NextComponentExpiry(ctx, messageID)
 		if err != nil || !found {

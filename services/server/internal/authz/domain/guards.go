@@ -157,35 +157,55 @@ func invokeGuard(in *Input, f *InvokeFacts) (Decision, error) {
 			return Decision{}, err
 		}
 	}
-	if in.Principal.Kind != KindUser || f.TriggerOrigin != OriginHuman {
-		return deny(OutcomeForbidden, ReasonOriginNotHuman), nil
+	if r := invokeReason(in, f, ia); r != "" {
+		return deny(OutcomeForbidden, r), nil
 	}
-	if !reachable(in.Path, f, ia != nil) {
-		return deny(OutcomeForbidden, ReasonAgentNotReachable), nil
-	}
-	if f.BillingMode != BillingOrganization && f.CredentialHolderID != in.Principal.ID {
-		return deny(OutcomeForbidden, ReasonBillingModePersonalNotHolder), nil
-	}
-	if toolClassOwnerOnly(in.Eff.Owner, f) {
-		return deny(OutcomeForbidden, ReasonToolClassOwnerOnly), nil
+	return Allow, nil
+}
+
+// invokeReason is the reason of the first refusing point of invokeGuard; "" allows.
+func invokeReason(in *Input, f *InvokeFacts, ia *InteractionFacts) Reason {
+	if r := triggerReason(in, f, ia != nil); r != "" {
+		return r
 	}
 	if ia != nil {
 		if r := componentRules(in, ia); r != "" {
-			return deny(OutcomeForbidden, r), nil
+			return r
 		}
 	}
 	if r := projectRules(in.Eff.Owner, f); r != "" {
-		return deny(OutcomeForbidden, r), nil
+		return r
 	}
+	return activeRunReason(f, ia)
+}
+
+// triggerReason applies points 1 to 5 of 05 section 5: a human trigger, a reachable agent (card
+// marks the mention rule met for an interaction), I2 and SR2.
+func triggerReason(in *Input, f *InvokeFacts, card bool) Reason {
+	switch {
+	case in.Principal.Kind != KindUser || f.TriggerOrigin != OriginHuman:
+		return ReasonOriginNotHuman
+	case !reachable(in.Path, f, card):
+		return ReasonAgentNotReachable
+	case f.BillingMode != BillingOrganization && f.CredentialHolderID != in.Principal.ID:
+		return ReasonBillingModePersonalNotHolder
+	case toolClassOwnerOnly(in.Eff.Owner, f):
+		return ReasonToolClassOwnerOnly
+	}
+	return ""
+}
+
+// activeRunReason applies point 8: an active run of another agent, and at stage accept a component
+// without a run while the agent's run is active, which would need a second run that cannot exist
+// (R-DM-14); a follow-up is a message (05 section 5 point 8).
+func activeRunReason(f *InvokeFacts, ia *InteractionFacts) Reason {
 	if !f.ActiveRunAgentID.IsZero() && f.ActiveRunAgentID != f.AgentID {
-		return deny(OutcomeForbidden, ReasonRunActiveOtherAgent), nil
+		return ReasonRunActiveOtherAgent
 	}
 	if ia != nil && ia.Stage == InteractionStageAccept && ia.ComponentRunID.IsZero() && f.ActiveRunAgentID == f.AgentID {
-		// A component without a run while the agent's run is active would need a second run,
-		// which cannot exist (R-DM-14); a follow-up is a message (05 section 5 point 8).
-		return deny(OutcomeForbidden, ReasonRunActive), nil
+		return ReasonRunActive
 	}
-	return Allow, nil
+	return ""
 }
 
 // reachable is point 2 (no agents in dms) and point 3: the agent is active and either operates

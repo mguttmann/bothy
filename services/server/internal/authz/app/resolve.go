@@ -213,26 +213,8 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	if err := a.grantFacts(spec.ID, r, res, &in); err != nil {
 		return domain.Input{}, err
 	}
-	if spec.ID == string(authorize.ActionTokenCreate) {
-		pf, found, err := a.principal.Principal(ctx, r.ID)
-		if err != nil {
-			return domain.Input{}, sourceError("principal source", err)
-		}
-		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
-	}
-	if req.Contains(domain.Token()) && r.Token != nil {
-		in.Invocation = invocationFacts(r.Token)
-	}
-	if triggers(spec.ID) {
-		// interaction.create carries the agent.invoke guard with the facts of the component
-		// (brief M2-15 design note 8 b); agent.invoke carries them at stage deliver (note 8 c).
-		if r.Invoke != nil {
-			var err error
-			if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
-				return domain.Input{}, err
-			}
-		}
-		in.Interaction = interactionFacts(r.Interaction)
+	if err := a.actionFacts(ctx, s, spec, req, r, res, t, &in); err != nil {
+		return domain.Input{}, err
 	}
 	if in.Principal.ActingFor {
 		var err error
@@ -241,6 +223,35 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		}
 	}
 	return in, nil
+}
+
+// actionFacts fills the facts of the action-specific atoms and guards: the holder of
+// token.create, the token facts of run.start and run.token.renew, and the trigger of agent.invoke
+// and interaction.create with the facts of the component (brief M2-15 design note 8 b;
+// agent.invoke carries them at stage deliver, note 8 c).
+func (a *Authorizer) actionFacts(ctx context.Context, s *actingPrincipal, spec domain.ActionSpec, req domain.Expr, r authorize.Resource,
+	res resolved, t time.Time, in *domain.Input) error {
+	if spec.ID == string(authorize.ActionTokenCreate) {
+		pf, found, err := a.principal.Principal(ctx, r.ID)
+		if err != nil {
+			return sourceError("principal source", err)
+		}
+		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
+	}
+	if req.Contains(domain.Token()) && r.Token != nil {
+		in.Invocation = invocationFacts(r.Token)
+	}
+	if !triggers(spec.ID) {
+		return nil
+	}
+	if r.Invoke != nil {
+		var err error
+		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
+			return err
+		}
+	}
+	in.Interaction = interactionFacts(r.Interaction)
+	return nil
 }
 
 // pendingReason is the reason of a pending person or device whose pending gate passed.
