@@ -445,7 +445,7 @@ func TestValuesUnstorable(t *testing.T) {
 		{"nul in detail value", "replace", step + "/detail", `{"out":"a\u0000b"}`, "/ops/0/value/out", "invalid"},
 		{"nul in detail key", "replace", step + "/detail", `{"a\u0000":1}`, "/ops/0/value/a\u0000", "invalid"},
 		{"nul in plan id", "replace", "/plan", `{"items":[{"id":"x\u0000","text":"t","status":"pending"}]}`, "/ops/0/value/items/0/id", "invalid"},
-		{"huge integer in detail", "replace", step + "/detail", `{"n":1760000000000000001}`, "/ops/0/value/n", "too_large"},
+		{"huge integer in detail", "replace", step + "/detail", `{"n":9007199254740993}`, "/ops/0/value/n", "too_large"},
 		{"huge float in detail", "replace", step + "/detail", `{"n":1.76e18}`, "/ops/0/value/n", "too_large"},
 		{"huge negative in detail", "replace", step + "/detail", `{"n":[-9007199254740993.5]}`, "/ops/0/value/n/0", "too_small"},
 	} {
