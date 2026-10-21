@@ -4,6 +4,7 @@ package app_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -78,7 +79,7 @@ func (r *repo) RecordDelivery(_ context.Context, w app.DeliveryWrite) (app.RunRo
 			continue
 		}
 		if !w.JTI.IsZero() {
-			x.InvocationJTI, x.RenewedFromJTI = w.JTI, ids.ID{}
+			x.InvocationJTI, x.RenewedFromJTI = w.JTI, w.RenewedFromJTI
 		}
 		x.BillingModeExpected, x.Version = w.BillingModeExpected, x.Version+1
 		r.runs[i] = x
@@ -115,10 +116,47 @@ func (r *repo) TransitionRun(_ context.Context, w app.TransitionWrite) (app.RunR
 				x.DurationMS, x.HasDuration = w.At.Sub(x.StartedAt).Milliseconds(), true
 			}
 		}
+		if !w.StartedJTI.IsZero() {
+			x.StartedJTI, x.RenewedFromJTI = w.StartedJTI, ids.ID{}
+		}
+		x.BillingModeUsed = cmp.Or(w.BillingModeUsed, x.BillingModeUsed)
+		x.Model, x.StatusLine, x.Summary = cmp.Or(w.Model, x.Model), cmp.Or(w.StatusLine, x.StatusLine), cmp.Or(w.Summary, x.Summary)
+		if w.BillingEvidence != nil {
+			x.BillingEvidence = w.BillingEvidence
+		}
+		if w.Metrics != nil {
+			x.Metrics = w.Metrics
+		}
 		r.runs[i] = x
 		return x, true, nil
 	}
 	return app.RunRow{}, false, nil
+}
+
+// lockActive returns the active runs that keep holds, ascending by id.
+func (r *repo) lockActive(keep func(app.RunRow) bool) []app.RunRow {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []app.RunRow
+	for _, x := range r.runs {
+		if x.State.Active() && keep(x) {
+			out = append(out, x)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.RunRow) int { return bytes.Compare(a.ID[:], b.ID[:]) })
+	return out
+}
+
+func (r *repo) LockActiveRunsByStarter(_ context.Context, principals []ids.ID) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return slices.Contains(principals, x.TriggeredBy) }), nil
+}
+
+func (r *repo) LockActiveRunsByAgent(_ context.Context, agent ids.ID) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return x.AgentID == agent }), nil
+}
+
+func (r *repo) OrphanCandidates(context.Context) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return x.State != domain.StateQueued }), nil
 }
 
 func (r *repo) AppendStep(_ context.Context, s app.StepRow) (app.StepRow, error) {
@@ -577,7 +615,8 @@ func newWorld(t *testing.T) *world {
 
 // build (re)creates the use cases over the fakes of w.
 func (w *world) build() {
-	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge}, app.Deps{
+	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
+		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, app.Deps{
 		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},

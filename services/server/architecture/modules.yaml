@@ -196,7 +196,7 @@ modules:
     adapter_vendors: [otel, pgx, websocket]
   runs:
     tables: [runs, run_steps, run_followups, message_components, interactions]
-    actions: [agent.invoke, run.read, run.overview.read, run.context.read, run.start, run.update,
+    actions: [agent.invoke, run.read, run.overview.read, run.context.read, run.start, run.token.renew, run.update,
               run.finish, run.cancel, run.followup.create, component.update, interaction.create,
               interaction.respond, command.autocomplete, command.autocomplete.respond,
               command.invoke]
