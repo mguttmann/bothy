@@ -130,7 +130,25 @@ Future<void> waitFor(
       await $.tester.tap(passkey);
     }
   }
-  throw TestFailure('timed out waiting for $finder');
+  throw _failure('timed out waiting for $finder; ${screenText()}');
+}
+
+/// A failure whose message also goes to the browser console, where the runner prints the
+/// lines that start with PATROL_LOG (patrol's own report of a web failure has no details).
+TestFailure _failure(String message) {
+  // ignore: avoid_print
+  print('PATROL_LOG ${jsonEncode({'type': 'e2e', 'message': message})}');
+  return TestFailure(message);
+}
+
+/// The texts on screen, for the message of a failed wait (the runner prints the details of a
+/// failed test).
+String screenText() {
+  final texts = <String>[
+    for (final e in find.byType(Text).evaluate())
+      if ((e.widget as Text).data case final t? when t.trim().isNotEmpty) t,
+  ];
+  return 'screen: ${texts.take(80).join(' | ')}';
 }
 
 /// Pumps until [finder] finds nothing any more (step-ups are confirmed on the way).
@@ -149,7 +167,7 @@ Future<void> waitGone(
       await $.tester.tap(passkey);
     }
   }
-  throw TestFailure('timed out waiting until $finder is gone');
+  throw _failure('timed out waiting until $finder is gone; ${screenText()}');
 }
 
 /// Waits for [finder], scrolls it into view and taps its last match (the open menu item of a
