@@ -259,6 +259,36 @@ this source), `adapters/httpapi/*_test.go` over PostgreSQL 18 with the full chai
 validation against openapi.yaml (BR-01, BR-03, BR-08, AZ-M22, the owner, step-up and audit table,
 If-Match, tokens, visibility, badge) and `migrations/agents_test.go`.
 
+## Slash command register (M2-16)
+
+`Commands` (`commands.go`, implemented by `app/commands.go`, `CommandService`) is the register of
+09 section 10 over the table `commands` (migration `00054`, queries `adapters/postgres/queries/commands.sql`).
+The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand` and
+`listChannelCommands` are `adapters/httpapi/commands.go`.
+
+- `domain/command.go` holds the pure rules: the built-in names of 09 10.1 (a test reads the
+  chapter), the definition and option rules with their field codes (detail never repeats a
+  value), scope coverage and the shadowing of `MostSpecific`.
+- `Register`: rules, then `authorize(command.register)` with the command facts of the submitted
+  definition (the target rule of `authz`), then the reserved names (`409` with
+  `command_name_reserved`), the lock of the owner's `principals` row (`identity.PrincipalWriter.LockPrincipal`)
+  and the count against `command.max_per_principal` (`400` `limit_reached`), the insert (`409` without
+  reason on a taken name) and in the same unit one audit entry and one `command.changed`.
+- `Update`: rules, load, `command.read` on the stored command, `command.register` on the new
+  definition, `If-Match`, reserved names, a no-op for an identical definition, otherwise a
+  compare-and-swap on `version`. `Remove` sets `removed_at`; a removed command answers `204`
+  without a write. The audit details carry the change, the scope, `control`, `required_level` and
+  the version, never name, description or options (SEC-AUD-5).
+- `command.changed` has the scope of the scope target (none, the space, or space and channel),
+  the resource `command` with its new version and the receive action `command.read`.
+- `ListForChannel` authorizes `command.read` on the channel, reads the live commands whose scope
+  covers it, keeps the most specific per owner and name, asks `command.read` per owner in filter
+  mode with the offered channel (09 10.3) and orders the channel's effective operator first.
+  Built-in commands are not part of it (the client list, 09 10.1).
+- `Resolve` gives the execution of `runs` the usable command without authorizing.
+- The owner kind is read from `agents`: an owner with an agents row is an agent, any other an app
+  (apps own commands from M2-25).
+
 ## Port (root package `internal/agents`)
 
 - Inbound: `Agents` (administration, policy, tool class; M1-51), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `Sessions`, `DevEnvironments` (milestone).
