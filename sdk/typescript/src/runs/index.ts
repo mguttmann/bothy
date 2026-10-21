@@ -1,11 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Run helpers (11 11.2 row `runs`): the live-box patcher {@link RunPatcher}, the handle of a
- * running run {@link RunHandle} and the context renderer {@link renderContext}.
+ * Run helpers (11 11.2 row `runs`): the adapter loop {@link Adapter} with its
+ * {@link AgentHandler}, the live-box patcher {@link RunPatcher}, the handle of a running run
+ * {@link RunHandle} and the context renderer {@link renderContext}.
  *
  * @module
  */
 
+export {
+  Adapter,
+  AgentHandler,
+  RuntimeFailure,
+  type ActualBilling,
+  type AdapterConfig,
+  type AdapterOptions,
+  type Invocation,
+  type StartOptions,
+} from "./adapter.js";
 export {
   CONTEXT_NOTICE,
   DATA_NOTICE,
