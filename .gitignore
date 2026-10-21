@@ -16,6 +16,8 @@ dist/
 
 # Python and uv
 .venv/
+# setuptools metadata of the editable SDK path dependency of plugins/claude-code-runner (M2-34)
+*.egg-info/
 __pycache__/
 *.py[cod]
 .pytest_cache/
