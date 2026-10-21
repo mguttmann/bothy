@@ -10,6 +10,13 @@ is the [`VERSION`](VERSION) file next to this one; release tags are `host/v<vers
 
 ### Added
 
+- Terminal conformance (M2-48): `make platform-bundle OUT=<dir> [GOOS= GOARCH=]` builds what a
+  platform run needs (the service, the Fake-`claude`, the tagged platform test binary, the test
+  binaries of `internal/pty`, `internal/session`, `internal/profiles` and `internal/confirm`, and
+  `bundle.json` with SHA-256 per file); `platform-test` builds and runs that bundle. The platform
+  suite refuses to run without the marker file of a disposable test machine (exit 2).
+  `test/noisedevice` is the Noise sidecar of the terminal suite's Go test device.
+
 - Terminal sessions (M2-45): `internal/session` opens one data connection per `session.open`,
   answers Noise message 1, checks the session token in the order of docs/spec/24-terminal.md 5.3
   with its own EdDSA verification of the ADR 0067 profile and the `jti` memory, binds session
@@ -64,3 +71,11 @@ is the [`VERSION`](VERSION) file next to this one; release tags are `host/v<vers
   acceptance.
 - A fake `claude` for the tests of HD6 and the platform suite behind the build tag `platform`
   (`make platform-test`, workflow `host-platform.yml`).
+
+### Fixed
+
+- A declaration that a ready delivers while a run of `doctor` is in progress is no longer lost
+  when the run stores its result, so the profile `claude` is offered after `confirmHost` (M2-48).
+- `bothy-host session-user remove` stops the host service before the helper of the removed
+  session user, so its sessions end `host_restarted` (R-TM-27) instead of `process_exited`
+  (M2-48).
