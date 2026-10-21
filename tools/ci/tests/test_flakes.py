@@ -641,3 +641,20 @@ def test_a_closed_issue_keeps_its_runs_reported() -> None:
     # The new issue lists only its own runs, and the flake of the closed list counts as new.
     assert "| new | `go` | `example.com/mod/a` | `TestA` |" in gh.comments[1]
     assert "| 1 | 32 | `go` |" in gh.issues[1]["body"]
+
+
+def test_every_flake_upload_includes_the_hidden_flake_dir() -> None:
+    # upload-artifact skips files under a directory that starts with a dot (.cache) unless
+    # include-hidden-files is set; the step would pass with `ignore` and upload nothing.
+    workflow = yaml.safe_load((REPO / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    uploads = [
+        (name, step)
+        for name, job in workflow["jobs"].items()
+        for step in job.get("steps", [])
+        if str(step.get("with", {}).get("name", "")).startswith("flakes-")
+    ]
+    assert len(uploads) >= 5
+    for name, step in uploads:
+        assert step["with"]["path"] == ".cache/flakes/", name
+        assert step["with"].get("include-hidden-files") is True, name
+        assert step["if"] == "always()", name

@@ -451,6 +451,7 @@ jobs:
         with:
           name: flakes-test-server-${{ matrix.shard }}
           path: .cache/flakes/
+          include-hidden-files: true # .cache starts with a dot
           if-no-files-found: ignore
           retention-days: 7
       # The shard's record of the packages it ran and its profiles for test-server-coverage.
@@ -535,6 +536,7 @@ jobs:
         with:
           name: flakes-test-server-contract
           path: .cache/flakes/
+          include-hidden-files: true # .cache starts with a dot
           if-no-files-found: ignore
           retention-days: 7
 
@@ -686,6 +688,7 @@ jobs:
         with:
           name: flakes-test-apps
           path: .cache/flakes/
+          include-hidden-files: true # .cache starts with a dot
           if-no-files-found: ignore
           retention-days: 7
       # The coverage reports of `make test` in this job for the job sonar, which scans them
@@ -991,6 +994,7 @@ jobs:
         with:
           name: flakes-postgres-image-amd64
           path: .cache/flakes/
+          include-hidden-files: true # .cache starts with a dot
           if-no-files-found: ignore
           retention-days: 7
 
@@ -1024,6 +1028,7 @@ jobs:
         with:
           name: flakes-postgres-image-arm64
           path: .cache/flakes/
+          include-hidden-files: true # .cache starts with a dot
           if-no-files-found: ignore
           retention-days: 7
 
