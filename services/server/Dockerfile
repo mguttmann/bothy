@@ -110,6 +110,9 @@ COPY packages/design_system/assets packages/design_system/assets
 COPY packages/design_system/fonts packages/design_system/fonts
 COPY packages/domain/lib packages/domain/lib
 COPY packages/l10n/lib packages/l10n/lib
+# The terminal of the console (M6-18): terminal_ui and its Noise package.
+COPY packages/bothy_noise/lib packages/bothy_noise/lib
+COPY packages/terminal_ui/lib packages/terminal_ui/lib
 COPY apps/console ./apps/console
 COPY docs/api/openapi.yaml docs/api/
 COPY services/server/VERSION services/server/
@@ -131,6 +134,20 @@ RUN flutter build web --release --target integration_test/admin/admin_bundle.dar
 
 FROM scratch AS console-e2e-web
 COPY --from=console-e2e-build /src/apps/console/build/admin-bundle /
+
+# The web bundle of the terminal test of phase 3 (brief M6-18 Design note 5):
+# integration_test/terminal/terminal_bundle.dart in place of lib/main.dart, built with the flags
+# of the console above in its own stage, so phase 2 does not wait for it. console_e2e.py exports
+# it with --target console-e2e-terminal-web and mounts it as console.assets_dir of its test api
+# only; no release image contains it, and the production stage stays last.
+FROM console AS console-e2e-terminal-build
+RUN flutter build web --release --target integration_test/terminal/terminal_bundle.dart \
+        --output /src/apps/console/build/terminal-bundle \
+        --base-href /console/ --no-web-resources-cdn --no-pub --no-wasm-dry-run \
+    && sh tool/version_json.sh ../../docs/api/openapi.yaml ../../services/server/VERSION build/terminal-bundle/version.json
+
+FROM scratch AS console-e2e-terminal-web
+COPY --from=console-e2e-terminal-build /src/apps/console/build/terminal-bundle /
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 ARG VERSION REVISION
