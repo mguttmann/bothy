@@ -126,12 +126,14 @@ authenticator):
    signed by WebCrypto keys of the page that are not extractable. The first redeems the enrollment
    code, sets a random password and enrolls TOTP; the second logs in with password and TOTP as an
    app and stays `pending`; its verification code comes from `getDevice` as that device;
-5. the ids and names go to `window.__e2eSeed` as a JSON string (`owner`, `sam`, `pendingDevice` with
+5. the ids and names make the document of `window.__e2eSeed`, a JSON string (`owner`, `sam`, `pendingDevice` with
    `code`, `spaces`, `channels`, `agents`, `group`; every inner object has `id` and `name`), which
    the Dart tests read;
-6. patrol's web protocol: initialise, list the tests with `__patrol__getTests` (the internal
-   `patrol_test_explorer` is left out), run each with `__patrol__runTest` in the listed order, up to
-   5 minutes each. Console lines starting with `PATROL_LOG` (patrol's step log) go to stderr. The
+6. patrol's web protocol: list the tests with `__patrol__getTests` (the internal
+   `patrol_test_explorer` is left out), then per test in the listed order a fresh load of the
+   bundle, `window.__e2eSeed` again, the initialisation and `__patrol__runTest`, up to 5 minutes
+   each. The fresh load is patrol's own rule (its web runner does the same): one load runs every
+   test of the bundle once and executes only the requested one. Console lines starting with `PATROL_LOG` (patrol's step log) go to stderr. The
    platform handler answers `startTest`, `verifyFileDownloads`, `getClipboard`, `setClipboard`,
    `grantPermissions`, `enableDarkMode` and `disableDarkMode`; any other action fails the run with
    its name.
