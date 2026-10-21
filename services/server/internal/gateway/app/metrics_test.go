@@ -243,13 +243,21 @@ func TestGatewayMetrics_ConnectionsActiveUpDown(t *testing.T) {
 
 // TestGatewayMetrics_DeliveryDurationLiveOnly: the hub marks the entries of live delivery (durable
 // and ephemeral) as live; entries of catch-up and of the flush after it are not, so the writer
-// measures bothy.delivery.duration for live delivery only.
+// measures bothy.delivery.duration for live delivery only. The live event is dispatched only once
+// the connection is live: catchup.complete is queued before the flush, and an event dispatched
+// in between is buffered and flushed, not delivered live (M1-65/15).
 func TestGatewayMetrics_DeliveryDurationLiveOnly(t *testing.T) {
 	t.Parallel()
 	w, alex, space, visible, _ := catchUpWorld()
 	h := newHub(t, w, hubCfg)
-	qc := connect(t, h, alex, 100, 0, 10)
+	qc := newQConn(100)
+	c, s := app.NewTestConnection(qc, alex)
+	h.Register(context.Background(), c, s)
+	if err := h.Attach(context.Background(), c, 0, 10); err != nil {
+		t.Fatal(err)
+	}
 	waitComplete(t, qc)
+	waitFor(t, "live phase", func() bool { return h.PhaseOf(c) == domain.PhaseLive })
 	h.Dispatch(context.Background(), msg(11, space, visible))
 	var live, caught int
 	for _, e := range qc.drain() {
