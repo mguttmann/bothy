@@ -9,7 +9,8 @@ downloads the shards' profiles, merges them per module and runs the coverage gat
 profile, which SonarQube reads as before.
 
 Assignment: every package of `go list ./...` in every Go module is one unit; a package of SPLITS
-is K units instead, its parts 1/K to K/K, each weighing 1/K of the package. Units are sorted by
+is K units instead, its parts 1/K to K/K, each weighing its measured duration (TIMINGS keeps it as
+`<package>@<J>/<K>`), else 1/K of the package. Units are sorted by
 their measured duration (TIMINGS, longest first, then by name) and each goes to the shard with the
 least total so far. A package without a measured duration (a new one) weighs the median, so it
 still lands in exactly one shard. The split is deterministic: every shard computes the same one.
