@@ -15,7 +15,10 @@ import (
 // the repository-wide lint and its exception list.
 var visiblePredicateAllowlist = map[string]string{
 	"GetMessage": "internal lookup by id of sending (reply target, parent message) and of getMessage after the visible " +
-		"read missed; the caller authorizes message.create, thread.create or message.read on the row and returns it to no reader",
+		"read missed; the caller authorizes message.create, thread.create or message.read on the row and returns it to no reader; " +
+		"ContextMessage of the run context (M2-13), which runs calls after run.context.read and which checks message.read in filter mode",
+	"ListContextWindow": "the run context window (M2-13 design note 11): one thread of the run whose run.context.read runs " +
+		"authorized, or the main thread of its parent message; every row passes message.read in filter mode before it leaves",
 	"GetMessageByClientID": "the idempotency lookup of the author's own (author, client_msg_id), 04 section 5.1 point 4; " +
 		"the use case authorizes message.create on the thread before it answers with the row",
 	"ListMentions": "the mentions of one message whose row the caller has already read with the visible predicate " +
