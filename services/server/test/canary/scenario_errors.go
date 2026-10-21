@@ -24,8 +24,8 @@ func (sc *Scenario) errorPaths() {
 	// whose name is a canary (W7).
 	sc.patch(alex, "/me/profile", map[string]any{"display_name": "\u202e" + sc.Reg.New(ClassContent, "", "bidi display name")}, http.StatusBadRequest)
 	dup := sc.Reg.New(ClassContent, "", "duplicate key value")
-	sc.call(o, req{method: http.MethodPost, path: "/spaces", body: []byte(`{"name":"Doppelt","name":"` + dup + `"}`)}, http.StatusBadRequest)
-	sc.post(o, "/spaces", map[string]any{"name": "Feld", sc.Reg.New(ClassContent, "", "unknown member name"): true}, http.StatusBadRequest)
+	sc.call(o, req{method: http.MethodPost, path: "/spaces", body: []byte(`{"name":"Duplicate","name":"` + dup + `"}`)}, http.StatusBadRequest)
+	sc.post(o, "/spaces", map[string]any{"name": "Field", sc.Reg.New(ClassContent, "", "unknown member name"): true}, http.StatusBadRequest)
 	// 401 without credentials, with a canary in the body.
 	if r := sc.raw(http.MethodPost, "/spaces", nil, []byte(`{"name":"`+sc.Reg.New(ClassContent, "", "space name (401)")+`"}`), "anonymous"); r.Status != http.StatusUnauthorized {
 		sc.T.Errorf("anonymous createSpace: %d, want 401", r.Status)
