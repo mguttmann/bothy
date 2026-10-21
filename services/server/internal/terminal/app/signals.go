@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
@@ -94,6 +95,16 @@ func (s *Service) stage(ctx context.Context, sig domain.Signal) error {
 // committed hands a staged signal over after the commit.
 func (s *Service) committed(ctx context.Context, sig domain.Signal) {
 	s.clusterSignals().Committed(ctx, sig)
+}
+
+// sendReady sends ready again on the control connection of hostID once the change is durable:
+// inside a unit of work (the Idempotency-Key stage runs the whole request in one) after its
+// outermost commit, because the ready re-reads the row and would otherwise carry the state before
+// the change (M2-48); outside one at once.
+func (s *Service) sendReady(ctx context.Context, hostID ids.ID) {
+	if !txn.AfterCommit(ctx, func() { s.control().SendReady(hostID) }) {
+		s.control().SendReady(hostID)
+	}
 }
 
 // SendSignal delivers s outside any unit of work (the relay's presence and pairing signals).
