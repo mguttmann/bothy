@@ -91,6 +91,9 @@ type TriggerChannel struct {
 	MainThreadID ids.ID
 	// The switches of 09 section 3.3.
 	RequireMention, ThreadRequireMention, FreeResponse, AutoThread, AllowMentionedAgents bool
+	// SettingsVersion is channels.settings_version, the member settings_version of
+	// AgentInvocationPayload (M2-08).
+	SettingsVersion int64
 }
 
 // TriggerFacts is the incoming port of the channel facts of the trigger decision (M2-05). It never

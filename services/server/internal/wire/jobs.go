@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	syncjobs "github.com/OWNER/bothy/services/server/internal/sync/adapters/jobs"
 )
 
@@ -109,6 +110,8 @@ type JobModules struct {
 	FilesImages filesjobs.ImageRunner
 	// FilesImageTimeout is file.image.processing_timeout, the River timeout of files.thumbnail.
 	FilesImageTimeout time.Duration
+	// QueuedExpiry is the use case of runs.queued_expiry (M2-08); nil only where no job runs.
+	QueuedExpiry runsjobs.Expirer
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
@@ -117,8 +120,8 @@ type JobModules struct {
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
 // audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
 // on the queue files without a River job timeout (M3-04) and files.thumbnail on the queue files
-// with the timeout file.image.processing_timeout (M3-06); the error is the first rejected
-// registration.
+// with the timeout file.image.processing_timeout (M3-06) and runs.queued_expiry on the queue
+// default (M2-08); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -149,6 +152,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := filesjobs.RegisterThumbnail(reg, m.FilesImages, m.FilesImageTimeout); err != nil {
+		return nil, err
+	}
+	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
 		return nil, err
 	}
 	return reg, nil

@@ -126,7 +126,9 @@ Eine angehängte Datei folgt immer ihrer Nachricht, auch nach dem Verschieben de
 
 1. Owner: Stufe `trigger` und alle Zusatzrechte auf allen Zielen außer DM-Kanälen, und nur in
    einer Sitzung eines Menschen. Ein persönliches API-Token eines Owners handelt mit den Freigaben
-   dieses Menschen, ohne Owner-Rechte (SR5 in [07-rechte.md](07-rechte.md)).
+   dieses Menschen, ohne Owner-Rechte (SR5 in [07-rechte.md](07-rechte.md)). Exception:
+   the check without a request (section 5) takes the owner status from the current owner list
+   without a session (R-AZ-29).
 2. Sonst: höchste Stufe aller gültigen Freigaben (nicht widerrufen, nicht abgelaufen) des
    Prinzipals und seiner gültigen Gruppen auf dem Pfad. Zusatzrechte: Vereinigung der
    Zusatzrechte derselben Freigaben.
@@ -625,6 +627,37 @@ Agenten-Laufzeit beteiligt ist; geprüft werden `required_level`, `required_capa
 `restricted_to`, Freigaben und Scope der App ([11-erweiterungen.md](11-erweiterungen.md),
 Abschnitt 9).
 
+**Check without a request.** In these cases the server evaluates the permissions of a person
+without a request of this person (R-AZ-29):
+
+- `agent.invoke` immediately before every delivery of `agent.invocation`, `agent.followup`,
+  `interaction.created` and `command.invoked` to an agent
+  ([04-sync-protokoll.md](04-sync-protokoll.md), section 15.3 step 2, section 15.4 item 2 and
+  section 15.6), at `run.token.renew` (04 section 15.3 step 3) and for the new run from deferred
+  follow-ups (04 section 15.4 item 4);
+- `command.invoke` and `interaction.create`, when the server checks an app command or the use of
+  a component of an app again with the permissions of that moment before handing it to the app
+  ([11-erweiterungen.md](11-erweiterungen.md), section 9; R-SY-02);
+- the permissions of the triggering person in the acting-for binding (rule 2.3 item 6, SR9 in
+  [07-rechte.md](07-rechte.md)).
+
+The following applies:
+
+- The person is a principal of kind `user` without session, device, token, `view_as` and
+  `acting_for`. Only the server itself builds this principal, never the authentication of a
+  request.
+- Blocks come only from the person's status (SR7): `disabled` or `deleted` gives
+  `principal_inactive`, `pending` gives `principal_pending`; in the acting-for binding such a
+  person has no permissions. Sessions, devices and tokens of the person do not count.
+- The owner status comes from the current owner list (`owners` with `revoked_at IS NULL`),
+  without a session (exception to rule 2.3 item 1 and R-AZ-14); everything else from rule 2.3
+  applies unchanged. A permission state computed this way is never the own permission state of
+  the principal of a request, not even of a personal API token of the same person; in the
+  acting-for binding it only narrows.
+- `authorize` with this principal and an action other than `agent.invoke`, `command.invoke` or
+  `interaction.create` is a programming error and ends like an unknown action (rule 1.5).
+- If such a check writes an audit entry, this person is the actor, without device and session.
+
 Folgen bei `allow`: Lauf `queued`, Live-Box-Anker, `trigger_state`, Ereignis an den Agenten,
 Aufruf-Marke bei Zustellung ([04-sync-protokoll.md](04-sync-protokoll.md), Abschnitt 15). Die
 Marke ist eine JWS mit Kopf `alg = EdDSA`, `kid` und `typ = agent-invocation+jwt` (RFC 8725,
@@ -783,7 +816,7 @@ Terminal-Kanäle ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/async
 | R-AZ-11 | Interne Zustellprüfungen (`push.deliver`, `webhook_out.deliver`) sind eigene Aktionen. | Regel 1.1: auch Zustellungen laufen durch den Katalog und sind testbar. |
 | R-AZ-12 | Schreibschutz eines Kanals sperrt alle `write`- und `trigger`-Aktionen für alle Prinzipale, auch Owner; nur `import.apply` schreibt. | Ein Lese-Spiegel hat genau einen führenden Ort; im Spiegel darf kein Agent ausgelöst werden. Freigaben können Owner nicht beschränken. |
 | R-AZ-13 | Bediener-Regel: Der wirksame Bediener hat implizit `write`; `space.operator.set` und `channel.operator.set` verlangen keine eigene Freigabe des Agenten. | Folgt dem Bediener ohne zweite, leicht vergessene Freigabe; beim Wechsel bleibt kein Rest. Ersetzt den Vorschlag, beim Setzen eine Freigabe zu verlangen. |
-| R-AZ-14 | Owner-Rechte nur in einer Sitzung, nie über ein persönliches API-Token. | Ein gestohlenes Token ohne Gerätebindung darf nie die ganze Instanz öffnen. |
+| R-AZ-14 | Owner-Rechte nur in einer Sitzung, nie über ein persönliches API-Token; the exception is the check without a request (R-AZ-29). | Ein gestohlenes Token ohne Gerätebindung darf nie die ganze Instanz öffnen. |
 | R-AZ-15 | Abläufe, die Erstinstallation, die Wiederherstellung am Host, der Abgleich von Claim-Gruppen, der automatische Widerruf von Geräten und planmäßige Schlüsselwechsel sind Systemaktionen im Katalog (`grant.expire`, `group.member.expire`, `group.member.sync`, `instance.bootstrap`, `owner.recover`, `device.expire`, `signing_key.transition`). | Jeder Audit-Eintrag nennt eine bekannte Aktion; Abläufe erreichen Clients und Läufe über `access.changed`; diese Vorgänge sind sicherheitsrelevant und gehören ins Audit, ohne eine Aktion eines Menschen vorzutäuschen. |
 | R-AZ-16 | Ein wartendes Gerät bekommt Tokens, darf aber nur sich selbst lesen (`403 device_pending`). | Die App kann ohne neue Anmeldung auf die Freigabe warten; Inhalte erreicht sie erst danach. |
 | R-AZ-17 | `resolve_i1` führt "erst umstellen, dann freigeben" in einer Transaktion aus, mit beiden Prüfungen. | Der geführte Ablauf der Konsole braucht kein Zwischenstadium, in dem I1 verletzt wäre. |
@@ -795,6 +828,7 @@ Terminal-Kanäle ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/async
 | R-AZ-23 | Terminal-Aktionen nur für Menschen in einer Sitzung, mit Step-up `frisch` je Öffnung; der Rechner handelt nur über `host.pair` und `host.connect`. | Owner verlangt Passkey beim Öffnen; ein Terminal ist Fernzugriff auf einen Rechner ([24-terminal.md](24-terminal.md), R-TM-07). |
 | R-AZ-24 | Rechner sind ein eigenes Ziel außerhalb des Baums; Freigaben dort nur durch Owner. | Eine Freigabe auf Instanz oder Bereich darf nie still einen Rechner öffnen; `manage` ist auf Rechnern sinnlos. |
 | R-AZ-27 | Automatic state changes of outgoing subscriptions (`disabled` after `410`, after `webhook.max_consecutive_failures`, after `webhook.retry_max_age` and on a gap; `paused` by the delivery quota) are the system action `webhook_out.transition`: per change one audit entry without an actor in the transaction of the change, with the subscription, the old and new state and the cause as a code. Changes by the owner stay `webhook_out.manage`; the disabling at uninstallation is covered by the entry of `app.uninstall`. | Rule 1.10: every audit entry names a known action, and [webhooks.md](../api/webhooks.md), section 4, requires the disabling in the audit log; as with R-AZ-15, a system action does not pretend to be an action of a person. One action for all causes, because the cause is in the details (D-W-104). |
+| R-AZ-29 | Check without a request (section 5): if the server evaluates the permissions of a person without the person's request (`agent.invoke` before every delivery to an agent, at `run.token.renew` and for the run from deferred follow-ups; `command.invoke` and `interaction.create` before handing over to an app; the permissions of the triggering person in the acting-for binding), this person is a principal without session, device and token: blocks come only from the person's status, the owner status from the current owner list (exception to R-AZ-14). Only the server builds this principal, only for these cases, and the permission state computed this way is never the own permission state of the principal of a request. | None of these cases has a request, session, device or token of the person; with R-AZ-14 alone no invocation of an owner would pass the repeated check (AZ-M19, every agent with `personal` or `host`), and no run of an owner would read its own context in the acting-for binding. The acceptance has already applied R-AZ-14 to the real request; afterwards the server evaluates the same person with the permissions of the moment, and a block or the loss of the owner status takes effect at once. A request with a personal token still gets no owner permissions. Remainder: an owner who triggered through grants with a personal token is evaluated as an owner afterwards; in the acting-for binding the run then reaches as far as the permissions of the agent. A permission of another person never arises from this (D-W-104). |
 | R-AZ-32 | New action `access.view_as.end` on the person's own console session (`auth_session`, self, without step-up, audit always, `rl.admin`): it ends "View as person" stored on the console session (03 `auth_sessions`, R-DM-49) before `authz.view_as_max_duration`; `access.view_as` from a console session starts the stored view. While a view is stored, the actions `access.view_as.end`, `auth.logout`, `auth.step_up` and `self.read` on the person's own session are decided without `view_as` ([07-rechte.md](07-rechte.md) section 4.2 steps 4 and 7 would otherwise deny them); every other decision of the session follows 07 section 9.2, and the first request after the end time gets `step_up_required`. The module `identity` owns the action, because the state lives on `auth_sessions`. | [07-rechte.md](07-rechte.md) section 9.2 requires audit at start and end and operations to start and end the view; ending must not need a fresh step-up, which `access.view_as` requires, so that an owner can always leave the view (D-W-100 extended to M5 and M6). |
 | R-AZ-33 | New public action `console.csp_report` on the instance (no login, without step-up and audit, `rl.public_auth`, owned by `instance`): the endpoint of the web console's `report-to` accepts violation reports, logs only the directive, the disposition and the blocked origin and stores nothing; its effect is `read` (05 2.7), so reports are accepted in maintenance mode as well ([19-sicherheit.md](19-sicherheit.md), section 5, rule 6). | Browsers send reports without the session cookie in many cases, so the endpoint cannot require a session; every operation needs an action from the catalogue (05 section 1), and the rate class of public endpoints bounds abuse (D-W-123). |
 

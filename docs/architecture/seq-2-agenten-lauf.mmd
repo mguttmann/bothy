@@ -17,15 +17,15 @@ sequenceDiagram
   MSG->>DB: BEGIN, Thread-Sequenz, INSERT Nachricht (origin human)
   MSG-)RU: In-Tx-Ereignis MessagePosted
   RU->>RU: authorize(Alex, agent.invoke, Thread): trigger, Bediener, Erwähnungsregel, I2-Vorprüfung
-  RU->>DB: INSERT runs (queued), Anker-Nachricht kind run, trigger_state queued
+  RU->>DB: INSERT runs (queued), Anker-Nachricht kind run, trigger_state received, Job runs.queued_expiry
   RU->>DB: Ereignisse message.created, run.state_changed, agent.invocation (an den Agenten, ohne Marke)
   MSG->>DB: Abschluss event_seq, COMMIT
-  MSG-->>A: 201, trigger_state queued
+  MSG-->>A: 201, trigger_state received
   DB--)GW: NOTIFY, Log-Tail liest
   GW-->>A: dispatch message.created, run.state_changed queued
   GW->>RU: PrepareDelivery(agent.invocation)
-  RU->>RU: authorize(Alex, agent.invoke) mit aktuellen Rechten, I2 erneut
-  RU->>DB: Aufruf-Marke (JWS, EdDSA) signieren, runs.invocation_jti setzen
+  RU->>RU: authorize(Alex ohne Sitzung, agent.invoke) mit aktuellen Rechten, I2 und SR2 erneut
+  RU->>DB: Aufruf-Marke (JWS, EdDSA) signieren, runs.invocation_jti setzen, trigger_state queued
   GW-->>AD: dispatch agent.invocation mit Marke
   AD->>AD: Signatur über JWKS, exp, aud, Ist-Modus gleich billing_mode der Marke (I3)
   AD->>RU: POST runs/{id}/start (Marke, billing_mode_used, external_session_ref)
