@@ -96,6 +96,9 @@ Future<ConsoleController> openConsole(
   String path,
 ) async {
   stepUps = 0;
+  // The live binding of patrol leaves text input to the browser, where a test cannot type; the
+  // test text input takes the framework's text input channel, so enterText reaches the fields.
+  if (!$.tester.testTextInput.isRegistered) $.tester.testTextInput.register();
   await $.tester.pumpWidget(
     ConsoleApp(
       environment: ConsoleEnvironment.browser(),
