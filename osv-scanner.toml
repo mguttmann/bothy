@@ -1139,27 +1139,6 @@ license.override = ["BSD-3-Clause"]
 reason = "LICENSE of this version is the three-clause BSD text. Runtime dependency of apps/client or transitive of one."
 
 [[PackageOverrides]]
-name = "flutter_driver"
-version = "0.0.0"
-ecosystem = "Pub"
-license.override = ["BSD-3-Clause"]
-reason = "Flutter SDK package (packages/flutter_driver of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-18 for M4-18). Transitive dev dependency of integration_test in apps/client."
-
-[[PackageOverrides]]
-name = "integration_test"
-version = "0.0.0"
-ecosystem = "Pub"
-license.override = ["BSD-3-Clause"]
-reason = "Flutter SDK package (packages/integration_test of the SDK); the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-18 for M4-18). Dev dependency of apps/client for its integration tests against the fake server."
-
-[[PackageOverrides]]
-name = "fuchsia_remote_debug_protocol"
-version = "0.0.0"
-ecosystem = "Pub"
-license.override = ["BSD-3-Clause"]
-reason = "Flutter SDK package (packages/fuchsia_remote_debug_protocol of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-18 for M4-18). Transitive dev dependency of flutter_driver."
-
-[[PackageOverrides]]
 name = "flutter_web_plugins"
 version = "0.0.0"
 ecosystem = "Pub"
@@ -1167,15 +1146,43 @@ license.override = ["BSD-3-Clause"]
 reason = "Flutter SDK package (packages/flutter_web_plugins of the SDK) without a LICENSE file of its own; the LICENSE of the Flutter repository it belongs to is BSD-3-Clause (checked against Flutter 3.47.7 on 2026-10-18 for M4-18). Transitive dependency of the plugins of apps/client."
 
 [[PackageOverrides]]
-name = "sync_http"
-version = "0.3.1"
+name = "jni"
+version = "1.0.3"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file is BSD-3-Clause of the Dart project authors (checked against the 0.3.1 archive on 2026-10-16 for M6-12, the same archive as here). Transitive dev dependency of flutter_driver in apps/client (M4-18)."
+reason = "LICENSE of this version is the three-clause BSD text. Transitive package of sentry_flutter (crash reports, M4-31)."
 
 [[PackageOverrides]]
-name = "webdriver"
-version = "3.2.0"
+name = "jni_flutter"
+version = "1.0.3"
 ecosystem = "Pub"
-license.override = ["Apache-2.0"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file is the Apache-2.0 text (checked against the 3.2.0 archive on 2026-10-16 for M6-12, the same archive as here). Transitive dev dependency of flutter_driver in apps/client (M4-18)."
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Transitive package of sentry_flutter (crash reports, M4-31)."
+
+[[PackageOverrides]]
+name = "package_info_plus"
+version = "10.2.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Transitive package of sentry_flutter (crash reports, M4-31)."
+
+[[PackageOverrides]]
+name = "package_info_plus_platform_interface"
+version = "4.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE of this version is the three-clause BSD text. Transitive package of sentry_flutter (crash reports, M4-31)."
+
+[[PackageOverrides]]
+name = "sentry"
+version = "10.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. Dart core of sentry_flutter (crash reports, M4-31)."
+
+[[PackageOverrides]]
+name = "sentry_flutter"
+version = "10.1.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is MIT. Crash reports of apps/client (docs/spec/15-client-architecture.md 16, M4-31)."

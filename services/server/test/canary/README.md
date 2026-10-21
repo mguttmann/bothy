@@ -89,7 +89,7 @@ encodings (standard and URL alphabet, with or without padding) at the three byte
 compact JWS is matched by its payload and signature segments (the header repeats across tokens).
 Secret files: the trimmed content, the bytes a hex or base64 text decodes to, every PEM body line
 and the private key material, the `d` of a JWK. IPv4 dotted, IPv6 compressed and expanded. IDs as
-UUID text and as 32 hex digits. Texts shorter than eight characters are not searched.
+UUID text and as 32 hex digits. Texts shorter than `minNeedle` (`scan.go`) are not searched.
 
 ## Adding an operation
 
@@ -104,7 +104,7 @@ cannot call goes into `Exempt` with its reason; the expected list is empty.
 - The logs of the PostgreSQL server itself.
 - Libraries that write to the process file descriptors directly, not through `os.Stdout` writers
   of the server, the standard logger or slog.
-- Texts shorter than eight characters: six-digit TOTP codes are registered, but would match
+- Texts shorter than `minNeedle` (`scan.go`): six-digit TOTP codes are registered, but would match
   unrelated digits.
 - File names, transcripts, search terms, push tokens, component form values and tool arguments:
   their tickets in M2 and M3 extend the scenario (channel prompts and skill references since

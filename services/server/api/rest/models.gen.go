@@ -16516,6 +16516,9 @@ type CreateChannelTemplateJSONRequestBody = TemplateCreate
 // CreateThreadJSONRequestBody defines body for CreateThread for application/json ContentType.
 type CreateThreadJSONRequestBody = ThreadCreate
 
+// SubmitClientMetricsJSONRequestBody defines body for SubmitClientMetrics for application/json ContentType.
+type SubmitClientMetricsJSONRequestBody = ClientMetricsBatch
+
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 

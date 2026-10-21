@@ -667,6 +667,9 @@ osv: ## Known vulnerabilities: every lock file (OSV-Scanner), Go call graphs (go
 
 licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of shipped components
 	$(UVRUN) python tools/ci/license_check.py
+	@# No Dart package depends on an OpenTelemetry or analytics SDK (ADR 0057, M4-31).
+	@if [ -n "$(DART_ON)" ]; then $(UVRUN) python tools/ci/dart_sdk_denylist.py --lock pubspec.lock; \
+	else $(call skip,dart-sdk-denylist,no Dart package selected); fi
 	@$(allowed_licenses); \
 	dirs="$(if $(GO_ON),$(GO_MODS)) $(if $(PY_ON),$(PY_PROJECTS)) $(if $(TS_ON),$(TS_PROJECTS))"; \
 	args=(); for d in $$dirs; do for n in $(LOCK_NAMES); do \

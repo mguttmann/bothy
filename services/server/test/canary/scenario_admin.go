@@ -166,6 +166,31 @@ func (sc *Scenario) settings() {
 	sc.del(alex, "/me/quiet-hours/"+q, none...)
 	sc.put(o, "/me/sidebar/spaces/"+research, map[string]any{"collapsed": true}, ok...)
 	sc.get(o, "/me/sidebar", ok...)
+	sc.clientMetrics()
+}
+
+// clientMetrics sends app metrics as Alex with canary values in the one free field of a batch,
+// app_version (once after a major version, once alone), then again with privacy.client_metrics
+// off (403 feature_disabled, M4-31). The server keeps only the major version, so no canary may
+// reach a log, trace or metric.
+func (sc *Scenario) clientMetrics() {
+	sc.T.Helper()
+	alex := sc.W.People["Alex"]
+	batch := func(version string) map[string]any {
+		return map[string]any{"platform": "macos", "app_version": version, "density": "compact", "theme": "dark", "metrics": []any{
+			map[string]any{"name": "client.thread_open.duration", "kind": "histogram", "buckets": []any{
+				map[string]any{"le": 0.1, "count": 12}, map[string]any{"le": 0.25, "count": 3}}},
+			map[string]any{"name": "client.reconnects", "kind": "counter", "close_code": 4009, "value": 1},
+			map[string]any{"name": "client.outbox.depth", "kind": "gauge", "value": 2},
+			map[string]any{"name": "client.screen_views", "kind": "counter", "value": 1},
+		}}
+	}
+	accepted := []int{http.StatusAccepted}
+	sc.post(alex, "/client-metrics", batch("1."+sc.Reg.New(ClassContent, "", "client metrics app version")), accepted...)
+	sc.post(alex, "/client-metrics", batch(sc.Reg.New(ClassContent, "", "client metrics app version alone")), accepted...)
+	sc.put(alex, "/me/settings/privacy.client_metrics", map[string]any{"value": false}, ok...)
+	sc.post(alex, "/client-metrics", batch("2."+sc.Reg.New(ClassContent, "", "client metrics app version, setting off")), http.StatusForbidden)
+	sc.del(alex, "/me/settings/privacy.client_metrics", none...)
 }
 
 // instance drives the instance and audit endpoints, the signing key rotation and the sync reads.

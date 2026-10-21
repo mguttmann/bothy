@@ -209,6 +209,9 @@ type ServerInterface interface {
 	// CreateThread Create a forum post or a thread from a message
 	// (POST /channels/{channel_id}/threads)
 	CreateThread(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params CreateThreadParams)
+	// SubmitClientMetrics Submit anonymous client measurements
+	// (POST /client-metrics)
+	SubmitClientMetrics(w http.ResponseWriter, r *http.Request)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath)
@@ -3223,6 +3226,20 @@ func (siw *ServerInterfaceWrapper) CreateThread(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateThread(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitClientMetrics operation middleware
+func (siw *ServerInterfaceWrapper) SubmitClientMetrics(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitClientMetrics(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8402,6 +8419,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/quiet-hours", wrapper.CreateQuietHoursRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/quiet-hours/{rule_id}", wrapper.DeleteQuietHoursRule)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/quiet-hours/{rule_id}", wrapper.PutQuietHoursRule)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/client-metrics", wrapper.SubmitClientMetrics)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents", wrapper.ListAgents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents", wrapper.CreateAgent)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/{agent_id}", wrapper.GetAgent)
@@ -8782,6 +8800,9 @@ type StrictServerInterface interface {
 	// CreateThread Create a forum post or a thread from a message
 	// (POST /channels/{channel_id}/threads)
 	CreateThread(ctx context.Context, request CreateThreadRequestObject) (CreateThreadResponseObject, error)
+	// SubmitClientMetrics Submit anonymous client measurements
+	// (POST /client-metrics)
+	SubmitClientMetrics(ctx context.Context, request SubmitClientMetricsRequestObject) (SubmitClientMetricsResponseObject, error)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
@@ -11158,6 +11179,37 @@ func (sh *strictHandler) CreateThread(w http.ResponseWriter, r *http.Request, ch
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateThreadResponseObject); ok {
 		if err := validResponse.VisitCreateThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitClientMetrics operation middleware
+func (sh *strictHandler) SubmitClientMetrics(w http.ResponseWriter, r *http.Request) {
+	var request SubmitClientMetricsRequestObject
+
+	var body SubmitClientMetricsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitClientMetrics(ctx, request.(SubmitClientMetricsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitClientMetrics")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitClientMetricsResponseObject); ok {
+		if err := validResponse.VisitSubmitClientMetricsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

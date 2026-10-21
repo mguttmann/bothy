@@ -15,6 +15,7 @@ import 'package:go_router/go_router.dart';
 import '../app/providers/session.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../sync/sidebar_ops.dart';
+import '../telemetry/telemetry_providers.dart';
 import 'providers.dart';
 import 'sidebar_footer.dart';
 import 'sidebar_header.dart';
@@ -104,6 +105,9 @@ class SidebarColumn extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final instance = ref.watch(currentInstanceProvider);
     final nodes = ref.watch(sidebarTreeProvider);
+    // `client.cold_start.duration` ends with the first sidebar that shows spaces from the
+    // local database (15 19, brief M4-31); later calls do nothing.
+    if (nodes.isNotEmpty) ref.read(appMeasurementsProvider).sidebarShown();
     SidebarWriter? writer() {
       final engine = ref.read(syncEngineProvider);
       final db = ref.read(localDatabaseProvider);

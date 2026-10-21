@@ -12,6 +12,7 @@ import 'package:domain/domain.dart';
 import 'package:flutter/widgets.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../telemetry/measurements.dart';
 import '../thread/thread_actions.dart';
 import 'draft_sync.dart';
 import 'mention_suggestions.dart';
@@ -54,7 +55,12 @@ final class ComposerController extends ChangeNotifier {
     required this._editing,
     this._typing,
     this.deviceId,
+    this.measurements,
   });
+
+  /// The measurement points of the app metrics: a send reports `client.send_local.duration`
+  /// (brief M4-31), or nothing when null.
+  final AppMeasurements? measurements;
 
   /// This device, so the answer of an own draft write moves the base version even while the
   /// person types (04 14: `overwrote_newer` only for another device's newer write).
@@ -261,6 +267,7 @@ final class ComposerController extends ChangeNotifier {
   Future<bool> send(String value) async {
     final body = value.trim();
     if (body.isEmpty) return false;
+    final started = measurements?.sendStarted();
     final max = limits?.messageMaxContentBytes;
     if (max != null && utf8.encode(body).length > max) {
       error = ContentTooLong(max);
@@ -279,6 +286,8 @@ final class ComposerController extends ChangeNotifier {
     notifyListeners();
     await _drafts.dropWaiting();
     await _actions.send(thread, body, replyTo: reply);
+    // The outbox write is done; the history shows it in the next frame.
+    if (started != null) measurements!.sendShown(started);
     return true;
   }
 

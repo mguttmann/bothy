@@ -23,6 +23,7 @@ import '../app/providers/session.dart';
 import '../composer/thread_composer.dart';
 import '../forum/forum_model.dart' show timeLabel;
 import '../sidebar/providers.dart';
+import '../telemetry/telemetry_providers.dart';
 import 'delete_confirm.dart';
 import 'history_model.dart';
 import 'message_list.dart';
@@ -91,6 +92,8 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
   void initState() {
     super.initState();
     _visible = ref.read(visibleThreadsProvider.notifier)..add(widget.threadId);
+    // `client.thread_open.duration` runs until the first messages show (brief M4-31).
+    ref.read(appMeasurementsProvider).threadOpening(_thread);
   }
 
   @override
@@ -340,6 +343,9 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
     final config = ref.watch(appConfigProvider);
     final windowValue = ref.watch(threadWindowProvider(_thread));
     final window = windowValue.value ?? const ContiguousWindow(messages: []);
+    if (window.messages.isNotEmpty) {
+      ref.read(appMeasurementsProvider).threadShown(_thread);
+    }
     final outbox = ref.watch(threadOutboxProvider(_thread)).value ?? const [];
     final principals = ref.watch(principalsByIdProvider).value ?? const {};
     final me = ref.watch(myPrincipalIdProvider);

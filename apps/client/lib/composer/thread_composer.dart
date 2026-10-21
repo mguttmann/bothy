@@ -19,6 +19,7 @@ import 'package:sync_engine/sync_engine.dart';
 import '../app/providers/ports.dart';
 import '../app/providers/session.dart';
 import '../settings/settings_providers.dart';
+import '../telemetry/telemetry_providers.dart';
 import '../thread/providers.dart';
 import '../thread/thread_actions.dart';
 import '../thread/typing_line.dart';
@@ -76,6 +77,7 @@ class ThreadComposerState extends ConsumerState<ThreadComposer> {
       editing: ref.read(draftEditingProvider),
       typing: engine.typing,
       deviceId: ref.read(signedInServicesProvider)?.auth.session?.deviceId,
+      measurements: ref.read(appMeasurementsProvider),
     )..addListener(_changed);
     final composer = _composer!;
     final thread = widget.threadId.value;
