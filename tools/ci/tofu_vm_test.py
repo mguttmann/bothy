@@ -125,7 +125,7 @@ def host_platform(machine: str | None = None) -> str:
 
 
 def accelerator(arch: str, system: str | None = None, machine: str | None = None) -> str:
-    """hvf on macOS and kvm on Linux when the guest has the host's architecture, else tcg."""
+    """Pick hvf on macOS and kvm on Linux when the guest has the host's architecture, else tcg."""
     same = host_platform(machine) == f"linux/{arch}"
     system = system or platform.system()
     if same and system == "Darwin":
@@ -393,6 +393,7 @@ class Tofu:
     """The test root with a temporary data directory and state."""
 
     def __init__(self, tofu: str, workdir: Path) -> None:
+        """Use the tofu binary `tofu` with its data and state under `workdir`."""
         self.tofu = tofu
         self.data = workdir / "tofu-data"
         self.state = workdir / "tofu.tfstate"
@@ -455,8 +456,11 @@ def var_args(values: dict[str, object]) -> list[str]:
 
 
 def tamper(good: Path, bad_sum: Path, bad_sig: Path, bundle: str) -> None:
-    """Two release copies that must fail: a changed bundle (checksum), and the changed bundle
-    with a SHA256SUMS that matches it, under the old signature (signature)."""
+    """Write two release copies that must fail.
+
+    A changed bundle (checksum), and the changed bundle with a SHA256SUMS that matches it, under
+    the old signature (signature).
+    """
     for target in (bad_sum, bad_sig):
         shutil.copytree(good, target)
         with (target / bundle).open("ab") as fh:
@@ -563,8 +567,10 @@ def build_probe(workdir: Path) -> Path:
 def release(
     trial: release_trial.Trial, tools: chain.Tools, www: Path, port: int, pub: Path
 ) -> tuple[str, list[Path]]:
-    """Build bundle and install.sh like the product trial of `make release-trial` into www/good,
-    sign them with the trial key like `release.yml` (job product-signing) and verify them.
+    """Build, sign and verify bundle and install.sh into www/good.
+
+    The build is the product trial of `make release-trial`, the signing uses the trial key like
+    `release.yml` (job product-signing).
 
     Returns:
         The product version and the written files.
@@ -744,9 +750,12 @@ TTY_PROBE = "sh -c 'if (: </dev/tty) 2>/dev/null; then echo TTY; else echo NOTTY
 
 
 def step_no_terminal(ctx: Context) -> None:
-    """Under the pseudo terminal of an SSH session (as remote-exec runs the delivery), the
-    function `detached` of the setup leaves install.sh without a terminal, so the enrollment
-    code cannot reach /dev/tty (D-M7-15-4); without it the probe sees the terminal."""
+    """Check that install.sh runs without a terminal under an SSH pseudo terminal.
+
+    Under the pseudo terminal of an SSH session (as remote-exec runs the delivery), the function
+    `detached` of the setup leaves install.sh without a terminal, so the enrollment code cannot
+    reach /dev/tty (D-M7-15-4); without it the probe sees the terminal.
+    """
     vm = ctx.need_vm()
     script = (
         "eval \"$(sed -n '/^detached() {/,/^}/p' /usr/local/lib/bothy/bothy-setup)\"\n"
@@ -774,8 +783,11 @@ BOOT_ID = "cat /proc/sys/kernel/random/boot_id"
 
 
 def step_reboot(ctx: Context) -> None:
-    """After a reboot the units bring the host back: the firewall table loads without an
-    ordering cycle in the journal, and bothy.service starts the stack (discovery answers 200)."""
+    """Check that the units bring the host back after a reboot.
+
+    The firewall table loads without an ordering cycle in the journal, and bothy.service starts
+    the stack (discovery answers 200).
+    """
     vm = ctx.need_vm()
     first = vm.run(BOOT_ID).stdout.strip()
     vm.run("systemctl reboot", check=False, timeout=30)

@@ -52,7 +52,7 @@ build tickets (M7-16).
 4. Provider versions are pinned (`required_providers`); Renovate keeps them current.
    `generic-vm` needs no provider (built-in features of OpenTofu only).
 5. Every module has a test that runs the portability test
-   ([16-betrieb.md](../../docs/spec/16-betrieb.md) 11.1) on a throwaway environment; for a cloud
+   ([16-operations.md](../../docs/spec/16-operations.md) 11.1) on a throwaway environment; for a cloud
    target this costs money at the provider and therefore runs only with the explicit approval of
    the owner. `generic-vm` is tested on a local VM without cost (`make tofu-vm-test`).
 

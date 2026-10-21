@@ -17,7 +17,7 @@ locals {
     arm64 = "c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a"
   }
 
-  # Mapping of the inputs to the options of install.sh (docs/spec/16-betrieb.md 3.1).
+  # Mapping of the inputs to the options of install.sh (docs/spec/16-operations.md 3.1).
   edge          = var.edge_mode == "tailscale" ? "tailscale" : "direct"
   edge_port     = var.edge_mode == "reverse_proxy" ? "443" : ""
   storage       = var.object_storage_mode == "seaweedfs" ? "s3" : "fs"

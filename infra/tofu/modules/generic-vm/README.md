@@ -59,7 +59,7 @@ The script, in this order:
 1. Packages: `curl`, `gnupg`, `nftables`, `ca-certificates` when missing.
 2. Docker Engine and the Compose plugin from `download.docker.com` (key checked by its
    fingerprint `9DC8 5822 9FC7 DD38 854A E2D8 8D81 803C 0EBF CD88`), unless Engine 26 and
-   Compose 2.26 or newer are present ([16-betrieb.md](../../../../docs/spec/16-betrieb.md) 3
+   Compose 2.26 or newer are present ([16-operations.md](../../../../docs/spec/16-operations.md) 3
    rule 7).
 3. The system user `bothy` in the group `docker`.
 4. cosign 3.1.3 from its GitHub release, checked against the SHA-256 of
