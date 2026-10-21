@@ -154,7 +154,7 @@ func TestPushSendThroughAPNs(t *testing.T) {
 		w.resetRegistration(reg, 0)
 		job := w.mentionJob("alex", w.alex)
 		w.apnsProd.Script(token, c.script...)
-		before, sentBefore := len(requestsFor(w.apnsProd, token)), w.sent("apns", c.outcome)
+		before, sentBefore, fcmBefore := len(requestsFor(w.apnsProd, token)), w.sent("apns", c.outcome), w.sent("fcm", c.outcome)
 		must(t, w.send(job))
 		if n := len(requestsFor(w.apnsProd, token)) - before; n != c.reqs {
 			t.Fatalf("%s: %d requests, want %d", c.name, n, c.reqs)
@@ -178,6 +178,9 @@ func TestPushSendThroughAPNs(t *testing.T) {
 		}
 		if n := w.sent("apns", c.outcome) - sentBefore; n != 1 {
 			t.Fatalf("%s: bothy.push.sent %s rose by %d, want 1", c.name, c.outcome, n)
+		}
+		if n := w.sent("fcm", c.outcome) - fcmBefore; n != 0 {
+			t.Fatalf("%s: bothy.push.sent of fcm rose by %d for an apns answer", c.name, n)
 		}
 	}
 }

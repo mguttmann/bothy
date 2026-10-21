@@ -161,43 +161,46 @@ func (a *Adapter) Send(ctx context.Context, reg app.Registration, n app.Notifica
 		return res, nil
 	}
 	st := a.envs[reg.Environment]
-	now := a.clock.Now()
-	tok, probe, err := st.acquire(ctx, now)
+	tok, probe, err := st.acquire(ctx, a.clock.Now())
 	if err != nil {
 		return domain.SendResult{Class: domain.ResultConfigError}, nil
 	}
-	v, err := a.do(ctx, reg, n, body, tok)
+	v, settled, err := a.exchange(ctx, st, reg, n, body, tok, probe)
 	if err != nil {
 		if probe {
 			st.abandonProbe()
 		}
 		return domain.SendResult{}, err
 	}
-	if v.renew {
-		next, ok := st.renew(ctx, tok, a.clock.Now())
-		if !ok {
-			if probe {
-				// The fresh token of the probe expired: a configuration error that starts the
-				// next pause (Design note 4 c), never a pause without end.
-				st.settle(ctx, true, true, reasonExpiredProviderToken, a.clock.Now())
-			}
-			return domain.SendResult{Class: domain.ResultConfigError}, nil
-		}
-		v, err = a.do(ctx, reg, n, body, next)
-		if err != nil {
-			if probe {
-				st.abandonProbe()
-			}
-			return domain.SendResult{}, err
-		}
-		if v.renew {
-			// A second ExpiredProviderToken: a fresh token does not help (Design note 4 b).
-			v = verdict{result: domain.SendResult{Class: domain.ResultConfigError}, pause: true, log: logErrorConfig, errType: reasonExpiredProviderToken}
-		}
+	if !settled {
+		st.settle(ctx, probe, v.pause, v.errType, a.clock.Now())
+		a.record(ctx, v, reg.Environment)
 	}
-	st.settle(ctx, probe, v.pause, v.errType, a.clock.Now())
-	a.record(ctx, v, reg.Environment)
 	return v.result, nil
+}
+
+// exchange sends body with tok and handles 403 ExpiredProviderToken (Design note 4 b): one
+// renewal and one retry; a second ExpiredProviderToken is a configuration error. settled reports
+// that the renewal was refused and the state of the environment is already updated: a refused
+// renewal of the probe starts the next pause, never a pause without end (Design note 4 c).
+func (a *Adapter) exchange(ctx context.Context, st *envState, reg app.Registration, n app.Notification, body []byte, tok string,
+	probe bool) (v verdict, settled bool, err error) {
+	v, err = a.do(ctx, reg, n, body, tok)
+	if err != nil || !v.renew {
+		return v, false, err
+	}
+	next, ok := st.renew(ctx, tok, a.clock.Now())
+	if !ok {
+		if probe {
+			st.settle(ctx, true, true, reasonExpiredProviderToken, a.clock.Now())
+		}
+		return verdict{result: domain.SendResult{Class: domain.ResultConfigError}}, true, nil
+	}
+	v, err = a.do(ctx, reg, n, body, next)
+	if err != nil || !v.renew {
+		return v, false, err
+	}
+	return verdict{result: domain.SendResult{Class: domain.ResultConfigError}, pause: true, log: logErrorConfig, errType: reasonExpiredProviderToken}, false, nil
 }
 
 // precheck runs the checks of Design note 5 c of brief M3-20 and serializes the payload. ok is
