@@ -86,7 +86,7 @@ adapter on the global meter provider.
 
 ## Port (Wurzelpaket `internal/messaging`)
 
-- Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader`.
+- Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker, `AppendSystemLine` seit M2-12), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader`.
 - Gibt In-Tx-Ereignisse aus: `MessagePosted`, `MessageDeleted`.
 - Abonniert In-Tx-Ereignisse: `chat.ThreadMoved`.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `files.AttachmentLocator`, kernel `personaldata.Participant`.
@@ -195,7 +195,9 @@ sync checks the reply target of a thread draft with it after `draft.write`.
 
 System codes (`messages.system_code`, CHECK of 03): `thread.reopened`, written when a message
 reopens a closed thread, with origin `system`, empty content, `silent`, the author of the
-reopening message and the sequence right before it. M2-12 adds `agent_session.resume_failed`.
+reopening message and the sequence right before it; `agent_session.resume_failed` (M2-12,
+R-DM-42), the fail-open line of an agent session, written through `AppendSystemLine`.
+`domain.IsSystemCode` holds the codes of the CHECK.
 
 ## Runs (M2-05)
 
@@ -229,6 +231,22 @@ Lock order: neither port takes the thread lock for a message change. runs holds 
 and then updates the message (`SetTriggerState` last in the acceptance), so both orders of runs
 take `runs` before `messages`; the anchor's `AppendToThread` locks the thread row like any new
 message.
+
+## System lines of other modules (M2-12)
+
+`AppendSystemLine(ctx, SystemLine{ThreadID, AuthorID, Code})` writes a system line inside the
+caller's unit of work and never authorizes; runs calls it from `OnSessionAttached` when an
+adapter reports `bind_failed: session_missing` (09 9.5 item 4), with the code
+`messaging.SystemAgentSessionResumeFailed` and the run's agent as author. It follows the reopen
+line of `createMessage` (brief M1-56 D6): the next `thread_seq` through `chat.AppendToThread`
+without `ReopenIfClosed` (a system line never reopens a closed thread, R-DM-42, and writes no
+`thread.reopened`), `domain.SystemLine` (kind and origin `system`, empty content, silent, a
+server `client_msg_id`, no mentions, no `trigger_state`), `created_at` now, the instance search
+language, `message.created` without the `client_msg_id` echo, then `MessagePosted` with `Kind`
+`system`, which the acceptance of runs ignores (SR4). The caller principal of `AppendToThread`
+is the principal of the request, as for the run anchor, and the author outside a request. It
+returns the written line. Errors: internal outside a unit of work and for a code that is not a
+system code of 03; `not_found` for an unknown thread.
 
 ## Reading (M1-57)
 
