@@ -51,6 +51,11 @@ type Config struct {
 	// MaxPinsPerThread is pin.max_per_thread, the most pins of one thread; listPins is not
 	// paginated.
 	MaxPinsPerThread int `config:"pin.max_per_thread"`
+	// HandleMaxChars is principal.handle_max_chars and DisplayNameMaxChars is
+	// principal.display_name_max_chars: the longest author of a card in its size reserve
+	// (D-M2-15-28), because the author can be renamed after the card was accepted.
+	HandleMaxChars      int `config:"principal.handle_max_chars"`
+	DisplayNameMaxChars int `config:"principal.display_name_max_chars"`
 }
 
 // check refuses limits below 1 and a default page above the largest.
@@ -66,6 +71,9 @@ func (c Config) check() error {
 	}
 	if c.EmojiMaxBytes < 1 || c.MaxDistinctReactions < 1 || c.MaxPinsPerThread < 1 {
 		return errors.New("messaging: reaction.emoji_max_bytes, reaction.max_distinct_per_message and pin.max_per_thread must be at least 1")
+	}
+	if c.HandleMaxChars < 1 || c.DisplayNameMaxChars < 1 {
+		return errors.New("messaging: principal.handle_max_chars and principal.display_name_max_chars must be at least 1")
 	}
 	return nil
 }

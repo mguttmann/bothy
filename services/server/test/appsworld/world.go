@@ -293,7 +293,7 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	Must(t, err)
 	msgs, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
 		TemplateNameMaxChars: 64, TemplateMaxPerScope: 100, ListContentMaxBytes: 4096, PageSizeDefault: 20, PageSizeMax: 50,
-		EmojiMaxBytes: 64, MaxDistinctReactions: 20, MaxPinsPerThread: 50},
+		EmojiMaxBytes: 64, MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50},
 		pool, w.uow, az, wire.MessagingWrites{Events: w.appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, ch.Service, w.id.Directory, w.Clk, log)
 	Must(t, err)
 	w.apps, err = wire.NewApps(cfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin,

@@ -27,7 +27,8 @@ import (
 // MessagingConfig binds the keys of the messaging use cases (message.max_content_bytes,
 // message.max_mentions, sync.event_payload_max_bytes, message.list_content_max_bytes,
 // template.name_max_chars, template.max_per_scope, api.page_size_default, api.page_size_max,
-// reaction.emoji_max_bytes, reaction.max_distinct_per_message, pin.max_per_thread). The error names
+// reaction.emoji_max_bytes, reaction.max_distinct_per_message, pin.max_per_thread,
+// principal.handle_max_chars, principal.display_name_max_chars). The error names
 // the key whose binding failed, never a value.
 func MessagingConfig(v *config.Values) (messagingapp.Config, error) {
 	var c messagingapp.Config

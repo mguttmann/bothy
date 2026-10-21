@@ -329,7 +329,7 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, no
 	mcfg := messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax,
 		TemplateNameMaxChars: TemplateNameMax, TemplateMaxPerScope: TemplateMax,
 		ListContentMaxBytes: ListContentMax, PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax,
-		EmojiMaxBytes: EmojiMax, MaxDistinctReactions: MaxDistinctReactions, MaxPinsPerThread: MaxPins}
+		EmojiMaxBytes: EmojiMax, MaxDistinctReactions: MaxDistinctReactions, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: MaxPins}
 	for _, o := range opts {
 		o(&mcfg)
 	}

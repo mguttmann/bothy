@@ -178,7 +178,7 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	}
 	hash := domain.HashInput{Context: hashContext, Kind: kind, Content: content, ReplyTo: replyTo}
 	if isCard {
-		if p.card.checked, err = s.checkCard(ctx, a, cmd, thread, p.handles); err != nil {
+		if p.card.checked, err = s.checkCard(ctx, a, cmd, thread); err != nil {
 			return prepared{}, err
 		}
 		hash.Card, hash.RunID = p.card.checked.Canonical, runIDText(cmd.RunID)

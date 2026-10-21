@@ -62,7 +62,7 @@ func cardField(pointer, code, detail string) error {
 // be cut (04 2.2 rule 2). handles are the mention handles of the content, each of which may become
 // a mention. Errors: 400 validation_failed (not_enabled without the port, the findings of Check,
 // too_long on /components), the errors of the author lookup.
-func (s *Service) checkCard(ctx context.Context, a actor.Actor, cmd messaging.CreateMessageCmd, thread ids.ID, handles []string) (*messaging.CheckedCard, error) {
+func (s *Service) checkCard(ctx context.Context, a actor.Actor, cmd messaging.CreateMessageCmd, thread ids.ID) (*messaging.CheckedCard, error) {
 	if s.d.Cards == nil {
 		return nil, domain.NotEnabled("/components")
 	}
@@ -74,31 +74,34 @@ func (s *Service) checkCard(ctx context.Context, a actor.Actor, cmd messaging.Cr
 	if err != nil {
 		return nil, err
 	}
-	author, err := s.author(ctx, a.ID)
-	if err != nil {
-		return nil, err
-	}
-	if !s.cardFits(author, in.RunID, checked.Components, len(handles), in.Now) {
+	if !s.cardFits(string(a.Kind), in.RunID, checked.Components, in.Now) {
 		return nil, cardField("/components", fieldTooLong, "the card does not fit sync.event_payload_max_bytes")
 	}
 	return &checked, nil
 }
 
 // cardFits reports whether the largest message.updated payload a card with the components comps
-// can reach fits sync.event_payload_max_bytes with an empty content (the content cut of M1-56 D7
-// can shorten everything else; components cannot be cut, 04 2.2 rule 2). Every ID, number and
-// time takes its longest form, every handle of the content counts as a mention, and the card
-// carries what a later message.updated may add (D-M2-15-26): reply_to_message_id, edited_at,
-// pinned, reaction.max_distinct_per_message reactions of reaction.emoji_max_bytes each, and on
-// every component run_id when bound, state disabled, expires_at, used_by and used_at. A card that
-// fits here keeps fitting through clicks, reactions, edits, expiry and the end of its run.
-func (s *Service) cardFits(author messaging.PrincipalRef, runID ids.ID, comps []messaging.Component, mentions int, now time.Time) bool {
+// can reach fits sync.event_payload_max_bytes with an empty content and content_truncated (the
+// content cut of M1-56 D7 can shorten everything else; components cannot be cut, 04 2.2 rule 2). The reserve is built
+// from configured bounds only, never from a value the card has now (D-M2-15-28): the author of
+// kind authorKind with the longest handle, display name (every character in its longest JSON
+// form) and an avatar, message.max_mentions mentions, reply_to_message_id, edited_at, pinned,
+// reaction.max_distinct_per_message reactions of reaction.emoji_max_bytes each, every ID, number
+// and time in its longest form, and on every component run_id when bound, state disabled,
+// expires_at, used_by and used_at (D-M2-15-26). Only comps and runID, which no later change of
+// the card's message can grow, come from the card. A card that fits here keeps fitting through
+// clicks, reactions, pins, edits, renames of its author, expiry and the end of its run.
+func (s *Service) cardFits(authorKind string, runID ids.ID, comps []messaging.Component, now time.Time) bool {
 	placeholder := ids.New()
+	author := messaging.PrincipalRef{
+		ID: placeholder, Kind: authorKind, Handle: strings.Repeat("x", s.cfg.HandleMaxChars),
+		DisplayName: strings.Repeat(longestJSONRune, s.cfg.DisplayNameMaxChars), AvatarFileID: placeholder,
+	}
 	m := messaging.Message{
 		ID: placeholder, ThreadID: placeholder, ChannelID: placeholder, ThreadSeq: maxSafeInteger, Author: author, ClientMsgID: placeholder,
 		Origin: string(domain.OriginAgent), Kind: string(domain.KindCard), ContentFormat: domain.ContentFormat, Version: maxSafeInteger,
-		CreatedAt: now, EditedAt: now, ReplyToID: placeholder, Pinned: true, MentionIDs: make([]ids.ID, mentions),
-		Reactions: make([]messaging.ReactionCount, s.cfg.MaxDistinctReactions), MyReactions: []string{}, ContentTruncated: true,
+		CreatedAt: now, EditedAt: now, ReplyToID: placeholder, Pinned: true, MentionIDs: make([]ids.ID, s.cfg.MaxMentions),
+		Reactions: make([]messaging.ReactionCount, s.cfg.MaxDistinctReactions), MyReactions: []string{},
 	}
 	for i := range m.MentionIDs {
 		m.MentionIDs[i] = placeholder
@@ -115,9 +118,16 @@ func (s *Service) cardFits(author messaging.PrincipalRef, runID ids.ID, comps []
 		}
 		m.Components[i] = c
 	}
-	p, err := payload(messageBody(m))
+	// The cut payload of eventPayload carries content_truncated, which messageBody never sets.
+	body := messageBody(m)
+	body.ContentTruncated = true
+	p, err := payload(body)
 	return err == nil && len(p) < s.cfg.EventPayloadMaxBytes
 }
+
+// longestJSONRune is a character of the longest JSON form a display name can carry: U+2028 is
+// written as the six bytes \u2028, more than any character in UTF-8 (at most four bytes).
+const longestJSONRune = "\u2028"
 
 // longestComponentState is the longest value of schema ComponentState (active, used, expired,
 // disabled).
@@ -143,7 +153,7 @@ func (s *Service) CardFits(ctx context.Context, messageID ids.ID) error {
 	if err := s.attachComponents(ctx, list); err != nil {
 		return err
 	}
-	if !s.cardFits(v.Author, ids.ID{}, list[0].Components, len(v.MentionIDs), s.now()) {
+	if !s.cardFits(v.Author.Kind, ids.ID{}, list[0].Components, s.now()) {
 		return cardField("/definition", fieldTooLong, "the card does not fit sync.event_payload_max_bytes")
 	}
 	return nil
