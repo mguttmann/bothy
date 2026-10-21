@@ -32,13 +32,13 @@ func (sc *Scenario) commands() {
 	path := "/commands/" + id
 	sc.get(lotse, path, ok...)
 	sc.matched(lotse, path, req{method: http.MethodPut, path: path,
-		body: def("Triage again "+sc.Reg.New(ClassContent, allgemein, "command description (update)"))}, http.StatusOK)
+		body: def("Triage again " + sc.Reg.New(ClassContent, allgemein, "command description (update)"))}, http.StatusOK)
 	sc.get(alex, "/channels/"+allgemein+"/commands", ok...)
 	sc.get(alex, path, ok...)
 	invoke := "/channels/" + allgemein + "/commands/" + id + "/invoke"
 	value := sc.Reg.New(ClassContent, allgemein, "command option value")
 	sc.post(alex, invoke, map[string]any{"options": []any{map[string]any{"name": "ticket", "value": value}}}, http.StatusAccepted)
-	sc.post(alex, invoke, map[string]any{"options": []any{map[string]any{"name": "ticket", "value": value + "‮"}}},
+	sc.post(alex, invoke, map[string]any{"options": []any{map[string]any{"name": "ticket", "value": value + "\u202e"}}},
 		http.StatusBadRequest)
 	sc.del(lotse, path, http.StatusNoContent)
 }

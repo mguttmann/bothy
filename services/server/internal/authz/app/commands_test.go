@@ -46,12 +46,13 @@ func offered(r authorize.Resource, channel ids.ID) authorize.Resource {
 	return r
 }
 
-// filterExpect checks one decision in filter mode, the mode of the list items.
-func (w *world) filterExpect(t *testing.T, p authorize.Principal, a authorize.Action, r authorize.Resource, o authorize.Outcome) {
+// readExpect checks one decision of command.read in filter mode, the mode of the list items and
+// of the receive check.
+func (w *world) readExpect(t *testing.T, p authorize.Principal, r authorize.Resource, o authorize.Outcome) {
 	t.Helper()
-	d := w.decide(t, authorize.Filter(context.Background()), p, a, r)
+	d := w.decide(t, authorize.Filter(context.Background()), p, authorize.ActionCommandRead, r)
 	if d.Outcome != o {
-		t.Fatalf("%s: got %s/%s, want %s", a, d.Outcome, d.Reason, o)
+		t.Fatalf("command.read: got %s/%s, want %s", d.Outcome, d.Reason, o)
 	}
 }
 
@@ -110,50 +111,50 @@ func TestCommandVisibility(t *testing.T) {
 	t.Run("EventScope", func(t *testing.T) {
 		w := newWorld(t)
 		ev := authorize.ResourceFromEvent("command", ids.New(), w.support, w.allgemein, ids.ID{}, ids.ID{})
-		w.filterExpect(t, w.user(w.alex), authorize.ActionCommandRead, ev, authorize.OutcomeAllow)
-		w.filterExpect(t, w.user(w.robin), authorize.ActionCommandRead, ev, authorize.OutcomeNotFound)
+		w.readExpect(t, w.user(w.alex), ev, authorize.OutcomeAllow)
+		w.readExpect(t, w.user(w.robin), ev, authorize.OutcomeNotFound)
 		inst := authorize.ResourceFromEvent("command", ids.New(), ids.ID{}, ids.ID{}, ids.ID{}, ids.ID{})
-		w.filterExpect(t, w.user(w.robin), authorize.ActionCommandRead, inst, authorize.OutcomeAllow)
+		w.readExpect(t, w.user(w.robin), inst, authorize.OutcomeAllow)
 		space := authorize.ResourceFromEvent("command", ids.New(), w.support, ids.ID{}, ids.ID{}, ids.ID{})
-		w.filterExpect(t, w.user(w.alex), authorize.ActionCommandRead, space, authorize.OutcomeAllow)
-		w.filterExpect(t, w.user(w.robin), authorize.ActionCommandRead, space, authorize.OutcomeNotFound)
+		w.readExpect(t, w.user(w.alex), space, authorize.OutcomeAllow)
+		w.readExpect(t, w.user(w.robin), space, authorize.OutcomeNotFound)
 	})
 	t.Run("Offered", func(t *testing.T) {
 		w := newWorld(t)
 		alex := w.user(w.alex)
 		lotse := command(w.lotse, cmdAgent, cmdInstance, ids.ID{})
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(lotse, w.allgemein), authorize.OutcomeAllow)
+		w.readExpect(t, alex, offered(lotse, w.allgemein), authorize.OutcomeAllow)
 		// The scope must cover the channel.
 		esk := command(w.lotse, cmdAgent, cmdChannel, w.eskalation)
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(esk, w.allgemein), authorize.OutcomeNotFound)
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(esk, w.eskalation), authorize.OutcomeAllow)
+		w.readExpect(t, alex, offered(esk, w.allgemein), authorize.OutcomeNotFound)
+		w.readExpect(t, alex, offered(esk, w.eskalation), authorize.OutcomeAllow)
 		// A dm channel never offers a command.
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(lotse, w.dm), authorize.OutcomeNotFound)
+		w.readExpect(t, alex, offered(lotse, w.dm), authorize.OutcomeNotFound)
 		// Texter as a guest: only with allow_mentioned_agents and its own write.
 		texter := command(w.texter, cmdAgent, cmdInstance, ids.ID{})
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(texter, w.allgemein), authorize.OutcomeNotFound)
+		w.readExpect(t, alex, offered(texter, w.allgemein), authorize.OutcomeNotFound)
 		w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.AllowMentionedAgents = true })
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(texter, w.allgemein), authorize.OutcomeNotFound)
+		w.readExpect(t, alex, offered(texter, w.allgemein), authorize.OutcomeNotFound)
 		agentSubject := func(id ids.ID) domain.Subject { return domain.Subject{Kind: domain.SubjectAgent, PrincipalID: id} }
 		w.grant(t, agentSubject(w.texter), domain.Target{Kind: domain.TargetChannel, ChannelID: w.allgemein}, domain.LevelWrite, time.Time{})
 		w.grant(t, agentSubject(w.assistent), domain.Target{Kind: domain.TargetChannel, ChannelID: w.allgemein}, domain.LevelWrite, time.Time{})
 		w.bump()
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(texter, w.allgemein), authorize.OutcomeAllow)
+		w.readExpect(t, alex, offered(texter, w.allgemein), authorize.OutcomeAllow)
 		// A personal agent is never a guest.
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(command(w.assistent, cmdAgent, cmdInstance, ids.ID{}), w.allgemein),
+		w.readExpect(t, alex, offered(command(w.assistent, cmdAgent, cmdInstance, ids.ID{}), w.allgemein),
 			authorize.OutcomeNotFound)
 		// A disabled owner offers nothing.
 		w.principals.Put(authz.PrincipalFacts{ID: w.texter, Kind: actor.KindAgent, Status: authz.PrincipalDisabled})
 		w.bump()
-		w.filterExpect(t, alex, authorize.ActionCommandRead, offered(texter, w.allgemein), authorize.OutcomeNotFound)
+		w.readExpect(t, alex, offered(texter, w.allgemein), authorize.OutcomeNotFound)
 		// Robin does not read Allgemein.
-		w.filterExpect(t, w.user(w.robin), authorize.ActionCommandRead, offered(lotse, w.allgemein), authorize.OutcomeNotFound)
+		w.readExpect(t, w.user(w.robin), offered(lotse, w.allgemein), authorize.OutcomeNotFound)
 	})
 	t.Run("AppOwner", func(t *testing.T) {
 		w := newWorld(t)
 		tracker := command(w.tracker, cmdApp, cmdInstance, ids.ID{})
-		w.filterExpect(t, w.user(w.alex), authorize.ActionCommandRead, offered(tracker, w.eskalation), authorize.OutcomeAllow)
-		w.filterExpect(t, w.user(w.alex), authorize.ActionCommandRead, offered(tracker, w.allgemein), authorize.OutcomeNotFound)
+		w.readExpect(t, w.user(w.alex), offered(tracker, w.eskalation), authorize.OutcomeAllow)
+		w.readExpect(t, w.user(w.alex), offered(tracker, w.allgemein), authorize.OutcomeNotFound)
 	})
 }
 

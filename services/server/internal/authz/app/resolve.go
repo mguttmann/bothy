@@ -256,8 +256,7 @@ func pendingReason(live domain.Liveness) domain.Reason {
 func (a *Authorizer) kindFacts(ctx context.Context, s *actingPrincipal, req domain.Expr, r authorize.Resource,
 	res resolved, in, base *domain.Input) error {
 	var err error
-	if (r.Kind == authorize.ResourceSpace || (r.Kind == authorize.ResourceCommand && res.path.Kind == domain.PathSpace)) &&
-		in.Eff.Level < domain.LevelRead {
+	if onSpace(r, res) && in.Eff.Level < domain.LevelRead {
 		if in.SpaceHasVisibleChannel, base.SpaceHasVisibleChannel, err = a.spaceHasVisibleChannel(ctx, s, res.path.SpaceID); err != nil {
 			return err
 		}
@@ -279,6 +278,12 @@ func (a *Authorizer) kindFacts(ctx context.Context, s *actingPrincipal, req doma
 		base.Target = in.Target
 	}
 	return nil
+}
+
+// onSpace reports a resource decided on a space path: a space, or a command scoped to a space
+// (M2-16), whose visibility and register guard read SpaceHasVisibleChannel.
+func onSpace(r authorize.Resource, res resolved) bool {
+	return r.Kind == authorize.ResourceSpace || (r.Kind == authorize.ResourceCommand && res.path.Kind == domain.PathSpace)
 }
 
 // spaceHasVisibleChannel reports read on at least one channel of space (final and base rights).

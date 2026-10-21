@@ -88,32 +88,14 @@ func (s *Service) invokeCommand(ctx context.Context, reg CommandRegister, cmd ru
 	if err != nil {
 		return runs.CommandInvocation{}, err
 	}
-	if !c.Control {
-		// The order of locks of the message acceptance: thread, then runs (03 section 6.3).
-		if err := s.d.Threads.LockForMessageChange(ctx, tg.info.ID); err != nil {
-			return runs.CommandInvocation{}, err
-		}
-	}
-	active, found, err := s.d.Repo.ActiveRunOfThread(ctx, tg.info.ID)
+	f, err := s.commandFacts(ctx, c, tg)
 	if err != nil {
 		return runs.CommandInvocation{}, err
 	}
-	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{c.OwnerPrincipalID})
-	if err != nil {
+	if err := s.authorizeCommand(ctx, c, tg, f.found); err != nil {
 		return runs.CommandInvocation{}, err
 	}
-	trig := domain.CommandTrigger{CommandID: c.ID, ThreadID: tg.info.ID, Owner: *agentFacts(facts, c.OwnerPrincipalID), Control: c.Control}
-	if found {
-		trig.ActiveRun = &domain.ActiveRun{RunID: active.ID, AgentID: active.AgentID}
-	}
-	dec, err := domain.DecideCommand(trig)
-	if err != nil {
-		return runs.CommandInvocation{}, err
-	}
-	if err := s.authorizeCommand(ctx, c, tg, found); err != nil {
-		return runs.CommandInvocation{}, err
-	}
-	if dec.Outcome == domain.OutcomeReject {
+	if f.decision.Outcome == domain.OutcomeReject {
 		// The decision and authorize disagree: fail closed (same rule as D-M2-05-14).
 		s.d.Log.LogAttrs(ctx, slog.LevelError, msgCommandMismatch, slog.String(keyAction, string(authorize.ActionCommandInvoke)),
 			slog.String(keyReason, reasonDecisionCommand))
@@ -123,27 +105,68 @@ func (s *Service) invokeCommand(ctx context.Context, reg CommandRegister, cmd ru
 	if err != nil {
 		return runs.CommandInvocation{}, err
 	}
-	inv := runs.CommandInvocation{InvocationID: ids.New(), CommandID: c.ID, ChannelID: tg.info.ChannelID, ThreadID: tg.info.ID}
 	invoker, err := s.invoker(ctx)
 	if err != nil {
 		return runs.CommandInvocation{}, err
 	}
+	inv := runs.CommandInvocation{InvocationID: ids.New(), CommandID: c.ID, ChannelID: tg.info.ChannelID, ThreadID: tg.info.ID}
 	if c.Control {
 		var runID ids.ID
-		if found && active.AgentID == c.OwnerPrincipalID {
-			runID = active.ID
+		if f.found && f.active.AgentID == c.OwnerPrincipalID {
+			runID = f.active.ID
 		}
 		return inv, s.emitCommandInvoked(ctx, c, tg, inv, runID, invoker, values)
 	}
-	mode := facts[c.OwnerPrincipalID].BillingMode
+	return s.openCommandRun(ctx, c, tg, inv, f.mode, invoker, values)
+}
+
+// commandFacts are the facts of one invocation: the active run of the target thread (any agent),
+// the owner's billing mode and the decision of M2-04.
+type commandFacts struct {
+	active   RunRow
+	found    bool
+	mode     string
+	decision domain.Decision
+}
+
+// commandFacts locks the target thread for a model command (the order of locks of the message
+// acceptance: thread, then runs, 03 section 6.3), reads the active run and the owner's facts and
+// decides with DecideCommand.
+func (s *Service) commandFacts(ctx context.Context, c agents.Command, tg invocationTarget) (commandFacts, error) {
+	if !c.Control {
+		if err := s.d.Threads.LockForMessageChange(ctx, tg.info.ID); err != nil {
+			return commandFacts{}, err
+		}
+	}
+	var f commandFacts
+	var err error
+	if f.active, f.found, err = s.d.Repo.ActiveRunOfThread(ctx, tg.info.ID); err != nil {
+		return commandFacts{}, err
+	}
+	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{c.OwnerPrincipalID})
+	if err != nil {
+		return commandFacts{}, err
+	}
+	f.mode = facts[c.OwnerPrincipalID].BillingMode
+	trig := domain.CommandTrigger{CommandID: c.ID, ThreadID: tg.info.ID, Owner: *agentFacts(facts, c.OwnerPrincipalID), Control: c.Control}
+	if f.found {
+		trig.ActiveRun = &domain.ActiveRun{RunID: f.active.ID, AgentID: f.active.AgentID}
+	}
+	f.decision, err = domain.DecideCommand(trig)
+	return f, err
+}
+
+// openCommandRun opens the run of a model command (design note 12) and appends its
+// agent.invocation. A run another path opened in the thread meanwhile is decided again with the
+// active run, whose refusal (run_active) authz audits; nothing of the unit is written then.
+func (s *Service) openCommandRun(ctx context.Context, c agents.Command, tg invocationTarget, inv runs.CommandInvocation, mode string,
+	invoker domain.PrincipalRefPayload, values []domain.OptionValue) (runs.CommandInvocation, error) {
 	sum, err := s.Open(ctx, OpenCmd{
 		ThreadID: tg.info.ID, AgentID: c.OwnerPrincipalID, TriggeredBy: caller(ctx).ID, TriggerKind: triggerKindCommand,
 		TriggeringCommandID: c.ID, BillingModeExpected: mode,
 	})
 	var exists *ActiveRunExistsError
 	if errors.As(err, &exists) {
-		// A path that opened a run without the thread lock: decide again with the active run, whose
-		// refusal (run_active) authz audits (design note 12 b).
 		if err := s.authorizeCommand(ctx, c, tg, true); err != nil {
 			return runs.CommandInvocation{}, err
 		}

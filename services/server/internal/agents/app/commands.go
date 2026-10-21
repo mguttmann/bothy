@@ -289,34 +289,50 @@ func (s *CommandService) Update(ctx context.Context, cmd agents.UpdateCommand) (
 		if err := s.check(ctx, authorize.ActionCommandRegister, resource(c.ID, c.OwnerID, c.OwnerKind, def)); err != nil {
 			return err
 		}
-		if !cmd.IfMatch.Present {
-			return errs.PreconditionRequired()
-		}
-		if !cmd.IfMatch.Valid || cmd.IfMatch.Version != c.Version {
-			return versionConflict(c)
-		}
-		if domain.IsReservedCommandName(def.Name) {
-			return reserved()
+		if err := updatable(cmd.IfMatch, c, def); err != nil {
+			return err
 		}
 		if def.Equal(c.Def) {
 			out = commandView(c)
 			return nil
 		}
-		v, changed, err := s.d.Store.UpdateCommand(ctx, c.ID, c.Version, def)
-		if errors.Is(err, ErrCommandTaken) {
-			return taken()
-		}
-		if err != nil {
-			return err
-		}
-		if !changed {
-			return s.lostRace(ctx, c.ID)
-		}
-		c.Def, c.Version = def, v
+		c, err = s.replace(ctx, c, def)
 		out = commandView(c)
-		return s.announce(ctx, authorize.ActionCommandRegister, c, changeUpdated)
+		return err
 	})
 	return out, err
+}
+
+// updatable checks the If-Match of an update against the stored command (428 without, 412
+// version_conflict with the current command) and the reserved names (409).
+func updatable(p agents.Precondition, c domain.Command, def domain.CommandDefinition) error {
+	if !p.Present {
+		return errs.PreconditionRequired()
+	}
+	if !p.Valid || p.Version != c.Version {
+		return versionConflict(c)
+	}
+	if domain.IsReservedCommandName(def.Name) {
+		return reserved()
+	}
+	return nil
+}
+
+// replace writes the new definition of c with a compare-and-swap on its version and announces
+// it; a taken name is 409, a lost race 412 or 404.
+func (s *CommandService) replace(ctx context.Context, c domain.Command, def domain.CommandDefinition) (domain.Command, error) {
+	v, changed, err := s.d.Store.UpdateCommand(ctx, c.ID, c.Version, def)
+	if errors.Is(err, ErrCommandTaken) {
+		return c, taken()
+	}
+	if err != nil {
+		return c, err
+	}
+	if !changed {
+		return c, s.lostRace(ctx, c.ID)
+	}
+	c.Def, c.Version = def, v
+	return c, s.announce(ctx, authorize.ActionCommandRegister, c, changeUpdated)
 }
 
 // lostRace answers a compare-and-swap that found the row changed: 412 version_conflict with the
@@ -353,21 +369,26 @@ func (s *CommandService) Remove(ctx context.Context, commandID ids.ID) error {
 		if c.Removed() {
 			return nil
 		}
-		v, changed, err := s.d.Store.RemoveCommand(ctx, c.ID, c.Version)
-		if err != nil {
+		return s.remove(ctx, c)
+	})
+}
+
+// remove sets removed_at of c with a compare-and-swap on its version and announces it.
+func (s *CommandService) remove(ctx context.Context, c domain.Command) error {
+	v, changed, err := s.d.Store.RemoveCommand(ctx, c.ID, c.Version)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		// Another removal or update won; a removed command is the outcome asked for.
+		now, found, err := s.d.Store.Command(ctx, c.ID)
+		if err != nil || (found && now.Removed()) {
 			return err
 		}
-		if !changed {
-			// Another removal or update won; a removed command is the outcome asked for.
-			now, found, err := s.d.Store.Command(ctx, c.ID)
-			if err != nil || (found && now.Removed()) {
-				return err
-			}
-			return s.lostRace(ctx, c.ID)
-		}
-		c.Version = v
-		return s.announce(ctx, authorize.ActionCommandRemove, c, changeRemoved)
-	})
+		return s.lostRace(ctx, c.ID)
+	}
+	c.Version = v
+	return s.announce(ctx, authorize.ActionCommandRemove, c, changeRemoved)
 }
 
 // Get implements agents.Commands (design note 7).

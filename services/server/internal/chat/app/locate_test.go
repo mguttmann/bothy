@@ -95,7 +95,7 @@ func TestTriggerChannel(t *testing.T) {
 
 	got, err := e.svc.TriggerChannel(ctx, text.ID)
 	want := chat.TriggerChannel{ChannelID: text.ID, SpaceID: sp.ID, Kind: "text", EffectiveOperatorID: spaceOp, RequireMention: true,
-		AutoThread: true, SettingsVersion: e.store.channels[text.ID].SettingsVersion}
+		AutoThread: true, SettingsVersion: e.store.channels[text.ID].SettingsVersion, MainThreadID: e.store.channels[text.ID].MainThreadID}
 	if err != nil || got != want {
 		t.Fatalf("text %+v, %v; want %+v", got, err, want)
 	}

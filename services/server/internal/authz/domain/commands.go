@@ -24,6 +24,7 @@ const (
 
 // The actions with command rules.
 const (
+	actionCommandRead     = "command.read"
 	actionCommandRegister = "command.register"
 	actionCommandInvoke   = "command.invoke"
 )
@@ -61,7 +62,7 @@ type CommandFacts struct {
 // listChannelCommands and the receive check of command.changed), whose visibility rule decides
 // (brief M2-16 design note 8 d; docs/DECISIONS.md D-M2-16-8).
 var extraResourceKinds = map[string][]string{
-	"command.read": {kindCommand},
+	actionCommandRead: {kindCommand},
 }
 
 // ActionResourceKinds returns the resource kinds of spec: its catalogue column and the extra kinds of
@@ -173,26 +174,26 @@ func commandRegisterGuard(in *Input) (Decision, error) {
 		if in.Path.Kind != PathSpace || in.Path.SpaceID != c.ScopeSpaceID {
 			return Decision{}, internalError("command.register on a space without its path")
 		}
-		if in.Eff.Level < LevelRead && !in.SpaceHasVisibleChannel {
-			return deny(OutcomeNotFound, ReasonNoGrant), nil
-		}
-		if !c.SpaceDefaultOperator && in.Eff.Level < LevelWrite {
-			return deny(OutcomeForbidden, ReasonLevelInsufficient), nil
-		}
-		return Allow, nil
+		return targetDecision(in.Eff.Level >= LevelRead || in.SpaceHasVisibleChannel, c.SpaceDefaultOperator || in.Eff.Level >= LevelWrite), nil
 	case scopeChannel:
 		if in.Path.Kind != PathChannel || in.Path.ChannelID != c.ScopeChannelID {
 			return Decision{}, internalError("command.register on a channel without its path")
 		}
-		if in.Path.DM || in.Eff.Level < LevelRead {
-			return deny(OutcomeNotFound, ReasonNoGrant), nil
-		}
-		if in.Eff.Level < LevelWrite {
-			return deny(OutcomeForbidden, ReasonLevelInsufficient), nil
-		}
-		return Allow, nil
+		return targetDecision(!in.Path.DM && in.Eff.Level >= LevelRead, in.Eff.Level >= LevelWrite), nil
 	}
 	return Decision{}, internalError("command.register with an unknown scope kind")
+}
+
+// targetDecision is the outcome of the target rule: an invisible target is not_found, a visible
+// one without the right level_insufficient.
+func targetDecision(visible, served bool) Decision {
+	switch {
+	case !visible:
+		return deny(OutcomeNotFound, ReasonNoGrant)
+	case !served:
+		return deny(OutcomeForbidden, ReasonLevelInsufficient)
+	}
+	return Allow
 }
 
 // commandInvokeGuard is the guard of command.invoke (05 section 4.10, 09 section 10.4, brief M2-16

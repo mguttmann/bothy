@@ -46,21 +46,26 @@ func definition(b *rest.CommandRegister) agents.RegisterCommand {
 		d.Control = *b.Control
 	}
 	if b.Options != nil {
-		d.Options = []agents.CommandOption{}
+		d.Options = make([]agents.CommandOption, 0, len(*b.Options))
 		for _, o := range *b.Options {
-			opt := agents.CommandOption{Name: o.Name, Description: o.Description, Type: string(o.Type), Required: o.Required}
-			if o.Autocomplete != nil {
-				opt.Autocomplete = *o.Autocomplete
-			}
-			if o.Choices != nil {
-				for _, c := range *o.Choices {
-					opt.Choices = append(opt.Choices, agents.CommandChoice{Name: c.Name, Value: c.Value})
-				}
-			}
-			d.Options = append(d.Options, opt)
+			d.Options = append(d.Options, optionOf(o))
 		}
 	}
 	return d
+}
+
+// optionOf converts one CommandOption of a body.
+func optionOf(o rest.CommandOption) agents.CommandOption {
+	opt := agents.CommandOption{Name: o.Name, Description: o.Description, Type: string(o.Type), Required: o.Required}
+	if o.Autocomplete != nil {
+		opt.Autocomplete = *o.Autocomplete
+	}
+	if o.Choices != nil {
+		for _, c := range *o.Choices {
+			opt.Choices = append(opt.Choices, agents.CommandChoice{Name: c.Name, Value: c.Value})
+		}
+	}
+	return opt
 }
 
 // commandREST converts a command into the schema Command; absent members stay absent.
