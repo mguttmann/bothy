@@ -110,6 +110,7 @@ run.context.read
 run.finish
 run.followup.create
 run.start
+run.token.renew
 run.update
 self.profile.update
 session.extension.create

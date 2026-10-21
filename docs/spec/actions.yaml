@@ -1852,6 +1852,21 @@ actions:
   rights_change: false
   rl_class: rl.agent_runtime
   effect: write
+- id: run.token.renew
+  section: agents
+  description: fresh invocation token for one's own run in `queued` or `waiting_input` with the current
+    unconsumed token, even an expired one (`runs.started_jti` NULL or not equal to `jti`, in SQL `IS DISTINCT
+    FROM`), or the token before the last renewal (`runs.renewed_from_jti`, lost response); repeats the
+    checks before a delivery (agent.invoke, I2, SR2, SR3) with current permissions ([09-agenten.md](09-agenten.md),
+    section 4.5.1)
+  resource: run
+  right: agent-self und Marke aktuell
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
 - id: run.update
   section: agents
   description: Live-Box-Patch des eigenen Laufs

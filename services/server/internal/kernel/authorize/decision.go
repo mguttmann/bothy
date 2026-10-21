@@ -42,6 +42,10 @@ type Decision struct {
 	// was waived by the quick reattach of 08 section 6.3 point 5 (M2-40): the use case then
 	// consumes no step-up.
 	QuickReattach bool
+	// Detail is the sub-reason of a decision whose problem reason differs from the audit reason;
+	// today the token verdict ("expired", "superseded", "invalid") of invocation_token_invalid
+	// (M2-09). Empty otherwise.
+	Detail string
 }
 
 // Allowed reports whether d allows the action. The zero Decision is no allow.
@@ -63,6 +67,7 @@ const (
 	reasonToolMismatch    Reason = "tool_class_mismatch"
 	reasonI6Violation     Reason = "i6_violation"
 	reasonHostNotActive   Reason = "host_not_active"
+	reasonTokenInvalid    Reason = "invocation_token_invalid"
 )
 
 // terminalReasons are the reasons of forbidden that answer 403 terminal_denied, with the reason of
@@ -89,6 +94,8 @@ var terminalReasons = map[Reason]string{
 //   - forbidden with a terminal guard reason (M2-40): 403 terminal_denied with the reason of 24
 //     section 13 (not_host_assignee, server_host_owner_only, i6_holder_only, no_session_user,
 //     profile_unknown, session_limit); host_not_active gives 409 host_unavailable without one;
+//   - forbidden with invocation_token_invalid (M2-09): 403 invocation_token_invalid with Detail,
+//     the token verdict, as reason;
 //   - invariant_violation: 409 with the reason as code (i1_violation, i6_violation, last_owner,
 //     billing_mode_mismatch, tool_class_mismatch) and the reason extension.
 //
@@ -105,6 +112,9 @@ func (d Decision) Err() error {
 		}
 		if d.Reason == reasonHostNotActive {
 			return errs.New(errs.CodeHostUnavailable, "")
+		}
+		if d.Reason == reasonTokenInvalid {
+			return errs.New(errs.CodeInvocationTokenInvalid, "").WithReason(d.Detail)
 		}
 		code, ok := forbiddenCodes[d.Reason]
 		if !ok {

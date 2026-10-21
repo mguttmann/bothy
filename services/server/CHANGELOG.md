@@ -11,6 +11,24 @@ documented in this file. The format is based on
 
 ### Added
 
+- Start, renewal, end and cancellation of runs (M2-09, I3, R-SY-10, R-SY-11, R-SY-19): the
+  operations `startRun`, `resumeRun`, `renewInvocationToken`, `awaitRunInput`, `finishRun` and
+  `cancelRun` are enabled. A start checks the invocation token (signature, `kid`, `typ`, `alg`,
+  `iss`, `aud`, run), its currency (`runs.invocation_jti`, not consumed), its expiry with
+  `auth.clock_leeway`, then the reported billing mode and tool class; every token error is 403
+  `invocation_token_invalid` with `reason` `expired`, `superseded` or `invalid`, a repeated start
+  with the same token answers 200 with `Idempotent-Replay: true`, and an I3 mismatch fails the run
+  with 409 `billing_mode_mismatch` or `tool_class_mismatch`. A renewal repeats the checks before a
+  delivery and records `runs.renewed_from_jti`; a refusal fails the run with 403
+  `agent_invocation_denied`. `run.start` and `run.token.renew` are real requirements of authz.
+  `cancelRun` ends a queued run at once and otherwise writes `run.cancel_requested` and the job
+  `runs.cancel_timeout` at `agent.cancel_grace`; a loss of `trigger` by the starter (also
+  `user.disable` and archives) and a disabled agent stop the affected runs in the same
+  transaction; the periodic job `runs.stall_check` (every `agent.presence_timeout`) fails runs as
+  `interrupted` or `stale` from the persisted heartbeat, never retried. New configuration keys
+  `agent.cancel_grace` and `run.orphan_timeout`, the start check
+  `heartbeat_persist_below_orphan_timeout`, the counter `bothy.agent.billing_mode_mismatch`, the
+  port `agents.Heartbeats` and the value `channel_read_only` of `RunCancelRequestedPayload.reason`.
 - Avatar and logo (M3-10): `setMyAvatar` and `deleteMyAvatar` (`self.profile.update`, people
   only), `uploadBrandingLogo` and `deleteBrandingLogo` (`instance.branding.update`, owner with
   fresh step-up, audited) and the public `getBrandingLogo` (`instance.discovery.read`). The image

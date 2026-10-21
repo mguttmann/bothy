@@ -262,6 +262,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.run.active", "bothy.run.duration", "bothy.run.finished", "bothy.run.start.latency",
 		// M2-08: the denial counter of the delivery check.
 		"bothy.agent.invocation.denied",
+		// M2-09: the counter of I3 mismatches.
+		"bothy.agent.billing_mode_mismatch",
 		"bothy.storage.volume.free", "bothy.storage.volume.size",
 		"bothy.telemetry.dropped", "bothy.terminal.hosts.connected", "bothy.terminal.relay.unpaired", "bothy.terminal.sessions.active",
 		"bothy.terminal.sessions.closed", "db.client.operation.duration", "http.server.request.duration",

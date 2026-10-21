@@ -97,9 +97,14 @@ def sync_detailed(
     """Start a queued run
 
      Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-    with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-    gets 409 `already_started`. A different `billing_mode_used` fails the run with
-    `billing_mode_mismatch`.
+    with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+    `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+    token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different
+    `billing_mode_used` fails the run with
+    `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+    409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+    `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+    delivery replaced it) or `invalid` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -134,9 +139,14 @@ def sync(
     """Start a queued run
 
      Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-    with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-    gets 409 `already_started`. A different `billing_mode_used` fails the run with
-    `billing_mode_mismatch`.
+    with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+    `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+    token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different
+    `billing_mode_used` fails the run with
+    `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+    409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+    `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+    delivery replaced it) or `invalid` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -166,9 +176,14 @@ async def asyncio_detailed(
     """Start a queued run
 
      Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-    with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-    gets 409 `already_started`. A different `billing_mode_used` fails the run with
-    `billing_mode_mismatch`.
+    with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+    `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+    token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different
+    `billing_mode_used` fails the run with
+    `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+    409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+    `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+    delivery replaced it) or `invalid` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -201,9 +216,14 @@ async def asyncio(
     """Start a queued run
 
      Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-    with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-    gets 409 `already_started`. A different `billing_mode_used` fails the run with
-    `billing_mode_mismatch`.
+    with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+    `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+    token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different
+    `billing_mode_used` fails the run with
+    `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+    409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+    `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+    delivery replaced it) or `invalid` (09 section 4.5).
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

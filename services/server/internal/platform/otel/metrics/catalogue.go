@@ -436,6 +436,13 @@ var (
 			{Key: keyReason, Values: runReasons, Optional: true},
 		},
 	}
+	// AgentBillingModeMismatch is bothy.agent.billing_mode_mismatch (4.3, M2-09): one per run that
+	// an I3 mismatch failed, found by the server at the start or reported by the adapter.
+	AgentBillingModeMismatch = Spec{
+		Name: "bothy.agent.billing_mode_mismatch", Kind: KindCounter, Unit: "{run}",
+		Description: "Runs failed by a mismatch of the billing mode or the tool class (I3).",
+		Attrs:       []Attr{{Key: keyAgentHandle, Source: SourceAgentHandles}},
+	}
 	// AgentInvocationDenied is bothy.agent.invocation.denied (4.3, M2-08): one per denial of
 	// agent.invoke immediately before a delivery to an agent (I2), with the run reason the denial
 	// maps to (09 5.2; the adapter test holds the values equal to the runs domain).
@@ -497,7 +504,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
-		RunActive, RunStartLatency, RunDuration, RunFinished, AgentInvocationDenied,
+		RunActive, RunStartLatency, RunDuration, RunFinished, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,

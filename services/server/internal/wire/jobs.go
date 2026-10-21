@@ -117,6 +117,11 @@ type JobModules struct {
 	TerminalSweepInterval time.Duration
 	// QueuedExpiry is the use case of runs.queued_expiry (M2-08); nil only where no job runs.
 	QueuedExpiry runsjobs.Expirer
+	// RunsLifecycle is the use case of runs.cancel_timeout and runs.stall_check (M2-09); nil only
+	// where no job runs. StallInterval is agent.presence_timeout, the interval of
+	// runs.stall_check.
+	RunsLifecycle runsjobs.Lifecycle
+	StallInterval time.Duration
 }
 
 // TerminalSweepConfig binds terminal.sweep_interval, the period of terminal.sweep (M2-46).
@@ -140,8 +145,9 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
 // on the queue files without a River job timeout (M3-04) and files.thumbnail on the queue files
 // with the timeout file.image.processing_timeout (M3-06), terminal.sweep on the queue
-// maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), and
-// runs.queued_expiry on the queue default (M2-08); the error is the first rejected registration.
+// maintenance, periodic with terminal.sweep_interval and once at the start (M2-46),
+// runs.queued_expiry on the queue default (M2-08) and runs.cancel_timeout and the periodic
+// runs.stall_check on the queue maintenance (M2-09); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -178,6 +184,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
+		return nil, err
+	}
+	if err := runsjobs.RegisterLifecycle(reg, m.RunsLifecycle, m.StallInterval); err != nil {
 		return nil, err
 	}
 	return reg, nil

@@ -1684,9 +1684,11 @@ func (s *server) startJobs(ctx context.Context) error {
 		return errors.New("wire: the jobs step needs the terminal step")
 	}
 	var queuedExpiry runsjobs.Expirer
+	var lifecycle runsjobs.Lifecycle
 	if s.runs != nil {
-		queuedExpiry = s.runs.Service
+		queuedExpiry, lifecycle = s.runs.Service, s.runs.Service
 	}
+	presence := s.values.Duration(keyPresenceTimeout)
 	mods := &JobModules{
 		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
 		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
@@ -1698,7 +1700,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		FilesScan:   files.ScanRunner(),
 		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
 		TerminalSweep: tm.Service, TerminalSweepInterval: sweepCfg.Interval,
-		QueuedExpiry: queuedExpiry,
+		QueuedExpiry: queuedExpiry, RunsLifecycle: lifecycle, StallInterval: presence,
 	}
 	if s.deps.JobModules != nil {
 		s.deps.JobModules(mods)

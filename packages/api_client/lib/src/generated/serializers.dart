@@ -307,6 +307,8 @@ import 'package:api_client/src/generated/model/interaction_created_payload.dart'
 import 'package:api_client/src/generated/model/interaction_respond.dart';
 import 'package:api_client/src/generated/model/interaction_response.dart';
 import 'package:api_client/src/generated/model/invariant_violation.dart';
+import 'package:api_client/src/generated/model/invocation_token_grant.dart';
+import 'package:api_client/src/generated/model/invocation_token_renew.dart';
 import 'package:api_client/src/generated/model/json_patch_operation.dart';
 import 'package:api_client/src/generated/model/jwks.dart';
 import 'package:api_client/src/generated/model/level.dart';
@@ -880,6 +882,8 @@ part 'serializers.g.dart';
   InteractionRespond,
   InteractionResponse,
   InvariantViolation,
+  InvocationTokenGrant,
+  InvocationTokenRenew,
   JsonPatchOperation,
   Jwks,
   Level,

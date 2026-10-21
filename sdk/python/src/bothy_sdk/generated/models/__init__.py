@@ -399,6 +399,8 @@ from .interaction_respond_state import InteractionRespondState
 from .interaction_response import InteractionResponse
 from .interaction_state import InteractionState
 from .invariant_violation import InvariantViolation
+from .invocation_token_grant import InvocationTokenGrant
+from .invocation_token_renew import InvocationTokenRenew
 from .json_object import JsonObject
 from .json_patch_operation import JsonPatchOperation
 from .json_patch_operation_op import JsonPatchOperationOp
@@ -1138,6 +1140,8 @@ __all__ = (
     "InteractionResponse",
     "InteractionState",
     "InvariantViolation",
+    "InvocationTokenGrant",
+    "InvocationTokenRenew",
     "JsonObject",
     "JsonPatchOperation",
     "JsonPatchOperationOp",

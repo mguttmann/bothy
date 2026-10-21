@@ -3356,10 +3356,11 @@ func (e RunCancelRequestedEventType) Valid() bool {
 
 // Defines values for RunCancelRequestedPayloadReason.
 const (
-	RunCancelRequestedPayloadReasonAccessRevoked RunCancelRequestedPayloadReason = "access_revoked"
-	RunCancelRequestedPayloadReasonAgentDisabled RunCancelRequestedPayloadReason = "agent_disabled"
-	RunCancelRequestedPayloadReasonUserCancelled RunCancelRequestedPayloadReason = "user_cancelled"
-	RunCancelRequestedPayloadReasonUserDisabled  RunCancelRequestedPayloadReason = "user_disabled"
+	RunCancelRequestedPayloadReasonAccessRevoked   RunCancelRequestedPayloadReason = "access_revoked"
+	RunCancelRequestedPayloadReasonAgentDisabled   RunCancelRequestedPayloadReason = "agent_disabled"
+	RunCancelRequestedPayloadReasonChannelReadOnly RunCancelRequestedPayloadReason = "channel_read_only"
+	RunCancelRequestedPayloadReasonUserCancelled   RunCancelRequestedPayloadReason = "user_cancelled"
+	RunCancelRequestedPayloadReasonUserDisabled    RunCancelRequestedPayloadReason = "user_disabled"
 )
 
 // Valid indicates whether the value is a known member of the RunCancelRequestedPayloadReason enum.
@@ -3368,6 +3369,8 @@ func (e RunCancelRequestedPayloadReason) Valid() bool {
 	case RunCancelRequestedPayloadReasonAccessRevoked:
 		return true
 	case RunCancelRequestedPayloadReasonAgentDisabled:
+		return true
+	case RunCancelRequestedPayloadReasonChannelReadOnly:
 		return true
 	case RunCancelRequestedPayloadReasonUserCancelled:
 		return true
@@ -10640,6 +10643,25 @@ type InvariantViolation struct {
 	PrincipalIds []Uuid `json:"principal_ids"`
 }
 
+// InvocationTokenGrant defines model for InvocationTokenGrant.
+type InvocationTokenGrant struct {
+	// ExpiresAt Examples: 2026-10-10T09:31:00.000Z
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// InvocationToken Fresh invocation token with a new `jti`; it replaces the current one of the run.
+	//
+	// Examples: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.signature
+	InvocationToken string `json:"invocation_token"`
+}
+
+// InvocationTokenRenew defines model for InvocationTokenRenew.
+type InvocationTokenRenew struct {
+	// InvocationToken The current invocation token of the run, or on a retry after a lost answer the token the last renewal replaced; it may have expired (09 section 4.5.1).
+	//
+	// Examples: eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
+	InvocationToken string `json:"invocation_token"`
+}
+
 // JsonObject Free-form JSON object whose schema is named in the field description.
 type JsonObject map[string]interface{}
 
@@ -12756,6 +12778,9 @@ type RunStart struct {
 
 	// Model Examples: model-large
 	Model *string `json:"model,omitempty"`
+
+	// ToolClassUsed Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
+	ToolClassUsed ToolClass `json:"tool_class_used"`
 }
 
 // RunState defines model for RunState.
@@ -16562,6 +16587,12 @@ type ListActiveRunsParams struct {
 	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
 }
 
+// CancelRunParams defines parameters for CancelRun.
+type CancelRunParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListRunStepsParams defines parameters for ListRunSteps.
 type ListRunStepsParams struct {
 	// Cursor Cursor from the previous page.
@@ -17080,6 +17111,24 @@ type RevokeOwnerJSONRequestBody = ReasonBody
 
 // CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
 type CreateTokenJSONRequestBody = ApiTokenCreate
+
+// AwaitRunInputJSONRequestBody defines body for AwaitRunInput for application/json ContentType.
+type AwaitRunInputJSONRequestBody = RunAwaitInput
+
+// CancelRunJSONRequestBody defines body for CancelRun for application/json ContentType.
+type CancelRunJSONRequestBody = RunCancel
+
+// FinishRunJSONRequestBody defines body for FinishRun for application/json ContentType.
+type FinishRunJSONRequestBody = RunFinish
+
+// RenewInvocationTokenJSONRequestBody defines body for RenewInvocationToken for application/json ContentType.
+type RenewInvocationTokenJSONRequestBody = InvocationTokenRenew
+
+// ResumeRunJSONRequestBody defines body for ResumeRun for application/json ContentType.
+type ResumeRunJSONRequestBody = RunStart
+
+// StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
+type StartRunJSONRequestBody = RunStart
 
 // RotateSigningKeyJSONRequestBody defines body for RotateSigningKey for application/json ContentType.
 type RotateSigningKeyJSONRequestBody = SigningKeyRotate
