@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner overrides of the claude-code-runner project (docs/quality/licenses.md, "Lizenz-Gate"
+# item 3): one entry per package whose license deps.dev cannot report, each with its reason.
+# Never a blanket override.
+
+[[PackageOverrides]]
+name = "bothy-sdk"
+ecosystem = "PyPI"
+version = "0.0.0"
+license.override = ["Apache-2.0"]
+reason = "The SDK of this repository (sdk/python, path dependency, never published, OQ-17); its pyproject.toml declares license Apache-2.0, the license of the repository."
+
+[[PackageOverrides]]
+name = "colorama"
+ecosystem = "PyPI"
+version = "0.4.6"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE.txt of the 0.4.6 wheel is the BSD 3-clause text (Jonathan Hartley); PyPI metadata only says 'BSD License'. Windows-only dependency of pytest in the dev group."
