@@ -225,9 +225,13 @@ type PrincipalRefPayload struct {
 }
 
 // InvocationPayloadInput are the members of AgentInvocationPayload of a message trigger (M2-08
-// design note 14); agent_session comes with M2-12.
+// design note 14) or of an interaction trigger (M2-15); agent_session comes with M2-12.
 type InvocationPayloadInput struct {
-	RunID, ThreadID, ChannelID, SpaceID, MessageID ids.ID
+	RunID, ThreadID, ChannelID, SpaceID ids.ID
+	// TriggerKind is message ("" means message) or interaction; MessageID is the triggering
+	// message of a message trigger, InteractionID the interaction of an interaction trigger.
+	TriggerKind              string
+	MessageID, InteractionID ids.ID
 	// TriggeredBy is the author as the messaging port returns it.
 	TriggeredBy PrincipalRefPayload
 	// BillingMode is the configured mode at the acceptance.
@@ -243,7 +247,8 @@ type invocationPayload struct {
 	ChannelID       string              `json:"channel_id"`
 	SpaceID         string              `json:"space_id,omitzero"`
 	TriggerKind     string              `json:"trigger_kind"`
-	MessageID       string              `json:"message_id"`
+	MessageID       string              `json:"message_id,omitzero"`
+	InteractionID   string              `json:"interaction_id,omitzero"`
 	TriggeredBy     PrincipalRefPayload `json:"triggered_by"`
 	BillingMode     string              `json:"billing_mode"`
 	SettingsVersion int64               `json:"settings_version,omitzero"`
@@ -252,18 +257,44 @@ type invocationPayload struct {
 // errPayload reports a payload input with a zero ID or an empty required member.
 var errPayload = errors.New("runs: incomplete event payload")
 
-// InvocationPayload encodes the payload of agent.invocation for a message trigger: IDs, the
-// trigger kind message, the author, the billing mode and the settings version, never content, a
-// prompt, skills or a project binding (04 2.2 rules 1 and 4), and no JSON null (ADR 0053). Errors:
-// a zero ID or an empty author or billing mode.
+// InvocationPayload encodes the payload of agent.invocation for a message trigger (the trigger
+// kind message and message_id) or an interaction trigger (trigger_kind interaction and
+// interaction_id, no message_id; M2-15 design note 11 c): IDs, the triggering person, the billing
+// mode and the settings version, never content, a prompt, skills, form values or a project
+// binding (04 2.2 rules 1 and 4), and no JSON null (ADR 0053). Errors: a zero ID, the object of
+// the other trigger kind, an unknown trigger kind or an empty person or billing mode.
 func InvocationPayload(in InvocationPayloadInput) ([]byte, error) {
-	if in.RunID.IsZero() || in.ThreadID.IsZero() || in.ChannelID.IsZero() || in.MessageID.IsZero() || in.TriggeredBy.ID == "" ||
+	kind := in.TriggerKind
+	if kind == "" {
+		kind = string(TriggerMessage)
+	}
+	var object ids.ID
+	switch TriggerKind(kind) {
+	case TriggerMessage:
+		object = in.MessageID
+		if !in.InteractionID.IsZero() {
+			return nil, errPayload
+		}
+	case TriggerInteraction:
+		object = in.InteractionID
+		if !in.MessageID.IsZero() {
+			return nil, errPayload
+		}
+	default:
+		return nil, errPayload
+	}
+	if in.RunID.IsZero() || in.ThreadID.IsZero() || in.ChannelID.IsZero() || object.IsZero() || in.TriggeredBy.ID == "" ||
 		in.TriggeredBy.Kind == "" || in.BillingMode == "" {
 		return nil, errPayload
 	}
 	p := invocationPayload{
-		RunID: in.RunID.String(), ThreadID: in.ThreadID.String(), ChannelID: in.ChannelID.String(), TriggerKind: string(TriggerMessage),
-		MessageID: in.MessageID.String(), TriggeredBy: in.TriggeredBy, BillingMode: in.BillingMode, SettingsVersion: in.SettingsVersion,
+		RunID: in.RunID.String(), ThreadID: in.ThreadID.String(), ChannelID: in.ChannelID.String(), TriggerKind: kind,
+		TriggeredBy: in.TriggeredBy, BillingMode: in.BillingMode, SettingsVersion: in.SettingsVersion,
+	}
+	if kind == string(TriggerMessage) {
+		p.MessageID = object.String()
+	} else {
+		p.InteractionID = object.String()
 	}
 	if !in.SpaceID.IsZero() {
 		p.SpaceID = in.SpaceID.String()
@@ -285,6 +316,56 @@ func FollowupPayload(runID, threadID, messageID ids.ID) ([]byte, error) {
 		return nil, errPayload
 	}
 	return json.Marshal(followupPayload{RunID: runID.String(), ThreadID: threadID.String(), MessageID: messageID.String()})
+}
+
+// interactionPayloadIDs is the part of InteractionCreatedPayload the delivery reads.
+type interactionPayloadIDs struct {
+	Interaction struct {
+		ID    string `json:"id"`
+		RunID string `json:"run_id"`
+	} `json:"interaction"`
+}
+
+// InteractionDeliveryIDs reads interaction.id and interaction.run_id of an
+// InteractionCreatedPayload, the interaction and the run of a delivery of interaction.created
+// (M2-15 design note 11 a). Errors: a payload that is not the schema or names no valid IDs.
+func InteractionDeliveryIDs(payload []byte) (interaction, run ids.ID, err error) {
+	var p interactionPayloadIDs
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return ids.ID{}, ids.ID{}, errPayload
+	}
+	interaction, err = ids.Parse(p.Interaction.ID)
+	if err != nil || interaction.IsZero() {
+		return ids.ID{}, ids.ID{}, errPayload
+	}
+	run, err = ids.Parse(p.Interaction.RunID)
+	if err != nil || run.IsZero() {
+		return ids.ID{}, ids.ID{}, errPayload
+	}
+	return interaction, run, nil
+}
+
+// InvocationInteractionID reads interaction_id of an AgentInvocationPayload of trigger_kind
+// interaction (M2-15 design note 11 b); zero when the payload names none. Errors: a payload that
+// is not JSON or an interaction_id that is not an ID.
+func InvocationInteractionID(payload []byte) (ids.ID, error) {
+	if len(payload) == 0 {
+		return ids.ID{}, nil
+	}
+	var p struct {
+		InteractionID string `json:"interaction_id"`
+	}
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return ids.ID{}, errPayload
+	}
+	if p.InteractionID == "" {
+		return ids.ID{}, nil
+	}
+	id, err := ids.Parse(p.InteractionID)
+	if err != nil {
+		return ids.ID{}, errPayload
+	}
+	return id, nil
 }
 
 // FollowupMessageID reads message_id of an AgentFollowupPayload, the trigger of agent.followup at
