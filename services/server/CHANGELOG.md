@@ -26,17 +26,6 @@ documented in this file. The format is based on
   `terminal.host_duplicate_probe_timeout`; deny reason `host_duplicate_connection`; the test client
   `internal/terminal/adapters/hosttest` and `specschema.ValidateChannelFrame` for the terminal
   channels.
-- Gateway frame conformance, gate G9 (M1-67): the test harness `wstest` validates every frame of
-  the gateway integration tests as it arrives against `docs/api/asyncapi.yaml` and the body
-  schemas of `openapi.yaml` (new test package `api/specschema`: one JSON Schema 2020-12 bundle,
-  strict about undeclared members, no `null`, integers below 2^53, at most
-  `sync.ws_max_frame_bytes`, `seq` and `permission_version` exactly on durable events,
-  `resource.version` as the catalogue says), each client frame on send, the order per connection
-  and every close code against `x-close-codes`; a violation fails the test. The register of ops and
-  event types and the enable list `gateway_ops` are compared with actions.yaml and asyncapi.yaml,
-  a corpus test observes every M1 event type and server op, and a parser test keeps the harness
-  the only WebSocket client of the tests. New direct dependency
-  `github.com/santhosh-tekuri/jsonschema/v6` (test code only).
 - Notification levels and quiet hours (M3-18): the module `notify` owns `notification_preferences`
   and `quiet_hours` and serves `listMyNotificationPreferences`, `putNotificationPreference`,
   `deleteNotificationPreference`, `listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`
