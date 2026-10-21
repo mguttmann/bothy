@@ -357,6 +357,8 @@ def test_docs_runs_dart_api_docs(repo: Repo) -> None:
     # The Dart API pages are built after the other docs checks and before the site build.
     assert scripts[-2:] == ["tools/docs/dart_api_docs.py", "tools/docs/external_assets_check.py"]
     assert ["tools/docs/dart_api_docs.py", "--out", "docs/api/dart"] in repo.python_calls()
+    # The terminal catalogue check of M2-48 runs among the docs checks before the Dart API pages.
+    assert "tools/docs/terminal_catalogue.py" in scripts[:-2]
     uv = [c["args"] for c in repo.calls("uv")]
     assert any("mkdocs" in args for args in uv)  # type: ignore[operator]
     # The site links into the generated pages, so the docs gate builds them for every
