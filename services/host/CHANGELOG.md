@@ -39,3 +39,8 @@ is the [`VERSION`](VERSION) file next to this one; release tags are `host/v<vers
   acceptance.
 - A fake `claude` for the tests of HD6 and the platform suite behind the build tag `platform`
   (`make platform-test`, workflow `host-platform.yml`).
+
+### Security
+
+- Go toolchain 1.27.2 to 1.27.3 (`toolchain` of `go.mod`): the standard library advisory
+  GO-2026-6809 in `crypto/x509` failed the gate `osv`.

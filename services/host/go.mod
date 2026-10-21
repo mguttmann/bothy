@@ -2,7 +2,7 @@ module github.com/OWNER/bothy/services/host
 
 go 1.26.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 require (
 	github.com/flynn/noise v1.1.0

@@ -15,7 +15,7 @@
 # stage only copies. Base images are pinned by digest (SEC-SC-4, `make lint`); Renovate updates
 # the digests, and the golang tag follows the toolchain of services/server/go.mod.
 
-FROM --platform=$BUILDPLATFORM golang:1.27.2-trixie@sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:1896654cfc5c2b5ad74c07f29cb36f5d2d1cbed42e3054070fbfe444e521e83c AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src/services/server
 COPY services/server/go.mod services/server/go.sum ./
