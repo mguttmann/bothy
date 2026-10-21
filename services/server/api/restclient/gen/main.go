@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command gen generates the API client package api/restclient from docs/api/openapi.yaml with
-// the oapi-codegen pinned in go.mod (06 "Codegenerierung", docs/DECISIONS.md D-M8-10-1). Unlike
+// the oapi-codegen pinned in go.mod (06 "Code generation", docs/DECISIONS.md D-M8-10-1). Unlike
 // api/routes/gen it keeps every operation of the contract: a client of the public API calls
 // operations the server of an older release does not serve yet. The output of oapi-codegen is cut
 // at top-level declarations into restclient.gen.go, restclient_02.gen.go and so on, each below

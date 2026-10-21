@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# oapi-codegen configuration of the generated API client (docs/spec/06-api.md "Codegenerierung",
+# oapi-codegen configuration of the generated API client (docs/spec/06-api.md "Code generation",
 # docs/DECISIONS.md D-M8-10-1). Unlike api/rest, which holds only the enabled operations, the
 # client is generated from the whole docs/api/openapi.yaml: tools such as `bothy import` call
 # operations through the public API only (22 2, R-IM-01). skip-prune keeps every schema;

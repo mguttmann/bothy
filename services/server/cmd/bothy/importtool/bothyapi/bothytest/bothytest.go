@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package bothytest is a fake server for the auth paths of the import tool
-// (docs/spec/22-import-migration.md 10, docs/spec/08-identitaet.md 5.3, 7.3 and 7.4). It runs
+// (docs/spec/22-import-migration.md 10, docs/spec/08-identity.md 5.3, 7.3 and 7.4). It runs
 // plain HTTP on 127.0.0.1 with a port the system assigns and serves beginPairing,
 // completePairing (202 until the test approves, then 201; 410 after a rejection or expiry),
 // refreshToken (rotation with a family and reuse detection: a reuse revokes the session), logout,

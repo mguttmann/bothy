@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package bothyapi is the authenticated client of the server API for the import tool
-// (docs/spec/22-import-migration.md 2, 8 and 10; docs/spec/08-identitaet.md 5.3, 6.4, 7.3 and
+// (docs/spec/22-import-migration.md 2, 8 and 10; docs/spec/08-identity.md 5.3, 6.4, 7.3 and
 // 7.4). The tool logs in only as a device with platform cli through device pairing, without a
 // step-up key (Login), keeps device ID, DPoP key and tokens in a session file that only the user
 // can read (SessionFile), and talks to the server only through the client generated from

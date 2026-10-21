@@ -2,7 +2,7 @@
 
 Authenticated client of the Bothy API for the import tool `bothy import`
 ([22 Import and migration](../../../../../../docs/spec/22-import-migration.md), sections 2, 8 and
-10; [08 Identity](../../../../../../docs/spec/08-identitaet.md), sections 5.3, 6.4, 7.3 and 7.4).
+10; [08 Identity](../../../../../../docs/spec/08-identity.md), sections 5.3, 6.4, 7.3 and 7.4).
 The tool reads and writes only through the public API (R-IM-01); `TestClientImportsNoServerModule`
 holds that the package uses no server module, only `internal/platform/egress` and the kernel.
 
