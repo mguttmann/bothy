@@ -9,12 +9,20 @@ part of 'agent_session_bind.dart';
 class _$AgentSessionBind extends AgentSessionBind {
   @override
   final String externalSessionRef;
+  @override
+  final String? expectedCurrentSessionId;
+  @override
+  final bool? takeOver;
 
   factory _$AgentSessionBind([
     void Function(AgentSessionBindBuilder)? updates,
   ]) => (AgentSessionBindBuilder()..update(updates))._build();
 
-  _$AgentSessionBind._({required this.externalSessionRef}) : super._();
+  _$AgentSessionBind._({
+    required this.externalSessionRef,
+    this.expectedCurrentSessionId,
+    this.takeOver,
+  }) : super._();
   @override
   AgentSessionBind rebuild(void Function(AgentSessionBindBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -27,22 +35,28 @@ class _$AgentSessionBind extends AgentSessionBind {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is AgentSessionBind &&
-        externalSessionRef == other.externalSessionRef;
+        externalSessionRef == other.externalSessionRef &&
+        expectedCurrentSessionId == other.expectedCurrentSessionId &&
+        takeOver == other.takeOver;
   }
 
   @override
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, externalSessionRef.hashCode);
+    _$hash = $jc(_$hash, expectedCurrentSessionId.hashCode);
+    _$hash = $jc(_$hash, takeOver.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
 
   @override
   String toString() {
-    return (newBuiltValueToStringHelper(
-      r'AgentSessionBind',
-    )..add('externalSessionRef', externalSessionRef)).toString();
+    return (newBuiltValueToStringHelper(r'AgentSessionBind')
+          ..add('externalSessionRef', externalSessionRef)
+          ..add('expectedCurrentSessionId', expectedCurrentSessionId)
+          ..add('takeOver', takeOver))
+        .toString();
   }
 }
 
@@ -55,6 +69,15 @@ class AgentSessionBindBuilder
   set externalSessionRef(String? externalSessionRef) =>
       _$this._externalSessionRef = externalSessionRef;
 
+  String? _expectedCurrentSessionId;
+  String? get expectedCurrentSessionId => _$this._expectedCurrentSessionId;
+  set expectedCurrentSessionId(String? expectedCurrentSessionId) =>
+      _$this._expectedCurrentSessionId = expectedCurrentSessionId;
+
+  bool? _takeOver;
+  bool? get takeOver => _$this._takeOver;
+  set takeOver(bool? takeOver) => _$this._takeOver = takeOver;
+
   AgentSessionBindBuilder() {
     AgentSessionBind._defaults(this);
   }
@@ -63,6 +86,8 @@ class AgentSessionBindBuilder
     final $v = _$v;
     if ($v != null) {
       _externalSessionRef = $v.externalSessionRef;
+      _expectedCurrentSessionId = $v.expectedCurrentSessionId;
+      _takeOver = $v.takeOver;
       _$v = null;
     }
     return this;
@@ -90,6 +115,8 @@ class AgentSessionBindBuilder
             r'AgentSessionBind',
             'externalSessionRef',
           ),
+          expectedCurrentSessionId: expectedCurrentSessionId,
+          takeOver: takeOver,
         );
     replace(_$result);
     return _$result;

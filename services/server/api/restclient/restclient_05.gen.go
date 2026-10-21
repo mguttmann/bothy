@@ -13,6 +13,258 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetStatsBackendsWithResponse Backend policy view per agent
+//
+// Per agent: configured and reported billing mode, supported modes, switches, denied invocations (I2, I3), cost per mode and the rate-limit state reported by the adapter (docs/spec/25-visualisierung.md, section 6.2). Agents of channels visible to the caller; cost members only with `cost.read.aggregate`. Never credentials, subscriptions or runtime names of an instance.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/backends (the `GetStatsBackends` operationId).
+func (c *ClientWithResponses) GetStatsBackendsWithResponse(ctx context.Context, params *GetStatsBackendsParams, reqEditors ...RequestEditorFn) (*GetStatsBackendsResponse, error) {
+	rsp, err := c.GetStatsBackends(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStatsBackendsResponse(rsp)
+}
+
+// GetCostStatsWithResponse Costs per space, agent or instance
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/costs (the `GetCostStats` operationId).
+func (c *ClientWithResponses) GetCostStatsWithResponse(ctx context.Context, params *GetCostStatsParams, reqEditors ...RequestEditorFn) (*GetCostStatsResponse, error) {
+	rsp, err := c.GetCostStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetCostStatsResponse(rsp)
+}
+
+// GetErrorStatsWithResponse Error rates of runs and deliveries
+//
+// Metrics: `run_failure_rate`, `invocation_denials`, `webhook_failure_rate`, `push_failure_rate`.
+// HTTP error rates come from telemetry, not from this API.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/errors (the `GetErrorStats` operationId).
+func (c *ClientWithResponses) GetErrorStatsWithResponse(ctx context.Context, params *GetErrorStatsParams, reqEditors ...RequestEditorFn) (*GetErrorStatsResponse, error) {
+	rsp, err := c.GetErrorStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetErrorStatsResponse(rsp)
+}
+
+// GetStatsLiveWithResponse Current live frame
+//
+// The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualisierung.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/live (the `GetStatsLive` operationId).
+func (c *ClientWithResponses) GetStatsLiveWithResponse(ctx context.Context, params *GetStatsLiveParams, reqEditors ...RequestEditorFn) (*GetStatsLiveResponse, error) {
+	rsp, err := c.GetStatsLive(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStatsLiveResponse(rsp)
+}
+
+// GetRunStatsWithResponse Runs per agent
+//
+// Metrics: `runs`, `completed`, `failed`, `cancelled`, `duration_ms_p50`, `duration_ms_p95`.
+// Grouped by agent.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/runs (the `GetRunStats` operationId).
+func (c *ClientWithResponses) GetRunStatsWithResponse(ctx context.Context, params *GetRunStatsParams, reqEditors ...RequestEditorFn) (*GetRunStatsResponse, error) {
+	rsp, err := c.GetRunStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRunStatsResponse(rsp)
+}
+
+// GetStatsSloWithResponse SLO traffic light from own measurement
+//
+// One entry per SLO of the Sloth files, computed from `stats_minutes` over the SLO period (docs/spec/25-visualisierung.md, section 6.4). Label "own measurement": values may differ from Prometheus. Requires `stats.read` on the instance (owner); a space manager gets `403 forbidden`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/slo (the `GetStatsSlo` operationId).
+func (c *ClientWithResponses) GetStatsSloWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetStatsSloResponse, error) {
+	rsp, err := c.GetStatsSlo(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStatsSloResponse(rsp)
+}
+
+// GetStatsTimelineWithResponse Minute buckets and runs for playback
+//
+// Minute aggregates from `stats_minutes` and run intervals for a range of at most `stats.timeline_max_range` inside `retention.stats_minutes` (docs/spec/25-visualisierung.md, section 6.5). Filtered to the channels visible to the caller. Rows without a channel (`sli.*`, gateway metrics) only with `stats.read` on the instance; `cost` only with `cost.read.aggregate`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/timeline (the `GetStatsTimeline` operationId).
+func (c *ClientWithResponses) GetStatsTimelineWithResponse(ctx context.Context, params *GetStatsTimelineParams, reqEditors ...RequestEditorFn) (*GetStatsTimelineResponse, error) {
+	rsp, err := c.GetStatsTimeline(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStatsTimelineResponse(rsp)
+}
+
+// GetToolCallStatsWithResponse Tool calls by tool name
+//
+// Metrics: `calls`, `failed`, `duration_ms_p50`. Grouped by tool name from `run_steps`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/tool-calls (the `GetToolCallStats` operationId).
+func (c *ClientWithResponses) GetToolCallStatsWithResponse(ctx context.Context, params *GetToolCallStatsParams, reqEditors ...RequestEditorFn) (*GetToolCallStatsResponse, error) {
+	rsp, err := c.GetToolCallStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolCallStatsResponse(rsp)
+}
+
+// GetUsageStatsWithResponse Usage per space
+//
+// Metrics: `messages`, `threads_created`, `active_people`, `runs`. Grouped by space.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /stats/usage (the `GetUsageStats` operationId).
+func (c *ClientWithResponses) GetUsageStatsWithResponse(ctx context.Context, params *GetUsageStatsParams, reqEditors ...RequestEditorFn) (*GetUsageStatsResponse, error) {
+	rsp, err := c.GetUsageStats(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUsageStatsResponse(rsp)
+}
+
+// GetStatusWithResponse Status page
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /status (the `GetStatus` operationId).
+func (c *ClientWithResponses) GetStatusWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetStatusResponse, error) {
+	rsp, err := c.GetStatus(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetStatusResponse(rsp)
+}
+
+// CreateStatusComponentWithBodyWithResponse Add a status component
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /status/components (the `CreateStatusComponent` operationId).
+func (c *ClientWithResponses) CreateStatusComponentWithBodyWithResponse(ctx context.Context, params *CreateStatusComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateStatusComponentResponse, error) {
+	rsp, err := c.CreateStatusComponentWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateStatusComponentResponse(rsp)
+}
+
+// CreateStatusComponentWithResponse Add a status component
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /status/components (the `CreateStatusComponent` operationId).
+func (c *ClientWithResponses) CreateStatusComponentWithResponse(ctx context.Context, params *CreateStatusComponentParams, body CreateStatusComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateStatusComponentResponse, error) {
+	rsp, err := c.CreateStatusComponent(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateStatusComponentResponse(rsp)
+}
+
+// DeleteStatusComponentWithResponse Remove a status component
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /status/components/{component_id} (the `DeleteStatusComponent` operationId).
+func (c *ClientWithResponses) DeleteStatusComponentWithResponse(ctx context.Context, componentId ComponentIdPath, reqEditors ...RequestEditorFn) (*DeleteStatusComponentResponse, error) {
+	rsp, err := c.DeleteStatusComponent(ctx, componentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteStatusComponentResponse(rsp)
+}
+
+// UpdateStatusComponentWithBodyWithResponse Change a status component
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /status/components/{component_id} (the `UpdateStatusComponent` operationId).
+func (c *ClientWithResponses) UpdateStatusComponentWithBodyWithResponse(ctx context.Context, componentId ComponentIdPath, params *UpdateStatusComponentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateStatusComponentResponse, error) {
+	rsp, err := c.UpdateStatusComponentWithBody(ctx, componentId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateStatusComponentResponse(rsp)
+}
+
+// UpdateStatusComponentWithResponse Change a status component
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /status/components/{component_id} (the `UpdateStatusComponent` operationId).
+func (c *ClientWithResponses) UpdateStatusComponentWithResponse(ctx context.Context, componentId ComponentIdPath, params *UpdateStatusComponentParams, body UpdateStatusComponentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateStatusComponentResponse, error) {
+	rsp, err := c.UpdateStatusComponent(ctx, componentId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateStatusComponentResponse(rsp)
+}
+
+// CreateStatusIncidentWithBodyWithResponse Open an incident or maintenance
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /status/incidents (the `CreateStatusIncident` operationId).
+func (c *ClientWithResponses) CreateStatusIncidentWithBodyWithResponse(ctx context.Context, params *CreateStatusIncidentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateStatusIncidentResponse, error) {
+	rsp, err := c.CreateStatusIncidentWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateStatusIncidentResponse(rsp)
+}
+
+// CreateStatusIncidentWithResponse Open an incident or maintenance
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /status/incidents (the `CreateStatusIncident` operationId).
+func (c *ClientWithResponses) CreateStatusIncidentWithResponse(ctx context.Context, params *CreateStatusIncidentParams, body CreateStatusIncidentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateStatusIncidentResponse, error) {
+	rsp, err := c.CreateStatusIncident(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateStatusIncidentResponse(rsp)
+}
+
+// AddStatusIncidentUpdateWithBodyWithResponse Add an update to an incident
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /status/incidents/{incident_id}/updates (the `AddStatusIncidentUpdate` operationId).
+func (c *ClientWithResponses) AddStatusIncidentUpdateWithBodyWithResponse(ctx context.Context, incidentId IncidentIdPath, params *AddStatusIncidentUpdateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddStatusIncidentUpdateResponse, error) {
+	rsp, err := c.AddStatusIncidentUpdateWithBody(ctx, incidentId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAddStatusIncidentUpdateResponse(rsp)
+}
+
 // AddStatusIncidentUpdateWithResponse Add an update to an incident
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -209,6 +461,8 @@ func (c *ClientWithResponses) ListAgentSessionsWithResponse(ctx context.Context,
 
 // BindAgentSessionWithBodyWithResponse Bind an existing external session
 //
+// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/bind (the `BindAgentSession` operationId).
@@ -221,6 +475,8 @@ func (c *ClientWithResponses) BindAgentSessionWithBodyWithResponse(ctx context.C
 }
 
 // BindAgentSessionWithResponse Bind an existing external session
+//
+// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -235,6 +491,8 @@ func (c *ClientWithResponses) BindAgentSessionWithResponse(ctx context.Context, 
 
 // ReportAgentSessionWithBodyWithResponse Report the external session reference and model
 //
+// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -248,6 +506,8 @@ func (c *ClientWithResponses) ReportAgentSessionWithBodyWithResponse(ctx context
 
 // ReportAgentSessionWithResponse Report the external session reference and model
 //
+// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -260,6 +520,8 @@ func (c *ClientWithResponses) ReportAgentSessionWithResponse(ctx context.Context
 }
 
 // ResetAgentSessionWithResponse Start a new agent session in the thread
+//
+// Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -22131,594 +22393,6 @@ func ParseDownloadFileResponse(rsp *http.Response) (*DownloadFileResponse, error
 		response.Headers429 = &headers
 	case true:
 		var headers DownloadFileResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseDownloadThumbnailResponse parses an HTTP response from a DownloadThumbnailWithResponse call
-func ParseDownloadThumbnailResponse(rsp *http.Response) (*DownloadThumbnailResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DownloadThumbnailResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest FileConflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 416:
-		var dest RangeNotSatisfiable
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON416 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers DownloadThumbnailResponse200Headers
-		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.AcceptRanges = &value
-		}
-		if values := rsp.Header.Values("Cache-Control"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Cache-Control", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.CacheControl = &value
-		}
-		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ContentDisposition = &value
-		}
-		if values := rsp.Header.Values("Content-Security-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Security-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ContentSecurityPolicy = &value
-		}
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("Cross-Origin-Resource-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Cross-Origin-Resource-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.CrossOriginResourcePolicy = &value
-		}
-		if values := rsp.Header.Values("ETag"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ETag = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Repr-Digest"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Repr-Digest", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ReprDigest = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 206:
-		var headers DownloadThumbnailResponse206Headers
-		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.AcceptRanges = &value
-		}
-		if values := rsp.Header.Values("Cache-Control"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Cache-Control", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.CacheControl = &value
-		}
-		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ContentDisposition = &value
-		}
-		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ContentRange = &value
-		}
-		if values := rsp.Header.Values("Content-Security-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Security-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ContentSecurityPolicy = &value
-		}
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("Cross-Origin-Resource-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Cross-Origin-Resource-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.CrossOriginResourcePolicy = &value
-		}
-		if values := rsp.Header.Values("ETag"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ETag = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Repr-Digest"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Repr-Digest", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ReprDigest = &value
-		}
-		response.Headers206 = &headers
-	case rsp.StatusCode == 400:
-		var headers DownloadThumbnailResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers DownloadThumbnailResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers DownloadThumbnailResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers DownloadThumbnailResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers DownloadThumbnailResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 416:
-		var headers DownloadThumbnailResponse416Headers
-		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ContentRange = &value
-		}
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers416 = &headers
-	case rsp.StatusCode == 429:
-		var headers DownloadThumbnailResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers DownloadThumbnailResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParseCreateFileTicketResponse parses an HTTP response from a CreateFileTicketWithResponse call
-func ParseCreateFileTicketResponse(rsp *http.Response) (*CreateFileTicketResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateFileTicketResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest FileTicket
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest FileConflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 201:
-		var headers CreateFileTicketResponse201Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers201 = &headers
-	case rsp.StatusCode == 400:
-		var headers CreateFileTicketResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers CreateFileTicketResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers CreateFileTicketResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers CreateFileTicketResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers CreateFileTicketResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 429:
-		var headers CreateFileTicketResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers CreateFileTicketResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {

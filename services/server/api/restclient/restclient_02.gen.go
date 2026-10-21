@@ -16,6 +16,131 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ArchiveChannel Archive a channel
+//
+// Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a rights change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
+func (c *Client) ArchiveChannel(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, body ArchiveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewArchiveChannelRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetChannelBehavior Read prompt, skills and mention rules
+//
+// The ETag is `settings_version`.
+//
+// Corresponds with GET /channels/{channel_id}/behavior (the `GetChannelBehavior` operationId).
+func (c *Client) GetChannelBehavior(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetChannelBehaviorRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutChannelBehaviorWithBody Change prompt, skills and mention rules
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
+func (c *Client) PutChannelBehaviorWithBody(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelBehaviorRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutChannelBehavior Change prompt, skills and mention rules
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
+func (c *Client) PutChannelBehavior(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, body PutChannelBehaviorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutChannelBehaviorRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListChannelCommands List commands usable in a channel
+//
+// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
+func (c *Client) ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListChannelCommandsRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AutocompleteCommandWithBody Get suggestions for an option
+//
+// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+// no choices when the owner does not answer in time.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+func (c *Client) AutocompleteCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAutocompleteCommandRequestWithBody(c.Server, channelId, commandId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AutocompleteCommand Get suggestions for an option
+//
+// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
+// no choices when the owner does not answer in time.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
+func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // InvokeCommandWithBody Run a command
 //
 // Takes any type of body and a specified content type.
@@ -5522,6 +5647,8 @@ func (c *Client) ListAgentSessions(ctx context.Context, threadId ThreadIdPath, r
 
 // BindAgentSessionWithBody Bind an existing external session
 //
+// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/bind (the `BindAgentSession` operationId).
@@ -5538,6 +5665,8 @@ func (c *Client) BindAgentSessionWithBody(ctx context.Context, threadId ThreadId
 }
 
 // BindAgentSession Bind an existing external session
+//
+// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5556,6 +5685,8 @@ func (c *Client) BindAgentSession(ctx context.Context, threadId ThreadIdPath, pa
 
 // ReportAgentSessionWithBody Report the external session reference and model
 //
+// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -5573,6 +5704,8 @@ func (c *Client) ReportAgentSessionWithBody(ctx context.Context, threadId Thread
 
 // ReportAgentSession Report the external session reference and model
 //
+// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -5589,6 +5722,8 @@ func (c *Client) ReportAgentSession(ctx context.Context, threadId ThreadIdPath, 
 }
 
 // ResetAgentSession Start a new agent session in the thread
+//
+// Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/reset (the `ResetAgentSession` operationId).
 func (c *Client) ResetAgentSession(ctx context.Context, threadId ThreadIdPath, params *ResetAgentSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -20532,6 +20667,17 @@ func NewReportAgentSessionRequestWithBody(server string, threadId ThreadIdPath, 
 			req.Header.Set("Idempotency-Key", headerParam0)
 		}
 
+		if params.IfMatch != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam1)
+		}
+
 	}
 
 	return req, nil
@@ -25985,12 +26131,16 @@ type ClientWithResponsesInterface interface {
 
 	// BindAgentSessionWithBodyWithResponse Bind an existing external session
 	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/bind (the `BindAgentSession` operationId).
 	BindAgentSessionWithBodyWithResponse(ctx context.Context, threadId ThreadIdPath, params *BindAgentSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BindAgentSessionResponse, error)
 
 	// BindAgentSessionWithResponse Bind an existing external session
+	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25999,6 +26149,8 @@ type ClientWithResponsesInterface interface {
 
 	// ReportAgentSessionWithBodyWithResponse Report the external session reference and model
 	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -26006,12 +26158,16 @@ type ClientWithResponsesInterface interface {
 
 	// ReportAgentSessionWithResponse Report the external session reference and model
 	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
 	ReportAgentSessionWithResponse(ctx context.Context, threadId ThreadIdPath, params *ReportAgentSessionParams, body ReportAgentSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*ReportAgentSessionResponse, error)
 
 	// ResetAgentSessionWithResponse Start a new agent session in the thread
+	//
+	// Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -26578,267 +26734,5 @@ type CreateAgentResponse429Headers struct {
 
 // CreateAgentResponseDefaultHeaders the declared response headers of an HTTP default response for CreateAgent
 type CreateAgentResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type CreateAgentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers201 the parsed response headers for an HTTP 201 response
-	Headers201 *CreateAgentResponse201Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *CreateAgentResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *CreateAgentResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *CreateAgentResponse403Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *CreateAgentResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *CreateAgentResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *CreateAgentResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *CreateAgentResponseDefaultHeaders
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateAgentResponse) GetJSON201() *Agent {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r CreateAgentResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r CreateAgentResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateAgentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateAgentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r CreateAgentResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// ListServedChannelsResponse200Headers the declared response headers of an HTTP 200 response for ListServedChannels
-type ListServedChannelsResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// ListServedChannelsResponse401Headers the declared response headers of an HTTP 401 response for ListServedChannels
-type ListServedChannelsResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// ListServedChannelsResponse403Headers the declared response headers of an HTTP 403 response for ListServedChannels
-type ListServedChannelsResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// ListServedChannelsResponse429Headers the declared response headers of an HTTP 429 response for ListServedChannels
-type ListServedChannelsResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// ListServedChannelsResponseDefaultHeaders the declared response headers of an HTTP default response for ListServedChannels
-type ListServedChannelsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type ListServedChannelsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *AgentChannelConfigList
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ListServedChannelsResponse200Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ListServedChannelsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ListServedChannelsResponse403Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ListServedChannelsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ListServedChannelsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListServedChannelsResponse) GetJSON200() *AgentChannelConfigList {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListServedChannelsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListServedChannelsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListServedChannelsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListServedChannelsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListServedChannelsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// GetServedChannelConfigResponse200Headers the declared response headers of an HTTP 200 response for GetServedChannelConfig
-type GetServedChannelConfigResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// GetServedChannelConfigResponse400Headers the declared response headers of an HTTP 400 response for GetServedChannelConfig
-type GetServedChannelConfigResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse401Headers the declared response headers of an HTTP 401 response for GetServedChannelConfig
-type GetServedChannelConfigResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// GetServedChannelConfigResponse403Headers the declared response headers of an HTTP 403 response for GetServedChannelConfig
-type GetServedChannelConfigResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse404Headers the declared response headers of an HTTP 404 response for GetServedChannelConfig
-type GetServedChannelConfigResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// GetServedChannelConfigResponse429Headers the declared response headers of an HTTP 429 response for GetServedChannelConfig
-type GetServedChannelConfigResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// GetServedChannelConfigResponseDefaultHeaders the declared response headers of an HTTP default response for GetServedChannelConfig
-type GetServedChannelConfigResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

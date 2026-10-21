@@ -304,6 +304,27 @@ func (e AgentInvocationEventType) Valid() bool {
 	}
 }
 
+// Defines values for AgentInvocationPayloadSessionMode.
+const (
+	Bind   AgentInvocationPayloadSessionMode = "bind"
+	New    AgentInvocationPayloadSessionMode = "new"
+	Resume AgentInvocationPayloadSessionMode = "resume"
+)
+
+// Valid indicates whether the value is a known member of the AgentInvocationPayloadSessionMode enum.
+func (e AgentInvocationPayloadSessionMode) Valid() bool {
+	switch e {
+	case Bind:
+		return true
+	case New:
+		return true
+	case Resume:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentInvocationPayloadTriggerKind.
 const (
 	AgentInvocationPayloadTriggerKindCommand     AgentInvocationPayloadTriggerKind = "command"
@@ -451,6 +472,21 @@ const (
 func (e AgentSessionChangedEventType) Valid() bool {
 	switch e {
 	case AgentSessionChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentSessionReportBindFailed.
+const (
+	SessionMissing AgentSessionReportBindFailed = "session_missing"
+)
+
+// Valid indicates whether the value is a known member of the AgentSessionReportBindFailed enum.
+func (e AgentSessionReportBindFailed) Valid() bool {
+	switch e {
+	case SessionMissing:
 		return true
 	default:
 		return false
@@ -6024,6 +6060,7 @@ type AgentInvocationEventType string
 
 // AgentInvocationPayload Sent to the agent; the envelope carries a fresh `invocation_token` per delivery.
 type AgentInvocationPayload struct {
+	// AgentSession The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`.
 	AgentSession *AgentSession `json:"agent_session,omitempty"`
 
 	// BillingMode Backend policy of an agent. `personal` runs on the subscription of exactly one person.
@@ -6044,6 +6081,9 @@ type AgentInvocationPayload struct {
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
 
+	// SessionMode `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+	SessionMode *AgentInvocationPayloadSessionMode `json:"session_mode,omitempty"`
+
 	// SettingsVersion Channel settings version; reload `agent.config.read` when newer than cached.
 	SettingsVersion *int64 `json:"settings_version,omitempty"`
 
@@ -6057,6 +6097,9 @@ type AgentInvocationPayload struct {
 	// TriggeredBy Minimal public view of a principal, embedded in other objects.
 	TriggeredBy PrincipalRef `json:"triggered_by"`
 }
+
+// AgentInvocationPayloadSessionMode `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+type AgentInvocationPayloadSessionMode string
 
 // AgentInvocationPayloadTriggerKind defines model for AgentInvocationPayload.TriggerKind.
 type AgentInvocationPayloadTriggerKind string
@@ -6323,12 +6366,23 @@ type AgentSessionList struct {
 
 // AgentSessionReport defines model for AgentSessionReport.
 type AgentSessionReport struct {
-	// ExternalSessionRef Examples: sess-7f3a
+	// BindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+	BindFailed *AgentSessionReportBindFailed `json:"bind_failed,omitempty"`
+
+	// ExternalSessionRef The reference the runtime actually uses; a different one replaces the stored reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
+	//
+	// Examples: sess-7f3a
 	ExternalSessionRef string `json:"external_session_ref"`
 
 	// Model Examples: model-large
 	Model *string `json:"model,omitempty"`
+
+	// Started `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it.
+	Started *bool `json:"started,omitempty"`
 }
+
+// AgentSessionReportBindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+type AgentSessionReportBindFailed string
 
 // AgentTriggerers Principals that may trigger the calling agent (allow list of the adapter).
 type AgentTriggerers struct {
@@ -17138,6 +17192,9 @@ type BindAgentSessionParams struct {
 type ReportAgentSessionParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
 }
 
 // ResetAgentSessionParams defines parameters for ResetAgentSession.
@@ -23344,12 +23401,16 @@ type ClientInterface interface {
 
 	// BindAgentSessionWithBody Bind an existing external session
 	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/bind (the `BindAgentSession` operationId).
 	BindAgentSessionWithBody(ctx context.Context, threadId ThreadIdPath, params *BindAgentSessionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BindAgentSession Bind an existing external session
+	//
+	// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23358,6 +23419,8 @@ type ClientInterface interface {
 
 	// ReportAgentSessionWithBody Report the external session reference and model
 	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -23365,12 +23428,16 @@ type ClientInterface interface {
 
 	// ReportAgentSession Report the external session reference and model
 	//
+	// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
 	ReportAgentSession(ctx context.Context, threadId ThreadIdPath, params *ReportAgentSessionParams, body ReportAgentSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ResetAgentSession Start a new agent session in the thread
+	//
+	// Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
 	//
 	// Corresponds with POST /threads/{thread_id}/agent-sessions/reset (the `ResetAgentSession` operationId).
 	ResetAgentSession(ctx context.Context, threadId ThreadIdPath, params *ResetAgentSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -25328,131 +25395,6 @@ func (c *Client) ExplainChannelAccess(ctx context.Context, channelId ChannelIdPa
 // Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
 func (c *Client) ArchiveChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewArchiveChannelRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ArchiveChannel Archive a channel
-//
-// Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a rights change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
-func (c *Client) ArchiveChannel(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, body ArchiveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewArchiveChannelRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetChannelBehavior Read prompt, skills and mention rules
-//
-// The ETag is `settings_version`.
-//
-// Corresponds with GET /channels/{channel_id}/behavior (the `GetChannelBehavior` operationId).
-func (c *Client) GetChannelBehavior(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetChannelBehaviorRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutChannelBehaviorWithBody Change prompt, skills and mention rules
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
-func (c *Client) PutChannelBehaviorWithBody(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutChannelBehaviorRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutChannelBehavior Change prompt, skills and mention rules
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /channels/{channel_id}/behavior (the `PutChannelBehavior` operationId).
-func (c *Client) PutChannelBehavior(ctx context.Context, channelId ChannelIdPath, params *PutChannelBehaviorParams, body PutChannelBehaviorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutChannelBehaviorRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListChannelCommands List commands usable in a channel
-//
-// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
-func (c *Client) ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListChannelCommandsRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AutocompleteCommandWithBody Get suggestions for an option
-//
-// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
-func (c *Client) AutocompleteCommandWithBody(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAutocompleteCommandRequestWithBody(c.Server, channelId, commandId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// AutocompleteCommand Get suggestions for an option
-//
-// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/commands/{command_id}/autocomplete (the `AutocompleteCommand` operationId).
-func (c *Client) AutocompleteCommand(ctx context.Context, channelId ChannelIdPath, commandId CommandIdPath, body AutocompleteCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewAutocompleteCommandRequest(c.Server, channelId, commandId, body)
 	if err != nil {
 		return nil, err
 	}

@@ -2314,7 +2314,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start a new agent session in the thread */
+        /**
+         * Start a new agent session in the thread
+         * @description Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
+         */
         post: operations["resetAgentSession"];
         delete?: never;
         options?: never;
@@ -2331,7 +2334,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bind an existing external session */
+        /**
+         * Bind an existing external session
+         * @description Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
+         */
         post: operations["bindAgentSession"];
         delete?: never;
         options?: never;
@@ -2348,7 +2354,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Report the external session reference and model */
+        /**
+         * Report the external session reference and model
+         * @description The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+         */
         post: operations["reportAgentSession"];
         delete?: never;
         options?: never;
@@ -3503,9 +3512,13 @@ export interface paths {
         /**
          * Start a queued run
          * @description Compare-and-swap `queued -> running` after checking the invocation token. Repeating the call
-         *     with the same token after success returns 200 with `Idempotent-Replay: true`; any other token
-         *     gets 409 `already_started`. A different `billing_mode_used` fails the run with
-         *     `billing_mode_mismatch`.
+         *     with the same token after success returns 200 with `Idempotent-Replay: true` while the run is
+         *     `running`; any other token gets 409 `already_started`. Once the run waits for input, the start
+         *     token is consumed and gets 403 `invocation_token_invalid` with `reason: superseded`. A different `billing_mode_used` fails the run with
+         *     `billing_mode_mismatch`; a `tool_class_used` above the `tool_class` of the token fails it with
+         *     409 `tool_class_mismatch`. A token error gives 403 `invocation_token_invalid` with `reason`
+         *     `expired` (renew with `renewInvocationToken`, then start again), `superseded` (a newer
+         *     delivery replaced it) or `invalid` (09 section 4.5).
          */
         post: operations["startRun"];
         delete?: never;
@@ -3525,9 +3538,39 @@ export interface paths {
         put?: never;
         /**
          * Resume a run that waited for input
-         * @description `waiting_input -> running` with the token of the interaction or follow-up delivery.
+         * @description `waiting_input -> running` with the token of the interaction or follow-up delivery. The consumed start token (its `jti` equals `runs.started_jti`) gets 403 `invocation_token_invalid` with `reason: superseded` (09 section 4.5).
          */
         post: operations["resumeRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/invocation-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get a fresh invocation token for an own waiting run
+         * @description For a run in `queued` or `waiting_input` whose invocation token expired before the start
+         *     (09 section 4.5.1). The body carries the current token; its expiry is not checked, but its
+         *     signature, audience, run and `jti` are: the `jti` equals the current one (`runs.invocation_jti`)
+         *     or the one the last renewal replaced (`runs.renewed_from_jti`, retry after a lost answer), and
+         *     it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
+         *     DISTINCT FROM jti`). A retry with the replaced token issues a
+         *     fresh token again; the run still starts at most once. The server repeats every check it runs
+         *     before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
+         *     SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
+         *     replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
+         *     run that already started gets 409 `already_started`.
+         */
+        post: operations["renewInvocationToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6944,12 +6987,29 @@ export interface components {
         AgentSessionBind: {
             /** @example sess-7f3a */
             external_session_ref: string;
+            /** @description Current session of the thread as the client saw it; absent when the thread has none. A mismatch answers 409 `conflict` with `reason` `session_changed` (09, 9.4). */
+            expected_current_session_id?: components["schemas"]["Uuid"];
+            /**
+             * @description Required when the session is current in another thread; otherwise 409 `conflict` with `reason` `session_bound_elsewhere`.
+             * @default false
+             */
+            take_over: boolean;
         };
         AgentSessionReport: {
-            /** @example sess-7f3a */
+            /**
+             * @description The reference the runtime actually uses; a different one replaces the stored reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
+             * @example sess-7f3a
+             */
             external_session_ref: string;
             /** @example model-large */
             model?: string;
+            /** @description `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it. */
+            started?: boolean;
+            /**
+             * @description The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+             * @enum {string}
+             */
+            bind_failed?: "session_missing";
         };
         /** @enum {string} */
         MessageKind: "text" | "voice" | "run" | "card" | "system";
@@ -6971,10 +7031,10 @@ export interface components {
             origin: components["schemas"]["MessageOrigin"];
             kind: components["schemas"]["MessageKind"];
             /**
-             * @description Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+             * @description Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
              * @enum {string}
              */
-            system_code?: "thread.reopened";
+            system_code?: "thread.reopened" | "agent_session.resume_failed";
             /**
              * @description Markdown. In lists longer contents are cut at `message.list_content_max_bytes` with `content_truncated`.
              * @example @support-agent the invoice export fails since this morning.
@@ -7828,6 +7888,7 @@ export interface components {
              */
             invocation_token: string;
             billing_mode_used: components["schemas"]["BillingMode"];
+            tool_class_used: components["schemas"]["ToolClass"];
             /**
              * @description Absent when the runtime creates the reference only during the run; then the first `reportAgentSession` creates the session row.
              * @example sess-7f3a
@@ -7836,6 +7897,25 @@ export interface components {
             /** @example model-large */
             model?: string;
             billing_evidence?: components["schemas"]["BillingEvidence"];
+        };
+        InvocationTokenRenew: {
+            /**
+             * @description The current invocation token of the run, or on a retry after a lost answer the token the last renewal replaced; it may have expired (09 section 4.5.1).
+             * @example eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.sig
+             */
+            invocation_token: string;
+        };
+        InvocationTokenGrant: {
+            /**
+             * @description Fresh invocation token with a new `jti`; it replaces the current one of the run.
+             * @example eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0.e30.signature
+             */
+            invocation_token: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-10T09:31:00.000Z
+             */
+            expires_at: string;
         };
         RunAwaitInput: {
             /** @example Waiting for approval */
@@ -8869,7 +8949,13 @@ export interface components {
             command_invocation_id?: components["schemas"]["Uuid"];
             triggered_by: components["schemas"]["PrincipalRef"];
             billing_mode: components["schemas"]["BillingMode"];
+            /** @description The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`. */
             agent_session?: components["schemas"]["AgentSession"];
+            /**
+             * @description `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+             * @enum {string}
+             */
+            session_mode?: "new" | "resume" | "bind";
             /**
              * Format: int64
              * @description Channel settings version; reload `agent.config.read` when newer than cached.
@@ -8886,7 +8972,7 @@ export interface components {
             run_id: components["schemas"]["Uuid"];
             thread_id: components["schemas"]["Uuid"];
             /** @enum {string} */
-            reason: "user_cancelled" | "access_revoked" | "agent_disabled" | "user_disabled";
+            reason: "user_cancelled" | "access_revoked" | "agent_disabled" | "user_disabled" | "channel_read_only";
             requested_by?: components["schemas"]["Uuid"];
         };
         InteractionCreatedPayload: {
@@ -16086,6 +16172,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -16126,6 +16213,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -16148,6 +16236,8 @@ export interface operations {
             header?: {
                 /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Optional ETag; when given, a mismatch gives 412 `version_conflict`. */
+                "If-Match"?: components["parameters"]["IfMatchOptional"];
             };
             path: {
                 thread_id: components["parameters"]["ThreadIdPath"];
@@ -16166,6 +16256,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -16176,6 +16267,8 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
@@ -18938,10 +19031,11 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK. */
+            /** @description OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5). */
             200: {
                 headers: {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
                     [name: string]: unknown;
@@ -18974,6 +19068,43 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5). */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Run"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    renewInvocationToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: components["parameters"]["RunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvocationTokenRenew"];
+            };
+        };
+        responses: {
             /** @description OK. */
             200: {
                 headers: {
@@ -18983,7 +19114,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Run"];
+                    "application/json": components["schemas"]["InvocationTokenGrant"];
                 };
             };
             400: components["responses"]["BadRequest"];

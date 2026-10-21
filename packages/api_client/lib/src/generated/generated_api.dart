@@ -335,6 +335,8 @@ export 'package:api_client/src/generated/model/interaction_created_payload.dart'
 export 'package:api_client/src/generated/model/interaction_respond.dart';
 export 'package:api_client/src/generated/model/interaction_response.dart';
 export 'package:api_client/src/generated/model/invariant_violation.dart';
+export 'package:api_client/src/generated/model/invocation_token_grant.dart';
+export 'package:api_client/src/generated/model/invocation_token_renew.dart';
 export 'package:api_client/src/generated/model/json_patch_operation.dart';
 export 'package:api_client/src/generated/model/jwks.dart';
 export 'package:api_client/src/generated/model/level.dart';

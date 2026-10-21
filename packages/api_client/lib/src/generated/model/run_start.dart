@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:api_client/src/generated/model/tool_class.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/billing_evidence.dart';
 import 'package:built_value/built_value.dart';
@@ -15,6 +16,7 @@ part 'run_start.g.dart';
 /// Properties:
 /// * [invocationToken] - JWS from the delivered invocation (I3).
 /// * [billingModeUsed]
+/// * [toolClassUsed]
 /// * [externalSessionRef] - Absent when the runtime creates the reference only during the run; then the first `reportAgentSession` creates the session row.
 /// * [model]
 /// * [billingEvidence]
@@ -27,6 +29,10 @@ abstract class RunStart implements Built<RunStart, RunStartBuilder> {
   @BuiltValueField(wireName: r'billing_mode_used')
   BillingMode get billingModeUsed;
   // enum billingModeUsedEnum {  personal,  organization,  };
+
+  @BuiltValueField(wireName: r'tool_class_used')
+  ToolClass get toolClassUsed;
+  // enum toolClassUsedEnum {  chat,  scoped,  host,  };
 
   /// Absent when the runtime creates the reference only during the run; then the first `reportAgentSession` creates the session row.
   @BuiltValueField(wireName: r'external_session_ref')
@@ -70,6 +76,11 @@ class _$RunStartSerializer implements PrimitiveSerializer<RunStart> {
     yield serializers.serialize(
       object.billingModeUsed,
       specifiedType: const FullType(BillingMode),
+    );
+    yield r'tool_class_used';
+    yield serializers.serialize(
+      object.toolClassUsed,
+      specifiedType: const FullType(ToolClass),
     );
     if (object.externalSessionRef != null) {
       yield r'external_session_ref';
@@ -132,6 +143,13 @@ class _$RunStartSerializer implements PrimitiveSerializer<RunStart> {
             specifiedType: const FullType(BillingMode),
           ) as BillingMode;
           result.billingModeUsed = valueDes;
+          break;
+        case r'tool_class_used':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(ToolClass),
+          ) as ToolClass;
+          result.toolClassUsed = valueDes;
           break;
         case r'external_session_ref':
           final valueDes = serializers.deserialize(

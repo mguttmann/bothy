@@ -12,11 +12,21 @@ part 'agent_session_bind.g.dart';
 ///
 /// Properties:
 /// * [externalSessionRef]
+/// * [expectedCurrentSessionId] - Current session of the thread as the client saw it; absent when the thread has none. A mismatch answers 409 `conflict` with `reason` `session_changed` (09, 9.4).
+/// * [takeOver] - Required when the session is current in another thread; otherwise 409 `conflict` with `reason` `session_bound_elsewhere`.
 @BuiltValue()
 abstract class AgentSessionBind
     implements Built<AgentSessionBind, AgentSessionBindBuilder> {
   @BuiltValueField(wireName: r'external_session_ref')
   String get externalSessionRef;
+
+  /// Current session of the thread as the client saw it; absent when the thread has none. A mismatch answers 409 `conflict` with `reason` `session_changed` (09, 9.4).
+  @BuiltValueField(wireName: r'expected_current_session_id')
+  String? get expectedCurrentSessionId;
+
+  /// Required when the session is current in another thread; otherwise 409 `conflict` with `reason` `session_bound_elsewhere`.
+  @BuiltValueField(wireName: r'take_over')
+  bool? get takeOver;
 
   AgentSessionBind._();
 
@@ -24,7 +34,7 @@ abstract class AgentSessionBind
       _$AgentSessionBind;
 
   @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(AgentSessionBindBuilder b) => b;
+  static void _defaults(AgentSessionBindBuilder b) => b..takeOver = false;
 
   @BuiltValueSerializer(custom: true)
   static Serializer<AgentSessionBind> get serializer =>
@@ -49,6 +59,20 @@ class _$AgentSessionBindSerializer
       object.externalSessionRef,
       specifiedType: const FullType(String),
     );
+    if (object.expectedCurrentSessionId != null) {
+      yield r'expected_current_session_id';
+      yield serializers.serialize(
+        object.expectedCurrentSessionId,
+        specifiedType: const FullType(String),
+      );
+    }
+    if (object.takeOver != null) {
+      yield r'take_over';
+      yield serializers.serialize(
+        object.takeOver,
+        specifiedType: const FullType(bool),
+      );
+    }
   }
 
   @override
@@ -82,6 +106,22 @@ class _$AgentSessionBindSerializer
             specifiedType: const FullType(String),
           ) as String;
           result.externalSessionRef = valueDes;
+          break;
+        case r'expected_current_session_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(String),
+          ) as String?;
+          if (valueDes == null) continue;
+          result.expectedCurrentSessionId = valueDes;
+          break;
+        case r'take_over':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.takeOver = valueDes;
           break;
         default:
           unhandled.add(key);

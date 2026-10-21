@@ -7,6 +7,9 @@ from uuid import UUID
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.agent_invocation_payload_session_mode import (
+    AgentInvocationPayloadSessionMode,
+)
 from ..models.agent_invocation_payload_trigger_kind import (
     AgentInvocationPayloadTriggerKind,
 )
@@ -38,6 +41,10 @@ class AgentInvocationPayload:
         interaction_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         command_invocation_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         agent_session (AgentSession | Unset):
+        session_mode (AgentInvocationPayloadSessionMode | Unset): `session.mode` of 09, 9.1: `new` creates the external
+            session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session
+            that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run
+            has neither `session_mode` nor `agent_session` (09, 3.6).
         settings_version (int | Unset): Channel settings version; reload `agent.config.read` when newer than cached.
     """
 
@@ -52,6 +59,7 @@ class AgentInvocationPayload:
     interaction_id: UUID | Unset = UNSET
     command_invocation_id: UUID | Unset = UNSET
     agent_session: AgentSession | Unset = UNSET
+    session_mode: AgentInvocationPayloadSessionMode | Unset = UNSET
     settings_version: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -88,6 +96,10 @@ class AgentInvocationPayload:
         if not isinstance(self.agent_session, Unset):
             agent_session = self.agent_session.to_dict()
 
+        session_mode: str | Unset = UNSET
+        if not isinstance(self.session_mode, Unset):
+            session_mode = self.session_mode.value
+
         settings_version = self.settings_version
 
         field_dict: dict[str, Any] = {}
@@ -112,6 +124,8 @@ class AgentInvocationPayload:
             field_dict["command_invocation_id"] = command_invocation_id
         if agent_session is not UNSET:
             field_dict["agent_session"] = agent_session
+        if session_mode is not UNSET:
+            field_dict["session_mode"] = session_mode
         if settings_version is not UNSET:
             field_dict["settings_version"] = settings_version
 
@@ -170,6 +184,13 @@ class AgentInvocationPayload:
         else:
             agent_session = AgentSession.from_dict(_agent_session)
 
+        _session_mode = d.pop("session_mode", UNSET)
+        session_mode: AgentInvocationPayloadSessionMode | Unset
+        if isinstance(_session_mode, Unset):
+            session_mode = UNSET
+        else:
+            session_mode = AgentInvocationPayloadSessionMode(_session_mode)
+
         settings_version = d.pop("settings_version", UNSET)
 
         agent_invocation_payload = cls(
@@ -184,6 +205,7 @@ class AgentInvocationPayload:
             interaction_id=interaction_id,
             command_invocation_id=command_invocation_id,
             agent_session=agent_session,
+            session_mode=session_mode,
             settings_version=settings_version,
         )
 

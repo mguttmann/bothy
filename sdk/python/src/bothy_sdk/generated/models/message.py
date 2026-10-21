@@ -50,7 +50,9 @@ class Message:
         version (int):
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         system_code (MessageSystemCode | Unset): Set exactly for `kind = system`; clients render the localized line from
-            it and `author`. `content_md` is empty then.
+            it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no
+            longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's
+            agent. A system line never reopens a done thread.
         content_truncated (bool | Unset): Set when `content_md` was cut (events above `sync.event_payload_max_bytes`,
             lists above `message.list_content_max_bytes`); `getMessage` returns the full content.
         reply_to_message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

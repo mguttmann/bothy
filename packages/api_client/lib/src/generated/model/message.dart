@@ -27,7 +27,7 @@ part 'message.g.dart';
 /// * [clientMsgId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [origin]
 /// * [kind]
-/// * [systemCode] - Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+/// * [systemCode] - Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
 /// * [contentMd] - Markdown. In lists longer contents are cut at `message.list_content_max_bytes` with `content_truncated`.
 /// * [contentFormat] - Version of the Markdown dialect; `1` is CommonMark 0.31.2 without raw HTML, with mention tokens (03 `messages`).
 /// * [contentTruncated] - Set when `content_md` was cut (events above `sync.event_payload_max_bytes`, lists above `message.list_content_max_bytes`); `getMessage` returns the full content.
@@ -79,10 +79,10 @@ abstract class Message implements Built<Message, MessageBuilder> {
   MessageKind get kind;
   // enum kindEnum {  text,  voice,  run,  card,  system,  };
 
-  /// Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+  /// Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
   @BuiltValueField(wireName: r'system_code')
   MessageSystemCodeEnum? get systemCode;
-  // enum systemCodeEnum {  thread.reopened,  };
+  // enum systemCodeEnum {  thread.reopened,  agent_session.resume_failed,  };
 
   /// Markdown. In lists longer contents are cut at `message.list_content_max_bytes` with `content_truncated`.
   @BuiltValueField(wireName: r'content_md')
@@ -603,11 +603,14 @@ class _$MessageSerializer implements PrimitiveSerializer<Message> {
   }
 }
 
-/// Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+/// Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
 class MessageSystemCodeEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'thread.reopened')
   static const MessageSystemCodeEnum threadPeriodReopened =
       _$messageSystemCodeEnum_threadPeriodReopened;
+  @BuiltValueEnumConst(wireName: r'agent_session.resume_failed')
+  static const MessageSystemCodeEnum agentSessionPeriodResumeFailed =
+      _$messageSystemCodeEnum_agentSessionPeriodResumeFailed;
   @BuiltValueEnumConst(wireName: r'unknown_default_open_api', fallback: true)
   static const MessageSystemCodeEnum unknownDefaultOpenApi =
       _$messageSystemCodeEnum_unknownDefaultOpenApi;

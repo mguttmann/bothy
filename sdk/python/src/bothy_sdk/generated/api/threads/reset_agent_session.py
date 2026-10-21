@@ -98,6 +98,10 @@ def sync_detailed(
 ) -> Response[AgentSession | Problem]:
     """Start a new agent session in the thread
 
+     Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next
+    run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current
+    session 409 `conflict` with `reason` `no_current_session`.
+
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -130,6 +134,10 @@ def sync(
 ) -> AgentSession | Problem | None:
     """Start a new agent session in the thread
 
+     Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next
+    run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current
+    session 409 `conflict` with `reason` `no_current_session`.
+
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -156,6 +164,10 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[AgentSession | Problem]:
     """Start a new agent session in the thread
+
+     Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next
+    run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current
+    session 409 `conflict` with `reason` `no_current_session`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -186,6 +198,10 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> AgentSession | Problem | None:
     """Start a new agent session in the thread
+
+     Ends the current session of the thread with `end_reason = reset` and answers the ended row; the next
+    run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current
+    session 409 `conflict` with `reason` `no_current_session`.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -302,6 +302,27 @@ func (e AgentInvocationEventType) Valid() bool {
 	}
 }
 
+// Defines values for AgentInvocationPayloadSessionMode.
+const (
+	Bind   AgentInvocationPayloadSessionMode = "bind"
+	New    AgentInvocationPayloadSessionMode = "new"
+	Resume AgentInvocationPayloadSessionMode = "resume"
+)
+
+// Valid indicates whether the value is a known member of the AgentInvocationPayloadSessionMode enum.
+func (e AgentInvocationPayloadSessionMode) Valid() bool {
+	switch e {
+	case Bind:
+		return true
+	case New:
+		return true
+	case Resume:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AgentInvocationPayloadTriggerKind.
 const (
 	AgentInvocationPayloadTriggerKindCommand     AgentInvocationPayloadTriggerKind = "command"
@@ -449,6 +470,21 @@ const (
 func (e AgentSessionChangedEventType) Valid() bool {
 	switch e {
 	case AgentSessionChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentSessionReportBindFailed.
+const (
+	SessionMissing AgentSessionReportBindFailed = "session_missing"
+)
+
+// Valid indicates whether the value is a known member of the AgentSessionReportBindFailed enum.
+func (e AgentSessionReportBindFailed) Valid() bool {
+	switch e {
+	case SessionMissing:
 		return true
 	default:
 		return false
@@ -5962,6 +5998,7 @@ type AgentInvocationEventType string
 
 // AgentInvocationPayload Sent to the agent; the envelope carries a fresh `invocation_token` per delivery.
 type AgentInvocationPayload struct {
+	// AgentSession The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`.
 	AgentSession *AgentSession `json:"agent_session,omitempty"`
 
 	// BillingMode Backend policy of an agent. `personal` runs on the subscription of exactly one person.
@@ -5982,6 +6019,9 @@ type AgentInvocationPayload struct {
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
 
+	// SessionMode `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+	SessionMode *AgentInvocationPayloadSessionMode `json:"session_mode,omitempty"`
+
 	// SettingsVersion Channel settings version; reload `agent.config.read` when newer than cached.
 	SettingsVersion *int64 `json:"settings_version,omitempty"`
 
@@ -5995,6 +6035,9 @@ type AgentInvocationPayload struct {
 	// TriggeredBy Minimal public view of a principal, embedded in other objects.
 	TriggeredBy PrincipalRef `json:"triggered_by"`
 }
+
+// AgentInvocationPayloadSessionMode `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+type AgentInvocationPayloadSessionMode string
 
 // AgentInvocationPayloadTriggerKind defines model for AgentInvocationPayload.TriggerKind.
 type AgentInvocationPayloadTriggerKind string
@@ -6261,12 +6304,23 @@ type AgentSessionList struct {
 
 // AgentSessionReport defines model for AgentSessionReport.
 type AgentSessionReport struct {
-	// ExternalSessionRef Examples: sess-7f3a
+	// BindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+	BindFailed *AgentSessionReportBindFailed `json:"bind_failed,omitempty"`
+
+	// ExternalSessionRef The reference the runtime actually uses; a different one replaces the stored reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
+	//
+	// Examples: sess-7f3a
 	ExternalSessionRef string `json:"external_session_ref"`
 
 	// Model Examples: model-large
 	Model *string `json:"model,omitempty"`
+
+	// Started `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it.
+	Started *bool `json:"started,omitempty"`
 }
+
+// AgentSessionReportBindFailed The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+type AgentSessionReportBindFailed string
 
 // AgentTriggerers Principals that may trigger the calling agent (allow list of the adapter).
 type AgentTriggerers struct {
