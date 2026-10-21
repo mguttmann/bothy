@@ -95,6 +95,16 @@ type Authorizer struct {
 	metrics   Metrics
 	cache     *snapshotCache
 	delivery  *deliveryState
+	// onScope is the test seam SetScopeObserver; nil in production.
+	onScope func(context.Context, authorize.Action)
+}
+
+// SetScopeObserver installs f, which every Scope call invokes with its context and action before
+// it decides (a test seam: TestSR9_EveryScopedList of M2-14 records which operation lists through
+// Scope). Call it before the Authorizer serves requests; nil removes it. It never changes a
+// decision.
+func (a *Authorizer) SetScopeObserver(f func(ctx context.Context, act authorize.Action)) {
+	a.onScope = f
 }
 
 // Compile-time check: the Authorizer is the kernel port.

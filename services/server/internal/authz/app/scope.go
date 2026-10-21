@@ -31,6 +31,9 @@ type scopeMemoKey struct {
 // check log; a principal that fails the liveness or pending checks gets the error of its decision,
 // which is audited like a denial of Authorize.
 func (a *Authorizer) Scope(ctx context.Context, p authorize.Principal, act authorize.Action) (authorize.Scope, error) {
+	if a.onScope != nil {
+		a.onScope(ctx, act)
+	}
 	sc, d, err := a.scope(ctx, p, act)
 	allowed := err == nil && d.Outcome == domain.OutcomeAllow
 	authorize.RecordCheck(ctx, authorize.Check{Action: string(act), Kind: authorize.CheckScope, Allowed: allowed})

@@ -73,6 +73,9 @@ func (s *server) startAuthz(context.Context) error {
 	if err != nil {
 		return err
 	}
+	if s.deps.ScopeObserver != nil {
+		az.SetScopeObserver(s.deps.ScopeObserver)
+	}
 	if sy == nil {
 		return errors.New("wire: the authz step needs the event log of the sync step")
 	}
