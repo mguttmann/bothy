@@ -35,6 +35,8 @@ type qconn struct {
 	// records the world step of the queueing).
 	stamp     func() int64
 	offeredAt map[int64]int64
+	// live, set by connect, reports whether the hub has the connection in the live phase.
+	live func() bool
 }
 
 func newQConn(maxFrames int) *qconn {
@@ -425,6 +427,7 @@ func connect(t testing.TB, h *app.Hub, a actor.Actor, maxFrames int, from, head 
 	t.Helper()
 	qc := newQConn(maxFrames)
 	c, s := app.NewTestConnection(qc, a)
+	qc.live = func() bool { return h.PhaseOf(c) == domain.PhaseLive }
 	h.Register(context.Background(), c, s)
 	if err := h.Attach(context.Background(), c, from, head); err != nil {
 		t.Fatal(err)

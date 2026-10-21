@@ -34,15 +34,19 @@ func catchUpWorld() (w *hubWorld, alex actor.Actor, space, visible, hidden ids.I
 	return w, alex, space, visible, hidden
 }
 
-// waitComplete drains qc until catchup.complete was written and returns every frame.
+// waitComplete drains qc until catchup.complete was written and, for a connection of connect,
+// until the hub has flushed the live buffer and moved it to the live phase, so that a later
+// Dispatch is delivered live; it returns every frame. The hub queues catchup.complete before the
+// flush, so the frame alone does not mean the connection is live.
 func waitComplete(t *testing.T, qc *qconn) []frame {
 	t.Helper()
 	var fs []frame
 	waitFor(t, "catchup.complete", func() bool {
 		fs = framesOf(t, qc.drain())
-		return slices.ContainsFunc(fs, func(f frame) bool { return f.op == "catchup.complete" })
+		return slices.ContainsFunc(fs, func(f frame) bool { return f.op == "catchup.complete" }) &&
+			(qc.live == nil || qc.live())
 	})
-	return fs
+	return framesOf(t, qc.drain())
 }
 
 // TestCatchUp_PagesCursorFramesAndComplete: about 2.5 pages (sync.catchup_page_size 4), half of
