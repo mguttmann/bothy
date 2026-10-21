@@ -159,7 +159,7 @@ def test_the_flakes_go_to_a_file_and_the_job_summary(
     flakes.record(tmp_path / "out", "go", [flake])
     [written] = (tmp_path / "out").iterdir()
     assert flakes.load_flakes([written]) == [flake]
-    assert "| go | `example.com/mod/a` | `TestA\\|'x'` | 2 | 1 |" in summary.read_text(
+    assert "| `go` | `example.com/mod/a` | `TestA\\|'x'` | 2 | 1 |" in summary.read_text(
         encoding="utf-8"
     )
     assert f"FLAKE (go): {PKG} TestA|`x`: passed after 1 failed run(s)" in capsys.readouterr().out
@@ -366,6 +366,57 @@ def test_a_failure_in_every_attempt_or_a_race_still_fails(
     assert found == []
 
 
+_TWICE_TEST = """package a
+
+import (
+	"os"
+	"testing"
+)
+
+// Fails in the first two attempts (the marker file counts them), passes in the third.
+func TestTwice(t *testing.T) {
+	m := os.Getenv("TWICE")
+	data, _ := os.ReadFile(m)
+	if len(data) < 2 {
+		_ = os.WriteFile(m, append(data, 'x'), 0o600)
+		t.Fatal("attempt", len(data)+1)
+	}
+}
+"""
+_MAIN_FAILS_TEST = """package b
+
+import (
+	"os"
+	"testing"
+)
+
+func TestB(t *testing.T) {}
+
+// A check after the tests that always fails, such as a leak check.
+func TestMain(m *testing.M) {
+	m.Run()
+	os.Exit(1)
+}
+"""
+
+
+def test_a_package_that_fails_in_every_attempt_fails_beside_a_later_flake(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gotestsum: str
+) -> None:
+    # gotestsum forgets a package-level failure of a rerun when another test needs one more
+    # attempt and passes in it; the last outcome of every test and package must decide.
+    module = tmp_path / "mod"
+    (module / "a").mkdir(parents=True)
+    (module / "b").mkdir()
+    (module / "go.mod").write_text("module example.com/mod\n\ngo 1.26\n", encoding="utf-8")
+    (module / "a" / "a_test.go").write_text(_TWICE_TEST, encoding="utf-8")
+    (module / "b" / "b_test.go").write_text(_MAIN_FAILS_TEST, encoding="utf-8")
+    monkeypatch.setenv("TWICE", str(tmp_path / "count"))
+    code, found, _ = _run(tmp_path, monkeypatch, gotestsum, {})
+    assert code != 0
+    assert found == [{"tool": "go", "package": PKG, "test": "TestTwice", "runs": 3, "failures": 2}]
+
+
 def test_go_shards_runs_each_go_test_through_flakes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gotestsum: str
 ) -> None:
@@ -423,6 +474,7 @@ class FakeGh:
         self.artifacts = artifacts
         self.issues: list[dict[str, Any]] = []
         self.comments: list[str] = []
+        self.foreign: list[str] = []
         self.calls: list[list[str]] = []
 
     def __call__(self, args: Sequence[str]) -> str:
@@ -443,9 +495,11 @@ class FakeGh:
         if args[:2] == ["issue", "list"]:
             return json.dumps([{"number": i["number"], "title": i["title"]} for i in self.issues])
         if args[:2] == ["api", "--paginate"] and args[2].endswith("/comments"):
-            return "".join(json.dumps({"body": b}) + "\n" for b in self.comments)
-        if args[0] == "api" and "/artifacts" in args[1]:
-            run = int(args[1].split("/runs/")[1].split("/")[0])
+            own = [{"body": b, "user": flakes.BOT} for b in self.comments]
+            other = [{"body": b, "user": "someone"} for b in self.foreign]
+            return "".join(json.dumps(c) + "\n" for c in [*other, *own])
+        if args[:2] == ["api", "--paginate"] and "/artifacts" in args[2]:
+            run = int(args[2].split("/runs/")[1].split("/")[0])
             names = [*self.artifacts[run], "go-shard-1"]
             return "".join(json.dumps({"name": n}) + "\n" for n in names)
         if args[:2] == ["run", "download"]:
@@ -490,20 +544,32 @@ def test_the_issue_gets_one_comment_per_run_with_flakes_and_the_list(
     [label] = [c for c in gh.calls if c[:2] == ["label", "create"]]
     assert label[label.index("--color") + 1] == "d93f0b"
     [first] = gh.comments
-    assert "| new | go | `example.com/mod/a` | `TestA` | 2 | 1 |" in first
-    assert "| 1 | 11 | go | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
+    assert "| new | `go` | `example.com/mod/a` | `TestA` | 2 | 1 |" in first
+    assert "| 1 | 11 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
     # The next run sees run 11 in the comments; a new run with TestA and TestB marks only TestB new.
     gh.artifacts[13] = {"flakes-test-apps": [_flake("TestA"), _flake("Test<B>-->")]}
     assert _issue(gh) == 0
     assert len(gh.comments) == 2
     second = gh.comments[1]
-    assert "|  | go | `example.com/mod/a` | `TestA` |" in second
+    assert "|  | `go` | `example.com/mod/a` | `TestA` |" in second
     # Angle brackets of a name could open or close an HTML comment such as the hidden line.
-    assert "| new | go | `example.com/mod/a` | `Test\u2039B\u203a--\u203a` |" in second
+    assert "| new | `go` | `example.com/mod/a` | `Test\u2039B\u203a--\u203a` |" in second
     assert second.count("-->") == 1
     assert flakes.parse_comments(gh.comments)[13][1]["test"] == "Test<B>-->"
-    assert "| 2 | 13 | go | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
+    assert "| 2 | 13 | `go` | `example.com/mod/a` | `TestA` |" in gh.issues[0]["body"]
     assert len([c for c in gh.calls if c[:2] == ["issue", "create"]]) == 1
     assert _issue(gh) == 0
     assert len(gh.comments) == 2
     assert "no new flakes" in capsys.readouterr().out
+
+
+def test_only_the_bot_comments_count_and_their_flakes_are_checked() -> None:
+    gh = FakeGh({21: {"flakes-test-apps": [{**_flake("TestA"), "tool": "[x](https://e) @u"}]}})
+    # A comment of another user cannot mark a run as seen, and a broken one of the bot is skipped.
+    gh.foreign.append(flakes.marker(21, [_flake("TestForged")]))
+    gh.comments.append('<!-- flakes run=5 {"flakes": [{}]} -->')
+    assert _issue(gh) == 0
+    assert len(gh.comments) == 2
+    assert "TestForged" not in gh.issues[0]["body"]
+    assert "`[x](https:`" in gh.comments[1]
+    assert "| 1 | 21 | `[x](https:` |" in gh.issues[0]["body"]

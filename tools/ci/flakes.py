@@ -65,6 +65,8 @@ SCHEMA = 1
 # The tracking issue: one open issue with this label and title.
 LABEL = "flake"
 TITLE = "Flaky tests (reruns that passed in CI)"
+# The author of the comments `issue` writes with the GITHUB_TOKEN.
+BOT = "github-actions[bot]"
 # The hidden line of a comment of `issue` with the run and its flakes (JSON).
 _MARKER = re.compile(r"<!-- flakes run=(\d+) (\{.*?\}) -->")
 _ATTEMPT = re.compile(r"\.attempt(\d+)$")
@@ -175,17 +177,31 @@ def _exec(args: argparse.Namespace) -> int:
     os.execvp("go", command)  # noqa: S606  # nosec B606 B607 - go test with the Makefile's flags
 
 
-def flakes_from_events(lines: Iterable[str]) -> list[Flake]:
-    """The flakes of gotestsum's timing events (pass, fail and skip of every attempt)."""
-    outcomes: dict[tuple[str, str], list[str]] = {}
+def outcomes(lines: Iterable[str]) -> dict[tuple[str, str], list[str]]:
+    """The results (pass, fail) of every test and package (test "") in the order of the attempts."""
+    found: dict[tuple[str, str], list[str]] = {}
     for line in lines:
         if not line.strip():
             continue
         event = json.loads(line)
         if event.get("Action") in ("pass", "fail"):
             key = (str(event.get("Package", "")), str(event.get("Test", "")))
-            outcomes.setdefault(key, []).append(event["Action"])
-    flaky = {k: v for k, v in outcomes.items() if "fail" in v and v[-1] == "pass"}
+            found.setdefault(key, []).append(event["Action"])
+    return found
+
+
+def still_failing(lines: Iterable[str]) -> list[tuple[str, str]]:
+    """The tests and packages whose last attempt failed.
+
+    gotestsum forgets a package that failed again in a rerun without a failed test when another
+    test needs one more attempt and passes in it; its exit code is then 0. This list decides.
+    """
+    return sorted(k for k, v in outcomes(lines).items() if v[-1] == "fail")
+
+
+def flakes_from_events(lines: Iterable[str]) -> list[Flake]:
+    """The flakes of gotestsum's timing events (pass, fail and skip of every attempt)."""
+    flaky = {k: v for k, v in outcomes(lines).items() if "fail" in v and v[-1] == "pass"}
     out: list[Flake] = []
     for (package, test), results in sorted(flaky.items()):
         inner = [
@@ -223,7 +239,10 @@ def _go(args: argparse.Namespace) -> int:
             merge_attempts(profile)
         lines = events.read_text(encoding="utf-8").splitlines() if events.exists() else []
     record(args.dir, "go", flakes_from_events(lines))
-    return done.returncode
+    failing = still_failing(lines)
+    for package, test in failing:
+        print(f"FAIL after the reruns: {package} {test or '(package)'}", file=sys.stderr)
+    return done.returncode or (1 if failing else 0)
 
 
 # --- Dart: the JSON report of flutter test -----------------------------------------------------
@@ -299,7 +318,7 @@ def table(flakes: Sequence[Flake]) -> str:
     rows = ["| Tool | Package | Test | Runs | Failures |", "|---|---|---|---|---|"]
     for f in flakes:
         cells = [
-            f["tool"],
+            _cell(f["tool"]),
             _cell(f["package"]),
             _cell(_test_name(f)),
             str(f["runs"]),
@@ -336,17 +355,29 @@ def load_flakes(paths: Iterable[Path]) -> list[Flake]:
             continue
         if not isinstance(data, dict) or data.get("schema") != SCHEMA:
             continue
-        for f in data.get("flakes", []):
-            if isinstance(f, dict) and {"tool", "package", "test", "runs", "failures"} <= set(f):
-                out.append(
-                    {
-                        "tool": str(f["tool"])[:10],
-                        "package": str(f["package"])[:_NAME_MAX],
-                        "test": str(f["test"])[:_NAME_MAX],
-                        "runs": int(f["runs"]),
-                        "failures": int(f["failures"]),
-                    }
-                )
+        out += clean(data.get("flakes", []))
+    return out
+
+
+def clean(items: Any) -> list[Flake]:
+    """The well-formed flakes of `items` with their names cut to a bounded length."""
+    out: list[Flake] = []
+    for f in items if isinstance(items, list) else []:
+        if not isinstance(f, dict) or not {"tool", "package", "test", "runs", "failures"} <= set(f):
+            continue
+        try:
+            runs, failures = int(f["runs"]), int(f["failures"])
+        except (TypeError, ValueError):
+            continue
+        out.append(
+            {
+                "tool": str(f["tool"])[:10],
+                "package": str(f["package"])[:_NAME_MAX],
+                "test": str(f["test"])[:_NAME_MAX],
+                "runs": runs,
+                "failures": failures,
+            }
+        )
     return out
 
 
@@ -390,9 +421,11 @@ def parse_comments(bodies: Iterable[str]) -> dict[int, list[Flake]]:
     for body in bodies:
         for match in _MARKER.finditer(body or ""):
             try:
-                seen[int(match[1])] = list(json.loads(match[2]).get("flakes", []))
+                payload = json.loads(match[2])
             except ValueError:
                 continue
+            if isinstance(payload, dict):
+                seen[int(match[1])] = clean(payload.get("flakes"))
     return seen
 
 
@@ -403,7 +436,7 @@ def comment(run: dict[str, Any], flakes: Sequence[Flake], known: set[str]) -> st
         new = "new" if _key(f) not in known else ""
         cells = [
             new,
-            f["tool"],
+            _cell(f["tool"]),
             _cell(f["package"]),
             _cell(_test_name(f)),
             str(f["runs"]),
@@ -432,7 +465,7 @@ def body(seen: dict[int, list[Flake]]) -> str:
     rows = ["| Runs with the flake | Last run | Tool | Package | Test |", "|---|---|---|---|---|"]
     for key in sorted(count, key=lambda k: (-count[k], k)):
         f = sample[key]
-        cells = [str(count[key]), str(last[key]), f["tool"], _cell(f["package"])]
+        cells = [str(count[key]), str(last[key]), _cell(f["tool"]), _cell(f["package"])]
         rows.append("| " + " | ".join([*cells, _cell(_test_name(f))]) + " |")
     return (
         "Tests that failed and then passed in a rerun of CI (docs/quality/gates.md, section "
@@ -484,10 +517,11 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
                 "--paginate",
                 f"repos/{args.repo}/issues/{number}/comments",
                 "--jq",
-                ".[] | {body}",
+                ".[] | {body, user: .user.login}",
             ]
         )
-        bodies = [str(c.get("body") or "") for c in _json_lines(listed)]
+        # Only the comments of this workflow: anyone can comment on the public issue.
+        bodies = [str(c.get("body") or "") for c in _json_lines(listed) if c.get("user") == BOT]
     seen = parse_comments(bodies)
     known = {_key(f) for flakes in seen.values() for f in flakes}
     added = 0
@@ -497,6 +531,7 @@ def _issue(args: argparse.Namespace, gh: Gh = _gh) -> int:
         listed = gh(
             [
                 "api",
+                "--paginate",
                 f"repos/{args.repo}/actions/runs/{run['id']}/artifacts?per_page=100",
                 "--jq",
                 ".artifacts[] | select(.expired | not) | {name}",
