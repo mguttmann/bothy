@@ -67,6 +67,8 @@ class Fake:
     def auth_status(self) -> int:
         env = dict(os.environ)
         self.record("auth_status", argv=sys.argv[1:], env=env, cwd=os.getcwd())
+        if self.scenario.get("auth_sleep"):
+            time.sleep(float(self.scenario["auth_sleep"]))
         if "auth_raw" in self.scenario:
             sys.stdout.write(str(self.scenario["auth_raw"]))
             return int(self.scenario.get("auth_exit", 0))

@@ -23,6 +23,7 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from bothy_sdk.sources import EventSource
 from bothy_sdk.testing.fakeserver import FakeServer
 
 from claude_code_runner.app import Runner
@@ -101,9 +102,16 @@ class World:
     def calls(self, kind: str) -> list[dict[str, Any]]:
         return [c for c in helper.read_capture(self.capture) if c["kind"] == kind]
 
-    async def start(self, config: RunnerConfig | None = None, **env: str) -> Runner:
+    async def start(
+        self,
+        config: RunnerConfig | None = None,
+        wrap: Callable[[EventSource], EventSource] | None = None,
+        **env: str,
+    ) -> Runner:
         runner = Runner(config or self.config(), self.environ(**env), clock=self.fake.clock)
-        await runner.build()
+        adapter = await runner.build()
+        if wrap is not None:
+            adapter.source = wrap(await adapter.make_source())
         task = asyncio.ensure_future(runner.run())
         self.runners.append((runner, task))
         await self.until(lambda: any(h.get("details", {}).get("adapter") for h in self.fake.heartbeats))
