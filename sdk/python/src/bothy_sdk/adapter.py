@@ -56,6 +56,7 @@ from bothy_sdk.generated.api.agent_runtime import (
     get_agent_triggerers,
     renew_invocation_token,
     resume_run,
+    send_heartbeat,
     start_run,
 )
 from bothy_sdk.generated.api.runs import get_run
@@ -67,6 +68,7 @@ from bothy_sdk.generated.models import (
     Heartbeat,
     InvocationTokenGrant,
     InvocationTokenRenew,
+    ProjectReadiness,
     Run,
     RunFinish,
     RunFinishState,
@@ -104,7 +106,9 @@ __all__ = [
     "AdapterConfig",
     "AgentHandler",
     "Invocation",
+    "RunRefused",
     "RuntimeFailure",
+    "RuntimeStatus",
     "StartOptions",
 ]
 
@@ -219,6 +223,52 @@ class RuntimeFailure(Exception):  # noqa: N818 - the name of the brief
     """
 
 
+class RunRefused(Exception):  # noqa: N818 - a refusal, not an error of the SDK
+    """Raised by ``prepare`` to end a run without a start (09 4.9).
+
+    With a reason the run ends ``failed`` with exactly that reason (``finishRun``), for example
+    ``runtime_not_authenticated`` or ``billing_mode_mismatch``; without one the run is no longer
+    active on the server (``404`` or ``run_inactive`` while loading its context) and only the
+    inbox entry is closed, without ``finishRun``. Either way the runtime never starts and the
+    entry is never started again.
+
+    Args:
+        reason: The reason code of ``finishRun``, or ``None`` for no ``finishRun``.
+
+    Examples:
+        >>> RunRefused("runtime_not_authenticated").reason
+        'runtime_not_authenticated'
+    """
+
+    def __init__(self, reason: str | None) -> None:
+        """Create the refusal; see the class docstring."""
+        super().__init__(reason or "run no longer active")
+        self.reason = reason
+
+
+@dataclass(frozen=True)
+class RuntimeStatus:
+    """Heartbeat members a handler knows only at run time (09 4.8, M2-34).
+
+    The adapter asks `AgentHandler.runtime_status` before every heartbeat and merges the
+    answer with its own members: the degraded reasons of both count, and the heartbeat is
+    ``degraded`` when either says so.
+
+    Attributes:
+        state: ``online`` or ``degraded``.
+        degraded_reasons: Codes of ``details.degraded_reasons``.
+        runtime_version: The runtime's version, replacing ``AdapterConfig.runtime_version``.
+        billing_modes_supported: Modes the adapter can prove; ``None`` leaves the member out.
+        project_readiness: Runners only: one entry per bound forum; ``None`` leaves it out.
+    """
+
+    state: str = "online"
+    degraded_reasons: Sequence[str] = ()
+    runtime_version: str | None = None
+    billing_modes_supported: Sequence[str] | None = None
+    project_readiness: Sequence[ProjectReadiness] | None = None
+
+
 class AgentHandler:
     """The runtime side of an adapter; subclass it and override `prepare` and `execute`.
 
@@ -269,6 +319,33 @@ class AgentHandler:
             run: The started run.
         """
         raise NotImplementedError
+
+    async def on_not_started(self, inv: Invocation) -> None:
+        """Free what ``prepare`` took when the run does not reach ``execute`` here.
+
+        Called once after every ``prepare`` that did not lead to ``execute``: ``prepare`` raised
+        (also `RunRefused` or a cancellation), or the start was refused, superseded or failed.
+        A later start attempt of the same run calls ``prepare`` again.
+
+        Args:
+            inv: The invocation.
+        """
+
+    def runtime_status(self) -> RuntimeStatus | None:
+        """Return the heartbeat members that change at run time, or ``None`` for none.
+
+        Called before every heartbeat; it must not block (no I/O).
+
+        Returns:
+            The status; the default ``None`` keeps the members of `AdapterConfig`.
+        """
+        return None
+
+    async def on_ready(self) -> None:
+        """Called after every ready source (gateway ``ready`` or the first poll).
+
+        A handler that wants its state reported at once calls `Adapter.send_heartbeat` here.
+        """
 
     async def on_followup(self, inv: Invocation, run: RunHandle) -> None:
         """Handle a follow-up message of a running or resumed run.
@@ -526,6 +603,10 @@ class Adapter:
 
     async def _on_ready(self) -> None:
         await self.outbox.flush()
+        try:
+            await self.handler.on_ready()
+        except Exception:  # a handler failure must not stop the connection
+            _LOG.exception("on_ready failed")
         if self.config.commands is not None:
             try:
                 await reconcile_commands(
@@ -537,9 +618,16 @@ class Adapter:
     def heartbeat(self) -> Heartbeat:
         """Return the agent heartbeat of this process (09 4.8), ``active_runs`` included.
 
+        The members of `AgentHandler.runtime_status` replace or extend those of the
+        configuration.
+
         Returns:
             The heartbeat (generated model).
         """
+        status = self.handler.runtime_status()
+        reasons = list(self._degraded)
+        if status is not None:
+            reasons += [r for r in status.degraded_reasons if r not in reasons]
         details: dict[str, Any] = {
             "active_runs": [
                 str(s.run_id) for s in self._runs.values() if s.handle.token_jti is not None
@@ -553,14 +641,32 @@ class Adapter:
         }
         if self.config.capabilities:
             details["capabilities"] = dict(self.config.capabilities)
-        if self._degraded:
-            details["degraded_reasons"] = list(self._degraded)
+        if reasons:
+            details["degraded_reasons"] = reasons
+        degraded = bool(reasons) or (status is not None and status.state == "degraded")
+        runtime_version = self.config.runtime_version
+        if status is not None and status.runtime_version is not None:
+            runtime_version = status.runtime_version
         return build_heartbeat(
-            "degraded" if self._degraded else "online",
-            runtime_version=self.config.runtime_version,
+            "degraded" if degraded else "online",
+            runtime_version=runtime_version,
+            billing_modes_supported=None if status is None else status.billing_modes_supported,
             reported_tool_class=self.handler.actual_tool_class().value,
             details=details,
+            project_readiness=None if status is None else status.project_readiness,
         )
+
+    async def send_heartbeat(self) -> None:
+        """Send the current heartbeat at once with ``sendHeartbeat``, outside any run binding.
+
+        For a state change the next regular heartbeat would report too late (for example a
+        project that became ready). A failure is logged; the regular heartbeat follows anyway.
+        """
+        try:
+            with self.client.unbound():
+                await self.client.call(send_heartbeat.asyncio_detailed, body=self.heartbeat())
+        except (ProblemError, httpx.TransportError) as exc:
+            _LOG.info("immediate heartbeat failed: %s", type(exc).__name__)
 
     # ---- restart -------------------------------------------------------------------------
 
@@ -849,19 +955,41 @@ class Adapter:
             if state.cancel_reason is not None:
                 await self.inbox.set_state(state.event_id, EntryState.CLOSED)
             raise
+        except RunRefused as refusal:
+            if refusal.reason is not None:
+                with self.client.bind_run(state.run_id, entry.token):
+                    await self._finish_refused(state, refusal.reason)
+            else:
+                await self.inbox.set_state(state.event_id, EntryState.CLOSED)
+                self._runs.pop(state.run_id, None)
+            _LOG.info("run %s refused in prepare: %s", state.run_id, refusal.reason or "inactive")
+            return None
         except Exception:
             _LOG.exception("prepare failed for run %s", state.run_id)
             await self._finish_refused(state, "adapter_error")
             return None
 
     async def _start(self, state: _RunState) -> None:
-        """Start a run from the inbox: prepare, compare again, renew if expired, start."""
+        """Start a run from the inbox: prepare, compare again, renew if expired, start.
+
+        `AgentHandler.on_not_started` follows every attempt that does not reach ``execute``.
+        """
+        executing = False
+        try:
+            executing = await self._start_attempt(state)
+        finally:
+            if not executing:
+                with contextlib.suppress(Exception):
+                    await self.handler.on_not_started(state.invocation)
+
+    async def _start_attempt(self, state: _RunState) -> bool:
+        """One start attempt; True once ``execute`` was entered (it has ended when this returns)."""
         options = await self._prepare(state)
         if options is None:
-            return
+            return False
         entry = await self._newest(state)
         if entry.state is not EntryState.ACCEPTED or entry.token is None:
-            return
+            return False
         claims = stored_claims(entry.token)
         inv = state.invocation
         state.invocation = inv = Invocation(inv.event_id, inv.seq, inv.type, inv.payload, claims)
@@ -870,12 +998,12 @@ class Adapter:
         mismatch = compare_actual(claims, Actual(billing.mode, tool_class.value))
         if mismatch is not TokenVerdict.VALID:
             await self._finish_refused(state, _REFUSAL_REASON[mismatch])
-            return
+            return False
         token = entry.token
         if self._expired(claims):
             renewed = await self._renew_or_close(state, token)
             if renewed is None:
-                return
+                return False
             token = renewed
         body = RunStart(
             invocation_token=token.reveal(),
@@ -891,13 +1019,14 @@ class Adapter:
             body.billing_evidence = evidence
         started = await self._start_call(state, token, body)
         if started is None:
-            return
+            return False
         run, token = started
         await self.inbox.set_state(state.event_id, EntryState.STARTED)
         state.handle.started(run, stored_claims(token).jti)
         self.client.set_run_token(state.run_id, token)
         self._run_tokens[state.run_id] = token
         await self._execute(state, token, self.handler.execute, inv)
+        return True
 
     async def _start_call(
         self, state: _RunState, token: Secret, body: RunStart
