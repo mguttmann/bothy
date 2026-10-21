@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	runshttp "github.com/OWNER/bothy/services/server/internal/runs/adapters/httpapi"
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
+	"github.com/OWNER/bothy/services/server/internal/runs/adapters/messagingsource"
 	runsmetrics "github.com/OWNER/bothy/services/server/internal/runs/adapters/otelmetrics"
 	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
@@ -57,6 +58,9 @@ type Runs struct {
 	// CancelTimeouts schedules runs.cancel_timeout (M2-09); the jobs step binds its inserter
 	// (BindJobs).
 	CancelTimeouts *runsjobs.CancelScheduler
+	// ComponentExpiry schedules runs.component_expiry (M2-15); the jobs step binds its inserter
+	// (BindJobs).
+	ComponentExpiry *runsjobs.ComponentScheduler
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -84,6 +88,16 @@ type RunsDeps struct {
 	// Heartbeats reads the persisted heartbeat for runs.stall_check (M2-09); nil means the reader
 	// of the agents module over pool.
 	Heartbeats runsapp.HeartbeatReader
+	// Components is the source of the components that messaging received (M2-15); NewRuns binds
+	// it to the new use cases. With it the components are on: Cards (the card port of messaging)
+	// and ThreadLocks (the thread lock of chat) are required. Without it (a test world without
+	// cards) runs has no components.
+	Components  *messagingsource.Source
+	Cards       runsapp.CardMessages
+	ThreadLocks runsapp.ThreadLocker
+	// ComponentExpiry schedules runs.component_expiry (M2-15); nil means the scheduler over the
+	// job runtime of the process (Runs.BindJobs).
+	ComponentExpiry runsapp.ComponentExpiryScheduler
 }
 
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
@@ -131,21 +145,39 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
-	svc, err := runsapp.New(cfg, runsapp.Deps{
-		Repo: runspg.NewRepository(pool), UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
+	repo := runspg.NewRepository(pool)
+	deps := runsapp.Deps{
+		Repo: repo, UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
 		Heartbeats: d.Heartbeats, Mismatches: mismatches,
-	})
+	}
+	var components *runsjobs.ComponentScheduler
+	if d.Components != nil {
+		if d.Cards == nil || d.ThreadLocks == nil {
+			return nil, errors.New("wire: the components of runs need the card port of messaging and the thread lock of chat")
+		}
+		if d.ComponentExpiry == nil {
+			components = &runsjobs.ComponentScheduler{}
+			d.ComponentExpiry = components
+		}
+		deps.Components, deps.Cards, deps.ThreadLocks, deps.ComponentExpiry = repo, d.Cards, d.ThreadLocks, d.ComponentExpiry
+	}
+	svc, err := runsapp.New(cfg, deps)
 	if err != nil {
 		return nil, err
 	}
+	if d.Components != nil {
+		if err := d.Components.Bind(svc); err != nil {
+			return nil, err
+		}
+	}
 	return &Runs{Service: svc, Handlers: runshttp.New(svc), CommandHandlers: runshttp.NewCommandExec(svc), Expiry: sched,
-		CancelTimeouts: cancels}, nil
+		CancelTimeouts: cancels, ComponentExpiry: components}, nil
 }
 
-// BindJobs gives the schedulers of runs.queued_expiry and runs.cancel_timeout the inserter of the
-// job runtime; the jobs step calls it once the runtime exists. A Runs built with its own
+// BindJobs gives the schedulers of runs.queued_expiry, runs.cancel_timeout and
+// runs.component_expiry the inserter of the job runtime; the jobs step calls it once the runtime exists. A Runs built with its own
 // scheduler ignores it for that scheduler.
 func (r *Runs) BindJobs(ins jobs.Inserter) {
 	if r == nil {
@@ -156,6 +188,9 @@ func (r *Runs) BindJobs(ins jobs.Inserter) {
 	}
 	if r.CancelTimeouts != nil {
 		r.CancelTimeouts.Bind(ins)
+	}
+	if r.ComponentExpiry != nil {
+		r.ComponentExpiry.Bind(ins)
 	}
 }
 

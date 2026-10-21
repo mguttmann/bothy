@@ -67,6 +67,7 @@ func (r *Repository) InsertRun(ctx context.Context, n app.NewRun) (app.RunRow, b
 	row, err := q.InsertRun(ctx, sqlcgen.InsertRunParams{
 		ID: uuid(n.ID), ThreadID: uuid(n.ThreadID), AgentID: uuid(n.AgentID), TriggerKind: n.TriggerKind,
 		TriggeringMessageID: optionalUUID(n.TriggeringMessageID), TriggeringCommandID: optionalUUID(n.TriggeringCommandID),
+		TriggeringInteractionID: optionalUUID(n.TriggeringInteractionID),
 		TriggeredBy:         uuid(n.TriggeredBy),
 		BillingModeExpected: n.BillingModeExpected, InvocationJti: uuid(n.InvocationJTI), QueuedAt: ts(n.QueuedAt),
 	})

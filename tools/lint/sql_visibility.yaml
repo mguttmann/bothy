@@ -254,3 +254,53 @@ exceptions:
   - query: runs.AllSteps
     category: after_authorize
     reason: "every step of the one run whose run.read authorize allowed (getRun); run_steps has no channel_id (D-M2-05-9)"
+  # M2-15: the components and interactions of cards. message_components and interactions have no
+  # channel_id; every read names the components of card messages that authorize already checked or
+  # that messaging loaded for an event of the same transaction, the one component or interaction
+  # whose path authorize then decides, or the cards a job or the end of a run names (07 7.4 rule 1,
+  # M2-15 design note 7).
+  - query: messaging.LockCardMessage
+    category: after_authorize
+    reason: "locks the card of a component change after runs authorized interaction.create or component.update on its path, or for the job runs.component_expiry and the end of a run; it returns facts, never content (M2-15)"
+  - query: runs.ComponentsOfMessages
+    category: after_authorize
+    reason: "the components of the card messages of one answer, page or event, each of which message.read allowed or messaging loaded for an event of the same transaction, whose receive action sync checks per reader (M2-15 design note 7)"
+  - query: runs.GetComponent
+    category: authorize_resolution
+    reason: "loads the one component of createInteraction or updateComponent first, because its card's thread and author form the descriptor of authorize; a denied component gives the same not_found as a missing one (02 9.2, M2-15)"
+  - query: runs.LockComponent
+    category: after_authorize
+    reason: "locks the one component whose interaction.create or component.update authorize decided on its path in the same unit of work (M2-15)"
+  - query: runs.LockSingleUseGroup
+    category: after_authorize
+    reason: "the single-use rule of 03: the active single_use components of the one card whose component authorize decided, locked in ascending id (M2-15)"
+  - query: runs.LockSingleUseSet
+    category: after_authorize
+    reason: "the single_use components of the one card whose component.update authorize allowed, locked for a state change (M2-15)"
+  - query: runs.LockDueComponents
+    category: system_job
+    reason: "the job runs.component_expiry locks the due active components of the one card it names, without a principal; nothing of the rows leaves the server except through message.updated (M2-15)"
+  - query: runs.NextComponentExpiry
+    category: system_job
+    reason: "the job runs.component_expiry reads the next expires_at of the one card it names to schedule itself again; only a time (M2-15)"
+  - query: runs.ActiveComponentMessagesOfRun
+    category: system_job
+    reason: "the end of a run reads the cards with active components of that run to disable them; only message ids, no content (M2-15)"
+  - query: runs.LockActiveRunComponents
+    category: system_job
+    reason: "the end of a run locks the active components of that run on one of its cards to disable them; nothing of the rows leaves the server except through message.updated (M2-15)"
+  - query: runs.LockRunShared
+    category: after_authorize
+    reason: "the share lock of the run of a new card of the author, whose message.create authorize allowed; the row is only compared with the author and the thread (M2-15)"
+  - query: runs.InteractionByClientID
+    category: after_authorize
+    reason: "the idempotency lookup of the principal's own (principal, client_interaction_id), 04 5.1; the answer follows only after message.read on the stored interaction's card (M2-15)"
+  - query: runs.GetInteraction
+    category: authorize_resolution
+    reason: "loads the one interaction of respondToInteraction or of a delivery first, because its card forms the descriptor of authorize or the trigger of agent.invoke; a denied interaction gives the same not_found as a missing one (M2-15)"
+  - query: runs.LockInteraction
+    category: after_authorize
+    reason: "locks the one interaction whose interaction.respond authorize allowed, or the one a delivery handles after agent.invoke decided (M2-15)"
+  - query: runs.RunOfInteraction
+    category: after_authorize
+    reason: "the run an interaction opened, for the representation of that interaction to the principal authorize allowed; only a run id (M2-15)"

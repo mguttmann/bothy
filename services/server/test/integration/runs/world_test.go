@@ -43,6 +43,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/runs/adapters/messagingsource"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
@@ -174,6 +175,8 @@ type world struct {
 	issuer  ids.ID
 	// heartbeats wraps the persisted heartbeat reader of agents for the stall check (M2-09).
 	heartbeats *heartbeatReads
+	// expiries records the jobs runs.component_expiry the runs module schedules (M2-15).
+	expiries *expiryJobs
 
 	owner, alex, sam, robin                    ids.ID
 	support, marketing, engineering, research  ids.ID
@@ -223,7 +226,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	log := slog.New(capture)
 	w := &world{t: t, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
 		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}, log: capture, metrics: &transitions{},
-		cancels: &cancelJobs{}, issuer: ids.New(), heartbeats: &heartbeatReads{}}
+		cancels: &cancelJobs{}, expiries: &expiryJobs{}, issuer: ids.New(), heartbeats: &heartbeatReads{}}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
 	w.creds = &creds{fake: fake.NewCredentials(), real: identityapp.NewCredentialSource(repo, repo, repo), own: map[ids.ID]bool{}}
@@ -251,6 +254,8 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessagePosted))
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAccessChanged))
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAgentDisabled))
+	// The components of a deleted card (M2-15).
+	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessageDeleted))
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
 	w.uow = uow
@@ -295,10 +300,13 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	w.chat = c.Service
 	// Messaging, threads and the instance settings serve the search tests of M3-13.
 	// The template, list and page limits (M1-57, M1-60) and the write ports (M1-58) are required (INT-W22/3).
+	// The components of cards: runs implements the source ports of messaging (M2-15).
+	components := messagingsource.New()
 	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
 		TemplateNameMaxChars: 64, TemplateMaxPerScope: 100, ListContentMaxBytes: 4096, PageSizeDefault: 20, PageSizeMax: 50,
 		EmojiMaxBytes: 64, MaxDistinctReactions: 20, MaxPinsPerThread: 50},
-		pool, uow, w.az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, c.Service, w.id.Directory, w.clk, nil)
+		pool, uow, w.az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec, Components: components},
+		c.Service, w.id.Directory, w.clk, nil)
 	must(t, err)
 	// The personal data of sync (read states and drafts, M1-61) serve the move tests of M1-62.
 	personal, err := wire.NewPersonal(syncapp.PersonalConfig{MaxContentBytes: 4096, MaxAttachments: 3, EventPayloadMaxBytes: 65536},
@@ -308,12 +316,13 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, err)
 	w.heartbeats.reader = hb
 	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
-		EventPayloadMaxBytes: 65536,
-		ClockLeeway:          30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
-		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, pool, uow, w.az, wire.RunsDeps{
+		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
+		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
+		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, EventPayloadMaxBytes: 65536, MaxContentBytes: 4096}, pool, uow, w.az, wire.RunsDeps{
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,
 		Expiry: noExpiry{}, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: w.rec, CancelTimeouts: w.cancels,
 		Heartbeats: w.heartbeats,
+		Components: components, Cards: m.Service, ThreadLocks: c.Service, ComponentExpiry: w.expiries,
 	}, w.clk, log)
 	must(t, err)
 	must(t, mods.RunsAcceptor.Bind(rn.Service))

@@ -24,7 +24,8 @@ type runsState struct {
 const moduleRuns = "runs"
 
 // runsWiring wires the runs module into the start step chat, after messaging, and its jobs
-// runs.queued_expiry (M2-08), runs.cancel_timeout and runs.stall_check (M2-09).
+// runs.queued_expiry (M2-08), runs.cancel_timeout and runs.stall_check (M2-09) and
+// runs.component_expiry (M2-15).
 func runsWiring() moduleWiring {
 	return moduleWiring{
 		module:   moduleRuns,
@@ -35,7 +36,7 @@ func runsWiring() moduleWiring {
 			rn := s.runs
 			s.mu.Unlock()
 			if rn != nil {
-				m.QueuedExpiry, m.RunsLifecycle = rn.Service, rn.Service
+				m.QueuedExpiry, m.RunsLifecycle, m.ComponentExpiry = rn.Service, rn.Service, rn.Service
 			}
 			// runs.stall_check runs every agent.presence_timeout (M2-09, D-M2-09-19).
 			m.StallInterval = s.values.Duration(keyPresenceTimeout)
@@ -54,15 +55,15 @@ func runsWiring() moduleWiring {
 
 // startRuns builds the runs module (M2-05) in the chat step over messaging (anchor and trigger
 // state), the threads and channel facts of chat and the agent facts of the agents step, binds the
-// acceptance of the unit of work to it and, in the worker role, registers the gauge
-// bothy.run.active on the global meter provider.
+// acceptance of the unit of work and the component source of messaging (M2-15) to it and, in the
+// worker role, registers the gauge bothy.run.active on the global meter provider.
 func (s *server) startRuns(context.Context) error {
 	cfg, err := RunsConfig(s.values)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az, sy, c, m, ag := s.pool, s.audit, s.authorizer, s.sync, s.chat, s.messaging, s.agents
+	pool, a, az, sy, c, m, ag, comps := s.pool, s.audit, s.authorizer, s.sync, s.chat, s.messaging, s.agents, s.cardComponents
 	s.mu.Unlock()
 	if ag == nil {
 		return errors.New("wire: the runs module needs the agents step")
@@ -73,6 +74,7 @@ func (s *server) startRuns(context.Context) error {
 	rn, err := NewRuns(cfg, pool, a.UoW(), az, RunsDeps{
 		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(),
+		Components: comps, Cards: m.Service, ThreadLocks: c.Service,
 	}, s.deps.Clock, s.logger())
 	if err != nil {
 		return err

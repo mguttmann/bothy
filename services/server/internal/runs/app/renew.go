@@ -109,6 +109,11 @@ func (s *Service) renewChecked(ctx context.Context, row RunRow, c tokenClaims, w
 	if err != nil {
 		return renewResult{}, err
 	}
+	if tr.gone {
+		// The interaction of the token no longer exists (its card was deleted, M2-15): the token
+		// names a trigger that cannot be checked again, so it is not renewed.
+		return renewResult{}, errs.New(errs.CodeInvocationTokenInvalid, "").WithReason("invalid")
+	}
 	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{row.AgentID})
 	if err != nil {
 		return renewResult{}, err
@@ -126,6 +131,7 @@ func (s *Service) renewChecked(ctx context.Context, row RunRow, c tokenClaims, w
 		Kind: authorize.ResourceThread, ID: row.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, OwnerID: info.CreatedBy,
 		Invoke: &authorize.InvokeFacts{AgentID: row.AgentID, TriggerOrigin: tr.origin, MentionsAgent: tr.mentions,
 			ActiveRunAgentID: row.AgentID, NewThread: tr.newThread},
+		Interaction: tr.facts,
 	}
 	d, err := s.d.Authorizer.Authorize(authorize.WithPermissionVersion(authorize.Filter(ctx), version), actor.Recheck(tr.person),
 		authorize.ActionAgentInvoke, r)
@@ -180,11 +186,11 @@ func (s *Service) refuseRenewal(ctx context.Context, row RunRow, eventType strin
 // renewalInput is the delivery the presented token came with, rebuilt from its claims for the
 // resolver of the delivery check: trigger_kind message is agent.invocation, followup is
 // agent.followup with its message, command (M2-16) is agent.invocation of the command run with the
-// command of the token. interaction comes with M2-15; until then its tokens are not renewed
-// (internal error, nothing issued).
+// command of the token, interaction (M2-15) is agent.invocation for the interaction that opened the
+// run and interaction.created for any other interaction of the run.
 func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, error) {
 	in := runs.DeliveryInput{AgentID: row.AgentID, ResourceKind: resourceRun, ResourceID: row.ID}
-	//exhaustive:ignore // interaction and autocomplete are not renewed until M2-15 (default).
+	//exhaustive:ignore // autocomplete tokens are never renewed (default).
 	switch domain.TriggerKind(c.TriggerKind) {
 	case domain.TriggerMessage:
 		in.Type = domain.EventAgentInvocation
@@ -210,6 +216,26 @@ func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, er
 			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the command of a renewal")
 		}
 		in.Type, in.Payload = domain.EventAgentInvocation, p
+	case domain.TriggerInteraction:
+		ix, err := ids.Parse(c.InteractionID)
+		if err != nil || ix.IsZero() {
+			return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: an interaction token without its interaction")
+		}
+		if row.TriggerKind == triggerKindInteraction && (row.TriggeringInteractionID == ix || row.TriggeringInteractionID.IsZero()) {
+			p, err := json.Marshal(struct {
+				InteractionID string `json:"interaction_id"`
+			}{ix.String()})
+			if err != nil {
+				return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
+			}
+			in.Type, in.Payload = domain.EventAgentInvocation, p
+			return in, nil
+		}
+		p, err := json.Marshal(map[string]map[string]string{"interaction": {"id": ix.String(), "run_id": row.ID.String()}})
+		if err != nil {
+			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the interaction of a renewal")
+		}
+		in.Type, in.ResourceKind, in.ResourceID, in.Payload = domain.EventInteractionCreated, resourceInteraction, ix, p
 	default:
 		return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: no renewal for the trigger kind of this token yet")
 	}

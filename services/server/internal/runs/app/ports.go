@@ -66,10 +66,10 @@ type StepRow struct {
 // NewRun is the input of Repository.InsertRun: a run in queued with version 1.
 type NewRun struct {
 	ID, ThreadID, AgentID, TriggeredBy ids.ID
-	// TriggerKind is message, command or interaction; TriggeringMessageID is set for message and
-	// TriggeringCommandID for command (M2-16).
-	TriggerKind                              string
-	TriggeringMessageID, TriggeringCommandID ids.ID
+	// TriggerKind is message, command or interaction; TriggeringMessageID is set for message,
+	// TriggeringCommandID for command (M2-16) and TriggeringInteractionID for interaction (M2-15).
+	TriggerKind                                                       string
+	TriggeringMessageID, TriggeringCommandID, TriggeringInteractionID ids.ID
 	// BillingModeExpected is the agent's billing mode at the acceptance (ruling D-M2-05-5).
 	BillingModeExpected string
 	// InvocationJTI is a fresh UUIDv7 that no token carries (ruling D-M2-05-4).

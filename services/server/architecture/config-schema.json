@@ -1241,6 +1241,54 @@
       "doc": "Most commands of one agent or app."
     },
     {
+      "name": "component.custom_id_max_chars",
+      "env": "BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Longest custom_id of a component in Unicode characters."
+    },
+    {
+      "name": "component.default_ttl",
+      "env": "BOTHY_COMPONENT__DEFAULT_TTL",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Expiry of a component without its own expires_at."
+    },
+    {
+      "name": "component.form_max_fields",
+      "env": "BOTHY_COMPONENT__FORM_MAX_FIELDS",
+      "kind": "int",
+      "default": "10",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Most fields of one form component."
+    },
+    {
+      "name": "component.max_per_message",
+      "env": "BOTHY_COMPONENT__MAX_PER_MESSAGE",
+      "kind": "int",
+      "default": "25",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "09-agents.md",
+      "doc": "Most components of one card message."
+    },
+    {
       "name": "console.assets_dir",
       "env": "BOTHY_CONSOLE__ASSETS_DIR",
       "kind": "string",

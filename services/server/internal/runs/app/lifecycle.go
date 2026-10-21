@@ -36,21 +36,28 @@ type OpenCmd struct {
 	ThreadID, AgentID, TriggeredBy, TriggeringMessageID ids.ID
 	// TriggeringCommandID is the command of a command run (M2-16); zero otherwise.
 	TriggeringCommandID ids.ID
-	// TriggerKind is message or command (interaction comes with M2-15): message needs no command,
-	// command needs TriggeringCommandID and no message.
+	// TriggeringInteractionID is the interaction of an interaction run (M2-15); zero otherwise.
+	TriggeringInteractionID ids.ID
+	// TriggerKind is message, command or interaction: message needs no command and no
+	// interaction, command needs TriggeringCommandID and interaction TriggeringInteractionID, each
+	// without a message.
 	TriggerKind string
 	// BillingModeExpected is the agent's billing mode now (ruling D-M2-05-5).
 	BillingModeExpected string
 }
 
-// openTrigger reports a trigger Open accepts: kind message without a command, or kind command with
-// its command and without a message (03 runs, the check on the triggering_* columns).
+// openTrigger reports a trigger Open accepts: kind message without a command or an interaction,
+// kind command with its command, or kind interaction with its interaction (M2-15), each of the two
+// without a message and without the object of the other (03 runs, the check on the triggering_*
+// columns).
 func openTrigger(cmd OpenCmd) bool {
 	switch cmd.TriggerKind {
 	case triggerKindMessage:
-		return cmd.TriggeringCommandID.IsZero()
+		return cmd.TriggeringCommandID.IsZero() && cmd.TriggeringInteractionID.IsZero()
 	case triggerKindCommand:
-		return !cmd.TriggeringCommandID.IsZero() && cmd.TriggeringMessageID.IsZero()
+		return !cmd.TriggeringCommandID.IsZero() && cmd.TriggeringMessageID.IsZero() && cmd.TriggeringInteractionID.IsZero()
+	case triggerKindInteraction:
+		return !cmd.TriggeringInteractionID.IsZero() && cmd.TriggeringMessageID.IsZero() && cmd.TriggeringCommandID.IsZero()
 	}
 	return false
 }
@@ -130,11 +137,13 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 		return runs.RunSummary{}, err
 	}
 	if !openTrigger(cmd) || cmd.ThreadID.IsZero() || cmd.AgentID.IsZero() || cmd.TriggeredBy.IsZero() {
-		return runs.RunSummary{}, errs.New(errs.CodeInternalError, "runs: Open needs a thread, an agent, a person and a trigger of kind message or command")
+		return runs.RunSummary{}, errs.New(errs.CodeInternalError,
+			"runs: Open needs a thread, an agent, a person and a trigger of kind message, command or interaction with its object")
 	}
 	row, inserted, err := s.d.Repo.InsertRun(ctx, NewRun{
 		ID: ids.New(), ThreadID: cmd.ThreadID, AgentID: cmd.AgentID, TriggeredBy: cmd.TriggeredBy, TriggerKind: cmd.TriggerKind,
 		TriggeringMessageID: cmd.TriggeringMessageID, TriggeringCommandID: cmd.TriggeringCommandID,
+		TriggeringInteractionID: cmd.TriggeringInteractionID,
 		BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
 	})
 	if err != nil {

@@ -31,8 +31,6 @@ rules:
     milestone: M4
   - match: "command."  # M2-16, M2-17
     milestone: M2
-  - match: "component."  # M2-15
-    milestone: M2
   - match: "console."  # M6-17
     milestone: M6
   - match: "dev."  # V2-01, V2-04

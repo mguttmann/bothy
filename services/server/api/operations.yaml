@@ -52,6 +52,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createHost
   - createIdentityProvider
   - createIncomingWebhook
+  - createInteraction
   - createMessage
   - createPersonalTemplate
   - createQuietHoursRule
@@ -199,6 +200,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - removeReaction
   - renewInvocationToken
   - reopenThread
+  - respondToInteraction
   - resumeApp
   - resumeRun
   - revokeDevice
@@ -234,6 +236,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateBranding
   - updateChannel
   - updateCommand
+  - updateComponent
   - updateForumTag
   - updateGroup
   - updateHost
@@ -287,9 +290,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createImportFile
     milestone: M8
     ticket: M8-03
-  - operation_id: createInteraction
-    milestone: M2
-    ticket: M2-15
   - operation_id: createPrice
     milestone: M2
     ticket: M2-22
@@ -415,9 +415,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: resetAgentSession
     milestone: M2
     ticket: M2-12
-  - operation_id: respondToInteraction
-    milestone: M2
-    ticket: M2-15
   - operation_id: search
     milestone: M3
     ticket: M3-14
@@ -448,9 +445,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: unregisterPush
     milestone: M3
     ticket: M3-22
-  - operation_id: updateComponent
-    milestone: M2
-    ticket: M2-15
   - operation_id: updateStatusComponent
     milestone: M7
     ticket: M7-09

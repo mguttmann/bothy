@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	messagingmetrics "github.com/OWNER/bothy/services/server/internal/messaging/adapters/otelmetrics"
 	messagingpg "github.com/OWNER/bothy/services/server/internal/messaging/adapters/postgres"
@@ -60,6 +61,17 @@ type MessagingWrites struct {
 	// Metrics counts the created messages; nil means bothy.message.created of
 	// messaging/adapters/otelmetrics on the global meter provider of platform/otel (M1-68).
 	Metrics messagingapp.Metrics
+	// Components is the source of the components of cards that runs implements (M2-15,
+	// runs/adapters/messagingsource), bound to the runs use cases once they exist (NewRuns); nil
+	// shows every message without components and answers a card with not_enabled (a role or a
+	// test without runs).
+	Components ComponentSource
+}
+
+// ComponentSource is the pair of source ports runs implements for messaging (M2-15).
+type ComponentSource interface {
+	messaging.ComponentReader
+	messaging.ComponentWriter
 }
 
 // NewMessaging builds the messaging module over pool with the unit of work uow, the Authorizer
@@ -85,11 +97,15 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 		}
 		w.Metrics = m
 	}
-	svc, err := messagingapp.New(cfg, messagingapp.Deps{
+	d := messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
 		Metrics: w.Metrics,
-	})
+	}
+	if w.Components != nil {
+		d.Components, d.Cards = w.Components, w.Components
+	}
+	svc, err := messagingapp.New(cfg, d)
 	if err != nil {
 		return nil, err
 	}

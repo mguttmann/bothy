@@ -12,7 +12,8 @@ import (
 
 // TestRunFacts: RunFacts returns handle, status, backend policy and target tool class of the
 // agents among the ids (M2-05); the holder is set exactly for a personal agent, and people and
-// unknown ids are absent.
+// unknown ids are absent. ComponentsAllowed is false exactly for an agent whose operator_config
+// sets supports_components to false (M2-15).
 func TestRunFacts(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
@@ -21,6 +22,11 @@ func TestRunFacts(t *testing.T) {
 	robin := w.person("robin", false)
 	lotse := w.create(owner, "lotse")
 	scout := w.create(owner, "scout")
+	quiet, err := w.svc.Create(ctx, owner, agents.CreateCmd{Handle: "quiet", DisplayName: "quiet", AdapterKind: "hermes",
+		OperatorConfig: map[string]any{"supports_components": false}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := w.svc.SetBillingMode(ctx, owner, lotse.ID, agents.BillingModeCmd{
 		BillingMode: agents.BillingPersonal, CredentialHolderID: owner.ID, Reason: "Own use", IfMatch: match(1),
 	}); err != nil {
@@ -33,13 +39,16 @@ func TestRunFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	var facts agents.Facts = w.svc
-	got, err := facts.RunFacts(ctx, []ids.ID{lotse.ID, scout.ID, robin.ID, ids.New()})
+	got, err := facts.RunFacts(ctx, []ids.ID{lotse.ID, scout.ID, quiet.ID, robin.ID, ids.New()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[ids.ID]agents.RunFacts{
-		lotse.ID: {ID: lotse.ID, Handle: "lotse", Status: "active", BillingMode: agents.BillingPersonal, CredentialHolderID: owner.ID, ToolClass: agents.ToolHost},
-		scout.ID: {ID: scout.ID, Handle: "scout", Status: "disabled", BillingMode: agents.BillingOrganization, ToolClass: agents.ToolChat},
+		lotse.ID: {ID: lotse.ID, Handle: "lotse", Status: "active", BillingMode: agents.BillingPersonal, CredentialHolderID: owner.ID, ToolClass: agents.ToolHost,
+			ComponentsAllowed: true},
+		scout.ID: {ID: scout.ID, Handle: "scout", Status: "disabled", BillingMode: agents.BillingOrganization, ToolClass: agents.ToolChat,
+			ComponentsAllowed: true},
+		quiet.ID: {ID: quiet.ID, Handle: "quiet", Status: "active", BillingMode: agents.BillingOrganization, ToolClass: agents.ToolChat},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("RunFacts = %+v, want %+v", got, want)

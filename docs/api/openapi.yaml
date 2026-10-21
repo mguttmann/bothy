@@ -9881,6 +9881,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
         '422':
@@ -9948,6 +9950,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -24430,10 +24434,10 @@ components:
           type: boolean
         run_id:
           $ref: '#/components/schemas/Uuid'
-          description: Agents only; the run this answer belongs to.
+          description: Agents only, and only with `kind = card`, which binds its components to this run (`Component.run_id`); it must be an active run of the author in the same thread, else `400 validation_failed` with code `invalid` on `/run_id` (09, 11.4). Every other kind gives `not_enabled` until answers in a run are built (M2-19). `Message.run_id` stays absent for a card.
         components:
           type: array
-          description: Agents and apps only; requires `kind = card`.
+          description: Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1).
           items:
             $ref: '#/components/schemas/ComponentCreate'
     MessageUpdate:
@@ -26039,7 +26043,7 @@ components:
           $ref: '#/components/schemas/ComponentType'
         definition:
           $ref: '#/components/schemas/JsonObject'
-          description: Schema `component.v1` (label, style, options, form fields).
+          description: Schema `component.v1` (09, 11.1) as stored, with the defaults applied (button `style`, select `min_values` and `max_values`, field `required`).
         position:
           type: integer
         single_use:
@@ -26074,6 +26078,7 @@ components:
           $ref: '#/components/schemas/ComponentType'
         definition:
           $ref: '#/components/schemas/JsonObject'
+          description: Schema `component.v1` (09, 11.1), a closed member set per type; `400 validation_failed` with one entry per finding below `/components/<index>/definition` and the codes `required`, `invalid` or `limit_reached`.
         single_use:
           type: boolean
         required_capability:
@@ -26091,6 +26096,7 @@ components:
           enum: [active, disabled]
         definition:
           $ref: '#/components/schemas/JsonObject'
+          description: A new `component.v1` object for the type of the component (09, 11.1); it may change in every state. Type, `custom_id`, `single_use`, `required_capability`, `restricted_to` and `run_id` cannot change.
     InteractionCreate:
       type: object
       additionalProperties: false
@@ -26100,7 +26106,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         values:
           $ref: '#/components/schemas/JsonObject'
-          description: Selected options or form values, validated against the component definition.
+          description: 'Selected options or form values, validated against the component definition (09, 11.1); absent means `{}`. Button: `{}`. Select: `{"selected": [<option value>, ...]}` with between `min_values` and `max_values` distinct option values. Form: an object keyed by field `name` (`text` and `textarea` strings, `number` a finite number, `boolean` a boolean, `choice` one of `choices`). A finding gives `400 validation_failed` with code `interaction_values_invalid` and its pointer; values whose `interaction.created` would exceed `sync.event_payload_max_bytes` give `too_long` on `/values`.'
     Interaction:
       type: object
       required:

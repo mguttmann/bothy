@@ -117,6 +117,9 @@ type JobModules struct {
 	// runs.stall_check.
 	RunsLifecycle runsjobs.Lifecycle
 	StallInterval time.Duration
+	// ComponentExpiry is the use case of runs.component_expiry (M2-15); nil only where no job
+	// runs.
+	ComponentExpiry runsjobs.ComponentExpirer
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
@@ -124,10 +127,11 @@ type JobModules struct {
 // sync.partition_maintenance (M1-16), sync.idempotency_cleanup (M1-20), authz.expiry_sweep and
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
 // audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
-// on the queue files without a River job timeout (M3-04), files.thumbnail on the queue files with
-// the timeout file.image.processing_timeout (M3-06), runs.queued_expiry on the queue default
-// (M2-08) and runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance
-// (M2-09); the error is the first rejected registration.
+// on the queue files without a River job timeout (M3-04) and files.thumbnail on the queue files
+// with the timeout file.image.processing_timeout (M3-06), runs.queued_expiry on the queue
+// default (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue
+// maintenance (M2-09) and runs.component_expiry, scheduled per card, on the queue maintenance
+// (M2-15); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -164,6 +168,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := runsjobs.RegisterLifecycle(reg, m.RunsLifecycle, m.StallInterval); err != nil {
+		return nil, err
+	}
+	if err := runsjobs.RegisterComponentExpiry(reg, m.ComponentExpiry); err != nil {
 		return nil, err
 	}
 	return reg, nil

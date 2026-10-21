@@ -179,15 +179,23 @@ func (s *Service) lockAgentRun(ctx context.Context, a actor.Actor, id ids.ID) (R
 //
 // Extension point: M2-11 (follow-ups deferred or discarded at the end of a run) and M2-15
 // (components disabled at the end) add their steps here, after the transition and in the same
-// unit of work, so they see the ended run and commit with it.
+// unit of work, so they see the ended run and commit with it. M2-15: DisableRunComponents at
+// every end state, not only after a stop (ruling D-M2-15-21).
 func (s *Service) endRun(ctx context.Context, row RunRow, to domain.State, reason string, setBy domain.Setter,
 	store TransitionStore) (Transitioned, error) {
 	if !to.Ended() {
 		return Transitioned{}, errs.New(errs.CodeInternalError, "runs: endRun needs an end state")
 	}
-	return s.Transition(ctx, TransitionCmd{
+	t, err := s.Transition(ctx, TransitionCmd{
 		RunID: row.ID, From: row.State, Version: row.Version, To: to, Reason: reason, SetBy: setBy, Store: store,
 	})
+	if err != nil {
+		return Transitioned{}, err
+	}
+	if err := s.DisableRunComponents(ctx, row.ID); err != nil {
+		return Transitioned{}, err
+	}
+	return t, nil
 }
 
 // auditReportedMismatch writes the audit entry of an I3 mismatch the adapter reported (design note
