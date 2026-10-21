@@ -395,7 +395,7 @@ canary class `manage_only` of `test/canary`.
 | `putProjectBinding` | `channel.project.bind` (owner, step-up, optional If-Match on the binding version) | `channel.settings_changed`, `agent.config_changed` to the effective operator |
 | `deleteProjectBinding` | `channel.project.bind` (owner, step-up) | the same |
 
-Rulings: docs/DECISIONS.md D-M2-03-1 to D-M2-03-12. Tests: `domain/project_binding_test.go`,
+Rulings: docs/DECISIONS.md D-M2-03-1 to D-M2-03-13. Tests: `domain/project_binding_test.go`,
 `test/integration/project_binding_test.go`, `migrations/chat_project_bindings_test.go` and the
 canary scenario `test/canary/scenario_project.go`.
 

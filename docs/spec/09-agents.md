@@ -1454,7 +1454,7 @@ every row from the facts, and a test keeps table and evidence equal.
 - Binding changes (`putProjectBinding`, `deleteProjectBinding`, M2-03): every effective change of
   the binding and every change of the effective operator of the forum sets `ready` to `false`; an
   identical PUT changes nothing. Only reports of the effective operator for a bound forum that is
-  not archived are applied; a readiness change writes no event, no audit entry and no new
+  not archived and not in an archived space are applied; a readiness change writes no event, no audit entry and no new
   `settings_version`.
 - A thread is a Claude Code session. The runner assigns the session ID in advance as a UUID; the
   first turn starts with `--session-id <uuid>`, every further one with `--resume <uuid>` (chosen via
