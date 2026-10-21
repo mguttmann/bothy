@@ -217,10 +217,9 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
 - Domain (`domain/thread.go`): `Thread` with `ThreadKind`, `ThreadState`, `TitleSource`; `Close`
   (a main thread is `409 invalid_state_transition`, a closed thread unchanged), `Reopen`,
   `SetTitle`; `CheckThreadTitle` (`thread.title_max_chars` Unicode characters, SEC-IN-4 through
-  `kernel/textcheck`, empty allowed, stored as given); `PlaceholderTitle` (trimmed, inner white
-  space collapsed, `strings.EqualFold` against `thread.placeholder_titles`, an entry plus one space
-  and ASCII digits; the empty title always) and `CreateTitleSource`; `CheckTagSet` (duplicates,
-  `thread.max_tags`) and `DiffTags` with the restricted flag.
+  `kernel/textcheck`, empty allowed, stored as given); `CheckTagSet` (duplicates,
+  `thread.max_tags`) and `DiffTags` with the restricted flag. Placeholders and title sources live
+  in `domain/title` (M2-18, below).
 - Store: `queries/threads.sql` (read, lock, insert, save, the thread sequence and the two keyset
   lists) and `queries/thread_tags.sql`; `DeleteForumTag` deletes the `thread_tags` rows of its tag
   in the same transaction, without an event per thread (clients reload tags on `channel.updated`).
@@ -251,10 +250,10 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
   moment, `NULL` for none; a later operator change of the channel leaves it. The representation
   adds `operator_agent_id` and the current `billing_mode` from `authz.AgentPolicySource` (bound in
   `internal/wire`); main threads carry neither.
-- Title source (09 section 12): a person with a title that is neither empty nor a placeholder
-  creates `manual`, everything else `auto`; `setThreadTitle` by a person sets `manual`, agents and
-  apps keep the source and get `409 title_manual` on a manual one; a main thread is `400`
-  (`main_thread_has_no_title`).
+- Title source (09 section 12, package `domain/title`, M2-18): a person with a title that is
+  neither empty nor a placeholder creates `manual`, everything else `auto`; `setThreadTitle` by
+  the thread's operator agent keeps `auto` and gets `409 title_manual` on a manual one, every
+  other principal sets `manual`; a main thread is `400` (`main_thread_has_no_title`).
 - Tags (D5): only a forum post (`not_a_forum_post`), no duplicates (`duplicate`), only live tags of
   the forum (`unknown_tag`), at most `thread.max_tags` (`limit_reached`); the same set answers
   without an event.
@@ -293,6 +292,26 @@ an agent or app), in the unit of work of the insert ([14-search.md](../../../../
 
 - Port: `Structure` adds `NotificationPath` and `LockNotificationPath` (the path of a notification preference target as `chat.NotificationPath`: kind, space, channel, thread, channel kind, `default_notification_level`, archived; the lock form takes `FOR SHARE` on thread, then channel, then space), `ChannelIDsOfSpace` (archived channels included) and `ThreadIDsOfChannels`, all ascending. None of them authorizes: `notify` authorizes the target with the returned path, and the two id lists run inside an archive that `space.archive` or `channel.archive` allowed. An id of another kind than the requested one is `not_found`.
 - Code: `chat/notification.go`, `app/notification.go`, `adapters/postgres/notification.go`; queries `ShareSpace`, `ShareChannel`, `ChannelIDsOfSpace`, `ThreadIDsOfChannels`.
+
+### Auto title and placeholders (M2-18)
+
+- `domain/title` is the only code that knows placeholders and title sources; it imports only the
+  standard library and `kernel-core`. `internal/chat/app` classifies the request principal
+  (`titleBy`): kind `user` is `ByPerson`, the agent equal to `threads.operator_agent_id` is
+  `ByOperatorAgent`, every other agent or app is `ByOther`.
+- Word lists: `domain/title/wordlists/de.txt` and `en.txt`, UTF-8, the SPDX line first, `#`
+  comments, one normalised entry per line, each once. They are embedded and parsed at start; the
+  default of `thread.placeholder_titles` is rendered from them (`DefaultConfigText`, German first).
+  A new language is a new file plus the new default cell in 09 section 21; no Go code changes.
+- Configuration: the effective `thread.placeholder_titles` replaces the default completely and is
+  read at start only; `app.New` builds one `title.Placeholders` from it.
+- Matching (`IsPlaceholder`): white space normalised (`Normalize`), `strings.EqualFold` against an
+  entry, or an entry plus one space and ASCII digits ("Neuer Chat 3"); the empty title always.
+  Short real names ("AI", "C#", "PC 2") and punctuation are real titles (docs/REUSE.md L23).
+- Sources: at creation (`SourceAtCreation`) a person's real title is `manual`, everything else
+  `auto`; on a change (`SourceOnUpdate`) a person and every other non-operator principal set
+  `manual`, the operator agent keeps `auto` and gets `title_manual` on `manual`
+  (docs/DECISIONS.md D-M2-18-1 to D-M2-18-7).
 
 ## Moving threads (M1-62)
 

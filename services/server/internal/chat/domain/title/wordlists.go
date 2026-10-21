@@ -111,7 +111,7 @@ func DefaultEntries() []string {
 
 // DefaultConfigText renders DefaultEntries as the default text of thread.placeholder_titles: a
 // JSON array with ", " between the elements and no HTML escaping, the form of the cell in
-// docs/spec/09-agenten.md section 21.
+// docs/spec/09-agents.md section 21.
 func DefaultConfigText() string {
 	entries := DefaultEntries()
 	parts := make([]string, 0, len(entries))

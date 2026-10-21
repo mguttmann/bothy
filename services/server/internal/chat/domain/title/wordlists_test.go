@@ -16,7 +16,7 @@ import (
 )
 
 // wantLists is the content of the word lists (brief M2-18 note 2b): together exactly the non-empty
-// entries of the default of thread.placeholder_titles in docs/spec/09-agenten.md section 21.
+// entries of the default of thread.placeholder_titles in docs/spec/09-agents.md section 21.
 var wantLists = map[string][]string{
 	"de": {"Neuer Chat", "Chat", "Ohne Titel", "Test"},
 	"en": {"New chat", "Chat", "Untitled", "Test"},

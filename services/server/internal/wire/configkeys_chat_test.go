@@ -21,7 +21,7 @@ func TestConfigKey_PlaceholderTitles(t *testing.T) {
 		t.Fatal("thread.placeholder_titles is not registered")
 	}
 	k := schema(t).Keys()[i]
-	if k.Kind != config.KindStringList || k.Chapter != "09-agenten.md" || k.Default != title.DefaultConfigText() {
+	if k.Kind != config.KindStringList || k.Chapter != "09-agents.md" || k.Default != title.DefaultConfigText() {
 		t.Fatalf("key %+v", k)
 	}
 	for env, want := range map[string][]string{
