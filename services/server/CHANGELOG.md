@@ -13,7 +13,7 @@ documented in this file. The format is based on
 
 - Project binding of forums (M2-03): `putProjectBinding` and `deleteProjectBinding`
   (`channel.project.bind`, owner with fresh step-up, audit of allow and deny) over the new table
-  `project_bindings` (migration `00046`): an opaque `workspace_ref` unique case-insensitively, a
+  `project_bindings` (migration `00048`): an opaque `workspace_ref` unique case-insensitively, a
   display-only `repository_url`, `default_branch` and the closed `runner_config` of schema
   `project_runner_config.v1` (`ProjectRunnerConfig`). A PUT replaces the whole binding, an
   identical PUT is a no-op; every change raises `settings_version` with `channel.settings_changed`
