@@ -681,3 +681,10 @@ def test_judge_fails_on_every_kind_of_failure() -> None:
         admin.judge([*ok, {"name": "b", "result": "skipped"}], [], csv)
     with pytest.raises(admin.CheckError, match="CSV"):
         admin.judge(ok, [], [])
+
+
+def test_problem_text_names_code_and_reason_only() -> None:
+    answer = {"json": {"code": "conflict", "reason": "billing_mode_not_personal", "detail": "x"}}
+    assert admin.problem_text(answer) == "conflict billing_mode_not_personal"
+    assert admin.problem_text({"json": {"code": "forbidden"}}) == "forbidden"
+    assert admin.problem_text({"json": None}) == ""

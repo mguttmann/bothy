@@ -227,6 +227,14 @@ def problem_code(answer: Mapping[str, Any]) -> str:
     return str(body.get("code") or "") if isinstance(body, dict) else ""
 
 
+def problem_text(answer: Mapping[str, Any]) -> str:
+    """Code and reason of a problem body for an error message; never the rest of the body,
+    which may echo a value."""
+    body = answer.get("json")
+    reason = str(body.get("reason") or "") if isinstance(body, dict) else ""
+    return " ".join(p for p in (problem_code(answer), reason) if p)
+
+
 # ---- page scripts ------------------------------------------------------------------------
 
 # A request of the console session (cookie, CSRF header) with extra headers; returns the status,
@@ -369,7 +377,7 @@ class ConsoleAdmin:
             self.step_up_with_passkey()
             answer = self.fetch(method, path, body, headers)
         if not 200 <= answer["status"] < 300:
-            raise CheckError(f"{op} answered {answer['status']} {problem_code(answer)}")
+            raise CheckError(f"{op} answered {answer['status']} {problem_text(answer)}")
         return answer
 
     def step_up_with_passkey(self) -> None:
@@ -500,7 +508,7 @@ class PageDevice:
             ):
                 continue
             if answer["status"] != want or not isinstance(answer["json"], dict):
-                raise CheckError(f"{op} answered {answer['status']} {problem_code(answer)}")
+                raise CheckError(f"{op} answered {answer['status']} {problem_text(answer)}")
             body_json: dict[str, Any] = answer["json"]
             return body_json
         raise CheckError(f"{op} kept asking for a DPoP nonce")  # pragma: no cover
@@ -644,13 +652,6 @@ def seed(page: Page, admin: ConsoleAdmin) -> dict[str, Any]:
         idempotent=True,
     )
     agent_id = support_agent["json"]["id"]
-    admin.call(
-        "setCredentialHolder",
-        "PUT",
-        f"/agents/{agent_id}/credential-holder",
-        {"credential_holder_id": owner["id"], "reason": "Alex holds the subscription"},
-        if_match=admin.etag("getAgent", f"/agents/{agent_id}"),
-    )
     admin.call(
         "setAgentBillingMode",
         "PUT",
@@ -838,6 +839,9 @@ def run_admin(pw: Playwright, login: Login, spki: str) -> dict[str, Any]:
         say("log in as the owner, step-up, passkey")
         log_in(page, login)
         admin = ConsoleAdmin(page)
+        # The seed is usually done within the 3 s of the first step-up; one passkey step-up here
+        # proves the path the seed and the flows rely on later.
+        admin.step_up_with_passkey()
         say("seed")
         document = seed(page, admin)
         check_seed(document)
