@@ -162,7 +162,9 @@ def test_wait_for() -> None:
             raise OSError("not yet")
         return True
 
-    vt.wait_for("x", probe, 5, 0.01)
+    # The deadline is far beyond any load: the probe succeeds on its second call either way.
+    vt.wait_for("x", probe, 3600, 0)
+    assert len(calls) == 2
     with pytest.raises(vt.VMTestError, match="timed out"):
         vt.wait_for("y", lambda: False, 0.05, 0.01)
 
