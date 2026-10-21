@@ -35,6 +35,7 @@ _SKIP = re.compile(r"^\s*SKIP\s+(\S+)\s+(.*)$", re.MULTILINE)
 # configuration the Makefile reads with `?=`; neither may leak into the make runs below.
 _DROPPED = {"MAKEFLAGS", "MAKELEVEL", "MFLAGS", "COMPONENTS", "COVERAGE_GO_MIN", "PERF_TIMEOUT"}
 _DROPPED |= {"GO_ARCH_LINT"}
+_DROPPED |= {"GO_TEST_TIMEOUT"}
 
 _FAKE = """#!{python}
 import json, os, sys
@@ -602,6 +603,7 @@ def test_go_tests_check_prerequisites_first(fakes: Fakes, shell: list[str]) -> N
         "contract_validate",
         "-covermode=atomic",
         "-coverprofile=coverage.out",
+        "-timeout=20m",
         "./...",
     ]
 
