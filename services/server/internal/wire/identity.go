@@ -188,7 +188,7 @@ type Identity struct {
 type IdentityWrites struct {
 	// Audit records the allow entries.
 	Audit auditing.Recorder
-	// Events appends user.updated.
+	// Events appends user.updated and device.pending (R-AZ-31, M3-19).
 	Events eventlog.Appender
 	// Flags are the feature flags of instance (M1-47); createToken asks tokens.personal_enabled
 	// through them (identity/adapters/instanceflags).
@@ -235,7 +235,7 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		return nil, err
 	}
 	devices, err := app.NewDevices(cfg, app.DevicesDeps{
-		Store: repo, People: repo, UoW: uow, Authorizer: az, Cursors: identityhttp.Cursors{}, Pepper: pepper,
+		Store: repo, People: repo, UoW: uow, Authorizer: az, Cursors: identityhttp.Cursors{}, Pepper: pepper, Events: w.Events,
 	})
 	if err != nil {
 		return nil, err

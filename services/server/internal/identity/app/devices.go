@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
@@ -35,6 +36,9 @@ type DevicesDeps struct {
 	// Pepper is the raw token pepper, the key of the verification code a pending device reads
 	// about itself (M1-38); empty means no code is shown.
 	Pepper []byte
+	// Events appends device.pending for a pending registration (R-AZ-31). nil refuses every
+	// pending registration with an internal error and still registers active devices.
+	Events eventlog.Appender
 }
 
 // Devices implements identity.Devices. It is safe for concurrent use.
@@ -88,7 +92,8 @@ func (s *Devices) Register(ctx context.Context, r identity.RegisterDevice) (iden
 			}
 			return err
 		}
-		out, err = s.deps.Store.InsertDevice(ctx, d)
+		kind, id := eventActor(ctx)
+		out, err = insertDevice(ctx, s.deps.Store, s.deps.Events, eventActorRef{kind: kind, id: id}, d)
 		return err
 	})
 	return out, err
@@ -169,6 +174,12 @@ func (s *Devices) ActiveKey(ctx context.Context, deviceID ids.ID, purpose identi
 		return identity.DeviceKey{}, notFound("device key")
 	}
 	return k, nil
+}
+
+// ActiveForUsers implements identity.Devices without authorize: the consumer push selected the
+// people and decides every hint with authorize (M3-19 design note 8).
+func (s *Devices) ActiveForUsers(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]identity.DeviceRef, error) {
+	return s.deps.Store.ActiveDevicesOfUsers(ctx, userIDs)
 }
 
 // authorize calls the Authorizer with device.list and turns a denial into its error.

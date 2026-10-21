@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -226,7 +227,7 @@ func (s *Service) approvePairingWrite(ctx context.Context, a actor.Actor, pairin
 		return identity.Device{}, err
 	}
 	d.CreatedAt = now
-	created, err := s.d.Devices.InsertDevice(ctx, d)
+	created, err := insertDevice(ctx, s.d.Devices, s.d.Events, eventActorRef{kind: eventlog.ActorUser, id: a.ID}, d)
 	if err != nil {
 		return identity.Device{}, err
 	}
