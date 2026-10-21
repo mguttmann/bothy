@@ -371,10 +371,94 @@ jobs:
           COMPONENTS: none
         run: make test coverage COMPONENTS="$COMPONENTS"
 
-  # Go tests against PostgreSQL and SeaweedFS (Docker on the runner) and the coverage threshold;
-  # AREAS=none leaves the tools suite to test-tools.
+  # Go tests against PostgreSQL and SeaweedFS (Docker on the runner), in shards that run at the
+  # same time: each shard runs `make test` for the packages tools/ci/go_shards.py assigns to it
+  # (every package of every Go module in exactly one shard, balanced by the measured durations in
+  # tools/ci/go_test_timings.json), with the flags of the single run. The plan lists test-server
+  # for all shards together, and the one result of the matrix fails when any shard fails.
+  # test-server-coverage merges the profiles and runs the coverage threshold. AREAS=none leaves
+  # the tools suite to test-tools.
   test-server:
-    name: test (server)
+    name: test (server, shard ${{ matrix.shard }} of 5)
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-server ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      # JDK and Android SDK for the JVM tests of the Android core that `make test` runs
+      # (brief M5-01; docs/DECISIONS.md D-M5-01-5).
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: hashFiles('packages/*/android/gradlew') != ''
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make test
+        env:
+          # As every step that reaches `make test` (docs/quality/gates.md, "Individual gates").
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+          COMPONENTS: server
+          GO_TEST_SHARD: ${{ matrix.shard }}/5
+        run: make test COMPONENTS="$COMPONENTS" AREAS=none GO_TEST_SHARD="$GO_TEST_SHARD"
+      # The shard's record of the packages it ran and its profiles for test-server-coverage.
+      - name: Pack the profiles of the shard
+        run: |
+          shopt -s nullglob
+          profiles=(services/*/coverage.out)
+          tar -cf "$RUNNER_TEMP/go-shard.tar" -C .cache/go-shard go-shard.txt -C "$GITHUB_WORKSPACE" "${profiles[@]}"
+      - name: Upload the profiles of the shard
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: go-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/go-shard.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  # The contract tests G7 of the server (`make contract-test`, Schemathesis against the server of
+  # this tree), in parallel with the shards of test-server and decided by the plan with them.
+  test-server-contract:
+    name: test (server contract)
     needs: plan
     if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-server ')
     runs-on: ubuntu-24.04
@@ -425,13 +509,56 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
-      - name: make test coverage contract-test
+      - name: make contract-test
         env:
           # As every step that reaches `make test` (docs/quality/gates.md, "Individual gates").
           MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: server
-        run: make test coverage contract-test COMPONENTS="$COMPONENTS" AREAS=none
-      # The coverage reports of `make test` in this job for the job sonar, which scans them
+        run: make contract-test COMPONENTS="$COMPONENTS" AREAS=none
+
+  # The coverage of the server tests: the profiles of the shards of test-server merged per module
+  # as one `go test ./...` writes them (tools/ci/go_shards.py merge, which also checks that every
+  # shard ran and every package ran in exactly one shard), then the threshold of `make coverage`
+  # on the merged profile without testing again (`-o test`).
+  test-server-coverage:
+    name: test (server coverage)
+    needs: [plan, test-server]
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' test-server ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - name: Download the profiles of the shards
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: go-shard-*
+          path: ${{ runner.temp }}/go-shard-artifacts
+      - name: Merge the profiles of the shards
+        run: |
+          # download-artifact puts a single matching artifact straight into the path and several
+          # into one folder each; every archive gets a folder of its own.
+          n=0
+          while IFS= read -r archive; do
+            n=$((n + 1))
+            mkdir -p "$RUNNER_TEMP/go-shards/$n"
+            tar -xf "$archive" -C "$RUNNER_TEMP/go-shards/$n"
+          done < <(find "$RUNNER_TEMP/go-shard-artifacts" -name go-shard.tar | sort)
+          uv run --no-project --python 3.14 tools/ci/go_shards.py merge --tags contract_validate --from "$RUNNER_TEMP/go-shards" --to .
+      - name: make coverage
+        env:
+          COMPONENTS: server
+        run: make -o test coverage COMPONENTS="$COMPONENTS" AREAS=none
+      # The merged coverage reports of the server tests for the job sonar, which scans them
       # instead of running the tests again. REPORTS covers every report path of
       # sonar-project.properties (tools/ci/tests/test_sonar_coverage_handoff.py); a component
       # this job did not test wrote no report. The list file always exists, so the artifact is
@@ -729,7 +856,7 @@ jobs:
     # which ci-ok already fails. On main only with the repository variable SONAR_MAIN_ANALYSIS:
     # until the main branch of the SonarQube Cloud project is named `main`, the server takes
     # `main` for a short-lived branch and fails its analysis (docs/quality/sonarqube-local.md).
-    needs: [plan, test-server, test-apps, test-sdk-plugins]
+    needs: [plan, test-server, test-server-coverage, test-apps, test-sdk-plugins]
     if: >-
       always() && needs.plan.result == 'success' && needs.plan.outputs.private_checks == 'true'
       && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
@@ -988,7 +1115,7 @@ jobs:
     # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
     # pending check run that the plan job created (docs/quality/push-discipline.md).
-    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, apps-macos, apps-windows, apps-android-26, apps-android-36]
+    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, apps-macos, apps-windows, apps-android-26, apps-android-36]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

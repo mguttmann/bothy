@@ -37,6 +37,12 @@ COVERAGE_DART_MIN ?= 80
 PERF_TIMEOUT ?= 60m
 # Time limit of each Go test binary in `make test` (named value quality.test.go_timeout).
 GO_TEST_TIMEOUT ?= 20m
+# One shard I/N of the Go tests (CI job "test (server)"): `make test` then runs only the packages
+# tools/ci/go_shards.py assigns to shard I and records them in GO_SHARD_RECORD; empty runs all.
+GO_TEST_SHARD ?=
+GO_SHARD_RECORD ?= .cache/go-shard/go-shard.txt
+# Build tags of `make test` (G8 response validation); the shard split lists packages with them.
+GO_TEST_TAGS := contract_validate
 # Host system of the Dart performance tests: they run in profile mode on macOS only.
 PERF_HOST ?= $(shell uname -s)
 
@@ -73,6 +79,7 @@ FLUTTER := env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR -
 FETCH := $(UVRUN) python tools/bin/fetch_tools.py
 # go, a Docker-compatible runtime and the pins of the server gates; a gap fails (R-QA-02).
 GO_PREREQS := $(UVRUN) python tools/ci/go_prereqs.py
+GO_SHARDS := $(UVRUN) python tools/ci/go_shards.py
 CODEGEN_CHECK := $(UVRUN) python tools/ci/codegen_check.py
 MIGRATIONS_LINT := $(UVRUN) python tools/ci/migrations_lint.py
 SEMGREP := $(UV)x --quiet --python 3.12 --from semgrep==$(SEMGREP_VERSION) semgrep
@@ -257,9 +264,16 @@ test: ## All tests with coverage data
 	@# test in another package (a use case tested through its HTTP adapter); see PL/1.
 	@# -timeout: each test binary gets GO_TEST_TIMEOUT instead of the default 10m, because the
 	@# instrumentation of the whole module slows the larger packages down (PL/2).
+	@# GO_TEST_SHARD: the same command for the packages of one shard; the CI job
+	@# "test (server coverage)" merges the shards' profiles (tools/ci/go_shards.py).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
 	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -tags contract_validate -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) ./...) || exit 1; done; fi
+	  if [ -n "$(GO_TEST_SHARD)" ]; then mkdir -p "$(dir $(GO_SHARD_RECORD))" && : > "$(GO_SHARD_RECORD)" || exit 1; fi; \
+	  for m in $(GO_MODS); do pkgs=./...; \
+	    if [ -n "$(GO_TEST_SHARD)" ]; then \
+	      pkgs=$$($(GO_SHARDS) packages --shard "$(GO_TEST_SHARD)" --record "$(abspath $(GO_SHARD_RECORD))" --tags $(GO_TEST_TAGS) --module $$m $(GO_MODS)) || exit 1; \
+	      [ -n "$$pkgs" ] || { echo "  go-test: no package of $$m in shard $(GO_TEST_SHARD)"; continue; }; fi; \
+	    (cd $$m && GO_ARCH_LINT="$$gal" go test -race -tags $(GO_TEST_TAGS) -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) $$pkgs) || exit 1; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
 	@# The workspace resolves once at the root (one pubspec.lock); then every member runs its tests.

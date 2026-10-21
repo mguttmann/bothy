@@ -23,8 +23,13 @@ REPO = Path(__file__).resolve().parents[3]
 WORKFLOW = REPO / ".github" / "workflows" / "ci.yml"
 PROPERTIES = REPO / "sonar-project.properties"
 SONAR_ARTIFACT = "sonar-coverage"
-# The jobs that run the component tests (the tools tests write no report SonarQube reads).
-TEST_JOBS = {"test-server": "server", "test-apps": "apps", "test-sdk-plugins": "sdk-plugins"}
+# The jobs that write the coverage reports of the component tests (the tools tests write no report
+# SonarQube reads); test-server-coverage merges the reports of the shards of test-server.
+TEST_JOBS = {
+    "test-server-coverage": "server",
+    "test-apps": "apps",
+    "test-sdk-plugins": "sdk-plugins",
+}
 
 
 def _workflow() -> dict[Any, Any]:
@@ -75,7 +80,9 @@ def test_test_jobs_pack_every_coverage_report_sonar_reads(job: str) -> None:
 @pytest.mark.parametrize(("job", "part"), sorted(TEST_JOBS.items()))
 def test_test_jobs_upload_the_reports_after_make_test(job: str, part: str) -> None:
     steps = _steps(job)
-    make = next(i for i, s in enumerate(steps) if "make test coverage" in str(s.get("run", "")))
+    make = next(
+        i for i, s in enumerate(steps) if re.search(r"make (-o )?test coverage", str(s.get("run")))
+    )
     [pack] = [i for i, s in enumerate(steps) if "REPORTS" in s.get("env", {})]
     [upload] = [i for i, s in enumerate(steps) if _uses(s, "actions/upload-artifact")]
     assert make < pack < upload
@@ -85,7 +92,8 @@ def test_test_jobs_upload_the_reports_after_make_test(job: str, part: str) -> No
 
 def test_sonar_needs_the_test_jobs_and_scans_without_testing() -> None:
     job = _workflow()["jobs"]["sonar"]
-    assert set(job["needs"]) == {"plan", *TEST_JOBS}
+    # test-server too: a failed shard skips test-server-coverage, and the scan must not run.
+    assert set(job["needs"]) == {"plan", "test-server", *TEST_JOBS}
     # A skipped test job (component not planned) must not skip the scan, a failed one must.
     condition = " ".join(str(job["if"]).split())
     assert condition.startswith("always() && needs.plan.result == 'success'")

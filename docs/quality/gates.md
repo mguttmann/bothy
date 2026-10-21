@@ -22,7 +22,8 @@ chapter 23, section 11.
 ## CI jobs
 
 `make gates` runs in seven jobs at the same time, each with every toolchain, the Go, npm, uv and
-pub caches and the cache of the pinned binaries; together they run every target of `make gates`
+pub caches and the cache of the pinned binaries (the server tests as a matrix of shards, followed
+by `test (server coverage)` with Go alone); together they run every target of `make gates`
 once for the components of the plan, the tests split by component
 (`tools/ci/tests/test_ci_parallel_gates.py`). `ci-ok` requires each of them (`tools/ci/ci_ok.py`).
 
@@ -32,12 +33,27 @@ once for the components of the plan, the tests split by component
 | `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
 | `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses` | always |
 | `test (tools)` | `test coverage` with no component (the Python tools) | always |
-| `test (server)` | `test coverage COMPONENTS=server AREAS=none` | when the plan needs it |
+| `test (server, shard I of N)` | `test COMPONENTS=server AREAS=none GO_TEST_SHARD=I/N`, one job per shard of a matrix | when the plan needs it |
+| `test (server coverage)` | `-o test coverage COMPONENTS=server AREAS=none` on the merged profiles of the shards | when the plan needs it |
+| `test (server contract)` | `contract-test COMPONENTS=server AREAS=none`, beside the shards | when the plan needs it |
 | `test (apps)` | `test coverage COMPONENTS=apps AREAS=none` (Dart and JVM) | when the plan needs it |
 | `test (SDKs and plugins)` | `test coverage` for the planned `sdk-python`, `sdk-typescript`, `plugins` with `AREAS=none` | when the plan needs it |
 
 `AREAS=none` leaves the tools suite to `test (tools)`; only the three tools tests that read
 component sources (`TOOLS_SOURCE_TESTS`) run in each test job as well.
+
+The Go tests run in shards at the same time (`tools/ci/go_shards.py`): every package of
+`go list ./...` in every Go module is assigned to exactly one shard, balanced by the package
+durations in `tools/ci/go_test_timings.json` (a package without a duration weighs the median; one
+that needs half the mean load of a shard or more runs alone),
+and each shard runs `go test` with the flags of the single run for its packages only. The plan
+lists `test-server` for all shards together; the result of the matrix fails when any shard
+fails. `test (server coverage)` merges the profiles as one `go test ./...` writes them (one mode
+line, then the blocks of every test binary; the same coverage, with fewer repeated count-0
+copies), after checking that every shard ran and every package ran in exactly
+one shard, and runs the coverage threshold on the merged profile; `ci-ok` and `build-verify-ok`
+require the shards, `test (server coverage)` and `test (server contract)` (`FOLLOWS` in `tools/ci/ci_ok.py`). To refresh the durations, run
+`tools/ci/go_shards.py timings` on the logs of the shards.
 
 ## Jobs a change needs
 
@@ -52,7 +68,7 @@ builds of server and host service).
 
 | Jobs | Run when the change touches |
 |---|---|
-| `test (server)`, `test (apps)`, `test (SDKs and plugins)` | their component in the component map (`server`; `apps`; `sdk-python`, `sdk-typescript` or `plugins`) |
+| `test (server)` (all shards, `test (server coverage)` and `test (server contract)`), `test (apps)`, `test (SDKs and plugins)` | their component in the component map (`server`; `apps`; `sdk-python`, `sdk-typescript` or `plugins`) |
 | `apps (macOS)`, `apps (Windows)`, `apps (Android API 26)`, `apps (Android API 36)` | `apps/`, `packages/` (with the native code of the members), the root `pubspec.yaml` (Flutter pin) or `pubspec.lock`; the Android jobs only in the public phase. Other inputs of the component `apps` (`design/`, the SLO generator, `analysis_options.yaml`, `tools/arch-check/`) feed the Dart gates and committed generated files under `packages/`, which `test (apps)` checks |
 | `postgres-image (amd64)`, `postgres-image (arm64)` | what `bothy-postgres` is built and tested from: `services/server/images/bothy-postgres/`, `internal/`, `cmd/bothy-backupd/`, `migrations/`, `migrations.sha256`, `test/postgresimage/`, `go.mod`, `go.sum`, `VERSION` and `.golangci.yml` under `services/server/` |
 
@@ -68,7 +84,7 @@ change. Most tools (`catalog`, `configdoc`, `denylist`, `doccheck`, `docs`, `ops
 repository-wide gates and the tools tests, so they need no conditional job. Some files select a
 component: `tools/api-checks/breaking.py` (`make api-breaking` runs for `server`),
 `tools/sonarqube/compose.yaml` (a test of the server reads its image pin),
-`tools/contract/` (`make contract-test` runs G7 in the job `test (server)`) and
+`tools/contract/` (`make contract-test` runs G7 in the job `test (server contract)`) and
 `tools/design-tokens/` (`apps` like `design/`, and `server`, whose designkeys generator and tests
 read `design/build/tokens.resolved.json`, which also selects `server`). Shared stay the folders every gate depends on
 (`SHARED_TOOL_FOLDERS`: `tools/bin/`, `tools/ci/` with the component map, `tools/hooks/`,
