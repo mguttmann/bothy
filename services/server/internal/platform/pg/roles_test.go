@@ -43,7 +43,7 @@ func restorePasswords(t *testing.T, db *pgtest.DB) {
 	original := pgtestPasswords(t, db)
 	t.Cleanup(func() {
 		ctx := context.Background()
-		conn, err := pg.Connect(ctx, db.SuperConfig(), providerFor(t, db.SecretsDir()), 10*time.Second, nil)
+		conn, err := pg.Connect(ctx, db.SuperConfig(), providerFor(t, db.SecretsDir()), testkit.Patience, nil)
 		if err != nil {
 			t.Errorf("restore the role passwords: %v", err)
 			return

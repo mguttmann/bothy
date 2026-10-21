@@ -66,7 +66,14 @@ const (
 	watchdogLabelValue = "lease"
 	// containerPort is the PostgreSQL port inside the container.
 	containerPort = "5432/tcp"
+	// runLabel marks the containers of one run of a test binary with runLabelValue, so a test
+	// that runs this binary as a child finds the containers of that child.
+	runLabel = "org.bothy.test.run"
 )
+
+// runLabelValue is the value of runLabel on the containers of this binary; empty for none. Only
+// the child of TestNoContainerSurvivesTheRun sets it, before its first New.
+var runLabelValue string
 
 // The superuser of the container and the database it connects to for CREATE DATABASE.
 const (
@@ -548,20 +555,34 @@ var speedFlags = []string{"-c", "fsync=off", "-c", "synchronous_commit=off", "-c
 // servers in parallel (PL/8).
 const maxConnections = "400"
 
-// runContainer starts the pinned image on 127.0.0.1 with a random host port, under
+// runContainer starts the pinned image on 127.0.0.1 with a host port Docker picks (started
+// again by runRetrying when that port is taken before the start binds it), under
 // watchdogScript and with AutoRemove, so the container and its anonymous data volume disappear
 // when the lease of this process ends; with the speed flags unless key is durable, and with the
 // CPU and memory limits of key.
 func runContainer(ctx context.Context, superPassword string, key clusterKey) (*testcontainers.DockerContainer, error) {
+	// Docker picks the host port only when the container starts; runRetrying starts again when
+	// another process took it in between. Every start gets a new name.
+	return runRetrying(ctx, func(ctx context.Context) (*testcontainers.DockerContainer, error) {
+		return testcontainers.Run(ctx, Image, containerOptions(superPassword, key)...)
+	})
+}
+
+// containerOptions are the options of the container of runContainer, with a new name each time.
+func containerOptions(superPassword string, key clusterKey) []testcontainers.ContainerCustomizer {
 	port := network.MustParsePort(containerPort)
 	cmd := []string{"postgres", "-c", "max_connections=" + maxConnections}
 	if !key.durable {
 		cmd = append(cmd, speedFlags...)
 	}
-	return testcontainers.Run(ctx, Image,
+	labels := map[string]string{label: labelValue, watchdogLabel: watchdogLabelValue}
+	if runLabelValue != "" {
+		labels[runLabel] = runLabelValue
+	}
+	return []testcontainers.ContainerCustomizer{
 		testcontainers.WithLogger(tclog.NewNoopLogger()),
-		testcontainers.WithName("bothy-pgtest-"+randomHex(6)),
-		testcontainers.WithLabels(map[string]string{label: labelValue, watchdogLabel: watchdogLabelValue}),
+		testcontainers.WithName("bothy-pgtest-" + randomHex(6)),
+		testcontainers.WithLabels(labels),
 		testcontainers.WithEnv(map[string]string{
 			"POSTGRES_USER": superUser, "POSTGRES_PASSWORD": superPassword, "POSTGRES_DB": superDatabase,
 		}),
@@ -576,10 +597,11 @@ func runContainer(ctx context.Context, superPassword string, key clusterKey) (*t
 			hc.Memory = key.memoryBytes
 		}),
 		// The image's entry point starts the server once to initialise the data directory and
-		// then for good; only the second line means ready.
-		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").
+		// then for good; only the second line means ready. WithWaitStrategy would cut the wait
+		// to a deadline of its own of 60 seconds.
+		testcontainers.WithWaitStrategyAndDeadline(startTimeout, wait.ForLog("database system is ready to accept connections").
 			WithOccurrence(2).WithStartupTimeout(startTimeout)),
-	)
+	}
 }
 
 // writePasswords generates the superuser and role passwords and writes them as files of mode
@@ -876,7 +898,8 @@ func (d *DB) Name() string { return d.name }
 
 // Config returns the connection configuration of role for this database: host 127.0.0.1, the
 // mapped port, sslmode disable, the password as a file: reference into SecretsDir, and generous
-// test deadlines (pool of 4, acquire 10s, statement 30s, lock 10s, idle in transaction 60s).
+// test deadlines (pool of 4, acquire, statement and lock testkit.Patience, idle in transaction
+// 60s).
 // Tests of a deadline change the fields they test.
 func (d *DB) Config(role pg.Role) pg.Config {
 	return d.c.config(d.name, string(role), d.c.ref(role))

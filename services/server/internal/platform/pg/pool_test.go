@@ -26,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
@@ -439,7 +440,7 @@ func TestWaitReadyKeepsTheCause(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	err = pool.WaitReady(ctx, 1500*time.Millisecond)
+	err = withCause(func(window time.Duration) error { return pool.WaitReady(ctx, window) })
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != "28P01" {
 		t.Errorf("WaitReady with a wrong password: %v, want the cause 28P01", err)
@@ -447,13 +448,34 @@ func TestWaitReadyKeepsTheCause(t *testing.T) {
 
 	missing := db.SuperConfig()
 	missing.Name = "no_such_database"
-	_, err = pg.Connect(ctx, missing, providerFor(t, db.SecretsDir()), 1500*time.Millisecond, slog.New(slog.DiscardHandler))
+	err = withCause(func(window time.Duration) error {
+		_, err := pg.Connect(ctx, missing, providerFor(t, db.SecretsDir()), window, slog.New(slog.DiscardHandler))
+		return err
+	})
 	if !errors.As(err, &pgErr) || pgErr.Code != "3D000" || !strings.Contains(err.Error(), "no_such_database") {
 		t.Errorf("Connect to a missing database: %v, want the cause 3D000 naming the database", err)
 	}
 	if !strings.Contains(err.Error(), "the password of postgres") && strings.Contains(err.Error(), "database.password_ref") {
 		t.Errorf("Connect names database.password_ref for another login: %v", err)
 	}
+}
+
+// withCause runs wait, a wait for the database that fails for good (a wrong password, a missing
+// database), with a window of 1.5 s and returns its error. When no attempt ended within the
+// window (a loaded host), the error carries only the end of the window and no cause; withCause
+// then tries again with a doubled window, until the windows add up to testkit.Patience.
+func withCause(wait func(window time.Duration) error) error {
+	var err error
+	spent := time.Duration(0)
+	for window := 1500 * time.Millisecond; spent < testkit.Patience; window *= 2 {
+		err = wait(window)
+		spent += window
+		var pgErr *pgconn.PgError
+		if err == nil || errors.As(err, &pgErr) || !errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+	}
+	return err
 }
 
 // TestBootstrapSpansCarryNoVerifier is not parallel: it swaps the tracer provider. The role
@@ -467,7 +489,7 @@ func TestBootstrapSpansCarryNoVerifier(t *testing.T) {
 
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	ctx, parent := tp.Tracer("test").Start(context.Background(), "migrate")
-	conn, err := pg.Connect(ctx, db.SuperConfig(), providerFor(t, db.SecretsDir()), 10*time.Second, nil)
+	conn, err := pg.Connect(ctx, db.SuperConfig(), providerFor(t, db.SecretsDir()), testkit.Patience, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

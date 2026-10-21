@@ -61,7 +61,7 @@ func TestMigrateEmptyDatabase(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := pgtest.New(t, pgtest.WithoutMigrations())
-	m := newMigrator(t, migrateDB(t, db, pg.RoleOwner, 5*time.Second), migrations.FS, pg.MigratorOptions{})
+	m := newMigrator(t, migrateDB(t, db, pg.RoleOwner, testkit.Patience), migrations.FS, pg.MigratorOptions{})
 	want := highest(t)
 
 	res, err := m.Up(ctx)
@@ -101,7 +101,7 @@ func TestMigrateConcurrentRunsApplyOnce(t *testing.T) {
 	results := make([]pg.Result, 2)
 	errs := make([]error, 2)
 	for i := range 2 {
-		m := newMigrator(t, migrateDB(t, db, pg.RoleOwner, 5*time.Second), fsys, pg.MigratorOptions{})
+		m := newMigrator(t, migrateDB(t, db, pg.RoleOwner, testkit.Patience), fsys, pg.MigratorOptions{})
 		wg.Go(func() { results[i], errs[i] = m.Up(ctx) })
 	}
 	wg.Wait()
@@ -119,7 +119,7 @@ func TestMigrateConcurrentRunsApplyOnce(t *testing.T) {
 			t.Errorf("version %d applied %d times, want once", v, applied[v])
 		}
 	}
-	for v, n := range versionRows(t, migrateDB(t, db, pg.RoleOwner, time.Second)) {
+	for v, n := range versionRows(t, migrateDB(t, db, pg.RoleOwner, testkit.Patience)) {
 		if n != 1 {
 			t.Errorf("goose_db_version has %d rows for version %d", n, v)
 		}
@@ -132,7 +132,7 @@ func TestMigrateNewerSchemaIsNoop(t *testing.T) {
 	have := highest(t)
 	name, content := nextMigration(have+1, "from_a_newer_binary")
 	db := pgtest.New(t, pgtest.WithMigrations(withMigrations(t, map[string]string{name: content})))
-	sqlDB := migrateDB(t, db, pg.RoleOwner, 5*time.Second)
+	sqlDB := migrateDB(t, db, pg.RoleOwner, testkit.Patience)
 	before := versionRows(t, sqlDB)
 
 	ran := false
@@ -166,7 +166,7 @@ func TestMigrateStepsOrder(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := pgtest.New(t, pgtest.WithoutMigrations())
-	sqlDB := migrateDB(t, db, pg.RoleOwner, 5*time.Second)
+	sqlDB := migrateDB(t, db, pg.RoleOwner, testkit.Patience)
 	var order []string
 	versionAt := func(label string) pg.Step {
 		return stepFunc{name: label, run: func(ctx context.Context, db *sql.DB) error {
@@ -191,7 +191,7 @@ func TestMigrateStepsOrder(t *testing.T) {
 
 	// A failing before-step stops the run before goose and is named in the error.
 	fresh := pgtest.New(t, pgtest.WithoutMigrations())
-	freshDB := migrateDB(t, fresh, pg.RoleOwner, 5*time.Second)
+	freshDB := migrateDB(t, fresh, pg.RoleOwner, testkit.Patience)
 	boom := stepFunc{name: "river", run: func(context.Context, *sql.DB) error { return errors.New("boom") }}
 	_, err = newMigrator(t, freshDB, migrations.FS, pg.MigratorOptions{Before: []pg.Step{boom}}).Up(ctx)
 	if err == nil || !strings.Contains(err.Error(), "river") {
@@ -207,7 +207,7 @@ func TestMigrateRequiresSchemaOwner(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	for _, role := range []pg.Role{pg.RoleApp, pg.RoleMaint} {
-		_, err := newMigrator(t, migrateDB(t, db, role, time.Second), migrations.FS, pg.MigratorOptions{}).Up(context.Background())
+		_, err := newMigrator(t, migrateDB(t, db, role, testkit.Patience), migrations.FS, pg.MigratorOptions{}).Up(context.Background())
 		if !errors.Is(err, pg.ErrNotSchemaOwner) {
 			t.Errorf("migrate as %s: %v, want ErrNotSchemaOwner", role, err)
 		}
@@ -221,7 +221,7 @@ func TestMigrationStatus(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := pgtest.New(t, pgtest.WithoutMigrations())
-	sqlDB := migrateDB(t, db, pg.RoleOwner, 5*time.Second)
+	sqlDB := migrateDB(t, db, pg.RoleOwner, testkit.Patience)
 	m := newMigrator(t, sqlDB, migrations.FS, pg.MigratorOptions{})
 
 	st, version, err := m.Status(ctx)
@@ -258,7 +258,7 @@ func TestMigrationStatus(t *testing.T) {
 		}
 	}
 	// bothy_app may read the status (it reads the version at start).
-	if _, _, err := newMigrator(t, migrateDB(t, db, pg.RoleApp, time.Second), migrations.FS, pg.MigratorOptions{}).Status(ctx); err != nil {
+	if _, _, err := newMigrator(t, migrateDB(t, db, pg.RoleApp, testkit.Patience), migrations.FS, pg.MigratorOptions{}).Status(ctx); err != nil {
 		t.Errorf("status as bothy_app: %v", err)
 	}
 }
@@ -270,7 +270,7 @@ func TestMigrateFailedMigration(t *testing.T) {
 	name := nextName(base+1, "broken")
 	fsys := withMigrations(t, map[string]string{name: "-- +goose Up\nCREATE TABLE half_done (id int);\nSELECT no_such_function();\n"})
 	db := pgtest.New(t, pgtest.WithoutMigrations())
-	sqlDB := migrateDB(t, db, pg.RoleOwner, 5*time.Second)
+	sqlDB := migrateDB(t, db, pg.RoleOwner, testkit.Patience)
 	res, err := newMigrator(t, sqlDB, fsys, pg.MigratorOptions{}).Up(ctx)
 	if err == nil || !strings.Contains(err.Error(), "migration "+itoa(base+1)) {
 		t.Fatalf("Up: %v, want an error naming migration %d", err, base+1)
