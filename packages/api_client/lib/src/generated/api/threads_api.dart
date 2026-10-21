@@ -1105,7 +1105,7 @@ class ThreadsApi {
   }
 
   /// Set the title
-  /// People set &#x60;title_source &#x3D; manual&#x60;. The operator agent may only replace an &#x60;auto&#x60; title.
+  /// Every principal except the thread&#39;s operator agent sets &#x60;title_source &#x3D; manual&#x60;. The operator agent may only replace an &#x60;auto&#x60; title, which stays &#x60;auto&#x60;; on a &#x60;manual&#x60; title it gets &#x60;409 title_manual&#x60;.
   ///
   /// Parameters:
   /// * [threadId]
