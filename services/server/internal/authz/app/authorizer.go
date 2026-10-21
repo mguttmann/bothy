@@ -161,7 +161,7 @@ func (a *Authorizer) Authorize(ctx context.Context, p authorize.Principal, act a
 		d = authorize.Decision{}
 	}
 	authorize.RecordCheck(ctx, authorize.Check{Action: string(act), Kind: authorize.CheckAuthorize, Allowed: err == nil && d.Allowed()})
-	a.audit(ctx, act, string(r.Kind), r.ID, r.Token, d, err)
+	a.audit(ctx, p, act, string(r.Kind), r.ID, r.Token, d, err)
 	if err == nil && !authorize.IsFilter(ctx) {
 		a.metrics.Decision(ctx, act, d.Outcome)
 	}
@@ -170,8 +170,9 @@ func (a *Authorizer) Authorize(ctx context.Context, p authorize.Principal, act a
 
 // audit hands a denial or an error to the recorder; allows and filter mode write nothing. A denial
 // on the invocation token or the mode guard of run.start carries the codes of tok as details
-// (denialDetails, M2-09).
-func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind string, id ids.ID, tok *authorize.TokenFacts,
+// (denialDetails, M2-09); a denial of a principal with an acting-for binding also names the
+// triggering person and the run (actingForDetails, M2-14).
+func (a *Authorizer) audit(ctx context.Context, p authorize.Principal, act authorize.Action, kind string, id ids.ID, tok *authorize.TokenFacts,
 	d authorize.Decision, failure error) {
 	if authorize.IsFilter(ctx) || (failure == nil && d.Allowed()) {
 		return
@@ -186,7 +187,7 @@ func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind strin
 		err = a.recorder.RecordDetached(ctx, e)
 	} else {
 		e.Decision, e.Reason = auditing.DecisionDeny, auditing.Reason(d.Reason)
-		e.Attrs = denialDetails(d, tok)
+		e.Attrs = actingForDetails(p, denialDetails(d, tok))
 		err = a.recorder.RecordDenial(ctx, e)
 	}
 	if err != nil {
@@ -227,6 +228,25 @@ func denialDetails(d authorize.Decision, tok *authorize.TokenFacts) auditing.Att
 	}
 	if len(attrs) == 0 {
 		return nil
+	}
+	return attrs
+}
+
+// actingForDetails adds the acting-for details of a denial to attrs (brief M2-14 design note 7):
+// acting_for_user_id and run_id as IDs for a principal whose Invocation-Token header named a run
+// of a person (statuses bound and run_inactive), nothing for an invalid binding or none. The token
+// and its jti never appear (SEC-AUD-5). It returns attrs, or nil when there is nothing.
+func actingForDetails(p authorize.Principal, attrs auditing.Attrs) auditing.Attrs {
+	status, user, run, _ := authorize.ActingForOf(p)
+	if status == "" || status == authorize.ActingForInvalid || user.IsZero() {
+		return attrs
+	}
+	if attrs == nil {
+		attrs = auditing.Attrs{}
+	}
+	attrs["acting_for_user_id"] = auditing.ID(user)
+	if !run.IsZero() {
+		attrs["run_id"] = auditing.ID(run)
 	}
 	return attrs
 }
@@ -289,7 +309,8 @@ func (a *Authorizer) requirement(act authorize.Action) (domain.ActionSpec, domai
 }
 
 // actingPrincipal is the request principal with its snapshot entry and the snapshots of "view as"
-// and acting for.
+// and acting for. actingFor is set only for a bound acting-for binding outside delivery mode
+// (SR9, brief M2-14 design notes 4d and 6); af are its run and thread.
 type actingPrincipal struct {
 	id        ids.ID
 	kind      string
@@ -298,10 +319,16 @@ type actingPrincipal struct {
 	entry     entry
 	viewAs    *entry
 	actingFor *entry
+	af        domain.ActingForFacts
+	// binding is the status of the Invocation-Token header ("" without one) and actingForUser
+	// the triggering person, both for the audit details of a denial (design note 7).
+	binding       string
+	actingForUser ids.ID
 }
 
 // rights returns the final rights on path (after "view as" and acting for) and the base rights
-// before the acting-for intersection.
+// before the acting-for intersection. A triggering person who is not an active person has no
+// rights (SR7), so the intersection is empty (brief M2-14 design note 4e).
 func (s *actingPrincipal) rights(path domain.Path) (final, base domain.Rights) {
 	base = domain.Effective(s.entry.snap, s.kind, s.id, path)
 	if s.viewAs != nil {
@@ -309,9 +336,29 @@ func (s *actingPrincipal) rights(path domain.Path) (final, base domain.Rights) {
 	}
 	final = base
 	if s.actingFor != nil {
-		final = final.Intersect(domain.Effective(s.actingFor.snap, domain.KindUser, s.actingFor.key.principal, path))
+		person := domain.Rights{}
+		if actingForLive(*s.actingFor) {
+			person = domain.Effective(s.actingFor.snap, domain.KindUser, s.actingFor.key.principal, path)
+		}
+		final = final.Intersect(person)
 	}
 	return final, base
+}
+
+// actingForLive reports a triggering person whose rights count: a known active person. Liveness
+// comes from the principal status only (SR7, R-AZ-29): disabled, deleted and pending people have
+// no rights.
+func actingForLive(e entry) bool {
+	return e.found && string(e.facts.Kind) == domain.KindUser && e.facts.Status == authz.PrincipalActive
+}
+
+// withoutActingFor returns s for one decision on which the intersection does not apply (an own
+// exception on the own thread or run, or an unbound action; domain.ActingForApplies): the agent's
+// own rights, with the binding kept for the audit details.
+func (s *actingPrincipal) withoutActingFor() *actingPrincipal {
+	c := *s
+	c.actingFor = nil
+	return &c
 }
 
 // domainPrincipal is the acting principal as the gate of HumanSession sees it: kind and session.
@@ -387,14 +434,46 @@ func (a *Authorizer) principalOf(ctx context.Context, p authorize.Principal, act
 		}
 		s.viewAs = &ve
 	}
-	if id := p.ActingForPerson(); !id.IsZero() {
-		ae, err := a.load(ctx, authz.CredentialRef{PrincipalID: id}, v, t)
-		if err != nil {
-			return nil, domain.Decision{}, err
-		}
-		s.actingFor = &ae
+	if d, err := a.bindActingFor(ctx, s, act, v, t); err != nil || d.Outcome != domain.OutcomeAllow {
+		return nil, d, err
 	}
 	return s, domain.Allow, nil
+}
+
+// bindActingFor applies the acting-for binding of the request to s (07 guard rule SR9, section 4.2
+// steps 1 and 4; brief M2-14 design notes 4b to 4e and 6). In delivery mode the binding is ignored
+// completely: an agent consumer is judged by its own grants (07 section 8.1). Otherwise the status
+// check of domain.CheckActingFor decides first, before any resource is resolved; a bound binding
+// of an action that is not unbound loads the triggering person's snapshot: the person as the
+// principal of the check without a request (R-AZ-29: no session, liveness from the status, owner
+// status from the owner list), under the cache key of that check, which no token principal of the
+// same person shares.
+func (a *Authorizer) bindActingFor(ctx context.Context, s *actingPrincipal, act string, v int64, t time.Time) (domain.Decision, error) {
+	if authorize.IsDelivery(ctx) {
+		return domain.Allow, nil
+	}
+	status, user, run, thread := authorize.ActingForOf(s.p)
+	if status == authorize.ActingForBound && user.IsZero() {
+		status = authorize.ActingForInvalid
+	}
+	s.binding = status
+	if status != authorize.ActingForInvalid {
+		s.actingForUser = user
+		s.af = domain.ActingForFacts{RunID: run, ThreadID: thread}
+	}
+	mode := domain.ActingForModeOf(act)
+	if d := domain.CheckActingFor(status, mode); d.Outcome != domain.OutcomeAllow {
+		return d, nil
+	}
+	if status != authorize.ActingForBound || mode == domain.ActingForUnbound {
+		return domain.Allow, nil
+	}
+	ae, err := a.loadRecheck(ctx, authz.CredentialRef{PrincipalID: user}, v, t)
+	if err != nil {
+		return domain.Decision{}, err
+	}
+	s.actingFor = &ae
+	return domain.Allow, nil
 }
 
 // viewAsEnded reports whether a view started at start has ended at t: from start plus
@@ -577,6 +656,10 @@ func (a *Authorizer) decideFor(ctx context.Context, s *actingPrincipal, act auth
 	if err != nil || !found {
 		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
 	}
+	if s.actingFor != nil && !domain.ActingForApplies(domain.ActingForModeOf(spec.ID), s.af, res.path,
+		domain.ResourceFacts{Kind: string(r.Kind), ID: r.ID}, authorize.IsDelivery(ctx)) {
+		s = s.withoutActingFor()
+	}
 	in, err := a.gather(ctx, s, spec, req, r, res, t)
 	if err != nil {
 		return authorize.Decision{}, err
@@ -713,4 +796,10 @@ func (w withoutViewAs) CredentialState() (sessionActive bool, deviceState string
 		return o.CredentialState()
 	}
 	return false, "", false, false
+}
+
+// ActingForBinding forwards authorize.ActingForBinder of the wrapped principal, so hiding the
+// view never drops an acting-for binding.
+func (w withoutViewAs) ActingForBinding() (status string, userID, runID, threadID ids.ID) {
+	return authorize.ActingForOf(w.Principal)
 }
