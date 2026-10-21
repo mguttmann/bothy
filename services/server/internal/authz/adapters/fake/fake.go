@@ -237,10 +237,19 @@ type Structure struct {
 	channelDetails map[ids.ID]authz.ChannelDetail
 	// onPutChannel is called by PutChannel after it stored a channel (OnPutChannel, M1-53).
 	onPutChannel func(authz.ChannelFacts)
+	// calls counts Thread and Channel, so tests see what a structure scope saves (M1-72).
+	calls struct{ thread, channel int }
 }
 
 // Compile-time check.
 var _ authz.StructureSource = (*Structure)(nil)
+
+// Calls returns how often Thread and Channel were called.
+func (s *Structure) Calls() (threads, channels int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls.thread, s.calls.channel
+}
 
 // OnPutChannel registers fn, which PutChannel calls with every channel it stores, outside the
 // lock. Test worlds over PostgreSQL write the channels row there, the target of the foreign key
@@ -463,6 +472,7 @@ func (s *Structure) Channel(_ context.Context, id ids.ID) (authz.ChannelFacts, b
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.calls.channel++
 	c, ok := s.channels[id]
 	c.DMParticipants = slices.Clone(c.DMParticipants)
 	return c, ok, nil
@@ -475,6 +485,7 @@ func (s *Structure) Thread(_ context.Context, id ids.ID) (authz.ThreadFacts, boo
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.calls.thread++
 	t, ok := s.threads[id]
 	return t, ok, nil
 }

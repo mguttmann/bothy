@@ -24,3 +24,23 @@ func TestWithoutRequestScope(t *testing.T) {
 		t.Fatalf("WithRequestScope after WithoutRequestScope = %p %v, request memo %p", page, ok, reqMemo)
 	}
 }
+
+// TestWithStructureScope: each call gives a fresh structure memo, independent of the request memo.
+func TestWithStructureScope(t *testing.T) {
+	t.Parallel()
+	if _, ok := authorize.StructureMemoFrom(context.Background()); ok {
+		t.Fatal("a structure memo without WithStructureScope")
+	}
+	first := authorize.WithStructureScope(context.Background())
+	a, ok := authorize.StructureMemoFrom(first)
+	if !ok || a == nil {
+		t.Fatal("no structure memo after WithStructureScope")
+	}
+	b, _ := authorize.StructureMemoFrom(authorize.WithStructureScope(first))
+	if b == a {
+		t.Fatal("a second scope reused the memo of the first")
+	}
+	if _, ok := authorize.RequestMemoFrom(first); ok {
+		t.Fatal("WithStructureScope installed a request memo")
+	}
+}

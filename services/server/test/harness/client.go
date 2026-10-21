@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -75,11 +76,18 @@ type Client struct {
 	SessionID string
 	// Observer, when set, sees every request and its final response.
 	Observer func(Request, Response)
+	// ClientIP, when set, is sent as X-Forwarded-For on every request and on the gateway upgrade,
+	// so the server (which trusts the loopback peer as its reverse proxy, server.trusted_proxies)
+	// counts the client by that address, as a deployment behind its proxy sees distinct clients.
+	// Load tests give each simulated client its own documentation address.
+	ClientIP string
 
 	publicURL string
 	http      *http.Client
 	key       *deviceKey
 	stepKey   *deviceKey
+	// tb is the test of the server: gateway connections report their frame violations to it (G9).
+	tb testing.TB
 
 	mu      sync.Mutex
 	access  string
@@ -151,6 +159,9 @@ func (c *Client) attempt(ctx context.Context, r Request, auth bool) Response {
 	}
 	for name, vs := range r.Header {
 		req.Header[name] = vs
+	}
+	if c.ClientIP != "" {
+		req.Header.Set("X-Forwarded-For", c.ClientIP)
 	}
 	if body != nil && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")

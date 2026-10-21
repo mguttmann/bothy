@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package report reads the load test thresholds of make perf from the specification and compares
-// measurements with them (docs/spec/02-architecture.md "Performance targets", ADR 0063). The values
-// perf.* have the place Load test in the table "Configuration values of this chapter" of chapter 02
-// and are never part of the server configuration schema, so the tests read them from that table
-// instead of a literal. M1-72 extends the package with the modes and results.json of ADR 0063.
+// Package report reads the load test thresholds of make perf from the specification, compares
+// measurements with them and writes the results file of ADR 0063 (chapter 02 "Performance
+// targets"). The values perf.* have the place "Load test" in the table "Configuration values of
+// this chapter" of chapter 02 and are never part of the server configuration schema, so the tests
+// read them from that table instead of a literal.
+//
+// The package also holds units and nearest-rank percentiles, the profile mode of the host
+// (match, emulated, below), the clock offset between database and host, and the results file
+// .cache/perf/results.json with its table and exit logic (Exit), which make perf runs last.
 //
 // Example:
 //
 //	targets, err := report.Load(report.ArchitectureChapter())
-//	min, err := targets.Minimum("perf.event_commit_min_per_s")
-//	err = report.CheckMinimum("perf.event_commit_min_per_s", measured, min)
+//	th, err := targets.Threshold("perf.message_create_p99")
+//	res := th.Result("TestPerf_MessageCreateP99", float64(p99), len(samples))
+//	err = report.Merge(report.ResultsPath(), profile, []report.Result{res}, nil)
 package report
 
 import (
@@ -30,18 +35,25 @@ const sectionTitle = "Configuration values of this chapter"
 // placeLoadTest is the place of the load test values in that table.
 const placeLoadTest = "Load test"
 
-// Targets are the load test values of one chapter, by name, as written in the table.
+// Targets are the load test values of one chapter, by name, as written in the table, with the
+// meaning column of each row.
 type Targets struct {
-	values map[string]string
+	values   map[string]string
+	meanings map[string]string
 }
 
 // ArchitectureChapter returns the path of docs/spec/02-architecture.md in this repository.
 func ArchitectureChapter() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "..", "..", "..", "..", "..", "docs", "spec", "02-architecture.md")
+	return filepath.Join(RepoRoot(), "docs", "spec", "02-architecture.md")
 }
 
-// Load reads the rows with place Load test from the section whose heading ends in
+// RepoRoot returns the root of the repository this package is compiled from.
+func RepoRoot() string {
+	_, file, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(file), "..", "..", "..", "..", "..")
+}
+
+// Load reads the rows with place "Load test" from the section whose heading ends in
 // "Configuration values of this chapter" up to the next heading of the same or a higher level.
 // The error reports a file that cannot be read or a chapter without that section.
 func Load(path string) (Targets, error) {
@@ -50,28 +62,23 @@ func Load(path string) (Targets, error) {
 		return Targets{}, fmt.Errorf("report: %w", err)
 	}
 	defer func() { _ = f.Close() }()
-	values := map[string]string{}
+	t := Targets{values: map[string]string{}, meanings: map[string]string{}}
 	level := 0
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := sc.Text()
 		if h := headingLevel(line); h > 0 {
 			switch {
-			case strings.HasSuffix(strings.TrimSpace(line), sectionTitle):
+			case level == 0 && strings.HasSuffix(strings.TrimSpace(line), sectionTitle):
 				level = h
 			case level > 0 && h <= level:
-				return Targets{values: values}, nil
+				return t, nil
 			}
 			continue
 		}
-		if level == 0 {
-			continue
+		if level > 0 {
+			t.addRow(line)
 		}
-		cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
-		if len(cells) < 3 || strings.TrimSpace(cells[1]) != placeLoadTest {
-			continue
-		}
-		values[unquote(cells[0])] = unquote(cells[2])
 	}
 	if err := sc.Err(); err != nil {
 		return Targets{}, fmt.Errorf("report: %w", err)
@@ -79,7 +86,20 @@ func Load(path string) (Targets, error) {
 	if level == 0 {
 		return Targets{}, fmt.Errorf("report: %s has no section %q", path, sectionTitle)
 	}
-	return Targets{values: values}, nil
+	return t, nil
+}
+
+// addRow keeps a table row of the section whose place is "Load test": name, value and meaning.
+func (t Targets) addRow(line string) {
+	cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
+	if len(cells) < 3 || strings.TrimSpace(cells[1]) != placeLoadTest {
+		return
+	}
+	name := unquote(cells[0])
+	t.values[name] = unquote(cells[2])
+	if len(cells) > 3 {
+		t.meanings[name] = strings.TrimSpace(cells[3])
+	}
 }
 
 // headingLevel returns the number of leading '#' of a Markdown heading, 0 for other lines.

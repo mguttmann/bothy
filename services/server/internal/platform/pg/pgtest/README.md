@@ -50,6 +50,17 @@ instead of the speed flags below; it starts with the first such `New`. Load and 
 because ADR 0063 point 2 measures only with the durability settings of production (M1-16,
 `perf/event_commit`; M1-72). Normal tests keep the fast container.
 
+M1-72 adds two things for the load and chaos tests of `make perf`:
+
+- `Limits(cpus, memoryBytes)` puts the database on a container started with `docker --cpus` and
+  `--memory` (the emulated profile of ADR 0063); each combination of `Durable` and `Limits` is its
+  own container of the test binary.
+- `DB.Restart(ctx)` restarts the PostgreSQL server of a durable database inside its container:
+  it sends `SIGUSR1` to the watchdog, which stops the server with a fast shutdown and starts it
+  again. Every connection breaks; the container, its host port, its data, its lease and
+  `AutoRemove` stay. `Restart` affects every database of that container and returns once a
+  superuser connection works after the server went down.
+
 Roles are cluster-wide: a test that changes a role password must not call `t.Parallel` and must
 restore the password (see `roles_test.go` in package `pg`).
 
@@ -96,6 +107,7 @@ hanging children it first checks that the container of the live run stays longer
 watchdog needs to decide. `TestWatchdogScript` runs the watchdog script against stub
 executables for `psql` and the entry point and covers a held lease, a lost lease, a server that
 becomes unreadable after the lease was taken, a lease never taken and `docker stop`.
+`TestWatchdogScriptRestartsOnUSR1` covers the in-place restart of `DB.Restart`.
 
 Containers of older `pgtest` versions and of other test helpers that label their containers
 `org.bothy.test` but have no watchdog (such as `org.bothy.test=seaweedfs`) lack the label
