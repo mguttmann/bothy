@@ -24,7 +24,17 @@ func TestWire_TerminalSubscriptionsAndSweep(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(golden)), "\n")
-	tail := lines[len(lines)-3:]
+	first := len(lines)
+	for i, l := range lines {
+		if strings.Contains(l, " -> terminal ") {
+			first = i
+			break
+		}
+	}
+	if first < 1 || first+3 > len(lines) || !strings.Contains(lines[first-1], " -> apps ") {
+		t.Fatalf("the subscriptions of terminal do not follow the existing ones: %q", lines)
+	}
+	tail := lines[first : first+3]
 	for i, want := range []string{"subscribe kernel.AccessChanged -> terminal ", "subscribe identity.DeviceRevoked -> terminal ",
 		"subscribe identity.SessionEnded -> terminal "} {
 		if !strings.HasPrefix(tail[i], want) || !strings.Contains(tail[i], "internal/terminal/app.(*Subscribers).") {
@@ -33,7 +43,7 @@ func TestWire_TerminalSubscriptionsAndSweep(t *testing.T) {
 	}
 	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: 45 * time.Second, PartitionInterval: time.Minute,
 		CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour,
-		ChainVerifyInterval: time.Hour})
+		ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
