@@ -239,7 +239,7 @@ func (c *Client) Report(ctx context.Context, r startup.Report) error {
 	if k == nil {
 		return nil
 	}
-	return k.sendReport(ctx, r)
+	return k.sendReport(ctx)
 }
 
 // Close implements startup.Control: the connection closes with 1000 and the loop ends. The close
@@ -382,6 +382,13 @@ func (c *Client) connect(ctx context.Context) outcome {
 	defer c.drop(k)
 	defer close(k.done)
 	return k.serve(ctx)
+}
+
+// attach makes k the live connection.
+func (c *Client) attach(k *conn) {
+	c.mu.Lock()
+	c.live = k
+	c.mu.Unlock()
 }
 
 // drop forgets k as the live connection.

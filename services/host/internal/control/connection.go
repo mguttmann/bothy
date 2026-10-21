@@ -51,6 +51,9 @@ type conn struct {
 	writeTimeout time.Duration
 	// closeCode is the code this side closed with, 0 while open.
 	closeCode int
+	// reportMu orders the reports of this connection: each one sends the current report, so the
+	// last one sent is the newest.
+	reportMu gosync.Mutex
 }
 
 // read is the reader goroutine: every frame of the server, decoded, until the connection ends
@@ -117,8 +120,15 @@ func (k *conn) close(code int) {
 	})
 }
 
-// sendReport sends r with the server-host flag of this connection.
-func (k *conn) sendReport(ctx context.Context, r startup.Report) error {
+// sendReport sends the current report with the server-host flag of this connection; without one
+// it sends nothing.
+func (k *conn) sendReport(ctx context.Context) error {
+	k.reportMu.Lock()
+	defer k.reportMu.Unlock()
+	r, ok := k.c.reports.Get()
+	if !ok {
+		return nil
+	}
 	if err := k.write(ctx, opReport, withPeer(r, k.peerLocal)); err != nil {
 		return err
 	}
@@ -242,11 +252,12 @@ func (k *conn) handle(ctx context.Context, f frameOrEnd, ready *bool) (outcome, 
 		k.reported = false
 		k.mu.Unlock()
 		c.backoff.Reset()
-		// The current report first, before any other frame is handled (24 section 2.2 point 5).
-		if r, ok := c.reports.Get(); ok {
-			if err := k.sendReport(ctx, r); err != nil {
-				return outcome{Reaction: Reaction{Kind: Backoff}}, true
-			}
+		// The connection is the live one before the current report goes out, so a Report from
+		// now on reaches it; then the current report first, before any other frame is handled
+		// (24 section 2.2 point 5).
+		c.attach(k)
+		if err := k.sendReport(ctx); err != nil {
+			return outcome{Reaction: Reaction{Kind: Backoff}}, true
 		}
 		c.deliver(startup.Ready{LLMCredentials: b.LLMCredentials}, k)
 	case *HeartbeatAck:
