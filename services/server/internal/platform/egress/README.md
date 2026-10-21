@@ -31,6 +31,9 @@ checked.
   `internal/wire` with `EgressConfig`), `Options` with purpose, host policy of the consumer,
   redirect mode and own limits of a domain chapter, `Deps` with resolver, root certificates,
   logger and counter.
+- `Options.HTTP2` lets a TLS connection negotiate HTTP/2 by ALPN (`ForceAttemptHTTP2`), for
+  services that accept only HTTP/2 such as APNs (brief M3-20); plain `http` stays HTTP/1.1 and
+  every check applies unchanged.
 - `Client.Do(req)` sends; `Client.HTTPClient()` returns an `*http.Client` for libraries that has
   the same checks in its transport.
 - `errors.Is(err, ErrBlocked)` recognizes every rejection; `*BlockedError` names reason and host.
