@@ -26,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -100,7 +101,8 @@ func newEnv(t *testing.T, cfg app.Config) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	devs, err := app.NewDevices(cfg, app.DevicesDeps{Store: repo, People: repo, UoW: uow, Authorizer: az, Cursors: httpapi.Cursors{}})
+	devs, err := app.NewDevices(cfg, app.DevicesDeps{Store: repo, People: repo, UoW: uow, Authorizer: az, Cursors: httpapi.Cursors{},
+		Events: nopEvents{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,3 +371,8 @@ func TestDevice_NoNullMembers(t *testing.T) {
 	}
 	// The harness fails the test at the end if a handler sent JSON null (ADR 0053).
 }
+
+// nopEvents accepts device.pending without storing it: this setup has no sync step (M3-19).
+type nopEvents struct{}
+
+func (nopEvents) Append(context.Context, ...eventlog.Event) error { return nil }

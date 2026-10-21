@@ -37,6 +37,9 @@ type DeviceStore interface {
 	// revoke_reason on the device id while it is not revoked, and revoked_at on its active keys;
 	// it returns the person of the device, revoked false when it was revoked already.
 	RevokeDevice(ctx context.Context, id ids.ID, reason identity.DeviceRevokeReason, by ids.ID, at time.Time) (userID ids.ID, revoked bool, err error)
+	// ActiveDevicesOfUsers returns the devices with state active of userIDs, grouped by person,
+	// each list ascending by id; a person without one is absent (identity.Devices.ActiveForUsers).
+	ActiveDevicesOfUsers(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]identity.DeviceRef, error)
 	// PendingDevicesCreatedBefore returns up to limit pending devices with created_at <= before,
 	// oldest first (the expiry of the job identity.auth_cleanup).
 	PendingDevicesCreatedBefore(ctx context.Context, before time.Time, limit int) ([]identity.Device, error)

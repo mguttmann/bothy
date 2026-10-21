@@ -48,7 +48,7 @@ func (nopCursors) Decode(string, []byte, string, any) error   { return nil }
 func newDevices(t *testing.T, f *fixture) *app.Devices {
 	t.Helper()
 	d, err := app.NewDevices(app.Config{PageSizeDefault: 50, PageSizeMax: 200}, app.DevicesDeps{
-		Store: f.repo, People: f.repo, UoW: f.uow, Authorizer: denyAll{}, Cursors: nopCursors{},
+		Store: f.repo, People: f.repo, UoW: f.uow, Authorizer: denyAll{}, Cursors: nopCursors{}, Events: &events{},
 	})
 	if err != nil {
 		t.Fatal(err)

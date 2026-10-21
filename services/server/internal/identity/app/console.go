@@ -209,7 +209,8 @@ type ConsoleStart struct {
 // internal for a failing random source.
 func (c *Console) Start(ctx context.Context, in ConsoleStart) (ConsoleStarted, error) {
 	now := c.d.Clock.Now().Truncate(time.Microsecond)
-	dev, err := c.d.Devices.InsertDevice(ctx, consolesession.WebDevice(ids.New(), in.UserID, now))
+	// The web device of a console login is active, so it appends no device.pending.
+	dev, err := insertDevice(ctx, c.d.Devices, nil, eventActorRef{}, consolesession.WebDevice(ids.New(), in.UserID, now))
 	if err != nil {
 		return ConsoleStarted{}, err
 	}
