@@ -141,7 +141,7 @@ void main() {
     );
 
     await tapOn($, find.text('Log out'));
-    await waitFor($, find.text('Log in'));
+    await waitFor($, find.text('Log in again'));
   });
 }
 
