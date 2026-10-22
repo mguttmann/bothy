@@ -342,8 +342,11 @@ def save_results(results: Path, target: str | None) -> None:
 
 
 def bundle_build_args(tmp: Path, version: str) -> list[str]:
-    """The build of the web bundle of the patrol suites: the target ``console-e2e-web`` of the
-    server Dockerfile, exported by the local exporter to ``<tmp>/admin-bundle``."""
+    """The build of the web bundle of the patrol suites.
+
+    The target ``console-e2e-web`` of the server Dockerfile, exported by the local exporter to
+    ``<tmp>/admin-bundle``.
+    """
     return [
         "docker", "buildx", "build", "--quiet",
         "--file", str(ROOT / "services" / "server" / "Dockerfile"),
@@ -355,8 +358,11 @@ def bundle_build_args(tmp: Path, version: str) -> list[str]:
 
 
 def share_bundle(bundle: Path) -> None:
-    """Makes the exported bundle readable for the user of the api container (65532), which
-    mounts it read-only, and checks that it holds the index.html the server needs."""
+    """Makes the exported bundle readable for the api container and checks it.
+
+    The user of the api container (65532) mounts it read-only; the bundle must hold the index.html
+    the server needs.
+    """
     if not (bundle / "index.html").is_file():
         raise StepError("the admin bundle holds no index.html")
     bundle.chmod(0o755)
@@ -373,8 +379,11 @@ def build_bundle(stack: Stack, tmp: Path, version: str) -> None:
 
 
 def run_admin(stack: Stack) -> None:
-    """Phase 2: api with the admin overlay, the sidecar after it (it shares the network
-    namespace of api, so it must follow the new container), then the patrol suites."""
+    """Phase 2.
+
+    Api with the admin overlay, the sidecar after it (it shares the network namespace of api, so it
+    must follow the new container), then the patrol suites.
+    """
     stack.files.append(ADMIN_OVERLAY)
     stack.env["E2E_MODE"] = "admin"
     say("phase 2: api with the admin bundle and a step-up of 3 s")

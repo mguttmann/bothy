@@ -172,8 +172,11 @@ class Login:
         return totp(self._secret, self._last)
 
     def skip_current_step(self) -> None:
-        """Treats the current step as used: a later run of the same seed (phase 2 of
-        console_e2e.py) does not know which steps an earlier one took."""
+        """Treats the current step as used.
+
+        A later run of the same seed (phase 2 of console_e2e.py) does not know which steps an
+        earlier one took.
+        """
         self._last = max(self._last, int(time.time()) // TOTP_PERIOD)
 
 

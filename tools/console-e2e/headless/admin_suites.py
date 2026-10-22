@@ -80,8 +80,10 @@ TOTP_PERIOD = 30
 
 @dataclass(frozen=True)
 class PatrolTest:
-    """One test of ``__patrol__getTests``: the full name ``__patrol__runTest`` takes and the
-    skip flag of the test or of a group around it."""
+    """One test of ``__patrol__getTests``.
+
+    The full name ``__patrol__runTest`` takes and the skip flag of the test or of a group around it.
+    """
 
     name: str
     skip: bool
@@ -125,8 +127,11 @@ def uuid7(now_ms: int | None = None) -> str:
 
 
 def request_htu(origin: str, path: str) -> str:
-    """The htu of a REST proof: the public origin plus the request path without query and
-    fragment (08 7.3; RESTHTU of the smoke probe), never the loopback address."""
+    """The htu of a REST proof.
+
+    The public origin plus the request path without query and fragment (08 7.3; RESTHTU of the smoke
+    probe), never the loopback address.
+    """
     parts = urlsplit(path)
     if parts.scheme or parts.netloc or not parts.path.startswith("/"):
         raise ValueError("the request path must be absolute and without origin")
@@ -142,9 +147,11 @@ def proof_header(jwk: Mapping[str, str]) -> dict[str, Any]:
 def proof_claims(
     method: str, htu: str, *, nonce: str, access_token: str, now: int, jti: str
 ) -> dict[str, Any]:
-    """The claims of a DPoP proof as the server checks them (dpop.go of the smoke probe): jti,
-    htm, htu, iat; nonce when the server sent one; ath (base64url SHA-256 of the token) when the
-    request carries a token."""
+    """The claims of a DPoP proof as the server checks them (dpop.go of the smoke probe).
+
+    Jti, htm, htu, iat; nonce when the server sent one; ath (base64url SHA-256 of the token) when
+    the request carries a token.
+    """
     claims: dict[str, Any] = {"jti": jti, "htm": method, "htu": htu, "iat": now}
     if nonce:
         claims["nonce"] = nonce
@@ -185,9 +192,11 @@ SEED_SHAPE: dict[str, tuple[str, ...]] = {
 
 
 def check_seed(seed: Mapping[str, Any]) -> None:
-    """Checks the shape of ``window.__e2eSeed`` that the Dart tests read: exactly the members of
-    SEED_SHAPE, every inner object with string ``id`` and ``name``, the pending device also with
-    its verification code in digits. Raises CheckError naming the member."""
+    """Checks the shape of ``window.__e2eSeed`` that the Dart tests read.
+
+    Exactly the members of SEED_SHAPE, every inner object with string ``id`` and ``name``, the
+    pending device also with its verification code in digits. Raises CheckError naming the member.
+    """
     if set(seed) != set(SEED_SHAPE):
         raise CheckError(f"seed members {sorted(seed)} differ from {sorted(SEED_SHAPE)}")
     objects: list[tuple[str, Any]] = []
@@ -228,8 +237,10 @@ def problem_code(answer: Mapping[str, Any]) -> str:
 
 
 def problem_text(answer: Mapping[str, Any]) -> str:
-    """Code and reason of a problem body for an error message; never the rest of the body,
-    which may echo a value."""
+    """Code and reason of a problem body for an error message.
+
+    Never the rest of the body, which may echo a value.
+    """
     body = answer.get("json")
     reason = str(body.get("reason") or "") if isinstance(body, dict) else ""
     return " ".join(p for p in (problem_code(answer), reason) if p)
@@ -343,6 +354,7 @@ class ConsoleAdmin:
     """
 
     def __init__(self, page: Page) -> None:
+        """Keeps the page whose session the requests use."""
         self.page = page
 
     def fetch(
@@ -368,8 +380,11 @@ class ConsoleAdmin:
         idempotent: bool = False,
         if_match: str | None = None,
     ) -> dict[str, Any]:
-        """Runs operation ``op`` with the step-up retry; returns the answer of a 2xx status and
-        raises CheckError naming ``op``, the status and the problem code otherwise."""
+        """Runs operation ``op`` with the step-up retry.
+
+        Returns the answer of a 2xx status and raises CheckError naming ``op``, the status and the
+        problem code otherwise.
+        """
         headers: dict[str, str] = {}
         if idempotent:
             headers["Idempotency-Key"] = uuid7()
@@ -384,8 +399,11 @@ class ConsoleAdmin:
         return answer
 
     def step_up_with_passkey(self) -> None:
-        """createStepUpChallenge, the passkey with userVerification required, then
-        completeStepUpWithPasskey; the server rotates the cookie."""
+        """One passkey step-up of the console session.
+
+        createStepUpChallenge, the passkey with userVerification required, then
+        completeStepUpWithPasskey; the server rotates the cookie.
+        """
         challenge = self.fetch("POST", "/auth/step-up/challenge")
         data = challenge["json"]
         if challenge["status"] != 200 or not isinstance(data, dict):
@@ -402,8 +420,11 @@ class ConsoleAdmin:
             raise CheckError(f"completeStepUpWithPasskey answered {done['status']}")
 
     def etag(self, op: str, path: str) -> str:
-        """The If-Match value of the current version of ``path``: the ETag of a fresh read with
-        operation ``op`` (06 3: the server names the version, the client treats it as opaque)."""
+        """The If-Match value of the current version of ``path``.
+
+        The ETag of a fresh read with operation ``op`` (06 3: the server names the version, the
+        client treats it as opaque).
+        """
         answer = self.call(op, "GET", path)
         tag = answer.get("etag")
         if not tag:
@@ -412,8 +433,11 @@ class ConsoleAdmin:
 
 
 def log_in(page: Page, login: Login) -> None:
-    """Alex's console login with password and TOTP, the step-up with password and TOTP and at
-    once the passkey registration, which needs the step-up of the last 3 s."""
+    """Alex's console login with password and TOTP.
+
+    Then the step-up with password and TOTP and at once the passkey registration, which needs the
+    step-up of the last 3 s.
+    """
     done = console_fetch(
         page,
         "POST",
@@ -532,10 +556,12 @@ def fresh_code(secret: str, used: int) -> tuple[str, int]:
 
 
 def seed_sam_devices(page: Page, enrollment_code: str) -> dict[str, str]:
-    """Sam's first device redeems the enrollment code, sets a random password and enrolls TOTP;
-    then Sam logs in as an app with a second device, which waits for approval. Returns the
-    pending device as ``{"id", "name", "code"}`` with its verification code (getDevice as that
-    device, 08 5.2)."""
+    """Sam's first device redeems the enrollment code, sets a random password and enrolls TOTP.
+
+    Then Sam logs in as an app with a second device, which waits for approval. Returns the pending
+    device as ``{"id", "name", "code"}`` with its verification code (getDevice as that device, 08
+    5.2).
+    """
     first = PageDevice.create(page, "sam-first")
     step_up = new_key(page, "sam-first-step-up")
     redeemed = first.call(
@@ -588,8 +614,10 @@ def seed_sam_devices(page: Page, enrollment_code: str) -> dict[str, str]:
 
 
 def seed(page: Page, admin: ConsoleAdmin) -> dict[str, Any]:
-    """The instance of the flows through the API as Alex; returns the document of
-    ``window.__e2eSeed`` (SEED_SHAPE)."""
+    """The instance of the flows through the API as Alex.
+
+    Returns the document of ``window.__e2eSeed`` (SEED_SHAPE).
+    """
     me = admin.call("getConsoleSession", "GET", "/console/session")["json"]
     owner = {"id": str(me["user_id"]), "name": str(me["display_name"])}
     spaces: dict[str, dict[str, Any]] = {}
@@ -726,6 +754,7 @@ class PlatformHandler:
     """
 
     def __init__(self, page: Page, log: Callable[[str], None] = say) -> None:
+        """Keeps the page and the log and starts with no recorded action."""
         self.page = page
         self.log = log
         self.downloads: list[str] = []
@@ -733,6 +762,7 @@ class PlatformHandler:
         self.actions: list[str] = []
 
     def __call__(self, source: object, request: Mapping[str, Any]) -> object:
+        """Answers one platform action of the Dart side, as described on the class."""
         del source
         action = str(request.get("action") or "")
         params = request.get("params") or {}
@@ -763,8 +793,10 @@ class PlatformHandler:
 def record_download(
     handler: PlatformHandler, downloads: list[Download]
 ) -> Callable[[Download], None]:
-    """The page's download listener: keeps the Download for the check after the run and its
-    suggested name for verifyFileDownloads."""
+    """The page's download listener.
+
+    Keeps the Download for the check after the run and its suggested name for verifyFileDownloads.
+    """
 
     def on_download(download: Download) -> None:
         handler.downloads.append(download.suggested_filename)
@@ -796,8 +828,10 @@ def open_bundle(page: Page, seed_json: str) -> None:
 
 
 def run_tests(page: Page, seed_json: str) -> list[dict[str, Any]]:
-    """patrol's protocol: list the tests, then run each in order on its own page load; returns
-    the results."""
+    """Patrol's protocol.
+
+    List the tests, then run each in order on its own page load; returns the results.
+    """
     open_bundle(page, seed_json)
     tree = page.evaluate("() => window.__patrol__getTests()")
     tests = flatten_tests(tree["group"])
@@ -833,8 +867,11 @@ def run_tests(page: Page, seed_json: str) -> list[dict[str, Any]]:
 def judge(
     tests: Sequence[Mapping[str, Any]], unknown: Sequence[str], records: Sequence[DownloadRecord]
 ) -> None:
-    """Raises CheckError when no test ran, an unsupported platform action was called, a test did
-    not pass (a skipped one included) or the A6 export produced no CSV download."""
+    """Judges the run of the patrol suites.
+
+    Raises CheckError when no test ran, an unsupported platform action was called, a test did not
+    pass (a skipped one included) or the A6 export produced no CSV download.
+    """
     if not tests:
         raise CheckError("the bundle lists no patrol test")
     if unknown:
@@ -899,10 +936,13 @@ CONSOLE_LINE_MAX = 500
 
 
 def console_log(lines: list[str]) -> Callable[[ConsoleMessage], None]:
-    """The page's console listener: patrol's step log (lines starting with PATROL_LOG) goes to
-    stderr; every other line (the output of flutter_test, for example the reason of a failed
-    expectation) goes to ``lines``, the member ``console`` of admin.json, never to stderr, cut to
-    the last CONSOLE_KEEP lines of CONSOLE_LINE_MAX characters."""
+    """The page's console listener.
+
+    Patrol's step log (lines starting with PATROL_LOG) goes to stderr; every other line (the output
+    of flutter_test, for example the reason of a failed expectation) goes to ``lines``, the member
+    ``console`` of admin.json, never to stderr, cut to the last CONSOLE_KEEP lines of
+    CONSOLE_LINE_MAX characters.
+    """
 
     def on_console(msg: ConsoleMessage) -> None:
         if msg.text.startswith("PATROL_LOG"):
