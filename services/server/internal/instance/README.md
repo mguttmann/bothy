@@ -86,7 +86,7 @@ stored identity or `sync_epoch`. `State.CheckIdentity` compares the stored ident
 one (`domain.IdentityMismatch`: an empty stored identity never mismatches); `internal/wire` runs it
 at start and, unless `database.restore_guard` is `off`, registers the readiness check
 `restore_not_finalized` on a mismatch and starts no log tail, presence tracker (no start rule or
-flush loop), River jobs, worker consumers or public listener. PostgreSQL 18 grants `EXECUTE` on both control functions to
+flush loop), terminal reconcile, River jobs, worker consumers or public listener. PostgreSQL 18 grants `EXECUTE` on both control functions to
 `PUBLIC`, so `bothy_app` reads them without a grant.
 
 `Restore.Finalize` (`app.NewRestore`, `RestoreDeps`) is `bothy restore finalize`, run as the schema

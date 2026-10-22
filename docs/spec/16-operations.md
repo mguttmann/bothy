@@ -889,7 +889,7 @@ at start: a point-in-time restore raises the timeline, a logical restore into a 
 changes the system identifier, and either mismatch keeps the process running but not ready, with
 the readiness reason `restore_not_finalized` and one log line naming the runbook step, until
 `bothy restore finalize` has run. Such a process serves and processes nothing: it opens no public
-listener and starts no log tail, no presence tracker, no River jobs and no worker consumers, so it neither takes writes
+listener and starts no log tail, no presence tracker, no terminal reconcile, no River jobs and no worker consumers, so it neither takes writes
 nor delivers events of a mixed timeline; only the internal listener answers. An empty stored identity never blocks. `bothy restore finalize`
 needs no running `api` or `worker`; it refuses (exit `1`) while another session of the role
 `bothy_app` is connected to the database, so a running stack cannot see half a change. It runs as

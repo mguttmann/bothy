@@ -34,6 +34,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	statusdomain "github.com/OWNER/bothy/services/server/internal/status/domain"
 	"github.com/OWNER/bothy/services/server/internal/wire"
+	"github.com/OWNER/bothy/services/server/test/terminaltest"
 )
 
 // restoreRow is the part of the instance row bothy restore finalize changes.
@@ -241,7 +242,11 @@ func (failingCursors) MoveCursorsTo(context.Context, int64) error { return errIn
 func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 	t.Parallel()
 	db := newServeDB(t)
+	// An active terminal session of the previous process gives the reconcile of the start work:
+	// it would detach the session with an event (M2-44); the lock holds it too (D-M7-04-10).
+	session := seedActiveTerminalSession(t, db)
 	simulateRestore(t, db)
+	var heads [2]int64
 	// presenceStarts counts the starts of the presence tracker (M2-20), whose start rule and flush
 	// loop write the agents table: the lock holds them too (D-M7-04-7).
 	var presenceStarts atomic.Int32
@@ -278,11 +283,25 @@ func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 		if n := presenceStarts.Load(); n != 0 {
 			t.Fatalf("%s: the presence tracker started %d times while the restore is not finalized", role, n)
 		}
+		if state := terminalSessionState(t, db, session); state != "active" {
+			t.Fatalf("%s: the terminal session is %s after a start under the lock, want active", role, state)
+		}
+		// No start under the lock writes an event or an audit entry; the first start may create
+		// the signing keys of the database, so the heads count from its end.
+		got := logHeads(t, db)
+		if role != wire.RoleAPI && got != heads {
+			t.Fatalf("%s: a start under the lock moved event_seq and audit_seq from %v to %v", role, heads, got)
+		}
+		heads = got
 		stopProcess(t, p)
 	}
 	off := start(t, wire.RoleAll, serveEnv(t, db, "BOTHY_DATABASE__RESTORE_GUARD=off"), wire.Deps{})
 	waitReadyz(t, off.waitInternal(t), http.StatusOK)
 	stopProcess(t, off)
+	// Without the lock the reconcile ran: the seeded session would have been detached by any start.
+	if state := terminalSessionState(t, db, session); state != "detached" {
+		t.Fatalf("the terminal session is %s after a start without the lock, want detached", state)
+	}
 
 	if _, err := finalizeRestore(t, db, nil); err != nil {
 		t.Fatal(err)
@@ -295,6 +314,61 @@ func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 	if presenceStarts.Load() != 1 {
 		t.Fatalf("presence tracker starts after finalize = %d, want 1", presenceStarts.Load())
 	}
+}
+
+// seedActiveTerminalSession inserts a person, an active host assigned to them, a session user and
+// an active terminal session as the schema owner, and returns the session.
+func seedActiveTerminalSession(t *testing.T, db *pgtest.DB) ids.ID {
+	t.Helper()
+	ctx := context.Background()
+	owner := db.Pool(t, pg.RoleOwner)
+	person := ids.New()
+	if _, err := owner.Exec(ctx, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'user', $2, $2)`,
+		person.String(), "alex"+strings.ReplaceAll(person.String()[24:], "-", "")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := owner.Exec(ctx, `INSERT INTO users (principal_id) VALUES ($1)`, person.String()); err != nil {
+		t.Fatal(err)
+	}
+	host, err := terminaltest.InsertHost(ctx, owner, terminaltest.Host{Name: "Lab", State: "active", AssignedUserID: person,
+		CreatedBy: person, ReportedSessionUsers: []string{"bothy-s-alex"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	su, err := terminaltest.InsertSessionUser(ctx, owner, terminaltest.SessionUser{HostID: host, UserID: person, OSUser: "bothy-s-alex", CreatedBy: person})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := terminaltest.InsertSession(ctx, owner, terminaltest.Session{HostID: host, UserID: person, SessionUserID: su, State: "active"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The partition of the next events, which the maintenance of a running server would create:
+	// the reconcile runs before it.
+	superExec(t, db, "SELECT sync_event_log_ensure_partitions(1000, 1, 1)")
+	return session
+}
+
+// terminalSessionState reads the state of a terminal session as the superuser.
+func terminalSessionState(t *testing.T, db *pgtest.DB, id ids.ID) string {
+	t.Helper()
+	var state string
+	if err := superOf(t, db).QueryRow(context.Background(), `SELECT state FROM terminal_sessions WHERE id = $1`, id.String()).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	return state
+}
+
+// logHeads reads event_seq and audit_seq, the heads of the event log and of the audit chain.
+func logHeads(t *testing.T, db *pgtest.DB) [2]int64 {
+	t.Helper()
+	var h [2]int64
+	if err := superOf(t, db).QueryRow(context.Background(), `SELECT
+		(SELECT value FROM sequence_counters WHERE name = 'event_seq'),
+		(SELECT value FROM sequence_counters WHERE name = 'audit_seq')`).Scan(&h[0], &h[1]); err != nil {
+		t.Fatal(err)
+	}
+	return h
 }
 
 // TestStart_EmptyStoredIdentityNeverBlocks: an instance older than M7-04 has no stored identity

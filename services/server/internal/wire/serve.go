@@ -502,14 +502,20 @@ func (s *server) components() []lifecycle.Component {
 // stays, so /readyz names the reason; the stop steps handle the parts that never started.
 func (s *server) whileFinalized(start func(ctx context.Context) error) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
-		s.mu.Lock()
-		pending := s.restorePending
-		s.mu.Unlock()
-		if pending {
+		if !s.finalized() {
 			return nil
 		}
 		return start(ctx)
 	}
+}
+
+// finalized reports whether the start lock of R-DM-50 is free. Work inside a start step that
+// writes (the terminal reconcile of mountTerminalStreams) asks it, like whileFinalized does for a
+// whole step.
+func (s *server) finalized() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return !s.restorePending
 }
 
 // register adds the components and stop steps in the order Serve documents.
@@ -1393,8 +1399,8 @@ func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserve
 // mountTerminalStreams builds the relay and the two stream routes of the terminal sessions
 // (M2-44) over the module, the control connection, identity's authenticator and nonces and the
 // signing keys, builds the hub of the signals across nodes (M2-47), reconciles the sessions of the
-// previous process (Design note 14, only with cluster.mode single), mounts both routes on mux and
-// registers the stop step of the relay.
+// previous process (Design note 14, only with cluster.mode single, and only while the start lock
+// of R-DM-50 is free), mounts both routes on mux and registers the stop step of the relay.
 func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, log *slog.Logger) error {
 	cfg, err := TerminalStreamsConfigFrom(s.values)
 	if err != nil {
@@ -1418,9 +1424,11 @@ func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *https
 	if err != nil {
 		return err
 	}
-	if !s.plan.Multi {
+	if !s.plan.Multi && s.finalized() {
 		// One node: the slots and connections of the previous process are gone (M2-44 Design
-		// note 14); with several nodes the other nodes still hold theirs.
+		// note 14); with several nodes the other nodes still hold theirs. The reconcile ends and
+		// detaches sessions with audit entries and events, so while the start lock holds it waits
+		// for the next start after bothy restore finalize.
 		if err := tm.Service.Reconcile(ctx); err != nil {
 			return err
 		}

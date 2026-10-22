@@ -46,8 +46,8 @@ type restoreGuard struct {
 // row loaded: unless database.restore_guard is off, it compares the stored database identity
 // with the current one, and a mismatch logs once, registers the readiness check
 // restore_not_finalized, which fails for good, for every role, and holds the steps that serve or
-// process (whileFinalized: log tail, presence tracker, jobs, worker consumers, public
-// listener). An empty stored identity never blocks. The error is a failed read; it ends the start.
+// process (whileFinalized: log tail, presence tracker, jobs, worker consumers, public listener;
+// the terminal reconcile asks finalized). An empty stored identity never blocks. The error is a failed read; it ends the start.
 func (s *server) checkRestoreGuard(ctx context.Context, st instance.State) error {
 	var g restoreGuard
 	if err := config.Bind(s.values, &g); err != nil {

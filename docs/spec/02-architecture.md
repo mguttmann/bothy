@@ -1300,7 +1300,7 @@ orchestrator restarts, clients resume according to 04.
    `database.restore_guard` is `off`, a database identity (`pg_control_system().system_identifier`,
    `pg_control_checkpoint().timeline_id`) that differs from the one stored in `instance` keeps
    every role not ready with `restore_not_finalized` and logs once that `bothy restore finalize`
-   must run; the process then skips step 8 (no log tail, presence tracker, River, worker consumers
+   must run; the process then skips step 8 (no log tail, presence tracker, terminal reconcile, River, worker consumers
    or public listener), so it takes no writes and delivers nothing. An empty stored identity
    never blocks.
 6. Ensure signing keys: every purpose without an `active` key gets one
