@@ -17,9 +17,11 @@ import 'package:sync_engine/testing.dart';
 import '../../test/support/fake_instance.dart';
 import '../../test/support/fakes.dart';
 import '../../test/support/other_device.dart';
+import '../../test/support/ready.dart';
 
 export '../../test/support/fake_instance.dart' show FakeInstance, eventually;
 export '../../test/support/other_device.dart' show OtherDevice;
+export '../../test/support/ready.dart' show tapWhenEnabled;
 
 /// The running test app and its fake.
 class TestApp {
@@ -71,6 +73,10 @@ class TestApp {
       await tester.pump(const Duration(milliseconds: 50));
     }
   }
+
+  /// Taps the widget with [key] once it is shown and enabled ([tapWhenEnabled]) and settles.
+  Future<void> tap(String key) =>
+      tapWhenEnabled(tester, find.byKey(ValueKey(key)));
 
   /// E1: types the fake's address and connects; waits for E2.
   Future<void> connect() async {
