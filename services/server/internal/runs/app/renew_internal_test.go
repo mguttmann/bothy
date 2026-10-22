@@ -36,6 +36,12 @@ func TestRenewalInput_CommandRun(t *testing.T) {
 		c := domain.InvocationClaims{TriggerKind: kind, CommandID: cmd.String()}
 		r := row
 		r.TriggerKind = kind
+		if kind == triggerKindInteraction {
+			// An interaction token names its interaction, the one that opened the run (M2-15).
+			ix := ids.New()
+			c = domain.InvocationClaims{TriggerKind: kind, InteractionID: ix.String()}
+			r.TriggeringInteractionID = ix
+		}
 		if got, err := renewalInput(r, c); err != nil || got.Type != domain.EventAgentInvocation || resolverFor(got.Type, r) == nil {
 			t.Errorf("trigger kind %s: %+v %v", kind, got, err)
 		}

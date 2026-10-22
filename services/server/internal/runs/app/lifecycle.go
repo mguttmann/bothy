@@ -144,7 +144,7 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 		ID: ids.New(), ThreadID: cmd.ThreadID, AgentID: cmd.AgentID, TriggeredBy: cmd.TriggeredBy, TriggerKind: cmd.TriggerKind,
 		TriggeringMessageID: cmd.TriggeringMessageID, TriggeringCommandID: cmd.TriggeringCommandID,
 		TriggeringInteractionID: cmd.TriggeringInteractionID,
-		BillingModeExpected: cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
+		BillingModeExpected:     cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
 	})
 	if err != nil {
 		return runs.RunSummary{}, err
