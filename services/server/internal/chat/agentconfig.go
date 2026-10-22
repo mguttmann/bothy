@@ -87,16 +87,13 @@ type TriggerChannel struct {
 	// EffectiveOperatorID is the operator after inheritance; zero for none.
 	EffectiveOperatorID ids.ID
 	// MainThreadID is the main thread of a text or DM channel, zero for a forum (the target of an
-	// incoming webhook post, M2-27 design note 5).
+	// incoming webhook post, M2-27 design note 5, and of a command without thread_id, M2-16).
 	MainThreadID ids.ID
 	// The switches of 09 section 3.3.
 	RequireMention, ThreadRequireMention, FreeResponse, AutoThread, AllowMentionedAgents bool
 	// SettingsVersion is channels.settings_version, the member settings_version of
 	// AgentInvocationPayload (M2-08).
 	SettingsVersion int64
-	// MainThreadID is the main thread of a text or dm channel; zero for a forum (M2-16: a command
-	// without thread_id goes to the main thread).
-	MainThreadID ids.ID
 }
 
 // TriggerFacts is the incoming port of the channel facts of the trigger decision (M2-05). It never

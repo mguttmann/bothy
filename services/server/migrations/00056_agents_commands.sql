@@ -13,7 +13,7 @@
 --
 -- The foreign key runs.triggering_command_id -> commands(id) ON DELETE SET NULL, which 00053
 -- deferred to this ticket, joins this file; it starts NOT VALID (docs/operations/upgrade.md rule
--- M5), and 00056 validates it.
+-- M5), and 00057 validates it.
 --
 -- Grants (migrations/README.md, grant rule): bothy_app may read, insert and update commands, not
 -- delete them: the product removes a command by removed_at.
