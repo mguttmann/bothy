@@ -13,6 +13,10 @@ SELECT * FROM agents WHERE principal_id = @principal_id FOR UPDATE;
 -- The records of a list locked in ascending id (BR-08, docs/DECISIONS.md M1-51).
 SELECT * FROM agents WHERE principal_id = ANY (@ids::uuid[]) ORDER BY principal_id FOR UPDATE;
 
+-- name: GetAgents :many
+-- The records of a list without a lock, ascending by id: the run facts of runs (M2-05).
+SELECT * FROM agents WHERE principal_id = ANY (@ids::uuid[]) ORDER BY principal_id;
+
 -- name: LockPersonalAgents :many
 -- Every personal record locked in ascending id, disabled agents included (10 section 9.1).
 SELECT * FROM agents WHERE billing_mode = 'personal' ORDER BY principal_id FOR UPDATE;

@@ -57,6 +57,12 @@ session and token.
   with the document.
 - Load test: the number of durable events per run stays independent of the patch rate.
 - Test that live box anchors create no revisions (03 `message_revisions`).
+- M2-05 names the tests of the state machine and the run object: `TestCanTransition_AllPairs`,
+  `TestReasonTable`, `TestNormalizeAdapterReason` and `TestTriggerStateMapping`
+  (`services/server/internal/runs/domain`); `TestTransition_EveryDisallowedPairRejected`,
+  `TestTransition_RaceOfTwoStartsOneWins`, `TestTransition_TriggerStatePerEndState`,
+  `TestTransition_UnknownAdapterReasonBecomesAdapterError`, `TestOpen_AtMostOneActivePerThread`
+  and `TestAcceptance_ThreadMessageOpensRun` (`services/server/test/integration/runs`).
 
 ## Pros and Cons of the Options
 

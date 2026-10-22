@@ -50,7 +50,8 @@ type binder struct {
 	cache sync.Map         // string -> attribute.Set
 }
 
-// newBinder checks s against kind and builds the closed sets from the literal values and v.
+// newBinder checks s against kind and builds the closed sets from the literal values and v; a
+// pattern source takes no values from v.
 func newBinder(s Spec, kinds []Kind, v Values) (*binder, error) {
 	if problems := Check([]Spec{s}); len(problems) > 0 {
 		return nil, fmt.Errorf("%w: %w", ErrSpec, errors.Join(problems...))
@@ -84,7 +85,8 @@ func newBinder(s Spec, kinds []Kind, v Values) (*binder, error) {
 	return b, nil
 }
 
-// attrs returns the attribute set of values, each outside its closed set replaced by "other".
+// attrs returns the attribute set of values, each outside its closed set (or its pattern)
+// replaced by "other".
 // The sets are cached by the normalised tuple, so the cache stays as small as the closed sets.
 func (b *binder) attrs(values []string) attribute.Set {
 	if len(values) != len(b.spec.Attrs) {

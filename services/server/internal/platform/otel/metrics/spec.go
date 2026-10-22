@@ -41,8 +41,10 @@ func (k Kind) String() string {
 }
 
 // Source names a closed value set that comes from generated or registered code instead of a
-// literal list: the instrument's owner passes its values at construction (Values). A Source
-// outside the constants below is an open set and fails Check.
+// literal list: the instrument's owner passes its values at construction (Values). A pattern
+// source (SourceAgentHandles) is the exception: the operator bounds its set at runtime, so the
+// binder checks each value against the pattern instead. A Source outside the constants below is
+// an open set and fails Check.
 type Source string
 
 // The closed sources of attribute values (signals.md "Cardinality" item 1).

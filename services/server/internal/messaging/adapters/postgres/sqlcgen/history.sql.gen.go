@@ -98,7 +98,8 @@ WITH page AS (
     ) AS opposite
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, false AS before_side, f.opposite
 FROM f LEFT JOIN page p ON true
 ORDER BY p.thread_seq
@@ -112,26 +113,30 @@ type ListThreadAfterParams struct {
 }
 
 type ListThreadAfterRow struct {
-	ID                pgtype.UUID
-	ThreadID          pgtype.UUID
-	ChannelID         pgtype.UUID
-	ThreadSeq         pgtype.Int8
-	AuthorPrincipalID pgtype.UUID
-	ClientMsgID       pgtype.UUID
-	Origin            pgtype.Text
-	Kind              pgtype.Text
-	SystemCode        pgtype.Text
-	ContentMd         pgtype.Text
-	ContentFormat     pgtype.Int2
-	ReplyToMessageID  pgtype.UUID
-	Silent            pgtype.Bool
-	Version           pgtype.Int8
-	EditedAt          pgtype.Timestamptz
-	DeletedAt         pgtype.Timestamptz
-	DeletedBy         pgtype.UUID
-	CreatedAt         pgtype.Timestamptz
-	BeforeSide        bool
-	Opposite          bool
+	ID                 pgtype.UUID
+	ThreadID           pgtype.UUID
+	ChannelID          pgtype.UUID
+	ThreadSeq          pgtype.Int8
+	AuthorPrincipalID  pgtype.UUID
+	ClientMsgID        pgtype.UUID
+	Origin             pgtype.Text
+	Kind               pgtype.Text
+	SystemCode         pgtype.Text
+	ContentMd          pgtype.Text
+	ContentFormat      pgtype.Int2
+	ReplyToMessageID   pgtype.UUID
+	RunID              pgtype.UUID
+	TriggerState       pgtype.Text
+	TriggerStateReason pgtype.Text
+	TriggerStateAt     pgtype.Timestamptz
+	Silent             pgtype.Bool
+	Version            pgtype.Int8
+	EditedAt           pgtype.Timestamptz
+	DeletedAt          pgtype.Timestamptz
+	DeletedBy          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	BeforeSide         bool
+	Opposite           bool
 }
 
 // after_seq = @anchor: the @row_limit lowest thread_seq above the anchor; opposite is whether a
@@ -163,6 +168,10 @@ func (q *Queries) ListThreadAfter(ctx context.Context, arg ListThreadAfterParams
 			&i.ContentMd,
 			&i.ContentFormat,
 			&i.ReplyToMessageID,
+			&i.RunID,
+			&i.TriggerState,
+			&i.TriggerStateReason,
+			&i.TriggerStateAt,
 			&i.Silent,
 			&i.Version,
 			&i.EditedAt,
@@ -199,7 +208,8 @@ WITH below AS (
     SELECT a.id, a.thread_id, a.channel_id, a.thread_seq, a.author_principal_id, a.client_msg_id, a.client_payload_sha256, a.origin, a.kind, a.system_code, a.content_md, a.content_format, a.reply_to_message_id, a.run_id, a.trigger_state, a.trigger_state_reason, a.trigger_state_at, a.silent, a.import_item_id, a.version, a.edited_at, a.deleted_at, a.deleted_by, a.created_at, a.search_language, a.search_vector, false AS before_side FROM above a
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, coalesce(p.before_side, false)::boolean AS before_side, false AS opposite
 FROM (SELECT 1) f LEFT JOIN page p ON true
 ORDER BY p.thread_seq
@@ -213,26 +223,30 @@ type ListThreadAroundParams struct {
 }
 
 type ListThreadAroundRow struct {
-	ID                pgtype.UUID
-	ThreadID          pgtype.UUID
-	ChannelID         pgtype.UUID
-	ThreadSeq         pgtype.Int8
-	AuthorPrincipalID pgtype.UUID
-	ClientMsgID       pgtype.UUID
-	Origin            pgtype.Text
-	Kind              pgtype.Text
-	SystemCode        pgtype.Text
-	ContentMd         pgtype.Text
-	ContentFormat     pgtype.Int2
-	ReplyToMessageID  pgtype.UUID
-	Silent            pgtype.Bool
-	Version           pgtype.Int8
-	EditedAt          pgtype.Timestamptz
-	DeletedAt         pgtype.Timestamptz
-	DeletedBy         pgtype.UUID
-	CreatedAt         pgtype.Timestamptz
-	BeforeSide        bool
-	Opposite          bool
+	ID                 pgtype.UUID
+	ThreadID           pgtype.UUID
+	ChannelID          pgtype.UUID
+	ThreadSeq          pgtype.Int8
+	AuthorPrincipalID  pgtype.UUID
+	ClientMsgID        pgtype.UUID
+	Origin             pgtype.Text
+	Kind               pgtype.Text
+	SystemCode         pgtype.Text
+	ContentMd          pgtype.Text
+	ContentFormat      pgtype.Int2
+	ReplyToMessageID   pgtype.UUID
+	RunID              pgtype.UUID
+	TriggerState       pgtype.Text
+	TriggerStateReason pgtype.Text
+	TriggerStateAt     pgtype.Timestamptz
+	Silent             pgtype.Bool
+	Version            pgtype.Int8
+	EditedAt           pgtype.Timestamptz
+	DeletedAt          pgtype.Timestamptz
+	DeletedBy          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	BeforeSide         bool
+	Opposite           bool
 }
 
 // around_seq = @anchor: up to @row_limit rows below the anchor (descending) and up to @row_limit
@@ -264,6 +278,10 @@ func (q *Queries) ListThreadAround(ctx context.Context, arg ListThreadAroundPara
 			&i.ContentMd,
 			&i.ContentFormat,
 			&i.ReplyToMessageID,
+			&i.RunID,
+			&i.TriggerState,
+			&i.TriggerStateReason,
+			&i.TriggerStateAt,
 			&i.Silent,
 			&i.Version,
 			&i.EditedAt,
@@ -296,7 +314,8 @@ WITH page AS (
     ) AS opposite
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, true AS before_side, f.opposite
 FROM f LEFT JOIN page p ON true
 ORDER BY p.thread_seq
@@ -310,26 +329,30 @@ type ListThreadBeforeParams struct {
 }
 
 type ListThreadBeforeRow struct {
-	ID                pgtype.UUID
-	ThreadID          pgtype.UUID
-	ChannelID         pgtype.UUID
-	ThreadSeq         pgtype.Int8
-	AuthorPrincipalID pgtype.UUID
-	ClientMsgID       pgtype.UUID
-	Origin            pgtype.Text
-	Kind              pgtype.Text
-	SystemCode        pgtype.Text
-	ContentMd         pgtype.Text
-	ContentFormat     pgtype.Int2
-	ReplyToMessageID  pgtype.UUID
-	Silent            pgtype.Bool
-	Version           pgtype.Int8
-	EditedAt          pgtype.Timestamptz
-	DeletedAt         pgtype.Timestamptz
-	DeletedBy         pgtype.UUID
-	CreatedAt         pgtype.Timestamptz
-	BeforeSide        bool
-	Opposite          bool
+	ID                 pgtype.UUID
+	ThreadID           pgtype.UUID
+	ChannelID          pgtype.UUID
+	ThreadSeq          pgtype.Int8
+	AuthorPrincipalID  pgtype.UUID
+	ClientMsgID        pgtype.UUID
+	Origin             pgtype.Text
+	Kind               pgtype.Text
+	SystemCode         pgtype.Text
+	ContentMd          pgtype.Text
+	ContentFormat      pgtype.Int2
+	ReplyToMessageID   pgtype.UUID
+	RunID              pgtype.UUID
+	TriggerState       pgtype.Text
+	TriggerStateReason pgtype.Text
+	TriggerStateAt     pgtype.Timestamptz
+	Silent             pgtype.Bool
+	Version            pgtype.Int8
+	EditedAt           pgtype.Timestamptz
+	DeletedAt          pgtype.Timestamptz
+	DeletedBy          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	BeforeSide         bool
+	Opposite           bool
 }
 
 // before_seq = @anchor: the @row_limit highest thread_seq below the anchor; opposite is whether a
@@ -361,6 +384,10 @@ func (q *Queries) ListThreadBefore(ctx context.Context, arg ListThreadBeforePara
 			&i.ContentMd,
 			&i.ContentFormat,
 			&i.ReplyToMessageID,
+			&i.RunID,
+			&i.TriggerState,
+			&i.TriggerStateReason,
+			&i.TriggerStateAt,
 			&i.Silent,
 			&i.Version,
 			&i.EditedAt,
@@ -389,7 +416,8 @@ WITH page AS (
     LIMIT $3
 )
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
-       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.silent, p.version, p.edited_at,
+       p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
+       p.trigger_state_at, p.silent, p.version, p.edited_at,
        p.deleted_at, p.deleted_by, p.created_at, true AS before_side, false AS opposite
 FROM (SELECT 1) f LEFT JOIN page p ON true
 ORDER BY p.thread_seq
@@ -402,26 +430,30 @@ type ListThreadNewestParams struct {
 }
 
 type ListThreadNewestRow struct {
-	ID                pgtype.UUID
-	ThreadID          pgtype.UUID
-	ChannelID         pgtype.UUID
-	ThreadSeq         pgtype.Int8
-	AuthorPrincipalID pgtype.UUID
-	ClientMsgID       pgtype.UUID
-	Origin            pgtype.Text
-	Kind              pgtype.Text
-	SystemCode        pgtype.Text
-	ContentMd         pgtype.Text
-	ContentFormat     pgtype.Int2
-	ReplyToMessageID  pgtype.UUID
-	Silent            pgtype.Bool
-	Version           pgtype.Int8
-	EditedAt          pgtype.Timestamptz
-	DeletedAt         pgtype.Timestamptz
-	DeletedBy         pgtype.UUID
-	CreatedAt         pgtype.Timestamptz
-	BeforeSide        bool
-	Opposite          bool
+	ID                 pgtype.UUID
+	ThreadID           pgtype.UUID
+	ChannelID          pgtype.UUID
+	ThreadSeq          pgtype.Int8
+	AuthorPrincipalID  pgtype.UUID
+	ClientMsgID        pgtype.UUID
+	Origin             pgtype.Text
+	Kind               pgtype.Text
+	SystemCode         pgtype.Text
+	ContentMd          pgtype.Text
+	ContentFormat      pgtype.Int2
+	ReplyToMessageID   pgtype.UUID
+	RunID              pgtype.UUID
+	TriggerState       pgtype.Text
+	TriggerStateReason pgtype.Text
+	TriggerStateAt     pgtype.Timestamptz
+	Silent             pgtype.Bool
+	Version            pgtype.Int8
+	EditedAt           pgtype.Timestamptz
+	DeletedAt          pgtype.Timestamptz
+	DeletedBy          pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	BeforeSide         bool
+	Opposite           bool
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -456,6 +488,10 @@ func (q *Queries) ListThreadNewest(ctx context.Context, arg ListThreadNewestPara
 			&i.ContentMd,
 			&i.ContentFormat,
 			&i.ReplyToMessageID,
+			&i.RunID,
+			&i.TriggerState,
+			&i.TriggerStateReason,
+			&i.TriggerStateAt,
 			&i.Silent,
 			&i.Version,
 			&i.EditedAt,

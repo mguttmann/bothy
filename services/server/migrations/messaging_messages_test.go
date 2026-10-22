@@ -18,8 +18,8 @@ import (
 
 // TestMessagingMigration_Schema holds messages and mentions against docs/spec/03-data-model.md
 // section 4.6 column by column, with every check, key and index, and with exactly the deviations
-// the migration names: the search columns come with 00035 and 00036 (M3-13), no has_attachments and no foreign keys to runs and
-// import_items yet (M1-56). threads.parent_message_id references messages, deferred.
+// the migration names: the search columns come with 00035 and 00036 (M3-13), no has_attachments and no foreign key to
+// import_items yet (M1-56); the foreign key to runs comes with 00051 (M2-05). threads.parent_message_id references messages, deferred.
 func TestMessagingMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -73,6 +73,8 @@ func TestMessagingMigration_Schema(t *testing.T) {
 		"FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE RESTRICT",
 		"FOREIGN KEY (deleted_by) REFERENCES principals(id) ON DELETE RESTRICT",
 		"FOREIGN KEY (reply_to_message_id) REFERENCES messages(id) ON DELETE SET NULL",
+		// Added by 00051 and validated by 00053 (M2-05).
+		"FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
 		"FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE RESTRICT",
 		"PRIMARY KEY (id)",
 	}

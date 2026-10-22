@@ -83,7 +83,8 @@ type MessagePosted struct {
 	AuthorKind string
 	// Origin is "human", "agent", "app" or "system" ("import" in M8).
 	Origin string
-	// Kind is "text" or "system" in M1.
+	// Kind is "text", "system" or, for the live box anchor of a run (CreateRunAnchor, M2-05),
+	// "run"; only a text message of origin human can trigger an agent (09 section 3.2).
 	Kind string
 	// ClientMsgID is the idempotency key of the message.
 	ClientMsgID ids.ID
@@ -136,6 +137,12 @@ type Message struct {
 	// ReplyToID is the quoted message; zero for none.
 	ReplyToID ids.ID
 	Silent    bool
+	// RunID is the run of a live box anchor (kind run); zero otherwise.
+	RunID ids.ID
+	// TriggerState is messages.trigger_state (schema TriggerState); "" while NULL.
+	// TriggerStateReason is set for failed and cancelled; TriggerStateAt is zero while NULL.
+	TriggerState, TriggerStateReason string
+	TriggerStateAt                   time.Time
 	// MentionIDs are the resolved mentions, sorted; never nil.
 	MentionIDs []ids.ID
 	// Reactions is the summary per symbol, ordered by the earliest reaction of each symbol, then
@@ -238,6 +245,29 @@ type HistoryPage struct {
 	HasMoreAfter  bool
 }
 
+// SetTriggerStateCmd is the input of Messages.SetTriggerState (M2-05).
+type SetTriggerStateCmd struct {
+	// MessageID is the triggering message; it must have origin human (03 messages check).
+	MessageID ids.ID
+	// State is a value of schema TriggerState.
+	State string
+	// Reason is trigger_state_reason; required for failed and cancelled, empty otherwise.
+	Reason string
+}
+
+// RunAnchorCmd is the input of Messages.CreateRunAnchor (M2-05): the live box anchor of RunID by
+// the agent AgentID in ThreadID (09 section 5.4).
+type RunAnchorCmd struct {
+	ThreadID, RunID, AgentID ids.ID
+}
+
+// AnchorRef names a written live box anchor.
+type AnchorRef struct {
+	// MessageID is the anchor; ThreadSeq its position in the thread.
+	MessageID ids.ID
+	ThreadSeq int64
+}
+
 // Messages is the incoming port of sending (M1-56) and reading (M1-57). The caller a is the principal of the request;
 // errors are kernel/errs errors, and an unknown and an invisible thread or channel give the same
 // 404 not_found.
@@ -294,4 +324,22 @@ type Messages interface {
 	// (message.revisions.read, M1-58); a deleted message has none. Errors: 404 for a missing or
 	// invisible message.
 	Revisions(ctx context.Context, messageID ids.ID) ([]RevisionView, error)
+	// SetTriggerState sets trigger_state, trigger_state_reason and trigger_state_at of a triggering
+	// message for runs (M2-05, 09 section 6). It never authorizes: the caller (runs) decided. It
+	// runs only inside the caller's unit of work. The same state and reason as stored write nothing
+	// (D-M2-05-17); otherwise the version rises by one and message.updated is appended with the
+	// representation of M1-56 D7 (a deleted message keeps its tombstone form). Errors: internal
+	// outside a unit of work, for an unknown message, a message whose origin is not human, an
+	// unknown state or a reason that does not fit the state.
+	//
+	// Example:
+	//
+	//	err := msgs.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: m, State: "received"})
+	SetTriggerState(ctx context.Context, cmd SetTriggerStateCmd) error
+	// CreateRunAnchor writes the live box anchor of a run inside the caller's unit of work (M2-05,
+	// 09 section 5.4): the next thread_seq of the thread, kind run, origin agent, the agent as
+	// author, empty content, silent, run_id, a server client_msg_id, no mentions; then
+	// message.created and MessagePosted with Kind run. It never authorizes: runs accepted the
+	// trigger. Errors: internal outside a unit of work; not_found for an unknown thread.
+	CreateRunAnchor(ctx context.Context, cmd RunAnchorCmd) (AnchorRef, error)
 }

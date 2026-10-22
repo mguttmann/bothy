@@ -423,3 +423,25 @@ func (s *Service) GetServedChannelConfig(ctx context.Context, a actor.Actor, cha
 	}
 	return servedDTO(b), nil
 }
+
+// The service answers the channel facts of the trigger decision of runs (M2-05).
+var _ chat.TriggerFacts = (*Service)(nil)
+
+// TriggerChannel implements chat.TriggerFacts: the channel read of Store.Channel, so the effective
+// operator is the one every other read of chat computes (03 channels "Effective operator"),
+// without authorization; runs decides with agent.invoke. Errors: not_found for an unknown channel.
+func (s *Service) TriggerChannel(ctx context.Context, channelID ids.ID) (chat.TriggerChannel, error) {
+	row, found, err := s.d.Store.Channel(ctx, channelID)
+	if err != nil {
+		return chat.TriggerChannel{}, err
+	}
+	if !found {
+		return chat.TriggerChannel{}, invisible()
+	}
+	c := row.Channel
+	return chat.TriggerChannel{
+		ChannelID: c.ID, SpaceID: c.SpaceID, Kind: string(c.Kind), EffectiveOperatorID: c.Operator(row.SpaceDefaultOperatorID).EffectiveAgentID,
+		RequireMention: c.RequireMention, ThreadRequireMention: c.ThreadRequireMention, FreeResponse: c.FreeResponse,
+		AutoThread: c.AutoThread, AllowMentionedAgents: c.AllowMentionedAgents,
+	}, nil
+}

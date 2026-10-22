@@ -91,7 +91,9 @@ func historyMessage(row historyRow) domain.Message {
 		ID: idOf(row.ID), ThreadID: idOf(row.ThreadID), ChannelID: idOf(row.ChannelID), ThreadSeq: row.ThreadSeq.Int64,
 		AuthorID: idOf(row.AuthorPrincipalID), ClientMsgID: idOf(row.ClientMsgID), Origin: domain.Origin(row.Origin.String),
 		Kind: domain.Kind(row.Kind.String), SystemCode: row.SystemCode.String, ContentMD: row.ContentMd.String,
-		ContentFormat: row.ContentFormat.Int16, ReplyToID: idOf(row.ReplyToMessageID), Silent: row.Silent.Bool, Version: row.Version.Int64,
+		ContentFormat: row.ContentFormat.Int16, ReplyToID: idOf(row.ReplyToMessageID), RunID: idOf(row.RunID),
+		TriggerState: row.TriggerState.String, TriggerStateReason: row.TriggerStateReason.String, TriggerStateAt: timeOf(row.TriggerStateAt),
+		Silent: row.Silent.Bool, Version: row.Version.Int64,
 		EditedAt: timeOf(row.EditedAt), DeletedAt: timeOf(row.DeletedAt), DeletedBy: idOf(row.DeletedBy), CreatedAt: timeOf(row.CreatedAt),
 	}
 }

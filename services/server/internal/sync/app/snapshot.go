@@ -19,8 +19,8 @@ import (
 )
 
 // RunSummarySource is the outgoing port of the running runs of the snapshot (schema RunSummary).
-// In M1 internal/wire binds adapters/noruns, which returns none, because the table runs exists
-// only from M2-05; M2-05 binds the runs port here.
+// internal/wire binds adapters/runsummary over the runs module (M2-05), which applies the
+// visibility pipeline of listActiveRuns.
 type RunSummarySource interface {
 	// ActiveRuns returns the runs that are not finished in the threads of channelIDs (the visible
 	// channels of the caller a). Errors: the source's.

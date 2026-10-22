@@ -245,7 +245,8 @@ func TestCatalogue_RegistryMatchesSignalsDoc(t *testing.T) {
 
 // TestCatalogue_M1InstrumentSet: the registry holds exactly the instruments this build records
 // (brief M1-68 "Instruments", plus the gauges of M2-01 already on the base, the app metrics of
-// M4-31, bothy.file.upload.size of M3-03 and the gauges of bothy-backupd of M7-02).
+// M4-31, bothy.file.upload.size of M3-03, the gauges of bothy-backupd of M7-02 and the four run
+// instruments of M2-05).
 func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
@@ -254,7 +255,10 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.egress.blocked", "bothy.event.appended", "bothy.event.consumer.lag", "bothy.event.consumer.pending_age",
 		"bothy.event.fanout.lag", "bothy.file.upload.size", "bothy.gateway.catchup.duration", "bothy.gateway.close", "bothy.gateway.connect.duration",
 		"bothy.gateway.connections.active", "bothy.gateway.outbound.dropped", "bothy.gateway.resync", "bothy.job.duration",
-		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected", "bothy.secrets.refresh.failures",
+		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected",
+		// M2-05: the run instruments of 4.3.
+		"bothy.run.active", "bothy.run.duration", "bothy.run.finished", "bothy.run.start.latency",
+		"bothy.secrets.refresh.failures",
 		"bothy.storage.volume.free", "bothy.storage.volume.size", "bothy.telemetry.dropped", "db.client.operation.duration", "http.server.request.duration",
 		// M4-31: the app metrics of 4.6a and the discard counter of their endpoint.
 		"bothy.client.catchup.duration", "bothy.client.catchup.events", "bothy.client.cold_start.duration",

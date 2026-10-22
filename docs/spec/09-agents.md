@@ -159,6 +159,13 @@ For a new message M of a principal P in the thread T of the channel C, the follo
    `trigger_state = received`. On rejection: M stays stored, `trigger_state = failed` with
    the reason.
 
+Order of the check and the auto thread (D-M2-05-2): with `auto_thread` in the main thread the check
+of point 7 names the thread of M, not the new thread, so the mention rule of point 3 and the guard
+of `agent.invoke` judge the same thread. The thread of point 5 is created only after the `allow` of
+point 7, so a denial leaves no empty thread. A candidate that M does not mention is first checked
+in filter mode: a person without `trigger` gets no `trigger_state` and no audit entry (point 4,
+D-M2-05-13).
+
 Position of the voice rule (D-M2-04-2): the rejection `voice_unsupported` of section 13 is decided
 after step 4 and before step 5. A voice message without a transcription path
 (`voice.transcription_mode` is `off`, or `agent` and the candidate lacks the effective feature
@@ -777,9 +784,12 @@ stateDiagram-v2
 | `runtime_error` | `failed` | Adapter | Runtime reports an error; details in the last step |
 | `adapter_error` | `failed` | Adapter | Error in the adapter itself |
 | `runtime_not_authenticated` | `failed` | Adapter | Runtime has no valid login |
+| `user_disabled` | `cancelled` | Server | The triggering person was disabled (`user.disable`, 02 section 4.3) |
 
-The server stores unknown reasons of an adapter as `adapter_error` with the original code in
-the details.
+The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
+unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the
+original code as the detail `original_reason` of a server step with `kind = status` and
+`name = adapter_reason`, cut to `run.step_detail_max_bytes`.
 
 ### 5.3 Run document (`run_document.v1`)
 

@@ -14,9 +14,10 @@ import (
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	synchttp "github.com/OWNER/bothy/services/server/internal/sync/adapters/httpapi"
-	"github.com/OWNER/bothy/services/server/internal/sync/adapters/noruns"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/sync/adapters/runsummary"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
 
@@ -44,6 +45,8 @@ type SyncReadDeps struct {
 	Agents     syncapp.AgentLister
 	Directory  syncapp.PrincipalDirectory
 	Flags      instance.Flags
+	// Runs gives the running runs of the snapshot (M2-05); required.
+	Runs runs.Runs
 }
 
 // SyncReads is the read part of the sync module (M1-63): the use cases of sync.CatchUp and
@@ -56,11 +59,11 @@ type SyncReads struct {
 
 // NewSyncReads builds catch-up and snapshot over d with the limits cfg. The head is event_seq of
 // instance.Versions, the epoch instance.sync_epoch of instance.State, and the running runs come
-// from adapters/noruns until M2-05 binds the runs port. It opens no connection. Errors: a missing
+// from the runs module through adapters/runsummary (M2-05). It opens no connection. Errors: a missing
 // collaborator or a limit below 1.
 func NewSyncReads(cfg syncapp.CatchUpConfig, d SyncReadDeps) (*SyncReads, error) {
 	if d.Pool == nil || d.UoW == nil || d.Chat == nil || d.Messaging == nil || d.Personal == nil || d.Agents == nil || d.Directory == nil ||
-		d.Flags == nil {
+		d.Flags == nil || d.Runs == nil {
 		return nil, errors.New("wire: catch-up and snapshot need the pool, chat, messaging, the personal data, agents, identity and the flags")
 	}
 	repo := instancepg.NewRepository(d.Pool)
@@ -72,7 +75,7 @@ func NewSyncReads(cfg syncapp.CatchUpConfig, d SyncReadDeps) (*SyncReads, error)
 	s, err := syncapp.NewSnapshot(syncapp.SnapshotDeps{
 		Head: head, Epoch: epoch, Authorizer: d.Authorizer, Directory: d.Directory, Structure: d.Chat, Threads: d.Chat,
 		Store: syncpg.NewPersonalRepository(d.Pool), Mentions: d.Messaging.Mentions(), Settings: d.Personal.Settings(),
-		Drafts: d.Personal.Drafts(), Agents: d.Agents, Runs: noruns.Source{}, Flags: d.Flags,
+		Drafts: d.Personal.Drafts(), Agents: d.Agents, Runs: runsummary.New(d.Runs), Flags: d.Flags,
 	})
 	if err != nil {
 		return nil, err

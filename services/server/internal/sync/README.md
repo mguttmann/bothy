@@ -25,7 +25,7 @@ Event log (append, tail, catch-up, redaction, partitions), snapshot, idempotency
 | `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`, `ConsumerService` (implements `sync.Consumers`: `Register`, `Ensure`, `Round`, `States`) and `ConsumerRunner`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows`, `ConsumerCursorStore`, `ConsumerLogReader`, `Waker`; personal data (M1-61): `Personal` (implements `sync.ReadStates`; `Personal.Drafts` and `Personal.Settings` the other two ports), `PersonalConfig`, `PersonalDeps`, outgoing ports `PersonalStore`, `DraftRows`, `ThreadSource`, `ChannelSource`, `MentionCounter`, and `Subscribers` with `OnMessagePosted`; catch-up and snapshot (M1-63): `CatchUpService` (`NewCatchUp`, `CatchUpConfig`, `CatchUpDeps`) and `SnapshotService` (`NewSnapshot`, `SnapshotDeps`), outgoing ports `CatchUpLog` with `VisibleQuery`, `HeadSource`, `EpochSource`, `SnapshotStructure`, `ThreadCounters`, `SnapshotStore`, `AgentLister`, `PrincipalDirectory`, `FlagEvaluator` and `RunSummarySource` |
 | `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`); `PersonalRepository` (`PersonalStore`) over `queries/read_states.sql`, `drafts.sql` and `user_settings.sql` (M1-61), also `SnapshotStore` (M1-63); the page query of catch-up `queries/catchup.sql` (`Repository.VisibleEvents`, M1-63) |
 | `adapters/httpapi/` | `Personal`, the handlers of `listMyReadStates`, `putReadState`, `markThreadUnread`, `putThreadDraft`, `deleteThreadDraft`, `putChannelDraft`, `deleteChannelDraft`, `listMyDrafts`, `listMySettings`, `putMySetting`, `deleteMySetting` and `getMySidebar` (M1-61); `Sync`, the handlers of `listEvents` and `getSnapshot`, and `SnapshotREST` (M1-63) |
-| `adapters/noruns/` | `Source`, the M1 binding of `app.RunSummarySource`: no running run, because the table `runs` exists only from M2-05, which binds the runs port instead (M1-63) |
+| `adapters/runsummary/` | `Source`, the binding of `app.RunSummarySource` to `runs.Runs.ActiveForActor` (M2-05): the active runs the caller may read through the pipeline of `listActiveRuns` (Scope of `run.read`, the threads through chat, `run.read` per run), limited to the channels the snapshot lists; it replaced the empty M1 binding `noruns` |
 | `adapters/otelmetrics/` | the lag gauges of the worker consumers (`RegisterConsumerGauges`); `New`, the implementation of `app.Metrics` (`bothy.event.appended`, `bothy.db.event_seq.lock_wait`, M1-68) |
 | `adapters/telemetry/` | `Correlator`: `correlation_id` and `trace_context` from the trace context of the append |
 | `adapters/jobs/` | jobs `sync.partition_maintenance` and `sync.idempotency_cleanup`: arguments, handlers, periodic registrations |
@@ -348,8 +348,8 @@ through `test/messagingworld` with `NewPersonal`) and
   channels and the person's `read_states` there, combined in Go: unread =
   `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)`, the mentions from
   `messaging.Mentions.CountUnread` above the same position, each listed thread checked with
-  `thread.read` in filter mode (M1-63/4); `active_runs` from `RunSummarySource` (in M1
-  `adapters/noruns`, empty); `agents` from the listing behind `listAgents` as `AgentPresence {agent_id, state,
+  `thread.read` in filter mode (M1-63/4); `active_runs` from `RunSummarySource` (bound
+  to `adapters/runsummary` over the runs module since M2-05); `agents` from the listing behind `listAgents` as `AgentPresence {agent_id, state,
   reported_billing_mode}`, whose presence the listing takes from the presence tracker of the
   process (`agents.Presence`, M2-20; ends the presence part of M1-63/3): tracked agents from memory, the
   others as stored (`unknown` or `offline`); only agents the principal may read, and only agents
@@ -359,7 +359,7 @@ through `test/messagingworld` with `NewPersonal`) and
 - **Configuration.** `sync.catchup_page_size`, `sync.catchup_max_events` (04).
 
 Rulings: docs/DECISIONS.md M1-63. Tests: `domain/catchup_test.go`, `app/catchup_test.go`,
-`adapters/noruns`, `adapters/httpapi/sync_test.go` and `snapshot_test.go` (PostgreSQL 18, the HTTP
+`adapters/runsummary`, `adapters/httpapi/sync_test.go` and `snapshot_test.go` (PostgreSQL 18, the HTTP
 chain with response validation through `test/messagingworld.NewSync`, including AZ-P5 for the
 snapshot), `internal/authz/app/eventresource_test.go` (`authorize.ResourceFromEvent`).
 

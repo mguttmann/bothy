@@ -54,6 +54,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics/metricstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
@@ -90,6 +91,8 @@ const (
 	EmojiMax             = 64
 	MaxDistinctReactions = 20
 	MaxPins              = 50
+	// StepDetailMax is run.step_detail_max_bytes of the runs module of a NewSync world (M2-05).
+	StepDetailMax = 4096
 )
 
 // Option changes the messaging configuration of a world (brief M1-57: small test values).
@@ -114,6 +117,9 @@ type Recorder struct {
 	posted  []messaging.MessagePosted
 	deleted []messaging.MessageDeleted
 	veto    bool
+	// then runs after a recorded MessagePosted inside the same unit of work, the way a subscriber
+	// such as runs writes into it (M2-05); nil does nothing.
+	then func(ctx context.Context, ev messaging.MessagePosted) error
 }
 
 // OnDeleted records ev (M1-58); it must run inside a unit of work.
@@ -133,12 +139,17 @@ func (r *Recorder) On(ctx context.Context, ev messaging.MessagePosted) error {
 		r.t.Error("MessagePosted outside a unit of work")
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.veto {
+		r.mu.Unlock()
 		return errVeto
 	}
 	r.posted = append(r.posted, ev)
-	return nil
+	then := r.then
+	r.mu.Unlock()
+	if then == nil {
+		return nil
+	}
+	return then(ctx, ev)
 }
 
 // Subscribe registers the test subscriber of MessagePosted that feeds rec.
@@ -163,6 +174,8 @@ type World struct {
 	// Svc is the messaging use cases; Threads the threads of chat.
 	Svc     *messagingapp.Service
 	Threads chat.Threads
+	// UoW is the unit of work of the modules, for calls that run only inside one (M2-05).
+	UoW *pg.UnitOfWork
 	// Authorizer is the real Authorizer of the world (Scope for CountUnread, M1-60).
 	Authorizer authorize.Authorizer
 	// Logs holds every record the modules logged (the chain logs into H.Logs).
@@ -331,7 +344,7 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, no
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.Svc, w.Threads, w.Authorizer, w.audit = m.Service, c.Service, az, rec
+	w.Svc, w.Threads, w.Authorizer, w.audit, w.UoW = m.Service, c.Service, az, rec, uow
 	handlers := wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers, Threads: c.ThreadHandlers, Messages: m.Handlers}
 	if subs != nil {
 		w.personal(subs, pool, uow, az, appender, c, m, &handlers)
@@ -396,8 +409,15 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 	if err != nil {
 		w.t.Fatal(err)
 	}
+	// The running runs of the snapshot come from the runs module (M2-05); the world subscribes no
+	// acceptance, so no message opens a run unless a test writes one.
+	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax, StepDetailMaxBytes: StepDetailMax}, pool, uow, az,
+		wire.RunsDeps{Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service}, w.Clock, log)
+	if err != nil {
+		w.t.Fatal(err)
+	}
 	r, err := wire.NewSyncReads(cfg, wire.SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service,
-		Personal: w.Personal, Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: writes.Flags})
+		Personal: w.Personal, Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: writes.Flags, Runs: rn.Service})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -487,6 +507,15 @@ func (w *World) SetVeto(veto bool) {
 	w.rec.mu.Lock()
 	defer w.rec.mu.Unlock()
 	w.rec.veto = veto
+}
+
+// AfterPosted makes the test subscriber of MessagePosted call then after it recorded an event,
+// inside the unit of work of the message, the way a subscriber such as runs writes into that unit
+// (M2-05); nil removes it. An error of then rolls the unit back.
+func (w *World) AfterPosted(then func(ctx context.Context, ev messaging.MessagePosted) error) {
+	w.rec.mu.Lock()
+	defer w.rec.mu.Unlock()
+	w.rec.then = then
 }
 
 // Posted returns a copy of the MessagePosted events seen so far.
