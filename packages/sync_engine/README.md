@@ -460,6 +460,14 @@ rows of the request share one `correlation_id` (10 11, BR-07). `previewGrant` re
 violation as `invariant_violations`. The trigger set is simplified: no thread operators, and a
 space's default operator serves all its channels.
 
+From M6-07 `rest/hint_handlers.dart` serves the read-only lists "Permission hints"
+(`listPermissionHints`) and "Expiring soon" (`listExpiringAccess`) of `access.hints.read`, a
+small model of the server's `internal/authz/app/hints.go` and `expiring.go` with the same order,
+scope (instance for owners, a space with `manage`) and labels; the world's
+`expiryReminderLead` is `authz.expiry_reminder_lead`. Simplified: no project bindings or dev
+environments (so `trigger_blocked` names only `sr2`), no apps (only agent tokens) and an offset
+as cursor.
+
 ### Faults
 
 `server.faults` is a `FaultPlan`, a queue of rules matched in order and fully deterministic

@@ -5922,4 +5922,180 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get adminSecretIncomingBearer =>
       'Senders that can set a header drop the last segment of the address and send it as Authorization: Bearer <token>.';
+
+  @override
+  String get adminNavHints => 'Permission hints';
+
+  @override
+  String get adminNavExpiring => 'Expiring soon';
+
+  @override
+  String get hintsTitle => 'Permission hints';
+
+  @override
+  String get hintsIntro =>
+      'Hints from the current permissions: what people can learn through agents and which access grants have no effect. A hint is not a block.';
+
+  @override
+  String get hintsScopeLabel => 'Show for';
+
+  @override
+  String get hintsScopeInstance => 'Whole instance';
+
+  @override
+  String get hintsKindLabel => 'Kind';
+
+  @override
+  String get hintsKindAll => 'All kinds';
+
+  @override
+  String get hintsKindH1 => 'Read horizon (H1)';
+
+  @override
+  String get hintsKindGrantToDisabled =>
+      'Access grant to a disabled or deleted account';
+
+  @override
+  String get hintsKindTriggerBlocked => 'Trigger agents without effect';
+
+  @override
+  String get hintsKindAgentPersonal => 'Agent in Personal mode';
+
+  @override
+  String get hintsKindUnknown => 'Other hint';
+
+  @override
+  String hintsH1Text(String person, String channelPath, String agent) {
+    return '$person can learn content of $channelPath through agent $agent.';
+  }
+
+  @override
+  String hintsGrantToDisabledText(String subject, String target, String level) {
+    return '$subject is disabled or deleted and still holds an access grant on $target: $level.';
+  }
+
+  @override
+  String hintsTriggerBlockedText(String subject, String target) {
+    return '$subject has the level Trigger agents on $target but cannot trigger an agent there.';
+  }
+
+  @override
+  String get hintsRuleSr2 =>
+      'SR2: an agent there has a tool class that only owners and people with a ready dev environment of their own may trigger.';
+
+  @override
+  String get hintsRuleSr3 =>
+      'SR3: a channel there is bound to a project; a run of a person who is not an owner needs a ready dev environment of their own.';
+
+  @override
+  String hintsAgentPersonalText(String agent, String holder) {
+    return 'Agent $agent uses Personal mode on the subscription of $holder.';
+  }
+
+  @override
+  String hintsAgentPersonalNoHolder(String agent) {
+    return 'Agent $agent uses Personal mode and has no holder.';
+  }
+
+  @override
+  String hintsAgentPersonalSet(String people) {
+    return 'I1 asks that only the holder can trigger it. These people can trigger it now: $people.';
+  }
+
+  @override
+  String get hintsAgentPersonalNobody =>
+      'I1 asks that only the holder can trigger it. Nobody can trigger it now.';
+
+  @override
+  String get hintsUnknownText => 'This version does not know this hint yet.';
+
+  @override
+  String get hintsEmpty => 'No permission hints.';
+
+  @override
+  String get hintsExplain => 'Explain';
+
+  @override
+  String get hintsExtend => 'Extend';
+
+  @override
+  String get hintsOpenAgent => 'Open agent';
+
+  @override
+  String get hintsClose => 'Close';
+
+  @override
+  String hintsExtendTitle(String name) {
+    return 'Extend the access grant for $name';
+  }
+
+  @override
+  String get hintsExtendNote =>
+      'Extending creates a new access grant with a new reason and the last day you enter, then revokes the old one.';
+
+  @override
+  String hintsExtended(String name) {
+    return 'The access grant for $name was extended: the new one applies, the old one is revoked.';
+  }
+
+  @override
+  String hintsExtendRevokeFailed(String name, String reason) {
+    return 'The new access grant for $name applies, but the old one could not be revoked: $reason';
+  }
+
+  @override
+  String get expiringTitle => 'Expiring soon';
+
+  @override
+  String get expiringIntro =>
+      'Access grants, group memberships and tokens of agents and apps that end soon. Extending replaces an access grant with a new one; a token is renewed by creating a new one and revoking the old one.';
+
+  @override
+  String get expiringEmpty => 'Nothing expires soon.';
+
+  @override
+  String get expiringKindGrant => 'Access grant';
+
+  @override
+  String get expiringKindMembership => 'Group membership';
+
+  @override
+  String get expiringKindToken => 'Token';
+
+  @override
+  String get expiringKindUnknown => 'Other access';
+
+  @override
+  String expiringGrantText(String subject, String target, String level) {
+    return '$subject on $target: $level';
+  }
+
+  @override
+  String expiringMembershipText(String person, String group) {
+    return '$person in the group $group';
+  }
+
+  @override
+  String expiringAgentTokenText(String agent) {
+    return 'Token of the agent $agent';
+  }
+
+  @override
+  String expiringAppTokenText(String app) {
+    return 'Token of the app $app';
+  }
+
+  @override
+  String get expiringAppTokenNote =>
+      'There is no token screen for apps here yet: create a new token for the app, switch the app over, then revoke the old one.';
+
+  @override
+  String get expiringUnknownText =>
+      'This version does not know this kind of access yet.';
+
+  @override
+  String get expiringOpenGroup => 'Open group';
+
+  @override
+  String get expiringRenewToken => 'Renew token';
 }

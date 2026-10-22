@@ -5952,4 +5952,181 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get adminSecretIncomingBearer =>
       'Sender, die einen Header setzen können, lassen den letzten Abschnitt der Adresse weg und senden ihn als Authorization: Bearer <token>.';
+
+  @override
+  String get adminNavHints => 'Rechtehinweise';
+
+  @override
+  String get adminNavExpiring => 'Läuft bald ab';
+
+  @override
+  String get hintsTitle => 'Rechtehinweise';
+
+  @override
+  String get hintsIntro =>
+      'Hinweise aus den aktuellen Rechten: was Personen über Agenten erfahren können und welche Freigaben nicht wirken. Ein Hinweis ist keine Sperre.';
+
+  @override
+  String get hintsScopeLabel => 'Anzeigen für';
+
+  @override
+  String get hintsScopeInstance => 'Ganze Instanz';
+
+  @override
+  String get hintsKindLabel => 'Art';
+
+  @override
+  String get hintsKindAll => 'Alle Arten';
+
+  @override
+  String get hintsKindH1 => 'Lesehorizont (H1)';
+
+  @override
+  String get hintsKindGrantToDisabled =>
+      'Freigabe an ein deaktiviertes oder gelöschtes Konto';
+
+  @override
+  String get hintsKindTriggerBlocked => 'Agenten auslösen ohne Wirkung';
+
+  @override
+  String get hintsKindAgentPersonal => 'Agent im Modus Persönlich';
+
+  @override
+  String get hintsKindUnknown => 'Anderer Hinweis';
+
+  @override
+  String hintsH1Text(String person, String channelPath, String agent) {
+    return '$person kann über Agent $agent Inhalte aus $channelPath erfahren.';
+  }
+
+  @override
+  String hintsGrantToDisabledText(String subject, String target, String level) {
+    return '$subject ist deaktiviert oder gelöscht und hat noch eine Freigabe auf $target: $level.';
+  }
+
+  @override
+  String hintsTriggerBlockedText(String subject, String target) {
+    return '$subject hat die Stufe Agenten auslösen auf $target, kann dort aber keinen Agenten auslösen.';
+  }
+
+  @override
+  String get hintsRuleSr2 =>
+      'SR2: Ein Agent dort hat eine Werkzeugklasse, die nur Owner und Personen mit einer eigenen bereiten Entwicklungsumgebung auslösen dürfen.';
+
+  @override
+  String get hintsRuleSr3 =>
+      'SR3: Ein Kanal dort ist an ein Projekt gebunden; ein Lauf einer Person, die kein Owner ist, braucht eine eigene bereite Entwicklungsumgebung.';
+
+  @override
+  String hintsAgentPersonalText(String agent, String holder) {
+    return 'Agent $agent nutzt den Modus Persönlich mit dem Abo von $holder.';
+  }
+
+  @override
+  String hintsAgentPersonalNoHolder(String agent) {
+    return 'Agent $agent nutzt den Modus Persönlich und hat keinen Inhaber.';
+  }
+
+  @override
+  String hintsAgentPersonalSet(String people) {
+    return 'I1 verlangt, dass nur der Inhaber ihn auslösen kann. Jetzt können ihn auslösen: $people.';
+  }
+
+  @override
+  String get hintsAgentPersonalNobody =>
+      'I1 verlangt, dass nur der Inhaber ihn auslösen kann. Jetzt kann ihn niemand auslösen.';
+
+  @override
+  String get hintsUnknownText =>
+      'Diese Version kennt diesen Hinweis noch nicht.';
+
+  @override
+  String get hintsEmpty => 'Keine Rechtehinweise.';
+
+  @override
+  String get hintsExplain => 'Erklären';
+
+  @override
+  String get hintsExtend => 'Verlängern';
+
+  @override
+  String get hintsOpenAgent => 'Agent öffnen';
+
+  @override
+  String get hintsClose => 'Schließen';
+
+  @override
+  String hintsExtendTitle(String name) {
+    return 'Freigabe für $name verlängern';
+  }
+
+  @override
+  String get hintsExtendNote =>
+      'Verlängern legt eine neue Freigabe mit neuem Grund und dem eingegebenen letzten Tag an und widerruft danach die alte.';
+
+  @override
+  String hintsExtended(String name) {
+    return 'Die Freigabe für $name wurde verlängert: Die neue gilt, die alte ist widerrufen.';
+  }
+
+  @override
+  String hintsExtendRevokeFailed(String name, String reason) {
+    return 'Die neue Freigabe für $name gilt, aber die alte konnte nicht widerrufen werden: $reason';
+  }
+
+  @override
+  String get expiringTitle => 'Läuft bald ab';
+
+  @override
+  String get expiringIntro =>
+      'Freigaben, Gruppenmitgliedschaften und Token von Agenten und Apps, die bald enden. Verlängern ersetzt eine Freigabe durch eine neue; ein Token erneuerst du, indem du ein neues anlegst und das alte widerrufst.';
+
+  @override
+  String get expiringEmpty => 'Nichts läuft bald ab.';
+
+  @override
+  String get expiringKindGrant => 'Freigabe';
+
+  @override
+  String get expiringKindMembership => 'Gruppenmitgliedschaft';
+
+  @override
+  String get expiringKindToken => 'Token';
+
+  @override
+  String get expiringKindUnknown => 'Anderer Zugriff';
+
+  @override
+  String expiringGrantText(String subject, String target, String level) {
+    return '$subject auf $target: $level';
+  }
+
+  @override
+  String expiringMembershipText(String person, String group) {
+    return '$person in der Gruppe $group';
+  }
+
+  @override
+  String expiringAgentTokenText(String agent) {
+    return 'Token des Agenten $agent';
+  }
+
+  @override
+  String expiringAppTokenText(String app) {
+    return 'Token der App $app';
+  }
+
+  @override
+  String get expiringAppTokenNote =>
+      'Für Apps gibt es hier noch keine Token-Seite: Lege ein neues Token für die App an, stelle die App um und widerrufe danach das alte.';
+
+  @override
+  String get expiringUnknownText =>
+      'Diese Version kennt diese Art von Zugriff noch nicht.';
+
+  @override
+  String get expiringOpenGroup => 'Gruppe öffnen';
+
+  @override
+  String get expiringRenewToken => 'Token erneuern';
 }

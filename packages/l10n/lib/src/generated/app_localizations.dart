@@ -9492,6 +9492,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Senders that can set a header drop the last segment of the address and send it as Authorization: Bearer <token>.'**
   String get adminSecretIncomingBearer;
+
+  /// Entry of the administration navigation for the list of permission hints (07 section 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Permission hints'**
+  String get adminNavHints;
+
+  /// Entry of the administration navigation for the list of access that expires soon (07 section 9.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Expiring soon'**
+  String get adminNavExpiring;
+
+  /// Title of the list of permission hints (07 section 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Permission hints'**
+  String get hintsTitle;
+
+  /// Explanation under the title of the permission hints (07 sections 6 and 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Hints from the current permissions: what people can learn through agents and which access grants have no effect. A hint is not a block.'**
+  String get hintsIntro;
+
+  /// Label of the filter that chooses the instance or one space for the permission hints and the expiring access.
+  ///
+  /// In en, this message translates to:
+  /// **'Show for'**
+  String get hintsScopeLabel;
+
+  /// Choice of the scope filter: the whole instance (owners only; the server refuses others).
+  ///
+  /// In en, this message translates to:
+  /// **'Whole instance'**
+  String get hintsScopeInstance;
+
+  /// Label of the filter that keeps one kind of permission hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get hintsKindLabel;
+
+  /// Choice of the kind filter that shows every kind of permission hint.
+  ///
+  /// In en, this message translates to:
+  /// **'All kinds'**
+  String get hintsKindAll;
+
+  /// Kind of a permission hint: a person can learn content through an agent (07 section 6).
+  ///
+  /// In en, this message translates to:
+  /// **'Read horizon (H1)'**
+  String get hintsKindH1;
+
+  /// Kind of a permission hint: an access grant whose subject is disabled or deleted (07 section 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Access grant to a disabled or deleted account'**
+  String get hintsKindGrantToDisabled;
+
+  /// Kind of a permission hint: an access grant with the level trigger whose triggering SR2 or SR3 blocks (07 section 9.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger agents without effect'**
+  String get hintsKindTriggerBlocked;
+
+  /// Kind of a permission hint: an agent in mode personal with its trigger set (07 section 9.5, I1).
+  ///
+  /// In en, this message translates to:
+  /// **'Agent in Personal mode'**
+  String get hintsKindAgentPersonal;
+
+  /// Kind of a permission hint this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Other hint'**
+  String get hintsKindUnknown;
+
+  /// Sentence of the hint H1 (07 section 6): the person may trigger the agent, which reads a channel the person may not read; channelPath is for example 'Marketing/Intern'.
+  ///
+  /// In en, this message translates to:
+  /// **'{person} can learn content of {channelPath} through agent {agent}.'**
+  String hintsH1Text(String person, String channelPath, String agent);
+
+  /// Sentence of the hint for an access grant whose subject is disabled or deleted; target is for example 'Channel Marketing/Intern', level the level with its capabilities.
+  ///
+  /// In en, this message translates to:
+  /// **'{subject} is disabled or deleted and still holds an access grant on {target}: {level}.'**
+  String hintsGrantToDisabledText(String subject, String target, String level);
+
+  /// Sentence of the hint for an access grant with the level trigger whose triggering a guard rule blocks; the rules follow as lines.
+  ///
+  /// In en, this message translates to:
+  /// **'{subject} has the level Trigger agents on {target} but cannot trigger an agent there.'**
+  String hintsTriggerBlockedText(String subject, String target);
+
+  /// Line under a blocked trigger access grant: the guard rule SR2 (tool class, 07 section 5) blocks it.
+  ///
+  /// In en, this message translates to:
+  /// **'SR2: an agent there has a tool class that only owners and people with a ready dev environment of their own may trigger.'**
+  String get hintsRuleSr2;
+
+  /// Line under a blocked trigger access grant: the guard rule SR3 (dev isolation, 07 section 5) blocks it.
+  ///
+  /// In en, this message translates to:
+  /// **'SR3: a channel there is bound to a project; a run of a person who is not an owner needs a ready dev environment of their own.'**
+  String get hintsRuleSr3;
+
+  /// Sentence of the hint for an agent in mode personal with its credential holder (10 section 13).
+  ///
+  /// In en, this message translates to:
+  /// **'Agent {agent} uses Personal mode on the subscription of {holder}.'**
+  String hintsAgentPersonalText(String agent, String holder);
+
+  /// Sentence of the hint for an agent in mode personal without a credential holder.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent {agent} uses Personal mode and has no holder.'**
+  String hintsAgentPersonalNoHolder(String agent);
+
+  /// Second sentence of the hint for an agent in mode personal: its trigger set, names separated by commas (10 section 5.4, I1).
+  ///
+  /// In en, this message translates to:
+  /// **'I1 asks that only the holder can trigger it. These people can trigger it now: {people}.'**
+  String hintsAgentPersonalSet(String people);
+
+  /// Second sentence of the hint for an agent in mode personal whose trigger set is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'I1 asks that only the holder can trigger it. Nobody can trigger it now.'**
+  String get hintsAgentPersonalNobody;
+
+  /// Text of a permission hint of a kind this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not know this hint yet.'**
+  String get hintsUnknownText;
+
+  /// Shown when the list of permission hints is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'No permission hints.'**
+  String get hintsEmpty;
+
+  /// Action of a hint or an expiring access grant that opens 'Who has access?' for its channel or space (01 section 5.2 A3).
+  ///
+  /// In en, this message translates to:
+  /// **'Explain'**
+  String get hintsExplain;
+
+  /// Action that replaces an expiring access grant with a new one (07 section 9.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Extend'**
+  String get hintsExtend;
+
+  /// Action of the hint for an agent in mode personal that opens the page of the agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Open agent'**
+  String get hintsOpenAgent;
+
+  /// Button that closes the dialog with 'Who has access?' opened from a hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get hintsClose;
+
+  /// Title of the grant wizard when it extends an access grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Extend the access grant for {name}'**
+  String hintsExtendTitle(String name);
+
+  /// Note in the grant wizard when it extends an access grant (07 section 9.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Extending creates a new access grant with a new reason and the last day you enter, then revokes the old one.'**
+  String get hintsExtendNote;
+
+  /// Notice after an access grant was extended.
+  ///
+  /// In en, this message translates to:
+  /// **'The access grant for {name} was extended: the new one applies, the old one is revoked.'**
+  String hintsExtended(String name);
+
+  /// Shown when extending created the new access grant and the revocation of the old one failed; reason is the server's reason.
+  ///
+  /// In en, this message translates to:
+  /// **'The new access grant for {name} applies, but the old one could not be revoked: {reason}'**
+  String hintsExtendRevokeFailed(String name, String reason);
+
+  /// Title of the list of access that expires soon (07 section 9.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Expiring soon'**
+  String get expiringTitle;
+
+  /// Explanation under the title of the list of access that expires soon (07 section 9.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Access grants, group memberships and tokens of agents and apps that end soon. Extending replaces an access grant with a new one; a token is renewed by creating a new one and revoking the old one.'**
+  String get expiringIntro;
+
+  /// Shown when no access expires soon.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing expires soon.'**
+  String get expiringEmpty;
+
+  /// Kind of an expiring access: an access grant.
+  ///
+  /// In en, this message translates to:
+  /// **'Access grant'**
+  String get expiringKindGrant;
+
+  /// Kind of an expiring access: a group membership.
+  ///
+  /// In en, this message translates to:
+  /// **'Group membership'**
+  String get expiringKindMembership;
+
+  /// Kind of an expiring access: an API token of an agent or an app.
+  ///
+  /// In en, this message translates to:
+  /// **'Token'**
+  String get expiringKindToken;
+
+  /// Kind of an expiring access this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Other access'**
+  String get expiringKindUnknown;
+
+  /// An expiring access grant: subject, target (for example 'Channel Marketing/Intern') and the level with its capabilities.
+  ///
+  /// In en, this message translates to:
+  /// **'{subject} on {target}: {level}'**
+  String expiringGrantText(String subject, String target, String level);
+
+  /// An expiring group membership.
+  ///
+  /// In en, this message translates to:
+  /// **'{person} in the group {group}'**
+  String expiringMembershipText(String person, String group);
+
+  /// An expiring API token of an agent (never its value).
+  ///
+  /// In en, this message translates to:
+  /// **'Token of the agent {agent}'**
+  String expiringAgentTokenText(String agent);
+
+  /// An expiring API token of an app (never its value).
+  ///
+  /// In en, this message translates to:
+  /// **'Token of the app {app}'**
+  String expiringAppTokenText(String app);
+
+  /// Note under an expiring token of an app: the administration has no token screen for apps yet, and a token is renewed by creating a new one and revoking the old one (08 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'There is no token screen for apps here yet: create a new token for the app, switch the app over, then revoke the old one.'**
+  String get expiringAppTokenNote;
+
+  /// Text of an expiring access of a kind this version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'This version does not know this kind of access yet.'**
+  String get expiringUnknownText;
+
+  /// Action of an expiring group membership that opens the group with its members.
+  ///
+  /// In en, this message translates to:
+  /// **'Open group'**
+  String get expiringOpenGroup;
+
+  /// Action of an expiring agent token that opens the page of the agent with its tokens (08 section 12).
+  ///
+  /// In en, this message translates to:
+  /// **'Renew token'**
+  String get expiringRenewToken;
 }
 
 class _AppLocalizationsDelegate

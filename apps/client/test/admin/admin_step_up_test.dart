@@ -88,6 +88,24 @@ void main() {
       );
       expect(adminLocationOf(['admin', 'incoming-webhooks', 'x']), isNull);
       expect(adminLocationOf(['admin', 'statistics']), isNull);
+      // The lists of 07 9.4 and 9.5 (M6-07) have no detail.
+      expect(
+        adminLocationOf(['admin', 'hints']),
+        const AdminLocation(AdminSection.hints),
+      );
+      expect(
+        adminLocationOf(['admin', 'expiring']),
+        const AdminLocation(AdminSection.expiring),
+      );
+      expect(adminLocationOf(['admin', 'hints', 'x']), isNull);
+      expect(
+        adminPathOf(const AdminLocation(AdminSection.hints)),
+        '/admin/hints',
+      );
+      expect(
+        adminPathOf(const AdminLocation(AdminSection.expiring)),
+        '/admin/expiring',
+      );
       expect(adminLocationOf(['admin', 'devices', 'x']), isNull);
       expect(
         adminPathOf(const AdminLocation(AdminSection.groups, id: 'g')),

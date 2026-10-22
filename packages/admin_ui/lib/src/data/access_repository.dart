@@ -565,6 +565,233 @@ final class ViewAsResult {
   final List<ViewAsItem> channels;
 }
 
+/// The kind of a permission hint (`PermissionHintKind`, 07 9.5), in the order of the list.
+enum AccessHintKind {
+  /// A person of an agent's trigger set can learn content of a channel through the agent that
+  /// the person may not read (H1, 07 6).
+  h1ReadHorizon('h1_read_horizon'),
+
+  /// A grant whose subject is disabled (SR7).
+  grantToDisabled('grant_to_disabled'),
+
+  /// A grant `trigger` whose triggering SR2 or SR3 blocks.
+  triggerBlocked('trigger_blocked'),
+
+  /// An agent in mode `personal` with its trigger set (I1).
+  agentPersonal('agent_personal'),
+
+  /// A kind this build does not know.
+  unknown('unknown');
+
+  const AccessHintKind(this.wire);
+
+  /// The name on the wire, for example `h1_read_horizon`.
+  final String wire;
+
+  /// The kinds the filter of the list offers, in the order of the list.
+  static const List<AccessHintKind> listed = [
+    h1ReadHorizon,
+    grantToDisabled,
+    triggerBlocked,
+    agentPersonal,
+  ];
+}
+
+/// One permission hint (`PermissionHint`, 07 9.5): the IDs the [kind] names, unchanged.
+final class AccessHint {
+  /// Creates the hint.
+  const AccessHint({
+    required this.kind,
+    this.agentId,
+    this.personId,
+    this.spaceId,
+    this.channelId,
+    this.grant,
+    this.rules = const [],
+    this.credentialHolderId,
+    this.triggerSet = const [],
+  });
+
+  /// The kind.
+  final AccessHintKind kind;
+
+  /// The agent of H1 and of `agent_personal`, or null.
+  final String? agentId;
+
+  /// The person of H1, or null.
+  final String? personId;
+
+  /// The space of the channel of H1, or null.
+  final String? spaceId;
+
+  /// The channel of H1 the person may not read, or null.
+  final String? channelId;
+
+  /// The grant of `grant_to_disabled` and `trigger_blocked`, or null.
+  final AdminGrant? grant;
+
+  /// The rules that block a `trigger_blocked` grant: `sr2` (tool class), `sr3` (dev isolation).
+  final List<String> rules;
+
+  /// The credential holder of an `agent_personal` agent, or null when it has none.
+  final String? credentialHolderId;
+
+  /// The people who may trigger an `agent_personal` agent (I1 asks for exactly the holder).
+  final List<String> triggerSet;
+}
+
+/// The names a page of hints or of expiring access names (`AccessLabels`): principals, groups,
+/// spaces and channels, as the administration lists show them. An ID without a label shows as
+/// it is.
+final class AccessPageLabels {
+  /// Creates the labels.
+  const AccessPageLabels({
+    this.principals = const {},
+    this.groups = const {},
+    this.spaces = const {},
+    this.channels = const {},
+  });
+
+  /// The principals by ID.
+  final Map<String, AccessPrincipal> principals;
+
+  /// The group names by ID.
+  final Map<String, String> groups;
+
+  /// The space names by ID.
+  final Map<String, String> spaces;
+
+  /// The channels by ID: their space and name.
+  final Map<String, ({String spaceId, String name})> channels;
+
+  /// The display name of the principal [id], or [id].
+  String principal(String id) => principals[id]?.displayName ?? id;
+
+  /// The name of the group [id], or [id].
+  String group(String id) => groups[id] ?? id;
+
+  /// The name of the space [id], or [id].
+  String space(String id) => spaces[id] ?? id;
+
+  /// The path of the channel [id] (`Marketing/Intern`), or [id].
+  String channelPath(String id) => target(AdminTargetKind.channel, id).path;
+
+  /// The target of [kind] and [id] with the names of the page; the instance for a null [kind]
+  /// or [AdminTargetKind.instance], the ID as the name where the page names none (a host).
+  AdminTarget target(AdminTargetKind? kind, String? id) {
+    if (kind == null || kind == AdminTargetKind.instance || id == null) {
+      return AdminTarget.instance;
+    }
+    if (kind == AdminTargetKind.channel) {
+      final c = channels[id];
+      if (c == null) return AdminTarget(kind, id: id, name: id);
+      return AdminTarget(
+        kind,
+        id: id,
+        name: c.name,
+        spaceName: space(c.spaceId),
+      );
+    }
+    return AdminTarget(
+      kind,
+      id: id,
+      name: kind == AdminTargetKind.space ? space(id) : id,
+    );
+  }
+
+  /// These labels joined with those of a later page; a name of [next] wins.
+  AccessPageLabels merge(AccessPageLabels next) => AccessPageLabels(
+    principals: {...principals, ...next.principals},
+    groups: {...groups, ...next.groups},
+    spaces: {...spaces, ...next.spaces},
+    channels: {...channels, ...next.channels},
+  );
+}
+
+/// One page of "Permission hints" (`PermissionHintPage`).
+final class AccessHintPage {
+  /// Creates the page.
+  const AccessHintPage(this.items, this.labels, {this.nextCursor});
+
+  /// The hints in the server's order.
+  final List<AccessHint> items;
+
+  /// The names of the page.
+  final AccessPageLabels labels;
+
+  /// The cursor of the next page, or null on the last one.
+  final String? nextCursor;
+}
+
+/// The kind of an access that expires soon (`ExpiringAccessItem.kind`, 07 9.4).
+enum ExpiringKind {
+  /// A grant.
+  grant,
+
+  /// A group membership.
+  membership,
+
+  /// An API token of an agent or an app.
+  token,
+
+  /// A kind this build does not know.
+  unknown,
+}
+
+/// One access that expires within `authz.expiry_reminder_lead` (`ExpiringAccessItem`).
+final class ExpiringEntry {
+  /// Creates the entry.
+  const ExpiringEntry({
+    required this.kind,
+    required this.expiresAt,
+    this.grant,
+    this.membershipId,
+    this.groupId,
+    this.userId,
+    this.tokenId,
+    this.principalId,
+  });
+
+  /// The kind.
+  final ExpiringKind kind;
+
+  /// When the access ends.
+  final DateTime expiresAt;
+
+  /// The grant of kind [ExpiringKind.grant], or null.
+  final AdminGrant? grant;
+
+  /// The membership of kind [ExpiringKind.membership], or null.
+  final String? membershipId;
+
+  /// The group of the membership, or null.
+  final String? groupId;
+
+  /// The member, or null.
+  final String? userId;
+
+  /// The token of kind [ExpiringKind.token], or null (never its value).
+  final String? tokenId;
+
+  /// The agent or app that holds the token, or null.
+  final String? principalId;
+}
+
+/// One page of "Expiring soon" (`ExpiringAccessPage`).
+final class ExpiringPage {
+  /// Creates the page.
+  const ExpiringPage(this.items, this.labels, {this.nextCursor});
+
+  /// The entries, ordered by expiry.
+  final List<ExpiringEntry> items;
+
+  /// The names of the page.
+  final AccessPageLabels labels;
+
+  /// The cursor of the next page, or null on the last one.
+  final String? nextCursor;
+}
+
 /// The calls of the grant screens; a changing call carries the [purpose] text the step-up
 /// dialog shows when the server answers `401 step_up_required` (05: `grant.create`,
 /// `grant.revoke` and `access.view_as` have step-up; `access.preview` has none).
@@ -606,6 +833,22 @@ abstract interface class AccessRepository {
 
   /// The read-only snapshot of what [userId] sees (`viewAsUser`, owners only, step-up).
   Future<ViewAsResult> viewAs(String userId, {required String purpose});
+
+  /// One page of "Permission hints" (`listPermissionHints`, 07 9.5; `access.hints.read`, no
+  /// step-up): of the space [spaceId], or of the instance without one; [kind] keeps one kind,
+  /// [cursor] continues after a page. The server decides what the caller may see (`403`,
+  /// `404`).
+  Future<AccessHintPage> permissionHints({
+    String? spaceId,
+    AccessHintKind? kind,
+    String? cursor,
+  });
+
+  /// One page of "Expiring soon" (`listExpiringAccess`, 07 9.4; `access.hints.read`, no
+  /// step-up): the grants, memberships and tokens that expire within
+  /// `authz.expiry_reminder_lead`, of the space [spaceId] or of the instance without one;
+  /// [cursor] continues after a page.
+  Future<ExpiringPage> expiringAccess({String? spaceId, String? cursor});
 }
 
 /// [AccessRepository] over the generated client of `api_client`.
@@ -821,6 +1064,99 @@ final class ApiAccessRepository implements AccessRepository {
           ],
         );
       });
+
+  @override
+  Future<AccessHintPage> permissionHints({
+    String? spaceId,
+    AccessHintKind? kind,
+    String? cursor,
+  }) => _call(() async {
+    final page = (await _access.listPermissionHints(
+      spaceId: spaceId,
+      cursor: cursor,
+      kind: switch (kind) {
+        AccessHintKind.h1ReadHorizon => PermissionHintKind.h1ReadHorizon,
+        AccessHintKind.grantToDisabled => PermissionHintKind.grantToDisabled,
+        AccessHintKind.triggerBlocked => PermissionHintKind.triggerBlocked,
+        AccessHintKind.agentPersonal => PermissionHintKind.agentPersonal,
+        null || AccessHintKind.unknown => null,
+      },
+    )).data!;
+    return AccessHintPage(
+      [
+        for (final h in page.items)
+          AccessHint(
+            kind: switch (h.kind) {
+              PermissionHintKind.h1ReadHorizon => AccessHintKind.h1ReadHorizon,
+              PermissionHintKind.grantToDisabled =>
+                AccessHintKind.grantToDisabled,
+              PermissionHintKind.triggerBlocked =>
+                AccessHintKind.triggerBlocked,
+              PermissionHintKind.agentPersonal => AccessHintKind.agentPersonal,
+              _ => AccessHintKind.unknown,
+            },
+            agentId: h.agentId,
+            personId: h.personId,
+            spaceId: h.spaceId,
+            channelId: h.channelId,
+            grant: h.grant == null ? null : _grant(h.grant!),
+            rules: [
+              for (final r in h.rules ?? const <PermissionHintRulesEnum>[])
+                ?switch (r) {
+                  PermissionHintRulesEnum.sr2 => 'sr2',
+                  PermissionHintRulesEnum.sr3 => 'sr3',
+                  _ => null,
+                },
+            ],
+            credentialHolderId: h.credentialHolderId,
+            triggerSet: h.triggerSet?.toList() ?? const [],
+          ),
+      ],
+      _labels(page.labels),
+      nextCursor: page.nextCursor,
+    );
+  });
+
+  @override
+  Future<ExpiringPage> expiringAccess({String? spaceId, String? cursor}) =>
+      _call(() async {
+        final page = (await _access.listExpiringAccess(
+          spaceId: spaceId,
+          cursor: cursor,
+        )).data!;
+        return ExpiringPage(
+          [
+            for (final e in page.items)
+              ExpiringEntry(
+                kind: switch (e.kind) {
+                  ExpiringAccessItemKindEnum.grant => ExpiringKind.grant,
+                  ExpiringAccessItemKindEnum.membership =>
+                    ExpiringKind.membership,
+                  ExpiringAccessItemKindEnum.token => ExpiringKind.token,
+                  _ => ExpiringKind.unknown,
+                },
+                expiresAt: e.expiresAt,
+                grant: e.grant == null ? null : _grant(e.grant!),
+                membershipId: e.membershipId,
+                groupId: e.groupId,
+                userId: e.userId,
+                tokenId: e.tokenId,
+                principalId: e.principalId,
+              ),
+          ],
+          _labels(page.labels),
+          nextCursor: page.nextCursor,
+        );
+      });
+
+  static AccessPageLabels _labels(AccessLabels l) => AccessPageLabels(
+    principals: {for (final p in l.principals) p.id: _principal(p)},
+    groups: {for (final g in l.groups) g.id: g.name},
+    spaces: {for (final s in l.spaces) s.id: s.name},
+    channels: {
+      for (final c in l.channels) c.id: (spaceId: c.spaceId, name: c.name),
+    },
+  );
 
   static GrantCreate _create(GrantRequest r, {I1Resolution? resolveI1}) =>
       GrantCreate(

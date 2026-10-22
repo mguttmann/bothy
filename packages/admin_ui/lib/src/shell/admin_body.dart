@@ -22,6 +22,8 @@ import '../devices/waiting_devices.dart';
 import '../grants/grants_list.dart';
 import '../groups/group_detail.dart';
 import '../groups/groups_list.dart';
+import '../hints/expiring_access_view.dart';
+import '../hints/permission_hints_view.dart';
 import '../hosts/host_page.dart';
 import '../hosts/hosts_list.dart';
 import '../incoming_webhooks/incoming_webhooks_view.dart';
@@ -40,8 +42,9 @@ import 'admin_routes.dart';
 /// [agentPresence] streams the live presence of an agent (null: the presence of `getAgent`);
 /// [maxWidth] limits the content (880 on the desktop; null fills the width, for the browser);
 /// [onViewAs] starts "View as person" in the host from [PersonDetail] and from "Who has
-/// access?" of [GrantsList] (null: the dialog of the desktop); [pickManifest] is the host's file
-/// dialog for the manifest of an app (null: no install and no update).
+/// access?" of [GrantsList], [PermissionHintsView] and [ExpiringAccessView] (null: the dialog
+/// of the desktop); [pickManifest] is the host's file dialog for the manifest of an app (null: no
+/// install and no update).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -146,6 +149,22 @@ class AdminBody extends StatelessWidget {
         clock: clock,
         onTarget: (key) =>
             onNavigate(AdminLocation(AdminSection.grants, id: key)),
+        onChanged: changed,
+        onViewAs: onViewAs,
+      ),
+      AdminSection.hints => PermissionHintsView(
+        repository: r,
+        onNavigate: onNavigate,
+        timeZone: timeZone,
+        clock: clock,
+        onChanged: changed,
+        onViewAs: onViewAs,
+      ),
+      AdminSection.expiring => ExpiringAccessView(
+        repository: r,
+        onNavigate: onNavigate,
+        timeZone: timeZone,
+        clock: clock,
         onChanged: changed,
         onViewAs: onViewAs,
       ),

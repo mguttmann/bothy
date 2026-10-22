@@ -487,6 +487,11 @@ final class FakeWorld {
   /// A larger backlog yields `resync_required` `too_far_behind` (`sync.catchup_max_events`).
   int catchupMaxEvents = 50000;
 
+  /// How long before its expiry a grant, a membership or an agent token shows in "Expiring
+  /// soon" (`authz.expiry_reminder_lead`, 07 9.4 and 14); the default of the specification, a
+  /// test may shorten it.
+  Duration expiryReminderLead = const Duration(hours: 48);
+
   /// People and agents by ID.
   final Map<String, FakePerson> people = {};
 
@@ -495,6 +500,17 @@ final class FakeWorld {
 
   /// The members (`GroupMember`) of each group, by group and person ID.
   final Map<String, Map<String, JsonMap>> groupMembers = {};
+
+  final Map<String, String> _membershipIds = {};
+
+  /// The ID of the membership of [userId] in [groupId] (`group_memberships.id`, 03), which
+  /// "Expiring soon" names but the API `GroupMember` does not carry, so [groupMembers] stays as
+  /// the group handlers return it.
+  ///
+  /// Assigned with [nextId] on the first call and kept for the life of the world; unlike the
+  /// server's new row, a member removed and added again keeps the ID (a simplification).
+  String membershipId(String groupId, String userId) =>
+      _membershipIds.putIfAbsent('$groupId|$userId', nextId);
 
   /// The grants by ID as the API returns them (`Grant`, brief M4-27); a revoked grant keeps
   /// its `revoked_at`.

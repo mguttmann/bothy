@@ -8,7 +8,9 @@ at `/admin`, `/admin/<section>` and `/admin/<section>/<id>` (`lib/admin/admin_ro
 over the REST client of the signed-in session; grants (M4-27) at `/admin/grants/<target key>`
 with the grant wizard, "Who has access?" and "View as person"; hosts (M4-37) at
 `/admin/hosts` and `/admin/hosts/<id>` for owners; agents (M4-28) at `/admin/agents` and
-`/admin/agents/<id>`, whose page gets the agent's presence from the engine's `EphemeralStore`. iOS and Android follow in M5.
+`/admin/agents/<id>`, whose page gets the agent's presence from the engine's `EphemeralStore`;
+the permission hints and the access that expires soon (M6-07) at `/admin/hints` and
+`/admin/expiring`. iOS and Android follow in M5.
 
 Flutter app for macOS and Windows, later iOS and Android. One code base for interface and
 logic; native code only where the system requires it.
