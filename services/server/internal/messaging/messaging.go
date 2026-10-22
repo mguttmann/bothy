@@ -397,6 +397,11 @@ type Messages interface {
 	// lock of LockCard. It returns the new version. Errors: internal outside a unit of work or for
 	// a deleted or unknown message.
 	ComponentsChanged(ctx context.Context, messageID ids.ID) (int64, error)
+	// CardFits checks that the card, with its components as stored now in the ambient unit of
+	// work, keeps the size reserve of createMessage for every later message.updated (D-M2-15-26);
+	// runs calls it when updateComponent writes a new definition. Errors: 400 validation_failed
+	// too_long on /definition; internal for a missing or deleted card.
+	CardFits(ctx context.Context, messageID ids.ID) error
 	// PrincipalOf returns the public reference of a principal the way TriggerMessageOf returns
 	// the author of a message (M2-15 design note 11 c: triggered_by of a run an interaction
 	// opened). It never authorizes. Errors: internal for an unknown principal.

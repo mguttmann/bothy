@@ -24,6 +24,7 @@ import (
 type CardMessages interface {
 	LockCard(ctx context.Context, messageID ids.ID) (messaging.CardFacts, error)
 	ComponentsChanged(ctx context.Context, messageID ids.ID) (int64, error)
+	CardFits(ctx context.Context, messageID ids.ID) error
 	PrincipalOf(ctx context.Context, principalID ids.ID) (messaging.PrincipalRef, error)
 }
 
@@ -304,20 +305,36 @@ func (s *Service) updateComponent(ctx context.Context, row ComponentRow, cmd run
 	if err != nil || !changed {
 		return portComponent(cur), err
 	}
-	updated, err := s.d.Components.SetComponent(ctx, w)
+	updated, err := s.writeComponent(ctx, row.MessageID, cur, w, def != nil)
 	if err != nil {
 		return runs.Component{}, err
 	}
-	if _, err := s.d.Cards.ComponentsChanged(ctx, row.MessageID); err != nil {
-		return runs.Component{}, err
+	return portComponent(updated), nil
+}
+
+// writeComponent stores the change w of the locked component cur of the card message: with a new
+// definition the card must keep its size reserve (D-M2-15-26; the unit of work rolls the write
+// back), then the message version rises with message.updated, and a reactivated component is
+// scheduled to expire again (design note 15 a).
+func (s *Service) writeComponent(ctx context.Context, message ids.ID, cur ComponentRow, w ComponentWrite, newDefinition bool) (ComponentRow, error) {
+	updated, err := s.d.Components.SetComponent(ctx, w)
+	if err != nil {
+		return ComponentRow{}, err
 	}
-	if w.State == domain.ComponentActive && cur.State != domain.ComponentActive {
-		// A reactivated component must expire again (design note 15 a).
-		if err := s.scheduleComponentExpiry(ctx, row.MessageID, updated.ExpiresAt); err != nil {
-			return runs.Component{}, err
+	if newDefinition {
+		if err := s.d.Cards.CardFits(ctx, message); err != nil {
+			return ComponentRow{}, err
 		}
 	}
-	return portComponent(updated), nil
+	if _, err := s.d.Cards.ComponentsChanged(ctx, message); err != nil {
+		return ComponentRow{}, err
+	}
+	if w.State == domain.ComponentActive && cur.State != domain.ComponentActive {
+		if err := s.scheduleComponentExpiry(ctx, message, updated.ExpiresAt); err != nil {
+			return ComponentRow{}, err
+		}
+	}
+	return updated, nil
 }
 
 // componentChange decides the write of updateComponent for the locked component cur and the

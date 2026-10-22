@@ -260,9 +260,12 @@ Card rules of `createMessage` (`cards.go` `cardRules`, after the decoder, D-M2-1
 (`required` on `/components`); only agents send cards (people `invalid` on `/components`, apps
 `not_enabled` until M2-25); `run_id` is accepted only with `kind = card` (`not_enabled` otherwise
 until M2-19); `content_md` keeps the rule of M1-56. Then `ComponentWriter.Check` and the size rule:
-the `message.created` payload of the card with every component, an empty content and the longest
-form of every ID and number must fit `sync.event_payload_max_bytes`, else `too_long` on
-`/components`, because components cannot be cut (04 section 2.2 rule 2). In the unit of work the
+the largest `message.updated` payload of the card (every component disabled, used and expiring,
+`reply_to_message_id`, `edited_at`, pinned, the most distinct reactions of the longest symbol),
+with an empty content and the longest form of every ID and number, must fit
+`sync.event_payload_max_bytes`, else `too_long` on `/components`, because components cannot be cut
+(04 section 2.2 rule 2; D-M2-15-26). `Messages.CardFits` checks the same reserve for
+`updateComponent` after a new definition is written. In the unit of work the
 message row is inserted first, then `Attach`, then `message.created` with the components is
 appended and `MessagePosted` is published (in that order, D-M2-05-3); `201` carries them, a replay `200` the current ones. `messages.run_id` stays NULL for a
 card (D-M2-15-6).

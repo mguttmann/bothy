@@ -5,6 +5,8 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -55,7 +57,7 @@ func cardField(pointer, code, detail string) error {
 }
 
 // checkCard checks the components of a card through the source port of runs and the size rule
-// (M2-15 design note 6 a): the message.created payload of the card with every component must fit
+// (M2-15 design note 6 a, D-M2-15-26): the largest message.updated payload of the card must fit
 // sync.event_payload_max_bytes even after the content cut of M1-56 D7, because components cannot
 // be cut (04 2.2 rule 2). handles are the mention handles of the content, each of which may become
 // a mention. Errors: 400 validation_failed (not_enabled without the port, the findings of Check,
@@ -76,38 +78,75 @@ func (s *Service) checkCard(ctx context.Context, a actor.Actor, cmd messaging.Cr
 	if err != nil {
 		return nil, err
 	}
-	if !s.cardFits(author, in, checked.Components, len(handles)) {
+	if !s.cardFits(author, in.RunID, checked.Components, len(handles), in.Now) {
 		return nil, cardField("/components", fieldTooLong, "the card does not fit sync.event_payload_max_bytes")
 	}
 	return &checked, nil
 }
 
-// cardFits reports whether the message.created payload of a card with the components comps fits
-// sync.event_payload_max_bytes with an empty content (the content cut of M1-56 D7 can shorten
-// everything else): every ID and number of the payload takes its longest form, and every handle
-// of the content counts as a mention.
-func (s *Service) cardFits(author messaging.PrincipalRef, in messaging.CardInput, comps []messaging.Component, mentions int) bool {
+// cardFits reports whether the largest message.updated payload a card with the components comps
+// can reach fits sync.event_payload_max_bytes with an empty content (the content cut of M1-56 D7
+// can shorten everything else; components cannot be cut, 04 2.2 rule 2). Every ID, number and
+// time takes its longest form, every handle of the content counts as a mention, and the card
+// carries what a later message.updated may add (D-M2-15-26): reply_to_message_id, edited_at,
+// pinned, reaction.max_distinct_per_message reactions of reaction.emoji_max_bytes each, and on
+// every component run_id when bound, state disabled, expires_at, used_by and used_at. A card that
+// fits here keeps fitting through clicks, reactions, edits, expiry and the end of its run.
+func (s *Service) cardFits(author messaging.PrincipalRef, runID ids.ID, comps []messaging.Component, mentions int, now time.Time) bool {
 	placeholder := ids.New()
-	now := in.Now
 	m := messaging.Message{
 		ID: placeholder, ThreadID: placeholder, ChannelID: placeholder, ThreadSeq: maxSafeInteger, Author: author, ClientMsgID: placeholder,
 		Origin: string(domain.OriginAgent), Kind: string(domain.KindCard), ContentFormat: domain.ContentFormat, Version: maxSafeInteger,
-		CreatedAt: now, MentionIDs: make([]ids.ID, mentions), Reactions: []messaging.ReactionCount{}, MyReactions: []string{},
-		ContentTruncated: true,
+		CreatedAt: now, EditedAt: now, ReplyToID: placeholder, Pinned: true, MentionIDs: make([]ids.ID, mentions),
+		Reactions: make([]messaging.ReactionCount, s.cfg.MaxDistinctReactions), MyReactions: []string{}, ContentTruncated: true,
 	}
 	for i := range m.MentionIDs {
 		m.MentionIDs[i] = placeholder
 	}
+	for i := range m.Reactions {
+		m.Reactions[i] = messaging.ReactionCount{Emoji: strings.Repeat("x", s.cfg.EmojiMaxBytes), Count: maxSafeInteger}
+	}
 	m.Components = make([]messaging.Component, len(comps))
 	for i, c := range comps {
-		c.ID, c.Version = placeholder, maxSafeInteger
-		if !in.RunID.IsZero() {
-			c.RunID = in.RunID
+		c.ID, c.Version, c.State = placeholder, maxSafeInteger, longestComponentState
+		c.ExpiresAt, c.UsedAt, c.UsedBy = now, now, placeholder
+		if !runID.IsZero() {
+			c.RunID = runID
 		}
 		m.Components[i] = c
 	}
 	p, err := payload(messageBody(m))
 	return err == nil && len(p) < s.cfg.EventPayloadMaxBytes
+}
+
+// longestComponentState is the longest value of schema ComponentState (active, used, expired,
+// disabled).
+const longestComponentState = "disabled"
+
+// CardFits implements messaging.Messages (D-M2-15-26): whether the stored card messageID, with its
+// components as they are now in the ambient unit of work, still fits the reserve of cardFits;
+// updateComponent calls it after a new definition is written. Errors: 400 validation_failed
+// too_long on /definition when it does not fit; internal for a missing or deleted card.
+func (s *Service) CardFits(ctx context.Context, messageID ids.ID) error {
+	cur, found, err := s.d.Store.Message(ctx, messageID)
+	if err != nil {
+		return err
+	}
+	if !found || !cur.DeletedAt.IsZero() {
+		return errs.New(errs.CodeInternalError, "messaging: a size check of a missing or deleted card")
+	}
+	v, err := s.base(ctx, cur)
+	if err != nil {
+		return err
+	}
+	list := []messaging.Message{v}
+	if err := s.attachComponents(ctx, list); err != nil {
+		return err
+	}
+	if !s.cardFits(v.Author, ids.ID{}, list[0].Components, len(v.MentionIDs), s.now()) {
+		return cardField("/definition", fieldTooLong, "the card does not fit sync.event_payload_max_bytes")
+	}
+	return nil
 }
 
 // maxSafeInteger is the largest integer the API carries (2^53 - 1, 06 section 2), the longest
