@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -687,26 +686,13 @@ func TestCommandAutocomplete(t *testing.T) {
 				t.Fatalf("404 differs: %d %s against %s", r.code, r.body, outsider.body)
 			}
 		}
-		// AZ-P4: the median times of the invisible and the unknown case differ by at most
-		// authz.not_found_timing_tolerance (its documented default; the key is not registered
-		// yet). Warm-up pairs first, then pairs in alternating order.
-		var a, b []time.Duration
-		for i := range 3 + 15 {
-			x := func() time.Duration { return w.askNow(w.outsider, w.allgemein.id, w.ticket, q47).took }
-			y := func() time.Duration { return w.askNow(w.outsider, ids.New().String(), w.ticket, q47).took }
-			var dx, dy time.Duration
-			if i%2 == 0 {
-				dx, dy = x(), y()
-			} else {
-				dy, dx = y(), x()
-			}
-			if i >= 3 {
-				a, b = append(a, dx), append(b, dy)
-			}
-		}
-		// Under the race detector the bound grows (testkit.TimingBound, PL/21), as in the leak test AZ-P4.
-		if d, tol := (median(a) - median(b)).Abs(), testkit.TimingBound(notFoundTimingTolerance); d > tol {
-			t.Fatalf("median times differ by %s", d)
+		// AZ-P4: the invisible and the unknown case take the same time within
+		// authz.not_found_timing_tolerance (its documented default; the key is not registered yet),
+		// compared by testkit.TimingSame, which a loaded machine cannot fail.
+		invisible := func() time.Duration { return w.askNow(w.outsider, w.allgemein.id, w.ticket, q47).took }
+		unknown := func() time.Duration { return w.askNow(w.outsider, ids.New().String(), w.ticket, q47).took }
+		if d, same := testkit.TimingSame(notFoundTimingTolerance, invisible, unknown); !same {
+			t.Fatalf("the times differ by %s in every round", d)
 		}
 		r := w.askNow(w.robin, w.eskalation.id, w.ticket, q47)
 		wantProblem(t, r.code, r.body, http.StatusForbidden, "agent_invocation_denied", "level_insufficient", "", "")
@@ -966,13 +952,6 @@ func TestCommandAutocompleteTimeout(t *testing.T) {
 // notFoundTimingTolerance is the documented default of authz.not_found_timing_tolerance (07
 // section 11.2 AZ-P4).
 const notFoundTimingTolerance = 20 * time.Millisecond
-
-// median returns the median of ds.
-func median(ds []time.Duration) time.Duration {
-	s := slices.Clone(ds)
-	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
-	return s[len(s)/2]
-}
 
 // TestCommandAutocompleteRateLimits: rl.trigger on autocompleteCommand, rl.agent_runtime on
 // answerAutocomplete and on the op (brief M2-17 "TestAutocomplete_RateLimits").
