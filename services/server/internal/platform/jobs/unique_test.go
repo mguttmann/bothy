@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/internal/fakemodule"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // uniqueRegistry registers fakemodule.echo and fakemodule.keyed with recorders on echo and keyed.
@@ -116,13 +117,28 @@ func TestJobsUniqueInsertAndPending(t *testing.T) {
 	}
 
 	// PendingTx finds a job until it completes, and a unique insert after that inserts again.
-	soon := stamp(time.Now().Add(2 * time.Second))
+	// The insert and the read share one unit of work: River cannot see, run or finalize the job
+	// before the commit, so the check holds on a machine of any speed.
+	soon := stamp(time.Now())
 	runTarget := ids.New()
-	if r := e.insertUnique(t, ins, fakemodule.Echo{Target: runTarget}, soon); !r.Inserted {
-		t.Fatalf("unique insert of the job that runs = %+v", r)
+	var res jobs.InsertResult
+	var pendingAt time.Time
+	var pendingOK bool
+	if err := e.uow.Do(t.Context(), func(ctx context.Context) error {
+		var err error
+		if res, err = ins.InsertUniqueTx(ctx, fakemodule.Echo{Target: runTarget}, &jobs.InsertOptions{ScheduledAt: soon}); err != nil {
+			return err
+		}
+		pendingAt, pendingOK, err = ins.PendingTx(ctx, fakemodule.Echo{Target: runTarget})
+		return err
+	}); err != nil {
+		t.Fatalf("unique insert and PendingTx of the job that runs: %v", err)
 	}
-	if at, ok := e.pending(t, ins, fakemodule.Echo{Target: runTarget}); !ok || !at.Equal(soon) {
-		t.Fatalf("PendingTx before the run = %s %v, want %s true", at, ok, soon)
+	if !res.Inserted {
+		t.Fatalf("unique insert of the job that runs = %+v", res)
+	}
+	if !pendingOK || !pendingAt.Equal(soon) {
+		t.Fatalf("PendingTx before the run = %s %v, want %s true", pendingAt, pendingOK, soon)
 	}
 	if j := receive(t, echo); j.Args.Target != runTarget {
 		t.Fatalf("ran %+v, want the job of %s", j.Args, runTarget)
@@ -147,7 +163,7 @@ func TestJobsUniqueInsertAndPending(t *testing.T) {
 // waitJobCompleted waits until the echo job of target is completed in River's table.
 func waitJobCompleted(t *testing.T, e *env, target ids.ID) {
 	t.Helper()
-	deadline := time.Now().Add(waitLong)
+	deadline := time.Now().Add(testkit.Patience)
 	for {
 		var n int
 		e.query(t, "SELECT count(*) FROM "+table("river_job")+" WHERE state = 'completed' AND args->>'target' = '"+target.String()+"'", &n)
@@ -155,7 +171,7 @@ func waitJobCompleted(t *testing.T, e *env, target ids.ID) {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("the job of %s did not complete within %s", target, waitLong)
+			t.Fatalf("the job of %s did not complete within %s", target, testkit.Patience)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}

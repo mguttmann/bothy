@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	syncpkg "github.com/OWNER/bothy/services/server/internal/sync"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
@@ -203,7 +204,7 @@ func TestRestartMidRound_NoDuplicateNoLoss(t *testing.T) {
 			if c.abort != nil {
 				select {
 				case <-abort:
-				case <-time.After(60 * time.Second):
+				case <-time.After(testkit.Patience):
 					t.Fatal("the consumer did not reach the third message")
 				}
 				c.abort(t, w, pid.Load(), cancel)
@@ -211,7 +212,7 @@ func TestRestartMidRound_NoDuplicateNoLoss(t *testing.T) {
 			var roundErr error
 			select {
 			case roundErr = <-done:
-			case <-time.After(60 * time.Second):
+			case <-time.After(testkit.Patience):
 				t.Fatal("the aborted round did not end")
 			}
 			if roundErr == nil {

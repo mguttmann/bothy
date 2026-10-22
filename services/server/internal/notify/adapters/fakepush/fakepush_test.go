@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fakepush"
 	"github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // Compile-time check: the fake is a provider of app.
@@ -118,7 +119,7 @@ func TestFakeProvider_GateBlocksUntilReleased(t *testing.T) {
 			errsCh <- err
 		})
 	}
-	wait, cancel := context.WithTimeout(ctx, 10*time.Second)
+	wait, cancel := context.WithTimeout(ctx, testkit.Patience)
 	defer cancel()
 	if err := p.WaitInFlight(wait, parallel); err != nil {
 		t.Fatalf("WaitInFlight(%d): %v with %d in flight", parallel, err, p.InFlight())

@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // kindsOf returns the hint kinds of person, sorted.
@@ -461,13 +462,17 @@ func TestSend_Steps(t *testing.T) {
 				_ = p.Send(context.Background(), job)
 			}()
 		}
-		deadline := time.Now().Add(10 * time.Second)
+		deadline := time.Now().Add(testkit.Patience)
 		for {
 			prov.mu.Lock()
 			running := prov.running
 			prov.mu.Unlock()
-			if running == 3 || time.Now().After(deadline) {
+			if running == 3 {
 				break
+			}
+			if time.Now().After(deadline) {
+				close(block)
+				t.Fatalf("%d sends in flight within %s, want 3", running, testkit.Patience)
 			}
 			time.Sleep(time.Millisecond)
 		}
