@@ -174,7 +174,7 @@ func TestAZP3_UnknownActionFailsClosedThroughAuthorize(t *testing.T) {
 		t.Fatalf("recorder %+v", w.rec.detached)
 	}
 	// A deferred action fails the same way (D3).
-	for _, a := range []authorize.Action{authorize.ActionInteractionCreate, authorize.ActionFileTranscriptSubmit, authorize.ActionImportApply} {
+	for _, a := range []authorize.Action{authorize.ActionRunFollowupCreate, authorize.ActionFileTranscriptSubmit, authorize.ActionImportApply} {
 		d, err := w.az.Authorize(context.Background(), w.user(w.owner), a, authorize.Resource{Kind: authorize.ResourceInstance})
 		if e, ok := errs.As(err); !ok || d.Allowed() || e.Cause != errs.CauseUnknownAction {
 			t.Errorf("%s: %+v %v", a, d, err)
