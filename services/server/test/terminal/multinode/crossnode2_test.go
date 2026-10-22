@@ -111,9 +111,11 @@ func TestCrossNode_DuplicateControlConnection(t *testing.T) {
 		// A paused client cannot finish its close handshake at the cleanup.
 		defer h1.Control.Unpause()
 		h1.Default(fakehost.Script{Kind: fakehost.Ignore})
+		// The probation starts with the first announcement inside connectHost; measuring from before
+		// the call keeps the lower bound below the real probation however slow the connect is.
+		connected := time.Now()
 		h2 := c.connectHost(nodeB, host, key)
 		h2.Default(fakehost.Script{Kind: fakehost.Ignore})
-		connected := time.Now()
 		r := c.openOn(nodeA, c.alex, host)
 		if r.Status != http.StatusCreated {
 			t.Fatalf("open: %d %s", r.Status, r.Body)
