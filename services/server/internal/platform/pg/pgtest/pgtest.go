@@ -2,7 +2,7 @@
 
 // Package pgtest gives integration tests a fresh PostgreSQL 18 database each (ADR 0006, plan
 // P-09 and P-10). One disposable container per test binary runs the pinned Image on 127.0.0.1
-// with a random host port; its four roles are bootstrapped with pg.Bootstrap and generated
+// with a random host port; its five roles are bootstrapped with pg.Bootstrap and generated
 // EXAMPLE passwords, and a template database per migration set is migrated once with
 // pg.Migrator as bothy_owner, so tests run against the schema production gets. Every New clones
 // that template.
@@ -38,6 +38,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,6 +89,7 @@ var secretFiles = map[pg.Role]string{
 	pg.RoleApp:     "db_app_password",
 	pg.RoleMaint:   "db_maint_password",
 	pg.RoleMonitor: "db_monitor_password",
+	pg.RoleBackup:  "db_backup_password",
 }
 
 // superSecretFile is the password file of the superuser (migrate.bootstrap_password_ref).
@@ -785,9 +787,15 @@ func (c *cluster) clone(ctx context.Context, name, template string) (err error) 
 			_ = c.dropDatabase(dctx, name)
 		}
 	}()
+	// Every role but the owner may connect, as pg.BootstrapDatabase grants it.
+	var connect []string
+	for _, r := range pg.Roles() {
+		if r != pg.RoleOwner {
+			connect = append(connect, pgx.Identifier{string(r)}.Sanitize())
+		}
+	}
 	grants := "REVOKE ALL ON DATABASE " + db + " FROM PUBLIC; GRANT CONNECT ON DATABASE " + db + " TO " +
-		pgx.Identifier{string(pg.RoleApp)}.Sanitize() + ", " + pgx.Identifier{string(pg.RoleMaint)}.Sanitize() + ", " +
-		pgx.Identifier{string(pg.RoleMonitor)}.Sanitize()
+		strings.Join(connect, ", ")
 	if _, err := c.admin.PGX().Exec(ctx, grants, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return fmt.Errorf("pgtest: grants of %s: %w", name, err)
 	}

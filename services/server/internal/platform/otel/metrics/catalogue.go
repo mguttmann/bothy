@@ -35,6 +35,8 @@ const (
 	keyOutcome       = "bothy.outcome"
 	keyPrincipalKind = "bothy.principal.kind"
 	keyAgentHandle   = "bothy.agent.handle"
+	keyBackupKind    = "bothy.backup.kind"
+	keyVolume        = "bothy.volume"
 	unitConnection   = "{connection}"
 )
 
@@ -45,6 +47,11 @@ var (
 	// httpMethods are http.request.method: the methods of the HTTP semantic conventions and
 	// _OTHER for every other method (platform/otel Middleware).
 	httpMethods = []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH", "_OTHER"}
+	// backupKinds are bothy.backup.kind of the last success: pg_full and pg_diff both record
+	// physical (M7-02).
+	backupKinds = []string{"physical", "logical", "objects"}
+	// volumes are bothy.volume: the volumes bothy-backupd measures (signals.md 4.6).
+	volumes = []string{"pgdata", "files", "pgbackrest-repo", "backup-scratch"}
 )
 
 // The instruments of signals.md that this build registers. Every instrument the server creates
@@ -252,6 +259,46 @@ var (
 		Name: "bothy.audit.verify.last_success.timestamp", Kind: KindGauge, Unit: "s", Float: true,
 		Description: "Unix time of the last successful audit chain verification.",
 	}
+	// BackupLastSuccess is bothy.backup.last_success.timestamp (4.6, M7-02): the Unix time of
+	// the last successful backup run per kind, recorded by bothy-backupd.
+	BackupLastSuccess = Spec{
+		Name: "bothy.backup.last_success.timestamp", Kind: KindGauge, Unit: "s", Float: true,
+		Description: "Unix time of the last successful backup run of a kind.",
+		Attrs:       []Attr{{Key: keyBackupKind, Values: backupKinds}},
+	}
+	// BackupWALLastArchived is bothy.backup.wal.last_archived.timestamp (4.6, M7-02):
+	// pg_stat_archiver.last_archived_time as Unix time.
+	BackupWALLastArchived = Spec{
+		Name: "bothy.backup.wal.last_archived.timestamp", Kind: KindGauge, Unit: "s", Float: true,
+		Description: "Unix time the last WAL segment was archived.",
+	}
+	// BackupDuration is bothy.backup.duration (4.6, M7-02): the duration of the last run per
+	// kind. The value restore_test is recorded by the restore test (M7-03); the column lists no
+	// values, so the closed set is the one of 4.6 bothy.backup.last_success.timestamp plus it.
+	BackupDuration = Spec{
+		Name: "bothy.backup.duration", Kind: KindGauge, Unit: "s", Float: true,
+		Description: "Duration of the last backup run of a kind.",
+		Attrs:       []Attr{{Key: keyBackupKind, Values: append(slices.Clone(backupKinds), "restore_test")}},
+	}
+	// BackupSize is bothy.backup.size (4.6, M7-02): the bytes the last run of a kind added.
+	BackupSize = Spec{
+		Name: "bothy.backup.size", Kind: KindGauge, Unit: "By",
+		Description: "Bytes the last backup run of a kind added to its repository.",
+		Attrs:       []Attr{{Key: keyBackupKind, Values: append(slices.Clone(backupKinds), "restore_test")}},
+	}
+	// StorageVolumeFree is bothy.storage.volume.free (4.6, M7-02): the bytes an unprivileged
+	// user may still write on a volume.
+	StorageVolumeFree = Spec{
+		Name: "bothy.storage.volume.free", Kind: KindGauge, Unit: "By",
+		Description: "Free bytes of a volume.",
+		Attrs:       []Attr{{Key: keyVolume, Values: volumes}},
+	}
+	// StorageVolumeSize is bothy.storage.volume.size (4.6, M7-02): the total bytes of a volume.
+	StorageVolumeSize = Spec{
+		Name: "bothy.storage.volume.size", Kind: KindGauge, Unit: "By",
+		Description: "Total bytes of a volume.",
+		Attrs:       []Attr{{Key: keyVolume, Values: volumes}},
+	}
 	// TelemetryDropped is bothy.telemetry.dropped (4.6, M1-10).
 	TelemetryDropped = Spec{
 		Name: "bothy.telemetry.dropped", Kind: KindCounter, Unit: "{item}",
@@ -276,6 +323,8 @@ func All() []Spec {
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize,
 		DBClientOperationDuration, DBPoolConnections,
+		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
+		StorageVolumeFree, StorageVolumeSize,
 		AuditVerifyFailures, AuditVerifyLastSuccess, TelemetryDropped, SecretsRefreshFailures,
 		ClientMetricsDiscarded,
 	}, Client()...)

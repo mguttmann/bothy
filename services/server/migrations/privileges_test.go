@@ -161,6 +161,9 @@ var appPrivileges = map[string][]string{
 	// deliveries (M7-05).
 	"webhook_subscriptions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"webhook_deliveries":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 backup_runs (M7-02): the console and the status page read the runs; only bothy_backup
+	// writes them (TestMigrationBackupRuns holds its rights).
+	"backup_runs": {"SELECT"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

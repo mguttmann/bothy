@@ -404,7 +404,8 @@ S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 
   `HeadObject`, `DeleteObject`, `CreateMultipartUpload`, `UploadPart`,
   `CompleteMultipartUpload`, `AbortMultipartUpload` and a presign interface with only
   `PresignUploadPart`. Only this package and the audit checkpoint sink
-  `internal/audit/adapters/s3sink` (M7-22) import the AWS SDK (depguard in `make lint`,
+  `internal/audit/adapters/s3sink` (M7-22) and the object mirror of the backup service
+  `internal/status/adapters/s3mirror` (M7-02) import the AWS SDK (depguard in `make lint`,
   `TestS3SDKOnlyInAdapter`); forbidigo forbids `DeleteObjects` and `PresignGetObject`. No request
   of the files driver sets server-side encryption, ACL, tagging, object lock, storage class or
   conditional headers.
@@ -858,7 +859,7 @@ signature names only in the audit log.
 | Test | Holds |
 |---|---|
 | Driver conformance: the same test suite against the file system and against SeaweedFS (testcontainers) | port contract, ranges, multipart, deletion of missing objects |
-| The S3 driver depends only on a Go interface with the port operations; architecture rule: only `internal/files/adapters/s3` imports the S3 SDK (and, since M7-22, the audit checkpoint sink `internal/audit/adapters/s3sink`) | "core S3 only", no `DeleteObjects` |
+| The S3 driver depends only on a Go interface with the port operations; architecture rule: only `internal/files/adapters/s3` imports the S3 SDK (and, since M7-22, the audit checkpoint sink `internal/audit/adapters/s3sink`; since M7-02, the backup mirror `internal/status/adapters/s3mirror`) | "core S3 only", no `DeleteObjects` |
 | EICAR test file against a real clamd container | `infected`, never servable, objects deleted, audit entry |
 | clamd stopped | file stays `pending`, `409 file_not_ready`; after the start `clean` |
 | Archive above `MaxRecursion` | `Heuristics.Limits.Exceeded` becomes `error`, not `clean` |
