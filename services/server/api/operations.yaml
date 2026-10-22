@@ -86,6 +86,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - explainChannelAccess
   - explainSpaceAccess
   - exportAuditEvents
+  - exportChannel
   - finishRun
   - getAgent
   - getApp
@@ -311,9 +312,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M7-09
   - operation_id: downloadGdprExport
     milestone: M7
-  - operation_id: exportChannel
-    milestone: M3
-    ticket: M3-11
   - operation_id: getAgentTriggerers
     milestone: M2
   - operation_id: getBrandingLogo

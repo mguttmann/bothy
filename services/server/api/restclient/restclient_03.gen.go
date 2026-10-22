@@ -884,6 +884,14 @@ type ClientWithResponsesInterface interface {
 	//
 	// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
 	//
+	// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+	// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+	// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+	// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+	// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+	// revocation ends the stream. An export cut after the first byte ends without a complete
+	// response (no final chunk); a range without messages gives `200` with an empty body.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
@@ -22826,19 +22834,4 @@ func (r ListHostsResponse) GetJSON200() *HostPage {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r ListHostsResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListHostsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListHostsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListHostsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
 }

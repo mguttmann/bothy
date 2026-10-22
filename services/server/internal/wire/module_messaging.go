@@ -38,7 +38,8 @@ func (s *server) startMessaging(context.Context) error {
 	if a == nil || sy == nil || id == nil || c == nil {
 		return errors.New("wire: messaging needs audit, sync, identity and chat")
 	}
-	m, err := NewMessaging(mcfg, pool, a.UoW(), az, MessagingWrites{Events: sy.Appender(), Redactor: sy.Redactor(), Audit: a.Recorder()},
+	m, err := NewMessaging(mcfg, pool, a.UoW(), az, MessagingWrites{Events: sy.Appender(), Redactor: sy.Redactor(), Audit: a.Recorder(),
+		Credentials: lazyCredentials(s.authenticator)},
 		c.Service, id.Directory, s.deps.Clock, s.logger())
 	if err != nil {
 		return err

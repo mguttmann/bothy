@@ -21347,6 +21347,14 @@ type ClientInterface interface {
 	//
 	// Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
 	//
+	// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+	// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+	// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+	// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+	// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+	// revocation ends the stream. An export cut after the first byte ends without a complete
+	// response (no final chunk); a range without messages gives `200` with an empty body.
+	//
 	// Corresponds with GET /channels/{channel_id}/export (the `ExportChannel` operationId).
 	ExportChannel(ctx context.Context, channelId ChannelIdPath, params *ExportChannelParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -25459,23 +25467,6 @@ func (c *Client) BeginStepUpOidcReauth(ctx context.Context, params *BeginStepUpO
 // Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
 func (c *Client) CompleteStepUpOidcReauthWithBody(ctx context.Context, params *CompleteStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCompleteStepUpOidcReauthRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteStepUpOidcReauth Finish a console step-up with OIDC
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
-func (c *Client) CompleteStepUpOidcReauth(ctx context.Context, params *CompleteStepUpOidcReauthParams, body CompleteStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteStepUpOidcReauthRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}

@@ -13,6 +13,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetAgentTriggerersWithResponse List who may trigger this agent
+//
+// Principals with effective `trigger` on a channel the agent operates, with `permission_version`. The adapter keeps it as allow list and reloads on `access.changed` (09, 15).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
+func (c *ClientWithResponses) GetAgentTriggerersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentTriggerersResponse, error) {
+	rsp, err := c.GetAgentTriggerers(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentTriggerersResponse(rsp)
+}
+
 // GetAgentWithResponse Read an agent with reported state
 //
 // Returns a wrapper object for the known response body format(s).
@@ -1333,6 +1348,14 @@ func (c *ClientWithResponses) PutChannelDraftWithResponse(ctx context.Context, c
 // ExportChannelWithResponse Export the history of a channel
 //
 // Streams one `Message` per line in `thread_seq` order per thread. Requires step-up.
+//
+// `from` must be strictly before `to`, else `400 validation_failed` at `#query/to` with code
+// `invalid`; the range has no upper bound, so clients split long ranges. Each line carries the
+// full `content_md` without `content_truncated` and without `my_reactions`; deleted messages
+// appear as tombstones at their `thread_seq`. Threads come ascending by id, the messages of a
+// thread ascending by `thread_seq`. Read rights are checked again before every batch, so a
+// revocation ends the stream. An export cut after the first byte ends without a complete
+// response (no final chunk); a range without messages gives `200` with an empty body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
