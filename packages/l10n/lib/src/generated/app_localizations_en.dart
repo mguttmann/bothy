@@ -3940,4 +3940,379 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get consoleReload => 'Reload';
+
+  @override
+  String get adminNavAgents => 'Agents';
+
+  @override
+  String get adminAgentsTitle => 'Agents';
+
+  @override
+  String get adminAgentsEmpty => 'No agents.';
+
+  @override
+  String get adminAgentsSwitchAll => 'Switch all agents';
+
+  @override
+  String get adminAgentDisabled => 'Disabled';
+
+  @override
+  String adminAgentWarningCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count warnings',
+      one: '1 warning',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminAgentBack => 'Back to the agents';
+
+  @override
+  String get adminAgentStateOnline => 'Online';
+
+  @override
+  String get adminAgentStateDegraded => 'Degraded';
+
+  @override
+  String get adminAgentStateOffline => 'Offline';
+
+  @override
+  String get adminAgentStateUnknown => 'No heartbeat yet';
+
+  @override
+  String adminAgentAdapter(String kind) {
+    return 'Adapter $kind';
+  }
+
+  @override
+  String adminAgentRuntimeVersion(String version) {
+    return 'Runtime version $version';
+  }
+
+  @override
+  String adminAgentLastHeartbeat(String when) {
+    return 'Last heartbeat $when';
+  }
+
+  @override
+  String get adminAgentConfigured => 'Configured mode';
+
+  @override
+  String get adminAgentReported => 'Reported mode';
+
+  @override
+  String get adminAgentReportedPerRun => 'Follows the configured mode per run';
+
+  @override
+  String adminAgentEvidence(String method) {
+    return 'Evidence: $method';
+  }
+
+  @override
+  String adminAgentSupported(String modes) {
+    return 'Can prove: $modes';
+  }
+
+  @override
+  String get adminAgentSupportedNone => 'Can prove: not reported';
+
+  @override
+  String adminAgentHolder(String name) {
+    return 'Holder: $name';
+  }
+
+  @override
+  String adminAgentWarnMismatch(String reported, String configured) {
+    return 'Adapter reports $reported, $configured is configured';
+  }
+
+  @override
+  String get adminAgentWarnUnsupported => 'Adapter cannot prove this mode';
+
+  @override
+  String get adminAgentWarnEvidenceUnknown =>
+      'Login type of the runtime unknown';
+
+  @override
+  String get adminAgentWarnToolClass =>
+      'Adapter reports a different tool class';
+
+  @override
+  String adminAgentWarnUnknown(String code) {
+    return 'Warning $code';
+  }
+
+  @override
+  String get adminAgentWarnFailUntilSwitched =>
+      'Invocations fail until the adapter is switched.';
+
+  @override
+  String get adminAgentWarnFailAll => 'All invocations fail.';
+
+  @override
+  String adminAgentSwitchHint(String mode) {
+    return 'To switch the adapter, whoever runs the instance changes the login of its runtime to $mode. The warning disappears with the next heartbeat that reports $mode.';
+  }
+
+  @override
+  String get adminAgentTargets => 'Operates';
+
+  @override
+  String get adminAgentTargetsNone => 'No space and no channel';
+
+  @override
+  String adminAgentTargetDefault(String target) {
+    return '$target, by default';
+  }
+
+  @override
+  String get adminAgentBackend => 'Backend';
+
+  @override
+  String get adminAgentSwitch => 'Switch backend';
+
+  @override
+  String get adminAgentHolderChange => 'Change holder';
+
+  @override
+  String get adminAgentSwitchExplain =>
+      'Switching needs a reason and confirmation. Personal works only while exactly one person may trigger the agent (I1).';
+
+  @override
+  String adminSwitchTitle(String agent) {
+    return 'Switch $agent';
+  }
+
+  @override
+  String adminSwitchToOrgBody(String agent) {
+    return '$agent then uses the organization key: the organization bears the costs, and everyone with Trigger agents may trigger it. The holder is cleared.';
+  }
+
+  @override
+  String adminSwitchToPersonalBody(String agent) {
+    return '$agent then uses the personal subscription of the holder: the holder pays, and only the holder may trigger it.';
+  }
+
+  @override
+  String get adminSwitchHolderPick => 'Pick the holder';
+
+  @override
+  String get adminSwitchConfirm => 'Switch';
+
+  @override
+  String adminSwitched(String agent, String mode) {
+    return '$agent now uses $mode';
+  }
+
+  @override
+  String stepUpPurposeSwitchAgent(String agent) {
+    return 'Switch the backend of $agent';
+  }
+
+  @override
+  String get stepUpPurposeSwitchAll => 'Switch the backend of several agents';
+
+  @override
+  String stepUpPurposeSetHolder(String agent) {
+    return 'Change the holder of $agent';
+  }
+
+  @override
+  String stepUpPurposeCreateToken(String agent) {
+    return 'Create a token for $agent';
+  }
+
+  @override
+  String adminHolderTitle(String agent) {
+    return 'Change the holder of $agent';
+  }
+
+  @override
+  String adminHolderBody(String agent) {
+    return '$agent keeps running on Personal, on the subscription of the new holder. Only the new holder may trigger it.';
+  }
+
+  @override
+  String adminHolderChanged(String name, String agent) {
+    return '$name is now the holder of $agent';
+  }
+
+  @override
+  String get adminI1Title => 'Personal is not possible right now';
+
+  @override
+  String adminI1Agent(String agent, String holder, String names) {
+    return '$agent would use the subscription of $holder, but these may trigger it too: $names';
+  }
+
+  @override
+  String adminI1AgentNoHolder(String agent, String names) {
+    return '$agent may also be triggered by: $names';
+  }
+
+  @override
+  String adminI1Hidden(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count more you cannot see',
+      one: '1 more you cannot see',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminI1Way =>
+      'Revoke their access grants, group memberships or owner rights first, or keep Organization.';
+
+  @override
+  String get adminSwitchAllTitle => 'Switch several agents';
+
+  @override
+  String get adminSwitchAllOrgBody =>
+      'Every agent then runs on the organization key; holders are cleared. Use this when there are doubts about a personal operation.';
+
+  @override
+  String get adminSwitchAllPersonalBody =>
+      'The checked agents then run on the personal subscription of the holder. If one of them would break I1, nothing changes.';
+
+  @override
+  String get adminSwitchAllProposed =>
+      'Proposed: the agents the last switch of several agents to Organization changed';
+
+  @override
+  String get adminSwitchAllNoProposal =>
+      'No earlier switch to propose from. Check the agents yourself.';
+
+  @override
+  String adminSwitchAllDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count agents changed',
+      one: '1 agent changed',
+      zero: 'No agent changed',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminTokensTitle => 'API tokens';
+
+  @override
+  String get adminTokensEmpty => 'No tokens.';
+
+  @override
+  String get adminTokenCreate => 'Create token';
+
+  @override
+  String adminTokenCreateTitle(String agent) {
+    return 'Create a token for $agent';
+  }
+
+  @override
+  String adminTokenCreateBody(String agent) {
+    return 'The adapter acts as $agent with this token. Its secret is shown only once.';
+  }
+
+  @override
+  String get adminTokenName => 'Name';
+
+  @override
+  String get adminTokenLastDay => 'Last day (YYYY-MM-DD)';
+
+  @override
+  String get adminTokenLastDayInvalid => 'Enter a day as YYYY-MM-DD.';
+
+  @override
+  String get adminTokenDpop => 'DPoP key thumbprint of the adapter';
+
+  @override
+  String adminTokenValidUntil(String when) {
+    return 'valid until $when';
+  }
+
+  @override
+  String adminTokenLastUsed(String when) {
+    return 'last used $when';
+  }
+
+  @override
+  String get adminTokenBound => 'DPoP-bound';
+
+  @override
+  String get adminTokenRevokedLabel => 'Revoked';
+
+  @override
+  String get adminTokenRevoke => 'Revoke';
+
+  @override
+  String adminTokenRevokeTitle(String name) {
+    return 'Revoke the token $name?';
+  }
+
+  @override
+  String get adminTokenRevokeBody =>
+      'An adapter that uses this token loses its access at once.';
+
+  @override
+  String adminTokenRevokedNotice(String name) {
+    return 'The token $name is revoked.';
+  }
+
+  @override
+  String adminTokenSecretTitle(String name) {
+    return 'Token $name';
+  }
+
+  @override
+  String get adminTokenSecretOnce =>
+      'This secret is shown only once. Copy it into the adapter\'s secret store now.';
+
+  @override
+  String get adminTokenSecretLabel => 'Token secret';
+
+  @override
+  String adminGuidedExplainGrant(String person, String agent, String holder) {
+    return 'This grant allows $person to trigger the agent $agent. $agent uses the personal subscription of $holder. $agent must first be switched to Organization; the organization key then bears the costs.';
+  }
+
+  @override
+  String adminGuidedExplainChange(String person, String agent, String holder) {
+    return 'This change allows $person to trigger the agent $agent. $agent uses the personal subscription of $holder. $agent must first be switched to Organization; the organization key then bears the costs.';
+  }
+
+  @override
+  String adminGuidedNotReady(String agent) {
+    return 'The adapter of $agent does not report an organization key yet. Invocations fail until it is switched.';
+  }
+
+  @override
+  String adminGuidedGrant(String agent) {
+    return 'Switch $agent to Organization and grant';
+  }
+
+  @override
+  String adminGuidedContinue(String agent) {
+    return 'Switch $agent to Organization and continue';
+  }
+
+  @override
+  String get adminGuidedTitle => 'Switch to Organization';
+
+  @override
+  String adminGuidedDone(String agent) {
+    return '$agent now uses Organization, and the change is saved.';
+  }
+
+  @override
+  String adminGuidedStillReports(String agent, String mode) {
+    return 'The adapter of $agent still reports $mode.';
+  }
+
+  @override
+  String get adminGuidedDoneClose => 'Close';
 }

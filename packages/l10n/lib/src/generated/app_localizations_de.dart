@@ -3959,4 +3959,381 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get consoleReload => 'Neu laden';
+
+  @override
+  String get adminNavAgents => 'Agenten';
+
+  @override
+  String get adminAgentsTitle => 'Agenten';
+
+  @override
+  String get adminAgentsEmpty => 'Keine Agenten.';
+
+  @override
+  String get adminAgentsSwitchAll => 'Alle Agenten umstellen';
+
+  @override
+  String get adminAgentDisabled => 'Deaktiviert';
+
+  @override
+  String adminAgentWarningCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Warnungen',
+      one: '1 Warnung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminAgentBack => 'Zurück zu den Agenten';
+
+  @override
+  String get adminAgentStateOnline => 'Online';
+
+  @override
+  String get adminAgentStateDegraded => 'Eingeschränkt';
+
+  @override
+  String get adminAgentStateOffline => 'Offline';
+
+  @override
+  String get adminAgentStateUnknown => 'Noch kein Heartbeat';
+
+  @override
+  String adminAgentAdapter(String kind) {
+    return 'Adapter $kind';
+  }
+
+  @override
+  String adminAgentRuntimeVersion(String version) {
+    return 'Laufzeit-Version $version';
+  }
+
+  @override
+  String adminAgentLastHeartbeat(String when) {
+    return 'Letzter Heartbeat $when';
+  }
+
+  @override
+  String get adminAgentConfigured => 'Eingestellter Modus';
+
+  @override
+  String get adminAgentReported => 'Gemeldeter Modus';
+
+  @override
+  String get adminAgentReportedPerRun =>
+      'Folgt dem eingestellten Modus je Lauf';
+
+  @override
+  String adminAgentEvidence(String method) {
+    return 'Beleg: $method';
+  }
+
+  @override
+  String adminAgentSupported(String modes) {
+    return 'Kann belegen: $modes';
+  }
+
+  @override
+  String get adminAgentSupportedNone => 'Kann belegen: nicht gemeldet';
+
+  @override
+  String adminAgentHolder(String name) {
+    return 'Inhaber: $name';
+  }
+
+  @override
+  String adminAgentWarnMismatch(String reported, String configured) {
+    return 'Adapter meldet $reported, eingestellt ist $configured';
+  }
+
+  @override
+  String get adminAgentWarnUnsupported =>
+      'Adapter kann diesen Modus nicht belegen';
+
+  @override
+  String get adminAgentWarnEvidenceUnknown =>
+      'Anmeldeart der Laufzeit unbekannt';
+
+  @override
+  String get adminAgentWarnToolClass =>
+      'Adapter meldet eine andere Werkzeugklasse';
+
+  @override
+  String adminAgentWarnUnknown(String code) {
+    return 'Warnung $code';
+  }
+
+  @override
+  String get adminAgentWarnFailUntilSwitched =>
+      'Aufrufe scheitern, bis der Adapter umgestellt ist.';
+
+  @override
+  String get adminAgentWarnFailAll => 'Alle Aufrufe scheitern.';
+
+  @override
+  String adminAgentSwitchHint(String mode) {
+    return 'Zum Umstellen stellt, wer die Instanz betreibt, die Anmeldung der Laufzeit auf $mode um. Die Warnung erlischt mit dem nächsten Heartbeat, der $mode meldet.';
+  }
+
+  @override
+  String get adminAgentTargets => 'Bedient';
+
+  @override
+  String get adminAgentTargetsNone => 'Kein Bereich und kein Kanal';
+
+  @override
+  String adminAgentTargetDefault(String target) {
+    return '$target, als Standard';
+  }
+
+  @override
+  String get adminAgentBackend => 'Backend';
+
+  @override
+  String get adminAgentSwitch => 'Backend umstellen';
+
+  @override
+  String get adminAgentHolderChange => 'Inhaber ändern';
+
+  @override
+  String get adminAgentSwitchExplain =>
+      'Umstellen braucht einen Grund und eine Bestätigung. Persönlich geht nur, solange genau eine Person den Agenten auslösen darf (I1).';
+
+  @override
+  String adminSwitchTitle(String agent) {
+    return '$agent umstellen';
+  }
+
+  @override
+  String adminSwitchToOrgBody(String agent) {
+    return '$agent läuft dann mit dem Schlüssel der Organisation: Die Organisation trägt die Kosten, und alle mit Agenten auslösen dürfen ihn auslösen. Der Inhaber wird entfernt.';
+  }
+
+  @override
+  String adminSwitchToPersonalBody(String agent) {
+    return '$agent läuft dann mit dem persönlichen Abo des Inhabers: Der Inhaber zahlt, und nur er darf ihn auslösen.';
+  }
+
+  @override
+  String get adminSwitchHolderPick => 'Inhaber wählen';
+
+  @override
+  String get adminSwitchConfirm => 'Umstellen';
+
+  @override
+  String adminSwitched(String agent, String mode) {
+    return '$agent läuft jetzt mit $mode';
+  }
+
+  @override
+  String stepUpPurposeSwitchAgent(String agent) {
+    return 'Backend von $agent umstellen';
+  }
+
+  @override
+  String get stepUpPurposeSwitchAll => 'Backend mehrerer Agenten umstellen';
+
+  @override
+  String stepUpPurposeSetHolder(String agent) {
+    return 'Inhaber von $agent ändern';
+  }
+
+  @override
+  String stepUpPurposeCreateToken(String agent) {
+    return 'Token für $agent erzeugen';
+  }
+
+  @override
+  String adminHolderTitle(String agent) {
+    return 'Inhaber von $agent ändern';
+  }
+
+  @override
+  String adminHolderBody(String agent) {
+    return '$agent läuft weiter Persönlich, mit dem Abo des neuen Inhabers. Nur der neue Inhaber darf ihn auslösen.';
+  }
+
+  @override
+  String adminHolderChanged(String name, String agent) {
+    return '$name ist jetzt Inhaber von $agent';
+  }
+
+  @override
+  String get adminI1Title => 'Persönlich ist gerade nicht möglich';
+
+  @override
+  String adminI1Agent(String agent, String holder, String names) {
+    return '$agent liefe mit dem Abo von $holder, aber diese dürfen ihn auch auslösen: $names';
+  }
+
+  @override
+  String adminI1AgentNoHolder(String agent, String names) {
+    return '$agent dürfen auch auslösen: $names';
+  }
+
+  @override
+  String adminI1Hidden(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weitere, die du nicht sehen kannst',
+      one: '1 weitere, die du nicht sehen kannst',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminI1Way =>
+      'Entziehe ihnen zuerst ihre Freigaben, Gruppenmitgliedschaften oder Owner-Rechte, oder bleib bei Organisation.';
+
+  @override
+  String get adminSwitchAllTitle => 'Mehrere Agenten umstellen';
+
+  @override
+  String get adminSwitchAllOrgBody =>
+      'Alle Agenten laufen dann mit dem Schlüssel der Organisation; Inhaber werden entfernt. Nutze das bei Zweifeln an einem persönlichen Betrieb.';
+
+  @override
+  String get adminSwitchAllPersonalBody =>
+      'Die angehakten Agenten laufen dann mit dem persönlichen Abo des Inhabers. Würde einer davon I1 verletzen, ändert sich nichts.';
+
+  @override
+  String get adminSwitchAllProposed =>
+      'Vorschlag: die Agenten, die die letzte Umstellung mehrerer Agenten auf Organisation geändert hat';
+
+  @override
+  String get adminSwitchAllNoProposal =>
+      'Keine frühere Umstellung als Vorschlag. Hake die Agenten selbst an.';
+
+  @override
+  String adminSwitchAllDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Agenten geändert',
+      one: '1 Agent geändert',
+      zero: 'Kein Agent geändert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminTokensTitle => 'API-Tokens';
+
+  @override
+  String get adminTokensEmpty => 'Keine Tokens.';
+
+  @override
+  String get adminTokenCreate => 'Token erzeugen';
+
+  @override
+  String adminTokenCreateTitle(String agent) {
+    return 'Token für $agent erzeugen';
+  }
+
+  @override
+  String adminTokenCreateBody(String agent) {
+    return 'Mit diesem Token handelt der Adapter als $agent. Sein Geheimnis wird nur einmal angezeigt.';
+  }
+
+  @override
+  String get adminTokenName => 'Name';
+
+  @override
+  String get adminTokenLastDay => 'Letzter Tag (JJJJ-MM-TT)';
+
+  @override
+  String get adminTokenLastDayInvalid => 'Gib einen Tag als JJJJ-MM-TT ein.';
+
+  @override
+  String get adminTokenDpop => 'Fingerabdruck des DPoP-Schlüssels des Adapters';
+
+  @override
+  String adminTokenValidUntil(String when) {
+    return 'gültig bis $when';
+  }
+
+  @override
+  String adminTokenLastUsed(String when) {
+    return 'zuletzt benutzt $when';
+  }
+
+  @override
+  String get adminTokenBound => 'DPoP-gebunden';
+
+  @override
+  String get adminTokenRevokedLabel => 'Widerrufen';
+
+  @override
+  String get adminTokenRevoke => 'Widerrufen';
+
+  @override
+  String adminTokenRevokeTitle(String name) {
+    return 'Token $name widerrufen?';
+  }
+
+  @override
+  String get adminTokenRevokeBody =>
+      'Ein Adapter mit diesem Token verliert sofort seinen Zugang.';
+
+  @override
+  String adminTokenRevokedNotice(String name) {
+    return 'Das Token $name ist widerrufen.';
+  }
+
+  @override
+  String adminTokenSecretTitle(String name) {
+    return 'Token $name';
+  }
+
+  @override
+  String get adminTokenSecretOnce =>
+      'Dieses Geheimnis wird nur einmal angezeigt. Kopiere es jetzt in den Geheimnisspeicher des Adapters.';
+
+  @override
+  String get adminTokenSecretLabel => 'Token-Geheimnis';
+
+  @override
+  String adminGuidedExplainGrant(String person, String agent, String holder) {
+    return 'Diese Freigabe erlaubt $person, den Agenten $agent auszulösen. $agent läuft mit dem persönlichen Abo von $holder. $agent muss zuerst auf Organisation umgestellt werden; die Kosten trägt dann der Schlüssel der Organisation.';
+  }
+
+  @override
+  String adminGuidedExplainChange(String person, String agent, String holder) {
+    return 'Diese Änderung erlaubt $person, den Agenten $agent auszulösen. $agent läuft mit dem persönlichen Abo von $holder. $agent muss zuerst auf Organisation umgestellt werden; die Kosten trägt dann der Schlüssel der Organisation.';
+  }
+
+  @override
+  String adminGuidedNotReady(String agent) {
+    return 'Der Adapter von $agent meldet noch keinen Schlüssel der Organisation. Aufrufe scheitern, bis er umgestellt ist.';
+  }
+
+  @override
+  String adminGuidedGrant(String agent) {
+    return '$agent auf Organisation umstellen und freigeben';
+  }
+
+  @override
+  String adminGuidedContinue(String agent) {
+    return '$agent auf Organisation umstellen und fortfahren';
+  }
+
+  @override
+  String get adminGuidedTitle => 'Auf Organisation umstellen';
+
+  @override
+  String adminGuidedDone(String agent) {
+    return '$agent läuft jetzt mit Organisation, und die Änderung ist gespeichert.';
+  }
+
+  @override
+  String adminGuidedStillReports(String agent, String mode) {
+    return 'Der Adapter von $agent meldet noch $mode.';
+  }
+
+  @override
+  String get adminGuidedDoneClose => 'Schließen';
 }

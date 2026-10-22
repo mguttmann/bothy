@@ -168,6 +168,9 @@ mixin FakeAccess {
   /// The display name of a person.
   String nameOf(String userId);
 
+  /// The I1 guard of the agent fake (10 5.4, 11).
+  void i1Guard(String op, I1Resolution? resolve);
+
   /// The targets the caller sees.
   final List<AdminTarget> targetList = [marketing, campaigns, internal];
 
@@ -255,6 +258,7 @@ mixin FakeAccess {
   Future<AdminGrant> createGrant(
     GrantRequest request, {
     required String purpose,
+    I1Resolution? resolveI1,
   }) async {
     await change(
       'createGrant',
@@ -262,6 +266,7 @@ mixin FakeAccess {
           '${request.reason}',
       purpose,
     );
+    i1Guard('createGrant', resolveI1);
     final grant = AdminGrant(
       id: 'grant-${_grants++}',
       subjectKind: request.subjectKind,

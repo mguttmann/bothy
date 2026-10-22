@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The owners: list, add and revoke (docs/spec/07-permissions.md 2.7, SR8; 08 4; 05
-/// `owner.add`, `owner.remove` with step-up).
+/// `owner.add`, `owner.remove` with step-up; 10 11: the guided switch when adding meets I1).
 library;
 
 import 'package:api_client/api_client.dart' show ApiProblem;
@@ -9,10 +9,14 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../agents/guided_flow.dart';
 import '../common/admin_action.dart';
 import '../common/confirm_change.dart';
 import '../common/problem_banner.dart';
+import '../data/access_repository.dart' show I1Resolution, InvariantFinding;
 import '../data/admin_repository.dart';
+import '../data/self_repository.dart' show SelfActionFailed;
+import '../grants/grant_labels.dart' show AccessNames;
 import '../self/device_tile.dart' show activityText;
 import '../self/self_feedback.dart';
 
@@ -22,6 +26,11 @@ import '../self/self_feedback.dart';
 /// The screen never decides which owner may go: revoking the last one is sent, and the
 /// server's `409 last_owner` is shown with its text (07 SR8). A `403` of the list shows the
 /// server's reason instead.
+///
+/// When adding an owner meets I1 (`409 i1_violation` with `conflicts`, 10 5.4), the section
+/// offers the guided option of 10 11 ([GuidedSwitch]): after a reason it repeats the same call
+/// once with `resolve_i1`, so the server switches the agents and adds the owner in one
+/// transaction (BR-07), and shows [GuidedResult].
 class OwnersSection extends StatefulWidget {
   /// Creates the section.
   const OwnersSection({
@@ -52,6 +61,7 @@ class _OwnersSectionState extends State<OwnersSection>
     with AdminActionState<OwnersSection> {
   List<AdminOwner>? _owners;
   ApiProblem? _problem;
+  _GuidedOwner? _guided;
 
   @override
   void initState() {
@@ -123,17 +133,66 @@ class _OwnersSectionState extends State<OwnersSection>
       builder: (_) => _AddOwnerDialog(candidates: candidates),
     );
     if (picked == null || !mounted) return;
-    final (person, reason) = picked;
+    setState(() => _guided = null);
+    final (person, typed) = picked;
+    final reason = typed.isEmpty ? l.adminDefaultReason : typed;
+    var conflicts = const <InvariantFinding>[];
     final ok = await runChange('add', () async {
-      await widget.repository.addOwner(
-        person.id,
-        reason: reason.isEmpty ? l.adminDefaultReason : reason,
-        purpose: l.stepUpPurposeAddOwner(person.displayName),
-      );
+      try {
+        await widget.repository.addOwner(
+          person.id,
+          reason: reason,
+          purpose: l.stepUpPurposeAddOwner(person.displayName),
+        );
+      } on SelfActionFailed catch (e) {
+        if (e.problem?.code == 'i1_violation') conflicts = e.conflicts;
+        rethrow;
+      }
       return SelfNotice(l.adminOwnersAdded(person.displayName));
     });
     if (ok) widget.onChanged?.call();
     if (mounted) await _load();
+    if (guidedAgentIds(conflicts).isEmpty || !mounted) return;
+    final names = await AccessNames.load(widget.repository);
+    if (!mounted) return;
+    // The guided option explains the conflict itself (10 11 step 2) and replaces the plain
+    // rejection.
+    setState(() {
+      notice = null;
+      _guided = _GuidedOwner(person, reason, conflicts, names);
+    });
+  }
+
+  /// The guided option for [g]: the reason of the switch, then the same `addOwner` once more
+  /// with `resolve_i1` (05 rule 1.6); never a switch on its own.
+  Future<void> _takeGuided(_GuidedOwner g) async {
+    final l = AppLocalizations.of(context);
+    final ids = guidedAgentIds(g.conflicts);
+    final switchReason = await GuidedFlow.askReason(
+      context,
+      agents: guidedAgentNames(g.names, g.conflicts),
+    );
+    if (switchReason == null || !mounted) return;
+    setState(() => _guided = null);
+    final ok = await runChange('add', () async {
+      await widget.repository.addOwner(
+        g.person.id,
+        reason: g.reason,
+        purpose: l.stepUpPurposeAddOwner(g.person.displayName),
+        resolveI1: I1Resolution(ids, reason: switchReason),
+      );
+      return SelfNotice(l.adminOwnersAdded(g.person.displayName));
+    });
+    if (ok) widget.onChanged?.call();
+    if (!mounted) return;
+    await _load();
+    if (ok && mounted) {
+      await GuidedResult.show(
+        context,
+        repository: widget.repository,
+        agentIds: ids,
+      );
+    }
   }
 
   @override
@@ -169,6 +228,14 @@ class _OwnersSectionState extends State<OwnersSection>
         ),
         const SizedBox(height: DsSpace.s8),
         noticeBanner(),
+        if (_guided case final g?)
+          GuidedSwitch(
+            conflicts: g.conflicts,
+            person: g.person.displayName,
+            names: g.names,
+            grant: false,
+            onTake: busy ? null : () => _takeGuided(g),
+          ),
         if (_problem case final problem?)
           ProblemBanner(problem: problem, onRetry: _load)
         else if (owners != null)
@@ -217,6 +284,16 @@ class _OwnersSectionState extends State<OwnersSection>
       ],
     );
   }
+}
+
+/// An "Add owner" the server rejected with I1, waiting for the guided option.
+final class _GuidedOwner {
+  const _GuidedOwner(this.person, this.reason, this.conflicts, this.names);
+
+  final AdminPerson person;
+  final String reason;
+  final List<InvariantFinding> conflicts;
+  final AccessNames names;
 }
 
 /// Picks the new owner and the reason; pops `(person, reason)` or null.

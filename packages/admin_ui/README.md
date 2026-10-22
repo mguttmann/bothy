@@ -4,9 +4,10 @@ Administration screens for the desktop app, the console and the emergency action
 
 Status: own devices and sessions (M4-25), the administration of people, groups and waiting
 devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4-27), the
-audit log (M4-29) and the hosts of the terminal with pairing and session users (M4-37); agents
-(M4-28) and the console (M6) follow. Kind: Flutter package, a member of the Dart workspace at
-the repository root (`resolution: workspace`, `publish_to: none`).
+audit log (M4-29), the hosts of the terminal with pairing and session users (M4-37) and the
+agents with their backend switch, the guided flow and their tokens (M4-28); the console (M6)
+follows. Kind: Flutter package, a member of the Dart workspace at the repository root
+(`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
 
@@ -39,12 +40,18 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `HostsList`, `HostDetail` | A8 for owners: the hosts and one host with every field of the first wireframe; the check results ask the audit of the host only for a named session user without a valid assignment |
 | `PairingWizard`, `CreateHostDialog`, `FingerprintConfirm`, `LlmLoginChoice`, `ServerHostChoice`, `SessionUserRows` | the three steps of pairing: create, the code in the command `bothy-host pair --server <origin> --code <code>` with its remaining time and "New code", then the fingerprint prefix, the LLM login (I6 explained), the server host and the session users from the reported names only |
 | `LlmLoginSection`, `ServerHostSection`, `DoctorResults`, `HostGrantsSection`, `SessionUsersSection`, `HostStateActions` | the parts of the host page: change of the declaration with `i6_violation` explained, declaration and report of the server host, every check entry with names and people, the grants with the server's preview and a "Not effective" badge, assign and end session users (`session_user_taken` and `session_user_not_on_host` explained), disable, enable, re-pair, retire |
+| `AgentsRepository`, `ApiAgentsRepository` | A5 over REST (part of `AdminRepository`): `listAgents`, `getAgent` (configured and reported mode, holder, `billing_modes_supported`, evidence and the server's `warnings` codes, unchanged), the operated targets from `Space.default_operator_agent_id` and `Channel.operator.effective_agent_id`, `setAgentBillingMode`, `setAllAgentsBillingMode`, `setCredentialHolder`, the proposal of "All to Personal" from the newest `agent.billing_mode.set_all` in the audit (`listAuditEvents`, step-up), `listTokens`, `createToken`, `revokeToken`; a `409 i1_violation` carries its `conflicts` in `SelfActionFailed.conflicts`; `createGrant`, `addGroupMember` and `addOwner` take `resolve_i1` |
+| `AgentsList`, `AgentPage`, `AgentModeBadge` | A5: the badge "Personal" or "Organization" with icon and text, the number of server warnings, an agent's page with adapter, presence (a stream of the host, else `getAgent`), configured next to reported mode ("follows the configured mode per run" without one), one text per server warning code of 10 8 with its consequence and the switch hint, the operated spaces and channels and the holder |
+| `SwitchModeDialog`, `HolderDialog`, `SwitchAllDialog`, `I1Explanation` | the switch of one agent (reason required; to organization clears the holder, to personal needs one), the change of the holder, the switch of several agents (all to organization with a reason; all to personal with a holder and an explicit, editable list proposed from the last global switch; one violating agent changes nothing, BR-08), and the explanation of an I1 rejection with the principals the caller may read and a count of the others |
+| `AgentTokens`, `TokenSecretView` | the agent's API tokens: prefix, validity, last use, DPoP binding, revoked ones; create with step-up and the DPoP key thumbprint of the adapter, the secret shown once and never kept, revoke after one confirmation without step-up |
+| `GuidedSwitch`, `GuidedFlow`, `GuidedResult` | the guided flow of 10 11 in the grant preview and on a `409 i1_violation` of adding a group member or an owner: the explanation, "Switch to Organization and grant" with a reason, one request with `resolve_i1`, and the result with the warning while the adapter still reports the old mode |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
 (`stepUpPurposeExtra`), and the step-up interceptor of `auth` asks when the server answers
-`401 step_up_required` (05: `device.approve`, `device.revoke`, `host.manage` and `audit.read`
-have step-up, `session.revoke` has none). A `403` hides the refused action for that item and shows the
+`401 step_up_required` (05: `device.approve`, `device.revoke`, `host.manage`, `audit.read`, `agent.billing_mode.set`,
+`agent.billing_mode.set_all`, `agent.credential_holder.set` and `token.create` have step-up,
+`session.revoke` and `token.revoke` have none). A `403` hides the refused action for that item and shows the
 translated reason; the screens hold no permission logic (15 1 principle 1).
 
 ## Embedding the administration
@@ -81,6 +88,8 @@ Further rules checked by `make arch`:
 | `lib/src/step_up/` | the step-up dialog |
 | `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
 | `lib/src/hosts/`, `lib/src/data/hosts_repository.dart` | screen A8 of M4-37 |
+| `lib/src/agents/`, `lib/src/data/agents_repository.dart` | screen A5 of M4-28 and the guided flow |
+| `test/agents/` | agent page, switches, switch of all agents, tokens, guided flow and the REST source over the agent fake (`test/admin/agents_fake.dart`) |
 | `test/hosts/` | pairing, I6, session users, check results, grants on a host and the host page over the host fake (`test/admin/hosts_fake.dart`) |
 | `test/grants/`, `test/access/` | the wizard, revoke, "Who has access?" and "View as person"; the fake reads the example of 07 9.3 at run time |
 | `test/self/`, `test/admin/`, `test/audit/` | widget tests over fake repositories that behave like the server behind the step-up interceptor |
