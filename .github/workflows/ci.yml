@@ -44,6 +44,11 @@ on:
 permissions:
   contents: read
 
+# The base commit of a pull request (empty on a push): a failed Go test in a package the pull
+# request changes is not rerun into a pass (tools/ci/flakes.py, docs/quality/gates.md "Flakes").
+env:
+  FLAKE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+
 # A new commit of a pull request cancels its older run. A push to main never cancels the run
 # in progress: merges come faster than one full run, and SonarQube needs a finished analysis of
 # main. The newer push waits; GitHub keeps at most one pending run per group.
@@ -976,6 +981,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
@@ -1010,6 +1016,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:

@@ -328,7 +328,7 @@ def _run(
 ) -> tuple[int, list[dict[str, Any]], Path]:
     module = tmp_path / "mod"
     monkeypatch.chdir(module)
-    for name in ("FLAKY", "ALWAYS", "RACE", "MAIN_FAILS"):
+    for name in ("FLAKY", "ALWAYS", "RACE", "MAIN_FAILS", "FLAKE_BASE"):
         monkeypatch.delenv(name, raising=False)
     for name, value in env.items():
         monkeypatch.setenv(name, value)
@@ -497,6 +497,116 @@ def test_go_shards_runs_each_go_test_through_flakes(
             "-coverprofile=c.out",
         ]
     ]
+
+
+# --- no reruns in the packages a pull request changes ------------------------------------------
+
+
+def _git(cwd: Path, *args: str) -> str:
+    done = subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return done.stdout.strip()
+
+
+def _repo_with_module(tmp_path: Path) -> str:
+    """A git repository whose module `mod` has the package a; returns its first commit."""
+    _module(tmp_path)
+    (tmp_path / "mod" / "c").mkdir()
+    (tmp_path / "mod" / "c" / "c.go").write_text("package c\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("x\n", encoding="utf-8")
+    _git(tmp_path, "init", "-q", "-b", "main")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "base")
+    return _git(tmp_path, "rev-parse", "HEAD")
+
+
+def _change(tmp_path: Path, path: str) -> None:
+    file = tmp_path / path
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text((file.read_text(encoding="utf-8") if file.exists() else "") + "// x\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "change")
+
+
+@pytest.mark.parametrize(
+    ("path", "strict"),
+    [
+        ("mod/a/a.go", True),
+        ("mod/a/a_test.go", True),
+        ("mod/a/testdata/golden/x.json", True),
+        ("mod/c/c.go", False),
+        ("mod/a/sub/x.go", False),
+        ("README.md", False),
+    ],
+)
+def test_the_changed_packages_are_the_directories_of_the_changed_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path: str, strict: bool
+) -> None:
+    base = _repo_with_module(tmp_path)
+    _change(tmp_path, path)
+    monkeypatch.chdir(tmp_path / "mod")
+    assert (PKG in flakes.changed_packages(base, [PKG, "example.com/mod/c"])) is strict
+
+
+def test_a_flake_in_a_package_the_pull_request_changes_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gotestsum: str
+) -> None:
+    # The pull request may have made the test flaky: its failure counts, the rerun does not.
+    base = _repo_with_module(tmp_path)
+    _change(tmp_path, "mod/a/a.go")
+    marker = str(tmp_path / "m")
+    code, found, _ = _run(tmp_path, monkeypatch, gotestsum, {"FLAKY": marker, "FLAKE_BASE": base})
+    assert code != 0
+    assert found == []
+
+
+def test_a_flake_outside_the_changed_packages_still_reruns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gotestsum: str
+) -> None:
+    base = _repo_with_module(tmp_path)
+    _change(tmp_path, "mod/c/c.go")
+    marker = str(tmp_path / "m")
+    code, found, _ = _run(tmp_path, monkeypatch, gotestsum, {"FLAKY": marker, "FLAKE_BASE": base})
+    assert code == 0
+    assert found == [{"tool": "go", "package": PKG, "test": "TestFlaky", "runs": 2, "failures": 1}]
+
+
+def test_a_base_that_cannot_be_compared_fails_before_the_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gotestsum: str
+) -> None:
+    _repo_with_module(tmp_path)
+    code, found, profile = _run(tmp_path, monkeypatch, gotestsum, {"FLAKE_BASE": "0" * 40})
+    assert (code, found) == (1, [])
+    assert not profile.exists()
+
+
+def test_ci_sets_the_base_of_a_pull_request_and_fetches_it_for_every_go_test() -> None:
+    # Every job whose make targets run `go test` through flakes.py needs the base commit.
+    workflow = yaml.safe_load((REPO / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    assert workflow["env"]["FLAKE_BASE"] == (
+        "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}"
+    )
+    go_targets = {"test", "contract-test", "image-test", "postgres-image-test"}
+    checked = []
+    for name, job in workflow["jobs"].items():
+        runs = "\n".join(str(s.get("run", "")) for s in job.get("steps", []))
+        words: set[str] = set()
+        for line in runs.splitlines():
+            if "make " in line:
+                # `make -o test coverage` treats test as done and does not run it.
+                tokens = line.split()
+                words |= {w for i, w in enumerate(tokens) if i == 0 or tokens[i - 1] != "-o"}
+        if not words & go_targets:
+            continue
+        checked.append(name)
+        [checkout] = [s for s in job["steps"] if "actions/checkout@" in str(s.get("uses", ""))]
+        assert checkout.get("with", {}).get("fetch-depth") == 0, name
+    assert {"test-server", "test-server-contract", "postgres-image-amd64"} <= set(checked)
 
 
 # --- the tracking issue ------------------------------------------------------------------------
