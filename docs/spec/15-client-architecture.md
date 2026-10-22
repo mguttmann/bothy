@@ -934,6 +934,48 @@ Ports of `terminal_ui`, implemented per app:
   open only after a click with a visible target and confirmation, queries of the window title and
   the clipboard stay unanswered. The blocks sit in `terminal_ui` before the renderer, so that
   they do not depend on its version (test TM-T14).
+- As built (M4-35, docs/decisions.d/M4-35.md): the filter is `EscapeFilter` in `terminal_ui`,
+  in front of xterm, on the byte stream of the host before UTF-8 decoding (ESC and every byte of
+  a sequence are ASCII, so the byte view and the renderer's decoded view see the same
+  sequences); it is pure Dart and independent of the renderer version. Allow list in short:
+  text, C0 controls and plain ESC sequences pass; DCS, SOS, PM and APC are dropped with their
+  content; CSI passes except window operations and reports (final `t`), status reports other
+  than CPR (`CSI 6 n`), device attributes other than DA1 and DA2, `$` requests, DECREQTPARM and
+  XTVERSION, so the only answers that reach the host are CPR and DA1/DA2; every OSC (OSC 52,
+  titles, color queries) is dropped except OSC 8, which becomes inert text plus a link record
+  that opens only after a click on a confirmation showing the target, and only for `https` and
+  `http`; CSI sequences that make xterm 4.0.0 throw or hang are dropped too (parameters above
+  `EscapeFilter.maxParameterValue`, SGR 38/48 without sub-parameters or with an index above 255,
+  REP counts above `EscapeFilter.maxRepeatCount`,
+  `CSI 0 X`). A sequence may be split at any byte across frames; memory per sequence is
+  bounded; the filter logs nothing. The full list is the doc comment of `EscapeFilter`.
+  Second layer: the screen of the view (`TerminalScreen`) leaves `onTitleChange`,
+  `onIconChange` and `onPrivateOSC` of xterm unset and catches renderer exceptions, so hostile
+  output cannot end the session as tampering.
+- As built (M4-35): `buildTerminalTheme` generates the xterm `TerminalTheme` from `DsColors`
+  (`color.terminal.*` of docs/design/components.md 12), so the screen follows light and dark
+  mode without a color of its own. xterm paints the cursor and the selection over the text,
+  has no field for `color.terminal.cursor-text` and paints the underline and bar cursors in the
+  wrong row, so its cursor and selection are transparent and the view paints both itself
+  (`TerminalMarksPainter`): the cursor cell opaque in `color.terminal.cursor` with its character
+  in `color.terminal.cursor-text`, a selected cell opaque in `color.terminal.selection-bg` with
+  its character in `color.terminal.fg`, and without the focus a frame in
+  `color.terminal.cursor` (D-M4-35-18). Text that the soft keyboard inserts at once with a
+  line break or a control character takes the path of a paste (D-M4-35-19). A pasted text
+  loses ESC and the other controls except tab and line breaks before it is shown and sent, and
+  a link target is only printable ASCII; the confirmation shows its host first.
+- xterm state found by M4-35 (2026-10-20; sources in [24-terminal.md](24-terminal.md),
+  section 12): version 4.0.0, published 2024-02-27, the latest release. Read in its source: OSC
+  0/1/2 call `onTitleChange` and `onIconChange`; every other OSC, OSC 52 and OSC 8 included,
+  goes to `onPrivateOSC`; there is no clipboard handler; all three are null by default. It
+  answers DA1, DA2, DA3, DSR 5 n, CPR (zero-based, a bug: `ESC[0;0R` at the home position; the
+  view adds one to row and column) and
+  `CSI 18 t` through `onOutput`, resizes the terminal on `CSI 8;r;c t`, ignores `CSI 20 t` and
+  `CSI 21 t`, and does not parse DCS (its content would be printed as text). Bugs: palette index
+  15 (SGR 97) resolves to white instead of bright white; selection and block cursor are painted
+  over the text, underline and bar cursor in row 0 (the view paints its own);
+  `TerminalView.onTapUp` is never called (the view detects link clicks with its
+  own pointer listener); the sequences listed above make it throw or hang.
 - Copying only by the person (selection and shortcut or menu); pasting more than one line
   shows the text beforehand ("Paste with line breaks?").
 - Mobile: extra keys bar according to 01, screen M8; Ctrl and Alt as one-shot or held

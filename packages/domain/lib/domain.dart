@@ -28,6 +28,7 @@ export 'src/ids.dart';
 export 'src/rules/cost_label.dart';
 export 'src/rules/cursor_rule.dart';
 export 'src/rules/event_catalog.dart';
+export 'src/rules/fingerprint_display.dart';
 export 'src/rules/forum_order.dart';
 export 'src/rules/fractional_index.dart';
 export 'src/rules/loaded_ranges.dart';

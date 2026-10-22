@@ -53,3 +53,4 @@ sdk/**/coverage/
 *.swp
 .claude/worktrees/
 .claude/settings.local.json
+**/test/goldens/failures/

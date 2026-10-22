@@ -1816,8 +1816,22 @@ Reason: the runner locks sessions and runs with secrets of the instance operator
 One Flutter widget for all clients. Renderer: package `xterm` by TerminalStudio, MIT, version
 4.0.0, for Android, iOS, Linux, macOS, Web and Windows (https://pub.dev/packages/xterm, retrieved
 2026-10-10 [verified]). According to pub.dev, the last release was about two years ago
-[verified]; before adopting it, the build ticket checks the maintenance state and open security
-advisories, and it holds the blocks from 11.2 with its own tests (TM-T14).
+[verified]. Check of the build ticket M4-35 on 2026-10-20 [verified]:
+
+- Release: 4.0.0 is the latest, published 2024-02-27, MIT; it depends on `convert`, `meta`,
+  `quiver`, `equatable` ^2.0.3 and `zmodem` 0.0.6 (MIT) (https://pub.dev/packages/xterm,
+  https://pub.dev/api/packages/xterm).
+- Maintenance: the repository https://github.com/TerminalStudio/xterm.dart is not archived,
+  last push 2025-06-19, 109 open issues and pull requests.
+- Security reports: none. OSV (https://api.osv.dev, query for ecosystem `Pub`, package `xterm`)
+  lists no vulnerability; the GitHub advisory database
+  (https://github.com/advisories?query=ecosystem%3Apub+xterm) has no entry; the issues hold no
+  security report for OSC 52, OSC 8, hyperlinks, the clipboard or titles.
+- Behavior and bugs of 4.0.0, read in its source:
+  [15-client-architecture.md](15-client-architecture.md), section 23.4.
+
+The package is taken as is; the blocks of 11.2 live in `terminal_ui` in front of the renderer and
+hold with own tests (TM-T14), independent of the renderer version (docs/decisions.d/M4-35.md).
 
 Every client shows: session list per host with state, reattach, fingerprint of the
 host, badge of the LLM login ("Personal", "Organization", "None"), remaining time until the
