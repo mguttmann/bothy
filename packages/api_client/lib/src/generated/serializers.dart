@@ -52,6 +52,7 @@ import 'package:api_client/src/generated/model/agent_session_report.dart';
 import 'package:api_client/src/generated/model/agent_triggerers.dart';
 import 'package:api_client/src/generated/model/agent_update.dart';
 import 'package:api_client/src/generated/model/agent_updated_event.dart';
+import 'package:api_client/src/generated/model/alertmanager_alert.dart';
 import 'package:api_client/src/generated/model/api_token.dart';
 import 'package:api_client/src/generated/model/api_token_create.dart';
 import 'package:api_client/src/generated/model/api_token_created.dart';
@@ -631,6 +632,7 @@ part 'serializers.g.dart';
   AgentTriggerers,
   AgentUpdate,
   AgentUpdatedEvent,
+  AlertmanagerAlert,
   ApiToken,
   ApiTokenCreate,
   ApiTokenCreated,
@@ -1622,6 +1624,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(CostEstimate)]),
             () => ListBuilder<CostEstimate>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AlertmanagerAlert)]),
+            () => ListBuilder<AlertmanagerAlert>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ImportItem)]),

@@ -182,7 +182,9 @@ effect from the next request, a newly granted one needs a new token.
 
 `app_installations.state = 'suspended'` is set by the action `app.suspend` and reset by
 `app.resume` (both owner, step-up, audit; 05). Reason: an emergency stop must not force a
-reinstallation with a new consent.
+reinstallation with a new consent. Incoming webhooks of a suspended app stay, but every post
+answers `404` while the installation is not `active`; after `app.resume` the same URL works
+again (8.4).
 
 ## 5. Scopes and grants
 
@@ -272,14 +274,36 @@ receiver does not allow forged webhooks.
 - Call: `POST` to the webhook address with `Authorization: Bearer <token>`. For senders without
   headers, the server allows the token as the last path segment; access logs redact
   this segment. An unknown webhook and a wrong token produce the same response `404`.
-- The token appears once; only the hash is stored.
+- Two operations serve the call, with the same action `webhook_in.post`, request body and
+  answers ([DECISIONS.md](../DECISIONS.md) D-M2-27-1): `postIncomingWebhookWithBearer` on
+  `POST /api/v1/hooks/{webhook_id}` takes the token from `Authorization: Bearer <token>`, where a
+  missing header or another scheme counts as a wrong token; `postIncomingWebhook` on
+  `POST /api/v1/hooks/{webhook_id}/{token}` takes the last path segment and ignores
+  `Authorization`. Of the root security only `bearerAuth` applies to the Bearer operation, with
+  the webhook token, which the token check of 8.4 verifies, not the authenticator
+  (D-M2-27-17).
+- The token appears once; only the hash is stored. The token has the kind `whi`
+  (`bothy_whi_...`); `createIncomingWebhook` returns it inside the absolute URL `url` built from
+  `server.public_url` with the path of `postIncomingWebhook`; Bearer senders drop the last
+  segment and send the token in the header.
 
 ### 8.2 Formats
 
 | `format` | Body | Mapping |
 |---|---|---|
-| `native` (default) | `content` (Markdown), optional `thread_id`, `thread_title`, `client_msg_id` | one message; `client_msg_id` makes retries idempotent |
-| `alertmanager` | webhook payload of Prometheus Alertmanager | one message per notification: state, count, `alertname`, summary per alert from labels and annotations, links `generatorURL` and `externalURL` as text |
+| `native` (default) | `content_md` (Markdown, required, not only white space), optional `title`, `thread_id`, `client_msg_id` (UUIDv7) | one message; `client_msg_id` makes retries idempotent: a repeat answers `200` with `Idempotent-Replay: true` and the original `message_id` and `thread_id`; the same `client_msg_id` with other content, or through another webhook of the same app, gives `422 idempotency_key_reuse` (the hash context names the webhook, the body `thread_id` and the `title`). Without `client_msg_id` the server creates one |
+| `alertmanager` | webhook payload of Prometheus Alertmanager | one message per notification: state, count, `alertname`, summary per alert from labels and annotations, links `generatorURL` and `externalURL` as text. The layout, the escaping of payload values, the URL rules and the shortening to `message.max_content_bytes` are fixed in [DECISIONS.md](../DECISIONS.md) D-M2-27-10 and D-M2-27-23. Retries are not deduplicated: every post gets a new server `client_msg_id` |
+
+The format is decided per request from the body, not stored per webhook
+([DECISIONS.md](../DECISIONS.md) D-M2-27-5). One closed request schema, `IncomingWebhookPost`,
+holds the members of both formats. A body with at least one Alertmanager member (`version`,
+`groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+`commonAnnotations`, `externalURL`, `alerts`) is `alertmanager`; if it also holds a native
+member, the answer is `400 validation_failed` with the pointer of the first native member and
+`errors[].code` `format_mixed`. Every other body is `native`. A format not listed in
+`webhook_in.formats_enabled` gives `400 validation_failed` with `errors[].code`
+`format_disabled`. Unknown members give `400 validation_failed` (`unknown_member`); a native
+`content_md` above `message.max_content_bytes` gives `413 payload_too_large`.
 
 Which formats are enabled is controlled by `webhook_in.formats_enabled`. Further formats do not
 go into the server but come as an app (section 10). Reason: a built-in converter is
@@ -297,8 +321,23 @@ Evidence for Alertmanager (https://prometheus.io/docs/alerting/latest/configurat
 
 1. Fixed thread of the webhook (`incoming_webhooks.thread_id`), otherwise
 2. `thread_id` in the body, if the thread belongs to the channel, otherwise
-3. `thread_title` creates a new thread (required in forums), otherwise
+3. `title` creates a new thread (required in forums), otherwise
 4. main thread of the text channel.
+
+Rules as built ([DECISIONS.md](../DECISIONS.md) D-M2-27-6 and D-M2-27-7):
+
+- Rule 1 holds only while the fixed thread belongs to the webhook's channel; then `thread_id`
+  and `title` of the body are ignored. A fixed thread moved to another channel gives `404`,
+  because a webhook writes only into its own channel.
+- Rule 2 uses the body `thread_id` only when that thread belongs to the webhook's channel; an
+  unknown thread or one of another channel falls through to the next rule, so nothing about
+  other channels shows.
+- Rule 3 in a forum creates a forum post with the message as its first message. In a text
+  channel the message is written into the main thread and the new thread starts from that
+  message; the answer names the new thread in `thread_id`, and a replay answers the same thread.
+- Rules 2 and 3 apply to `native` bodies only. A forum reached by none of the rules gives
+  `400 validation_failed` with `errors[].code` `required_for_forum_post` (pointer `/title` for
+  `native`, empty for `alertmanager`).
 
 One thread per alert group would need a mapping from an external key to a thread. Matching
 by title is ruled out because name-based identity is its own class of errors; the
@@ -310,17 +349,40 @@ mapping comes as a separate table if needed (proposal in the report) or as an ap
 flowchart TD
     R["POST incoming webhook"] --> RL{"rl.webhook_in within limit?"}
     RL -- no --> E429["429"]
-    RL -- yes --> T{"Token valid, not revoked?"}
-    T -- no --> E404["404"]
+    RL -- yes --> PA{"rl.public_auth of the client IP free?"}
+    PA -- no --> E429
+    PA -- yes --> T{"Token valid, not revoked, installation active?"}
+    T -- no --> FT["failed token: one token of rl.public_auth"]
+    FT --> E404["404"]
     T -- yes --> SZ{"Body up to webhook_in.max_body_bytes?"}
     SZ -- no --> E413["413"]
     SZ -- yes --> F{"Format enabled and valid?"}
-    F -- no --> E400["400 validation_failed"]
-    F -- yes --> AZ{"authorize app: message.create on the channel"}
+    F -- no --> E400["400"]
+    F -- yes --> TG{"Target thread (8.3)?"}
+    TG -- "fixed thread in another channel" --> E404
+    TG -- "forum without title" --> E400
+    TG -- yes --> AZ{"authorize app: webhook_in.post, message.create on the channel"}
     AZ -- no --> E404
     AZ -- yes --> W["Message origin app, mentions not resolved"]
-    W --> OK["201 with message_id"]
+    W --> OK["201 with message_id and thread_id, 200 on a replay"]
 ```
+
+The token check is a stage of the HTTP chain (02 9.1, `StageWebhookToken`) after the rate
+limit `rl.webhook_in` and before the body is read, so a wrong token wins over a body that is too
+large ([DECISIONS.md](../DECISIONS.md) D-M2-27-2 and D-M2-27-20). The authenticator never runs
+on the two post operations; the request stays anonymous until the token check replaces it with
+the webhook actor: the app with its active installation and only the scope `messages:write`
+(D-M2-27-3). A failed check takes one token of `rl.public_auth` of the client IP; while that
+bucket is empty the stage answers `429` without checking the token. Every refusal answers the
+same `404 not_found` as an unknown webhook: unknown ID, wrong or malformed token, revoked
+webhook, an installation that is uninstalled or not `active` (so `app.suspend` stops posts and
+`app.resume` lets the same URL work again, D-M2-27-13), a fixed thread in another channel and
+every denial of `webhook_in.post`, `message.create` or `thread.create` (D-M2-27-4).
+
+Both post operations are also served on the internal listener (`server.internal_listen_addr`)
+in every role, for senders inside the stack such as Alertmanager, through a chain of their own
+whose client IP is the peer address (no forwarded headers, R-SE-09) and whose rate limits count
+per listener; nothing else of the API is mounted there (D-M2-27-15, D-M2-27-18).
 
 - `origin = 'app'`; the message never triggers agents (03, `incoming_webhooks`).
 - Mentions in the text are not resolved. Reason: a leaked token should not be able to trigger
@@ -328,6 +390,9 @@ flowchart TD
   channel settings.
 - Content up to `message.max_content_bytes`; no attachments through this path (files through the
   app API with `files:write`).
+- Revocation ends posting: `revokeIncomingWebhook`, `app.uninstall` (4.3) and the archive of the
+  channel, which revokes its active webhooks in the archive transaction with the archive time
+  ([DECISIONS.md](../DECISIONS.md) D-M2-27-14, D-M2-27-21); after their commit no post writes.
 
 ## 9. Commands and interactions for apps
 
@@ -539,7 +604,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | `webhook.hmac_master_key_ref` | Server | `file:<secrets.dir>/webhook_hmac_master_key` | reference to the master key from which the HMAC secrets of the subscriptions are derived ([webhooks.md](../api/webhooks.md), section 2.1) |
 | `webhook.receiver_tolerance` | Receiver | `5m` | recommendation, not a server value: tolerance for `webhook-timestamp` at the receiver and default of the check function of the SDKs |
 | `webhook_in.max_body_bytes` | Server | `1048576` | size of an incoming body |
-| `webhook_in.formats_enabled` | Server | `native, alertmanager` | enabled incoming formats |
+| `webhook_in.formats_enabled` | Server | `["native", "alertmanager"]` | enabled incoming formats; the start check `webhook_in_formats` allows only `native` and `alertmanager`, each at most once; an empty list switches every format off |
 | `sdk.http_timeout` | SDK | `30s` | timeout of a REST request |
 | `sdk.retry_max_attempts` | SDK | `5` | attempts per idempotent operation |
 | `sdk.retry_backoff_base` | SDK | `500ms` | base of the backoff |

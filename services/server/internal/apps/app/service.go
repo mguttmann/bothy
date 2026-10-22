@@ -57,6 +57,8 @@ type Deps struct {
 	// Webhooks are the outgoing webhooks: install creates the manifest subscription, uninstall
 	// disables the subscriptions and resume makes their heads due (M2-26 design note 14).
 	Webhooks *WebhookService
+	// Incoming are the incoming webhooks: uninstall revokes them (M2-27 design note 11 a).
+	Incoming *IncomingService
 	// SpecVersion is the version of the API contract (routes.SpecVersion) min_api_version is
 	// compared with.
 	SpecVersion string
@@ -79,7 +81,7 @@ var _ apps.Apps = (*Service)(nil)
 // is no SemVer or an entry of webhook.allowed_hosts that is no host[:port].
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Repo == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil || d.Principals == nil || d.Tokens == nil ||
-		d.Grants == nil || d.Rights == nil || d.Scopes == nil || d.Cursors == nil || d.Webhooks == nil {
+		d.Grants == nil || d.Rights == nil || d.Scopes == nil || d.Cursors == nil || d.Webhooks == nil || d.Incoming == nil {
 		return nil, errors.New("apps: New needs every collaborator")
 	}
 	if cfg.ManifestMaxBytes < 1 || cfg.CommandMax < 1 || cfg.CommandDescriptionMaxChars < 1 || cfg.HandleMaxChars < 1 ||

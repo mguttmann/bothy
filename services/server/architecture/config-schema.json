@@ -3891,6 +3891,30 @@
       "max": "",
       "chapter": "11-extensions.md",
       "doc": "How long the server signs with the old and the new HMAC generation after a rotation."
+    },
+    {
+      "name": "webhook_in.formats_enabled",
+      "env": "BOTHY_WEBHOOK_IN__FORMATS_ENABLED",
+      "kind": "list(string)",
+      "default": "[\"native\", \"alertmanager\"]",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "11-extensions.md",
+      "doc": "Formats of incoming webhooks that are switched on: native and alertmanager."
+    },
+    {
+      "name": "webhook_in.max_body_bytes",
+      "env": "BOTHY_WEBHOOK_IN__MAX_BODY_BYTES",
+      "kind": "int",
+      "default": "1048576",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "11-extensions.md",
+      "doc": "Largest body of an incoming webhook call in bytes."
     }
   ]
 }

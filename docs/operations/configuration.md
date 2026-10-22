@@ -474,8 +474,8 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 | `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server | duration | `24h` | how long the server signs with the old and the new HMAC generation | active |
 | `webhook.hmac_master_key_ref` | `BOTHY_WEBHOOK__HMAC_MASTER_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/webhook_hmac_master_key` | reference to the master key from which the HMAC secrets of the subscriptions are derived ([webhooks.md](../api/webhooks.md), section 2.1) | active |
 | `webhook.receiver_tolerance` |  | Receiver |  | `5m` | recommendation, not a server value: tolerance for `webhook-timestamp` at the receiver and default of the check function of the SDKs |  |
-| `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server |  | `1048576` | size of an incoming body | planned (M2) |
-| `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server |  | `native, alertmanager` | enabled incoming formats | planned (M2) |
+| `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server | int | `1048576` | size of an incoming body | active |
+| `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server | list(string) | `["native", "alertmanager"]` | enabled incoming formats; the start check `webhook_in_formats` allows only `native` and `alertmanager`, each at most once; an empty list switches every format off | active |
 | `sdk.http_timeout` |  | SDK |  | `30s` | timeout of a REST request |  |
 | `sdk.retry_max_attempts` |  | SDK |  | `5` | attempts per idempotent operation |  |
 | `sdk.retry_backoff_base` |  | SDK |  | `500ms` | base of the backoff |  |

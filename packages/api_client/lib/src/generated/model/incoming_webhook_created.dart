@@ -13,14 +13,14 @@ part 'incoming_webhook_created.g.dart';
 ///
 /// Properties:
 /// * [webhook]
-/// * [url] - Full URL including the token. Shown once.
+/// * [url] - Absolute URL from `server.public_url` including the token, shown once. Senders that set a header drop the last segment and send the token as `Authorization: Bearer <token>`.
 @BuiltValue()
 abstract class IncomingWebhookCreated
     implements Built<IncomingWebhookCreated, IncomingWebhookCreatedBuilder> {
   @BuiltValueField(wireName: r'webhook')
   IncomingWebhook get webhook;
 
-  /// Full URL including the token. Shown once.
+  /// Absolute URL from `server.public_url` including the token, shown once. Senders that set a header drop the last segment and send the token as `Authorization: Bearer <token>`.
   @BuiltValueField(wireName: r'url')
   String get url;
 

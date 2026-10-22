@@ -60,16 +60,29 @@ func Middleware(l *Limiter) func(http.Handler) http.Handler {
 	}
 }
 
-// credentialsPrecheck is the failed-credentials rule of 02 "Chain in the api node": before the
-// credentials of r are verified it reserves one token of rl.public_auth of the client IP. While
-// the bucket is empty the answer is 429 rate_limited and nothing is verified. Reserving instead of
-// looking keeps concurrent requests from all passing on the same token, so at most burst
-// verifications of one client IP run per refill (red team M1-19, finding 1). The returned settle
-// function keeps the token for credentials that failed with 401 other than token_expired and
-// use_dpop_nonce, and gives it back otherwise: valid credentials and the normal flows of a valid
-// client cost nothing, and an error of another kind (the identity store is down) is not the
-// client's failure.
+// credentialsPrecheck is the failed-credentials rule of 02 "Chain in the api node" for
+// StageAuthenticate: before the credentials of r are verified FailedCredentialGuard reserves one
+// token of rl.public_auth of the client IP. The returned settle function keeps the token for
+// credentials that failed with 401 other than token_expired and use_dpop_nonce, and gives it back
+// otherwise: valid credentials and the normal flows of a valid client cost nothing, and an error of
+// another kind (the identity store is down) is not the client's failure.
 func (l *Limiter) credentialsPrecheck(r *http.Request) (func(error), error) {
+	settle, err := l.FailedCredentialGuard(r)
+	if err != nil {
+		return nil, err
+	}
+	return func(authErr error) { settle(countsAsFailure(authErr)) }, nil
+}
+
+// FailedCredentialGuard reserves one token of rl.public_auth for the client IP of r (02 9.1, 05 3):
+// while the bucket is empty it returns 429 rate_limited (with Retry-After and the RateLimit headers
+// of rl.public_auth) and no settle function, and the caller must not check the credential.
+// Otherwise settle(failed) must be called exactly once: failed true keeps the token (a failed
+// credential), false gives it back. Reserving instead of looking keeps concurrent requests from all
+// passing on the same token, so at most burst checks of one client IP run per refill (red team
+// M1-19, finding 1). Besides StageAuthenticate it guards the token check of the incoming webhooks
+// (M2-27 design note 2c). The error is also that of Limiter.Allow for a limiter without the class.
+func (l *Limiter) FailedCredentialGuard(r *http.Request) (settle func(failed bool), err error) {
 	ip, _ := reqmeta.ClientIP(r.Context())
 	key := KeyForIP(ip)
 	d, err := l.Allow(ClassPublicAuth, key)
@@ -79,8 +92,8 @@ func (l *Limiter) credentialsPrecheck(r *http.Request) (func(error), error) {
 	if !d.Allowed {
 		return nil, rateLimited(ClassPublicAuth, d)
 	}
-	return func(authErr error) {
-		if !countsAsFailure(authErr) {
+	return func(failed bool) {
+		if !failed {
 			_ = l.Refund(ClassPublicAuth, key)
 		}
 	}, nil

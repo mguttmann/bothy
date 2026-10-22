@@ -177,12 +177,14 @@ type server struct {
 	tel       *otel.Telemetry
 	pool      *pg.Pool
 	internal  *http.Server
-	public    *http.Server
-	mux       *http.ServeMux
-	required  int64
-	instance  instance.Record
-	jobsCfg   jobs.Config
-	jobsRT    *jobs.Runtime
+	// internalMux is the mux of the internal listener; the routes step adds the webhook routes.
+	internalMux *http.ServeMux
+	public      *http.Server
+	mux         *http.ServeMux
+	required    int64
+	instance    instance.Record
+	jobsCfg     jobs.Config
+	jobsRT      *jobs.Runtime
 	// audit is the audit module (M1-24); later tickets hand its recorder to the modules.
 	audit *Audit
 	// authorizer is the kernel/authorize.Authorizer of the process (M1-28); the use cases of later
@@ -620,10 +622,11 @@ func (s *server) startInternal(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	srv, host, port := s.serve(ln, httpserver.InternalHandler(httpserver.Internal(s.reg), s.sec), "internal listener")
+	mux := httpserver.Internal(s.reg)
+	srv, host, port := s.serve(ln, httpserver.InternalHandler(mux, s.sec), "internal listener")
 	s.logger().InfoContext(ctx, msgInternalListener, slog.String(attr.ServerAddress, host), slog.Int(attr.ServerPort, port))
 	s.mu.Lock()
-	s.internal = srv
+	s.internal, s.internalMux = srv, mux
 	s.mu.Unlock()
 	return nil
 }
@@ -1097,17 +1100,21 @@ func (s *server) startApps(ctx context.Context) error {
 	if err := master.Check(ctx); err != nil {
 		return err
 	}
+	icfg, err := IncomingConfig(s.values)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
-	pool, a, az, admin, id, sy := s.pool, s.audit, s.authorizer, s.authzAdmin, s.identity, s.sync
+	pool, a, az, admin, id, sy, ch, msg := s.pool, s.audit, s.authorizer, s.authzAdmin, s.identity, s.sync, s.chat, s.messaging
 	s.mu.Unlock()
-	if a == nil || az == nil || admin == nil || id == nil || sy == nil {
-		return errors.New("wire: the apps step needs the audit step, sync, the Authorizer, the authz Admin and identity")
+	if a == nil || az == nil || admin == nil || id == nil || sy == nil || ch == nil || msg == nil {
+		return errors.New("wire: the apps step needs the audit step, sync, the Authorizer, the authz Admin, identity, chat and messaging")
 	}
 	state := instanceapp.NewState(instancepg.NewRepository(pool), a.UoW())
 	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id,
 		Grants: admin.Admin, Clock: s.deps.Clock, Webhooks: WebhookDeps{
 			Config: wcfg, State: state, Log: sy.LogReader(), Master: master, Sender: sender, Logger: s.logger(),
-		}})
+		}, Incoming: icfg, Chat: ch, Messages: msg})
 	if err != nil {
 		return err
 	}
@@ -1330,8 +1337,11 @@ func (s *server) mountRoutes(ctx context.Context) error {
 	}
 	bindings := append(RouteBindings(routes.Enabled()), GatewayRouteBinding(), HostConnectRouteBinding())
 	bindings = append(bindings, TerminalStreamRouteBindings()...)
-	return startRoutes(bindings, BuildRegistry(s.deps.Registrations),
-		cat, log, mount)
+	if err := startRoutes(bindings, BuildRegistry(s.deps.Registrations), cat, log, mount); err != nil {
+		return err
+	}
+	// Every role serves the incoming webhooks on the internal listener (M2-27 design note 12).
+	return s.mountInternalHooks(cat, log)
 }
 
 // mountAPI is the mount part of mountRoutes for api and all: the chain, the rate limiter with its
@@ -1354,6 +1364,12 @@ func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.
 		return err
 	}
 	s.mu.Lock()
+	ap := s.apps
+	s.mu.Unlock()
+	if err := InstallWebhookToken(chain, ap, limiter); err != nil {
+		return err
+	}
+	s.mu.Lock()
 	mux, pool, a := s.publicMux(), s.pool, s.audit
 	s.chain = chain
 	s.mu.Unlock()
@@ -1361,7 +1377,7 @@ func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.
 		return errors.New("wire: the setup gate needs the unit of work of the audit step")
 	}
 	InstallSetupGate(chain, mux, instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()))
-	if err := MountRoutes(s.role, mux, s.handlers(), cat, chain, log); err != nil {
+	if err := MountRoutes(s.role, mux, s.handlers(), cat, chain, log, WebhookBodyLimit(s.values.Int(keyWebhookInMaxBodyBytes))); err != nil {
 		return err
 	}
 	if err := MountConsole(mux, s.values); err != nil {

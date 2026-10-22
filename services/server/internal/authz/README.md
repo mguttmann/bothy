@@ -246,6 +246,18 @@ is still deferred, is `not_found` without an error line, so one event never stop
 (`TestResourceFromEventCatalogue` decides every durable event type; docs/DECISIONS.md M1-63/9,
 M1-63/12).
 
+### Post of an incoming webhook `webhook_in.post` (M2-27)
+
+`webhook_in.post` is no longer deferred (removed from `domain/testdata/deferred_actions.golden`):
+its row in `domain/requirements_table.go` is `All(AppKind, AtLeast(LevelWrite))` on the resource
+of the webhook's channel. The token check of apps makes the actor the app of the webhook with only
+`messages:write` among its granted scopes; the action needs no scope. The right is not `Public`, so
+an anonymous principal is `unauthenticated` before the expression; an app with `write` is
+allowed, with `read` only `forbidden level_insufficient`, without a grant `not_found`; a person is
+`forbidden subject_kind_not_allowed`. Denials are audited like other `denials` actions; apps turns
+every refusal into the `404` of an unknown webhook. Test: `app/webhookin_test.go`
+(`TestWebhookInPostRequirement`).
+
 ### How a module builds a `Resource`
 
 Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.

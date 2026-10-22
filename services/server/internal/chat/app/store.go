@@ -157,6 +157,9 @@ type Store interface {
 	// ShareThread returns the thread id like Thread and holds FOR SHARE on its row until the end
 	// of the unit (M1-61).
 	ShareThread(ctx context.Context, id ids.ID) (th domain.Thread, found bool, err error)
+	// ThreadByParentMessage returns the thread that started from the message messageID; found is
+	// false when none did.
+	ThreadByParentMessage(ctx context.Context, messageID ids.ID) (th domain.Thread, found bool, err error)
 	// InsertThread inserts the thread th of kind thread and returns the stored row. Errors:
 	// conflict on /parent_message_id when the parent message already started a thread.
 	InsertThread(ctx context.Context, th domain.Thread) (domain.Thread, error)

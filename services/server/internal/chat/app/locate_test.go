@@ -94,8 +94,8 @@ func TestTriggerChannel(t *testing.T) {
 	e.az.err = errs.New(errs.CodeForbidden, "authorize called")
 
 	got, err := e.svc.TriggerChannel(ctx, text.ID)
-	want := chat.TriggerChannel{ChannelID: text.ID, SpaceID: sp.ID, Kind: "text", EffectiveOperatorID: spaceOp, RequireMention: true,
-		AutoThread: true, SettingsVersion: e.store.channels[text.ID].SettingsVersion}
+	want := chat.TriggerChannel{ChannelID: text.ID, SpaceID: sp.ID, Kind: "text", EffectiveOperatorID: spaceOp, MainThreadID: text.MainThreadID,
+		RequireMention: true, AutoThread: true, SettingsVersion: e.store.channels[text.ID].SettingsVersion}
 	if err != nil || got != want {
 		t.Fatalf("text %+v, %v; want %+v", got, err, want)
 	}

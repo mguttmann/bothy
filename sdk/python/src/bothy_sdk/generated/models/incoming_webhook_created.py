@@ -18,7 +18,8 @@ class IncomingWebhookCreated:
     """
     Attributes:
         webhook (IncomingWebhook):
-        url (str): Full URL including the token. Shown once.
+        url (str): Absolute URL from `server.public_url` including the token, shown once. Senders that set a
+            header drop the last segment and send the token as `Authorization: Bearer <token>`.
     """
 
     webhook: IncomingWebhook

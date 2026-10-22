@@ -45,6 +45,9 @@ const (
 	headerXForwardedFor = "X-Forwarded-For"
 	problemTypePrefix   = "/api/v1/problems/"
 	tokenPathParam      = "{token}"
+	// tokenPlaceholder replaces a {token} segment in instance: the template segment percent-encoded,
+	// because instance is a uri-reference (RFC 3986), which has no braces.
+	tokenPlaceholder    = "%7Btoken%7D" //nolint:gosec // G101: the placeholder written instead of a token, no credential
 	defaultRetryAfter   = 5 * time.Second
 	keyMaxJSONBodyBytes = "http.max_json_body_bytes"
 	keyMaxUploadBytes   = "file.max_upload_bytes"
@@ -107,9 +110,9 @@ type fieldError struct {
 //
 // The body carries type /api/v1/problems/{code}, the title of the code, status, code,
 // correlation_id from kernel/reqmeta, instance (the request path without query, with every
-// {token} segment of the route template kept as the literal {token}; unmatched requests have no
-// instance, because no route says which segments are secret), and detail, errors[], current,
-// reason and hint when the error carries them, and the extension members of an
+// {token} segment of the route template written as the placeholder %7Btoken%7D; unmatched
+// requests have no instance, because no route says which segments are secret), and detail,
+// errors[], current, reason and hint when the error carries them, and the extension members of an
 // errs.ProblemExtender in the chain of err (never over a standard member, never null, never for
 // internal_error). The headers of the error (WWW-Authenticate,
 // DPoP-Nonce, Allow) are applied; 503 unavailable and maintenance always carry Retry-After
@@ -179,8 +182,13 @@ func toError(r *http.Request, err error) *errs.Error {
 // payloadTooLarge is 413 with detail naming the key of the route's body limit.
 func payloadTooLarge(ctx context.Context) *errs.Error {
 	key := keyMaxJSONBodyBytes
-	if op, ok := OperationFrom(ctx); ok && op.RequestBody.transfer() {
-		key = keyMaxUploadBytes
+	if op, ok := OperationFrom(ctx); ok {
+		switch {
+		case op.BodyLimit > 0 && op.BodyLimitKey != "":
+			key = op.BodyLimitKey
+		case op.RequestBody.transfer():
+			key = keyMaxUploadBytes
+		}
 	}
 	return errs.New(errs.CodePayloadTooLarge, "Body exceeds "+key+".")
 }
@@ -361,7 +369,7 @@ func setAPIHeaders(h http.Header, media string) {
 }
 
 // instancePath returns the escaped request path with every segment whose template segment is
-// {token} replaced by the literal {token} (06 "Errors" item 1, SEC-LOG-3). Paths and templates of
+// {token} replaced by tokenPlaceholder (06 "Errors" item 1, SEC-LOG-3). Paths and templates of
 // different length cannot happen for a matched route; the path is then dropped to "" rather than
 // risk a secret.
 func instancePath(path, template string) string {
@@ -374,7 +382,7 @@ func instancePath(path, template string) string {
 	}
 	for i, t := range ts {
 		if t == tokenPathParam {
-			ps[i] = tokenPathParam
+			ps[i] = tokenPlaceholder
 		}
 	}
 	return strings.Join(ps, "/")

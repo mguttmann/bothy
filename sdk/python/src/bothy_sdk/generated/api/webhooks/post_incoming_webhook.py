@@ -39,6 +39,11 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> IncomingWebhookResult | Problem:
+    if response.status_code == 200:
+        response_200 = IncomingWebhookResult.from_dict(response.json())
+
+        return response_200
+
     if response.status_code == 201:
         response_201 = IncomingWebhookResult.from_dict(response.json())
 
@@ -58,6 +63,11 @@ def _parse_response(
         response_413 = Problem.from_dict(response.json())
 
         return response_413
+
+    if response.status_code == 422:
+        response_422 = Problem.from_dict(response.json())
+
+        return response_422
 
     if response.status_code == 429:
         response_429 = Problem.from_dict(response.json())
@@ -89,13 +99,41 @@ def sync_detailed(
 ) -> Response[IncomingWebhookResult | Problem]:
     """Post a message through an incoming webhook
 
-     The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-    app` and never trigger agents. Unknown or revoked webhooks give 404.
+     The token is the last path segment; `Authorization` is ignored. Servers write the path only as its
+    pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse
+    proxies must redact it (16 4.3).
+
+    The format is recognised per request from the body: a body with at least one Alertmanager member
+    (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+    `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+    Alertmanager and gives one message per notification; it must carry no native member (`400
+    validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+    optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+    gives `400 validation_failed` with `format_disabled`.
+
+    Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+    `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+    message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+    uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+    counts against `rl.public_auth` of the client IP.
+
+    The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+    agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+    `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+    Senders inside the stack reach the same path on the internal listener.
 
     Args:
         webhook_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         token (str):
-        body (IncomingWebhookPost):
+        body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
+            recognised per request (11 8.2,
+            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
+            Prometheus
+            Alertmanager (format `alertmanager`) and must contain no native member; every other body
+            is
+            `native` and needs `content_md`. Unknown members are refused.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -127,13 +165,41 @@ def sync(
 ) -> IncomingWebhookResult | Problem | None:
     """Post a message through an incoming webhook
 
-     The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-    app` and never trigger agents. Unknown or revoked webhooks give 404.
+     The token is the last path segment; `Authorization` is ignored. Servers write the path only as its
+    pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse
+    proxies must redact it (16 4.3).
+
+    The format is recognised per request from the body: a body with at least one Alertmanager member
+    (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+    `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+    Alertmanager and gives one message per notification; it must carry no native member (`400
+    validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+    optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+    gives `400 validation_failed` with `format_disabled`.
+
+    Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+    `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+    message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+    uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+    counts against `rl.public_auth` of the client IP.
+
+    The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+    agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+    `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+    Senders inside the stack reach the same path on the internal listener.
 
     Args:
         webhook_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         token (str):
-        body (IncomingWebhookPost):
+        body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
+            recognised per request (11 8.2,
+            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
+            Prometheus
+            Alertmanager (format `alertmanager`) and must contain no native member; every other body
+            is
+            `native` and needs `content_md`. Unknown members are refused.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -160,13 +226,41 @@ async def asyncio_detailed(
 ) -> Response[IncomingWebhookResult | Problem]:
     """Post a message through an incoming webhook
 
-     The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-    app` and never trigger agents. Unknown or revoked webhooks give 404.
+     The token is the last path segment; `Authorization` is ignored. Servers write the path only as its
+    pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse
+    proxies must redact it (16 4.3).
+
+    The format is recognised per request from the body: a body with at least one Alertmanager member
+    (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+    `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+    Alertmanager and gives one message per notification; it must carry no native member (`400
+    validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+    optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+    gives `400 validation_failed` with `format_disabled`.
+
+    Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+    `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+    message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+    uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+    counts against `rl.public_auth` of the client IP.
+
+    The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+    agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+    `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+    Senders inside the stack reach the same path on the internal listener.
 
     Args:
         webhook_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         token (str):
-        body (IncomingWebhookPost):
+        body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
+            recognised per request (11 8.2,
+            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
+            Prometheus
+            Alertmanager (format `alertmanager`) and must contain no native member; every other body
+            is
+            `native` and needs `content_md`. Unknown members are refused.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -196,13 +290,41 @@ async def asyncio(
 ) -> IncomingWebhookResult | Problem | None:
     """Post a message through an incoming webhook
 
-     The token in the path authenticates the call; servers redact it in logs. Messages have `origin =
-    app` and never trigger agents. Unknown or revoked webhooks give 404.
+     The token is the last path segment; `Authorization` is ignored. Servers write the path only as its
+    pattern `/api/v1/hooks/{webhook_id}/{token}` in logs, traces and `Problem.instance`, and reverse
+    proxies must redact it (16 4.3).
+
+    The format is recognised per request from the body: a body with at least one Alertmanager member
+    (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+    `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of Prometheus
+    Alertmanager and gives one message per notification; it must carry no native member (`400
+    validation_failed`, `format_mixed`). Every other body is `native`: Markdown in `content_md` with
+    optional `title`, `thread_id` and `client_msg_id`. A format outside `webhook_in.formats_enabled`
+    gives `400 validation_failed` with `format_disabled`.
+
+    Order of checks (11 8.4): `rl.webhook_in` of the webhook (`429`), the token (`404`), the body up to
+    `webhook_in.max_body_bytes` (`413`), the format (`400`), `authorize` of the app (`404`), then the
+    message (`201`). An unknown or revoked webhook, a wrong or malformed token, a suspended or
+    uninstalled app and every refusal of the app's rights give the same `404`. A failed token check
+    counts against `rl.public_auth` of the client IP.
+
+    The message has `origin = app` with the app as author, resolves no mentions and never triggers an
+    agent. `native` with `client_msg_id` is idempotent: a repeat answers `200` with the original and
+    `Idempotent-Replay: true`, other content with the same `client_msg_id` `422 idempotency_key_reuse`.
+    Senders inside the stack reach the same path on the internal listener.
 
     Args:
         webhook_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         token (str):
-        body (IncomingWebhookPost):
+        body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
+            recognised per request (11 8.2,
+            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
+            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
+            Prometheus
+            Alertmanager (format `alertmanager`) and must contain no native member; every other body
+            is
+            `native` and needs `content_md`. Unknown members are refused.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

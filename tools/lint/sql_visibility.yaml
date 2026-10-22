@@ -110,6 +110,9 @@ exceptions:
   - query: chat.GetThread
     category: authorize_resolution
     reason: "resolves one thread (channel, operator) for authorize; the use case returns it only after thread.read allowed it"
+  - query: chat.GetThreadByParentMessage
+    category: authorize_resolution
+    reason: "resolves the one thread that started from a message the caller wrote itself (the replay of an incoming webhook post, M2-27); apps authorizes message.create on it before it answers"
   - query: chat.LockThread
     category: after_authorize
     reason: "locks the one thread a change authorize allowed (03 section 6.3)"

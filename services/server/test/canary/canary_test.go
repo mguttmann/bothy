@@ -250,6 +250,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.instance()
 	sc.auth(idp)
 	sc.apps()
+	sc.incomingWebhooks()
 	sc.hosts()
 	sc.terminalSessions()
 	sc.errorPaths()

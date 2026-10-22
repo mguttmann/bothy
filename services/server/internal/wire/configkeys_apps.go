@@ -6,7 +6,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // appsConfigKeys returns the keys the module apps reads first (M2-24): app.manifest_max_bytes of
 // docs/spec/11-extensions.md section 16, webhook.allowed_hosts of 03 section 9 (R-DM-17) and the
-// command limits of 09. Defaults as the chapter tables write them.
+// command limits of 09, and the keys of the incoming webhooks of 11 section 16 (M2-27). Defaults as
+// the chapter tables write them.
 func appsConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -29,5 +30,21 @@ func appsConfigKeys() []config.Key {
 			Doc:     "Longest command description in characters.",
 			Chapter: chapter09,
 		},
+		{
+			Name: keyWebhookInMaxBodyBytes, Kind: config.KindInt, Default: "1048576", Min: "1",
+			Doc:     "Largest body of an incoming webhook call in bytes.",
+			Chapter: chapter11,
+		},
+		{
+			Name: keyWebhookInFormatsEnabled, Kind: config.KindStringList, Default: `["native", "alertmanager"]`,
+			Doc:     "Formats of incoming webhooks that are switched on: native and alertmanager.",
+			Chapter: chapter11,
+		},
 	}
 }
+
+// The keys of the incoming webhooks (M2-27).
+const (
+	keyWebhookInMaxBodyBytes   = "webhook_in.max_body_bytes"
+	keyWebhookInFormatsEnabled = "webhook_in.formats_enabled"
+)

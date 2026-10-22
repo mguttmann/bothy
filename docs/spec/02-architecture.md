@@ -190,7 +190,7 @@ of lower modules that the module implements.
 | `authz` | `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person, revocation of all grants of a subject in the caller's permission change), `AppScopes` (scope table for the event subscriptions of an app), `I1Resolver` (guided flow `resolve_i1`, M2-21); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `AgentPolicySwitch` (M2-21), `HostSource` | kernel `authorize.AccessChanged` (with the triggering action; `runs` cancels with reason `user_disabled` on `user.disable`, otherwise with `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (posting, correction, totals), `Prices` | | | |
 | `identity` | `Auth` (login, refresh, logout, child sessions, step-up), `Directory`, `Devices`, `Tokens`, `Owners`, `PrincipalWrites` (principals of agents and apps); declares `AvatarFiles`, `AppInstallations` (active installation of an app) | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
-| `chat` | `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
+| `chat` | `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info), `ThreadsByParent` (the thread that started from a message, for the replay of an incoming webhook post in `apps`), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
 | `agents` | `Agents` (administration, policy, tool class), `Presence`, `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `Sessions`, `DevEnvironments` (milestone); declares `ConsumerFeed` (the stream of the REST consumer operations, M2-07) | `AgentDisabled` | | `authz.AgentPolicySource` (policy, tool class, readiness of the dev environment), `authz.AgentPolicySwitch` (the switch to `organization` of the guided flow, M2-21), kernel `personaldata.Participant` |
 | `files` | `Uploads` (sessions, parts), `Files` (read, open, preview, file tickets, delete), `Attachments`, `Transcripts`, `TextExtracts`; declares `AttachmentLocator` | `FileFinalized` (scan and, if applicable, transcript final) | `chat.ThreadMoved` (copy `message_attachments.channel_id`) | `identity.AvatarFiles`, kernel `personaldata.Participant` |
 | `messaging` | `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
@@ -793,10 +793,11 @@ Per route, wrapped around the handler of every operation (pattern and operation 
 
 | Step | Place | Task |
 |---|---|---|
-| 5 | `platform/httpserver` | Operation with action and rate-limit class from `api/routes` into the context; limits per route class: `http.max_json_body_bytes` or `file.max_upload_bytes`, deadline `http.request_timeout` or `http.transfer_timeout`; response writer with the proof check (9.3) |
+| 5 | `platform/httpserver` | Operation with action and rate-limit class from `api/routes` into the context; limits per route class: `http.max_json_body_bytes` or `file.max_upload_bytes`, deadline `http.request_timeout` or `http.transfer_timeout`; response writer with the proof check (9.3). The two operations with action `webhook_in.post` have the body limit `webhook_in.max_body_bytes` (`Operation.BodyLimit`); a declared `Content-Length` above it is refused at step 11 instead of here, so the token check of step 8a answers first (11 section 8.4: token before size) |
 | 6 | `platform/httpserver` | CORS (SEC-CORS-1, SEC-CORS-2) |
-| 7 | `kernel/actor` (from `identity`) | Check the access token with DPoP or the API token, session, device, principal status; without credentials: principal `anonymous` |
+| 7 | `kernel/actor` (from `identity`) | Check the access token with DPoP or the API token, session, device, principal status; without credentials: principal `anonymous`. Operations with action `webhook_in.post` (`Operation.AnonymousCredentials`) skip the credentials precheck and the authenticator and stay `anonymous`, whatever `Authorization` holds |
 | 8 | `platform/ratelimit` | Token bucket of the class, `429` with `Retry-After` |
+| 8a | `apps/adapters/httpapi` (`TokenStage` at `httpserver.StageWebhookToken`, installed by `internal/wire`) | Only for action `webhook_in.post`: `apps` checks the token of the incoming webhook (11 section 8.4), from the path value `token` (`postIncomingWebhook`) or from `Authorization: Bearer` (`postIncomingWebhookWithBearer`). A failed check answers `404 not_found` and keeps one token of `rl.public_auth` of the client IP (`ratelimit.Limiter.FailedCredentialGuard`); while that bucket is empty the answer is `429` without a check. Success replaces the anonymous actor with the webhook actor |
 | 9 | `platform/httpserver` | Maintenance mode (05, rule 9) |
 | 10 | `platform/httpserver` | `Idempotency-Key` (8.4) |
 | 11 | `platform/httpserver` | Media type; JSON guard: duplicate keys, invalid UTF-8, nesting beyond `http.max_json_depth` (SEC-IN-2) |
@@ -816,6 +817,12 @@ the request consumes a token from `rl.public_auth` of the client IP. If this buc
 step 7 answers requests with credentials from this client IP with `429`, without checking the
 credentials (05, section 3). Reason: every check costs a signature verification, and without
 this rule it would be unbounded.
+
+The internal listener (3.2) serves only the two operations with action `webhook_in.post`, through
+a chain of its own with the same per-route steps: it has no trusted proxies, so the client IP of
+step 3 is the peer address and forwarded headers are never read
+([19-security.md](19-security.md), R-SE-09), and it has its own rate limiter, so
+`rl.webhook_in` and `rl.public_auth` count per listener.
 
 ### 9.2 404 instead of 403
 

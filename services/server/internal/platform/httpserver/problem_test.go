@@ -150,7 +150,9 @@ func TestProblem_InstanceRedactsToken(t *testing.T) {
 		})}}})
 	resp := h.Do(h.NewRequest(http.MethodPost, "/api/v1/hooks/"+thingID+"/s3cr3t-t0ken?x=1", `{"a":1}`))
 	p := resp.Problem(t)
-	if p["instance"] != "/api/v1/hooks/"+thingID+"/{token}" || strings.Contains(string(resp.Body), "s3cr3t") {
+	// The placeholder is percent-encoded: instance is a uri-reference (RFC 3986), which has no
+	// braces (contract test G7, M2-27).
+	if p["instance"] != "/api/v1/hooks/"+thingID+"/%7Btoken%7D" || strings.Contains(string(resp.Body), "s3cr3t") {
 		t.Fatalf("instance %v, body %s", p["instance"], resp.Body)
 	}
 	other := problemFor(t, errs.New(errs.CodeNotFound, ""))

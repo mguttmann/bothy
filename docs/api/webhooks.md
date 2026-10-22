@@ -270,9 +270,15 @@ in this list; the check `api-catalogue-sync` (M1-03, subcheck `webhook-events`) 
 1. A person with `manage` on the channel creates the incoming webhook
    (`createIncomingWebhook`, step-up). They choose an installed app as the writing principal
    and optionally a fixed thread. The response contains the URL with the token exactly once.
-2. External systems send `POST /api/v1/hooks/{webhook_id}/{token}` with `content_md`, optionally
-   `title` (a new thread if there is no fixed thread) and `client_msg_id` (idempotency for
-   retries of the sender).
+2. External systems post in one of two variants with the same request body
+   (`IncomingWebhookPost`) and the same answers: `postIncomingWebhook` on
+   `POST /api/v1/hooks/{webhook_id}/{token}` with the token as the last path segment
+   (`Authorization` is ignored), or `postIncomingWebhookWithBearer` on
+   `POST /api/v1/hooks/{webhook_id}` with `Authorization: Bearer <token>` (exactly one header,
+   scheme `Bearer`, one token; a missing or other scheme counts as a wrong token). The `url` of
+   `createIncomingWebhook` is the absolute path variant built from `server.public_url`; a Bearer
+   sender drops the last segment and sends it in the header instead, so the token never appears
+   in a URL. Tokens start with `bothy_whi_`; the server keeps only their HMAC.
 3. The message has `origin = app`, and the author is the app. It never triggers agents (03,
    `incoming_webhooks`). The app needs `write` on the channel.
 4. Unknown or revoked webhooks and wrong tokens result in `404`. Rate-limit class
@@ -280,6 +286,96 @@ in this list; the check `api-catalogue-sync` (M1-03, subcheck `webhook-events`) 
 5. The token is in the URL because many senders can only configure a URL. Server and
    proxies redact the path after `/hooks/{webhook_id}/` in logs and traces. Rotation: create a new
    webhook, revoke the old one.
+6. Formats. The format is recognised per request from the body; it is not stored per webhook,
+   and both formats use the same URL. A body with at least one Alertmanager member (`version`,
+   `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
+   `commonAnnotations`, `externalURL`, `alerts`) is `alertmanager` and must carry no native
+   member, else `400 validation_failed` with the pointer of the first native member and
+   `errors[].code` `format_mixed`. Every other body is `native`. A format not listed in
+   `webhook_in.formats_enabled` gives `400 validation_failed` with an empty pointer and
+   `format_disabled`. Unknown members give `400 validation_failed` with `unknown_member`.
+    - `native`: Markdown in `content_md` (required, at least one non-white-space character, at
+      most `message.max_content_bytes` UTF-8 bytes, else `413 payload_too_large`), stored byte
+      for byte; optional `title` (new thread, point 7), `thread_id` (existing thread, point 7) and
+      `client_msg_id` (a UUIDv7, else `not_uuid_v7`; when absent the server creates one, so only a
+      sender's own `client_msg_id` makes retries idempotent).
+    - `alertmanager`: the unchanged webhook payload of Prometheus Alertmanager (`version` `4`,
+      `status` and each `alerts[].status` `firing` or `resolved`, at least one alert, each alert
+      with `status` and `labels`, every label and annotation value a string). One notification
+      gives one message: a header line with `FIRING` or `RESOLVED`, the alert name (`alertname`
+      of `commonLabels`, else of `groupLabels`, else `Alerts`) and the number of alerts; one list
+      item per alert with its status, name, severity (label `severity`) and summary (annotation
+      `summary`, else `description`, else the remaining labels as `name=value`), with
+      `Runbook:` from the annotation `runbook_url` and `Source:` from `generatorURL`; an item
+      `- and <k> more alerts` for `truncatedAlerts` and alerts dropped to fit; and a last line
+      `Alertmanager:` with `externalURL`. Payload values are escaped so they add no formatting,
+      links or images; a URL appears only as an absolute `http` or `https` autolink and is never
+      fetched by the server. The message never exceeds `message.max_content_bytes`. Each
+      notification gets a new client message ID, so retries of Alertmanager are not
+      deduplicated. The layout is fixed in [DECISIONS.md](../DECISIONS.md) (D-M2-27) and by the
+      golden files of `services/server/internal/apps/domain/incoming/testdata`.
+7. Target thread (11 8.3), in this order: (1) the fixed thread of the webhook while it belongs
+   to the webhook's channel, and `thread_id` and `title` of the body are ignored; a fixed thread
+   moved to another channel gives `404`. (2) `thread_id` of a `native` body when that thread
+   belongs to the webhook's channel; an unknown thread or one of another channel falls through
+   to the next rule. (3) `title` of a `native` body creates a thread: in a forum a forum post with
+   the message as its first message; in a text channel the message goes into the main thread
+   and the new thread starts from it, and the answer names the new thread in `thread_id`.
+   (4) The main thread of a text channel. A forum that none of these reaches gives
+   `400 validation_failed` with `required_for_forum_post` (pointer `/title` for `native`, empty
+   for `alertmanager`), so Alertmanager posts into a text channel or a fixed thread.
+8. Order of checks (11 8.4): `rl.webhook_in` keyed by `webhook_id` (`429 rate_limited` with
+   `Retry-After`, before any database access); the token (`404`; a failed check takes one token
+   from `rl.public_auth` of the client IP, and while that bucket is empty the answer is `429`
+   without a check); a body above `webhook_in.max_body_bytes` (`413
+   payload_too_large`), malformed JSON (`400 malformed_request`) and the schema (`400
+   validation_failed`); the format and its body rules (`400`, `413`); the target thread; then
+   `authorize` of the app (`webhook_in.post`, then `message.create` and for a new thread
+   `thread.create`) and the write. An unknown or revoked webhook, a wrong or malformed token, an
+   app that is suspended or uninstalled, an app without `write` or without the scope
+   `messages:write`, a read-only or archived channel and every other refusal of the app's rights
+   give the same `404 not_found` with the body and headers of an unknown webhook. Success is
+   `201` with `message_id` and `thread_id` (`IncomingWebhookResult`).
+9. Replay. A `native` post with a `client_msg_id` already used by the same app answers `200`
+   with `Idempotent-Replay: true` and the `message_id` and `thread_id` of the first answer (for a
+   title in a text channel the thread started from the message); no second message and no
+   second thread are created. The request hash covers the webhook, `content_md`, `thread_id` and
+   `title`, so the same `client_msg_id` with other content, another `thread_id` or `title`, or
+   through another webhook of the same app gives `422 idempotency_key_reuse`.
+10. Internal listener. Senders inside the stack (Alertmanager) use the same two paths on
+    `server.internal_listen_addr`, in every server role, with the same behaviour. There the
+    client IP is the peer address and forwarded headers are never read; `rl.webhook_in` and
+    `rl.public_auth` count per listener. Nothing else of the API is served on that listener
+    besides health and readiness.
+11. Cron example. A job creates one `client_msg_id` (UUIDv7) per run and reuses it on every
+    retry of that run, so a run gives exactly one message however often it retries (11 10.4).
+    The token comes from a file or a secret store; the value below is a placeholder.
+
+    ```sh
+    #!/bin/sh
+    # Nightly report: one client_msg_id per run, the same on every retry.
+    HOOK_URL="https://chat.example.com/api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901"
+    HOOK_TOKEN="$(cat /etc/nightly-report/hook_token)"  # bothy_whi_EXAMPLE..._...
+    MSG_ID="$(python3 -c 'import uuid; print(uuid.uuid7())')"  # UUIDv7, Python 3.14 or later
+    BODY=$(printf '{"content_md": "Backup finished on db.example.com.", "client_msg_id": "%s"}' "$MSG_ID")
+
+    for attempt in 1 2 3 4 5; do
+      status=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$HOOK_URL" \
+        -H "Authorization: Bearer $HOOK_TOKEN" \
+        -H 'Content-Type: application/json' \
+        --data "$BODY")
+      case "$status" in
+        201|200) exit 0 ;;                        # 200: replay of an earlier attempt of this run
+        429|5??|000) sleep "$((attempt * 30))" ;;  # rate limit, server or network error: retry
+        *) echo "incoming webhook refused: $status" >&2; exit 1 ;;
+      esac
+    done
+    exit 1
+    ```
+
+    A sender that can only configure a URL posts the same body to
+    `https://chat.example.com/api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/bothy_whi_EXAMPLE..._...`
+    without the `Authorization` header.
 
 ## 9. Configuration values
 

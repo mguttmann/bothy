@@ -83,8 +83,10 @@ func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 // reqmeta.Transport (M1-43), and the console cookie (M6-01). Without credentials it returns the
 // anonymous actor; a request the cookie authenticated then passes ConsoleGuard (consoleGuard). Its error becomes the problem
 // (after the failed-credentials hook, when one is set). A request with credentials passes the precheck
-// of M1-19 first, whose settle function gets the result of the Authenticator. The actor, the DPoP
-// facts of the request (reqmeta.Proof) and a setter of response headers go into the context.
+// of M1-19 first, whose settle function gets the result of the Authenticator. An operation with
+// AnonymousCredentials skips the precheck, the Authenticator and ConsoleGuard and stays anonymous.
+// The actor, the DPoP facts of the request (reqmeta.Proof) and a setter of response headers go
+// into the context.
 func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip, _ := reqmeta.ClientIP(r.Context())
@@ -110,6 +112,12 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 		c.mu.Lock()
 		hook, precheck := c.failedCreds, c.precheck
 		c.mu.Unlock()
+		if op.AnonymousCredentials {
+			// The credential of this operation (the incoming webhook token, M2-27) is not one the
+			// Authenticator knows; a later stage checks it, and counts its failures itself.
+			next.ServeHTTP(w, r.WithContext(actor.WithActor(r.Context(), actor.Anonymous())))
+			return
+		}
 		var settle func(error)
 		if precheck != nil && creds.Present() {
 			var err error
@@ -186,12 +194,17 @@ func (c *Chain) HTU(r *http.Request) string {
 	return c.publicURL.Scheme + "://" + c.publicURL.Host + r.URL.EscapedPath()
 }
 
-// bodyStage is StageBody: a body on an operation without one is 415, a body with another media
-// type than the operation's is 415, a missing required body is 400 validation_failed, and a JSON
-// body passes the guard of SEC-IN-2 before it is restored for the next stages.
+// bodyStage is StageBody: a declared length above Operation.BodyLimit is 413 (StageRoute left it
+// to this stage), a body on an operation without one is 415, a body with another media type than
+// the operation's is 415, a missing required body is 400 validation_failed, and a JSON body passes
+// the guard of SEC-IN-2 before it is restored for the next stages.
 func (c *Chain) bodyStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		op, _ := OperationFrom(r.Context())
+		if op.BodyLimit > 0 && r.ContentLength > op.BodyLimit {
+			WriteProblem(w, r, payloadTooLarge(r.Context()))
+			return
+		}
 		body, err := c.checkBody(r, op)
 		if !op.RequestBody.transfer() {
 			// The body is read (or refused); the read deadline of StageRoute has done its job.
