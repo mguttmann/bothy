@@ -40,6 +40,14 @@ type BackupConfig struct {
 	FilesDriver string `config:"file.storage.driver"`
 	// FilesRoot is file.fs.root, the directory the object backup reads with the driver fs.
 	FilesRoot string `config:"file.fs.root"`
+	// RestoreTestSchedule is backup.restore_test.schedule, the cron schedule of the restore test.
+	RestoreTestSchedule string `config:"backup.restore_test.schedule"`
+	// RestoreTestSampleFiles is backup.restore_test.sample_files.
+	RestoreTestSampleFiles int `config:"backup.restore_test.sample_files"`
+	// RestoreTestSampleThreads is backup.restore_test.sample_threads.
+	RestoreTestSampleThreads int `config:"backup.restore_test.sample_threads"`
+	// RTOTarget is dr.rto_target, the bound of check 7 of the restore test.
+	RTOTarget time.Duration `config:"dr.rto_target"`
 }
 
 // BackupSettings binds the keys of bothy-backupd from v.

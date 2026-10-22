@@ -13,6 +13,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
+// configFlagUsage is the usage text of the flag --config of every command.
+const configFlagUsage = "configuration file"
+
 // backupCommand runs "bothy-backupd backup <kind> [--config FILE]": one run of kind now, for the
 // runbook and the tests (brief M7-02 design note 1). It returns 0 when the run succeeded, 1 when
 // it failed or the slot of the kind runs already, 2 for a usage or configuration error. The run
@@ -21,7 +24,7 @@ import (
 func backupCommand(ctx context.Context, args, env []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("bothy-backupd backup", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	file := fs.String("config", "", "configuration file")
+	file := fs.String("config", "", configFlagUsage)
 	kind, rest := "", args
 	if len(rest) > 0 && rest[0] != "" && rest[0][0] != '-' {
 		kind, rest = rest[0], rest[1:]
@@ -68,7 +71,7 @@ func expireCommand(ctx context.Context, args, env []string, stderr io.Writer) in
 	fs.SetOutput(io.Discard)
 	offsite := fs.Bool("offsite", false, "expire the off-site target")
 	dir := fs.String("credentials", "", "directory of the owner's off-site key")
-	file := fs.String("config", "", "configuration file")
+	file := fs.String("config", "", configFlagUsage)
 	if err := fs.Parse(args); err != nil {
 		return usageError(stderr, "expire: "+err.Error())
 	}
@@ -90,6 +93,41 @@ func expireCommand(ctx context.Context, args, env []string, stderr io.Writer) in
 		return exitFailure
 	}
 	_, _ = io.WriteString(stderr, "bothy-backupd: expire --offsite succeeded\n")
+	return exitOK
+}
+
+// restoreTestCommand runs "bothy-backupd restore-test [--config FILE]": the automatic restore
+// test once now (docs/spec/16-operations.md 8.3, brief M7-03), for the runbook and the tests. It
+// returns 0 when every check passed, 1 when a check failed or a test runs already, 2 for a usage
+// or configuration error. The test writes its restore_test row of backup_runs; its metrics are
+// exported before the command ends.
+func restoreTestCommand(ctx context.Context, args, env []string, stderr io.Writer) int {
+	fs := flag.NewFlagSet("bothy-backupd restore-test", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	file := fs.String("config", "", configFlagUsage)
+	if err := fs.Parse(args); err != nil {
+		return usageError(stderr, "restore-test: "+err.Error())
+	}
+	if fs.NArg() > 0 {
+		return usageError(stderr, fmt.Sprintf("restore-test: unexpected argument %q", fs.Arg(0)))
+	}
+	d, code := loadDaemon(ctx, env, *file, stderr, stderr)
+	if d == nil {
+		return code
+	}
+	defer d.close(ctx)
+	if err := d.d.WaitReady(ctx); err != nil {
+		_, _ = fmt.Fprintf(stderr, "bothy-backupd: %v\n", err)
+		return exitFailure
+	}
+	_ = d.d.Prime(ctx) // logged by Prime; the test itself needs no history
+	err := d.d.RestoreTest(ctx)
+	d.d.Sample(ctx)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "bothy-backupd: restore-test: %v\n", err)
+		return exitFailure
+	}
+	_, _ = io.WriteString(stderr, "bothy-backupd: restore-test succeeded\n")
 	return exitOK
 }
 

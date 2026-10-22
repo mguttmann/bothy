@@ -49,6 +49,26 @@ type BackupRuns interface {
 	// LastSuccess returns the started_at of the newest succeeded run of any of kinds and true,
 	// or false when there is none. It returns ErrNoBackupTable when the table does not exist.
 	LastSuccess(ctx context.Context, kinds ...BackupKind) (time.Time, bool, error)
+	// LatestSucceeded returns the newest succeeded run of any of kinds by started_at with its
+	// manifest and true, or false when there is none: the restore test reads the backup it
+	// restores this way (M7-03).
+	//
+	// Example:
+	//
+	//	run, ok, err := runs.LatestSucceeded(ctx, status.BackupPGFull, status.BackupPGDiff)
+	LatestSucceeded(ctx context.Context, kinds ...BackupKind) (BackupRun, bool, error)
+}
+
+// BackupRun is a recorded run as LatestSucceeded returns it.
+type BackupRun struct {
+	// ID is backup_runs.id.
+	ID ids.ID
+	// Kind is backup_runs.kind.
+	Kind BackupKind
+	// StartedAt is backup_runs.started_at.
+	StartedAt time.Time
+	// Manifest is backup_runs.manifest, the JSON of backup_manifest.v1.
+	Manifest []byte
 }
 
 // FinishedRun is the outcome of one run as Finish records it.
@@ -61,6 +81,9 @@ type FinishedRun struct {
 	SizeBytes int64
 	// Manifest is the JSON of backup_manifest.v1; nil records the default '{}' (a failed run).
 	Manifest []byte
+	// Checks is the JSON of restore_test_checks.v1 of a restore test; nil records the default
+	// '{}' (every backup kind).
+	Checks []byte
 	// Error is the error code of a failed run, a code without content or secrets
 	// (domain.ValidErrorCode); "" for a succeeded run.
 	Error string

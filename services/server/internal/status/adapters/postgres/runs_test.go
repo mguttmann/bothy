@@ -212,3 +212,51 @@ func TestRunsNoBackupTable(t *testing.T) {
 		t.Errorf("LastSuccess = %v, want ErrNoBackupTable", err)
 	}
 }
+
+// TestRunsLatestSucceededAndChecks holds the two additions of M7-03: LatestSucceeded returns the
+// newest succeeded row of the kinds with its id and manifest (failed rows and other kinds do not
+// count), and Finish stores the checks of a restore test.
+func TestRunsLatestSucceededAndChecks(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	runs, clk, db := newRuns(t)
+	if _, found, err := runs.LatestSucceeded(ctx, status.BackupPGFull, status.BackupPGDiff); err != nil || found {
+		t.Fatalf("LatestSucceeded on an empty table = %v, %v; want false", found, err)
+	}
+	record := func(kind status.BackupKind, succeeded bool, manifest string) ids.ID {
+		t.Helper()
+		clk.Advance(time.Hour)
+		id, err := runs.Start(ctx, kind)
+		if err != nil {
+			t.Fatal(err)
+		}
+		run := status.FinishedRun{ID: id, Succeeded: succeeded, SizeBytes: 1, Manifest: []byte(manifest)}
+		if !succeeded {
+			run = status.FinishedRun{ID: id, SizeBytes: -1, Error: "pgbackrest_exit_1"}
+		}
+		if err := runs.Finish(ctx, run); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	record(status.BackupPGFull, true, `{"n":1}`)
+	diff := record(status.BackupPGDiff, true, `{"n":2}`)
+	record(status.BackupPGFull, false, "")
+	record(status.BackupLogical, true, `{"n":3}`)
+	got, found, err := runs.LatestSucceeded(ctx, status.BackupPGFull, status.BackupPGDiff)
+	if err != nil || !found || got.ID != diff || got.Kind != status.BackupPGDiff || string(got.Manifest) != `{"n": 2}` {
+		t.Errorf("LatestSucceeded = %+v (%s), %v, %v; want the differential", got, got.Manifest, found, err)
+	}
+
+	test, err := runs.Start(ctx, status.BackupRestoreTest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []byte(`{"schema":"restore_test_checks.v1","checks":[]}`)
+	if err := runs.Finish(ctx, status.FinishedRun{ID: test, SizeBytes: -1, Checks: checks, Error: "checks_failed"}); err != nil {
+		t.Fatal(err)
+	}
+	if r := readRun(t, db, test); r.state != "failed" || r.checks["schema"] != "restore_test_checks.v1" || len(r.manifest) != 0 {
+		t.Errorf("restore test row %+v", r)
+	}
+}

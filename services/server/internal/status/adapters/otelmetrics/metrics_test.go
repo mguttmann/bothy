@@ -134,3 +134,58 @@ func TestLastSuccessWALAndVolume(t *testing.T) {
 		}
 	}
 }
+
+// TestRestoreTestMetrics holds alerting.md for the restore test: a passed test records the
+// duration (also bothy.backup.duration{restore_test}) and the last success; a failed one records
+// its duration and one failure per failed check with bothy.reason the check name, and no last
+// success; LastSuccess of the start sets the gauge.
+func TestRestoreTestMetrics(t *testing.T) {
+	r, reader := newRecorder(t)
+	ctx := context.Background()
+	at := time.Date(2026, 10, 24, 5, 40, 0, 0, time.UTC)
+	r.LastSuccess(ctx, domain.KindRestoreTest, at.Add(-7*24*time.Hour))
+	r.RunFinished(ctx, domain.KindRestoreTest, true, 40*time.Minute, 0, at)
+	r.RunFinished(ctx, domain.KindRestoreTest, false, 10*time.Minute, 0, at.Add(time.Hour))
+	r.RestoreChecksFailed(ctx, []domain.CheckName{domain.CheckEventLog, domain.CheckAuditChain})
+	r.RestoreChecksFailed(ctx, []domain.CheckName{domain.CheckEventLog})
+
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatal(err)
+	}
+	gauges, failures := map[string]float64{}, map[string]int64{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			switch d := m.Data.(type) {
+			case metricdata.Gauge[float64]:
+				for _, dp := range d.DataPoints {
+					key := m.Name
+					if v, ok := dp.Attributes.Value("bothy.backup.kind"); ok {
+						key += "{" + v.AsString() + "}"
+					}
+					gauges[key] = dp.Value
+				}
+			case metricdata.Sum[int64]:
+				for _, dp := range d.DataPoints {
+					v, _ := dp.Attributes.Value("bothy.reason")
+					failures[m.Name+"{"+v.AsString()+"}"] = dp.Value
+				}
+			}
+		}
+	}
+	if got := gauges["bothy.backup.restore_test.last_success.timestamp"]; got != float64(at.Unix()) {
+		t.Errorf("last success %v, want the passed test %v", got, at.Unix())
+	}
+	if got := gauges["bothy.backup.restore_test.duration"]; got != 600 {
+		t.Errorf("duration %v, want the last test 600", got)
+	}
+	if got := gauges["bothy.backup.duration{restore_test}"]; got != 600 {
+		t.Errorf("bothy.backup.duration{restore_test} %v, want 600", got)
+	}
+	if _, ok := gauges["bothy.backup.size{restore_test}"]; ok {
+		t.Error("the restore test recorded a size")
+	}
+	if failures["bothy.backup.restore_test.failures{event_log}"] != 2 || failures["bothy.backup.restore_test.failures{audit_chain}"] != 1 || len(failures) != 2 {
+		t.Errorf("failures %v, want event_log 2 and audit_chain 1", failures)
+	}
+}

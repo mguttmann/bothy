@@ -156,3 +156,34 @@ func TestBackupDaemonOffsiteMirror(t *testing.T) {
 		t.Errorf("PgBackRestEnv = %q", env)
 	}
 }
+
+// TestBackupDaemonRestoreTest: with a restore directory the daemon builds the restore test,
+// creates the directory with mode 0700 and records a restore_test row; without a succeeded
+// physical backup the test fails with checks_failed and its check pgbackrest names no_backup.
+func TestBackupDaemonRestoreTest(t *testing.T) {
+	t.Parallel()
+	db := pgtest.New(t)
+	ctx := testkit.Context(t)
+	restore := filepath.Join(t.TempDir(), "restore")
+	d, err := wire.NewBackupDaemon(ctx, backupdEnv(t, db), wire.BackupDaemonOptions{DumpDir: t.TempDir(), RestoreDir: restore})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(d.Close)
+	if err := d.WaitReady(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if st, err := os.Stat(restore); err != nil || st.Mode().Perm() != 0o700 {
+		t.Errorf("restore directory %v, %v; want mode 0700", st, err)
+	}
+	if err := d.RestoreTest(ctx); err == nil || !strings.Contains(err.Error(), "no_backup") {
+		t.Errorf("RestoreTest = %v, want a failure naming no_backup", err)
+	}
+	var state, code string
+	if err := db.SuperConn(t).QueryRow(ctx, "SELECT state, error FROM backup_runs WHERE kind = 'restore_test'").Scan(&state, &code); err != nil {
+		t.Fatal(err)
+	}
+	if state != "failed" || code != "checks_failed" {
+		t.Errorf("row %s %q, want failed with checks_failed", state, code)
+	}
+}

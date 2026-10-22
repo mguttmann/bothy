@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/audit"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/status"
@@ -73,6 +74,8 @@ type Config struct {
 	// Volumes maps the metric volume name (pgdata, files, pgbackrest-repo, backup-scratch) to
 	// its mount path for Sample.
 	Volumes map[string]string
+	// Restore is the configuration of the restore test (M7-03).
+	Restore RestoreConfig
 }
 
 // Deps are the ports the service uses.
@@ -89,6 +92,11 @@ type Deps struct {
 	Clock clock.Clock
 	// Log receives one line per run; nil means slog.Default().
 	Log *slog.Logger
+	// Scratch is the scratch area of the restore test; nil leaves the restore test out.
+	Scratch Scratch
+	// Chain verifies the audit chain of the copy (the port of the module audit); the restore
+	// test needs it with Scratch.
+	Chain audit.RowsVerifier
 }
 
 // Service runs the backups of one instance. It is safe for concurrent use: each slot admits one
@@ -104,7 +112,8 @@ type Service struct {
 
 // New returns the service over cfg and deps. It fails when Runs, Exec, Source or Clock is nil,
 // when cfg.ObjectsDriver is neither "fs" nor "s3", when the driver fs has no FilesRoot, when
-// DumpDir is empty or when LocalRetentionFull is below 1.
+// DumpDir is empty or when LocalRetentionFull is below 1; with Scratch, when Chain is nil or a
+// sample size or the RTO target of cfg.Restore is not positive.
 //
 // Example:
 //
@@ -121,6 +130,10 @@ func New(cfg Config, deps Deps) (*Service, error) {
 		return nil, errors.New("status: the backup service needs a dump directory")
 	case cfg.LocalRetentionFull < 1:
 		return nil, errors.New("status: backup.pg.local_retention_full must be at least 1")
+	case deps.Scratch != nil && deps.Chain == nil:
+		return nil, errors.New("status: the restore test needs the audit verifier Chain")
+	case deps.Scratch != nil && (cfg.Restore.SampleThreads < 1 || cfg.Restore.SampleFiles < 1 || cfg.Restore.RTOTarget <= 0):
+		return nil, errors.New("status: the restore test needs backup.restore_test.sample_threads, sample_files and dr.rto_target above 0")
 	}
 	log := deps.Log
 	if log == nil {
@@ -251,6 +264,9 @@ func (s *Service) steps(ctx context.Context, kind domain.Kind, id ids.ID, starte
 	case domain.KindObjects:
 		out, code, err = s.objects(ctx)
 		retain, thinning = s.cfg.ObjectsRetention, true
+	case domain.KindRestoreTest:
+		// Run refuses it before; the restore test has its own use case (RestoreTest).
+		return nil, out, "kind_invalid", fmt.Errorf("status: %q is not a backup kind", kind)
 	}
 	if err != nil {
 		return nil, out, code, err
@@ -376,7 +392,8 @@ func (s *Service) manifest(ctx context.Context, kind domain.Kind, id ids.ID, sta
 }
 
 // metricKinds are the kinds of the attribute bothy.backup.kind with the backup_runs kinds they
-// cover; the physical one is reported as pg_full, which the metrics map to physical.
+// cover; the physical one is reported as pg_full, which the metrics map to physical. The restore
+// test has its own gauge (KindRestoreTest).
 var metricKinds = []struct {
 	kind  domain.Kind
 	kinds []status.BackupKind
@@ -384,10 +401,12 @@ var metricKinds = []struct {
 	{domain.KindPGFull, []status.BackupKind{status.BackupPGFull, status.BackupPGDiff}},
 	{domain.KindLogical, []status.BackupKind{status.BackupLogical}},
 	{domain.KindObjects, []status.BackupKind{status.BackupObjects}},
+	{domain.KindRestoreTest, []status.BackupKind{status.BackupRestoreTest}},
 }
 
-// Prime records the last success of each metric kind (physical, logical, objects) read from
-// backup_runs, so bothy.backup.last_success.timestamp is right from the start of the process and
+// Prime records the last success of each metric kind (physical, logical, objects) and of the
+// restore test read from backup_runs, so bothy.backup.last_success.timestamp and
+// bothy.backup.restore_test.last_success.timestamp are right from the start of the process and
 // not only after the next run. A kind without a success records nothing.
 //
 // It returns the first error of Runs.LastSuccess, for example status.ErrNoBackupTable; without

@@ -15,7 +15,7 @@ VALUES (sqlc.arg(id), sqlc.arg(kind), 'running', sqlc.arg(started_at));
 -- Only a running row moves: a second finish of the same run changes nothing and the caller fails.
 UPDATE backup_runs
 SET state = sqlc.arg(state), finished_at = sqlc.arg(finished_at), size_bytes = sqlc.narg(size_bytes),
-    manifest = sqlc.arg(manifest), error = sqlc.narg(error)
+    manifest = sqlc.arg(manifest), checks = sqlc.arg(checks), error = sqlc.narg(error)
 WHERE id = sqlc.arg(id) AND state = 'running';
 
 -- name: LastBackupSuccess :one
@@ -23,3 +23,12 @@ WHERE id = sqlc.arg(id) AND state = 'running';
 SELECT max(started_at)::timestamptz AS last_success
 FROM backup_runs
 WHERE state = 'succeeded' AND kind = ANY (sqlc.arg(kinds)::text[]);
+
+-- name: LatestBackupRun :one
+-- The newest succeeded run of the kinds with its manifest: the backup the restore test restores
+-- (M7-03). The index (kind, started_at DESC) serves this per kind.
+SELECT id, kind, started_at, manifest
+FROM backup_runs
+WHERE state = 'succeeded' AND kind = ANY (sqlc.arg(kinds)::text[])
+ORDER BY started_at DESC, id DESC
+LIMIT 1;

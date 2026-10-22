@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -25,6 +26,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/otelmetrics"
 	statuspg "github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/s3mirror"
+	"github.com/OWNER/bothy/services/server/internal/status/adapters/scratch"
 	statusapp "github.com/OWNER/bothy/services/server/internal/status/app"
 	statusdomain "github.com/OWNER/bothy/services/server/internal/status/domain"
 )
@@ -33,6 +35,15 @@ import (
 const (
 	backupdAppName         = "bothy-backupd"
 	backupdManifestAppName = "bothy-backupd-manifest"
+	// backupdRestoreAppName is the pool of the restored copy of the restore test, on its socket.
+	backupdRestoreAppName = "bothy-backupd-restore-test"
+)
+
+// The pool of the restored copy: one check at a time reads it; the scratch PostgreSQL listens on
+// the default port number, which names its socket file.
+const (
+	restoreMaxConns   = 2
+	restoreSocketPort = 5432
 )
 
 // manifestMaxConns is the pool of the manifest queries: one snapshot transaction at a time per
@@ -77,6 +88,9 @@ type BackupDaemonOptions struct {
 	DumpDir string
 	// LocalResticRepo is the restic repository without an off-site target.
 	LocalResticRepo string
+	// RestoreDir is the directory of the restore test in backup-scratch (M7-03); it is created
+	// when missing and emptied by every test. Empty leaves the restore test out.
+	RestoreDir string
 }
 
 // BackupDaemon is the backup service of bothy-backupd (brief M7-02) built from the server
@@ -100,6 +114,7 @@ type backupdSettings struct {
 	secrets   secrets.Config
 	db        pg.Config
 	schedules map[statusdomain.Kind]statusdomain.Schedule
+	restore   statusdomain.Schedule
 	target    *statusdomain.OffsiteTarget
 }
 
@@ -126,6 +141,9 @@ func loadBackupdSettings(v *config.Values) (backupdSettings, error) {
 	}
 	if s.schedules, err = parsedBackupSchedules(s.backup); err != nil {
 		return fail(err)
+	}
+	if s.restore, err = statusdomain.ParseSchedule(s.backup.RestoreTestSchedule); err != nil {
+		return fail(fmt.Errorf("%s: %w", keyRestoreTestSchedule, err))
 	}
 	if s.backup.OffsiteTarget != "" {
 		t, err := statusdomain.ParseOffsiteTarget(s.backup.OffsiteTarget)
@@ -189,18 +207,58 @@ func NewBackupDaemon(ctx context.Context, v *config.Values, o BackupDaemonOption
 		return nil, err
 	}
 	clk := clock.System()
-	svc, err := statusapp.New(serviceConfig(s, o), statusapp.Deps{
+	deps := statusapp.Deps{
 		Runs:    statuspg.NewRuns(runsPool, clk, ids.NewGenerator(clk, rand.Reader)),
 		Exec:    exec,
 		Source:  statuspg.NewManifestSource(superPool),
 		Metrics: rec, Clock: clk, Log: log,
-	})
+	}
+	if o.RestoreDir != "" {
+		sc, err := restoreScratch(s, o, exec, provider, log)
+		if err != nil {
+			runsPool.Close()
+			superPool.Close()
+			return nil, err
+		}
+		deps.Scratch, deps.Chain = sc, auditapp.RowsVerifier{}
+	}
+	svc, err := statusapp.New(serviceConfig(s, o), deps)
 	if err != nil {
 		runsPool.Close()
 		superPool.Close()
 		return nil, err
 	}
 	return &BackupDaemon{svc: svc, exec: exec, runsPool: runsPool, superPool: superPool, wait: s.migrate.DependencyWait, log: log}, nil
+}
+
+// restoreScratch is the scratch area of the restore test in o.RestoreDir: pgBackRest and restic
+// through exec, the copy opened on its socket as migrate.bootstrap_user (restoreDB).
+func restoreScratch(s backupdSettings, o BackupDaemonOptions, exec *executor.Executor, provider *secrets.Provider, log *slog.Logger) (*scratch.Scratch, error) {
+	if err := os.MkdirAll(o.RestoreDir, 0o700); err != nil {
+		return nil, fmt.Errorf("create the restore directory: %w", err)
+	}
+	filesRoot := ""
+	if s.backup.FilesDriver == driverFS {
+		filesRoot = s.backup.FilesRoot
+	}
+	return scratch.New(scratch.Config{
+		Dir: o.RestoreDir, Tools: exec, FilesRoot: filesRoot, Stderr: o.ToolOutput,
+		Open: func(ctx context.Context, socket string) (*pg.Pool, error) {
+			return pg.Open(ctx, restoreDB(s, socket), provider, log)
+		},
+	})
+}
+
+// restoreDB is the pool of the restored copy: the Unix socket in the scratch directory, never a
+// host of the network, as migrate.bootstrap_user, without TLS (a local socket) and without
+// statement deadline, like the manifest pool. The scratch pg_hba.conf admits the socket, so the
+// password reference of the bootstrap user is resolved but not needed.
+func restoreDB(s backupdSettings, socket string) pg.Config {
+	c := s.db
+	c.Host, c.Port, c.SSLMode, c.SSLRootCert = socket, restoreSocketPort, pg.SSLModeDisable, ""
+	c.User, c.PasswordRef, c.MaxConns = s.migrate.BootstrapUser, s.migrate.BootstrapPasswordRef, restoreMaxConns
+	c.StatementTimeout, c.IdleInTxTimeout = 0, 0
+	return c.WithAppName(backupdRestoreAppName)
 }
 
 // manifestDB is the pool of the manifest queries as migrate.bootstrap_user. The queries count
@@ -228,6 +286,11 @@ func serviceConfig(s backupdSettings, o BackupDaemonOptions) statusapp.Config {
 		LocalRetentionFull: s.backup.PGLocalRetentionFull, RetentionFull: s.backup.PGRetentionFull,
 		LogicalRetention: s.backup.LogicalRetention, ObjectsRetention: s.backup.ObjectsRetention,
 		ServerVersion: o.ServerVersion, Volumes: volumes,
+		Restore: statusapp.RestoreConfig{
+			Schedule: s.restore, Scheduled: o.RestoreDir != "",
+			SampleThreads: s.backup.RestoreTestSampleThreads, SampleFiles: s.backup.RestoreTestSampleFiles,
+			RTOTarget: s.backup.RTOTarget,
+		},
 	}
 }
 
@@ -370,6 +433,10 @@ func (d *BackupDaemon) Run(ctx context.Context, kind string) error {
 	}
 	return d.svc.Run(ctx, k)
 }
+
+// RestoreTest runs the restore test once now; see statusapp.Service.RestoreTest. It returns
+// statusapp.ErrBusy while one runs and an error when a check failed.
+func (d *BackupDaemon) RestoreTest(ctx context.Context) error { return d.svc.RestoreTest(ctx) }
 
 // Prime records the last successful run per kind in the gauges; an error is logged and
 // returned.

@@ -186,7 +186,7 @@ of lower modules that the module implements.
 | Module | Port (excerpt) | Emits (in-tx) | Subscribes (in-tx) | Implements sources |
 |---|---|---|---|---|
 | `instance` | `Settings`, `Flags`, `Keys` (signer per purpose, `Signers` and `PublicKeys` of a purpose for the outgoing webhooks, JWKS, rotation), `Counters` (only for the phase hooks of `authz`, `sync`, `audit`), `Versions` (read counter values without a lock, for example `permission_version` for the permission cache, `event_seq` for catch-up); declares `LoginOptionsSource` (login drivers and password path for the discovery), `FlagUserSource` (people of a rollout), `FlagGroupSource` (valid groups of a person for the evaluation) | | | |
-| `audit` | `Log` (query, verification) | | | kernel `auditing.Recorder` |
+| `audit` | `Log` (query, verification), `RowsVerifier` (verification of a supplied chain, M7-03) | | | kernel `auditing.Recorder` |
 | `authz` | `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person, revocation of all grants of a subject in the caller's permission change), `AppScopes` (scope table for the event subscriptions of an app), `I1Resolver` (guided flow `resolve_i1`, M2-21); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `AgentPolicySwitch` (M2-21), `HostSource` | kernel `authorize.AccessChanged` (with the triggering action; `runs` cancels with reason `user_disabled` on `user.disable`, otherwise with `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (posting, correction, totals), `Prices` | | | |
 | `identity` | `Auth` (login, refresh, logout, child sessions, step-up), `Directory`, `Devices`, `Tokens`, `Owners`, `PrincipalWrites` (principals of agents and apps); declares `AvatarFiles`, `AppInstallations` (active installation of an app) | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
@@ -222,7 +222,7 @@ else is forbidden and fails in the gate (section 7).
 | `agents` | `identity`, `authz`, `chat` | create the agent principal, the credential holder is a person; implements `AgentPolicySource`; thread for sessions, where commands apply |
 | `files` | `identity`, `chat` | implements `AvatarFiles`; check the upload channel; subscription `chat.ThreadMoved` for the copy `message_attachments.channel_id` |
 | `messaging` | `identity`, `chat`, `files` | resolve mentions; thread sequence and reopening; bind and read attachments |
-| `status` | `agents` | agent presence as a status component |
+| `status` | `agents`, `audit` | agent presence as a status component; the restore test verifies the audit chain of the restored copy with the verification of `audit.verify` (`audit.RowsVerifier`, M7-03) |
 | `runs` | `instance`, `chat`, `agents`, `messaging`, `billing` | sign the token; operator, mention rule, project binding; policy and session; anchor and `trigger_state`; post costs |
 | `search` | `chat`, `messaging`, `files` | thread titles, messages, file names and transcripts |
 | `importer` | `identity`, `chat`, `agents`, `messaging`, `files` | creates people, structure, messages, earlier session references and files; sets the read-only state of the mirrored channels |

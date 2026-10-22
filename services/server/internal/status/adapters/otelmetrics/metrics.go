@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package otelmetrics is the metrics adapter of bothy-backupd: the gauges bothy.backup.* and
-// bothy.storage.volume.* of docs/observability/signals.md 4.6 through the declarations of the
-// metric registry (platform/otel/metrics). It implements app.Metrics. pg_full and pg_diff
-// record bothy.backup.kind=physical; timestamps are Unix seconds.
+// Package otelmetrics is the metrics adapter of bothy-backupd: the instruments bothy.backup.*
+// (with bothy.backup.restore_test.* of M7-03) and bothy.storage.volume.* of
+// docs/observability/signals.md 4.6 through the declarations of the metric registry
+// (platform/otel/metrics). It implements app.Metrics. pg_full and pg_diff record
+// bothy.backup.kind=physical; timestamps are Unix seconds.
 //
 // Example:
 //
@@ -22,9 +23,13 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/status/domain"
 )
 
-// Recorder holds the gauges of bothy-backupd. It is safe for concurrent use.
+// Recorder holds the instruments of bothy-backupd. It is safe for concurrent use.
 type Recorder struct {
 	lastSuccess, wal, duration, size, free, total *metrics.Gauge
+	// restoreLast and restoreDuration are the gauges of the restore test, restoreFailures its
+	// counter of failed checks (M7-03).
+	restoreLast, restoreDuration *metrics.Gauge
+	restoreFailures              *metrics.Counter
 }
 
 // Compile-time check: Recorder is the outgoing port of app.
@@ -44,6 +49,8 @@ func New(mp metric.MeterProvider) (*Recorder, error) {
 		{&r.size, metrics.BackupSize},
 		{&r.free, metrics.StorageVolumeFree},
 		{&r.total, metrics.StorageVolumeSize},
+		{&r.restoreLast, metrics.BackupRestoreTestLastSuccess},
+		{&r.restoreDuration, metrics.BackupRestoreTestDuration},
 	} {
 		gauge, err := metrics.NewGauge(mp, g.spec, nil)
 		if err != nil {
@@ -51,6 +58,11 @@ func New(mp metric.MeterProvider) (*Recorder, error) {
 		}
 		*g.dst = gauge
 	}
+	c, err := metrics.NewCounter(mp, metrics.BackupRestoreTestFailures, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	r.restoreFailures = c
 	return r, nil
 }
 
@@ -69,6 +81,15 @@ func unixSeconds(t time.Time) float64 { return float64(t.UnixNano()) / 1e9 }
 // a succeeded one.
 func (r *Recorder) RunFinished(ctx context.Context, kind domain.Kind, succeeded bool, duration time.Duration, sizeBytes int64, finishedAt time.Time) {
 	v := kindValue(kind)
+	if kind == domain.KindRestoreTest {
+		// The restore test adds nothing to a repository, so it records no size.
+		r.duration.Record(ctx, max(duration, 0).Seconds(), v)
+		r.restoreDuration.Record(ctx, max(duration, 0).Seconds())
+		if succeeded {
+			r.restoreLast.Record(ctx, unixSeconds(finishedAt))
+		}
+		return
+	}
 	r.duration.Record(ctx, max(duration, 0).Seconds(), v)
 	r.size.Record(ctx, float64(max(sizeBytes, 0)), v)
 	if succeeded {
@@ -78,7 +99,18 @@ func (r *Recorder) RunFinished(ctx context.Context, kind domain.Kind, succeeded 
 
 // LastSuccess implements app.Metrics.
 func (r *Recorder) LastSuccess(ctx context.Context, kind domain.Kind, at time.Time) {
+	if kind == domain.KindRestoreTest {
+		r.restoreLast.Record(ctx, unixSeconds(at))
+		return
+	}
 	r.lastSuccess.Record(ctx, unixSeconds(at), kindValue(kind))
+}
+
+// RestoreChecksFailed implements app.Metrics: one per failed check, bothy.reason the check name.
+func (r *Recorder) RestoreChecksFailed(ctx context.Context, checks []domain.CheckName) {
+	for _, c := range checks {
+		r.restoreFailures.Add(ctx, 1, string(c))
+	}
 }
 
 // WALArchived implements app.Metrics.
