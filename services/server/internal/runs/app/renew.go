@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -178,11 +179,12 @@ func (s *Service) refuseRenewal(ctx context.Context, row RunRow, eventType strin
 
 // renewalInput is the delivery the presented token came with, rebuilt from its claims for the
 // resolver of the delivery check: trigger_kind message is agent.invocation, followup is
-// agent.followup with its message. interaction and command come with M2-15 and M2-16; until then
-// their tokens are not renewed (internal error, nothing issued).
+// agent.followup with its message, command (M2-16) is agent.invocation of the command run with the
+// command of the token. interaction comes with M2-15; until then its tokens are not renewed
+// (internal error, nothing issued).
 func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, error) {
 	in := runs.DeliveryInput{AgentID: row.AgentID, ResourceKind: resourceRun, ResourceID: row.ID}
-	//exhaustive:ignore // interaction, command and autocomplete are not renewed until M2-15 and M2-16 (default).
+	//exhaustive:ignore // interaction and autocomplete are not renewed until M2-15 (default).
 	switch domain.TriggerKind(c.TriggerKind) {
 	case domain.TriggerMessage:
 		in.Type = domain.EventAgentInvocation
@@ -196,6 +198,18 @@ func renewalInput(row RunRow, c domain.InvocationClaims) (runs.DeliveryInput, er
 			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the follow-up of a renewal")
 		}
 		in.Type, in.Payload = domain.EventAgentFollowup, p
+	case domain.TriggerCommand:
+		cmd, err := ids.Parse(c.CommandID)
+		if err != nil || cmd.IsZero() {
+			return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: a command token without its command")
+		}
+		p, err := json.Marshal(struct {
+			CommandID string `json:"command_id"`
+		}{cmd.String()})
+		if err != nil {
+			return runs.DeliveryInput{}, errs.Wrap(errs.CodeInternalError, err, "runs: the command of a renewal")
+		}
+		in.Type, in.Payload = domain.EventAgentInvocation, p
 	default:
 		return runs.DeliveryInput{}, errs.New(errs.CodeInternalError, "runs: no renewal for the trigger kind of this token yet")
 	}
