@@ -275,6 +275,35 @@ void main() {
       expect(find.text('Statistics'), findsOneWidget);
     });
 
+    // Brief M6-04 Design note 2 (red team): the OIDC re-login of an action step-up returns to a
+    // console that already had its first step-up; the callback must still complete it.
+    testWidgets('/step-up/callback completes the re-login of an action step-up', (
+      tester,
+    ) async {
+      final b = TestBrowser();
+      final key = oidcFlowKey(OidcFlowKind.stepUp, _attempt);
+      b.flows.write(key, 'verifier-3');
+      b.server.routes['GET /api/v1/console/session'] = (_) =>
+          Answer(200, consoleSession(stepUp: true, methods: ['oidc_reauth']));
+      b.server.routes['POST /api/v1/auth/step-up/oidc/complete'] = (_) =>
+          const Answer(200, stepUpResult);
+      final c = await pumpConsole(
+        tester,
+        b,
+        location:
+            '/step-up/callback?challenge_id=$_challenge&login_code=lc_3&login_attempt_id=$_attempt',
+      );
+      final complete = b.server
+          .to('POST', '/api/v1/auth/step-up/oidc/complete')
+          .single;
+      expect(complete.body, {
+        'login_code': 'lc_3',
+        'client_verifier': 'verifier-3',
+      });
+      expect(b.flows.read(key), isNull);
+      expect(c.state, isA<ConsoleSignedIn>());
+    });
+
     testWidgets('an error on /step-up/callback deletes the entry', (
       tester,
     ) async {
@@ -529,20 +558,48 @@ void main() {
       expect(find.text('You logged out of the console.'), findsOneWidget);
     });
 
-    testWidgets('a lapsed step-up returns to the step-up screen', (
-      tester,
-    ) async {
-      final b = TestBrowser();
-      var lapsed = false;
-      b.server.routes['GET /api/v1/console/session'] = (_) => lapsed
-          ? const Answer(401, {'code': 'step_up_required', 'status': 401})
-          : Answer(200, consoleSession(stepUp: true));
-      final controller = await pumpConsole(tester, b, location: '/audit');
-      lapsed = true;
-      unawaited(controller.refreshSession());
-      await tester.pumpAndSettle();
-      expect(find.text('Confirm that it is you'), findsOneWidget);
-    });
+    // Brief M6-04 Design note 2 (D-M6-04-2): a signed-in console answers step_up_required with
+    // the step-up of the action in a dialog over the page, not with the step-up screen of the
+    // login; a cancel keeps the page.
+    testWidgets(
+      'step_up_required while signed in asks in a dialog and keeps the page',
+      (tester) async {
+        final b = TestBrowser();
+        var lapsed = false;
+        b.server.routes['GET /api/v1/console/session'] = (_) => lapsed
+            ? const Answer(401, {'code': 'step_up_required', 'status': 401})
+            : Answer(200, consoleSession(stepUp: true));
+        b.server.routes['POST /api/v1/auth/step-up/challenge'] = (_) =>
+            const Answer(200, {
+              'challenge_id': _challenge,
+              'challenge': 'Zm9vYmFy',
+              'passkey_options': {'challenge': 'Zm9vYmFy'},
+              'expires_at': '2026-10-10T09:35:00.000Z',
+            });
+        final controller = await pumpConsole(tester, b, location: '/audit');
+        lapsed = true;
+        unawaited(controller.refreshSession());
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('consoleStepUp.dialog')),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Next, your browser asks for your passkey.'),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const ValueKey('consoleStepUp.cancel')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('consoleStepUp.dialog')),
+          findsNothing,
+        );
+        expect(find.text('Confirm that it is you'), findsNothing);
+        expect(controller.state, isA<ConsoleSignedIn>());
+        expect(controller.page, ConsolePage.audit);
+        expect(b.server.to('POST', '/api/v1/auth/step-up/passkey'), isEmpty);
+      },
+    );
 
     testWidgets('a session without a method says so', (tester) async {
       final b = TestBrowser();

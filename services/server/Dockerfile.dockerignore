@@ -7,7 +7,9 @@
 # test sources are those of the smoke probe, built only by the target smoke. The console
 # stage (brief M6-02, docs/spec/18-release.md 7 rule 7) also reads the root files of the pub
 # workspace, every member pubspec.yaml, the console and the lib/ of the packages it uses, the
-# assets and fonts of design_system, the OpenAPI document for version.json; no tests.
+# assets and fonts of design_system, the OpenAPI document for version.json; no tests. Besides the
+# smoke probe, the only test sources are the patrol suites of apps/console/integration_test, built
+# only by the target console-e2e-web (brief M6-04).
 *
 !services/server/go.mod
 !services/server/go.sum
@@ -25,6 +27,7 @@
 !packages/*/pubspec.yaml
 !packages/bothy_viz/harness/pubspec.yaml
 !apps/console/
+!packages/admin_ui/lib/
 !packages/api_client/lib/
 !packages/auth/lib/
 !packages/design_system/lib/

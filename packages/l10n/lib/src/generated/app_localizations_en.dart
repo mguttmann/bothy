@@ -4315,4 +4315,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get adminGuidedDoneClose => 'Close';
+
+  @override
+  String get adminPersonViewAs => 'View as this person';
+
+  @override
+  String adminViewAsRemaining(String time) {
+    return '$time left';
+  }
+
+  @override
+  String get adminViewAsEnd => 'End view';
+
+  @override
+  String adminViewAsSidebarOf(String name) {
+    return 'Sidebar as $name sees it';
+  }
+
+  @override
+  String adminViewAsNotVisible(String name, String names) {
+    return 'Not visible for $name: $names';
+  }
+
+  @override
+  String get adminViewAsStructureOnly =>
+      'The console shows structure and access only, never the content of a channel.';
+
+  @override
+  String get adminViewAsStructureLater =>
+      'The structure appears when a view starts. End this view and start it again to see it.';
+
+  @override
+  String get consoleStepUpPasskeyNext =>
+      'Next, your browser asks for your passkey.';
+
+  @override
+  String get consoleStepUpOidcAction =>
+      'This change needs a new login at your login service. Confirm there, then make the change again.';
 }

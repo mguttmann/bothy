@@ -9,6 +9,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import 'admin/admin_page.dart';
+import 'admin/console_admin.dart';
+import 'admin/console_route.dart';
+import 'admin/step_up_dialog.dart';
 import 'login/logged_out_view.dart';
 import 'login/login_view.dart';
 import 'login/step_up_view.dart';
@@ -42,6 +46,10 @@ class ConsoleApp extends StatefulWidget {
   static ConsoleController controllerOf(BuildContext context) =>
       context.findAncestorStateOfType<_ConsoleAppState>()!._controller;
 
+  /// The administration state of the console that [context] belongs to.
+  static ConsoleAdmin adminOf(BuildContext context) =>
+      context.findAncestorStateOfType<_ConsoleAppState>()!._admin;
+
   @override
   State<ConsoleApp> createState() => _ConsoleAppState();
 }
@@ -50,8 +58,10 @@ class _ConsoleAppState extends State<ConsoleApp> {
   late final ConsoleController _controller = ConsoleController(
     widget.environment,
   );
+  late final ConsoleAdmin _admin = ConsoleAdmin(_controller);
   late final _ConsoleRouterDelegate _delegate = _ConsoleRouterDelegate(
     _controller,
+    _admin,
   );
   late final PlatformRouteInformationProvider? _provider =
       widget.initialLocation == null
@@ -63,9 +73,19 @@ class _ConsoleAppState extends State<ConsoleApp> {
         );
 
   @override
+  void initState() {
+    super.initState();
+    // The step-up of an action shows its dialog over the navigator of the router.
+    _controller.stepUpPrompt = DialogStepUpPrompt(
+      () => _delegate.navigatorKey.currentContext,
+    );
+  }
+
+  @override
   void dispose() {
     _delegate.dispose();
     _provider?.dispose();
+    _admin.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -138,21 +158,25 @@ class _ConsoleRouteParser extends RouteInformationParser<Uri> {
 /// person enters only counts when the state allows it (an administration page needs a step-up).
 class _ConsoleRouterDelegate extends RouterDelegate<Uri>
     with ChangeNotifier, PopNavigatorRouterDelegateMixin<Uri> {
-  _ConsoleRouterDelegate(this.controller) {
-    controller.addListener(notifyListeners);
+  _ConsoleRouterDelegate(this.controller, this.admin) {
+    _changes.addListener(notifyListeners);
   }
 
   final ConsoleController controller;
+
+  final ConsoleAdmin admin;
+
+  late final Listenable _changes = Listenable.merge([controller, admin]);
 
   @override
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Uri? get currentConfiguration {
-    final page = controller.page;
+    final path = controller.path;
     // While starting, the browser keeps its location (the callback query is still needed).
-    if (controller.state is ConsoleStarting || page == null) return null;
-    return Uri(path: page.path);
+    if (controller.state is ConsoleStarting || path == null) return null;
+    return Uri(path: path);
   }
 
   @override
@@ -161,14 +185,14 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
 
   @override
   Future<void> setNewRoutePath(Uri configuration) {
-    final page = ConsolePage.fromPath(configuration.path);
-    if (page != null) controller.open(page);
+    final route = ConsoleRoute.parse(configuration.path);
+    if (route != null) controller.openRoute(route);
     return SynchronousFuture(null);
   }
 
   @override
   void dispose() {
-    controller.removeListener(notifyListeners);
+    _changes.removeListener(notifyListeners);
     super.dispose();
   }
 
@@ -240,6 +264,13 @@ class _ConsoleRouterDelegate extends RouterDelegate<Uri>
         page: c.page!,
         onOpen: c.open,
         onLogout: c.logout,
+        banner: ConsoleViewAsBanner(admin: admin),
+        body: ConsoleAdminPage(
+          controller: c,
+          admin: admin,
+          route: c.route,
+          downloads: c.environment.downloads,
+        ),
       ),
     };
   }

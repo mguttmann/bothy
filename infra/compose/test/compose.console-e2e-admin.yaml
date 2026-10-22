@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Test overlay of phase 2 of the console E2E test (brief M6-04 Design note 4): the patrol web
+# suites of the console administration under the enforced CSP. TEST ONLY: never use it for an
+# installation; make release-build leaves infra/compose/test out of the release bundle.
+# tools/console-e2e/console_e2e.py adds it to the files of phase 1 (compose.console-e2e.yaml) after
+# phase 1 passed, recreates api and the TLS sidecar with it and runs console-browser with
+# E2E_MODE=admin. Only existing configuration keys are set; no port is published.
+
+services:
+
+  api:
+    environment:
+      # The bundle of integration_test/admin/admin_bundle.dart (target console-e2e-web of
+      # services/server/Dockerfile) in place of the console of the image, served with the same
+      # headers and CSP by the same handler.
+      BOTHY_CONSOLE__ASSETS_DIR: /usr/share/bothy/console-e2e
+      # A step-up holds 3 s, so every changing action of the suites asks for a fresh one and runs
+      # through the step-up adapter of the console with the virtual authenticator.
+      BOTHY_AUTH__STEP_UP_MAX_AGE: 3s
+    volumes:
+      - ${E2E_ADMIN_BUNDLE:?set by console_e2e.py}:/usr/share/bothy/console-e2e:ro
+
+  console-browser:
+    environment:
+      # Empty runs SEC-T05 (phase 1); admin runs the patrol suites (headless/admin_suites.py).
+      E2E_MODE: ${E2E_MODE:-}

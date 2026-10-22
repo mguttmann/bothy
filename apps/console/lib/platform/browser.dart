@@ -5,6 +5,8 @@
 /// included, gets `browser_stub.dart`, which never touches the network.
 library;
 
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import 'browser_stub.dart'
@@ -47,6 +49,13 @@ abstract interface class PasskeyPort {
   Future<Map<String, Object?>> get(Map<String, Object?> options);
 }
 
+/// The browser's download of a file the console made itself (the audit export of A6, brief
+/// M6-04). The bytes never reach browser storage: the file goes straight to the download.
+abstract interface class FileDownloads {
+  /// Offers [bytes] as a download named [name] with the media type [type].
+  void save(String name, String type, Uint8List bytes);
+}
+
 /// The person cancelled the passkey prompt, or the browser offered no passkey.
 class PasskeyCancelled implements Exception {
   /// Creates the error.
@@ -58,13 +67,14 @@ class PasskeyCancelled implements Exception {
 
 /// Everything the console needs from its host: the origin it is served from and the ports.
 class ConsoleEnvironment {
-  /// Creates the environment from its parts; [adapter] replaces the browser's HTTP stack in
-  /// tests.
+  /// Creates the environment from its parts; [downloads] saves files (null hides the audit
+  /// export), [adapter] replaces the browser's HTTP stack in tests.
   const ConsoleEnvironment({
     required this.origin,
     required this.flowStore,
     required this.navigation,
     required this.passkeys,
+    this.downloads,
     this.adapter,
   });
 
@@ -83,6 +93,9 @@ class ConsoleEnvironment {
 
   /// The WebAuthn API.
   final PasskeyPort passkeys;
+
+  /// The download of files, or null where the platform has none (the audit export is hidden).
+  final FileDownloads? downloads;
 
   /// The HTTP adapter; null means the browser's own (cookies of the same origin go along).
   final HttpClientAdapter? adapter;

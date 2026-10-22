@@ -7,6 +7,7 @@ library;
 
 import 'dart:math';
 
+import 'package:admin_ui/admin_ui.dart' show AdminLocation;
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:built_collection/built_collection.dart';
@@ -14,6 +15,8 @@ import 'package:built_value/json_object.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../admin/console_route.dart';
+import '../admin/step_up.dart';
 import '../http/console_client.dart';
 import '../login/oidc_flow.dart';
 import '../platform/browser.dart';
@@ -148,9 +151,28 @@ class ConsoleController extends ChangeNotifier {
   /// source unless a test passes one).
   ConsoleController(this.environment, {Random? random})
     : _random = random ?? Random.secure() {
+    actionStepUp = ConsoleActionStepUp(
+      api: () => api,
+      passkeys: environment.passkeys,
+      methods: () => _methodsOf(session),
+      oidcProviders: () => [
+        for (final p in providers)
+          if (p.kind == ConsoleProviderKind.oidc) p,
+      ],
+      prompt: () => stepUpPrompt,
+      onOidc: stepUpWithOidc,
+      onConfirmed: () => _loadSession(own: true),
+    );
     api = createConsoleApiClient(
       origin: environment.origin,
       onUnauthorized: _onUnauthorized,
+      interceptors: [
+        ConsoleStepUpInterceptor(
+          dio: () => api.dio,
+          stepUp: actionStepUp.confirm,
+          active: () => _state is ConsoleSignedIn,
+        ),
+      ],
       adapter: environment.adapter,
     );
   }
@@ -161,10 +183,17 @@ class ConsoleController extends ChangeNotifier {
   /// The generated API over the console's HTTP factory.
   late final ApiClient api;
 
+  /// The step-up of an administration action (brief M6-04 Design note 2).
+  late final ConsoleActionStepUp actionStepUp;
+
+  /// The dialog of the action step-up; the app sets it once its navigator exists, and without
+  /// it an action that needs a step-up is cancelled.
+  ConsoleStepUpPrompt? stepUpPrompt;
+
   final Random _random;
   bool _started = false;
   ConsoleState _state = const ConsoleStarting();
-  ConsolePage _page = ConsolePage.live;
+  ConsoleRoute _route = ConsoleRoute.ofPage(ConsolePage.live);
   ConsolePage? _initial;
 
   /// The public instance metadata, null until the start read it.
@@ -186,7 +215,23 @@ class ConsoleController extends ChangeNotifier {
     ConsoleSignedOut() => ConsolePage.login,
     ConsoleNeedsStepUp() => ConsolePage.stepUp,
     ConsoleLoggedOut() => ConsolePage.loggedOut,
-    ConsoleSignedIn() => _page,
+    ConsoleSignedIn() => _route.page,
+  };
+
+  /// The place of the administration the signed-in console shows (brief M6-04 Design note 1).
+  ConsoleRoute get route => _route;
+
+  /// The session of the current state, or null without one.
+  ConsoleSession? get session => switch (_state) {
+    ConsoleSignedIn(:final session) ||
+    ConsoleNeedsStepUp(:final session) => session,
+    _ => null,
+  };
+
+  /// The path the browser shows for the current page and place, relative to the console base.
+  String? get path => switch (_state) {
+    ConsoleSignedIn() => _route.path,
+    _ => page?.path,
   };
 
   /// The login providers of discovery the console offers a button for.
@@ -217,7 +262,12 @@ class ConsoleController extends ChangeNotifier {
   List<StepUpMethod> get stepUpMethods {
     final s = _state;
     if (s is! ConsoleNeedsStepUp) return const [];
-    final available = s.session.stepUpMethodsAvailable;
+    return _methodsOf(s.session);
+  }
+
+  static List<StepUpMethod> _methodsOf(ConsoleSession? session) {
+    if (session == null) return const [];
+    final available = session.stepUpMethodsAvailable;
     return [
       if (available.contains(ConsoleSessionStepUpMethodsAvailableEnum.passkey))
         StepUpMethod.passkey,
@@ -238,9 +288,10 @@ class ConsoleController extends ChangeNotifier {
   Future<void> start(Uri location) async {
     if (_started) return;
     _started = true;
-    final requested = ConsolePage.fromPath(location.path);
+    final at = ConsoleRoute.parse(location.path);
+    final requested = at?.page;
     _initial = requested;
-    if (requested != null && requested.isAdministration) _page = requested;
+    if (at != null && at.page.isAdministration) _route = at;
     try {
       final d = (await api.getDiscoveryApi().getDiscovery()).data!;
       final built = await readBuiltSpecVersion(
@@ -261,22 +312,38 @@ class ConsoleController extends ChangeNotifier {
       await _completeOidcLogin(query);
       return;
     }
-    await _loadSession();
+    // A stored view whose end passed while the tab was closed answers the first request with
+    // 401 step_up_required and ends it (07 9.2); the session itself is valid, so read again.
+    await _loadSession(again: true);
     if (requested == ConsolePage.stepUpCallback) {
       await _completeStepUpOidc(query);
     }
   }
 
-  /// Shows [page] when the person may see it: an administration page only with a step-up.
-  void open(ConsolePage page) {
-    if (_state is ConsoleSignedIn && page.isAdministration && page != _page) {
-      _page = page;
+  /// Shows [page] at its first place when the person may see it: an administration page only
+  /// with a step-up.
+  void open(ConsolePage page) => openRoute(ConsoleRoute.ofPage(page));
+
+  /// Shows the place [to] when the person may see it (an administration page only with a
+  /// step-up); the same place again changes nothing.
+  void openRoute(ConsoleRoute to) {
+    if (_state is ConsoleSignedIn && to.page.isAdministration && to != _route) {
+      _route = to;
       notifyListeners();
     }
   }
 
-  /// Reads the session again; a `401` moves to E7 or to the step-up through the interceptor.
-  Future<void> refreshSession() => _loadSession();
+  /// Shows the place [location] of the administration, on the page of its section.
+  void openAdmin(AdminLocation location) =>
+      openRoute(ConsoleRoute.forAdmin(location));
+
+  /// Reads the session again; a `401` moves to E7 through the interceptor.
+  ///
+  /// [afterViewEnd] is for the end of a stored view by its time: the server answers the first
+  /// request after the end with `401 step_up_required` (07 9.2), so this read leaves that answer
+  /// to itself and reads once more instead of starting a step-up.
+  Future<void> refreshSession({bool afterViewEnd = false}) =>
+      _loadSession(own: afterViewEnd, again: afterViewEnd);
 
   /// Logs in with [provider]: OIDC sends the tab to the login service, a proxy provider logs in
   /// without input.
@@ -443,7 +510,9 @@ class ConsoleController extends ChangeNotifier {
 
   Future<void> _completeStepUpOidc(Map<String, String> query) async {
     final verifier = _takeVerifier(OidcFlowKind.stepUp, query);
-    if (_state is! ConsoleNeedsStepUp) return;
+    // Also a signed-in console: the OIDC re-login of an action step-up (M6-04) returns to a
+    // session that had its first step-up already.
+    if (_state is! ConsoleNeedsStepUp && _state is! ConsoleSignedIn) return;
     final code = query['login_code'];
     if (query['error'] != null || verifier == null || code == null) {
       _notify(ConsoleNotice.stepUpFailed);
@@ -484,10 +553,20 @@ class ConsoleController extends ChangeNotifier {
   String _redirect(ConsolePage page) =>
       environment.origin.replace(path: page.fullPath).toString();
 
-  Future<void> _loadSession() async {
+  Future<void> _loadSession({bool own = false, bool again = false}) async {
     try {
-      _applySession((await api.getAuthApi().getConsoleSession()).data!);
+      _applySession(
+        (await api.getAuthApi().getConsoleSession(
+          extra: own ? const {consoleNoStepUpExtra: true} : null,
+        )).data!,
+      );
     } on DioException catch (e) {
+      final code = e.response == null
+          ? null
+          : ApiProblem.fromResponse(e.response!).code;
+      if (again && code == 'step_up_required') {
+        return _loadSession(own: true);
+      }
       if (_state is ConsoleStarting) {
         _set(
           e.response?.statusCode == 401
@@ -504,22 +583,15 @@ class ConsoleController extends ChangeNotifier {
         : ConsoleSignedIn(session),
   );
 
-  /// A `401` of any call: during a session `step_up_required` goes back to the step-up and every
-  /// other code to E7 with the reason; before a session (login forms, the start) it changes
-  /// nothing, the caller shows its own message.
+  /// A `401` of any call: during a session every code but `step_up_required` goes to E7 with
+  /// the reason; before a session (login forms, the start) it changes nothing, the caller shows
+  /// its own message. `step_up_required` of a signed-in console is the action's step-up (the
+  /// adapter of [actionStepUp] runs it and repeats the request, brief M6-04 Design note 2); on
+  /// the step-up screen it changes nothing either.
   void _onUnauthorized(ApiProblem problem) {
-    final s = _state;
-    final session = switch (s) {
-      ConsoleSignedIn(:final session) => session,
-      ConsoleNeedsStepUp(:final session) => session,
-      _ => null,
-    };
-    if (session == null) return;
-    _set(
-      problem.code == 'step_up_required'
-          ? ConsoleNeedsStepUp(session)
-          : ConsoleLoggedOut(reasonCode: problem.code),
-    );
+    final current = session;
+    if (current == null || problem.code == 'step_up_required') return;
+    _set(ConsoleLoggedOut(reasonCode: problem.code));
   }
 
   /// Runs [action] as the request of the current screen: busy while it runs, then the notice of
@@ -550,6 +622,11 @@ class ConsoleController extends ChangeNotifier {
   }
 
   void _set(ConsoleState state) {
+    // E7 ends the session: the next login in this tab starts at the first page, not at a place
+    // of the person who logged out (brief M6-04, D-M6-04-3).
+    if (state is ConsoleLoggedOut) {
+      _route = ConsoleRoute.ofPage(ConsolePage.live);
+    }
     _state = state;
     notice = null;
     notifyListeners();

@@ -1150,5 +1150,14 @@
   "adminGuidedTitle": "Auf Organisation umstellen",
   "adminGuidedDone": "{agent} läuft jetzt mit Organisation, und die Änderung ist gespeichert.",
   "adminGuidedStillReports": "Der Adapter von {agent} meldet noch {mode}.",
-  "adminGuidedDoneClose": "Schließen"
+  "adminGuidedDoneClose": "Schließen",
+  "adminPersonViewAs": "Als diese Person ansehen",
+  "adminViewAsRemaining": "noch {time}",
+  "adminViewAsEnd": "Ansicht beenden",
+  "adminViewAsSidebarOf": "Seitenleiste, wie {name} sie sieht",
+  "adminViewAsNotVisible": "Nicht sichtbar für {name}: {names}",
+  "adminViewAsStructureOnly": "Die Konsole zeigt nur Aufbau und Zugriff, nie den Inhalt eines Kanals.",
+  "adminViewAsStructureLater": "Der Aufbau erscheint beim Start einer Ansicht. Beende diese Ansicht und starte sie neu, um ihn zu sehen.",
+  "consoleStepUpPasskeyNext": "Als Nächstes fragt dein Browser nach deinem Passkey.",
+  "consoleStepUpOidcAction": "Diese Änderung braucht eine neue Anmeldung bei deinem Anmeldedienst. Bestätige dort und mache die Änderung danach noch einmal."
 }
