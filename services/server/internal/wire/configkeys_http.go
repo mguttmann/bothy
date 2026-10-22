@@ -44,7 +44,7 @@ func httpConfigKeys() []config.Key {
 			Chapter: chapter02,
 		},
 		{
-			Name: "http.request_timeout", Kind: config.KindDuration, Default: "15s", Min: minPositiveDuration,
+			Name: keyHTTPRequestTimeout, Kind: config.KindDuration, Default: "15s", Min: minPositiveDuration,
 			Doc:     "Context deadline of a normal request.",
 			Chapter: chapter02,
 		},

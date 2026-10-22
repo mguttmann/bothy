@@ -71,7 +71,9 @@ var requirementGroups = []struct {
 		"pin.delete", "space.update", "webhook_in.create", "webhook_in.read", "webhook_in.revoke",
 	}},
 	{"human", Human, []string{"client_metrics.submit", "dm.create"}},
-	{"trigger and `agent.invoke` without a run (for app commands `required_level`)", Deferred("M2"), []string{
+	// command.autocomplete (M2-17 design note 3): an agent owner needs trigger and the agent.invoke
+	// guard without a run, an app owner the required_level of the command.
+	{"trigger and `agent.invoke` without a run (for app commands `required_level`)", AutocompleteLevel, []string{
 		"command.autocomplete",
 	}},
 	{"agent-self or app-self, owner of the command", Any(AgentSelf, AppSelf), []string{

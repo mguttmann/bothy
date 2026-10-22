@@ -6771,6 +6771,7 @@ type AuthProviderInfo struct {
 
 // AutocompleteAnswer defines model for AutocompleteAnswer.
 type AutocompleteAnswer struct {
+	// Choices At most `command.autocomplete_max_choices`.
 	Choices []CommandChoice `json:"choices"`
 }
 
@@ -6791,6 +6792,7 @@ type AutocompleteQuery struct {
 
 // AutocompleteResult defines model for AutocompleteResult.
 type AutocompleteResult struct {
+	// Choices At most `command.autocomplete_max_choices`.
 	Choices []CommandChoice `json:"choices"`
 }
 
@@ -17200,6 +17202,9 @@ type ArchiveChannelJSONRequestBody = ReasonBody
 // PutChannelBehaviorJSONRequestBody defines body for PutChannelBehavior for application/json ContentType.
 type PutChannelBehaviorJSONRequestBody = ChannelBehaviorPut
 
+// AutocompleteCommandJSONRequestBody defines body for AutocompleteCommand for application/json ContentType.
+type AutocompleteCommandJSONRequestBody = AutocompleteQuery
+
 // InvokeCommandJSONRequestBody defines body for InvokeCommand for application/json ContentType.
 type InvokeCommandJSONRequestBody = CommandInvoke
 
@@ -17238,6 +17243,9 @@ type CreateUploadJSONRequestBody = UploadCreate
 
 // SubmitClientMetricsJSONRequestBody defines body for SubmitClientMetrics for application/json ContentType.
 type SubmitClientMetricsJSONRequestBody = ClientMetricsBatch
+
+// AnswerAutocompleteJSONRequestBody defines body for AnswerAutocomplete for application/json ContentType.
+type AnswerAutocompleteJSONRequestBody = AutocompleteAnswer
 
 // RegisterCommandJSONRequestBody defines body for RegisterCommand for application/json ContentType.
 type RegisterCommandJSONRequestBody = CommandRegister

@@ -194,7 +194,7 @@ func (a *Authorizer) tokenAndInvokeFacts(ctx context.Context, s *actingPrincipal
 	if req.Contains(domain.Token()) && r.Token != nil {
 		in.Invocation = invocationFacts(r.Token)
 	}
-	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
+	if takesInvokeFacts(spec.ID) && r.Invoke != nil {
 		var err error
 		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
 			return err
@@ -251,6 +251,12 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		}
 	}
 	return in, nil
+}
+
+// takesInvokeFacts reports the actions whose guard reads the invoke facts: agent.invoke and
+// command.autocomplete, which applies the agent.invoke guard without a run (M2-17).
+func takesInvokeFacts(action string) bool {
+	return action == string(authorize.ActionAgentInvoke) || action == string(authorize.ActionCommandAutocomplete)
 }
 
 // pendingReason is the reason of a pending person or device whose pending gate passed.

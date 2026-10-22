@@ -87,7 +87,7 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 
 ## Port (root package `internal/runs`)
 
-- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). Planned: start, resume, patch, finish, cancel (M2-09, M2-10), `Interactions` (M2-15), `CommandExec` (M2-16).
+- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). Planned: start, resume, patch, finish, cancel (M2-09, M2-10), `Interactions` (M2-15), `CommandExec` (M2-16; `Autocomplete` and `AnswerAutocomplete` M2-17). Source port (M2-17): `AutocompleteRelay`.
 - Emits durable events (M2-08): `agent.invocation` (audience the agent, receive action `agent.events.consume`, resource the run without version, no token).
 - Emits in-tx events: none.
 - Subscribes (M2-05): `messaging.MessagePosted` (the acceptance, `app.Acceptor`, registered after the subscriber of sync). Planned: `messaging.MessageDeleted`, `files.FileFinalized`, `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
@@ -161,6 +161,52 @@ The port `runs.Runs` gains `Start`, `Resume`, `RenewToken`, `AwaitInput`, `Finis
 - **Cancel:** `requestCancel` is the one function behind every cancellation (M2-16 `/stop` and M8-03 reuse it): it appends `run.cancel_requested` (personal to the agent, `requested_by` only for `user_cancelled`) and either ends the run at once or schedules `runs.cancel_timeout` at now plus `agent.cancel_grace` (`CancelTimeoutScheduler`, `adapters/jobs.CancelScheduler`). `Cancel` ends a queued run at once, requests otherwise, answers a cancelled run without change and audits the allow (`state_before`, `immediate`, `cancel_reason`, `no_change`); the reason text is checked and stored nowhere.
 - **Revocation and disabled agent:** `Acceptor.OnAccessChanged` (phase 3.1, never calls `authorize`) locks the active runs of the affected starters, keeps those whose channel they lost (`domain.LostTriggerRuns`; every run for `user.disable`) and requests their cancellation with `access_revoked`, `user_disabled` or `channel_read_only` (`domain.CancelReasonFor`); the states stay. `Acceptor.OnAgentDisabled` ends the agent's active runs `cancelled` with `agent_disabled` at once.
 - **Orphans:** `StallCheck` reads the started active runs and the persisted heartbeat of their agents (`agents.Heartbeats`) and fails `interrupted` and `stale` runs (`domain.OrphanVerdict`), one unit of work per run with the verdict decided again under the lock; nothing is retried.
+
+## Autocompletion (M2-17)
+
+`CommandExec.Autocomplete` and `CommandExec.AnswerAutocomplete` (`autocomplete.go`,
+`app/autocomplete.go`, `domain/autocomplete.go`, handlers `adapters/httpapi/autocomplete.go`) serve
+`autocompleteCommand` and `answerAutocomplete`; the gateway op `command.autocomplete_result` calls
+`AnswerAutocomplete` too. Neither holds a transaction, writes a row or appends a durable event, and
+neither creates a run or a cost entry (R-AG-14).
+
+- `Autocomplete`: `agents.Commands.Resolve` (404 for an unknown, removed, not covered or shadowed
+  command), the thread of the request (404 when unknown or of another channel, before `authorize`),
+  the channel facts, the target thread (`domain.AutocompleteTarget`: the given thread, else the main
+  thread of a text channel, else none in a forum, R-AZ-26), then `command.autocomplete` in request
+  mode at the permission version read once (`instance.Versions`) and the query rules
+  (`domain.ValidateAutocompleteQuery`). An agent owner without a target thread gets an empty list
+  at once. An app command is `404` until M2-25, because `Resolve` hides it (D-M2-16-20); the
+  use case would answer an empty list for an app owner and the requirement already decides it. Otherwise the payload of `command.autocomplete_requested`
+  (`400 validation_failed` with the field code `too_long` and an empty pointer above
+  `sync.event_payload_max_bytes`), a fresh token with
+  `trigger_kind = autocomplete`, no `run_id`, the command and the target thread
+  (`domain.AutocompleteGrant`, target billing mode and tool class of the agent), the request in the
+  registry, and the source port `AutocompleteRelay` (implemented by
+  `gateway/adapters/autocompleterelay`). Not sent: an empty list at once. Sent: the first accepted
+  answer, or an empty list after `command.autocomplete_timeout`; the end of the request context
+  expires the request.
+- `AnswerAutocomplete`: an unknown or forgotten request is `404` without `authorize`; then
+  `command.autocomplete.respond` on the command at the place of the request with the owner as
+  `OwnerID`, the answer rules (`domain.ValidateAutocompleteAnswer`, at most
+  `command.autocomplete_max_choices`; the request stays open after a `400`), `410` for an expired
+  request, `204` without effect for an answered one, otherwise the compare-and-swap
+  `open -> answered` that wakes the waiter.
+- The registry of open requests is a mutex-guarded map in the memory of the process
+  (`autocompleteBox`); every transition is a compare-and-swap of `domain.AutocompleteRequest`.
+  Answered and expired requests stay until `expires_at` plus `command.autocomplete_timeout` and are
+  swept by every call (no goroutine). A restart forgets every request (at most once, 04 section 9).
+  With `cluster.mode = multi`, before M7-17 distributes requests and answers, only owner
+  connections and REST answers on the same api node are reached; elsewhere the person gets an empty
+  list and the answer `404` (OQ-07, RK-37).
+- Residual risk (T-AI-02, 07 SR9): an adapter that reads the API with its own rights while it
+  computes suggestions could return names from channels the person cannot read; the server cannot
+  filter free-form choices. SR9 binds requests only within a run; M2-14 decides about autocomplete
+  tokens as `acting_for`.
+- Keys: `command.autocomplete_timeout`, `command.autocomplete_max_choices` (bound with the relay in
+  `internal/wire`, `BindAutocomplete`), `sync.event_payload_max_bytes`, `agent.invocation_token_ttl`.
+- Registrations: `runs.Register` declares the ephemeral `command.autocomplete_requested` and the op
+  `command.autocomplete_result`, whose handler the gateway runs on `CommandExec`.
 
 ## Invocation tokens (M2-06)
 

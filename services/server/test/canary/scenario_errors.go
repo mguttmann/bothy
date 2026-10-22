@@ -4,6 +4,7 @@ package canary
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -67,7 +68,7 @@ func (sc *Scenario) errorPaths() {
 
 // gatewayOps sends every client gateway op M1 registers: identify, heartbeat, focus,
 // typing.start and typing.stop on a connection of Alex, reauth and resume on further ones, and
-// ack on a connection of the agent Lotse.
+// ack and command.autocomplete_result on a connection of the agent Lotse.
 func (sc *Scenario) gatewayOps() {
 	sc.T.Helper()
 	alex := sc.W.People["Alex"]
@@ -121,7 +122,13 @@ func (sc *Scenario) gatewayOps() {
 	} else {
 		sc.GatewaySent["ack"]++
 	}
-	sc.drain(a, "Lotse")
+	// An answer to an unknown autocomplete request: an error frame, the connection stays (M2-17).
+	if err := a.Send("command.autocomplete_result", map[string]any{"request_id": newID(), "choices": []any{}}); err != nil {
+		sc.T.Errorf("command.autocomplete_result: %v", err)
+	} else {
+		sc.GatewaySent["command.autocomplete_result"]++
+	}
+	sc.drainExpecting(a, "Lotse", "command.autocomplete_result")
 	a.Close()
 }
 
@@ -129,6 +136,14 @@ func (sc *Scenario) gatewayOps() {
 // close of the server is a failure.
 func (sc *Scenario) drain(g *harness.GatewayConn, who string) {
 	sc.T.Helper()
+	sc.drainExpecting(g, who, "")
+}
+
+// drainExpecting is drain that accepts the one error frame of op with code not_found, which an
+// answer to an unknown autocomplete request gets (M2-17); "" accepts none.
+func (sc *Scenario) drainExpecting(g *harness.GatewayConn, who, op string) {
+	sc.T.Helper()
+	expected := op != ""
 	for {
 		ctx, cancel := context.WithTimeout(sc.Ctx, time.Second)
 		f, err := g.Next(ctx)
@@ -138,6 +153,16 @@ func (sc *Scenario) drain(g *harness.GatewayConn, who string) {
 				sc.T.Errorf("gateway of %s ended: %v", who, err)
 			}
 			return
+		}
+		if f.Op == "error" && expected {
+			var e struct {
+				Op   string `json:"op"`
+				Code string `json:"code"`
+			}
+			if json.Unmarshal(f.D, &e) == nil && e.Op == op && e.Code == "not_found" {
+				expected = false
+				continue
+			}
 		}
 		if f.Op == "error" || f.Op == "invalid_session" {
 			sc.T.Errorf("gateway of %s: %s %s", who, f.Op, clip(f.D))

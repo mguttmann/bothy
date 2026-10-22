@@ -13,11 +13,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addGroupMember
   - addOwner
   - addReaction
+  - answerAutocomplete
   - approveDevice
   - approvePairing
   - archiveChannel
   - archiveSpace
   - attachTerminalSession
+  - autocompleteCommand
   - awaitRunInput
   - beginEnrollment
   - beginIdentityLink
@@ -253,15 +255,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: addStatusIncidentUpdate
     milestone: M7
     ticket: M7-09
-  - operation_id: answerAutocomplete
-    milestone: M2
-    ticket: M2-17
   - operation_id: applyImportBatch
     milestone: M8
     ticket: M8-03
-  - operation_id: autocompleteCommand
-    milestone: M2
-    ticket: M2-17
   - operation_id: bindAgentSession
     milestone: M2
     ticket: M2-12
@@ -464,6 +460,7 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
 gateway_ops:
   enabled:           # sorted ascending
     - ack
+    - command.autocomplete_result
     - focus
     - heartbeat
     - identify
@@ -472,8 +469,6 @@ gateway_ops:
     - typing.start
     - typing.stop
   later:             # sorted by op
-    - op: command.autocomplete_result
-      milestone: M2
     - op: run.update
       milestone: M2
     - op: stats.subscribe

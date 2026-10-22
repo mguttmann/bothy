@@ -22,6 +22,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -58,6 +59,13 @@ type staticNonces struct{}
 
 func (staticNonces) CurrentNonce() string { return "n" }
 
+// noAnswers takes no answer of command.autocomplete_result.
+type noAnswers struct{}
+
+func (noAnswers) AnswerAutocomplete(context.Context, runs.AutocompleteAnswer) error {
+	return errs.New(errs.CodeNotFound, "")
+}
+
 // noThreads is a chat port that knows no thread.
 type noThreads struct{}
 
@@ -84,13 +92,15 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		t.Fatal(err)
 	}
 	gw, err := wire.NewGateway(cfg, wire.GatewayDeps{Authenticator: actor.AnonymousOnly{}, Authorizer: allowAll{}, Nonces: staticNonces{},
-		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}, Threads: noThreads{}, Consumers: noConsumers{}})
+		Limiter: l, Reads: &wire.SyncReads{}, Instance: fixedInstance{}, Threads: noThreads{}, Consumers: noConsumers{},
+		Autocomplete: noAnswers{}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	actions := map[string]authorize.Action{
-		"ack":   authorize.ActionAgentEventsConsume,
-		"focus": authorize.ActionGatewayFocus, "heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect,
+		"ack":                         authorize.ActionAgentEventsConsume,
+		"command.autocomplete_result": authorize.ActionCommandAutocompleteRespond,
+		"focus":                       authorize.ActionGatewayFocus, "heartbeat": authorize.ActionGatewayConnect, "identify": authorize.ActionGatewayConnect,
 		"reauth": authorize.ActionGatewayConnect, "resume": authorize.ActionGatewayConnect, "typing.start": authorize.ActionTypingStart,
 		"typing.stop": authorize.ActionTypingStart,
 	}
@@ -102,7 +112,7 @@ func TestGatewayOpsEnableList(t *testing.T) {
 		}
 	}
 	if got := gw.App.Dispatcher().Ops(); !slices.Equal(got, want) ||
-		!slices.Equal(want, []string{"ack", "focus", "heartbeat", "identify", "reauth", "resume", "typing.start", "typing.stop"}) {
+		!slices.Equal(want, []string{"ack", "command.autocomplete_result", "focus", "heartbeat", "identify", "reauth", "resume", "typing.start", "typing.stop"}) {
 		t.Errorf("registered %v, enabled %v", got, want)
 	}
 	if cfg.HeartbeatInterval != 30*time.Second || cfg.ResumeWindow != 5*time.Minute {

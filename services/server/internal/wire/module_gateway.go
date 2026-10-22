@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -52,8 +53,9 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	id, az, reads, pool, a, ch, ag, rn := s.identity, s.authorizer, s.syncReads, s.pool, s.audit, s.chat, s.agents, s.runs
 	s.mu.Unlock()
 	var invocations runs.Delivery
+	var answers gatewayapp.AutocompleteAnswerer
 	if rn != nil {
-		invocations = rn.Service
+		invocations, answers = rn.Service, rn.Service
 	}
 	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil || ag == nil {
 		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work, chat and agents")
@@ -61,9 +63,12 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	gw, err := NewGateway(cfg, GatewayDeps{
 		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
 		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers,
-		Presence: ag.Presence, Invocations: invocations, Clock: s.deps.Clock, Log: log,
+		Presence: ag.Presence, Invocations: invocations, Autocomplete: answers, Clock: s.deps.Clock, Log: log,
 	})
 	if err != nil {
+		return err
+	}
+	if err := bindAutocomplete(s.values, rn, gw); err != nil {
 		return err
 	}
 	if ag.Presence != nil {

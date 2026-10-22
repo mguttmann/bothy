@@ -116,6 +116,10 @@ type member struct {
 	// mutex like the indices.
 	focus    []domain.FocusEntry
 	focusGen uint64
+
+	// attached orders the connections by their Attach (the newest wins the relay of an
+	// autocomplete request, M2-17); 0 before Attach.
+	attached atomic.Uint64
 }
 
 // Hub implements Delivery and delivers the durable events of the log to the registered
@@ -146,6 +150,8 @@ type Hub struct {
 	consumers *ConsumerEngine
 	// position is the hub position: the highest seq Dispatch has finished (Position).
 	position atomic.Int64
+	// attachSeq counts the attaches of the process for member.attached (M2-17).
+	attachSeq atomic.Uint64
 
 	// lagMu guards the state of bothy.event.fanout.lag: the batches the tail announced (Known)
 	// that are not fully distributed, and the highest seq Dispatch distributed.
@@ -265,6 +271,7 @@ func (h *Hub) Attach(ctx context.Context, c *Connection, from, head int64) error
 	if m == nil {
 		return nil // the connection closed meanwhile
 	}
+	m.attached.Store(h.attachSeq.Add(1))
 	if m.consumer {
 		m.mu.Lock()
 		m.phase, m.head = domain.PhaseLive, head

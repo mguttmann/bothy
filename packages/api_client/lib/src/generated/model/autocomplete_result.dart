@@ -13,10 +13,11 @@ part 'autocomplete_result.g.dart';
 /// AutocompleteResult
 ///
 /// Properties:
-/// * [choices]
+/// * [choices] - At most `command.autocomplete_max_choices`.
 @BuiltValue()
 abstract class AutocompleteResult
     implements Built<AutocompleteResult, AutocompleteResultBuilder> {
+  /// At most `command.autocomplete_max_choices`.
   @BuiltValueField(wireName: r'choices')
   BuiltList<CommandChoice> get choices;
 
