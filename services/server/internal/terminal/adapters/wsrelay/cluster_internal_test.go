@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
@@ -59,23 +60,13 @@ func (f *fakeRelayUC) all() string {
 	return strings.Join(f.calls, ",")
 }
 
-// testCtx is a context bounded for one test.
-func testCtx(t *testing.T) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	t.Cleanup(cancel)
-	return ctx
-}
+// testCtx is a context bounded by testkit.Patience for one test.
+func testCtx(t *testing.T) context.Context { return testkit.Context(t) }
 
-// waitFor polls cond within the bound of a test.
+// waitFor polls cond until it holds, bounded by testkit.Patience.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	testkit.Until(t, what, cond)
 }
 
 // TestRelay_SidelessExpectationDeadline: the deadline of an expectation without sides decides by
@@ -215,8 +206,7 @@ func TestRelay_LoneSides(t *testing.T) {
 // on a host with require_local_confirm exactly once per pairing; other sessions announce nothing.
 func TestRelay_SessionPairedSentOnce(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	for _, confirm := range []bool{true, false} {
 		uc := &fakeRelayUC{}
 		r, _, sent := clusterRelay(t, uc)

@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/hosttest"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
@@ -26,8 +27,8 @@ import (
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
 
-// waitLong bounds every wait of a test.
-const waitLong = 30 * time.Second
+// waitLong bounds every wait of a test (testkit.Patience, docs/DECISIONS.md PL/8).
+const waitLong = testkit.Patience
 
 // The short windows of the cluster: the tests wait at most a small multiple of them; exact
 // boundaries are proven by the unit tests of domain (Design note 13 of M2-47).
@@ -510,13 +511,7 @@ func (c *cluster) state(session string) string {
 // eventually waits until cond holds or waitLong passes.
 func (c *cluster) eventually(what string, cond func() bool) {
 	c.t.Helper()
-	deadline := time.Now().Add(waitLong)
-	for !cond() {
-		if time.Now().After(deadline) {
-			c.t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	testkit.Until(c.t, what, cond)
 }
 
 // waitState waits until the session has the state string want.

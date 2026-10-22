@@ -25,6 +25,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The upstream names of the example edge; the responders answer under these aliases.
@@ -101,7 +102,7 @@ func newTestNetwork(ctx context.Context, t *testing.T) *testcontainers.DockerNet
 		t.Fatalf("create test network: %v", err)
 	}
 	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 		defer cancel()
 		if err := nw.Remove(ctx); err != nil {
 			t.Errorf("remove test network: %v", err)
