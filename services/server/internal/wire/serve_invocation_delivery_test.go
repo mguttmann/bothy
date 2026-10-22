@@ -160,16 +160,41 @@ func (w *invocationWorld) nextInvocation(c *wstest.Client, ack bool) invocationF
 	}
 }
 
-// nothingDeliveredBefore proves that the refused run of message never reached the agent on c:
-// it waits until the run failed, lets p trigger again in thread and reads the next invocation,
-// which must be the one of the new message. The consumer delivers in seq order and the refused
-// invocation has the lower seq, so a delivery of it would arrive first; no fixed window decides.
-func (w *invocationWorld) nothingDeliveredBefore(c *wstest.Client, message string, p gwPerson, thread, text string) {
-	w.t.Helper()
-	testkit.Until(w.t, "the refused run", func() bool { r, _ := w.runOf(message); return r.state == "failed" })
-	next, _ := w.say(p, thread, text)
-	if f := w.nextInvocation(c, true); f.Payload.MessageID != next {
-		w.t.Fatalf("a refused invocation was delivered: %+v", f)
+// refusedUndelivered reads the frames of c, acknowledging every other dispatch so
+// agent.max_inflight_events never holds the stream, until the run of message has failed; an
+// agent.invocation on the way fails the test. A refused delivery fails the run in the same unit
+// that decides not to send, so once the run is failed no frame of it can follow. The only bound
+// is testkit.Patience; the short read slices only let the loop look at the run between frames.
+func (w *invocationWorld) refusedUndelivered(t *testing.T, c *wstest.Client, message string) {
+	t.Helper()
+	deadline := testkit.Deadline()
+	for {
+		if r, _ := w.runOf(message); r.state == "failed" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the run of %s did not fail within testkit.Patience", message)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		op, raw, err := c.Next(ctx)
+		cancel()
+		if errors.Is(err, context.DeadlineExceeded) {
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if op != "dispatch" {
+			continue
+		}
+		var f invocationFrame
+		if err := json.Unmarshal(raw, &f); err != nil {
+			t.Fatal(err)
+		}
+		if f.Type == "agent.invocation" {
+			t.Fatalf("a refused invocation was delivered: %+v", f)
+		}
+		sendAck(t, c, f.Seq)
 	}
 }
 
@@ -322,9 +347,7 @@ func TestInvocationDelivery(t *testing.T) {
 		m, _ := w.say(w.sam, ch.thread, "@"+handle+" please look")
 		w.must(w.owner, http.MethodPost, "/api/v1/grants/"+grant+"/revoke", map[string]any{"reason": "left the team"})
 		c, _ = w.ready(t, w.agentParams(a, ""))
-		// A new grant lets Sam trigger again; the next delivery must be the new run.
-		w.triggerGrant(w.sam, ch)
-		w.nothingDeliveredBefore(c, m, w.sam, ch.thread, "@"+handle+" and now")
+		w.refusedUndelivered(t, c, m)
 		r, _ := w.runOf(m)
 		if r.reason != "access_revoked" {
 			t.Fatalf("run %+v", r)
@@ -418,10 +441,7 @@ func TestInvocationDelivery(t *testing.T) {
 		}
 		w.sql(`UPDATE agents SET reported_tool_class = 'host' WHERE principal_id = $1`, a.id.String())
 		c, _ = w.ready(t, w.agentParams(a, ""))
-		testkit.Until(t, "the refused run", func() bool { r, _ := w.runOf(m2); return r.state == "failed" })
-		// The agent reports scoped again; the next delivery must be Sam's new trigger.
-		w.sql(`UPDATE agents SET reported_tool_class = 'scoped' WHERE principal_id = $1`, a.id.String())
-		w.nothingDeliveredBefore(c, m2, w.sam, ch2.thread, "@"+handle+" scoped this time")
+		w.refusedUndelivered(t, c, m2)
 		if r, _ := w.runOf(m2); r.reason != "tool_class_owner_only" {
 			t.Fatalf("run %+v", r)
 		}
@@ -443,7 +463,7 @@ func TestInvocationDelivery(t *testing.T) {
 		}
 		w.sql(`UPDATE runs SET queued_at = queued_at - interval '49 hours' WHERE id = $1`, r.id)
 		c, _ := w.ready(t, w.agentParams(a, ""))
-		w.nothingDeliveredBefore(c, m, w.sam, ch.thread, "@"+handle+" still there")
+		w.refusedUndelivered(t, c, m)
 		if r, _ := w.runOf(m); r.reason != "agent_unavailable" {
 			t.Fatalf("run %+v", r)
 		}
