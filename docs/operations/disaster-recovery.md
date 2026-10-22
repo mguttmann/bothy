@@ -54,9 +54,10 @@ automatic restore test measures the duration on every run.
    tokens of the old keys stop verifying, people sign in again, webhook receivers need the new
    public key. Remove the variable again after that start.
 3. `docker compose up -d secrets-init postgres backup`, then restore from repo2 according to
-   [backup-restore.md](backup-restore.md) 5.2 from step 4 (target: latest state).
+   [backup-restore.md](backup-restore.md) 5.2 steps 4 and 5 only (target: latest state); its
+   finalize and start follow here once.
 4. Restore the objects from restic.
-5. `bothy restore finalize`, restore test, then start all services. Without this step
+5. `docker compose run --rm migrate restore finalize`, restore test, then start all services. Without this step
    `api` and `worker` stay not ready with `restore_not_finalized`, because the database identity
    of the new host differs from the stored one ([16-operations.md](../spec/16-operations.md) 8.4).
 6. Point DNS or the Tailscale device to the new host. With `tailscale` the device is new; keep
