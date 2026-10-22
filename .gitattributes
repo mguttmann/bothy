@@ -26,3 +26,10 @@ pubspec.lock linguist-generated=true
 go.sum linguist-generated=true
 docs/**/*.svg linguist-generated=true
 design/build/** linguist-generated=true
+
+# Append-only registries: a local rebase, cherry-pick or merge keeps the lines both sides
+# appended (docs/DECISIONS.md PL/27). GitHub's merge ignores this driver.
+CHANGELOG.md merge=union
+docs/DECISIONS.md merge=union
+migrations.sha256 merge=union
+tools/docs/language-allow.txt merge=union

@@ -362,6 +362,18 @@ the gate (section 10 asks for the ticket file); and a conflict resolution that d
 ticket's lines loses them unnoticed, so a branch that still has its rulings in
 `docs/DECISIONS.md` moves its section into `docs/decisions.d/<ticket>.md` when it rebases.
 
+The append-only registries that stay shared (every `CHANGELOG.md`, `docs/DECISIONS.md`, every
+`migrations.sha256` and `tools/docs/language-allow.txt`) carry `merge=union` in `.gitattributes`
+(docs/DECISIONS.md PL/27): when two branches append lines at the same place, a local rebase,
+cherry-pick or merge keeps the lines of both sides without a conflict. GitHub ignores the
+driver, so a pull request still shows the conflict until its branch is rebuilt locally. A
+union does not resolve anything else: when both sides change the same line it keeps both
+versions, and two rows that both sides added with the same PL number both stay, so read
+the result; two migrations with the same number still fail
+`migrations-lint` (`duplicate-version`), and an unsorted sum file is rewritten by
+`make migrations-lock`. Code, JSON, YAML and the other Markdown documents keep the normal merge
+(`tools/ci/tests/test_merge_union.py` holds the list).
+
 ## Performance (`make perf`)
 
 `make perf` runs the load tests of every Go module with performance targets (list `PERF_MODULES`
