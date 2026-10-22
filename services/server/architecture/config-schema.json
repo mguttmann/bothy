@@ -986,6 +986,18 @@
       "doc": "Most commands of one agent or app."
     },
     {
+      "name": "console.assets_dir",
+      "env": "BOTHY_CONSOLE__ASSETS_DIR",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Directory of the built web console that the api process serves under /console/; empty means no console."
+    },
+    {
       "name": "consumer.batch_size",
       "env": "BOTHY_CONSUMER__BATCH_SIZE",
       "kind": "int",

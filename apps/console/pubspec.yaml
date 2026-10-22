@@ -10,11 +10,37 @@ environment:
   sdk: ^3.13.5
   flutter: 3.47.7
 
+# Members of the workspace the console uses directly; each is reachable from the console's arrows
+# in tools/arch-check/rules.yaml (docs/spec/15-client-architecture.md 3.1). Never sync_engine or
+# local_store (rule 3).
 dependencies:
+  api_client:
+    path: ../../packages/api_client
+  # PkcePair of the OIDC login and re-login; the console uses no DPoP part (brief M6-02).
+  auth:
+    path: ../../packages/auth
+  built_collection: ^5.1.2
+  built_value: ^8.13.0
+  design_system:
+    path: ../../packages/design_system
+  dio: ^5.11.1
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  # Path URLs below /console/ instead of #/ fragments, so the OIDC callback path reaches the app.
+  flutter_web_plugins:
+    sdk: flutter
+  l10n:
+    path: ../../packages/l10n
+  # Browser interop of the web adapters (sessionStorage, navigator.credentials, location).
+  web: ^1.1.1
 
 dev_dependencies:
+  alchemist: ^0.14.1
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+
+flutter:
+  uses-material-design: true

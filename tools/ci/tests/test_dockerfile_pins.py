@@ -237,7 +237,8 @@ def test_server_builder_image_follows_the_go_toolchain() -> None:
 
 def test_server_readme_names_the_pinned_base_images() -> None:
     dockerfile = (REPO / "services/server/Dockerfile").read_text()
-    # The smoke stage reuses the runtime image (brief M1-73), so two images for three stages.
+    # The smoke stage reuses the runtime image (brief M1-73) and the console stage the builder
+    # image (brief M6-02), so two images for five stages.
     refs = sorted(set(re.findall(r"^FROM (?:--\S+ )*(\S+@sha256:[0-9a-f]{64})", dockerfile, re.M)))
     assert len(refs) == 2
     readme = (REPO / "services/server/README.md").read_text()

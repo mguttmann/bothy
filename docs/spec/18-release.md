@@ -318,7 +318,16 @@ daemon. A full installation from that result is the local end-to-end run of M7-1
    `services/server/Dockerfile.dockerignore` applies to this Dockerfile only: it ignores
    everything and allows only `go.mod`, `go.sum`, `VERSION`, `api/`, `cmd/`, `internal/` and
    `migrations/` of the server, without test files and `testdata/`. A build whose `VERSION`
-   differs from `services/server/VERSION` fails.
+   differs from `services/server/VERSION` fails. For the web console (M6-02) the context also
+   admits the root `pubspec.yaml`, `pubspec.lock` and `analysis_options.yaml`, every member
+   `pubspec.yaml` of the pub workspace (the root resolution needs them all), `apps/console`
+   without `test/`, `build/` and `coverage/`, the `lib/` of `api_client`, `auth`,
+   `design_system`, `domain` and `l10n`, the `assets/` and `fonts/` of `design_system` and
+   `docs/api/openapi.yaml` (for `version.json`). The console stage runs on `$BUILDPLATFORM`
+   (rule 2), because its output is platform independent; it builds with the Flutter version of
+   the workspace (`pubspec.yaml`), cloned at its tag with the revision checked, on the pinned
+   builder image of the server (rule 5), and the final stage copies `build/web` to
+   `/usr/share/bothy/console`, which `BOTHY_CONSOLE__ASSETS_DIR` of the image names.
 
 ## 8. App distribution
 

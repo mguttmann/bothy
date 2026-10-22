@@ -84,7 +84,7 @@ type imageConfig struct {
 // fsEntry is one entry of the exported container file system.
 type fsEntry struct {
 	header *tar.Header
-	data   []byte // content, kept for the binary only
+	data   []byte // content, kept for the binary and keepContent only
 }
 
 // env returns the value of the environment variable name and fails the test when it is empty.
@@ -211,7 +211,7 @@ func createContainer(t *testing.T, image string) string {
 }
 
 // exportFS creates a container from image without starting it and returns its file system by
-// path (without a leading "./" or "/"); the content is kept for the binary only.
+// path (without a leading "./" or "/"); the content is kept for the binary and keepContent only.
 func exportFS(t *testing.T, image string) map[string]fsEntry {
 	t.Helper()
 	id := createContainer(t, image)
@@ -232,7 +232,7 @@ func exportFS(t *testing.T, image string) map[string]fsEntry {
 		}
 		name := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(h.Name, "./"), "/"), "/")
 		e := fsEntry{header: h}
-		if name == binaryPath {
+		if name == binaryPath || keepContent[name] {
 			if e.data, err = io.ReadAll(tr); err != nil {
 				t.Fatalf("read %s: %v", name, err)
 			}

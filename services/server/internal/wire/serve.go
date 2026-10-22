@@ -1148,7 +1148,8 @@ func (s *server) mountRoutes(context.Context) error {
 }
 
 // mountAPI is the mount part of mountRoutes for api and all: the chain, the rate limiter with its
-// sweeper, the Idempotency-Key stage, the setup gate, the REST routes and the gateway.
+// sweeper, the Idempotency-Key stage, the setup gate, the REST routes, the web console of
+// console.assets_dir (M6-02) and the gateway.
 func (s *server) mountAPI(cat *authzapp.Catalog, log *slog.Logger) error {
 	chain, err := NewChain(s.chainCfg, s.authenticator(), log)
 	if err != nil {
@@ -1174,6 +1175,9 @@ func (s *server) mountAPI(cat *authzapp.Catalog, log *slog.Logger) error {
 	}
 	InstallSetupGate(chain, mux, instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()))
 	if err := MountRoutes(s.role, mux, s.handlers(), cat, chain, log); err != nil {
+		return err
+	}
+	if err := MountConsole(mux, s.values); err != nil {
 		return err
 	}
 	if err := s.mountGateway(mux, chain, limiter, log); err != nil {
