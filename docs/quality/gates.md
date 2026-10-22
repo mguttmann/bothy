@@ -368,9 +368,10 @@ The append-only registries that stay shared (every `CHANGELOG.md`, `docs/DECISIO
 cherry-pick or merge keeps the lines of both sides without a conflict. GitHub ignores the
 driver, so a pull request still shows the conflict until its branch is rebuilt locally. A
 union does not resolve anything else: when both sides change the same line it keeps both
-versions, so read the result; two migrations with the same number still fail
-`migrations-check` (`duplicate-version`), and an unsorted sum file is rewritten by
-`make migrations-lock`. Code, JSON, YAML and Markdown documents keep the normal merge
+versions, and two rows that both sides added with the same PL number both stay, so read
+the result; two migrations with the same number still fail
+`migrations-lint` (`duplicate-version`), and an unsorted sum file is rewritten by
+`make migrations-lock`. Code, JSON, YAML and the other Markdown documents keep the normal merge
 (`tools/ci/tests/test_merge_union.py` holds the list).
 
 ## Performance (`make perf`)
