@@ -13,6 +13,7 @@ import (
 	"time"
 
 	hd "github.com/OWNER/bothy/services/host/internal/doctor"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 )
 
@@ -130,7 +131,7 @@ func TestPlatform_TMT21_Sessions(t *testing.T) {
 			t.Errorf("%d reports of the refused start, want one", n)
 		}
 		// No control connection is left that could accept a session.open.
-		deadline := time.Now().Add(waitShort)
+		deadline := testkit.Deadline()
 		for w.srv.Connected() {
 			if time.Now().After(deadline) {
 				t.Fatal("the refused service kept its control connection")

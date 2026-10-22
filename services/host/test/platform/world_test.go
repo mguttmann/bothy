@@ -33,6 +33,7 @@ import (
 	hd "github.com/OWNER/bothy/services/host/internal/doctor"
 	"github.com/OWNER/bothy/services/host/internal/frame"
 	"github.com/OWNER/bothy/services/host/internal/noise"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 )
 
@@ -61,8 +62,8 @@ const (
 // Waits of the suite: bounds of polling loops, never sleeps of that length. They are generous
 // because a hosted runner is slow; each loop returns as soon as its condition holds.
 const (
-	waitLong    = 120 * time.Second
-	waitShort   = 30 * time.Second
+	waitLong    = testkit.Patience
+	waitShort   = testkit.Patience
 	openWindow  = 60 * time.Second
 	pollEvery   = 100 * time.Millisecond
 	tokenTTL    = 2 * time.Minute
@@ -269,7 +270,7 @@ func (w *world) refused(o opening, detail string) {
 func (s *tsess) start() (sessiontest.Ended, bool) {
 	s.w.t.Helper()
 	s.send(frame.Start(120, 40))
-	deadline := time.Now().Add(waitLong)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if e, ok := s.w.srv.EndedOf(s.id); ok {
 			return e, true
@@ -481,7 +482,7 @@ func atoiOr(v string) int {
 // waitGone waits until none of pids exists.
 func waitGone(t *testing.T, what string, pids []int) {
 	t.Helper()
-	deadline := time.Now().Add(waitShort)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if !slices.ContainsFunc(pids, pidAlive) {
 			return
@@ -523,7 +524,7 @@ func buildFake() error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*testkit.Patience)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "build", "-ldflags", "-X 'main.startLog="+startLogPath()+"'", //nolint:gosec // the build of the suite
 		"-o", filepath.Join(fakeDir(), exeName("claude")), "./testdata/fakeclaude")
@@ -569,7 +570,7 @@ func interactiveStarts(t *testing.T) []map[string]string {
 // firstInteractive waits for the first interactive entry in the start log.
 func firstInteractive(t *testing.T) map[string]string {
 	t.Helper()
-	deadline := time.Now().Add(waitShort)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if e := interactiveStarts(t); len(e) > 0 {
 			return e[0]

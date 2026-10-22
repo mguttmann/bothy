@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/host/internal/hostos"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // tricky holds spaces, both quote kinds, a backslash and shell syntax that must stay literal.
@@ -185,15 +186,19 @@ func TestPersonalConfigDir(t *testing.T) {
 
 	// The probe is bounded by host_service.auth_status_timeout; a timeout or a failure is pty_failed.
 	e := env("", true)
+	// The probe ignores its context on purpose and returns only at the end of the test, later
+	// than testkit.Patience.
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
 	e.LoginEnv = func(context.Context, time.Duration) (bool, string, error) {
-		time.Sleep(2 * time.Second) // ignores its context on purpose
+		<-release
 		return false, "", nil
 	}
 	start := time.Now()
 	if _, err := ClaudePersonal(context.Background(), e, repo, 50*time.Millisecond); detailOf(err) != DetailPTYFailed {
 		t.Errorf("slow probe: %v", err)
 	}
-	if time.Since(start) > time.Second {
+	if time.Since(start) > testkit.Patience {
 		t.Error("the probe timeout was not applied")
 	}
 	gotTimeout := make(chan time.Duration, 1)

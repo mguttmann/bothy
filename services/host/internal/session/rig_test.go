@@ -35,6 +35,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/helper"
 	"github.com/OWNER/bothy/services/host/internal/hostos"
 	"github.com/OWNER/bothy/services/host/internal/noise"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/profiles"
 	"github.com/OWNER/bothy/services/host/internal/pty"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
@@ -150,7 +151,7 @@ func (r *recorder) Ended(_ context.Context, e control.SessionEnded) error {
 // wait polls cond (which takes the lock itself) until it holds or the timeout passes.
 func (r *recorder) wait(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := testkit.Deadline()
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("timeout waiting for %s (ended %d)", what, r.endedCount())
@@ -334,8 +335,7 @@ func newRig(t *testing.T, opts ...rigOption) *rig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	t.Cleanup(cancel)
+	ctx := testkit.Context(t)
 	// The home of the helper lies under /tmp, not under the temporary folder of the test user: the
 	// checks of HD11 walk the chain files (.claude, .git) of every folder above a place, and a
 	// folder above a temporary folder inside a real home could hold a large real .claude.
@@ -422,7 +422,7 @@ func (r *rig) startHelper() {
 		go func() { _ = cmd.Wait(); close(done) }()
 		select {
 		case <-done:
-		case <-time.After(5 * time.Second):
+		case <-time.After(testkit.Patience):
 			_ = cmd.Process.Kill()
 			<-done
 		}

@@ -16,6 +16,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // testOptions needs nothing on Windows: the Job Objects belong to the supervisor.
@@ -168,7 +170,7 @@ func alive(pid int) bool {
 // waitGone fails the test when one of pids still runs after the wait limit.
 func waitGone(t *testing.T, pids ...int) {
 	t.Helper()
-	deadline := time.Now().Add(waitLimit)
+	deadline := testkit.Deadline()
 	for _, pid := range pids {
 		for alive(pid) {
 			if time.Now().After(deadline) {

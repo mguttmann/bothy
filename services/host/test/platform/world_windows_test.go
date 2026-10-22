@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // The commands the suite types into a PTY on Windows (PowerShell, the login shell of Design note
@@ -127,7 +129,7 @@ func restartHelper(t *testing.T, user string) {
 
 func waitService(t *testing.T, svc, state string) {
 	t.Helper()
-	deadline := time.Now().Add(waitShort)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if out, _ := try("sc.exe", "query", svc); strings.Contains(out, state) {
 			return

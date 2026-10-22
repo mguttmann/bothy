@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/control"
 	"github.com/OWNER/bothy/services/host/internal/noise"
 	"github.com/OWNER/bothy/services/host/internal/pairing"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 	"github.com/OWNER/bothy/services/host/internal/state"
 )
@@ -133,8 +134,7 @@ func login(t *testing.T, ctx context.Context, h *sessiontest.HostServer, st *sta
 }
 
 func TestHostServerControl(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	h := sessiontest.NewHostServer(t, sessiontest.HostOptions{Code: pairCode, Declaration: "organization"})
 	st, _, err := pairWith(t, h, pairCode)
 	if err != nil {
@@ -219,8 +219,7 @@ func TestHostServerControl(t *testing.T) {
 }
 
 func TestHostServerReconnect(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testkit.Context(t)
 	h := sessiontest.NewHostServer(t, sessiontest.HostOptions{Code: pairCode, Declaration: "personal"})
 	st, _, err := pairWith(t, h, pairCode)
 	if err != nil {
@@ -229,7 +228,7 @@ func TestHostServerReconnect(t *testing.T) {
 	first, _ := login(t, ctx, h, st, []string{})
 	first.next(ctx) // ready
 	_ = first.ws.Close(websocket.StatusNormalClosure, "")
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := testkit.Deadline()
 	for h.Connected() && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}

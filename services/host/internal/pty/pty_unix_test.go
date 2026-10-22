@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // testPath is the PATH of the test sessions; it holds only system folders, never the runner's own.
@@ -65,7 +67,7 @@ func alive(pid int) bool {
 // waitGone fails the test when one of pids still exists after the wait limit.
 func waitGone(t *testing.T, pids ...int) {
 	t.Helper()
-	deadline := time.Now().Add(waitLimit)
+	deadline := testkit.Deadline()
 	for _, pid := range pids {
 		for alive(pid) {
 			if time.Now().After(deadline) {
@@ -190,7 +192,7 @@ func startTree(t *testing.T, s *Supervisor, id string) (p Process, out *collecto
 	bg := atoi(t, out.waitMatch(t, regexp.MustCompile(`BG:(\d+)`))[1])
 	ss := atoi(t, out.waitMatch(t, regexp.MustCompile(`SS:(\d+)`))[1])
 	// The setsid child is in its own session only once setsid returned.
-	deadline := time.Now().Add(waitLimit)
+	deadline := testkit.Deadline()
 	for {
 		sid, err := unix.Getsid(ss)
 		if err == nil && sid == ss {

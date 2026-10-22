@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // The commands the suite types into a PTY on Linux and macOS (bash and zsh, the login shells
@@ -229,7 +231,7 @@ func startAs(t *testing.T, user string, args ...string) func() {
 		go func() { _ = cmd.Wait(); close(done) }()
 		select {
 		case <-done:
-		case <-time.After(10 * time.Second):
+		case <-time.After(testkit.Patience):
 			_ = cmd.Process.Kill()
 			<-done
 		}

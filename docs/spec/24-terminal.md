@@ -150,17 +150,18 @@ flowchart LR
        service compares `osu` exactly with `host_service.session_users`; uniqueness per host, in
        contrast, ignores case (03, `host_session_users`; docs/DECISIONS.md D-M2-39-9).
 
-       Server values and declaration on the host (M2-45, D-M2-45-2, D-M2-45-3): the server
-       values the host service applies come with the `hello` of every data connection:
-       `clock_leeway_ms` (`auth.clock_leeway`), `idle_timeout_ms` (`terminal.idle_timeout`) and
-       `detach_grace_ms` (`terminal.detach_grace`). The host service uses those of the data
-       connection that carries a handshake: the leeway for the checks of `exp` and `jti` (5.3),
-       idle and detach for the timers of that session (6.2, 6.3); every attach refreshes them. A
-       `hello` with a negative leeway or without a positive idle or detach value closes that data
-       connection with `4002`. The declaration comes only from `ready` (D-M2-42-15); the server
-       sends `ready` again after a committed change of the declaration, the host service stores
-       it, evaluates HD6 again and sends `report`; a running session keeps its profile and
-       environment, and new openings and attaches use the new offer.
+        Server values and declaration on the host (M2-45, D-M2-45-2, D-M2-45-3): the server
+        values the host service applies come with the `hello` of every data connection:
+        `clock_leeway_ms` (`auth.clock_leeway`), `idle_timeout_ms` (`terminal.idle_timeout`) and
+        `detach_grace_ms` (`terminal.detach_grace`). The host service uses those of the data
+        connection that carries a handshake: the leeway for the checks of `exp` and `jti` (5.3),
+        idle and detach for the timers of that session (6.2, 6.3); every attach refreshes them. A
+        `hello` with a negative leeway or without a positive idle or detach value closes that data
+        connection with `4002`. The declaration comes only from `ready` (D-M2-42-15); the server
+        sends `ready` again after a committed change of the declaration, the host service stores
+        it, evaluates HD6 again and sends `report`; a running session keeps its profile and
+        environment, and new openings and attaches use the new offer.
+
     6. **No shared locations** (Ruling T13): On the host there is no location that one
        session user can write and another can read or execute, if it carries code,
        settings or logins. For the locations that the host service knows, this means:

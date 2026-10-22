@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // memListener is an in-memory endpoint: every dial creates a net.Pipe and hands one end to Accept,
@@ -154,7 +156,7 @@ func (h *harness) agent(p Peer, d Dialog, want int) {
 
 func (h *harness) waitAgents(want int) {
 	h.t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := testkit.Deadline()
 	for h.s.Agents() != want {
 		if time.Now().After(deadline) {
 			h.t.Fatalf("agents = %d, want %d", h.s.Agents(), want)
@@ -206,7 +208,7 @@ func waitFor[T any](t *testing.T, ch <-chan T, what string) T {
 	select {
 	case v := <-ch:
 		return v
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		t.Fatalf("timed out waiting for %s", what)
 	}
 	var zero T

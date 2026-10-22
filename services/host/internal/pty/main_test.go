@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 // helperMarker as the first argument turns the test binary into a test helper process instead of
@@ -21,7 +23,7 @@ import (
 const helperMarker = "bothy-pty-test-helper"
 
 // waitLimit bounds every wait of these tests, so a broken tree end fails instead of hanging.
-const waitLimit = 20 * time.Second
+const waitLimit = testkit.Patience
 
 func TestMain(m *testing.M) {
 	if len(os.Args) > 2 && os.Args[1] == helperMarker {
@@ -85,7 +87,7 @@ func (c *collector) text() string {
 // waitMatch waits until the output matches re and returns the submatches of the first match.
 func (c *collector) waitMatch(t *testing.T, re *regexp.Regexp) []string {
 	t.Helper()
-	deadline := time.Now().Add(waitLimit)
+	deadline := testkit.Deadline()
 	for time.Now().Before(deadline) {
 		if m := re.FindStringSubmatch(c.text()); m != nil {
 			return m

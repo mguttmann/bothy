@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 )
 
 var (
@@ -52,7 +54,7 @@ func TestConfirmOpenAndAttach(t *testing.T) {
 		if h.s.Ask(context.Background(), reqOpen, 100*time.Millisecond) {
 			t.Fatal("Ask = true without an answer")
 		}
-		if time.Since(start) > 3*time.Second {
+		if time.Since(start) > testkit.Patience {
 			t.Fatal("Ask did not end at its timeout")
 		}
 		waitFor(t, b.cancelled, "the dialog to end after the timeout")
@@ -74,11 +76,13 @@ func TestConfirmOpenAndAttach(t *testing.T) {
 
 	t.Run("no agent", func(t *testing.T) {
 		h := newHarness(t, testRule())
+		// Without an agent Ask answers at once; waiting for the timeout would take longer than
+		// testkit.Patience.
 		start := time.Now()
-		if h.s.Ask(context.Background(), reqOpen, wait) {
+		if h.s.Ask(context.Background(), reqOpen, 2*testkit.Patience) {
 			t.Fatal("Ask = true without an agent")
 		}
-		if time.Since(start) > time.Second {
+		if time.Since(start) > testkit.Patience {
 			t.Fatal("Ask without an agent waited for the timeout")
 		}
 	})
@@ -176,7 +180,7 @@ func TestConfirmPeerRefused(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_ = c.SetReadDeadline(time.Now().Add(5 * time.Second))
+			_ = c.SetReadDeadline(testkit.Deadline())
 			n, err := io.Copy(io.Discard, c)
 			if n != 0 || err != nil {
 				t.Fatalf("peer %s: read %d bytes, err %v; want a close without data", p.UID, n, err)
@@ -233,7 +237,7 @@ func rawAgent(t *testing.T, h *harness) (net.Conn, *bufio.Reader) {
 
 func readMsg(t *testing.T, c net.Conn, r *bufio.Reader) map[string]any {
 	t.Helper()
-	_ = c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_ = c.SetReadDeadline(testkit.Deadline())
 	line, err := r.ReadBytes('\n')
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -247,7 +251,7 @@ func readMsg(t *testing.T, c net.Conn, r *bufio.Reader) map[string]any {
 
 func writeLine(t *testing.T, c net.Conn, s string) {
 	t.Helper()
-	_ = c.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	_ = c.SetWriteDeadline(testkit.Deadline())
 	if _, err := io.WriteString(c, s+"\n"); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -297,7 +301,7 @@ func TestConfirmProtocolStrict(t *testing.T) {
 			h := newHarness(t, testRule())
 			c, _ := rawAgent(t, h)
 			go func() {
-				_ = c.SetWriteDeadline(time.Now().Add(5 * time.Second))
+				_ = c.SetWriteDeadline(testkit.Deadline())
 				_, _ = io.WriteString(c, line+"\n")
 			}()
 			h.waitAgents(0)
