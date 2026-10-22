@@ -5,7 +5,6 @@
 package postgresimage_test
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -55,8 +54,8 @@ func buildHookBackupd(t *testing.T) string {
 	arch := strings.TrimSpace(mustDocker(t, "info", "--format", "{{.Architecture}}"))
 	goarch := map[string]string{"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}[arch]
 	dir := t.TempDir()
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
-	defer cancel()
+	// The build is bounded by the timeout of go test only, not by a number of its own.
+	ctx := t.Context()
 	//nolint:gosec // G204: the Go toolchain of this test run builds this repository's command.
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-tags", "restoretesthook", "-o", filepath.Join(dir, "bothy-backupd"), "../../cmd/bothy-backupd")
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+goarch) //nolint:forbidigo // the toolchain's environment
