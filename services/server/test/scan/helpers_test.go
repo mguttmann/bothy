@@ -43,7 +43,6 @@ const (
 	testStreamMax    = 256 << 10
 	testMaxScanSize  = 128 << 10
 	testMaxRecursion = 3
-	waitScan         = testkit.Patience
 )
 
 var shared struct {
@@ -56,7 +55,7 @@ var shared struct {
 func sharedClamd(t *testing.T) *clamdtest.Clamd {
 	t.Helper()
 	if shared.srv == nil && shared.err == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())
 		defer cancel()
 		shared.srv, shared.err = clamdtest.Start(ctx, clamdtest.Options{StreamMaxLength: testStreamMax, MaxScanSize: testMaxScanSize,
 			MaxFileSize: testStreamMax, MaxRecursion: testMaxRecursion})
@@ -169,17 +168,12 @@ func readFile(t *testing.T, db *pgxpool.Pool, id string) fileRow {
 // waitFinal waits until the file left upload_state and scan_status pending.
 func waitFinal(t *testing.T, db *pgxpool.Pool, id string) fileRow {
 	t.Helper()
-	deadline := time.Now().Add(waitScan)
-	for {
-		r := readFile(t, db, id)
-		if r.UploadState != "pending" || r.ScanStatus != "pending" {
-			return r
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("file %s still pending after %v", id, waitScan)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	var r fileRow
+	testkit.Until(t, "file "+id+" left pending", func() bool {
+		r = readFile(t, db, id)
+		return r.UploadState != "pending" || r.ScanStatus != "pending"
+	})
+	return r
 }
 
 // count runs a count query with one argument.

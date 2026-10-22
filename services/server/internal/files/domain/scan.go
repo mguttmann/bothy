@@ -125,7 +125,7 @@ func Deliverable(uploadState, scanStatus string, deleted bool) bool {
 	return !deleted && uploadState == UploadComplete && (scanStatus == ScanClean || scanStatus == ScanSkipped)
 }
 
-// Final reports whether a file reached its end state (12 2, "endgültig"): deliverable, or
+// Final reports whether a file reached its end state (12 2, "final"): deliverable, or
 // upload_state failed, or scan_status infected or error. A deleted file is final when its states
 // are; deletion itself is not a state of 12 2.
 //

@@ -23,6 +23,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -66,20 +67,15 @@ func nestedZip(t *testing.T, payload []byte, depth int) []byte {
 	return b
 }
 
-// gone reports that path does not exist, waiting up to waitScan: the pass deletes objects and
+// gone waits until path does not exist (testkit.Until): the pass deletes objects and
 // parts after the commit of the result (design note 6f), so the row can be final a moment earlier.
 func gone(t *testing.T, path string) bool {
 	t.Helper()
-	deadline := time.Now().Add(waitScan)
-	for {
-		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-			return true
-		}
-		if time.Now().After(deadline) {
-			return false
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+	testkit.Until(t, path+" is deleted", func() bool {
+		_, err := os.Stat(path)
+		return errors.Is(err, os.ErrNotExist)
+	})
+	return true
 }
 
 // TestScan runs the cases of the shared server with the shared clamd.
@@ -285,8 +281,7 @@ func TestScan(t *testing.T) {
 // file stays pending without event and the job keeps inserting rounds with growing delay up to
 // file.scan.retry_backoff_cap; after the start the due round sets clean.
 func TestScanClamdStoppedStaysPending(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Minute)
-	defer cancel()
+	ctx := testkit.Context(t)
 	clamd, err := clamdtest.Start(ctx, clamdtest.Options{Restartable: true})
 	if err != nil {
 		t.Fatal(err)
@@ -302,13 +297,9 @@ func TestScanClamdStoppedStaysPending(t *testing.T) {
 	content := []byte("waiting for the scanner")
 	u := send(t, alex, w.Channels["Support/Allgemein"], "wait.txt", "", content, content)
 	u.complete(t, alex, "")
-	deadline := time.Now().Add(waitScan)
-	for count(t, db, `SELECT count(*) FROM jobs.river_job WHERE kind = 'files.scan' AND args->>'file_id' = $1`, u.FileID) < 5 {
-		if time.Now().After(deadline) {
-			t.Fatal("fewer than five rounds while clamd is stopped")
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+	testkit.Until(t, "five rounds while clamd is stopped", func() bool {
+		return count(t, db, `SELECT count(*) FROM jobs.river_job WHERE kind = 'files.scan' AND args->>'file_id' = $1`, u.FileID) >= 5
+	})
 	rows, err := db.Query(ctx, `SELECT (args->>'round')::bigint, scheduled_at, created_at FROM jobs.river_job
 		WHERE kind = 'files.scan' AND args->>'file_id' = $1 ORDER BY (args->>'round')::bigint`, u.FileID)
 	if err != nil {

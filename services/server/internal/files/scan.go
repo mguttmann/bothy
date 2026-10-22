@@ -9,7 +9,7 @@ import (
 )
 
 // FileFinalized is the in-transaction event of a file that became final (docs/spec/12-files.md
-// 2 "endgültig", 10; 02 "Ports, Ereignisse und Quellen je Modul"): the scan pass of M3-04
+// 2 "final", 10; 02 4.3 "Ports, events and sources per module"): the scan pass of M3-04
 // publishes it in the unit of work that writes the final state, so a subscriber (the release of
 // held agent invocations, M3-07) sees the state and the event together. It carries only the id;
 // the subscriber reads what it needs.

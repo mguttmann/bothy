@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd"
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
@@ -54,7 +53,7 @@ func TestMain(m *testing.M) {
 func realClamd(t *testing.T) *clamdtest.Clamd {
 	t.Helper()
 	shared.once.Do(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())
 		defer cancel()
 		shared.srv, shared.err = clamdtest.Start(ctx, clamdtest.Options{StreamMaxLength: testStreamMax,
 			MaxScanSize: testMaxScanSize, MaxFileSize: testStreamMax, MaxRecursion: testMaxRecursion})
@@ -139,8 +138,7 @@ func TestRealClamdVerdicts(t *testing.T) {
 }
 
 func TestRealClamdStopAndStart(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 6*time.Minute)
-	defer cancel()
+	ctx := testkit.Context(t)
 	srv, err := clamdtest.Start(ctx, clamdtest.Options{Restartable: true})
 	if err != nil {
 		t.Fatal(err)
