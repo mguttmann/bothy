@@ -7467,5 +7467,1591 @@
   "adminNavIncomingWebhooks": "Incoming webhooks",
   "@adminNavIncomingWebhooks": {
     "description": "Entry of the administration navigation: the incoming webhooks per channel (11 section 8)."
+  },
+  "adminAppListTitle": "Apps",
+  "@adminAppListTitle": {
+    "description": "Heading of the apps list of the administration (11 4)."
+  },
+  "adminAppInstall": "Install app",
+  "@adminAppInstall": {
+    "description": "Button that starts the installation of an app from a manifest file."
+  },
+  "adminAppInstallNoPicker": "Installing needs a file dialog; use the web console.",
+  "@adminAppInstallNoPicker": {
+    "description": "Hint next to the disabled install button when the host offers no file dialog."
+  },
+  "adminAppListEmpty": "No apps installed.",
+  "@adminAppListEmpty": {
+    "description": "The apps list without apps."
+  },
+  "adminAppVersion": "Version {version}",
+  "@adminAppVersion": {
+    "description": "The version of an app manifest.",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPublisher": "by {publisher}",
+  "@adminAppPublisher": {
+    "description": "The publisher of an app.",
+    "placeholders": {
+      "publisher": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppBack": "Back to the apps",
+  "@adminAppBack": {
+    "description": "Button on the app page that returns to the apps list."
+  },
+  "adminAppStateActive": "Active",
+  "@adminAppStateActive": {
+    "description": "State badge of an active app installation."
+  },
+  "adminAppStateSuspended": "Suspended",
+  "@adminAppStateSuspended": {
+    "description": "State badge of a suspended app installation."
+  },
+  "adminAppStateUninstalled": "Uninstalled",
+  "@adminAppStateUninstalled": {
+    "description": "State badge of an uninstalled app."
+  },
+  "adminAppStateUnknown": "Unknown state",
+  "@adminAppStateUnknown": {
+    "description": "State badge of a state this version does not know."
+  },
+  "adminAppScopeMessagesRead": "Read messages and threads and search in them",
+  "@adminAppScopeMessagesRead": {
+    "description": "Plain meaning of the app scope messages:read (05 2.6)."
+  },
+  "adminAppScopeMessagesWrite": "Write, edit and delete messages, react and start threads",
+  "@adminAppScopeMessagesWrite": {
+    "description": "Plain meaning of the app scope messages:write (05 2.6)."
+  },
+  "adminAppScopeFilesRead": "Read files",
+  "@adminAppScopeFilesRead": {
+    "description": "Plain meaning of the app scope files:read (05 2.6)."
+  },
+  "adminAppScopeFilesWrite": "Upload files",
+  "@adminAppScopeFilesWrite": {
+    "description": "Plain meaning of the app scope files:write (05 2.6)."
+  },
+  "adminAppScopeCommandsWrite": "Register and remove commands and answer their suggestions",
+  "@adminAppScopeCommandsWrite": {
+    "description": "Plain meaning of the app scope commands:write (05 2.6)."
+  },
+  "adminAppScopeComponentsWrite": "Change its buttons and forms and answer interactions",
+  "@adminAppScopeComponentsWrite": {
+    "description": "Plain meaning of the app scope components:write (05 2.6)."
+  },
+  "adminAppScopeUsersRead": "Read the profiles of people",
+  "@adminAppScopeUsersRead": {
+    "description": "Plain meaning of the app scope users:read (05 2.6)."
+  },
+  "adminAppScopeEventsSubscribe": "Receive events and catch up on missed ones",
+  "@adminAppScopeEventsSubscribe": {
+    "description": "Plain meaning of the app scope events:subscribe (05 2.6)."
+  },
+  "adminAppScopeCostsReconcile": "Read and submit cost reconciliations",
+  "@adminAppScopeCostsReconcile": {
+    "description": "Plain meaning of the app scope costs:reconcile (05 2.6)."
+  },
+  "adminAppScopeUnknown": "No description in this version",
+  "@adminAppScopeUnknown": {
+    "description": "Meaning of a scope this version does not know."
+  },
+  "adminAppScopeRequired": "required",
+  "@adminAppScopeRequired": {
+    "description": "Badge of a scope the app requires."
+  },
+  "adminAppScopeOptional": "optional",
+  "@adminAppScopeOptional": {
+    "description": "Badge of a scope the owner may grant."
+  },
+  "adminAppFileNotText": "The file is not text (UTF-8).",
+  "@adminAppFileNotText": {
+    "description": "A manifest file that is not UTF-8 text."
+  },
+  "adminAppFileNotJsonOrYaml": "The file is neither JSON nor YAML.",
+  "@adminAppFileNotJsonOrYaml": {
+    "description": "A manifest file that is neither JSON nor YAML."
+  },
+  "adminAppFileNotObject": "The file holds no manifest object.",
+  "@adminAppFileNotObject": {
+    "description": "A manifest file whose document is a list or a single value."
+  },
+  "adminAppUpdate": "Update",
+  "@adminAppUpdate": {
+    "description": "Button that updates an app with a new manifest."
+  },
+  "adminAppSuspend": "Suspend",
+  "@adminAppSuspend": {
+    "description": "Button that suspends an app (11 4.3)."
+  },
+  "adminAppResume": "Resume",
+  "@adminAppResume": {
+    "description": "Button that resumes a suspended app (11 4.3)."
+  },
+  "adminAppUninstall": "Uninstall",
+  "@adminAppUninstall": {
+    "description": "Button that uninstalls an app (11 4.3)."
+  },
+  "adminAppSuspendTitle": "Suspend {name}?",
+  "@adminAppSuspendTitle": {
+    "description": "Title of the suspend dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppSuspendBody": "An emergency stop: nothing is deleted, and resuming needs no new consent.",
+  "@adminAppSuspendBody": {
+    "description": "Body of the suspend dialog (11 4.3)."
+  },
+  "adminAppResumeTitle": "Resume {name}?",
+  "@adminAppResumeTitle": {
+    "description": "Title of the resume dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppResumeBody": "This comes back when the app is resumed:",
+  "@adminAppResumeBody": {
+    "description": "Body of the resume dialog above the table of effects."
+  },
+  "adminAppUninstallTitle": "Uninstall {name}?",
+  "@adminAppUninstallTitle": {
+    "description": "Title of the uninstall dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppUninstallBody": "This cannot be undone; a new installation needs a new consent.",
+  "@adminAppUninstallBody": {
+    "description": "Body of the uninstall dialog (11 4.3)."
+  },
+  "adminAppEffectsPart": "Part",
+  "@adminAppEffectsPart": {
+    "description": "Column heading of the table of effects: what is affected."
+  },
+  "adminAppEffectsResult": "Effect",
+  "@adminAppEffectsResult": {
+    "description": "Column heading of the table of effects: what happens to it."
+  },
+  "adminAppEffectRowTokens": "Tokens",
+  "@adminAppEffectRowTokens": {
+    "description": "Row of the table of effects (11 4.3): the tokens of the app."
+  },
+  "adminAppEffectRowDeliveries": "Deliveries",
+  "@adminAppEffectRowDeliveries": {
+    "description": "Row of the table of effects (11 4.3): outgoing webhook deliveries."
+  },
+  "adminAppEffectRowCommands": "Commands",
+  "@adminAppEffectRowCommands": {
+    "description": "Row of the table of effects (11 4.3): the commands of the app."
+  },
+  "adminAppEffectRowComponents": "Components",
+  "@adminAppEffectRowComponents": {
+    "description": "Row of the table of effects (11 4.3): buttons and forms of the app."
+  },
+  "adminAppEffectRowGrants": "Access grants and incoming webhooks",
+  "@adminAppEffectRowGrants": {
+    "description": "Row of the table of effects (11 4.3)."
+  },
+  "adminAppEffectRowMessages": "Messages of the app",
+  "@adminAppEffectRowMessages": {
+    "description": "Row of the table of effects (11 4.3)."
+  },
+  "adminAppEffectBlocked": "Blocked, not revoked",
+  "@adminAppEffectBlocked": {
+    "description": "Effect of suspend on tokens (11 4.3)."
+  },
+  "adminAppEffectPaused": "Paused, the position is kept",
+  "@adminAppEffectPaused": {
+    "description": "Effect of suspend on deliveries (11 4.3)."
+  },
+  "adminAppEffectHidden": "Hidden",
+  "@adminAppEffectHidden": {
+    "description": "Effect of suspend on commands (11 4.3)."
+  },
+  "adminAppEffectDisabled": "Disabled",
+  "@adminAppEffectDisabled": {
+    "description": "Effect of suspend and uninstall on components (11 4.3)."
+  },
+  "adminAppEffectSuspendGrants": "Remain; incoming webhooks answer 404 until the app is resumed",
+  "@adminAppEffectSuspendGrants": {
+    "description": "Effect of suspend on access grants and incoming webhooks (11 4.3, 8.4)."
+  },
+  "adminAppEffectRemain": "Remain",
+  "@adminAppEffectRemain": {
+    "description": "Effect of suspend on the messages of the app (11 4.3)."
+  },
+  "adminAppEffectRevoked": "Revoked",
+  "@adminAppEffectRevoked": {
+    "description": "Effect of uninstall on tokens, access grants and incoming webhooks (11 4.3)."
+  },
+  "adminAppEffectSubscriptionsDisabled": "Subscriptions are disabled",
+  "@adminAppEffectSubscriptionsDisabled": {
+    "description": "Effect of uninstall on deliveries (11 4.3)."
+  },
+  "adminAppEffectRemoved": "Removed",
+  "@adminAppEffectRemoved": {
+    "description": "Effect of uninstall on commands (11 4.3)."
+  },
+  "adminAppEffectUninstallMessages": "Remain; the author is kept and the app is disabled",
+  "@adminAppEffectUninstallMessages": {
+    "description": "Effect of uninstall on the messages of the app (11 4.3)."
+  },
+  "adminAppEffectWorkAgain": "Work again",
+  "@adminAppEffectWorkAgain": {
+    "description": "What resume brings back for tokens (11 4.3)."
+  },
+  "adminAppEffectDeliveriesContinue": "Continue from the kept position",
+  "@adminAppEffectDeliveriesContinue": {
+    "description": "What resume brings back for deliveries (11 4.3)."
+  },
+  "adminAppEffectShownAgain": "Shown again",
+  "@adminAppEffectShownAgain": {
+    "description": "What resume brings back for commands (11 4.3)."
+  },
+  "adminAppEffectEnabledAgain": "Enabled again",
+  "@adminAppEffectEnabledAgain": {
+    "description": "What resume brings back for components (11 4.3)."
+  },
+  "adminAppEffectResumeGrants": "Unchanged; incoming webhooks accept calls again",
+  "@adminAppEffectResumeGrants": {
+    "description": "What resume brings back for access grants and incoming webhooks (11 4.3, 8.4)."
+  },
+  "adminAppEffectUnchanged": "Unchanged",
+  "@adminAppEffectUnchanged": {
+    "description": "What resume changes for the messages of the app (11 4.3)."
+  },
+  "adminAppSuspended": "{name} is suspended.",
+  "@adminAppSuspended": {
+    "description": "Notice after suspending an app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppResumed": "{name} is active again.",
+  "@adminAppResumed": {
+    "description": "Notice after resuming an app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppUninstalled": "{name} is uninstalled.",
+  "@adminAppUninstalled": {
+    "description": "Notice after uninstalling an app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppUpdated": "{name} now has version {version}.",
+  "@adminAppUpdated": {
+    "description": "Notice after updating an app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      },
+      "version": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppConsentSaved": "The new consent for {name} is saved.",
+  "@adminAppConsentSaved": {
+    "description": "Notice after the new consent of an update.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeInstall": "Install the app {name}",
+  "@adminAppPurposeInstall": {
+    "description": "Step-up purpose of app.install.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeUpdate": "Update the app {name}",
+  "@adminAppPurposeUpdate": {
+    "description": "Step-up purpose of an update of the manifest.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeScopes": "Change the consent for {name}",
+  "@adminAppPurposeScopes": {
+    "description": "Step-up purpose of app.scopes.update.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeSuspend": "Suspend the app {name}",
+  "@adminAppPurposeSuspend": {
+    "description": "Step-up purpose of app.suspend.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeResume": "Resume the app {name}",
+  "@adminAppPurposeResume": {
+    "description": "Step-up purpose of app.resume.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeUninstall": "Uninstall the app {name}",
+  "@adminAppPurposeUninstall": {
+    "description": "Step-up purpose of app.uninstall.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeGrant": "Create the access grant for {name} on {target}",
+  "@adminAppPurposeGrant": {
+    "description": "Step-up purpose of grant.create for an app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      },
+      "target": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPurposeToken": "Create a token for {name}",
+  "@adminAppPurposeToken": {
+    "description": "Step-up purpose of token.create for an app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppInstallTitle": "Install an app",
+  "@adminAppInstallTitle": {
+    "description": "Title of the install dialog."
+  },
+  "adminAppInstallPickBody": "Choose the manifest file of the app (JSON or YAML). The server checks it before anything is installed.",
+  "@adminAppInstallPickBody": {
+    "description": "First step of the install dialog (11 4.1: a file, never an address)."
+  },
+  "adminAppPick": "Choose file",
+  "@adminAppPick": {
+    "description": "Button that opens the file dialog for a manifest."
+  },
+  "adminAppChecking": "Checking the manifest",
+  "@adminAppChecking": {
+    "description": "Shown while the server validates the manifest."
+  },
+  "adminAppFileChosen": "File: {name}",
+  "@adminAppFileChosen": {
+    "description": "The name of the chosen manifest file.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppInvalid": "The server refused the manifest:",
+  "@adminAppInvalid": {
+    "description": "Heading of the failed validation rules (11 3.2)."
+  },
+  "adminAppErrorLine": "{pointer}: rule \"{rule}\"",
+  "@adminAppErrorLine": {
+    "description": "One failed validation rule with its place in the manifest.",
+    "placeholders": {
+      "pointer": {
+        "type": "String",
+        "example": "x"
+      },
+      "rule": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppManifestRoot": "the whole manifest",
+  "@adminAppManifestRoot": {
+    "description": "Place of a failed rule that concerns the manifest as a whole."
+  },
+  "adminAppConsentIntro": "{name} by {publisher}, version {version}, asks for the following. Read it before you agree.",
+  "@adminAppConsentIntro": {
+    "description": "Introduction of the consent (11 4.1).",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      },
+      "publisher": {
+        "type": "String",
+        "example": "x"
+      },
+      "version": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppConsentScopes": "What the app may read and write",
+  "@adminAppConsentScopes": {
+    "description": "Heading of the scopes in the consent (11 4.1)."
+  },
+  "adminAppConsentEvents": "Events the app receives",
+  "@adminAppConsentEvents": {
+    "description": "Heading of the events in the consent (11 4.1)."
+  },
+  "adminAppConsentDestinations": "Where data are sent",
+  "@adminAppConsentDestinations": {
+    "description": "Heading of the target hosts of outgoing data in the consent (11 4.1)."
+  },
+  "adminAppConsentCommands": "Commands",
+  "@adminAppConsentCommands": {
+    "description": "Heading of the commands in the consent."
+  },
+  "adminAppConsentComponents": "Components",
+  "@adminAppConsentComponents": {
+    "description": "Heading of the components in the consent."
+  },
+  "adminAppConsentGrants": "Access grants the app asks for",
+  "@adminAppConsentGrants": {
+    "description": "Heading of the requested grants in the consent (11 4.1)."
+  },
+  "adminAppConsentEgress": "Data that leave the instance, in the publisher's words",
+  "@adminAppConsentEgress": {
+    "description": "Heading of data_egress in the consent (11 3.1)."
+  },
+  "adminAppConsentNoEgress": "The manifest names no data that leave the instance.",
+  "@adminAppConsentNoEgress": {
+    "description": "Consent of a manifest without data_egress."
+  },
+  "adminAppConsentNone": "None.",
+  "@adminAppConsentNone": {
+    "description": "An empty part of the consent."
+  },
+  "adminAppComponentButton": "Buttons",
+  "@adminAppComponentButton": {
+    "description": "Component type button of a manifest."
+  },
+  "adminAppComponentSelect": "Selection lists",
+  "@adminAppComponentSelect": {
+    "description": "Component type select of a manifest."
+  },
+  "adminAppComponentForm": "Forms",
+  "@adminAppComponentForm": {
+    "description": "Component type form of a manifest."
+  },
+  "adminAppGrantAskChannel": "{level} on one channel",
+  "@adminAppGrantAskChannel": {
+    "description": "A requested grant on a channel the owner picks.",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppGrantAskSpace": "{level} in one space",
+  "@adminAppGrantAskSpace": {
+    "description": "A requested grant on a space the owner picks.",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppGrantAskInstance": "{level} on the whole instance",
+  "@adminAppGrantAskInstance": {
+    "description": "A requested grant on the instance.",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppGrantAskOther": "{level} on a target this version does not know",
+  "@adminAppGrantAskOther": {
+    "description": "A requested grant on an unknown target kind.",
+    "placeholders": {
+      "level": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppGrantPurpose": "Purpose: {purpose}",
+  "@adminAppGrantPurpose": {
+    "description": "The publisher's purpose of a requested grant.",
+    "placeholders": {
+      "purpose": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppGrantTarget": "Target",
+  "@adminAppGrantTarget": {
+    "description": "Label of the target picker of a requested grant."
+  },
+  "adminAppGrantNone": "Do not create",
+  "@adminAppGrantNone": {
+    "description": "Item of the target picker: no grant is created."
+  },
+  "adminAppConsentToken": "Token of the app",
+  "@adminAppConsentToken": {
+    "description": "Heading of the token fields in the consent."
+  },
+  "adminAppTokenBody": "The app signs in with this token. Its secret is shown only once.",
+  "@adminAppTokenBody": {
+    "description": "Explanation of the token of an app."
+  },
+  "adminAppTokenDpop": "DPoP key thumbprint (optional)",
+  "@adminAppTokenDpop": {
+    "description": "Optional DPoP thumbprint of an app token (08 12)."
+  },
+  "adminAppInstallSubmit": "Install",
+  "@adminAppInstallSubmit": {
+    "description": "Confirms the consent and installs the app."
+  },
+  "adminAppGrantsStepTitle": "Access grants and token",
+  "@adminAppGrantsStepTitle": {
+    "description": "Title of the grants step of the install dialog."
+  },
+  "adminAppGrantsStepBody": "{name} is installed. Check what each access grant changes, then create the access grants and the token.",
+  "@adminAppGrantsStepBody": {
+    "description": "Body of the grants step.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppNoGrants": "No access grant chosen; only the token is created.",
+  "@adminAppNoGrants": {
+    "description": "Grants step without chosen grants."
+  },
+  "adminAppCreateGrants": "Create access grants and token",
+  "@adminAppCreateGrants": {
+    "description": "Button that creates the chosen grants and the token."
+  },
+  "adminAppStepInstall": "Install {name}",
+  "@adminAppStepInstall": {
+    "description": "Progress line of the installation.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppStepGrant": "Access grant on {target}",
+  "@adminAppStepGrant": {
+    "description": "Progress line of one grant.",
+    "placeholders": {
+      "target": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppStepToken": "Token {name}",
+  "@adminAppStepToken": {
+    "description": "Progress line of the token.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppStepLine": "{step}: {status}",
+  "@adminAppStepLine": {
+    "description": "A progress line: the step and its status.",
+    "placeholders": {
+      "step": {
+        "type": "String",
+        "example": "x"
+      },
+      "status": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppStepFinished": "finished",
+  "@adminAppStepFinished": {
+    "description": "Status of a finished step."
+  },
+  "adminAppStepFailed": "failed: {reason}",
+  "@adminAppStepFailed": {
+    "description": "Status of a failed step with the server's reason.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppStepWaiting": "waiting",
+  "@adminAppStepWaiting": {
+    "description": "Status of a step that has not run yet."
+  },
+  "adminAppTokenSecretTitle": "Token of {name}",
+  "@adminAppTokenSecretTitle": {
+    "description": "Title of the dialog that shows an app token once.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppTokenSecretOnce": "This secret is shown only once. Copy it into the app's secret store now.",
+  "@adminAppTokenSecretOnce": {
+    "description": "Warning of the dialog that shows an app token once (08 12)."
+  },
+  "adminAppKeyId": "Key ID of the webhook signatures: {kid}",
+  "@adminAppKeyId": {
+    "description": "The ID of the active signing key shown with the app token (11 4.1).",
+    "placeholders": {
+      "kid": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppHomepage": "Homepage: {url}",
+  "@adminAppHomepage": {
+    "description": "The homepage of an app, shown as text only.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppPageEvents": "Subscribed events",
+  "@adminAppPageEvents": {
+    "description": "Heading of the events the installation subscribes to."
+  },
+  "adminAppTokenNew": "New token",
+  "@adminAppTokenNew": {
+    "description": "Button that creates a token for an app."
+  },
+  "adminAppTokenCreateTitle": "Create a token for {name}",
+  "@adminAppTokenCreateTitle": {
+    "description": "Title of the token form of an app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppTokenRevokeBody": "The app loses the access of this token at once.",
+  "@adminAppTokenRevokeBody": {
+    "description": "Body of the revoke dialog of an app token."
+  },
+  "adminAppUpdateTitle": "Update {name}",
+  "@adminAppUpdateTitle": {
+    "description": "Title of the update dialog.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppUpdateBody": "Choose the new manifest file with the same slug ({slug}).",
+  "@adminAppUpdateBody": {
+    "description": "First step of the update dialog (11 4.2).",
+    "placeholders": {
+      "slug": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppDiffTitle": "Changes from version {from} to {to}",
+  "@adminAppDiffTitle": {
+    "description": "Heading of the diff of two manifests.",
+    "placeholders": {
+      "from": {
+        "type": "String",
+        "example": "x"
+      },
+      "to": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppDiffScopes": "What the app may read and write",
+  "@adminAppDiffScopes": {
+    "description": "Part of the diff: scopes."
+  },
+  "adminAppDiffEvents": "Events",
+  "@adminAppDiffEvents": {
+    "description": "Part of the diff: events."
+  },
+  "adminAppDiffGrants": "Requested access grants",
+  "@adminAppDiffGrants": {
+    "description": "Part of the diff: requested grants."
+  },
+  "adminAppDiffAdded": "Added: {items}",
+  "@adminAppDiffAdded": {
+    "description": "Added items of one part of the diff.",
+    "placeholders": {
+      "items": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppDiffRemoved": "Removed: {items}",
+  "@adminAppDiffRemoved": {
+    "description": "Removed items of one part of the diff.",
+    "placeholders": {
+      "items": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppDiffNone": "Nothing changes in scopes, events, destinations, access grants or commands.",
+  "@adminAppDiffNone": {
+    "description": "A diff without changes."
+  },
+  "adminAppDiffRemovedNow": "Removed items take effect at once.",
+  "@adminAppDiffRemovedNow": {
+    "description": "Notice of the diff (11 4.2)."
+  },
+  "adminAppDiffHostsConfirmed": "You confirm new destinations with this update.",
+  "@adminAppDiffHostsConfirmed": {
+    "description": "Notice of the diff (11 4.2)."
+  },
+  "adminAppDiffGrantsLater": "An update never adds an access grant: create added ones under Access grants.",
+  "@adminAppDiffGrantsLater": {
+    "description": "Notice of the diff (11 4.2)."
+  },
+  "adminAppDiffNewConsent": "Added scopes and events need a new consent after the update; until then the app keeps its current ones.",
+  "@adminAppDiffNewConsent": {
+    "description": "Notice of the diff (11 4.2)."
+  },
+  "adminAppNewConsentTitle": "New consent for {name}",
+  "@adminAppNewConsentTitle": {
+    "description": "Title of the new consent after an update.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppNewConsentBody": "Version {version} asks for more. Choose what the app may use; required items stay on.",
+  "@adminAppNewConsentBody": {
+    "description": "Body of the new consent after an update (11 4.2).",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "x"
+      }
+    }
+  },
+  "adminAppNewConsentSubmit": "Save consent",
+  "@adminAppNewConsentSubmit": {
+    "description": "Button that saves the new consent."
+  },
+  "adminAppNewConsentLater": "Later",
+  "@adminAppNewConsentLater": {
+    "description": "Closes the new consent without a change; the app keeps its current scopes."
+  },
+  "adminHookTitle": "Outgoing webhooks",
+  "@adminHookTitle": {
+    "description": "Heading of the outgoing webhook subscriptions of an app (11 7)."
+  },
+  "adminHookEmpty": "No subscriptions.",
+  "@adminHookEmpty": {
+    "description": "The app has no outgoing webhook subscription."
+  },
+  "adminHookCreate": "New subscription",
+  "@adminHookCreate": {
+    "description": "Button that opens the form of a new outgoing webhook subscription."
+  },
+  "adminHookStateActive": "Active",
+  "@adminHookStateActive": {
+    "description": "State of a subscription that delivers."
+  },
+  "adminHookStatePaused": "Paused",
+  "@adminHookStatePaused": {
+    "description": "State of a paused subscription (by the owner or the delivery quota)."
+  },
+  "adminHookStateDisabled": "Disabled",
+  "@adminHookStateDisabled": {
+    "description": "State of a subscription the server disabled."
+  },
+  "adminHookStateUnknown": "Unknown state",
+  "@adminHookStateUnknown": {
+    "description": "State value of a newer server."
+  },
+  "adminHookEvents": "Events: {events}",
+  "@adminHookEvents": {
+    "description": "The event types of a subscription, comma separated.",
+    "placeholders": {
+      "events": {
+        "type": "String",
+        "example": "message.created, message.updated"
+      }
+    }
+  },
+  "adminHookFailures": "{count, plural, =0{No failures in a row} =1{1 failure in a row} other{{count} failures in a row}}",
+  "@adminHookFailures": {
+    "description": "Failed delivery attempts in a row of a subscription.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
+  },
+  "adminHookSigned": "Signed with {schemes}, key {kid}",
+  "@adminHookSigned": {
+    "description": "The signature schemes of a subscription and the key ID of the last accepted delivery.",
+    "placeholders": {
+      "schemes": {
+        "type": "String",
+        "example": "v1a, v1"
+      },
+      "kid": {
+        "type": "String",
+        "example": "whk-2026-10"
+      }
+    }
+  },
+  "adminHookDisabledAt": "Disabled {when}",
+  "@adminHookDisabledAt": {
+    "description": "When the server disabled a subscription.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Yesterday 9:00 AM"
+      }
+    }
+  },
+  "adminHookReasonGap": "A gap: events left the event log before they were delivered.",
+  "@adminHookReasonGap": {
+    "description": "Why a subscription is disabled: its newest delivery ended with event_expired (11 6)."
+  },
+  "adminHookReasonGone": "The receiver answered 410 Gone.",
+  "@adminHookReasonGone": {
+    "description": "Why a subscription is disabled: the receiver answered HTTP 410."
+  },
+  "adminHookReasonFailures": "{count, plural, =1{Disabled after 1 failure in a row.} other{Disabled after {count} failures in a row.}}",
+  "@adminHookReasonFailures": {
+    "description": "Why a subscription is disabled: too many failed attempts in a row.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "25"
+      }
+    }
+  },
+  "adminHookReasonNone": "The server names no reason.",
+  "@adminHookReasonNone": {
+    "description": "A disabled subscription whose newest delivery explains nothing (for example after the app was uninstalled)."
+  },
+  "adminHookPause": "Pause",
+  "@adminHookPause": {
+    "description": "Button that pauses a subscription."
+  },
+  "adminHookResume": "Resume",
+  "@adminHookResume": {
+    "description": "Button that resumes a paused or disabled subscription."
+  },
+  "adminHookDelete": "Delete",
+  "@adminHookDelete": {
+    "description": "Button that deletes a subscription."
+  },
+  "adminHookDeliveries": "Deliveries",
+  "@adminHookDeliveries": {
+    "description": "Button that opens the deliveries of a subscription."
+  },
+  "adminHookPauseTitle": "Pause the subscription to {url}?",
+  "@adminHookPauseTitle": {
+    "description": "Title of the confirmation of pausing a subscription.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookPauseBody": "Nothing goes to this address until you resume. Matching events keep being recorded and go out in order after resuming.",
+  "@adminHookPauseBody": {
+    "description": "What pausing a subscription does (11 6: rows keep being created while paused)."
+  },
+  "adminHookResumeTitle": "Resume the subscription to {url}?",
+  "@adminHookResumeTitle": {
+    "description": "Title of the confirmation of resuming a subscription.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookResumeBody": "Waiting deliveries go out to this address again, in order.",
+  "@adminHookResumeBody": {
+    "description": "What resuming a subscription does."
+  },
+  "adminHookDeleteTitle": "Delete the subscription to {url}?",
+  "@adminHookDeleteTitle": {
+    "description": "Title of the confirmation of deleting a subscription.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookDeleteBody": "No further events go to this address.",
+  "@adminHookDeleteBody": {
+    "description": "What deleting a subscription does."
+  },
+  "adminHookPausedNotice": "The subscription to {url} is paused.",
+  "@adminHookPausedNotice": {
+    "description": "Notice after pausing.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookResumedNotice": "The subscription to {url} is active.",
+  "@adminHookResumedNotice": {
+    "description": "Notice after resuming.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookDeletedNotice": "The subscription to {url} is deleted.",
+  "@adminHookDeletedNotice": {
+    "description": "Notice after deleting.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookCreatedNotice": "The subscription to {url} is created.",
+  "@adminHookCreatedNotice": {
+    "description": "Notice after creating.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookFormTitle": "New subscription for {app}",
+  "@adminHookFormTitle": {
+    "description": "Title of the form of a new outgoing webhook subscription.",
+    "placeholders": {
+      "app": {
+        "type": "String",
+        "example": "Repo Bridge"
+      }
+    }
+  },
+  "adminHookFormBody": "Events of the chosen types go to this address, signed with v1a. The server accepts only https addresses its webhook settings allow.",
+  "@adminHookFormBody": {
+    "description": "Explanation of the subscription form (11 7: https only, webhook.allowed_hosts is checked by the server)."
+  },
+  "adminHookUrl": "Address",
+  "@adminHookUrl": {
+    "description": "Label of the address field of a subscription."
+  },
+  "adminHookUrlHttps": "The address must start with https://.",
+  "@adminHookUrlHttps": {
+    "description": "Error under the address field when the scheme is not https."
+  },
+  "adminHookEventTypes": "Event types",
+  "@adminHookEventTypes": {
+    "description": "Label above the event type checkboxes of a subscription."
+  },
+  "adminHookNoEvents": "The installation grants no events to subscribe to.",
+  "@adminHookNoEvents": {
+    "description": "The app has no granted events, so no subscription can be created."
+  },
+  "adminHookHmac": "Also sign with HMAC (v1)",
+  "@adminHookHmac": {
+    "description": "Checkbox that adds the symmetric v1 signature to a subscription."
+  },
+  "adminHookSubmit": "Create subscription",
+  "@adminHookSubmit": {
+    "description": "Button that creates the subscription."
+  },
+  "adminHookPurposeCreate": "Create a webhook subscription for {app}",
+  "@adminHookPurposeCreate": {
+    "description": "Step-up purpose of creating a subscription.",
+    "placeholders": {
+      "app": {
+        "type": "String",
+        "example": "Repo Bridge"
+      }
+    }
+  },
+  "adminHookPurposeChange": "Change the webhook subscription to {url}",
+  "@adminHookPurposeChange": {
+    "description": "Step-up purpose of pausing or resuming a subscription.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookPurposeDelete": "Delete the webhook subscription to {url}",
+  "@adminHookPurposeDelete": {
+    "description": "Step-up purpose of deleting a subscription.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookPurposeRedeliver": "Deliver the event again",
+  "@adminHookPurposeRedeliver": {
+    "description": "Purpose text of a redelivery (the server asks no step-up for it)."
+  },
+  "adminHookDeliveriesTitle": "Deliveries to {url}",
+  "@adminHookDeliveriesTitle": {
+    "description": "Heading of the deliveries of a subscription.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminHookDeliveriesEmpty": "No deliveries yet.",
+  "@adminHookDeliveriesEmpty": {
+    "description": "The subscription has no deliveries."
+  },
+  "adminHookReload": "Reload",
+  "@adminHookReload": {
+    "description": "Button that loads the deliveries again."
+  },
+  "adminHookMore": "Load more",
+  "@adminHookMore": {
+    "description": "Button that loads the next page of deliveries."
+  },
+  "adminHookDeliveryPending": "Waiting",
+  "@adminHookDeliveryPending": {
+    "description": "Status of a delivery waiting for its attempt."
+  },
+  "adminHookDeliverySucceeded": "Delivered",
+  "@adminHookDeliverySucceeded": {
+    "description": "Status of a delivery the receiver accepted."
+  },
+  "adminHookDeliveryFailed": "Failed",
+  "@adminHookDeliveryFailed": {
+    "description": "Status of a delivery ended by a 410 of the receiver."
+  },
+  "adminHookDeliveryDead": "Given up",
+  "@adminHookDeliveryDead": {
+    "description": "Status of a delivery the server gave up."
+  },
+  "adminHookDeliveryUnknown": "Unknown status",
+  "@adminHookDeliveryUnknown": {
+    "description": "Status value of a newer server."
+  },
+  "adminHookAttempts": "{count, plural, =1{1 attempt} other{{count} attempts}}",
+  "@adminHookAttempts": {
+    "description": "Attempts of a delivery so far.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "adminHookNextAttempt": "next attempt {when}",
+  "@adminHookNextAttempt": {
+    "description": "When the next attempt of a delivery is due.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 11:05 AM"
+      }
+    }
+  },
+  "adminHookLastStatus": "last status {code}",
+  "@adminHookLastStatus": {
+    "description": "The last HTTP status code of a delivery.",
+    "placeholders": {
+      "code": {
+        "type": "String",
+        "example": "503"
+      }
+    }
+  },
+  "adminHookLastError": "last error: {error}",
+  "@adminHookLastError": {
+    "description": "The last error of a delivery as text.",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "timed out"
+      }
+    }
+  },
+  "adminHookEventSeq": "{type}, sequence {seq}",
+  "@adminHookEventSeq": {
+    "description": "Event type and sequence number of a delivery.",
+    "placeholders": {
+      "type": {
+        "type": "String",
+        "example": "message.created"
+      },
+      "seq": {
+        "type": "String",
+        "example": "5301"
+      }
+    }
+  },
+  "adminHookEventGone": "Event left the log, sequence {seq}",
+  "@adminHookEventGone": {
+    "description": "A delivery whose event is no longer in the event log, so its type is unknown.",
+    "placeholders": {
+      "seq": {
+        "type": "String",
+        "example": "5300"
+      }
+    }
+  },
+  "adminHookCreatedAt": "created {when}",
+  "@adminHookCreatedAt": {
+    "description": "When a delivery was created.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 10:50 AM"
+      }
+    }
+  },
+  "adminHookDeliveredAt": "delivered {when}",
+  "@adminHookDeliveredAt": {
+    "description": "When a delivery succeeded.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 10:51 AM"
+      }
+    }
+  },
+  "adminHookErrorTimeout": "timed out",
+  "@adminHookErrorTimeout": {
+    "description": "Delivery error code timeout (D-M2-26-6)."
+  },
+  "adminHookErrorConnectionFailed": "connection failed",
+  "@adminHookErrorConnectionFailed": {
+    "description": "Delivery error code connection_failed."
+  },
+  "adminHookErrorTlsFailed": "TLS handshake or certificate failed",
+  "@adminHookErrorTlsFailed": {
+    "description": "Delivery error code tls_failed."
+  },
+  "adminHookErrorAddressBlocked": "the address resolves to a blocked network",
+  "@adminHookErrorAddressBlocked": {
+    "description": "Delivery error code address_blocked (the address check after DNS resolution)."
+  },
+  "adminHookErrorHostNotAllowed": "the target address is not allowed",
+  "@adminHookErrorHostNotAllowed": {
+    "description": "Delivery error code host_not_allowed."
+  },
+  "adminHookErrorHttpStatus": "unexpected HTTP status",
+  "@adminHookErrorHttpStatus": {
+    "description": "Delivery error code http_status (any status that is no success and no throttle)."
+  },
+  "adminHookErrorThrottled": "throttled by the receiver",
+  "@adminHookErrorThrottled": {
+    "description": "Delivery error code throttled (429, 502, 503, 504; not counted as a failure)."
+  },
+  "adminHookErrorGone": "the receiver answered 410 Gone",
+  "@adminHookErrorGone": {
+    "description": "Delivery error code gone."
+  },
+  "adminHookErrorNotAuthorized": "the app may no longer receive this event",
+  "@adminHookErrorNotAuthorized": {
+    "description": "Delivery error code not_authorized."
+  },
+  "adminHookErrorNotSubscribed": "the subscription no longer covers this event type",
+  "@adminHookErrorNotSubscribed": {
+    "description": "Delivery error code not_subscribed."
+  },
+  "adminHookErrorEventExpired": "the event left the event log",
+  "@adminHookErrorEventExpired": {
+    "description": "Delivery error code event_expired."
+  },
+  "adminHookRedeliver": "Redeliver",
+  "@adminHookRedeliver": {
+    "description": "Button that makes a delivery due again."
+  },
+  "adminHookRedelivered": "The delivery is due again.",
+  "@adminHookRedelivered": {
+    "description": "Notice after a redelivery."
+  },
+  "adminHookRedeliverExpired": "The event left the event log; it cannot be delivered again.",
+  "@adminHookRedeliverExpired": {
+    "description": "The server refused a redelivery with 409 conflict, reason event_expired."
+  },
+  "adminHookKeysTitle": "Signing keys",
+  "@adminHookKeysTitle": {
+    "description": "Heading of the public keys of the webhook signatures."
+  },
+  "adminHookKeysBody": "Receivers verify the v1a signature of every delivery with one of these public keys.",
+  "@adminHookKeysBody": {
+    "description": "What the signing keys are for (11 7)."
+  },
+  "adminHookKeyActive": "Active",
+  "@adminHookKeyActive": {
+    "description": "State of the key that signs now."
+  },
+  "adminHookKeyNext": "Next",
+  "@adminHookKeyNext": {
+    "description": "State of the key that signs after the next rotation."
+  },
+  "adminHookKeyRetiring": "Retiring",
+  "@adminHookKeyRetiring": {
+    "description": "State of a key that is being retired."
+  },
+  "adminHookKeyUntil": "valid until {when}",
+  "@adminHookKeyUntil": {
+    "description": "When a retiring key ends.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 11:00 AM"
+      }
+    }
+  },
+  "adminSecretHmacTitle": "HMAC secret for {url}",
+  "@adminSecretHmacTitle": {
+    "description": "Title of the once-only dialog of the HMAC secret of a subscription.",
+    "placeholders": {
+      "url": {
+        "type": "String",
+        "example": "https://bridge.example.com/hooks"
+      }
+    }
+  },
+  "adminSecretHmacLabel": "HMAC secret (v1)",
+  "@adminSecretHmacLabel": {
+    "description": "Label above the HMAC secret."
+  },
+  "adminSecretHmacOnce": "This secret is shown only now. Store it at the receiver, which checks the v1 signature with it.",
+  "@adminSecretHmacOnce": {
+    "description": "Warning of the once-only HMAC secret."
+  },
+  "adminManifestFileType": "App manifest",
+  "@adminManifestFileType": {
+    "description": "Name of the file type in the file dialog for the manifest of an app (11 section 3.1)."
+  },
+  "adminIncomingTitle": "Incoming webhooks",
+  "@adminIncomingTitle": {
+    "description": "Heading of the incoming webhooks of a channel (11 8)."
+  },
+  "adminIncomingChannel": "Channel",
+  "@adminIncomingChannel": {
+    "description": "Label of the channel picker of the incoming webhooks."
+  },
+  "adminIncomingNoChannels": "You see no channel.",
+  "@adminIncomingNoChannels": {
+    "description": "The caller sees no channel, so no incoming webhook can be shown."
+  },
+  "adminIncomingEmpty": "This channel has no incoming webhooks.",
+  "@adminIncomingEmpty": {
+    "description": "The chosen channel has no active incoming webhook."
+  },
+  "adminIncomingCreate": "Create incoming webhook",
+  "@adminIncomingCreate": {
+    "description": "Button that opens the dialog of a new incoming webhook."
+  },
+  "adminIncomingWritesAs": "writes as {app}",
+  "@adminIncomingWritesAs": {
+    "description": "The app an incoming webhook posts as.",
+    "placeholders": {
+      "app": {
+        "type": "String",
+        "example": "Repo Bridge"
+      }
+    }
+  },
+  "adminIncomingCreatedAt": "created {when}",
+  "@adminIncomingCreatedAt": {
+    "description": "When an incoming webhook was created.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Oct 1, 2026 9:00 AM"
+      }
+    }
+  },
+  "adminIncomingLastUsed": "last used {when}",
+  "@adminIncomingLastUsed": {
+    "description": "When an incoming webhook was last called.",
+    "placeholders": {
+      "when": {
+        "type": "String",
+        "example": "Today 10:30 AM"
+      }
+    }
+  },
+  "adminIncomingNeverUsed": "never used",
+  "@adminIncomingNeverUsed": {
+    "description": "An incoming webhook that was never called."
+  },
+  "adminIncomingRevoke": "Revoke",
+  "@adminIncomingRevoke": {
+    "description": "Button that revokes an incoming webhook."
+  },
+  "adminIncomingRevokeTitle": "Revoke the incoming webhook {name}?",
+  "@adminIncomingRevokeTitle": {
+    "description": "Title of the confirmation of revoking an incoming webhook.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build alerts"
+      }
+    }
+  },
+  "adminIncomingRevokeBody": "Calls of its address are answered with 404 from now on.",
+  "@adminIncomingRevokeBody": {
+    "description": "What revoking an incoming webhook does (11 8.1)."
+  },
+  "adminIncomingRevokedNotice": "The incoming webhook {name} is revoked.",
+  "@adminIncomingRevokedNotice": {
+    "description": "Notice after revoking.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build alerts"
+      }
+    }
+  },
+  "adminIncomingCreatedNotice": "The incoming webhook {name} is created.",
+  "@adminIncomingCreatedNotice": {
+    "description": "Notice after creating.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build alerts"
+      }
+    }
+  },
+  "adminIncomingDialogTitle": "New incoming webhook in {path}",
+  "@adminIncomingDialogTitle": {
+    "description": "Title of the dialog of a new incoming webhook.",
+    "placeholders": {
+      "path": {
+        "type": "String",
+        "example": "Marketing/Campaigns"
+      }
+    }
+  },
+  "adminIncomingDialogBody": "A service sends messages into this channel through the webhook's address. The webhook writes as an app.",
+  "@adminIncomingDialogBody": {
+    "description": "Explanation of the create dialog (11 8.1)."
+  },
+  "adminIncomingName": "Name",
+  "@adminIncomingName": {
+    "description": "Label of the name field of an incoming webhook."
+  },
+  "adminIncomingModeExisting": "Write as an existing app",
+  "@adminIncomingModeExisting": {
+    "description": "Choice: the webhook writes as an installed app."
+  },
+  "adminIncomingModeNewApp": "New incoming app",
+  "@adminIncomingModeNewApp": {
+    "description": "Choice offered to owners: create a minimal app for this webhook (11 8.1)."
+  },
+  "adminIncomingNewAppBody": "Installs a minimal app that may only write messages, with write access on exactly this channel.",
+  "@adminIncomingNewAppBody": {
+    "description": "What the option New incoming app does (11 8.1)."
+  },
+  "adminIncomingApp": "App",
+  "@adminIncomingApp": {
+    "description": "Label of the app picker of an incoming webhook."
+  },
+  "adminIncomingNoApps": "No active app is installed.",
+  "@adminIncomingNoApps": {
+    "description": "The app picker has nothing to offer."
+  },
+  "adminIncomingSubmit": "Create",
+  "@adminIncomingSubmit": {
+    "description": "Button that creates the incoming webhook (the one confirmation of the action)."
+  },
+  "adminIncomingStepInstall": "Install the incoming app",
+  "@adminIncomingStepInstall": {
+    "description": "Progress step 1 of New incoming app."
+  },
+  "adminIncomingStepGrant": "Grant write on {path}",
+  "@adminIncomingStepGrant": {
+    "description": "Progress step 2 of New incoming app.",
+    "placeholders": {
+      "path": {
+        "type": "String",
+        "example": "Marketing/Campaigns"
+      }
+    }
+  },
+  "adminIncomingStepWebhook": "Create the webhook",
+  "@adminIncomingStepWebhook": {
+    "description": "Progress step of creating the webhook."
+  },
+  "adminIncomingStepLine": "{step}: {state}",
+  "@adminIncomingStepLine": {
+    "description": "One progress line: the step and its state or the server's reason.",
+    "placeholders": {
+      "step": {
+        "type": "String",
+        "example": "Create the webhook"
+      },
+      "state": {
+        "type": "String",
+        "example": "done"
+      }
+    }
+  },
+  "adminIncomingStepDone": "done",
+  "@adminIncomingStepDone": {
+    "description": "State of a finished progress step."
+  },
+  "adminIncomingStepWaiting": "waiting",
+  "@adminIncomingStepWaiting": {
+    "description": "State of a progress step that has not run."
+  },
+  "adminIncomingRetry": "Retry",
+  "@adminIncomingRetry": {
+    "description": "Button that repeats the failed step and the rest."
+  },
+  "adminIncomingUninstall": "Uninstall the incoming app",
+  "@adminIncomingUninstall": {
+    "description": "Button that uninstalls the half-installed incoming app."
+  },
+  "adminIncomingUninstalled": "The incoming app is uninstalled.",
+  "@adminIncomingUninstalled": {
+    "description": "Notice after uninstalling the half-installed incoming app."
+  },
+  "adminIncomingPurposeCreate": "Create an incoming webhook in {path}",
+  "@adminIncomingPurposeCreate": {
+    "description": "Step-up purpose of creating an incoming webhook (with an incoming app: every call of the action).",
+    "placeholders": {
+      "path": {
+        "type": "String",
+        "example": "Marketing/Campaigns"
+      }
+    }
+  },
+  "adminIncomingPurposeRevoke": "Revoke the incoming webhook {name}",
+  "@adminIncomingPurposeRevoke": {
+    "description": "Step-up purpose of revoking.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build alerts"
+      }
+    }
+  },
+  "adminIncomingPurposeUninstall": "Uninstall the incoming app {name}",
+  "@adminIncomingPurposeUninstall": {
+    "description": "Step-up purpose of uninstalling the half-installed incoming app.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build alerts"
+      }
+    }
+  },
+  "adminSecretIncomingTitle": "Address of {name}",
+  "@adminSecretIncomingTitle": {
+    "description": "Title of the once-only dialog of a new incoming webhook.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build alerts"
+      }
+    }
+  },
+  "adminSecretIncomingLabel": "Webhook address with token",
+  "@adminSecretIncomingLabel": {
+    "description": "Label above the address of an incoming webhook."
+  },
+  "adminSecretIncomingOnce": "This address holds the token and is shown only now. Copy it into the sending service.",
+  "@adminSecretIncomingOnce": {
+    "description": "Warning of the once-only address of an incoming webhook."
+  },
+  "adminSecretIncomingBearer": "Senders that can set a header drop the last segment of the address and send it as Authorization: Bearer <token>.",
+  "@adminSecretIncomingBearer": {
+    "description": "How Bearer senders use the address (11 8.1); <token> stays as written."
   }
 }
