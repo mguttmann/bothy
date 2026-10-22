@@ -16,6 +16,25 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// BeginPasskeyLogin Start a passkey login
+//
+// Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/passkey/begin (the `BeginPasskeyLogin` operationId).
+func (c *Client) BeginPasskeyLogin(ctx context.Context, body BeginPasskeyLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginPasskeyLoginRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CompletePasskeyLoginWithBody Finish a passkey login and register the device
 //
 // Completes a passkey login with a DPoP proof of the device key. A new device stays `pending` until approved; a known active device stays active. Every rejection gives the same `401` body.
