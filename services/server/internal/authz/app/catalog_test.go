@@ -366,15 +366,19 @@ func TestAZP1_RouteMessagesAndIdentity(t *testing.T) {
 }
 
 // TestVerifyRegistrations_DeferredActions: a route, a channel op or an event type that names a
-// deferred action fails the start (07 section 4.2, D3).
+// deferred action fails the start (07 section 4.2, D3). The route names the first entry the table
+// still defers, so the ticket that builds an action does not have to rewrite this test.
 func TestVerifyRegistrations_DeferredActions(t *testing.T) {
 	cat, _ := newCatalog()
-	route := authorize.RouteBinding{OperationID: "startRun", Method: "POST",
-		Pattern: "/api/v1/runs/{run_id}/start", Action: "run.start", RateLimitClass: "rl.agent_runtime"}
+	deferred := domain.DeferredActions()
+	if len(deferred) == 0 {
+		t.Skip("the requirement table defers no action any more")
+	}
+	route := binding(t, "deferredRoute", deferred[0])
 	err := cat.VerifyRegistrations([]authorize.RouteBinding{route}, nil)
 	var re *app.RegistrationError
 	if !errors.As(err, &re) || len(re.Violations) != 1 || re.Violations[0].Kind != app.ViolationDeferredAction ||
-		re.Violations[0].Action != "run.start" {
+		re.Violations[0].Action != deferred[0] {
 		t.Fatalf("route: %v", err)
 	}
 	// Since M2-43 no channel op names a deferred action (host.connect is HostSelf), and since M3-03
