@@ -293,7 +293,10 @@ in this list; the check `api-catalogue-sync` (M1-03, subcheck `webhook-events`) 
    member, else `400 validation_failed` with the pointer of the first native member and
    `errors[].code` `format_mixed`. Every other body is `native`. A format not listed in
    `webhook_in.formats_enabled` gives `400 validation_failed` with an empty pointer and
-   `format_disabled`. Unknown members give `400 validation_failed` with `unknown_member`.
+   `format_disabled`. A native body with any other member gives `400 validation_failed` with
+   `unknown_member`; an Alertmanager payload may carry members it does not name, at the top and
+   in each alert (for example `routeLabels` and `notification_reason` of v0.34.1), which are
+   ignored (D-M7-20-5).
     - `native`: Markdown in `content_md` (required, at least one non-white-space character, at
       most `message.max_content_bytes` UTF-8 bytes, else `413 payload_too_large`), stored byte
       for byte; optional `title` (new thread, point 7), `thread_id` (existing thread, point 7) and

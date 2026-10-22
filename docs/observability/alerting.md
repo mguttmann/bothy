@@ -18,12 +18,23 @@ external service, that service reports it. The instance operator chooses this se
 
 Routing checked locally with `amtool config routes test` (Alertmanager v0.34.1) on 2026-10-10: `page`
 goes to `external-oncall` and `bothy-ops`, `ticket` to `bothy-ops`, `Watchdog` to
-`external-heartbeat` [verified].
+`external-heartbeat` [verified]. As built (M7-20): `make ops-check` holds the three routes in the
+gate (section 5 item 3), and `make alert-e2e` proves the delivery end to end (section 5 item 5).
+The three receivers read their URLs only from secret files (`url_file`), never from the
+configuration.
 
 ## 2. Alert channel in the instance
 
-1. The owner creates a channel "Operations" (only owner and deputy with `read`) and in it an
-   incoming webhook ([05-actions.md](../spec/05-actions.md) `webhook_in.create`).
+As built (M7-20). The guide with the commands is
+[docs/operations/alerting-setup.md](../operations/alerting-setup.md).
+
+1. The owner creates, in a session with step-up (console or desktop app; an API token cannot step
+   up, [08-identity.md](../spec/08-identity.md) 12), a space and in it the text channel
+   "Operations" that only owners and their deputies read (no grant for anyone else), installs an
+   app with the scope `messages:write` (`app.install`), grants it `write` on the channel and
+   creates an incoming webhook of that app in the channel
+   ([05-actions.md](../spec/05-actions.md) `channel.create`, `webhook_in.create`). No tool
+   creates these: they need the step-up of a person (07 SR5).
 2. Alertmanager sends its own unchanged JSON payload. The server recognises the format per
    request from the body (format `alertmanager`, [webhooks.md](../api/webhooks.md) section 8),
    so the URL that `createIncomingWebhook` returns serves both `native` and `alertmanager`; no
@@ -31,10 +42,23 @@ goes to `external-oncall` and `bothy-ops`, `ticket` to `bothy-ops`, `Watchdog` t
    alert name, severity, summary, runbook link and the state firing or resolved. Alertmanager in
    the stack uses the same path `/api/v1/hooks/{webhook_id}/{token}` on
    `server.internal_listen_addr` (point 3).
-3. The URL of the webhook is a secret and is stored in
-   `secrets/alertmanager/alertmanager_bothy_webhook_url`. Alertmanager reaches the server through
-   the internal listener (`http://api:8081`).
-4. Messages from incoming webhooks never trigger agents (`origin = app`).
+3. The URL of the webhook is a secret. `infra/compose/alert-setup.sh channel` reads it from
+   standard input (hidden on a terminal), keeps the path `/api/v1/hooks/<id>/<token>`, replaces
+   the origin by the internal listener `http://api:8081` (option `--internal-base`), writes
+   `infra/compose/secrets/alertmanager_bothy_webhook_url` with mode `0600` and prints only
+   `<created|updated|kept> <name> sha256:<12 hex>`, the fingerprint form of `secrets-init`
+   ([16-operations.md](../spec/16-operations.md) 5.3); a second run with the same URL changes nothing.
+   `alert-setup.sh external` and `alert-setup.sh heartbeat` write the URLs of the external
+   on-call channel and of the heartbeat service unchanged. `secrets-init` copies the three files
+   into the subdirectory `alertmanager` of the volume `secrets` (files `0444`, as for every
+   third-party service), which Alertmanager mounts read-only at `/run/bothy/secrets`. Alertmanager
+   reaches the server only through the internal listener; there is no public path.
+4. Alertmanager v0.34.1 starts with a missing `url_file` and fails only when it sends (checked
+   2026-10-20 with the image `prom/alertmanager:v0.34.1`), which would drop every alert in
+   silence. So it starts through the guard `infra/observability/alertmanager/start.sh`: while one
+   `url_file` of the configuration is missing, unreadable or empty, it exits with a message that
+   names the files (never a value) and the commands that fix it.
+5. Messages from incoming webhooks never trigger agents (`origin = app`).
 
 ## 3. Alerts
 
@@ -190,3 +214,14 @@ with `promtool` and `amtool` in the version of the images:
 4. The thresholds from 3.2 against the configuration reference (check `alert-thresholds`). If a
    cell of the column "Configuration value" names a value of the reference, it must read exactly
    `` `<name>` `` or ``above `<name>` ``; any other form is a finding.
+5. `make alert-e2e` ([tools/observability/alert_e2e.py](../../tools/observability/alert_e2e.py),
+   not in `make check`, [gates.md](../quality/gates.md)) proves the path end to end against the
+   Compose smoke stack of M1-73 with the profile `observability` and the test overlay
+   `infra/compose/test/compose.alert-e2e.yaml`: Alertmanager refuses to start without its URL
+   files; the owner sets up the channel "Operations", the app and the incoming webhook with
+   step-up; `alert-setup.sh` writes the three URLs (the external ones point to a local stub);
+   Prometheus loads the test rules `infra/compose/test/alert-e2e/rules.yaml` (one `page`, one
+   `ticket` alert, only in the overlay) next to the real ones. The channel shows a firing message
+   per test alert with name, level and summary and origin `app`, then a resolved message after
+   the rules stop; the external stub gets the `page` alert and never the `ticket` alert; the
+   heartbeat stub gets the Watchdog. Not proven: a real external on-call or heartbeat service.
