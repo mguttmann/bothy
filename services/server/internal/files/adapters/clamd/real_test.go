@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd"
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The limits of the shared test clamd; small, so the limit tests stay fast.
@@ -120,10 +121,21 @@ func TestRealClamdVerdicts(t *testing.T) {
 	if err != nil || v.Kind != domain.VerdictError || v.Reason != domain.ReasonScanLimitsExceeded {
 		t.Errorf("archive over MaxScanSize: %+v, %v", v, err)
 	}
-	v, err = c.Scan(ctx, bytes.NewReader(bytes.Repeat([]byte("y"), testStreamMax*2)))
-	if err != nil || v.Kind != domain.VerdictError || v.Reason != domain.ReasonScanStreamLimitExceeded {
-		t.Errorf("stream limit: %+v, %v", v, err)
-	}
+	// clamd answers the stream limit and closes with the rest of the stream unread, which resets
+	// the TCP leg of the test relay; the reset can drop the reply before the relay forwards it
+	// (about one run in forty). The production client talks to clamd over its Unix socket, where
+	// the reply stays readable. So a scan that lost the reply on the relay is repeated; any
+	// verdict other than the stream limit fails at once.
+	testkit.Until(t, "the stream limit verdict", func() bool {
+		v, err := c.Scan(ctx, bytes.NewReader(bytes.Repeat([]byte("y"), testStreamMax*2)))
+		if err != nil && !errors.Is(err, domain.ErrClamdProtocol) && ctx.Err() == nil {
+			return false
+		}
+		if err != nil || v.Kind != domain.VerdictError || v.Reason != domain.ReasonScanStreamLimitExceeded {
+			t.Fatalf("stream limit: %+v, %v", v, err)
+		}
+		return true
+	})
 }
 
 func TestRealClamdStopAndStart(t *testing.T) {
