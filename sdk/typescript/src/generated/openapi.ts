@@ -3619,7 +3619,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List commands usable in a channel */
+        /**
+         * List commands usable in a channel
+         * @description Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+         *     of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+         *     lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+         *     before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+         *     channel lists nothing.
+         */
         get: operations["listChannelCommands"];
         put?: never;
         post?: never;
@@ -3638,7 +3645,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a command */
+        /**
+         * Register a command
+         * @description Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+         *     command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+         *     reason.
+         */
         post: operations["registerCommand"];
         delete?: never;
         options?: never;
@@ -3655,7 +3667,12 @@ export interface paths {
         };
         /** Read a command */
         get: operations["getCommand"];
-        /** Replace a command definition */
+        /**
+         * Replace a command definition
+         * @description Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+         *     command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+         *     reason. An identical definition answers the command unchanged.
+         */
         put: operations["updateCommand"];
         post?: never;
         /** Remove a command */
@@ -8086,17 +8103,19 @@ export interface components {
             value: string;
         };
         CommandInvoke: {
-            /** @description Absent invokes in the main thread or creates a thread per `auto_thread`. */
+            /** @description Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start. */
             thread_id?: components["schemas"]["Uuid"];
             options?: components["schemas"]["CommandOptionValue"][];
         };
         CommandInvocation: {
+            /** @description New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`. */
             invocation_id: components["schemas"]["Uuid"];
             command_id: components["schemas"]["Uuid"];
             channel_id: components["schemas"]["Uuid"];
             thread_id?: components["schemas"]["Uuid"];
             /** @description Run created for non-control commands. */
             run_id?: components["schemas"]["Uuid"];
+            /** @description Always true; a refusal is an error response. */
             accepted: boolean;
         };
         AutocompleteQuery: {
@@ -8970,6 +8989,15 @@ export interface components {
             message_id?: components["schemas"]["Uuid"];
             interaction_id?: components["schemas"]["Uuid"];
             command_invocation_id?: components["schemas"]["Uuid"];
+            /** @description Triggering command; set exactly for `trigger_kind = command`. */
+            command_id?: components["schemas"]["Uuid"];
+            /**
+             * @description Name of the triggering command; set exactly for `trigger_kind = command`.
+             * @example escalate
+             */
+            command_name?: string;
+            /** @description Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`. */
+            options?: components["schemas"]["CommandOptionValue"][];
             triggered_by: components["schemas"]["PrincipalRef"];
             billing_mode: components["schemas"]["BillingMode"];
             agent_session?: components["schemas"]["AgentSession"];
@@ -9003,6 +9031,7 @@ export interface components {
             control: boolean;
             channel_id: components["schemas"]["Uuid"];
             thread_id?: components["schemas"]["Uuid"];
+            /** @description Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent. */
             run_id?: components["schemas"]["Uuid"];
             invoked_by: components["schemas"]["PrincipalRef"];
             options: components["schemas"]["CommandOptionValue"][];

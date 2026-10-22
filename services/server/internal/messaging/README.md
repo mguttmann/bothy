@@ -194,6 +194,9 @@ which M2-12 writes (R-DM-42).
 
 ## Runs (M2-05)
 
+`PrincipalRefs` (M2-16) renders principals of the directory as `PrincipalRef` without authorizing,
+for the invoker of a command (`invoked_by`, `triggered_by`), because `runs` may not use `identity`.
+
 The two ports of runs run only inside the caller's unit of work (internal otherwise) and never
 authorize: runs accepted the trigger or changed the run.
 

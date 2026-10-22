@@ -47,6 +47,7 @@ const (
 	opTerminal
 	opDelivery
 	opHostSelf
+	opCommandLevel
 )
 
 // Fact names a fact of the resource descriptor that a conditional capability depends on.
@@ -195,7 +196,7 @@ var exprNames = map[op]string{
 	opThreadOperator: "ThreadOperator", opChannelOperator: "ChannelOperator",
 	opReadOnOperatedChannel: "ReadOnOperatedChannel", opGroupMember: "GroupMember", opPreview: "Preview",
 	opSystem: "System", opHumanSession: "HumanSession", opAssignee: "Assignee", opTerminal: "Terminal",
-	opDelivery: "Delivery", opHostSelf: "HostSelf",
+	opDelivery: "Delivery", opHostSelf: "HostSelf", opCommandLevel: "CommandLevel",
 }
 
 // capOpNames are the names of the nodes with a capability.

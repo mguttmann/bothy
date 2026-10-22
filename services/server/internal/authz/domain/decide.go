@@ -240,6 +240,8 @@ type Input struct {
 	Grant                                                      *GrantFacts
 	Invoke                                                     *InvokeFacts
 	Token                                                      *TokenFacts
+	// Command are the facts of a command resource and of command.invoke (M2-16); nil otherwise.
+	Command *CommandFacts
 	// Host are the facts of a host resource, and of the host of a terminal_session; nil for every
 	// other kind.
 	Host *HostFacts
@@ -567,6 +569,9 @@ func init() {
 		opByKind:    func(v evaluator, e Expr) (bool, Reason, error) { return v.byKind(e) },
 		opTargetCap: func(v evaluator, e Expr) (bool, Reason, error) { return v.targetCap(e) },
 		opPreview:   func(v evaluator, _ Expr) (bool, Reason, error) { return v.preview() },
+		opCommandLevel: func(v evaluator, _ Expr) (bool, Reason, error) {
+			return v.commandLevel()
+		},
 	}
 }
 

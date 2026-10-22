@@ -115,6 +115,20 @@ func (s *Service) CreateRunAnchor(ctx context.Context, cmd messaging.RunAnchorCm
 	return messaging.AnchorRef{MessageID: row.ID, ThreadSeq: row.ThreadSeq}, nil
 }
 
+// PrincipalRefs implements messaging.Messages (M2-16): the public views of principals from the
+// directory of identity, without an authorization.
+func (s *Service) PrincipalRefs(ctx context.Context, principalIDs []ids.ID) (map[ids.ID]messaging.PrincipalRef, error) {
+	ps, err := s.d.Directory.Principals(ctx, principalIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[ids.ID]messaging.PrincipalRef, len(ps))
+	for id, p := range ps {
+		out[id] = messaging.PrincipalRef{ID: p.ID, Kind: string(p.Kind), Handle: p.Handle, DisplayName: p.DisplayName, AvatarFileID: p.AvatarFileID}
+	}
+	return out, nil
+}
+
 // TriggerMessageOf implements messaging.Messages (M2-08): the stored row, its mentions and its
 // author, without content and without an authorization; runs decides with agent.invoke.
 func (s *Service) TriggerMessageOf(ctx context.Context, messageID ids.ID) (messaging.TriggerMessage, error) {

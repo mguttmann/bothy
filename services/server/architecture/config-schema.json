@@ -1193,6 +1193,18 @@
       "doc": "single or multi (several api nodes behind a proxy that routes both terminal stream paths of a session to one node)."
     },
     {
+      "name": "command.autocomplete_max_choices",
+      "env": "BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES",
+      "kind": "int",
+      "default": "25",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Most suggestions of one autocomplete answer and most static choices of one command option."
+    },
+    {
       "name": "command.description_max_chars",
       "env": "BOTHY_COMMAND__DESCRIPTION_MAX_CHARS",
       "kind": "int",

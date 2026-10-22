@@ -81,6 +81,16 @@ def sync_detailed(
 ) -> Response[CommandList | Problem]:
     """List commands usable in a channel
 
+     Lists the registered commands offered in the channel: those of the channel's effective operator
+    first, then those
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
+    group ordered by
+    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
+    before `space`
+    before `instance`). The built-in commands are not part of the list; the client shows them from its
+    own list. A dm
+    channel lists nothing.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -110,6 +120,16 @@ def sync(
 ) -> CommandList | Problem | None:
     """List commands usable in a channel
 
+     Lists the registered commands offered in the channel: those of the channel's effective operator
+    first, then those
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
+    group ordered by
+    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
+    before `space`
+    before `instance`). The built-in commands are not part of the list; the client shows them from its
+    own list. A dm
+    channel lists nothing.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -133,6 +153,16 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[CommandList | Problem]:
     """List commands usable in a channel
+
+     Lists the registered commands offered in the channel: those of the channel's effective operator
+    first, then those
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
+    group ordered by
+    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
+    before `space`
+    before `instance`). The built-in commands are not part of the list; the client shows them from its
+    own list. A dm
+    channel lists nothing.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -160,6 +190,16 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> CommandList | Problem | None:
     """List commands usable in a channel
+
+     Lists the registered commands offered in the channel: those of the channel's effective operator
+    first, then those
+    of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each
+    group ordered by
+    lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel`
+    before `space`
+    before `instance`). The built-in commands are not part of the list; the client shows them from its
+    own list. A dm
+    channel lists nothing.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

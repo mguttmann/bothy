@@ -13,6 +13,129 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// UpdateSpaceWithResponse Change name, icon or color
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /spaces/{space_id} (the `UpdateSpace` operationId).
+func (c *ClientWithResponses) UpdateSpaceWithResponse(ctx context.Context, spaceId SpaceIdPath, params *UpdateSpaceParams, body UpdateSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSpaceResponse, error) {
+	rsp, err := c.UpdateSpace(ctx, spaceId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSpaceResponse(rsp)
+}
+
+// ExplainSpaceAccessWithResponse Who has access to a space
+//
+// Every principal with access and the chain of sources (direct, group, inherited, operator, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /spaces/{space_id}/access (the `ExplainSpaceAccess` operationId).
+func (c *ClientWithResponses) ExplainSpaceAccessWithResponse(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*ExplainSpaceAccessResponse, error) {
+	rsp, err := c.ExplainSpaceAccess(ctx, spaceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExplainSpaceAccessResponse(rsp)
+}
+
+// ArchiveSpaceWithBodyWithResponse Archive a space
+//
+// Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /spaces/{space_id}/archive (the `ArchiveSpace` operationId).
+func (c *ClientWithResponses) ArchiveSpaceWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, params *ArchiveSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ArchiveSpaceResponse, error) {
+	rsp, err := c.ArchiveSpaceWithBody(ctx, spaceId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseArchiveSpaceResponse(rsp)
+}
+
+// ArchiveSpaceWithResponse Archive a space
+//
+// Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /spaces/{space_id}/archive (the `ArchiveSpace` operationId).
+func (c *ClientWithResponses) ArchiveSpaceWithResponse(ctx context.Context, spaceId SpaceIdPath, params *ArchiveSpaceParams, body ArchiveSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*ArchiveSpaceResponse, error) {
+	rsp, err := c.ArchiveSpace(ctx, spaceId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseArchiveSpaceResponse(rsp)
+}
+
+// ListSpaceChannelsWithResponse List visible channels of a space
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /spaces/{space_id}/channels (the `ListSpaceChannels` operationId).
+func (c *ClientWithResponses) ListSpaceChannelsWithResponse(ctx context.Context, spaceId SpaceIdPath, reqEditors ...RequestEditorFn) (*ListSpaceChannelsResponse, error) {
+	rsp, err := c.ListSpaceChannels(ctx, spaceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSpaceChannelsResponse(rsp)
+}
+
+// CreateChannelWithBodyWithResponse Create a channel
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /spaces/{space_id}/channels (the `CreateChannel` operationId).
+func (c *ClientWithResponses) CreateChannelWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, params *CreateChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateChannelResponse, error) {
+	rsp, err := c.CreateChannelWithBody(ctx, spaceId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateChannelResponse(rsp)
+}
+
+// CreateChannelWithResponse Create a channel
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /spaces/{space_id}/channels (the `CreateChannel` operationId).
+func (c *ClientWithResponses) CreateChannelWithResponse(ctx context.Context, spaceId SpaceIdPath, params *CreateChannelParams, body CreateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateChannelResponse, error) {
+	rsp, err := c.CreateChannel(ctx, spaceId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateChannelResponse(rsp)
+}
+
+// MoveSpaceWithBodyWithResponse Change the global position of a space
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /spaces/{space_id}/move (the `MoveSpace` operationId).
+func (c *ClientWithResponses) MoveSpaceWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, params *MoveSpaceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveSpaceResponse, error) {
+	rsp, err := c.MoveSpaceWithBody(ctx, spaceId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveSpaceResponse(rsp)
+}
+
+// MoveSpaceWithResponse Change the global position of a space
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /spaces/{space_id}/move (the `MoveSpace` operationId).
+func (c *ClientWithResponses) MoveSpaceWithResponse(ctx context.Context, spaceId SpaceIdPath, params *MoveSpaceParams, body MoveSpaceJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveSpaceResponse, error) {
+	rsp, err := c.MoveSpace(ctx, spaceId, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveSpaceResponse(rsp)
+}
+
 // SetSpaceOperatorWithBodyWithResponse Set the default operator of a space
 //
 // Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.

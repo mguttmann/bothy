@@ -467,6 +467,12 @@ the details; a test of the use case finds exactly one entry.
 - DM channel or content in it: `p` is a participant.
 - The resource is a host and 2.12, item 5 holds; for a terminal session: `p` is its person
   or an owner.
+- Command (M2-16, 09 section 10.3): `p` is its owner or an effective owner, or sees its scope
+  target (`read` on the channel, the space visible, any principal for `instance`; without command
+  facts the scope of the event, for the receive check of `command.changed`). As an item of the list
+  of a channel C: `p` has `read` on C, C is no dm channel, the scope covers C, the owner is active
+  and C's effective operator, or an agent guest (`allow_mentioned_agents`, its own level at least
+  `write`, billing mode `organization`), or an app with level at least `write`.
 
 ### 4.4 Invariants in the transaction
 

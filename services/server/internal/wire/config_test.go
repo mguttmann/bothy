@@ -308,6 +308,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		// M2-27
 		"webhook_in.max_body_bytes":  {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "11-extensions.md"},
 		"webhook_in.formats_enabled": {Kind: config.KindStringList, Default: `["native", "alertmanager"]`, Chapter: "11-extensions.md"},
+		// M2-16
+		"command.autocomplete_max_choices": {Kind: config.KindInt, Default: "25", Min: "1", Chapter: "09-agents.md"},
 
 		// M3-13
 		"search.languages":  {Kind: config.KindStringList, Default: `["german","english"]`, Chapter: "14-search.md"},

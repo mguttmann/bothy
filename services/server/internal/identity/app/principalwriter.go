@@ -107,6 +107,12 @@ func (w *PrincipalWriter) lockOther(ctx context.Context, id ids.ID) (domain.Prin
 	return p, nil
 }
 
+// LockPrincipal implements identity.PrincipalWriter: the row lock of an agent or app principal.
+func (w *PrincipalWriter) LockPrincipal(ctx context.Context, id ids.ID) error {
+	_, err := w.lockOther(ctx, id)
+	return err
+}
+
 // SetPrincipalStatus implements identity.PrincipalWriter: active and disabled are the targets; a
 // deleted principal stays deleted (08 section 11).
 func (w *PrincipalWriter) SetPrincipalStatus(ctx context.Context, id ids.ID, status identity.Status) (identity.PrincipalView, bool, error) {

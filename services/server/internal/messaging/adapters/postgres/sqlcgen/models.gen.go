@@ -215,6 +215,22 @@ type ChannelSkillBinding struct {
 	SkillRef  string
 }
 
+type Command struct {
+	ID               pgtype.UUID
+	OwnerPrincipalID pgtype.UUID
+	Name             string
+	Description      string
+	ScopeKind        string
+	ScopeSpaceID     pgtype.UUID
+	ScopeChannelID   pgtype.UUID
+	Options          []byte
+	RequiredLevel    string
+	Control          bool
+	Version          int64
+	CreatedAt        pgtype.Timestamptz
+	RemovedAt        pgtype.Timestamptz
+}
+
 type Device struct {
 	ID           pgtype.UUID
 	UserID       pgtype.UUID

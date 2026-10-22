@@ -995,6 +995,12 @@ Serializers _$serializers =
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [
+              const FullType(CommandOptionValue),
+            ]),
+            () => ListBuilder<CommandOptionValue>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
               const FullType(ConsoleSessionStepUpMethodsAvailableEnum),
             ]),
             () => ListBuilder<ConsoleSessionStepUpMethodsAvailableEnum>(),

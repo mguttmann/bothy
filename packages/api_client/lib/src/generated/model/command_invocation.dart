@@ -11,16 +11,16 @@ part 'command_invocation.g.dart';
 /// CommandInvocation
 ///
 /// Properties:
-/// * [invocationId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [invocationId] - New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
 /// * [commandId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [channelId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [runId] - Run created for non-control commands.
-/// * [accepted]
+/// * [accepted] - Always true; a refusal is an error response.
 @BuiltValue()
 abstract class CommandInvocation
     implements Built<CommandInvocation, CommandInvocationBuilder> {
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
   @BuiltValueField(wireName: r'invocation_id')
   String get invocationId;
 
@@ -40,6 +40,7 @@ abstract class CommandInvocation
   @BuiltValueField(wireName: r'run_id')
   String? get runId;
 
+  /// Always true; a refusal is an error response.
   @BuiltValueField(wireName: r'accepted')
   bool get accepted;
 

@@ -385,6 +385,9 @@ Rulings: docs/DECISIONS.md D-M2-02-1 to D-M2-02-13. Tests: `domain/behavior_test
 `FuzzValidateBehavior`), `app/behavior_internal_test.go`, `test/integration/behavior` and the
 canary class `manage_only` of `test/canary`.
 
+`TriggerChannel.MainThreadID` (M2-16) names the main thread of a text channel: a command without
+`thread_id` goes there.
+
 ## Project binding and readiness (M2-03)
 
 - Port `chat.ProjectBindings` (`projectbinding.go`): `PutProjectBinding`, `DeleteProjectBinding`

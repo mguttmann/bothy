@@ -11,10 +11,13 @@ import (
 	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -53,6 +56,48 @@ type Agents struct {
 	// Switch implements authz.AgentPolicySwitch over Service (M2-21); the start steps bind it into
 	// the resolver of authz (AuthzAdmin.BindAgentPolicySwitch).
 	Switch *authzsource.Switch
+	// Commands is the command register (M2-16) and CommandHandlers its REST handlers; nil until
+	// BindCommands, which the chat step calls once chat exists.
+	Commands        *agentsapp.CommandService
+	CommandHandlers *agentshttp.Commands
+}
+
+// CommandsConfig binds the keys of the command register (command.max_per_principal,
+// command.description_max_chars, command.autocomplete_max_choices, sync.event_payload_max_bytes).
+// The error names the key whose binding failed, never a value.
+func CommandsConfig(v *config.Values) (agentsapp.CommandConfig, error) {
+	var c agentsapp.CommandConfig
+	if err := config.Bind(v, &c); err != nil {
+		return agentsapp.CommandConfig{}, err
+	}
+	return c, nil
+}
+
+// CommandDeps are the collaborators of the command register from the other steps of the start.
+type CommandDeps struct {
+	UoW        txn.UnitOfWork
+	Authorizer authorize.Authorizer
+	Audit      auditing.Recorder
+	Events     eventlog.Appender
+	// Principals locks the owner's principal row (identity).
+	Principals agentsapp.PrincipalLocker
+	// Channels gives the channel facts of a list and a resolve (chat).
+	Channels chat.TriggerFacts
+}
+
+// BindCommands builds the command register of the agents module (M2-16) over pool and its REST
+// handlers. The chat step calls it, because the register reads channels through chat. Errors: a
+// missing collaborator or a limit below 1.
+func (ag *Agents) BindCommands(cfg agentsapp.CommandConfig, pool *pg.Pool, d CommandDeps) error {
+	c, err := agentsapp.NewCommands(cfg, agentsapp.CommandDeps{
+		Store: agentspg.NewRepository(pool), UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit, Events: d.Events,
+		Principals: d.Principals, Channels: d.Channels,
+	})
+	if err != nil {
+		return err
+	}
+	ag.Commands, ag.CommandHandlers = c, agentshttp.NewCommands(c)
+	return nil
 }
 
 // NewAgents builds the agents module over pool with the unit of work uow, the Authorizer az, the

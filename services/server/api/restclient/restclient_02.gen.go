@@ -16,6 +16,68 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// RefreshToken Rotate the refresh token
+//
+// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
+// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
+// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
+// server issues a new access token and returns the same refresh token, without rotation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
+func (c *Client) RefreshToken(ctx context.Context, params *RefreshTokenParams, body RefreshTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRefreshTokenRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LoginWithTrustedHeaderWithBody Log in with the identity header of a trusted reverse proxy
+//
+// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
+// otherwise 404.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
+func (c *Client) LoginWithTrustedHeaderWithBody(ctx context.Context, params *LoginWithTrustedHeaderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLoginWithTrustedHeaderRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
+//
+// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
+// otherwise 404.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
+func (c *Client) LoginWithTrustedHeader(ctx context.Context, params *LoginWithTrustedHeaderParams, body LoginWithTrustedHeaderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLoginWithTrustedHeaderRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetChannel Read a channel
 //
 // Corresponds with GET /channels/{channel_id} (the `GetChannel` operationId).
@@ -172,6 +234,12 @@ func (c *Client) PutChannelBehavior(ctx context.Context, channelId ChannelIdPath
 }
 
 // ListChannelCommands List commands usable in a channel
+//
+// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+// channel lists nothing.
 //
 // Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
 func (c *Client) ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -899,6 +967,10 @@ func (c *Client) AnswerAutocomplete(ctx context.Context, requestId RequestIdPath
 
 // RegisterCommandWithBody Register a command
 //
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /commands (the `RegisterCommand` operationId).
@@ -915,6 +987,10 @@ func (c *Client) RegisterCommandWithBody(ctx context.Context, params *RegisterCo
 }
 
 // RegisterCommand Register a command
+//
+// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -963,6 +1039,10 @@ func (c *Client) GetCommand(ctx context.Context, commandId CommandIdPath, reqEdi
 
 // UpdateCommandWithBody Replace a command definition
 //
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
@@ -979,6 +1059,10 @@ func (c *Client) UpdateCommandWithBody(ctx context.Context, commandId CommandIdP
 }
 
 // UpdateCommand Replace a command definition
+//
+// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+// reason. An identical definition answers the command unchanged.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -23649,6 +23733,12 @@ type ClientWithResponsesInterface interface {
 
 	// ListChannelCommandsWithResponse List commands usable in a channel
 	//
+	// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+	// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+	// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+	// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+	// channel lists nothing.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
@@ -23975,12 +24065,20 @@ type ClientWithResponsesInterface interface {
 
 	// RegisterCommandWithBodyWithResponse Register a command
 	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /commands (the `RegisterCommand` operationId).
 	RegisterCommandWithBodyWithResponse(ctx context.Context, params *RegisterCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterCommandResponse, error)
 
 	// RegisterCommandWithResponse Register a command
+	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24003,12 +24101,20 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateCommandWithBodyWithResponse Replace a command definition
 	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
 	UpdateCommandWithBodyWithResponse(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateCommandResponse, error)
 
 	// UpdateCommandWithResponse Replace a command definition
+	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26752,141 +26858,5 @@ type ListAgentsResponse429Headers struct {
 
 // ListAgentsResponseDefaultHeaders the declared response headers of an HTTP default response for ListAgents
 type ListAgentsResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type ListAgentsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *AgentPage
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *ListAgentsResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *ListAgentsResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *ListAgentsResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *ListAgentsResponse403Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *ListAgentsResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *ListAgentsResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r ListAgentsResponse) GetJSON200() *AgentPage {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r ListAgentsResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListAgentsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListAgentsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListAgentsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListAgentsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListAgentsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListAgentsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListAgentsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListAgentsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CreateAgentResponse201Headers the declared response headers of an HTTP 201 response for CreateAgent
-type CreateAgentResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CreateAgentResponse400Headers the declared response headers of an HTTP 400 response for CreateAgent
-type CreateAgentResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentResponse401Headers the declared response headers of an HTTP 401 response for CreateAgent
-type CreateAgentResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CreateAgentResponse403Headers the declared response headers of an HTTP 403 response for CreateAgent
-type CreateAgentResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentResponse409Headers the declared response headers of an HTTP 409 response for CreateAgent
-type CreateAgentResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentResponse422Headers the declared response headers of an HTTP 422 response for CreateAgent
-type CreateAgentResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateAgentResponse429Headers the declared response headers of an HTTP 429 response for CreateAgent
-type CreateAgentResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// CreateAgentResponseDefaultHeaders the declared response headers of an HTTP default response for CreateAgent
-type CreateAgentResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
 }

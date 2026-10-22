@@ -292,7 +292,8 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	personal, err := wire.NewPersonal(syncapp.PersonalConfig{MaxContentBytes: 4096, MaxAttachments: 3, EventPayloadMaxBytes: 65536},
 		pool, uow, w.az, appender, c.Service, m.Service, w.clk)
 	must(t, err)
-	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour}, pool, uow, w.az, wire.RunsDeps{
+	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
+		EventPayloadMaxBytes: 65536}, pool, uow, w.az, wire.RunsDeps{
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,
 		Expiry: noExpiry{},
 	}, w.clk, log)

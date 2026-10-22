@@ -6089,14 +6089,25 @@ type AgentInvocationPayload struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
 
+	// CommandId Triggering command; set exactly for `trigger_kind = command`.
+	CommandId *Uuid `json:"command_id,omitempty"`
+
 	// CommandInvocationId UUIDv7 (RFC 9562), lowercase canonical form.
 	CommandInvocationId *Uuid `json:"command_invocation_id,omitempty"`
+
+	// CommandName Name of the triggering command; set exactly for `trigger_kind = command`.
+	//
+	// Examples: escalate
+	CommandName *string `json:"command_name,omitempty"`
 
 	// InteractionId UUIDv7 (RFC 9562), lowercase canonical form.
 	InteractionId *Uuid `json:"interaction_id,omitempty"`
 
 	// MessageId Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
 	MessageId *Uuid `json:"message_id,omitempty"`
+
+	// Options Parsed option values in the order of the command definition; set exactly for `trigger_kind = command`.
+	Options *[]CommandOptionValue `json:"options,omitempty"`
 
 	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
 	RunId Uuid `json:"run_id"`
@@ -7570,6 +7581,7 @@ type CommandChoice struct {
 
 // CommandInvocation defines model for CommandInvocation.
 type CommandInvocation struct {
+	// Accepted Always true; a refusal is an error response.
 	Accepted bool `json:"accepted"`
 
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -7578,7 +7590,7 @@ type CommandInvocation struct {
 	// CommandId UUIDv7 (RFC 9562), lowercase canonical form.
 	CommandId Uuid `json:"command_id"`
 
-	// InvocationId UUIDv7 (RFC 9562), lowercase canonical form.
+	// InvocationId New per accepted invocation; it appears as `invocation_id` in `command.invoked` and as `command_invocation_id` in `agent.invocation`.
 	InvocationId Uuid `json:"invocation_id"`
 
 	// RunId Run created for non-control commands.
@@ -7592,7 +7604,7 @@ type CommandInvocation struct {
 type CommandInvoke struct {
 	Options *[]CommandOptionValue `json:"options,omitempty"`
 
-	// ThreadId Absent invokes in the main thread or creates a thread per `auto_thread`.
+	// ThreadId Absent: in a text channel the main thread for a control command, and for a model command only when `auto_thread` is false; otherwise `400 validation_failed` (`/thread_id`, `required`), because a command has no message from which the `auto_thread` thread could start.
 	ThreadId *Uuid `json:"thread_id,omitempty"`
 }
 
@@ -7674,7 +7686,7 @@ type CommandInvokedPayload struct {
 	InvokedBy PrincipalRef         `json:"invoked_by"`
 	Options   []CommandOptionValue `json:"options"`
 
-	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	// RunId Active run of the command owner in the thread at execution time; absent when the owner has none (R-AZ-25). Never the run of another agent.
 	RunId *Uuid `json:"run_id,omitempty"`
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
@@ -21235,6 +21247,12 @@ type ClientInterface interface {
 
 	// ListChannelCommands List commands usable in a channel
 	//
+	// Lists the registered commands offered in the channel: those of the channel's effective operator first, then those
+	// of guest agents (only with `allow_mentioned_agents`) and of apps with `write` on the channel, each group ordered by
+	// lower-case name, owner and ID. Per owner and name only the most specific scope appears (`channel` before `space`
+	// before `instance`). The built-in commands are not part of the list; the client shows them from its own list. A dm
+	// channel lists nothing.
+	//
 	// Corresponds with GET /channels/{channel_id}/commands (the `ListChannelCommands` operationId).
 	ListChannelCommands(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -21541,12 +21559,20 @@ type ClientInterface interface {
 
 	// RegisterCommandWithBody Register a command
 	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /commands (the `RegisterCommand` operationId).
 	RegisterCommandWithBody(ctx context.Context, params *RegisterCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RegisterCommand Register a command
+	//
+	// Registers a command of the calling agent or app. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21565,12 +21591,20 @@ type ClientInterface interface {
 
 	// UpdateCommandWithBody Replace a command definition
 	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /commands/{command_id} (the `UpdateCommand` operationId).
 	UpdateCommandWithBody(ctx context.Context, commandId CommandIdPath, params *UpdateCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCommand Replace a command definition
+	//
+	// Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with `reason:
+	// command_name_reserved`; a name the owner already uses on the same scope target answers `409 conflict` without a
+	// reason. An identical definition answers the command unchanged.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25488,68 +25522,6 @@ func (c *Client) StepUpWithPassword(ctx context.Context, params *StepUpWithPassw
 // Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
 func (c *Client) RefreshTokenWithBody(ctx context.Context, params *RefreshTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRefreshTokenRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RefreshToken Rotate the refresh token
-//
-// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
-// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
-// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
-// server issues a new access token and returns the same refresh token, without rotation.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
-func (c *Client) RefreshToken(ctx context.Context, params *RefreshTokenParams, body RefreshTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRefreshTokenRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// LoginWithTrustedHeaderWithBody Log in with the identity header of a trusted reverse proxy
-//
-// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
-// otherwise 404.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
-func (c *Client) LoginWithTrustedHeaderWithBody(ctx context.Context, params *LoginWithTrustedHeaderParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLoginWithTrustedHeaderRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// LoginWithTrustedHeader Log in with the identity header of a trusted reverse proxy
-//
-// Only enabled when the server listens on loopback and a `trusted_header` provider is active;
-// otherwise 404.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
-func (c *Client) LoginWithTrustedHeader(ctx context.Context, params *LoginWithTrustedHeaderParams, body LoginWithTrustedHeaderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLoginWithTrustedHeaderRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
