@@ -554,6 +554,25 @@ func (s *store) ThreadCounters(_ context.Context, channels []ids.ID) ([]chat.Thr
 	return out, s.fail
 }
 
+func (s *store) LocateThreads(_ context.Context, threads []ids.ID) ([]chat.ThreadInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureThreads()
+	out := []chat.ThreadInfo{}
+	for _, id := range threads {
+		th, ok := s.threads[id]
+		if !ok {
+			continue
+		}
+		c := s.row(s.channels[th.ChannelID])
+		out = append(out, chat.ThreadInfo{ID: th.ID, ChannelID: th.ChannelID, SpaceID: c.Channel.SpaceID, ChannelKind: string(c.Channel.Kind),
+			Kind: string(th.Kind), State: string(th.State), OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy, Version: th.Version,
+			ChannelArchived: c.Channel.Archived() || c.SpaceArchived, LastMessageSeq: th.LastMessageSeq, UnreadFloorSeq: th.UnreadFloorSeq})
+	}
+	slices.SortFunc(out, func(a, b chat.ThreadInfo) int { return strings.Compare(a.ID.String(), b.ID.String()) })
+	return out, s.fail
+}
+
 func (s *store) InsertThread(_ context.Context, th domain.Thread) (domain.Thread, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

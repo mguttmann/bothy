@@ -833,6 +833,15 @@ Rules:
    per entry (rule 3), reads only `cost_entries` and names neither channel nor thread nor content
    (05, rule 1.2 and R-AZ-28). Writing queries only hit rows of a resource that `authorize` has checked
    before (for example the copies of `channel_id` when moving); the lint does not check them.
+   Thread-scoped tables without `channel_id` (`runs`, `run_steps`; a run follows its thread when
+   the thread moves, 03 `threads`) follow one of two forms instead (D-M2-05-9): (a) the query reads
+   the rows of exactly one thread or run whose visibility was checked first (`getRun`,
+   `listRunSteps`, `listThreadRuns`, the active run of a thread at the acceptance; exception
+   category `after_authorize`, the load before `authorize` in `getRun` `authorize_resolution`),
+   or (b) for the active-run lists (`listActiveRuns`, `Snapshot.active_runs`) it reads the active
+   runs, resolves their threads through the port of `chat`, keeps only threads whose channel is
+   in `Scope.ChannelIDs` and runs `authorize` per row (category `thread_scope`). The gauge query
+   of `bothy.run.active` has no principal (`system_job`).
 2. Totals (`total`), facets and "more results" count only within this predicate.
 3. After the SQL filter, `authorize` also runs for every result with the read action (for example
    `message.read`). The SQL filter is the performance, `authorize` the truth. A difference

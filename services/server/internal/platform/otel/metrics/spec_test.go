@@ -188,3 +188,38 @@ func TestRecord_SourceValuesRequired(t *testing.T) {
 		t.Fatalf("NewCounter with the classes: %v", err)
 	}
 }
+
+func TestRecord_AgentHandlePattern(t *testing.T) {
+	var reported []error
+	restore := metrics.SetStrict(func(err error) { reported = append(reported, err) })
+	defer restore()
+	mp, reader := metricstest.Provider(t)
+	// The handles are not passed: the pattern of 03 principals.handle is the closed set.
+	c, err := metrics.NewCounter(mp, metrics.RunFinished, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	c.Add(ctx, 1, "alex-bot", "completed", "")
+	c.Add(ctx, 1, "sam.helper_2", "failed", "stale")
+	if len(reported) != 0 {
+		t.Fatalf("handles of the pattern were reported: %v", reported)
+	}
+	for _, bad := range []string{"Robin", "-robin", "robin bot", ""} {
+		c.Add(ctx, 1, bad, "cancelled", "user_cancelled")
+	}
+	if len(reported) != 4 || !mentions(reported, "bothy.agent.handle", `"Robin"`) {
+		t.Errorf("strict switch reported %v, want the four handles outside the pattern", reported)
+	}
+	m := metricstest.Find(t, reader, "bothy.run.finished")
+	for handle, want := range map[string]float64{"alex-bot": 1, "sam.helper_2": 1, "other": 4} {
+		if got := metricstest.Sum(m, map[string]string{"bothy.agent.handle": handle}); got != want {
+			t.Errorf("%s = %v, want %v", handle, got, want)
+		}
+	}
+	for _, p := range metricstest.Points(m) {
+		if _, has := p.Attrs["bothy.reason"]; has == (p.Attrs["bothy.run.state"] == "completed") {
+			t.Errorf("point %v: bothy.reason must be absent exactly for completed", p.Attrs)
+		}
+	}
+}

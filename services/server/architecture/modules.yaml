@@ -199,7 +199,7 @@ modules:
     ephemeral_events: [run.updated, command.autocomplete_requested]
     ws_ops: [run.update, command.autocomplete_result]
     depends_on: [instance, chat, agents, messaging, billing]
-    adapter_vendors: []
+    adapter_vendors: [pgx, otel]   # sqlc code and the repository of runs and run_steps; adapters/otelmetrics records the run metrics (M2-05)
   search:
     tables: []
     actions: [search.query]

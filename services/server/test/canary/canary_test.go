@@ -242,6 +242,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.content()
 	sc.files()
 	sc.behavior()
+	sc.runs()
 	sc.projectBinding()
 	sc.people()
 	sc.agents()

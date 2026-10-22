@@ -63,6 +63,9 @@ var Fixtures = map[string]ParamFixture{
 	// A file Sam uploads into Marketing/Kampagnen: before attachment only its uploader reads it
 	// (05 file.read, M3-03), and its upload session only its principal (getUpload).
 	"file_id": extraFixture(func(e *Extras) string { return e.FileID }),
+	// The run of Texter in the thread of Marketing/Kampagnen that the first message of the world
+	// opened (M2-05): neither requester reads Marketing (05 run.read).
+	"run_id": extraFixture(func(e *Extras) string { return e.RunID }),
 }
 
 // isHuman reports whether r is one of the people of w.
@@ -84,6 +87,8 @@ func isHuman(w *harness.World, r *harness.Client) bool {
 // M3-03).
 type Extras struct {
 	ProviderID, HostID, AppID, SubscriptionID, FileID string
+	// RunID is the run of Texter in Marketing/Kampagnen (M2-05).
+	RunID string
 }
 
 // extrasWebhookHost is the host of the webhook subscription of the Extras; the server must allow it
@@ -137,6 +142,7 @@ func PrepareExtras(tb testing.TB, w *harness.World) *Extras {
 		"url": "https://" + extrasWebhookHost + "/leak", "event_types": []string{"message.created"},
 	}}, http.StatusCreated))
 	e.FileID = uploadOfSam(tb, w)
+	e.RunID = runOfMarketing(tb, w)
 	extras.Store(w, e)
 	return e
 }
@@ -156,6 +162,23 @@ func uploadOfSam(tb testing.TB, w *harness.World) string {
 		tb.Fatalf("leak: no file_id in %s", r.Body)
 	}
 	return body.FileID
+}
+
+// runOfMarketing returns the run the first message of the world opened in the thread of
+// Marketing/Kampagnen (listThreadRuns as the owner).
+func runOfMarketing(tb testing.TB, w *harness.World) string {
+	tb.Helper()
+	var page struct {
+		Items []struct {
+			ID string `json:"id"`
+		} `json:"items"`
+	}
+	harness.MustDo(tb, w.Owner, harness.Request{Method: http.MethodGet, Path: "/threads/" + w.Threads["Marketing/Kampagnen"] + "/runs"},
+		http.StatusOK).JSON(tb, &page)
+	if len(page.Items) == 0 {
+		tb.Fatal("leak: the thread of Marketing/Kampagnen has no run")
+	}
+	return page.Items[0].ID
 }
 
 // createdID returns the member id (or host_id) of a creation response, or the id of its member

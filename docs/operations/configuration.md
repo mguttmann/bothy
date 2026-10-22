@@ -243,7 +243,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | int | `100` | templates per person or per channel; `listTemplates` is not paginated | active |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | size of a file | active |
 | `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server |  | `500` | length of `last_text_excerpt` | planned (M2) |
-| `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server |  | `16384` | size of `run_steps.detail` | planned (M2) |
+| `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | int | `16384` | size of `run_steps.detail` | active |
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server |  | `2000` | stored steps per run | planned (M2) |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | without progress: stall notice | planned (M2) |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | expiry of a component without its own value | planned (M2) |

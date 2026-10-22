@@ -585,6 +585,22 @@ func (stubServer) GetMessage(context.Context, rest.GetMessageRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) GetRun(context.Context, rest.GetRunRequestObject) (rest.GetRunResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListThreadRuns(context.Context, rest.ListThreadRunsRequestObject) (rest.ListThreadRunsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListRunSteps(context.Context, rest.ListRunStepsRequestObject) (rest.ListRunStepsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListActiveRuns(context.Context, rest.ListActiveRunsRequestObject) (rest.ListActiveRunsResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) UpdateMessage(context.Context, rest.UpdateMessageRequestObject) (rest.UpdateMessageResponseObject, error) {
 	return nil, nil
 }
@@ -1061,6 +1077,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-57
 		"listThreadMessages": {"GET /api/v1/threads/{thread_id}/messages", "thread.read", "rl.read"},
 		"getMessage":         {"GET /api/v1/messages/{message_id}", "message.read", "rl.read"},
+		"getRun":             {"GET /api/v1/runs/{run_id}", "run.read", "rl.read"},
+		"listThreadRuns":     {"GET /api/v1/threads/{thread_id}/runs", "run.read", "rl.read"},
+		"listRunSteps":       {"GET /api/v1/runs/{run_id}/steps", "run.read", "rl.read"},
+		"listActiveRuns":     {"GET /api/v1/runs", "run.overview.read", "rl.read"},
 
 		// M2-26
 		"getWebhookKeys":            {"GET /api/v1/instance/webhook-keys", "instance.discovery.read", "rl.public_auth"},

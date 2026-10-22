@@ -96,6 +96,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getMySidebar
   - getProblemType
+  - getRun
   - getServedChannelConfig
   - getSnapshot
   - getSpace
@@ -107,6 +108,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - handleOidcCallback
   - installApp
   - issueHostPairingCode
+  - listActiveRuns
   - listAgents
   - listApps
   - listAuditEvents
@@ -133,11 +135,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listOwners
   - listPins
   - listReactions
+  - listRunSteps
   - listServedChannels
   - listSpaceChannels
   - listSpaces
   - listTemplates
   - listThreadMessages
+  - listThreadRuns
   - listTokens
   - listUserDevices
   - listUserSessions
@@ -338,9 +342,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M7-09
   - operation_id: getPushPreview
     milestone: M3
-  - operation_id: getRun
-    milestone: M2
-    ticket: M2-05
   - operation_id: getRunContext
     milestone: M2
     ticket: M2-13
@@ -383,9 +384,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: leaveDm
     milestone: V3
     ticket: V3-01
-  - operation_id: listActiveRuns
-    milestone: M2
-    ticket: M2-05
   - operation_id: listAgentSessions
     milestone: M2
     ticket: M2-12
@@ -414,15 +412,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listPrices
     milestone: M2
     ticket: M2-22
-  - operation_id: listRunSteps
-    milestone: M2
-    ticket: M2-05
   - operation_id: listTerminalSessions
     milestone: M2
     ticket: M2-44
-  - operation_id: listThreadRuns
-    milestone: M2
-    ticket: M2-05
   - operation_id: openTerminalSession
     milestone: M2
     ticket: M2-44

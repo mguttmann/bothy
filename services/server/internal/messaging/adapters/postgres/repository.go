@@ -88,7 +88,7 @@ func (r *Repository) InsertMessage(ctx context.Context, m domain.Message) (domai
 		ID: uuid(m.ID), ThreadID: uuid(m.ThreadID), ChannelID: uuid(m.ChannelID), ThreadSeq: m.ThreadSeq,
 		AuthorPrincipalID: uuid(m.AuthorID), ClientMsgID: uuid(m.ClientMsgID), ClientPayloadSha256: m.PayloadSHA256,
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: pgtype.Text{String: m.SystemCode, Valid: m.SystemCode != ""},
-		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageID: optionalUUID(m.ReplyToID),
+		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageID: optionalUUID(m.ReplyToID), RunID: optionalUUID(m.RunID),
 		Silent: m.Silent, CreatedAt: pgtype.Timestamptz{Time: m.CreatedAt, Valid: true}, SearchLanguage: m.SearchLanguage,
 	})
 	var pgErr *pgconn.PgError
@@ -193,6 +193,19 @@ func (r *Repository) Tombstone(ctx context.Context, id ids.ID, visible []ids.ID,
 	return changed(messageRow(row), err, "deleting a message")
 }
 
+// SetTriggerState implements app.Store.
+func (r *Repository) SetTriggerState(ctx context.Context, id ids.ID, state, reason string, at time.Time) (domain.Message, bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return domain.Message{}, false, err
+	}
+	row, err := q.SetTriggerState(ctx, sqlcgen.SetTriggerStateParams{
+		ID: uuid(id), TriggerState: pgtype.Text{String: state, Valid: true}, TriggerStateReason: pgtype.Text{String: reason, Valid: reason != ""},
+		TriggerStateAt: pgtype.Timestamptz{Time: at, Valid: true},
+	})
+	return one(messageRow(row), err, "setting a trigger state")
+}
+
 // changed converts the row of an UPDATE of a locked message; no row is internal, because the
 // caller holds the lock of a live message.
 func changed(row messageRow, err error, what string) (domain.Message, error) {
@@ -267,7 +280,8 @@ func toMessage(row messageRow) domain.Message {
 		ID: idOf(row.ID), ThreadID: idOf(row.ThreadID), ChannelID: idOf(row.ChannelID), ThreadSeq: row.ThreadSeq,
 		AuthorID: idOf(row.AuthorPrincipalID), ClientMsgID: idOf(row.ClientMsgID), PayloadSHA256: row.ClientPayloadSha256,
 		Origin: domain.Origin(row.Origin), Kind: domain.Kind(row.Kind), SystemCode: row.SystemCode.String, ContentMD: row.ContentMd,
-		ContentFormat: row.ContentFormat, ReplyToID: idOf(row.ReplyToMessageID), Silent: row.Silent, Version: row.Version,
+		ContentFormat: row.ContentFormat, ReplyToID: idOf(row.ReplyToMessageID), RunID: idOf(row.RunID), TriggerState: row.TriggerState.String,
+		TriggerStateReason: row.TriggerStateReason.String, TriggerStateAt: timeOf(row.TriggerStateAt), Silent: row.Silent, Version: row.Version,
 		EditedAt: timeOf(row.EditedAt), DeletedAt: timeOf(row.DeletedAt), DeletedBy: idOf(row.DeletedBy), CreatedAt: timeOf(row.CreatedAt),
 	}
 }

@@ -42,11 +42,14 @@ content_tables:
 
 # Categories: authorize_resolution (resolves a resource path for authorize), after_authorize
 # (loads a single resource after authorize allowed it), system_job (job without principal),
-# log_tail (the log tail reads every event; delivery checks authorize per receiver).
+# log_tail (the log tail reads every event; delivery checks authorize per receiver), thread_scope
+# (a list over a thread-scoped table without channel_id, such as runs: reads the active runs,
+# resolves their threads through the chat port, keeps only threads whose channel is in
+# Scope.ChannelIDs and authorizes each row; docs/DECISIONS.md D-M2-05-9).
 exceptions:
   - query: chat.GetChannel
     category: authorize_resolution
-    reason: "resolves one channel (space, archive state, operator) for authorize; the use case returns it only after channel.read allowed it"
+    reason: "resolves one channel (space, archive state, operator) for authorize; the use case returns it only after channel.read allowed it; for chat.TriggerFacts (M2-05) it gives the trigger facts inside the unit of work of a message whose message.create authorize allowed, and runs decides with agent.invoke"
   - query: chat.LockChannel
     category: after_authorize
     reason: "locks the one channel a change authorize allowed (03 section 6.3)"
@@ -185,3 +188,30 @@ exceptions:
   - query: sync.ListReadStatesOfChannel
     category: after_authorize
     reason: "the caller's own read states of the one channel, read only when the channel is in the visible set of Scope; each row then passes thread.read"
+  - query: chat.LocateThreads
+    category: authorize_resolution
+    reason: "resolves the channel, space and state of a batch of threads named by id (chat.Threads.Locate) for the thread_scope lists of runs, which keep only threads whose channel is in Scope.ChannelIDs and then authorize each row (M2-05)"
+  - query: runs.GetRun
+    category: authorize_resolution
+    reason: "getRun loads the one run first, because its thread and triggered_by form the descriptor of authorize run.read; a denied run gives the same not_found as a missing one (02 9.2, M2-05)"
+  - query: runs.ActiveRunOfThread
+    category: after_authorize
+    reason: "the active run of the one thread whose message the acceptance handles (09 3.4) or whose run Open found taken; runs has no channel_id, the thread was checked first (D-M2-05-9)"
+  - query: runs.ThreadRuns
+    category: after_authorize
+    reason: "the runs of the one thread listThreadRuns found visible through Scope(run.read); runs has no channel_id, and each row is authorized with run.read (D-M2-05-9)"
+  - query: runs.ActiveRuns
+    category: thread_scope
+    reason: "listActiveRuns and the snapshot read the active runs in batches, resolve their threads through chat.Threads.Locate, keep only threads whose channel is in Scope.ChannelIDs and authorize each row with run.read; runs has no channel_id (D-M2-05-9)"
+  - query: runs.ActiveCounts
+    category: system_job
+    reason: "the gauge bothy.run.active of the worker counts the active runs per agent and state without a principal; only numbers, no content (M2-05)"
+  - query: runs.StepCounts
+    category: after_authorize
+    reason: "step_count of the runs of one page, each of which run.read allowed; run_steps has no channel_id (D-M2-05-9)"
+  - query: runs.Steps
+    category: after_authorize
+    reason: "one page of steps of the one run whose run.read authorize allowed (listRunSteps); run_steps has no channel_id (D-M2-05-9)"
+  - query: runs.AllSteps
+    category: after_authorize
+    reason: "every step of the one run whose run.read authorize allowed (getRun); run_steps has no channel_id (D-M2-05-9)"

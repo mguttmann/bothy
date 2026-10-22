@@ -192,6 +192,15 @@ func (s *Service) InfoForShare(ctx context.Context, threadID ids.ID) (chat.Threa
 	return info(th, c), nil
 }
 
+// Locate implements chat.Threads: the routing data of the known threads among threadIDs in one
+// store read, without authorization (M2-05); no thread returns none without a query.
+func (s *Service) Locate(ctx context.Context, threadIDs []ids.ID) ([]chat.ThreadInfo, error) {
+	if len(threadIDs) == 0 {
+		return []chat.ThreadInfo{}, nil
+	}
+	return s.d.Store.LocateThreads(ctx, threadIDs)
+}
+
 // Counters implements chat.Threads: the counters of the threads of channelIDs with something
 // unread for somebody, without authorization (M1-63); no channel returns none without a query.
 func (s *Service) Counters(ctx context.Context, channelIDs []ids.ID) ([]chat.ThreadCounter, error) {

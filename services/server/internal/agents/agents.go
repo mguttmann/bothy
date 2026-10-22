@@ -180,3 +180,29 @@ type Agents interface {
 	// version_conflict.
 	SetToolClass(ctx context.Context, a actor.Actor, id ids.ID, cmd ToolClassCmd) (Agent, error)
 }
+
+// RunFacts are the facts about one agent that runs needs for the trigger decision and the run
+// metrics (M2-05): principal handle and status, the backend policy and the target tool class.
+// Nothing in it is a credential.
+type RunFacts struct {
+	ID ids.ID
+	// Handle and Status (active, disabled, deleted) come from the principal.
+	Handle, Status string
+	// BillingMode is personal or organization; CredentialHolderID is set exactly for personal.
+	BillingMode        string
+	CredentialHolderID ids.ID
+	// ToolClass is the target tool class.
+	ToolClass string
+}
+
+// Facts is the incoming port of the agent facts of runs (M2-05). It never authorizes: runs decides
+// with agent.invoke and never reveals the facts. It reads inside the ambient transaction of ctx.
+type Facts interface {
+	// RunFacts returns the facts of the agents among agentIDs, in one read of the records and one
+	// of the principals; people, apps and unknown ids are absent. Errors: the database error.
+	//
+	// Example:
+	//
+	//	facts, err := agentFacts.RunFacts(ctx, []ids.ID{lotse})
+	RunFacts(ctx context.Context, agentIDs []ids.ID) (map[ids.ID]RunFacts, error)
+}
