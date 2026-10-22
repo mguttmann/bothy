@@ -289,8 +289,8 @@ after other tests of its package ran (an order dependency, state that another te
 therefore fails in every full run and passes in every rerun: CI passes, and the test is a flake
 in every run, so it heads the flake list (`test_an_order_dependent_failure_is_a_flake_of_every_run`).
 A check in TestMain that only the other tests trip passes the same way when a test of the same
-package flakes in that run. Local runs without `CI=true` keep failing on both. Fix such a test
-like a flake: the list is the queue.
+package flakes in that run. In a package the pull request changes both fail (PL/26); local runs
+without `CI=true` keep failing on both. Fix such a test like a flake: the list is the queue.
 
 Where the list is:
 
