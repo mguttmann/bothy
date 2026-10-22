@@ -5,6 +5,7 @@
 /// sends the cookies of the same origin by itself.
 library;
 
+import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
@@ -28,8 +29,12 @@ ConsoleEnvironment browserEnvironment() {
 
 /// [FileDownloads] over a temporary `blob:` URL and an anchor with the `download` attribute:
 /// the browser saves the file, nothing is kept in browser storage, and the URL is revoked
-/// right after the click.
+/// [revokeAfter] after the click, because Firefox and Safari may read the URL only after the
+/// click returned.
 class AnchorDownloads implements FileDownloads {
+  /// How long the `blob:` URL of a download stays valid after the click.
+  static const revokeAfter = Duration(minutes: 1);
+
   /// Creates the downloads of [document].
   AnchorDownloads(this.document);
 
@@ -47,7 +52,7 @@ class AnchorDownloads implements FileDownloads {
     document.body?.append(anchor);
     anchor.click();
     anchor.remove();
-    web.URL.revokeObjectURL(url);
+    Timer(revokeAfter, () => web.URL.revokeObjectURL(url));
   }
 }
 

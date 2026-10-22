@@ -131,8 +131,8 @@ authenticator):
    the Dart tests read;
 6. patrol's web protocol: list the tests with `__patrol__getTests` (the internal
    `patrol_test_explorer` is left out), then per test in the listed order a fresh load of the
-   bundle, `window.__e2eSeed` again, the initialisation and `__patrol__runTest`, up to 5 minutes
-   each. The fresh load is patrol's own rule (its web runner does the same): one load runs every
+   bundle, `window.__e2eSeed` again, the initialization and `__patrol__runTest`, each bounded by
+   `TEST_TIMEOUT_MS` of `headless/admin_suites.py`. The fresh load is patrol's own rule (its web runner does the same): one load runs every
    test of the bundle once and executes only the requested one. Console lines starting with `PATROL_LOG` (patrol's step log) go to stderr. The
    platform handler answers `startTest`, `verifyFileDownloads`, `getClipboard`, `setClipboard`,
    `grantPermissions`, `enableDarkMode` and `disableDarkMode`; any other action fails the run with
@@ -141,7 +141,7 @@ authenticator):
 The phase fails on a failed or skipped test, on an empty test list, on an unsupported platform
 action, on any CSP violation, console CSP error or foreign origin, and when no download ends with
 `.csv` and has `occurred_at` in its first line (the export of A6). The result is
-`out/results/admin.json`: per test its name, result and details (cut to 2000 characters), the
+`out/results/admin.json`: per test its name, result and details (cut to `DETAILS_MAX` characters), the
 platform actions called, the downloads (file name and first line), violations, console CSP errors,
 foreign origins and the console output of the page (the reason of a failed expectation; patrol
 itself often reports a failure without details); each failed test also leaves a screenshot
