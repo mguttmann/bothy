@@ -277,8 +277,9 @@ func NewExpiryService(pool *pg.Pool, a *Audit, sy *Sync, cfg authzapp.ExpiryConf
 	})
 }
 
-// AuthzAdminConfig binds group.name_max_chars, group.description_max_chars, api.page_size_default
-// and api.page_size_max into the configuration of the Admin use cases (M1-48). The error names
+// AuthzAdminConfig binds group.name_max_chars, group.description_max_chars, api.page_size_default,
+// api.page_size_max, audit.reason_max_chars and authz.expiry_reminder_lead (the window of
+// "Expiring soon", M6-07) into the configuration of the Admin use cases (M1-48). The error names
 // the key whose binding failed, never a value.
 func AuthzAdminConfig(v *config.Values) (authzapp.AdminConfig, error) {
 	var c authzapp.AdminConfig
@@ -327,11 +328,16 @@ func NewAuthzAdmin(pool *pg.Pool, cfg authzapp.AdminConfig, a *Audit, sy *Sync, 
 	if err != nil {
 		return nil, err
 	}
+	tokens, err := identityapp.NewTokenExpiry(identitypg.NewRepository(pool))
+	if err != nil {
+		return nil, err
+	}
 	admin, err := authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: a.UoW(), Authorizer: az, Store: authzpg.NewRepository(pool),
 		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: NewStructureSource(pool), Hosts: NewHostSource(pool),
 		Rights: a.RightsHook(), Audit: a.Recorder(), Clock: clk, Events: sy.Appender(), Scopes: az, Cursors: authzhttp.Cursors{},
 		Config: cfg, Views: identityapp.NewConsoleViews(identitypg.NewRepository(pool)), Resolver: resolver,
+		Agents: newAgentDirectory(pool), Tokens: tokens,
 	})
 	if err != nil {
 		return nil, err

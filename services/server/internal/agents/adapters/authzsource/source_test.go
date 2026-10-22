@@ -95,7 +95,8 @@ func realWorld(t *testing.T, holder ids.ID, list []agentFixture) authz.AgentPoli
 // authz fake and the agents implementation: PersonalAgents lists exactly the active personal
 // agents ascending (a disabled personal agent is not in the I1 list), AgentPolicy reports mode,
 // holder, target and reported tool class (the effective class is their maximum) and ok false for
-// an unknown agent, the billing modes the adapter reported (M1-49), and no dev environment is ready before V2.
+// an unknown agent, the billing modes the adapter reported (M1-49), no dev environment is ready before V2,
+// and AgentIDs lists every agent, disabled ones too, ascending (M6-07).
 func TestAgentPolicySourceContract(t *testing.T) {
 	t.Parallel()
 	for name, build := range map[string]policyWorld{"fake": fakeWorld, "agents": realWorld} {
@@ -138,6 +139,16 @@ func TestAgentPolicySourceContract(t *testing.T) {
 			}
 			if ready, err := src.DevEnvironmentReady(ctx, holder, ids.New()); err != nil || ready {
 				t.Fatalf("DevEnvironmentReady = %v, %v", ready, err)
+			}
+			dir, ok := src.(authz.AgentDirectory)
+			if !ok {
+				t.Fatal("the source does not list the agents (M6-07)")
+			}
+			all, err := dir.AgentIDs(ctx)
+			wantIDs := []ids.ID{list[0].id, list[1].id, list[2].id, list[3].id}
+			slices.SortFunc(wantIDs, func(a, b ids.ID) int { return bytes.Compare(a[:], b[:]) })
+			if err != nil || !slices.Equal(all, wantIDs) {
+				t.Fatalf("AgentIDs = %v, %v, want every agent ascending %v", all, err, wantIDs)
 			}
 		})
 	}

@@ -74,6 +74,9 @@ var idCfg = identityapp.Config{
 // viewAsMax is authz.view_as_max_duration of the world.
 const viewAsMax = 15 * time.Minute
 
+// reminderLead is authz.expiry_reminder_lead of the world (M6-07).
+const reminderLead = 48 * time.Hour
+
 // pepper is the token pepper of the world (fixed test bytes, never a secret).
 var pepper = []byte("0123456789abcdef0123456789abcdef")
 
@@ -153,6 +156,8 @@ func newWorld(t *testing.T) *world {
 	_, err = maint.Run(context.Background())
 	must(t, err)
 	repo := identitypg.NewRepository(pool)
+	tokenExpiry, err := identityapp.NewTokenExpiry(repo)
+	must(t, err)
 	w.az, err = authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: idCfg.StepUpMaxAge, ViewAsMaxDuration: viewAsMax}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
 		Credentials: identityapp.NewCredentialSource(repo, repo, repo), Structure: w.structure, Policies: w.policies,
@@ -162,7 +167,9 @@ func newWorld(t *testing.T) *world {
 	w.admin, err = authzapp.NewAdminService(authzapp.AdminDeps{
 		UoW: w.uow, Authorizer: w.az, Store: authzpg.NewRepository(pool), Principals: principals, Structure: w.structure, Rights: hook,
 		Audit: w.rec, Clock: w.clk, Events: appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
-		Config: authzapp.AdminConfig{GroupNameMaxChars: 20, GroupDescriptionMaxChars: 40, PageSizeDefault: 2, PageSizeMax: 3},
+		Config: authzapp.AdminConfig{GroupNameMaxChars: 20, GroupDescriptionMaxChars: 40, PageSizeDefault: 2, PageSizeMax: 3,
+			ExpiryReminderLead: reminderLead},
+		Agents: w.policies, Tokens: tokenExpiry,
 	})
 	must(t, err)
 	dir := filepath.Join(t.TempDir(), "signing-keys")

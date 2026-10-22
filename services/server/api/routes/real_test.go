@@ -81,6 +81,14 @@ func (stubServer) ViewAsUser(context.Context, rest.ViewAsUserRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) ListPermissionHints(context.Context, rest.ListPermissionHintsRequestObject) (rest.ListPermissionHintsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListExpiringAccess(context.Context, rest.ListExpiringAccessRequestObject) (rest.ListExpiringAccessResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListApps(context.Context, rest.ListAppsRequestObject) (rest.ListAppsResponseObject, error) {
 	return nil, nil
 }
@@ -1040,6 +1048,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"previewGrant":         {"POST /api/v1/grants/preview", "access.preview", "rl.admin"},
 		"viewAsUser":           {"GET /api/v1/users/{user_id}/view-as", "access.view_as", "rl.admin"},
 		"revokeGrant":          {"POST /api/v1/grants/{grant_id}/revoke", "grant.revoke", "rl.admin"},
+		// M6-07
+		"listPermissionHints": {"GET /api/v1/access/hints", "access.hints.read", "rl.read"},
+		"listExpiringAccess":  {"GET /api/v1/access/expiring", "access.hints.read", "rl.read"},
 		// M1-51
 		"listAgents":              {"GET /api/v1/agents", "agent.read", "rl.read"},
 		"createAgent":             {"POST /api/v1/agents", "agent.create", "rl.admin"},
