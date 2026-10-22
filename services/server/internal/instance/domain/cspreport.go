@@ -87,9 +87,10 @@ type legacyReport struct {
 }
 
 // ParseCSPReports returns the violations of body in format. In the Reporting API format it keeps
-// the reports of type csp-violation and skips every other report and every item that is no
-// object; members it does not read are ignored. Errors: ErrCSPReport for a body that is not an
-// array (Reporting API) or not an object with the object csp-report (legacy).
+// the reports of type csp-violation and skips every other report; members it does not read are
+// ignored. The body follows the contract's shape: errors are ErrCSPReport for a body that is not
+// an array of objects (Reporting API) or not an object with exactly the object csp-report
+// (legacy).
 //
 // Example:
 //
@@ -97,6 +98,12 @@ type legacyReport struct {
 //	// v[0].BlockedOrigin == "inline"
 func ParseCSPReports(format CSPReportFormat, body []byte) ([]CSPViolation, error) {
 	if format == CSPLegacy {
+		// Exactly the one member csp-report (CspReportLegacy of the contract); the members of
+		// the report itself that the server does not read are ignored.
+		var top map[string]json.RawMessage
+		if err := json.Unmarshal(body, &top); err != nil || len(top) != 1 {
+			return nil, ErrCSPReport
+		}
 		var r legacyReport
 		if err := json.Unmarshal(body, &r); err != nil || r.Report == nil {
 			return nil, ErrCSPReport
@@ -108,11 +115,17 @@ func ParseCSPReports(format CSPReportFormat, body []byte) ([]CSPViolation, error
 		return []CSPViolation{violation(directive, r.Report.Disposition, r.Report.BlockedURI)}, nil
 	}
 	var items []json.RawMessage
-	if err := json.Unmarshal(body, &items); err != nil {
+	if err := json.Unmarshal(body, &items); err != nil || items == nil {
 		return nil, ErrCSPReport
 	}
 	out := []CSPViolation{}
 	for _, raw := range items {
+		// Every item is an object (CspReportList of the contract); null and other values are
+		// no report of the Reporting API.
+		var object map[string]json.RawMessage
+		if json.Unmarshal(raw, &object) != nil || object == nil {
+			return nil, ErrCSPReport
+		}
 		var r reportingAPIReport
 		if json.Unmarshal(raw, &r) != nil || r.Type != "csp-violation" {
 			continue

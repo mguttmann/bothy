@@ -24,7 +24,6 @@ func TestParseCSPReports(t *testing.T) {
 			{"type":"deprecation","body":{"id":"x"}},
 			{"type":"csp-violation","body":{"blockedURL":"inline","effectiveDirective":"style-src-attr","disposition":"report"}},
 			{"type":"csp-violation","body":{"blockedURL":"trusted-types-policy","effectiveDirective":"trusted-types","disposition":"enforce"}},
-			"not an object",
 			{"type":"csp-violation","body":"not an object"}
 		]`, []domain.CSPViolation{
 			{Directive: "script-src-elem", Disposition: "enforce", BlockedOrigin: "https://cdn.example.com:8443"},
@@ -61,7 +60,11 @@ func TestParseCSPReports(t *testing.T) {
 	for _, bad := range []struct {
 		format domain.CSPReportFormat
 		body   string
-	}{{domain.CSPReportingAPI, `{"type":"csp-violation"}`}, {domain.CSPLegacy, `[]`}, {domain.CSPLegacy, `{"csp-report":1}`}, {domain.CSPReportingAPI, `nope`}} {
+	}{{domain.CSPReportingAPI, `{"type":"csp-violation"}`}, {domain.CSPLegacy, `[]`}, {domain.CSPLegacy, `{"csp-report":1}`}, {domain.CSPReportingAPI, `nope`},
+		// The legacy body is exactly {"csp-report": {...}} (CspReportLegacy has no other member).
+		{domain.CSPLegacy, `{"csp-report":{"blocked-uri":"inline"},"extra":1}`}, {domain.CSPLegacy, `{}`},
+		// Every item of the Reporting API body is an object (CspReportList of the contract).
+		{domain.CSPReportingAPI, `null`}, {domain.CSPLegacy, `null`}, {domain.CSPReportingAPI, `[null]`}, {domain.CSPReportingAPI, `[{"type":"csp-violation"},"not an object"]`}} {
 		if _, err := domain.ParseCSPReports(bad.format, []byte(bad.body)); err == nil {
 			t.Errorf("%s accepted", bad.body)
 		}
