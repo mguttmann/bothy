@@ -952,11 +952,12 @@ func TestCommandAutocompleteTimeout(t *testing.T) {
 	if !ok || e == nil || e.Op != "command.autocomplete_result" || e.Ref != "late-1" || !lateOK(start, e.Code == "gone", e.Code == "not_found") {
 		t.Fatalf("op after the end: %+v", e)
 	}
-	// The connection stays: a new request still reaches it.
+	// The connection stays: a new request still reaches it (the frame arriving is the proof). The
+	// answer may come before or after the short timeout, so both outcomes are accepted.
 	out = w.ask(w.sam, w.allgemein.id, w.ticket, q47)
 	f = w.mustAC(c)
 	sendResult(t, c, f.Payload.RequestID, []any{choice("A", "a")}, "")
-	if r := w.got(out); len(r.choices()) != 1 {
+	if r := w.got(out); r.code != http.StatusOK || len(r.choices()) > 1 {
 		t.Fatalf("after the error frame: %d %s", r.code, r.body)
 	}
 	noViolations(t, c)
