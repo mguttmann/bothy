@@ -23,8 +23,11 @@ type Repository struct {
 	pool *pg.Pool
 }
 
-// Compile-time check: Repository is the outgoing port of app.
-var _ app.Repository = (*Repository)(nil)
+// Compile-time checks: Repository is the outgoing port of app and of bothy restore finalize.
+var (
+	_ app.Repository        = (*Repository)(nil)
+	_ app.RestoreRepository = (*Repository)(nil)
+)
 
 // NewRepository returns the repository over pool; inside a unit of work every statement uses the
 // ambient transaction instead (pg.Querier).
@@ -113,6 +116,9 @@ func toRecord(row sqlcgen.LockInstanceRow) instance.Record {
 	if row.SetupCompletedAt.Valid {
 		rec.SetupCompletedAt = row.SetupCompletedAt.Time.UTC()
 	}
+	if row.PgSystemIdentifier.Valid {
+		rec.DatabaseIdentity = instance.DatabaseIdentity{SystemIdentifier: row.PgSystemIdentifier.String, TimelineID: row.PgTimelineID.Int64}
+	}
 	return rec
 }
 
@@ -126,6 +132,46 @@ func (r *Repository) EnsureInstance(ctx context.Context, instanceID, syncEpoch i
 // SetVersions records the versions unless a larger schema_version is recorded (app.Repository).
 func (r *Repository) SetVersions(ctx context.Context, schemaVersion int64, minServerVersion string) error {
 	return r.queries(ctx).SetVersions(ctx, sqlcgen.SetVersionsParams{SchemaVersion: schemaVersion, MinServerVersion: minServerVersion})
+}
+
+// ClusterIdentity reads the identity of the database cluster (app.Repository).
+func (r *Repository) ClusterIdentity(ctx context.Context) (instance.DatabaseIdentity, error) {
+	row, err := r.queries(ctx).ClusterIdentity(ctx)
+	if err != nil {
+		return instance.DatabaseIdentity{}, err
+	}
+	return instance.DatabaseIdentity{SystemIdentifier: row.SystemIdentifier, TimelineID: row.TimelineID}, nil
+}
+
+// FillIdentity stores id while the identity columns are empty (app.Repository).
+func (r *Repository) FillIdentity(ctx context.Context, id instance.DatabaseIdentity) (bool, error) {
+	n, err := r.queries(ctx).FillIdentity(ctx, sqlcgen.FillIdentityParams{SystemIdentifier: id.SystemIdentifier, TimelineID: id.TimelineID})
+	return n == 1, err
+}
+
+// FinalizeInstance sets the epoch and the identity in the unit of work of ctx
+// (app.RestoreRepository).
+func (r *Repository) FinalizeInstance(ctx context.Context, syncEpoch ids.ID, id instance.DatabaseIdentity) error {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	n, err := sqlcgen.New(tx).FinalizeInstance(ctx, sqlcgen.FinalizeInstanceParams{
+		SyncEpoch: uuid(syncEpoch), SystemIdentifier: id.SystemIdentifier, TimelineID: id.TimelineID,
+	})
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return errs.New(errs.CodeNotFound, `the instance row is missing; run "bothy migrate up"`)
+	}
+	return nil
+}
+
+// OtherSessionsOfRole counts the other sessions of role on this database
+// (app.RestoreRepository).
+func (r *Repository) OtherSessionsOfRole(ctx context.Context, role string) (int64, error) {
+	return r.queries(ctx).OtherSessionsOfRole(ctx, role)
 }
 
 // uuid converts an ID to the pgx type.

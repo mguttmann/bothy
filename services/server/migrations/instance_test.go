@@ -71,6 +71,9 @@ func TestMigration_InstanceTablesMatchSpec(t *testing.T) {
 		{"min_server_version", "text", "YES", ""},
 		{"sync_epoch", "uuid", "NO", ""},
 		{"created_at", "timestamp with time zone", "NO", "now()"},
+		// R-DM-50 (M7-04): added by 00054, so they follow created_at in ordinal order.
+		{"pg_system_identifier", "text", "YES", ""},
+		{"pg_timeline_id", "bigint", "YES", ""},
 	}
 	if got := columns(t, super, "instance"); !slices.Equal(got, wantInstance) {
 		t.Errorf("instance columns\n got %v\nwant %v", got, wantInstance)

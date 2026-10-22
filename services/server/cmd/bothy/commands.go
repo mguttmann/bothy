@@ -79,6 +79,11 @@ var commands = []command{
 		},
 	},
 	{
+		name:    "restore",
+		summary: "Finish a restore or a relocation before api and worker start",
+		run:     restoreCommand,
+	},
+	{
 		name:    "telemetry",
 		summary: "Map a principal id to its telemetry pseudonym for the owner",
 		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {

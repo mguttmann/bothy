@@ -652,6 +652,7 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server | enum(disable, verify-full) | `verify-full` | TLS to the database; in the internal Compose network `disable` (SEC-TLS-5) | active |
 | `database.sslrootcert` | `BOTHY_DATABASE__SSLROOTCERT` | Server | string | empty | CA bundle for `verify-full`; empty uses the system roots | active |
 | `database.max_conns` | `BOTHY_DATABASE__MAX_CONNS` | Server | int | `20` | size of the connection pool per process (start value until the load test) | active |
+| `database.restore_guard` | `BOTHY_DATABASE__RESTORE_GUARD` | Server | enum(on, off) | `on` | `on` or `off`: with `on` a server whose database identity differs from the stored one stays not ready (`restore_not_finalized`) until `bothy restore finalize`; `off` only where a failover loses no committed transaction (8.4, R-DM-50) | active |
 | `migrate.require_recent_backup` | `BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP` | Server | bool | `true` | `migrate` requires a fresh backup | active |
 | `migrate.recent_backup_max_age` | `BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE` | Server | duration | `24h` | how old this backup may be | active |
 | `migrate.lock_timeout` | `BOTHY_MIGRATE__LOCK_TIMEOUT` | Server | duration | `5s` | `lock_timeout` per migration step | active |

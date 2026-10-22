@@ -1,6 +1,6 @@
 # Module `instance`
 
-Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the permission version (`Versions.PermissionVersion`, `app.NewVersions`) for the permission cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot.
+Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the permission version (`Versions.PermissionVersion`, `app.NewVersions`) for the permission cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). M1-63 adds `Versions.EventSeq`, the lock-free read of `event_seq`, the head of catch-up and snapshot. M7-04 adds the database identity of the instance row (R-DM-50), `State.CheckIdentity` for the start lock and the port `Restore` of `bothy restore finalize`.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -11,9 +11,9 @@ Instance identity, sync epoch, minimum server version, settings and branding, fe
 
 | Package | Content |
 |---|---|
-| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`, `FormatWebhookPublicKey`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`); feature flags (`flags.go`): the registry `RegisteredFlags` with `FlagDefinition`, `FlagKind` and the key constants, `Flags`, `FlagSubject`, `SubjectOf`, `EvaluatedFlag`, `FlagAdmin` with `FeatureFlag`, `FlagRollout`, `PutFlagCmd`, the source ports `FlagGroupSource` and `FlagUserSource` |
-| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`), the branding version and changes (`branding.go`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`); the flag rules (`flags.go`: `FlagSpec`, `CheckRegistry`, `Evaluate`, `InRollout`, `Rollout`, `NormalizeRollout`, `ReachedRemoveBy`) |
-| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing ports `SettingsRepository` and `FlagRepository` (`flags.go`: `Admin` also implements `Flags` and `FlagAdmin`; `FlagSpecs`) |
+| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`, `FormatWebhookPublicKey`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`); feature flags (`flags.go`): the registry `RegisteredFlags` with `FlagDefinition`, `FlagKind` and the key constants, `Flags`, `FlagSubject`, `SubjectOf`, `EvaluatedFlag`, `FlagAdmin` with `FeatureFlag`, `FlagRollout`, `PutFlagCmd`, the source ports `FlagGroupSource` and `FlagUserSource`; restore (`restore.go`, M7-04): `DatabaseIdentity`, `IdentityCheck`, `Restore` with `FinalizeRestore`, `RelocationManifest`, `FinalizeResult`, `ErrServerConnected`, `RelocationMismatchError`, the audit actions `ActionRestoreFinalize` and `ActionRelocationFinalize` |
+| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`), the branding version and changes (`branding.go`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`); the flag rules (`flags.go`: `FlagSpec`, `CheckRegistry`, `Evaluate`, `InRollout`, `Rollout`, `NormalizeRollout`, `ReachedRemoveBy`); the start lock and the relocation check (`restore.go`: `Identity`, `IdentityMismatch`, `RelocationFacts`, `RelocationDifference`) |
+| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing ports `SettingsRepository` and `FlagRepository` (`flags.go`: `Admin` also implements `Flags` and `FlagAdmin`; `FlagSpecs`); `NewRestore` (`restore.go`, `RestoreDeps`) with the outgoing ports `RestoreRepository`, `CursorMover` and `AuditHeadSource` |
 | `adapters/postgres/` | `Repository` over `platform/pg` (both outgoing ports), sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
 | `adapters/keystore/` | `Store`: the key store `secrets.signing_key_dir` over the secret provider (Ed25519, PKCS#8 PEM, `Thumbprint` after RFC 7638) |
 | `adapters/httpapi/` | `Keys`: the REST handlers `getJwks` and `rotateSigningKey`; `Admin`: `getDiscovery`, `getInstance`, `listInstanceSettings`, `putInstanceSetting`, `updateBranding`, `getProblemType`, `listFeatureFlags`, `putFeatureFlag` |
@@ -76,6 +76,31 @@ minimum the process keeps running for every role, the readiness check
 `schema_requires_newer_server` fails for good and the log line
 `server version below instance.min_server_version` carries `bothy.version.own` and
 `bothy.version.required`; `/readyz` names only the check. An empty minimum is no lock.
+
+### Restore finalize and the start lock (M7-04)
+
+Migration `00054_instance_restore_identity.sql` adds `pg_system_identifier` (decimal text of
+`pg_control_system().system_identifier`) and `pg_timeline_id` (`pg_control_checkpoint().timeline_id`)
+to the instance row (R-DM-50). `RecordMigration` fills both while they are empty and never changes a
+stored identity or `sync_epoch`. `State.CheckIdentity` compares the stored identity with the current
+one (`domain.IdentityMismatch`: an empty stored identity never mismatches); `internal/wire` runs it
+at start and, unless `database.restore_guard` is `off`, registers the readiness check
+`restore_not_finalized` on a mismatch and starts no log tail, presence tracker (no start rule or
+flush loop), terminal reconcile, River jobs, worker consumers or public listener. PostgreSQL 18 grants `EXECUTE` on both control functions to
+`PUBLIC`, so `bothy_app` reads them without a grant.
+
+`Restore.Finalize` (`app.NewRestore`, `RestoreDeps`) is `bothy restore finalize`, run as the schema
+owner in one unit of work whose registry holds the audit hook: it refuses with
+`ErrServerConnected` while another session of `bothy_app` is connected to the database, locks the
+instance row, reads `head_seq` (`event_seq`) and the current identity, then either sets a new UUIDv7
+epoch and calls the outgoing ports `CursorMover` (agents, apps, sync, passed in by `internal/wire`),
+or, with a `RelocationManifest`, compares head, audit head (outgoing port `AuditHeadSource`) and
+epoch (`domain.RelocationDifference`, `RelocationMismatchError`) and keeps epoch and cursors. It
+stores the identity and records `instance.restore.finalize` or
+`instance.restore.finalize_relocation` (no actor, resource `instance`, details `head_seq`,
+`previous_sync_epoch`, `sync_epoch`, `pg_system_identifier`, `pg_timeline_id`). Any error rolls
+everything back. instance declares `CursorMover` itself, because agents, apps and sync depend on
+instance (02 4.5).
 
 ### Signing keys (`Keys`, M1-32)
 

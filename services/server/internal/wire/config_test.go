@@ -179,6 +179,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"database.sslmode":                      {Kind: config.KindEnum, Default: "verify-full", Enum: []string{"disable", "verify-full"}, Chapter: "16-operations.md"},
 		"database.sslrootcert":                  {Kind: config.KindString, Default: "", Chapter: "16-operations.md"},
 		"database.max_conns":                    {Kind: config.KindInt, Default: "20", Min: "1", Max: "2147483647", Chapter: "16-operations.md"},
+		"database.restore_guard":                {Kind: config.KindEnum, Default: "on", Enum: []string{"on", "off"}, Chapter: "16-operations.md"},
 		"database.acquire_timeout":              {Kind: config.KindDuration, Default: "2s", Min: "1ms", Chapter: "02-architecture.md"},
 		"database.statement_timeout":            {Kind: config.KindDuration, Default: "5s", Min: "1ms", Max: "24d", Chapter: "02-architecture.md"},
 		"database.lock_timeout":                 {Kind: config.KindDuration, Default: "2s", Min: "1ms", Max: "24d", Chapter: "02-architecture.md"},

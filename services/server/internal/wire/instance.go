@@ -103,7 +103,9 @@ const (
 // tickets (setup state, instance_id, sync_epoch) and compares the own version with
 // instance.min_server_version once. Below it the process keeps running but registers the
 // failing readiness check schema_requires_newer_server, so it never becomes ready; the log line
-// names both versions, /readyz only the check. This applies to every role.
+// names both versions, /readyz only the check. This applies to every role. Then it runs the start
+// lock of R-DM-50 (checkRestoreGuard): a database identity that differs from the stored one
+// registers restore_not_finalized the same way.
 func (s *server) loadInstance(ctx context.Context) error {
 	s.mu.Lock()
 	pool := s.pool
@@ -124,6 +126,9 @@ func (s *server) loadInstance(ctx context.Context) error {
 	s.mu.Lock()
 	s.instance = rec
 	s.mu.Unlock()
+	if err := s.checkRestoreGuard(ctx, st); err != nil {
+		return err
+	}
 	if rec.SetupCompleted() {
 		s.logger().InfoContext(ctx, msgInstanceSetupCompleted)
 	} else {

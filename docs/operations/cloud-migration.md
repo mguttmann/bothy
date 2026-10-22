@@ -10,7 +10,14 @@ Mac to Linux VM, VM to cloud, cloud to cloud, container database to managed serv
 A move is a restore without data loss: in maintenance mode the old instance accepts nothing more,
 its last state moves completely. Therefore the sync epoch stays the same, and
 clients continue with their cursor. `instance_id`, token pepper and signing key move along;
-so tokens, devices and invocation tokens stay valid.
+so tokens, devices and invocation tokens stay valid. `bothy restore finalize --relocation` proves
+on the target that nothing was lost (section 3 step 4) before it keeps the epoch.
+
+A move to a managed PostgreSQL service with automatic failover: a failover raises the timeline,
+and the start lock holds the server not ready until `bothy restore finalize` ran
+([disaster-recovery.md](disaster-recovery.md), case G). Set `database.restore_guard = off` only
+where the provider documents that a failover loses no committed transaction; otherwise a failover
+is handled like a restore with a new epoch ([16-operations.md](../spec/16-operations.md) 8.4).
 
 ## 2. Preparation (days before)
 
@@ -63,6 +70,16 @@ so tokens, devices and invocation tokens stay valid.
    emergency revocation after it is missing on the target.
 4. Target: restore of the logical dump and of the objects; compare the manifest (row counts,
    `head_seq`, audit head, file count). A difference means: abort, make the old instance writable again.
+   Then save the manifest of the final backup (`backup_runs.manifest` of that run on the old
+   instance) as `manifest.json` next to the Compose file and run
+   `docker compose run --rm -v ./manifest.json:/tmp/manifest.json:ro migrate restore finalize --relocation /tmp/manifest.json`
+   (the `migrate` container is read-only and sees only its secrets, so the file is mounted): it compares
+   `event_log.head_seq`, `audit.last_seq`, `audit.last_hash` and `sync_epoch` with the restored
+   database and stores the identity of the new cluster, keeping the epoch and every cursor. The
+   target runs on a new cluster, so without this step it stays not ready (`restore_not_finalized`,
+   [16-operations.md](../spec/16-operations.md) 8.4). Exit `1` names the differing field and changes
+   nothing: abort as above, or, if the target must go live with what it has, run
+   `bothy restore finalize` without the option (new epoch, clients reload).
 5. Start the target, restore test by hand, smoke tests ([16-operations.md](../spec/16-operations.md) 11.1).
 6. Repeat on the target the emergency revocations that happened on the old instance after the final
    backup (audit log of the old instance from the noted point in time on).

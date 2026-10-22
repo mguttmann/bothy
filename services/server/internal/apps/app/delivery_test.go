@@ -106,3 +106,6 @@ func TestRedeliverWebhook(t *testing.T) { appsworld.ScenarioRedeliverWebhook(t) 
 
 // TestUpdateWebhookSubscription runs appsworld.ScenarioUpdateWebhookSubscription.
 func TestUpdateWebhookSubscription(t *testing.T) { appsworld.ScenarioUpdateWebhookSubscription(t) }
+
+// TestWebhookCarriesEpoch runs appsworld.ScenarioWebhookCarriesEpochAfterRestore (M7-04).
+func TestWebhookCarriesEpoch(t *testing.T) { appsworld.ScenarioWebhookCarriesEpochAfterRestore(t) }

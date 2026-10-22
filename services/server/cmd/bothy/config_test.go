@@ -302,6 +302,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"database.name = bothy  # default\n" +
 		"database.password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
 		"database.port = 5432  # default\n" +
+		"database.restore_guard = on  # default\n" +
 		"database.sslmode = verify-full  # default\n" +
 		"database.sslrootcert =   # default\n" +
 		"database.statement_timeout = 5s  # default\n" +

@@ -1,7 +1,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- name: LoadInstance :one
-SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at
+SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at,
+       pg_system_identifier, pg_timeline_id
 FROM instance WHERE id = 1;
 
 -- name: EnsureInstance :exec
@@ -20,7 +21,8 @@ WHERE id = 1 AND schema_version <= sqlc.arg(schema_version)::bigint;
 -- name: LockInstance :one
 -- bothy setup (M1-37): the row locked until the end of the unit of work, so two setups serialise.
 -- bothy_app may lock it through its column right UPDATE (setup_completed_at).
-SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at
+SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at,
+       pg_system_identifier, pg_timeline_id
 FROM instance WHERE id = 1 FOR UPDATE;
 
 -- name: CompleteSetup :execrows

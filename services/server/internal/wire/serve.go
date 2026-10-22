@@ -244,6 +244,9 @@ type server struct {
 	keyCheck    time.Duration
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
+	// restorePending is set by the start lock of R-DM-50 (restore_not_finalized, M7-04): the
+	// process then serves and processes nothing, see whileFinalized.
+	restorePending bool
 	// search is the language configuration of full-text search (search.languages,
 	// search.locale_map; M3-13): identity answers the language of new messages and threads with
 	// it, and the step schema checks its configurations against the database.
@@ -475,21 +478,44 @@ func (s *server) components() []lifecycle.Component {
 		step("routes", s.mountRoutes),
 	}
 	if s.api() {
-		cs = append(cs, step("log_tail", s.startLogTail), step("agent_presence", s.startPresence))
+		cs = append(cs, step("log_tail", s.whileFinalized(s.startLogTail)), step("agent_presence", s.whileFinalized(s.startPresence)))
 	}
-	cs = append(cs, step("jobs", s.startJobs))
+	cs = append(cs, step("jobs", s.whileFinalized(s.startJobs)))
 	if s.worker() {
 		// 02 "Start" step 8: the worker consumers start after River (M2-01).
-		cs = append(cs, step("event_consumers", s.startEventConsumers), step("scan_health", s.startScanHealth))
+		cs = append(cs, step("event_consumers", s.whileFinalized(s.startEventConsumers)), step("scan_health", s.startScanHealth))
 	}
 	if s.api() {
-		cs = append(cs, step("public_listener", s.startPublic))
+		cs = append(cs, step("public_listener", s.whileFinalized(s.startPublic)))
 	}
 	if s.plan.Listener {
 		// M2-47: the LISTEN ephemeral connection after the HTTP listeners (soft dependency).
 		cs = append(cs, step("terminal_ephemeral", s.startTerminalEphemeral))
 	}
 	return append(cs, step("ready", s.ready))
+}
+
+// whileFinalized returns start, or a step that starts nothing while the start lock of R-DM-50
+// holds (restore_not_finalized, M7-04): a restored database whose restore was not finalized must
+// neither take writes on the public listener nor deliver from the log tail, River or the worker
+// consumers, because they would mix the old and the new timeline. Only the internal listener
+// stays, so /readyz names the reason; the stop steps handle the parts that never started.
+func (s *server) whileFinalized(start func(ctx context.Context) error) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		if !s.finalized() {
+			return nil
+		}
+		return start(ctx)
+	}
+}
+
+// finalized reports whether the start lock of R-DM-50 is free. Work inside a start step that
+// writes (the terminal reconcile of mountTerminalStreams) asks it, like whileFinalized does for a
+// whole step.
+func (s *server) finalized() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return !s.restorePending
 }
 
 // register adds the components and stop steps in the order Serve documents.
@@ -1373,8 +1399,8 @@ func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserve
 // mountTerminalStreams builds the relay and the two stream routes of the terminal sessions
 // (M2-44) over the module, the control connection, identity's authenticator and nonces and the
 // signing keys, builds the hub of the signals across nodes (M2-47), reconciles the sessions of the
-// previous process (Design note 14, only with cluster.mode single), mounts both routes on mux and
-// registers the stop step of the relay.
+// previous process (Design note 14, only with cluster.mode single, and only while the start lock
+// of R-DM-50 is free), mounts both routes on mux and registers the stop step of the relay.
 func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, log *slog.Logger) error {
 	cfg, err := TerminalStreamsConfigFrom(s.values)
 	if err != nil {
@@ -1398,9 +1424,11 @@ func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *https
 	if err != nil {
 		return err
 	}
-	if !s.plan.Multi {
+	if !s.plan.Multi && s.finalized() {
 		// One node: the slots and connections of the previous process are gone (M2-44 Design
-		// note 14); with several nodes the other nodes still hold theirs.
+		// note 14); with several nodes the other nodes still hold theirs. The reconcile ends and
+		// detaches sessions with audit entries and events, so while the start lock holds it waits
+		// for the next start after bothy restore finalize.
 		if err := tm.Service.Reconcile(ctx); err != nil {
 			return err
 		}

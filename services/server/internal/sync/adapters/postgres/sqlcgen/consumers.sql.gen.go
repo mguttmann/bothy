@@ -119,6 +119,20 @@ func (q *Queries) LockConsumerCursor(ctx context.Context, name string) ([]int64,
 	return items, nil
 }
 
+const moveAllConsumerCursors = `-- name: MoveAllConsumerCursors :execrows
+UPDATE event_consumer_cursors SET last_seq = $1::bigint, updated_at = now()
+`
+
+// bothy restore finalize (M7-04, 03 6.7 item 1): every worker consumer to the head of the
+// restored log, in the caller's transaction.
+func (q *Queries) MoveAllConsumerCursors(ctx context.Context, headSeq int64) (int64, error) {
+	result, err := q.db.Exec(ctx, moveAllConsumerCursors, headSeq)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const oldestEventAfter = `-- name: OldestEventAfter :many
 SELECT occurred_at FROM event_log
 WHERE seq > $1::bigint

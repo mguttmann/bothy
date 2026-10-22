@@ -171,8 +171,16 @@ restore of a production-sized database against `dr.rto_target`.
    `pgbackrest restore` with `--delta` on the volume `pgdata`).
 5. `docker compose start postgres`; PostgreSQL replays WAL up to the target and begins a new
    timeline.
-6. `docker compose run --rm migrate bothy restore finalize`: new `sync_epoch`, cursors of the
-   agents, webhooks and worker consumers to `head_seq`, audit entry (03 section 6.7).
+6. `docker compose run --rm migrate restore finalize` (the entrypoint of the image is `bothy`): new
+   `sync_epoch`, cursors of the agents, webhooks and worker consumers to `head_seq`, audit entry
+   (03 section 6.7). It also stores the identity of the restored database
+   (`instance.pg_system_identifier`, `instance.pg_timeline_id`, R-DM-50), all in one transaction;
+   on an error nothing changes and the command can run again. It refuses with exit `1` while `api`
+   or `worker` is connected (step 1 stopped them). Skipping this step is caught: a server whose
+   database identity differs from the stored one stays not ready with `restore_not_finalized`,
+   serves and delivers nothing and logs this step ([16-operations.md](../spec/16-operations.md) 8.4); the switch
+   `database.restore_guard = off` is only for a managed failover without loss of committed
+   transactions (section 6).
 7. Trigger a restore test against the new state by hand.
 8. `docker compose start api worker`. Clients get `resync_required` with reason
    `epoch_changed` and reload; their outbox is kept.
@@ -184,7 +192,10 @@ restore of a production-sized database against `dr.rto_target`.
    run.
 2. `pg_restore --clean --if-exists --no-owner --role=bothy_owner` from the restic snapshot.
 3. Restore the objects from restic into the volume `files` (or into the bucket).
-4. `bothy restore finalize`, then start and restore test.
+4. `bothy restore finalize`, then start and restore test. The logical restore created a new
+   cluster, so without this step the server stays not ready (`restore_not_finalized`). For a
+   relocation without data loss use `bothy restore finalize --relocation <manifest>` instead
+   ([cloud-migration.md](cloud-migration.md) 3).
 
 ## 6. Managed PostgreSQL service
 
@@ -192,6 +203,14 @@ restore of a production-sized database against `dr.rto_target`.
 2. `bothy-backupd` runs without pgBackRest: logical dump, object backup, manifest,
    restore test (restore of the logical dump into a scratch database in the container).
 3. A PITR at the provider creates a new database instance; after that, 5.2 applies from step 6.
+4. Automatic failover of the provider promotes a standby and raises the timeline, which the start
+   lock treats like a restore (`restore_not_finalized`). Only where the provider documents that a
+   failover loses no committed transaction (synchronous replication) set
+   `database.restore_guard = off`; otherwise run `bothy restore finalize` after a failover, which
+   starts a new epoch, because a lost commit would let new writes reuse sequence numbers clients
+   already hold ([16-operations.md](../spec/16-operations.md) 8.4). Whether a provider shows
+   `pg_control_system()` and `pg_control_checkpoint()` to the application role is not checked;
+   PostgreSQL 18 grants both to `PUBLIC`.
 
 ## 7. Limits
 
