@@ -349,16 +349,6 @@ type File struct {
 	SearchVector       interface{}
 }
 
-type FileThumbnail struct {
-	FileID    pgtype.UUID
-	Variant   string
-	ObjectKey string
-	MimeType  string
-	Width     int32
-	Height    int32
-	SizeBytes int64
-}
-
 type FileUploadPart struct {
 	FileID     pgtype.UUID
 	PartNumber int32
