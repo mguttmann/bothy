@@ -121,7 +121,7 @@ func TestJobRegistryHasChainVerify(t *testing.T) {
 // start of a worker, and a registry without the interval is refused (M2-09).
 func TestWire_JobsAndSubscriptions(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+	m := wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
 		AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: 90 * time.Second}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {

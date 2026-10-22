@@ -33,7 +33,7 @@ func TestWire_TerminalSubscriptionsAndSweep(t *testing.T) {
 	}
 	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: 45 * time.Second, PartitionInterval: time.Minute,
 		CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour,
-		ChainVerifyInterval: time.Hour})
+		ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestWire_TerminalSubscriptionsAndSweep(t *testing.T) {
 		t.Fatalf("%s not periodic every terminal.sweep_interval with RunOnStart: %+v", terminaljobs.KindSweep, reg.Periodic())
 	}
 	if _, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
-		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour}); err == nil {
+		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute}); err == nil {
 		t.Fatal("a registry without terminal.sweep_interval was built")
 	}
 }
