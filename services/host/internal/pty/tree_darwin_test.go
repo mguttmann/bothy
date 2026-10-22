@@ -10,10 +10,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 const isLinux = false
@@ -83,13 +86,29 @@ while :; do sleep 1; done`
 	out := collect(p)
 	re := regexp.MustCompile(`BG:(\d+)`)
 	for {
-		if m := re.FindStringSubmatch(out.text()); m != nil {
+		// The PID is printed only once nohup has replaced itself with sleep: nohup ignores the
+		// hangup before that exec, so a helper killed earlier would take the background process
+		// with it on a slow machine.
+		if m := re.FindStringSubmatch(out.text()); m != nil && commandName(m[1]) == "sleep" {
 			fmt.Printf("TREE %d %s\n", p.PID(), m[1])
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	select {}
+}
+
+// commandName returns the command name of the process pid, empty when it is gone.
+func commandName(pid string) string {
+	n, err := strconv.Atoi(pid)
+	if err != nil {
+		return ""
+	}
+	kp, err := unix.SysctlKinfoProc("kern.proc.pid", n)
+	if err != nil {
+		return ""
+	}
+	return unix.ByteSliceToString(kp.Proc.P_comm[:])
 }
 
 // runFileEntries reads the run file of dir.

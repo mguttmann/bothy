@@ -302,6 +302,9 @@ type rig struct {
 	// startDelay slows every PTY start of the helper.
 	startDelay time.Duration
 	helper     *exec.Cmd
+	// rest keeps, per data connection, the output that followed the last match of readUntil, so
+	// output that arrives in one frame with the match is not lost to the next readUntil.
+	rest map[*sessiontest.Conn]string
 }
 
 type rigOption func(*rig)
@@ -535,7 +538,11 @@ func (r *rig) send(dc *sessiontest.Conn, dev *sessiontest.Device, f frame.Frame)
 // readUntil reads frames of the host until the data seen contains want; it returns the frames.
 func (r *rig) readUntil(dc *sessiontest.Conn, dev *sessiontest.Device, want string) []frame.Frame {
 	r.t.Helper()
-	var seen bytes.Buffer
+	if r.rest == nil {
+		r.rest = map[*sessiontest.Conn]string{}
+	}
+	var seen strings.Builder
+	seen.WriteString(r.rest[dc])
 	var out []frame.Frame
 	for !strings.Contains(seen.String(), want) {
 		m, err := dc.NextBinary(r.ctx)
@@ -549,6 +556,10 @@ func (r *rig) readUntil(dc *sessiontest.Conn, dev *sessiontest.Device, want stri
 		out = append(out, f)
 		seen.Write(f.Data)
 	}
+	// The output after the match stays for the next readUntil on dc: a slow machine delivers the
+	// answers of two commands in one frame.
+	text := seen.String()
+	r.rest[dc] = text[strings.Index(text, want)+len(want):]
 	return out
 }
 
