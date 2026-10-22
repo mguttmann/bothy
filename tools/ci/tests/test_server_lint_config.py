@@ -53,6 +53,9 @@ OTHER = {
     # The scaffold configuration and the generated queries of the Grafana panel plugin (M7-25).
     "plugins/grafana-bothy-live/.config/**",
     "plugins/grafana-bothy-live/src/queries.gen.ts",
+    # The Flutter loader template of the web console, JavaScript only after `flutter build web`
+    # fills its placeholders (docs/DECISIONS.md D-M6-02-13).
+    "apps/console/web/flutter_bootstrap.js",
 }
 # Files whose path looks like generated code. Each one that a lint rule exempts must be one that
 # sonar.exclusions leaves out too: dropping an entry there must narrow the rule.
