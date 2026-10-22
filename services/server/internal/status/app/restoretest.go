@@ -46,6 +46,7 @@ const (
 	reasonRTOExceeded        = "rto_exceeded"
 	codeChecksFailed         = "checks_failed"
 	codeScratchCleanupFailed = "scratch_cleanup_failed"
+	codeCanceled             = "canceled"
 )
 
 // The names of sequence_counters that event_log and audit_events draw from (03 4.1).
@@ -128,15 +129,20 @@ func (s *Service) restoreTest(ctx context.Context) error {
 		b = nil
 	}
 	ok := checks.Passed() && cleared && b != nil
+	// A test stopped with the process (its context ended) is canceled like a backup run: its
+	// failed checks say nothing about the backup, so they raise no alert.
+	canceled := ctx.Err() != nil
 	code := ""
 	switch {
+	case canceled:
+		ok, code = false, codeCanceled
 	case !cleared:
 		code = codeScratchCleanupFailed
 	case !ok:
 		code = codeChecksFailed
 	}
 	finishErr := s.deps.Runs.Finish(fctx, status.FinishedRun{ID: id, Succeeded: ok, SizeBytes: -1, Checks: b, Error: code})
-	s.restoreFinished(fctx, id, checks, ok, code, finishErr == nil, finished.Sub(started))
+	s.restoreFinished(fctx, id, checks, ok, code, finishErr == nil, canceled, finished.Sub(started))
 	switch {
 	case !ok:
 		return fmt.Errorf("status: restore test failed: %s", failedList(checks, code))
@@ -147,7 +153,7 @@ func (s *Service) restoreTest(ctx context.Context) error {
 }
 
 // restoreFinished logs the outcome and records the metrics.
-func (s *Service) restoreFinished(ctx context.Context, id ids.ID, checks domain.RestoreChecks, ok bool, code string, recorded bool, took time.Duration) {
+func (s *Service) restoreFinished(ctx context.Context, id ids.ID, checks domain.RestoreChecks, ok bool, code string, recorded, canceled bool, took time.Duration) {
 	state, level := "succeeded", slog.LevelInfo
 	if !ok || !recorded {
 		state, level = "failed", slog.LevelError
@@ -164,7 +170,7 @@ func (s *Service) restoreFinished(ctx context.Context, id ids.ID, checks domain.
 		return
 	}
 	s.deps.Metrics.RunFinished(ctx, domain.KindRestoreTest, ok, took, 0, s.deps.Clock.Now())
-	if f := checks.Failed(); len(f) > 0 {
+	if f := checks.Failed(); len(f) > 0 && !canceled {
 		s.deps.Metrics.RestoreChecksFailed(ctx, f)
 	}
 }

@@ -29,6 +29,8 @@ type fakeScratch struct {
 	step    time.Duration
 	// restoreTook is added to the clock by Restore, the slow step of a large backup.
 	restoreTook time.Duration
+	// onStart runs when the copy starts, for a stop of the process during a test.
+	onStart func()
 }
 
 func newFakeScratch(clk *clock.Fake) *fakeScratch {
@@ -61,6 +63,9 @@ func (s *fakeScratch) Restore(_ context.Context, label string) error {
 func (s *fakeScratch) Verify(context.Context) error { return s.hit("Verify") }
 
 func (s *fakeScratch) Start(context.Context) (app.ScratchDB, error) {
+	if s.onStart != nil {
+		s.onStart()
+	}
 	if err := s.hit("Start"); err != nil {
 		return nil, err
 	}

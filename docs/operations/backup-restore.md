@@ -138,12 +138,14 @@ to D-M7-03-9):
 5. The sampled objects come from `restic restore latest --tag objects --path <file.fs.root>` with
    one `--include` per object into `<scratch>/objects`; with the driver `s3` the file sample is
    skipped (`objects_driver_s3`).
-6. The server is stopped with `SIGINT` (fast shutdown), after a minute with `SIGKILL`, and the
-   directory is emptied.
+6. The server is stopped with `SIGINT` (fast shutdown), with `SIGKILL` when the fast shutdown
+   does not end in time, and the directory is emptied.
 7. `backup_runs` gets the row `restore_test` (`succeeded`, or `failed` with `checks_failed` or
    `scratch_cleanup_failed`) and the metrics of 16 8.3 "As built" item 5.
 
-By hand: `docker compose exec backup bothy-backupd restore-test` (exit `0` when no check failed).
+By hand: `docker compose exec backup bothy-backupd restore-test` (exit `0` when no check failed),
+outside the time of `backup.restore_test.schedule`: both use the same scratch directory, and only
+one test per process is excluded.
 The result is in the newest row `SELECT state, error, checks FROM backup_runs WHERE kind =
 'restore_test' ORDER BY started_at DESC LIMIT 1`. Not proven by this build: the duration of a
 restore of a production-sized database against `dr.rto_target`.

@@ -158,3 +158,31 @@ func TestRestoreRecordingFailures(t *testing.T) {
 		}
 	})
 }
+
+// TestRestoreCanceledIsNoCheckFailure: a test whose context ends while it runs (bothy-backupd
+// stops) finishes its row with the code canceled, like a canceled backup run, still clears the
+// scratch area and records no failed check in the metrics, so a stop never raises the alert of a
+// failed check.
+func TestRestoreCanceledIsNoCheckFailure(t *testing.T) {
+	t.Parallel()
+	r := newRestoreEnv(t, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r.scratch.db.err["Facts"] = context.Canceled
+	r.scratch.onStart = cancel
+	if err := r.svc.RestoreTest(ctx); err == nil {
+		t.Error("RestoreTest succeeded after its context ended")
+	}
+	rows := r.runs.snapshot()
+	if last := rows[len(rows)-1]; last.kind != status.BackupRestoreTest || last.state != "failed" || last.code != "canceled" {
+		t.Errorf("row %s %s %q, want a failed restore_test with canceled", last.kind, last.state, last.code)
+	}
+	if calls := r.scratch.callList(); calls[len(calls)-1] != "Clear" {
+		t.Errorf("scratch calls %v, want Clear last", calls)
+	}
+	r.m.mu.Lock()
+	defer r.m.mu.Unlock()
+	if len(r.m.failed) != 0 {
+		t.Errorf("failed checks recorded %v, want none", r.m.failed)
+	}
+}
