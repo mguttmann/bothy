@@ -3,7 +3,7 @@
 // Package runstest is test support of the runs module; only tests import it, and the binary
 // exclusion test keeps it out of cmd/bothy.
 //
-// ReferenceVerifier is the reference of the adapter check of docs/spec/09-agenten.md 4.5 "Check in
+// ReferenceVerifier is the reference of the adapter check of docs/spec/09-agents.md 4.5 "Check in
 // the adapter" (M2-06, ruling D-M2-06-9). It stands in for an external adapter: it fetches the
 // public JWKS (getJwks) through a client the caller passes and checks an invocation token with
 // the Go standard library only (encoding/base64 in strict mode, encoding/json, crypto/ed25519),
