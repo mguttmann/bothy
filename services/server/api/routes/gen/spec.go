@@ -42,6 +42,12 @@ var bodyKinds = map[string]bodyKind{
 // mediaJSON is the media type of JSON bodies and answers.
 const mediaJSON = "application/json"
 
+// reportMediaTypes is the only pair of media types one request body may declare: the Reporting
+// API format and the legacy report-uri format of a Content Security Policy violation report
+// (submitCspReport, docs/spec/19-security.md 5 rule 6). Both are JSON; the route table records
+// them as the body kind report.
+var reportMediaTypes = []string{"application/csp-report", "application/reports+json"}
+
 // ifMatch is the If-Match mode of an operation, as rendered into the route table.
 type ifMatch string
 
@@ -61,6 +67,7 @@ const (
 	bodyJSON        bodyKind = "json"
 	bodyMultipart   bodyKind = "multipart"
 	bodyOctetStream bodyKind = "octet-stream"
+	bodyReport      bodyKind = "report"
 )
 
 // opMeta is everything the route table records about one operation under paths. The fields
@@ -451,7 +458,7 @@ func ifMatchMode(required bool) ifMatch {
 }
 
 // requestBody returns the body kind and whether the body is required. A body has exactly one
-// media type of bodyKinds.
+// media type of bodyKinds, or exactly the pair reportMediaTypes (body kind report).
 func (w *specWalk) requestBody(at string, body *openapi3.RequestBodyRef) (bodyKind, bool) {
 	if body == nil {
 		return bodyNone, false
@@ -461,6 +468,9 @@ func (w *specWalk) requestBody(at string, body *openapi3.RequestBodyRef) (bodyKi
 		return bodyNone, false
 	}
 	types := slices.Sorted(maps.Keys(body.Value.Content))
+	if slices.Equal(types, reportMediaTypes) {
+		return bodyReport, body.Value.Required
+	}
 	if len(types) != 1 {
 		w.p.add(at, "request body declares %d media types; the route table supports exactly one media type", len(types))
 		return bodyNone, body.Value.Required

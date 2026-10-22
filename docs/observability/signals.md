@@ -58,6 +58,7 @@ processes or to detect a missing one (M1-68).
 | `bothy.authz.decisions` | Counter | `{decision}` | `bothy.action`, `bothy.decision` | api: decisions for requests and ops; filters at delivery and in lists (07 section 4.2) do not count, otherwise delivery would mask every other number | `bothy_authz_decisions_total` |
 | `bothy.authz.errors` | Counter | `{check}` | `bothy.reason` (`unknown_action`, `authz_not_checked`, `filter_mismatch`) | api: program errors of the permission check ([02-architecture.md](../spec/02-architecture.md) 9.3, 07 section 4.2); `filter_mismatch`: an element passed the SQL filter of a list but not `authorize` and was discarded (07 section 7.4, rule 3) | `bothy_authz_errors_total` |
 | `bothy.ratelimit.rejected` | Counter | `{request}` | `bothy.ratelimit.class` | api | `bothy_ratelimit_rejected_total` |
+| `bothy.console.csp_violations` | Counter | `{report}` | `bothy.csp.directive`, `bothy.csp.disposition` | api: one per violation report that `submitCspReport` accepted ([19-security.md](../spec/19-security.md) 5 rule 6, M6-03); within `rl.public_auth` | `bothy_console_csp_violations_total` |
 | `bothy.gateway.connections.active` | UpDownCounter | `{connection}` | `bothy.principal.kind` | api | `bothy_gateway_connections_active` |
 | `bothy.gateway.connect.duration` | Histogram | `s` | `bothy.outcome` (`ok`, `client_error`, `server_error`), `bothy.principal.kind` | api: upgrade until `ready` or `resumed` | `bothy_gateway_connect_duration_seconds` |
 | `bothy.gateway.catchup.duration` | Histogram | `s` | `bothy.outcome` (`complete`, `resync_required`) | api: `ready`/`resumed` until `catchup.complete` | `bothy_gateway_catchup_duration_seconds` |
@@ -274,6 +275,9 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.close.code` | close code from [04-sync-protocol.md](../spec/04-sync-protocol.md) 6.4 | |
 | `bothy.consumer.name` | `push`, `webhooks` | name of the worker consumer ([03-data-model.md](../spec/03-data-model.md) `event_consumer_cursors`) |
 | `bothy.correlation_id` | UUID | only in logs; in spans it is the trace ID |
+| `bothy.csp.blocked_origin` | origin (scheme, host, port) of the blocked URL of a CSP violation report, or one of `inline`, `eval`, `wasm-eval`, `data`, `blob`, `trusted-types-policy`, `trusted-types-sink`, `other`; never a path, a query or the document URL | only in the log `csp violation reported`, never on metrics (M6-03) |
+| `bothy.csp.directive` | effective directive of a CSP violation report of the console from the fixed list of the handler (`script-src-elem`, `style-src-elem`, `trusted-types`, ...), else `other` | log `csp violation reported` (info) of `submitCspReport` and the metric `bothy.console.csp_violations` (M6-03) |
+| `bothy.csp.disposition` | `enforce`, `report`, `other` | like `bothy.csp.directive` |
 | `bothy.decision` | decision from [05-actions.md](../spec/05-actions.md) 2.5 | |
 | `bothy.egress.purpose` | purpose of an egress client from the code (`oidc`, `webhook`, ...) | only in logs of rejected connections ([19-security.md](../spec/19-security.md) SEC-NET-5) |
 | `bothy.event.durability` | `durable`, `ephemeral` | |

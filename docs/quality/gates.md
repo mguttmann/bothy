@@ -75,6 +75,7 @@ builds of server and host service).
 | `test (server)` (all shards, `test (server coverage)` and `test (server contract)`), `test (apps)`, `test (SDKs and plugins)` | their component in the component map (`server`; `apps`; `sdk-python`, `sdk-typescript` or `plugins`) |
 | `apps (macOS)`, `apps (Windows)`, `apps (Android API 26)`, `apps (Android API 36)` | `apps/`, `packages/` (with the native code of the members), the root `pubspec.yaml` (Flutter pin) or `pubspec.lock`; the Android jobs only in the public phase. Other inputs of the component `apps` (`design/`, the SLO generator, `analysis_options.yaml`, `tools/arch-check/`) feed the Dart gates and committed generated files under `packages/`, which `test (apps)` checks |
 | `postgres-image (amd64)`, `postgres-image (arm64)` | what `bothy-postgres` is built and tested from: `services/server/images/bothy-postgres/`, `internal/`, `cmd/bothy-backupd/`, `migrations/`, `migrations.sha256`, `test/postgresimage/`, `go.mod`, `go.sum`, `VERSION` and `.golangci.yml` under `services/server/` |
+| `console-e2e` | the build context of the server image (`services/server/Dockerfile.dockerignore`: `api/`, `cmd/`, `internal/`, `migrations/`, `test/smoke/`, `go.mod`, `go.sum`, `VERSION` and the Dockerfile under `services/server/`; `apps/console/`, `packages/`, the root `pubspec.yaml`, `pubspec.lock` and `analysis_options.yaml`) or the Compose stack of the test (`infra/compose/compose.yaml`, `compose.smoke.yaml`, `compose.console-e2e.yaml`, `smoke.env`, `console-e2e.env` and `console-e2e/` under `infra/compose/test/`) |
 
 Every job runs on a push to `main`, on a manual run, for an empty diff and when a shared input
 changes: every path the component map does not know (among them the `Makefile`, `.github/`, the
@@ -420,6 +421,7 @@ or the pre-push hook:
 | `perf` | load tests of the performance targets of 02 and the chaos tests of the event path, on `perf.reference_profile` (section above, ADR 0063) | end of a milestone, release, tickets that touch a performance target (PLAN P-07) |
 | `portability` | the whole stack from images on a fresh machine plus the smoke test (`infra/compose/smoke.sh`) | release workflow |
 | `tofu-vm-test` | the OpenTofu module `generic-vm` on a local VM: the product trial, a pinned Ubuntu cloud image in QEMU (KVM, HVF or TCG) with the rendered user data, the smoke probe against the stack, a second delivery over SSH that changes nothing, a wrong checksum and a wrong signature that stop the setup ([infra/tofu/test/generic-vm/README.md](../../infra/tofu/test/generic-vm/README.md)); needs QEMU on the build host and refuses to run under GitHub Actions (D-W-127) | build host, tickets that change `infra/tofu/modules/generic-vm` or the bundle |
+| `console-e2e` | SEC-T05: the web console of the server image under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (`tools/console-e2e`, M6-03) | CI job `console-e2e` of `ci.yml` and `build-verify.yml` when the plan lists it ("Jobs a change needs"), feeding `ci-ok` |
 
 ## Migrations
 

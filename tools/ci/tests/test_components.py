@@ -241,6 +241,7 @@ POSTGRES = {"postgres-image-amd64", "postgres-image-arm64"}
 DESKTOP = {"apps-macos", "apps-windows"}
 ANDROID = {"apps-android-26", "apps-android-36"}
 PLATFORM = DESKTOP | ANDROID
+CONSOLE = {"console-e2e"}
 EVERY_JOB = set(components.CONDITIONAL_JOBS)
 
 
@@ -248,30 +249,37 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
     ("files", "expected"),
     [
         # Server code inside the build context of bothy-postgres runs the image jobs.
-        (["services/server/internal/chat/x.go"], TESTS_SERVER | POSTGRES),
-        (["services/server/cmd/bothy-backupd/main.go"], TESTS_SERVER | POSTGRES),
+        (["services/server/internal/chat/x.go"], TESTS_SERVER | POSTGRES | CONSOLE),
+        (["services/server/cmd/bothy-backupd/main.go"], TESTS_SERVER | POSTGRES | CONSOLE),
         (["services/server/images/bothy-postgres/Dockerfile"], TESTS_SERVER | POSTGRES),
         (["services/server/images/bothy-postgres/entrypoint.sh"], TESTS_SERVER | POSTGRES),
         (["services/server/test/postgresimage/postgresimage_test.go"], TESTS_SERVER | POSTGRES),
-        (["services/server/migrations/00099_x.sql"], TESTS_SERVER | POSTGRES),
-        (["services/server/go.mod"], TESTS_SERVER | POSTGRES),
-        (["services/server/VERSION"], TESTS_SERVER | POSTGRES),
+        (["services/server/migrations/00099_x.sql"], TESTS_SERVER | POSTGRES | CONSOLE),
+        (["services/server/go.mod"], TESTS_SERVER | POSTGRES | CONSOLE),
+        (["services/server/VERSION"], TESTS_SERVER | POSTGRES | CONSOLE),
+        # The console test runs for the build context of the server image and the Compose
+        # stack of the test (M6-03), not for other server or app files.
+        (["apps/console/lib/main.dart"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["services/server/test/smoke/seed.go"], TESTS_SERVER | CONSOLE),
+        (["services/server/Dockerfile"], TESTS_SERVER | CONSOLE),
+        (["infra/compose/test/compose.console-e2e.yaml"], CONSOLE),
+        (["tools/console-e2e/console_e2e.py"], EVERY_JOB),
         # Server code outside it does not.
-        (["services/server/api/rest/handler.go"], TESTS_SERVER),
-        (["services/server/cmd/bothy/main.go"], TESTS_SERVER),
+        (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE),
+        (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE),
         (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER),
         (["services/host/internal/noise/noise.go"], TESTS_SERVER),
         (["docs/spec/actions.yaml"], TESTS_SERVER),
         # Members of the Dart workspace (with their native code) and its root files run the
         # platform jobs; inputs of generated Dart files that are committed under packages/ do not.
         (["apps/client/lib/main.dart"], {"test-apps"} | PLATFORM),
-        (["packages/device_key/darwin/Sources/core.swift"], {"test-apps"} | PLATFORM),
-        (["packages/device_key/android/core/src/main/x.kt"], {"test-apps"} | PLATFORM),
-        (["packages/device_key/windows/core/core.cpp"], {"test-apps"} | PLATFORM),
+        (["packages/device_key/darwin/Sources/core.swift"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["packages/device_key/android/core/src/main/x.kt"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["packages/device_key/windows/core/core.cpp"], {"test-apps"} | PLATFORM | CONSOLE),
         (["apps/client/platform-tests.json"], {"test-apps"} | PLATFORM),
-        (["pubspec.yaml"], {"test-apps"} | PLATFORM),
-        (["pubspec.lock"], {"test-apps"} | PLATFORM),
-        (["analysis_options.yaml"], {"test-apps"}),
+        (["pubspec.yaml"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["pubspec.lock"], {"test-apps"} | PLATFORM | CONSOLE),
+        (["analysis_options.yaml"], {"test-apps"} | CONSOLE),
         (["design/tokens/color.json"], {"test-apps"}),
         (["tools/arch-check/rules.yaml"], {"test-apps"}),
         (["services/host/testdata/noise/recordings/go.json"], {"test-apps", "test-server"}),
@@ -285,8 +293,8 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["docs/spec/07-permissions.md"], set()),
         (["README.md", "infra/compose/secrets.yaml"], set()),
         # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
-        (["README.md", "infra/compose/compose.yaml"], {"test-sdk-plugins"}),
-        (["services/server/internal/x.go", "docs/DECISIONS.md"], TESTS_SERVER | POSTGRES),
+        (["README.md", "infra/compose/compose.yaml"], {"test-sdk-plugins"} | CONSOLE),
+        (["services/server/internal/x.go", "docs/DECISIONS.md"], TESTS_SERVER | POSTGRES | CONSOLE),
         # Shared inputs run every job: the API contract, the Makefile, tools, workflows, root
         # files outside the component map, and an empty or unknown diff.
         (["docs/api/openapi.yaml"], EVERY_JOB),
@@ -333,8 +341,8 @@ def test_ci_plan_leaves_android_out_while_the_repository_is_private() -> None:
         # A push to main, a manual run and the release gate of the product: every job.
         ("all", EVERY_JOB),
         # The release gate of one component (release.yml): its jobs.
-        ("server", TESTS_SERVER | POSTGRES),
-        ("apps", {"test-apps"} | PLATFORM),
+        ("server", TESTS_SERVER | POSTGRES | CONSOLE),
+        ("apps", {"test-apps"} | PLATFORM | CONSOLE),
         ("plugins", {"test-sdk-plugins"}),
         ("sdk-python", {"test-sdk-plugins"}),
     ],

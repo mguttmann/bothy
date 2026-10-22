@@ -103,9 +103,10 @@ const (
 	BodyJSON                        // application/json
 	BodyMultipart                   // multipart/form-data
 	BodyOctetStream                 // application/octet-stream
+	BodyReport                      // application/reports+json or application/csp-report (CSP violation reports)
 )
 
-// String returns the kind as a short name: none, json, multipart, octet-stream.
+// String returns the kind as a short name: none, json, multipart, octet-stream, report.
 func (k BodyKind) String() string {
 	switch k {
 	case BodyNone:
@@ -116,6 +117,8 @@ func (k BodyKind) String() string {
 		return "multipart"
 	case BodyOctetStream:
 		return "octet-stream"
+	case BodyReport:
+		return "report"
 	}
 	return fmt.Sprintf("BodyKind(%d)", int(k))
 }
@@ -131,7 +134,7 @@ type Operation struct {
 	Public         bool        // operation-level security: []
 	IdempotencyKey bool        // declares the header Idempotency-Key (#/components/parameters/IdempotencyKey)
 	IfMatch        IfMatchMode // IfMatchNone, IfMatchOptional, IfMatchRequired (header If-Match)
-	RequestBody    BodyKind    // BodyNone, BodyJSON, BodyMultipart, BodyOctetStream
+	RequestBody    BodyKind    // BodyNone, BodyJSON, BodyMultipart, BodyOctetStream, BodyReport
 	BodyRequired   bool        // requestBody.required
 	ETagStatuses   []int       // 2xx statuses whose response declares the ETag header
 	Download       bool        // a 2xx response streams a body that is not JSON (route class of downloads)

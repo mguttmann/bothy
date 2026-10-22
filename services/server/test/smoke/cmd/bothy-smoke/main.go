@@ -9,17 +9,20 @@
 //	bothy-smoke precheck [--base-url URL] [--public-url URL]
 //	bothy-smoke run      [--base-url URL] [--public-url URL] [--out DIR]
 //	bothy-smoke scan     [--in DIR]
+//	bothy-smoke seed     [--base-url URL] [--public-url URL] [--out DIR]
 //
 // precheck proves the setup lock before the bootstrap; run reads DIR/setup.out, drives the
 // scenario and writes DIR/canaries.txt (mode 0600); scan reads IN/out/canaries.txt and scans every
 // file below IN/otel and IN/logs, then checks that the collector export is not empty. The
 // environment provides SMOKE_PUBLIC_URL (default of --public-url) and SMOKE_CANARY (run only).
 // Steps are logged as "ok <step>" on stderr; no value is ever printed. Exit codes: 0 pass, 1 a
-// check failed, 2 usage.
+// check failed, 2 usage. seed prepares the console test of M6-03 instead of the scenario: it reads
+// DIR/setup.out, gives the owner a password with TOTP and writes DIR/console-login.json (mode 0600).
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -56,7 +59,7 @@ func getenv(name string) string {
 // run executes one subcommand and returns the exit code.
 func run(args []string, stderr io.Writer) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(stderr, "usage: bothy-smoke precheck|run|scan [flags]")
+		_, _ = fmt.Fprintln(stderr, "usage: bothy-smoke precheck|run|scan|seed [flags]")
 		return 2
 	}
 	fs := flag.NewFlagSet("bothy-smoke "+args[0], flag.ContinueOnError)
@@ -76,6 +79,8 @@ func run(args []string, stderr io.Writer) int {
 		err = scenario(*baseURL, *publicURL, *out, stderr)
 	case "scan":
 		err = scan(*in, stderr)
+	case "seed":
+		err = seed(*baseURL, *publicURL, *out)
 	default:
 		_, _ = fmt.Fprintf(stderr, "bothy-smoke: unknown subcommand %q\n", args[0])
 		return 2
@@ -143,4 +148,27 @@ func scan(in string, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintln(stderr, "ok telemetry present")
 	return nil
+}
+
+// seed runs smoke.Seed and writes the login of the console test; the file is never printed.
+func seed(baseURL, publicURL, out string) error {
+	setupOut, err := os.ReadFile(filepath.Join(out, "setup.out")) // #nosec G304 G703 -- the output directory of the run, a flag of the harness
+	if err != nil {
+		return errors.New("cannot read setup.out")
+	}
+	api, err := smoke.NewHTTPClient(baseURL, publicURL)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), precheckTimeout)
+	defer cancel()
+	login, err := smoke.Seed(ctx, api, setupOut)
+	if err != nil {
+		return err
+	}
+	b, err := json.Marshal(login) // #nosec G117 -- the login of the test seed, written with mode 0600 and never printed
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(out, "console-login.json"), b, 0o600) // #nosec G703 -- the output directory of the run
 }

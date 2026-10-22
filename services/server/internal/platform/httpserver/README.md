@@ -44,6 +44,17 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   `server.public_url` (`SameOrigin`), else `403 forbidden` with reason `csrf_check_failed`
   (`ReasonCSRFCheckFailed`), logged with the reason only. Requests with an `Authorization` header
   are not checked. `httpservertest.Actors.SetCookie` and `LogCapture.Contains` serve the tests.
+  The action `console.csp_report` (`ActionCSPReport`) is not checked: a browser sends a violation
+  report with the cookie but never with the CSRF header, and the report changes nothing (M6-03).
+- Console CSP (M6-03, `csp.go`): `ContentSecurityPolicy(nonce)` builds the policy of
+  `docs/spec/19-security.md` 5 with `TrustedTypesPolicies` (the names SEC-T05 observes), `NewNonce`
+  returns 128 random bits in base64, and `ConsoleAssets` sets the policy with a fresh nonce, COOP,
+  COEP, CORP, `X-Frame-Options`, `Permissions-Policy` and `Reporting-Endpoints` (`CSPReportPath`) on
+  every response of the console mount. `OpenConsoleAssets` reads `index.html` once and refuses one
+  without `NoncePlaceholder`; each answer of index.html carries the nonce of its CSP, no ETag.
+- Body kind `BodyReport` (M6-03): `application/reports+json` or `application/csp-report`, read
+  whole under `http.max_json_body_bytes` and the JSON guard, available as `RawJSONBody`; the
+  request validator checks no schema for it.
 - `Operation.AuthorizedInBand`: the one route that authenticates and authorizes on the connection
   it opens (`GET /api/v1/gateway`, M1-64); `Chain.Wrap` runs no per-route stage for it, only the
   outer steps 1 to 4, and puts the operation into the context.

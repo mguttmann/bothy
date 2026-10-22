@@ -37,7 +37,7 @@ Privacy: [20-privacy.md](20-privacy.md). Dev isolation:
 |---|---|---|
 | SEC-HDR-1 | all | `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security` (SEC-TLS-3), no version information in `Server` |
 | SEC-HDR-2 | API (JSON) | `Cache-Control: no-store`, `Cross-Origin-Resource-Policy: same-origin`, `Content-Type: application/json` or `application/problem+json` |
-| SEC-HDR-3 | console (HTML and assets) | CSP according to section 5, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()` |
+| SEC-HDR-3 | console (HTML and assets) | CSP according to section 5, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`; also `Cross-Origin-Resource-Policy: same-origin` (no other origin may embed a console asset) and `Reporting-Endpoints: csp="/api/v1/csp-reports"` (M6-03) |
 | SEC-HDR-4 | file retrieval | `Content-Disposition: attachment` with `filename*` (RFC 6266), except for the inline list from [12-files.md](12-files.md), section 9.3; `Content-Security-Policy: default-src 'none'; sandbox`; `Cache-Control` according to 12, section 9.3 (always `private`, `no-store` with a ticket) |
 
 COOP and COEP make the console "cross-origin isolated". Flutter needs this for multi-threaded
@@ -75,9 +75,15 @@ Content-Security-Policy:
   frame-ancestors 'none';
   object-src 'none';
   require-trusted-types-for 'script';
-  trusted-types <policy names of the Flutter loader and the engine>;
+  trusted-types flutter-js;
   report-to csp
 ```
+
+`Reporting-Endpoints: csp="/api/v1/csp-reports"` names the endpoint of `report-to csp`. The CSP
+stands on every response below `/console/` (index.html, assets, SPA fallback, redirect and 404 of
+the console mount), never on `/api/` (SEC-HDR-2). `index.html` has no `<base>` element, because
+`base-uri 'none'` blocks it; the loader derives every URL from the URL of its own script
+(docs/decisions.d/M6-03.md D-M6-03-2).
 
 Rules:
 
@@ -91,13 +97,24 @@ Rules:
 3. `'wasm-unsafe-eval'` is needed because the renderer compiles WebAssembly [derived]. No
    `'unsafe-eval'`, no `'unsafe-inline'` for scripts.
 4. The names of the Trusted Types policies of the Flutter loader and the engine are not confirmed
-   by primary sources [assumed: `flutter-js`, `flutter-engine`]. The test SEC-T05 loads the
-   console in a headless browser with an enforced CSP and fails on every violation; the
-   list in the repo follows this test, not this documentation.
-5. In current browsers, `connect-src 'self'` covers the WebSocket to the same host [assumed];
-   SEC-T05 checks that too. If it fails, `wss://<host>` is added.
+   by primary sources. The test SEC-T05 loads the console in a headless browser with an enforced
+   CSP and fails on every violation; the list in the repo follows this test, not this
+   documentation. Observed (M6-03, CanvasKit build, Chromium 156, Firefox 157, WebKit 27.2):
+   exactly `flutter-js`, the policy of the loader for the script URLs it injects; the engine
+   creates none [verified by SEC-T05]. The one list is `TrustedTypesPolicies` in
+   `services/server/internal/platform/httpserver/csp.go`.
+5. In current browsers, `connect-src 'self'` covers the WebSocket to the same host; SEC-T05 checks
+   that too. If it fails, `wss://<host>` is added. Observed (M6-03): `connect-src 'self'` covers
+   `wss://` to the own origin in Chromium, Firefox and WebKit; no `wss://<host>` is needed
+   [verified by SEC-T05].
 6. Violations go to an endpoint of the instance (`report-to`), with a rate limit and without content
-   in the log.
+   in the log. The endpoint is `submitCspReport` (`POST /api/v1/csp-reports`, R-AZ-33,
+   `rl.public_auth`): Reporting API format and legacy `report-uri` format,
+   `http.max_json_body_bytes`, no storage; the log carries only the effective directive, the
+   disposition and the origin of the blocked URL (or a keyword such as `inline`), the metric
+   `bothy.console.csp_violations` counts the reports. Identical violations of one request share
+   one log record, and one request writes at most `console.csp_report_max_records` records, so
+   abuse within the rate limit raises a counter, not the log volume.
 7. `frame-src` is in the CSP only if `console.grafana_embed_url` is set, and names exactly
    its origin (`frame-src https://grafana.example.com`); otherwise `default-src 'none'` blocks every
    iframe. The embedding is optional and off by default; its conditions (auth proxy,
@@ -321,7 +338,7 @@ Format of the checkpoints (03, `audit_checkpoints`):
 | SEC-T02 | Lint: no `InsecureSkipVerify`, no `http.DefaultClient`, no raw SQL | SEC-TLS-4, SEC-NET-1, SEC-IN-5 |
 | SEC-T03 | Headers of every response kind against an expected list (API, console, file, error) | SEC-HDR-1 to 4 |
 | SEC-T04 | CORS: no `Access-Control-Allow-*` except at the public endpoints; WebSocket with a foreign `Origin` rejected | SEC-CORS-1 to 4 |
-| SEC-T05 | Console in a headless browser with an enforced CSP: zero violations, no fetch from a foreign origin, WebSocket works | Section 5 |
+| SEC-T05 | Console in a headless browser with an enforced CSP: zero violations, no fetch from a foreign origin, WebSocket works. `make console-e2e` (`tools/console-e2e`, M6-03): Chromium with the full flow (password and passkey step-up, negative test with a report), Firefox and WebKit as smoke test; CI job `console-e2e` on every change of `apps` or `server` | Section 5 |
 | SEC-T06 | Schema fuzzing of all routes: no `5xx` except expected ones, no acceptance of unknown fields, duplicate JSON keys rejected | SEC-IN-1, SEC-IN-2 |
 | SEC-T07 | Bidi and control characters in display names rejected | SEC-IN-4 |
 | SEC-T08 | Uploads: wrong type declaration, SVG with a script, decompression bomb, size over the limit, scanner not ready, infected test file (EICAR) | SEC-UP-1 to 7 |

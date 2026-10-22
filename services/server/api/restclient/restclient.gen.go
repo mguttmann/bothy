@@ -7927,6 +7927,15 @@ type CredentialOverview struct {
 	TotpEnrolled     bool       `json:"totp_enrolled"`
 }
 
+// CspReportLegacy Legacy report of the `report-uri` directive (CSP Level 2). The server reads only `effective-directive` (else `violated-directive`), `blocked-uri` and `disposition` of `csp-report`.
+type CspReportLegacy struct {
+	// CspReport Free-form JSON object whose schema is named in the field description.
+	CspReport JsonObject `json:"csp-report"`
+}
+
+// CspReportList Reports of the Reporting API (https://www.w3.org/TR/reporting-1/); each item is a report object whose `body` is a CSP violation report (https://www.w3.org/TR/CSP3/#reporting). The server reads only `type`, `body.effectiveDirective`, `body.blockedURL` and `body.disposition`.
+type CspReportList = []JsonObject
+
 // Cursor Opaque pagination cursor. Clients must not parse or build cursors.
 //
 // Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
@@ -17955,6 +17964,9 @@ type ReconcileCostsJSONRequestBody = CostReconcile
 // SubmitCostReconciliationJSONRequestBody defines body for SubmitCostReconciliation for application/json ContentType.
 type SubmitCostReconciliationJSONRequestBody = CostReconcile
 
+// SubmitCspReportApplicationReportsPlusJSONRequestBody defines body for SubmitCspReport for application/reports+json ContentType.
+type SubmitCspReportApplicationReportsPlusJSONRequestBody = CspReportList
+
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove
 
@@ -21475,6 +21487,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
 	SubmitCostReconciliation(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCspReportWithBody Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SubmitCspReportWithApplicationReportsPlusJSONBody Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes a body of the `application/reports+json` content type.
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithApplicationReportsPlusJSONBody(ctx context.Context, body SubmitCspReportApplicationReportsPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDevice Read a device
 	//
@@ -25646,76 +25676,6 @@ func (c *Client) MoveChannelWithBody(ctx context.Context, channelId ChannelIdPat
 // Corresponds with POST /channels/{channel_id}/move (the `MoveChannel` operationId).
 func (c *Client) MoveChannel(ctx context.Context, channelId ChannelIdPath, params *MoveChannelParams, body MoveChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveChannelRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetChannelOperatorWithBody Set or inherit the operator of a channel
-//
-// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
-func (c *Client) SetChannelOperatorWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetChannelOperatorRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetChannelOperator Set or inherit the operator of a channel
-//
-// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
-func (c *Client) SetChannelOperator(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, body SetChannelOperatorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetChannelOperatorRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// DeleteProjectBinding Remove the project binding
-//
-// Corresponds with DELETE /channels/{channel_id}/project-binding (the `DeleteProjectBinding` operationId).
-func (c *Client) DeleteProjectBinding(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteProjectBindingRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// PutProjectBindingWithBody Bind a forum to a project
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
-func (c *Client) PutProjectBindingWithBody(ctx context.Context, channelId ChannelIdPath, params *PutProjectBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutProjectBindingRequestWithBody(c.Server, channelId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

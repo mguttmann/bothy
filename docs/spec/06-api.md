@@ -65,7 +65,7 @@ readiness are not part of the public API; they are on the internal listener
 | Money | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
 | No `null` | The server never sends JSON `null`. If a field is missing, it has no value. Clients treat a received `null` like a missing field. Values are removed through their own fields or modes (for example `use_global_order: true`, `OperatorSet.mode = none`), never through `null`. | dart-dio does not know the null type [verified, Q4]; one way for all generators (R-API-03, [ADR 0053](../adr/0053-no-json-null-in-api-and-events.md)). |
 | Unknown values | Clients ignore unknown fields, enum values, event types and problem codes. The server rejects unknown fields in requests and gateway frames (`400 validation_failed` or close code `4002`, respectively); writing schemas have `additionalProperties: false` ([19-security.md](19-security.md), SEC-IN-1; PLAN W7). A client sees from `features` in the discovery whether a server knows a new field. | A silently discarded field swallows an intent on an older server; responses and events stay additive (section 13). |
-| Media types | JSON as `application/json` (UTF-8); errors as `application/problem+json`; file parts as `application/octet-stream`; images for avatar and logo as `multipart/form-data` (part `file`); exports as `application/x-ndjson`. | One format per purpose; NDJSON lets large exports stream. |
+| Media types | JSON as `application/json` (UTF-8); errors as `application/problem+json`; file parts as `application/octet-stream`; images for avatar and logo as `multipart/form-data` (part `file`); exports as `application/x-ndjson`. CSP violation reports of the web console (`submitCspReport`, M6-03) as `application/reports+json` (Reporting API) or `application/csp-report` (legacy `report-uri`), both JSON under `http.max_json_body_bytes` and the JSON guard; the only operation with two request media types. | One format per purpose; NDJSON lets large exports stream. |
 | Size | JSON bodies up to `http.max_json_body_bytes`, nesting up to `http.max_json_depth` ([02-architecture.md](02-architecture.md)), otherwise `413 payload_too_large` or `400 malformed_request`, respectively. `http.max_json_body_bytes` is strictly larger than `message.max_content_bytes`. | Protection against memory pressure without preventing long messages. |
 | Caching | Authenticated JSON responses carry `Cache-Control: no-store`. File contents carry `Cache-Control: private, immutable`, because the content of a file ID never changes. | No content in third-party caches; the client deletes on `access.changed` itself (04, 8.3). |
 | Correlation | Every response carries `Correlation-Id`: the trace ID of the request written as a UUID (schema `CorrelationId`, not a UUIDv7). The same value appears in problems, events (`correlation_id`) and in the audit. The server generates it; it ignores a sent `Correlation-Id`, and it takes over an incoming `traceparent` only as a span link, not as the parent trace ([17-observability.md](17-observability.md), section 3). | A forgeable client value would falsify audit trails. |
@@ -406,6 +406,7 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `createInteraction` | POST | `/api/v1/components/{component_id}/interactions` | client ID in the body (table above) |
 | `applyImportBatch` | POST | `/api/v1/imports/{import_id}/batches` | origin key of the import ([22-import-migration.md](22-import-migration.md)) |
 | `createImportFile` | POST | `/api/v1/imports/{import_id}/files` | origin key of the import ([22-import-migration.md](22-import-migration.md)) |
+| `submitCspReport` | POST | `/api/v1/csp-reports` | anonymous measurements; a retry counts a sample twice |
 | `submitClientMetrics` | POST | `/api/v1/client-metrics` | anonymous measurements; a retry counts a sample twice |
 <!-- END GENERATED: idempotency_exempt -->
 
@@ -703,6 +704,7 @@ Generated from openapi.yaml.
 | GET | `/api/v1/instance/webhook-keys` | `getWebhookKeys` | `instance.discovery.read` | Public keys for webhook signatures |
 | GET | `/api/v1/instance/branding/logo` | `getBrandingLogo` | `instance.discovery.read` | Download the instance logo |
 | GET | `/api/v1/problems/{code}` | `getProblemType` | `instance.discovery.read` | Documentation of a problem type |
+| POST | `/api/v1/csp-reports` | `submitCspReport` | `console.csp_report` | Accept a CSP violation report of the web console |
 
 #### Auth
 

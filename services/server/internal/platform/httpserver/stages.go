@@ -241,10 +241,10 @@ func (c *Chain) checkBody(r *http.Request, op Operation) ([]byte, error) {
 		return nil, errs.New(errs.CodeUnsupportedMediaType, detailUnexpectedBody)
 	}
 	media, _, err := mime.ParseMediaType(r.Header.Get(headerContentType))
-	if err != nil || media != op.RequestBody.mediaType() {
+	if err != nil || !op.RequestBody.accepts(media) {
 		return nil, errs.New(errs.CodeUnsupportedMediaType, "Expected "+op.RequestBody.mediaType()+".")
 	}
-	if op.RequestBody != BodyJSON {
+	if !op.RequestBody.json() {
 		return nil, nil
 	}
 	return c.guardJSON(r, op)

@@ -16,6 +16,76 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// SetChannelOperatorWithBody Set or inherit the operator of a channel
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
+func (c *Client) SetChannelOperatorWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetChannelOperatorRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetChannelOperator Set or inherit the operator of a channel
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
+func (c *Client) SetChannelOperator(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, body SetChannelOperatorJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetChannelOperatorRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteProjectBinding Remove the project binding
+//
+// Corresponds with DELETE /channels/{channel_id}/project-binding (the `DeleteProjectBinding` operationId).
+func (c *Client) DeleteProjectBinding(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteProjectBindingRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutProjectBindingWithBody Bind a forum to a project
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
+func (c *Client) PutProjectBindingWithBody(ctx context.Context, channelId ChannelIdPath, params *PutProjectBindingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutProjectBindingRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // PutProjectBinding Bind a forum to a project
 //
 // Takes a body of the `application/json` content type.
@@ -700,6 +770,44 @@ func (c *Client) SubmitCostReconciliationWithBody(ctx context.Context, params *S
 // Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
 func (c *Client) SubmitCostReconciliation(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSubmitCostReconciliationRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SubmitCspReportWithBody Accept a CSP violation report of the web console
+//
+// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+func (c *Client) SubmitCspReportWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitCspReportRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SubmitCspReportWithApplicationReportsPlusJSONBody Accept a CSP violation report of the web console
+//
+// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+//
+// Takes a body of the `application/reports+json` content type.
+//
+// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+func (c *Client) SubmitCspReportWithApplicationReportsPlusJSONBody(ctx context.Context, body SubmitCspReportApplicationReportsPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitCspReportRequestWithApplicationReportsPlusJSONBody(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -11014,6 +11122,46 @@ func NewSubmitCostReconciliationRequestWithBody(server string, params *SubmitCos
 		}
 
 	}
+
+	return req, nil
+}
+
+// NewSubmitCspReportRequestWithApplicationReportsPlusJSONBody calls the generic SubmitCspReport builder with application/reports+json body
+func NewSubmitCspReportRequestWithApplicationReportsPlusJSONBody(server string, body SubmitCspReportApplicationReportsPlusJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSubmitCspReportRequestWithBody(server, "application/reports+json", bodyReader)
+}
+
+// NewSubmitCspReportRequestWithBody constructs an http.Request for the SubmitCspReport method, with any body, and a specified content type
+func NewSubmitCspReportRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/csp-reports")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -23265,6 +23413,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /costs/reconciliations (the `SubmitCostReconciliation` operationId).
 	SubmitCostReconciliationWithResponse(ctx context.Context, params *SubmitCostReconciliationParams, body SubmitCostReconciliationJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitCostReconciliationResponse, error)
 
+	// SubmitCspReportWithBodyWithResponse Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitCspReportResponse, error)
+
+	// SubmitCspReportWithApplicationReportsPlusJSONBodyWithResponse Accept a CSP violation report of the web console
+	//
+	// Endpoint of `report-to csp` and of `Reporting-Endpoints: csp="/api/v1/csp-reports"` on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (`application/reports+json`, an array of reports) and the legacy `report-uri` format (`application/csp-report`), both limited by `http.max_json_body_bytes`. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts `bothy.console.csp_violations`. Members it does not read are ignored.
+	//
+	// Takes a body of the `application/reports+json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /csp-reports (the `SubmitCspReport` operationId).
+	SubmitCspReportWithApplicationReportsPlusJSONBodyWithResponse(ctx context.Context, body SubmitCspReportApplicationReportsPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitCspReportResponse, error)
+
 	// GetDeviceWithResponse Read a device
 	//
 	// A pending device polls this to learn when it was approved.
@@ -26984,233 +27150,4 @@ type GetAgentResponse403Headers struct {
 // GetAgentResponse404Headers the declared response headers of an HTTP 404 response for GetAgent
 type GetAgentResponse404Headers struct {
 	CorrelationId *CorrelationId
-}
-
-// GetAgentResponse429Headers the declared response headers of an HTTP 429 response for GetAgent
-type GetAgentResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// GetAgentResponseDefaultHeaders the declared response headers of an HTTP default response for GetAgent
-type GetAgentResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type GetAgentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *GetAgentResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *GetAgentResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *GetAgentResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *GetAgentResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *GetAgentResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *GetAgentResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *GetAgentResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetAgentResponse) GetJSON200() *Agent {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r GetAgentResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r GetAgentResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r GetAgentResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetAgentResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r GetAgentResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r GetAgentResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r GetAgentResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetAgentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetAgentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetAgentResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// UpdateAgentResponse200Headers the declared response headers of an HTTP 200 response for UpdateAgent
-type UpdateAgentResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// UpdateAgentResponse400Headers the declared response headers of an HTTP 400 response for UpdateAgent
-type UpdateAgentResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateAgentResponse401Headers the declared response headers of an HTTP 401 response for UpdateAgent
-type UpdateAgentResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// UpdateAgentResponse403Headers the declared response headers of an HTTP 403 response for UpdateAgent
-type UpdateAgentResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateAgentResponse404Headers the declared response headers of an HTTP 404 response for UpdateAgent
-type UpdateAgentResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateAgentResponse412Headers the declared response headers of an HTTP 412 response for UpdateAgent
-type UpdateAgentResponse412Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateAgentResponse422Headers the declared response headers of an HTTP 422 response for UpdateAgent
-type UpdateAgentResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateAgentResponse428Headers the declared response headers of an HTTP 428 response for UpdateAgent
-type UpdateAgentResponse428Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateAgentResponse429Headers the declared response headers of an HTTP 429 response for UpdateAgent
-type UpdateAgentResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// UpdateAgentResponseDefaultHeaders the declared response headers of an HTTP default response for UpdateAgent
-type UpdateAgentResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type UpdateAgentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
-	ApplicationproblemJSON412 *PreconditionFailed
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
-	ApplicationproblemJSON428 *PreconditionRequired
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *UpdateAgentResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *UpdateAgentResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *UpdateAgentResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *UpdateAgentResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *UpdateAgentResponse404Headers
-	// Headers412 the parsed response headers for an HTTP 412 response
-	Headers412 *UpdateAgentResponse412Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *UpdateAgentResponse422Headers
-	// Headers428 the parsed response headers for an HTTP 428 response
-	Headers428 *UpdateAgentResponse428Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *UpdateAgentResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *UpdateAgentResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r UpdateAgentResponse) GetJSON200() *Agent {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
 }

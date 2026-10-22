@@ -11,11 +11,14 @@ import 'package:dio/dio.dart';
 import 'dart:typed_data';
 
 import 'package:api_client/src/generated/api_util.dart';
+import 'package:api_client/src/generated/model/csp_report_legacy.dart';
 import 'package:api_client/src/generated/model/discovery.dart';
 import 'package:api_client/src/generated/model/jwks.dart';
 import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/problem_type.dart';
 import 'package:api_client/src/generated/model/webhook_keys.dart';
+import 'package:built_collection/built_collection.dart';
+import 'package:built_value/json_object.dart';
 
 class DiscoveryApi {
   final Dio _dio;
@@ -374,5 +377,63 @@ class DiscoveryApi {
       statusMessage: _response.statusMessage,
       extra: _response.extra,
     );
+  }
+
+  /// Accept a CSP violation report of the web console
+  /// Endpoint of &#x60;report-to csp&#x60; and of &#x60;Reporting-Endpoints: csp&#x3D;\&quot;/api/v1/csp-reports\&quot;&#x60; on every console response (19-security 5 rule 6, R-AZ-33). Public, because browsers send reports without cookies in many cases; a console cookie is not checked by the CSRF guard here, the action changes nothing. Accepts the Reporting API format (&#x60;application/reports+json&#x60;, an array of reports) and the legacy &#x60;report-uri&#x60; format (&#x60;application/csp-report&#x60;), both limited by &#x60;http.max_json_body_bytes&#x60;. The server stores no report; it logs only the effective directive, the disposition and the origin of the blocked URL and counts &#x60;bothy.console.csp_violations&#x60;. Members it does not read are ignored.
+  ///
+  /// Parameters:
+  /// * [requestBody]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> submitCspReport({
+    required BuiltList<BuiltMap<String, JsonObject>> requestBody,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/csp-reports';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/reports+json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(BuiltList, [FullType(BuiltMap)]);
+      _bodyData = _serializers.serialize(requestBody, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
   }
 }
