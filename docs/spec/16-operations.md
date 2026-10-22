@@ -262,7 +262,8 @@ portability test equal to the second block above and the version of the document
 `/healthz` only reports that the process is alive. `/readyz` reports ready when the startup
 has completed, the database answers, the binary version matches the schema (section 10), an active
 signing key exists per purpose, no shutdown has begun, the database identity matches the stored
-one or the restore was finalized (`restore_not_finalized`, 8.4) and (from M3) the
+one or the restore was finalized (`restore_not_finalized`, 8.4; not checked with
+`database.restore_guard = off`) and (from M3) the
 object storage answers; the names of the checks are in
 [02-architecture.md](02-architecture.md), section 15.2. Responses: `GET` and `HEAD`,
 `Content-Type: application/json`, `Cache-Control: no-store`; success `200` with
@@ -886,7 +887,7 @@ as the epoch, the cursors and the audit entry; any error changes nothing. `bothy
 both columns only while they are empty (first installation, or an instance migrated before M7-04)
 and never changes `sync_epoch`. Every server role compares the stored identity with the current one
 at start: a point-in-time restore raises the timeline, a logical restore into a fresh cluster
-changes the system identifier, and either mismatch keeps the process running but not ready, with
+changes the system identifier, and unless `database.restore_guard` is `off` (managed failover, below) either mismatch keeps the process running but not ready, with
 the readiness reason `restore_not_finalized` and one log line naming the runbook step, until
 `bothy restore finalize` has run. Such a process serves and processes nothing: it opens no public
 listener and starts no log tail, no presence tracker, no terminal reconcile, no River jobs and no worker consumers, so it neither takes writes
