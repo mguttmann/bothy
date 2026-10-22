@@ -65,6 +65,14 @@ mode equals reported mode).
   delayed delivery.
 - Scenario AG-09: a duplicate delivery leads to exactly one successful `run.start`.
 - A schema test keeps the claims in line with docs/spec/05-actions.md section 5.
+- M2-06: the schema test `TestInvocationClaims_MatchSpec` (`internal/runs/domain`) holds the claim
+  set of the code equal to 05 section 5 and 09 4.5; the reference verifier
+  (`internal/runs/adapters/runstest`, `TestReferenceVerifier_RejectsAlgAndTyp`,
+  `TestReferenceVerifier_Points`, `TestReferenceVerifier_JWKSCache`) and the server verifier
+  (`TestVerify_Reasons`, `TestInvocationToken_ForeignPurposeKey`) reject every other `alg`, `typ`
+  and key purpose; AG-22 at token level: `TestAG22_ScheduledRotationFailsNoToken` and
+  `TestAG22_EmergencyRotationTokenLevel` (`test/integration/invocationtoken`); the run level is
+  M2-31's.
 
 ## Pros and Cons of the Options
 
