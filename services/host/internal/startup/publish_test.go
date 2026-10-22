@@ -25,6 +25,8 @@ func TestPublishOnChange(t *testing.T) {
 	if r := x.ctl.last(); len(r.Profiles) != 1 || r.Profiles[0].Name != "only" {
 		t.Fatalf("report profiles %v", r.Profiles)
 	}
+	// The entry scans of the start report their results on their own; count only after them.
+	s.Runner().WaitScans()
 	_, before, _ := x.ctl.count()
 	res := s.Runner().RunLight(context.Background())
 	s.Publish(context.Background(), res)
