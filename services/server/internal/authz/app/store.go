@@ -109,6 +109,14 @@ type Store interface {
 	// ListGrants returns at most limit grants with an id above after that match f at t,
 	// ascending (listGrants).
 	ListGrants(ctx context.Context, f GrantFilter, after ids.ID, t time.Time, limit int) ([]domain.Grant, error)
+	// ExpiringGrants returns the grants that are not revoked, not of a deleted group, whose
+	// expires_at lies in (t, until], ordered by expires_at, then id (the list "Expiring soon",
+	// M6-07); a read without lock.
+	ExpiringGrants(ctx context.Context, t, until time.Time) ([]domain.Grant, error)
+	// ExpiringMemberships returns the memberships that are not removed, of live groups, whose
+	// expires_at lies in (t, until], ordered by expires_at, then id, each with its group (M6-07);
+	// a read without lock.
+	ExpiringMemberships(ctx context.Context, t, until time.Time) ([]domain.MembershipWithGroup, error)
 }
 
 // GrantFilter selects the grants of ListGrants. Zero values do not filter. Without AllTargets

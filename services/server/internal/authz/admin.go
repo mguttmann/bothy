@@ -309,6 +309,84 @@ type ViewAsSnapshot struct {
 	Channels  []ChannelView
 }
 
+// HintsQuery is the input of ListPermissionHints (OpenAPI listPermissionHints): a zero SpaceID
+// lists the instance (owners), otherwise the space; a non-empty Kind narrows to one kind of
+// HintKinds (h1_read_horizon, grant_to_disabled, trigger_blocked, agent_personal).
+type HintsQuery struct {
+	PageQuery
+	SpaceID ids.ID
+	Kind    string
+}
+
+// PermissionHint is one entry of the list "Permission hints" (OpenAPI PermissionHint, 07 section
+// 9.5). H1 names AgentID, PersonID, SpaceID and ChannelID; grant_to_disabled and trigger_blocked
+// carry Grant, trigger_blocked also Rules (sr2, sr3); agent_personal names AgentID,
+// CredentialHolderID (zero for none) and TriggerSet. Other fields stay zero.
+type PermissionHint struct {
+	Kind                                  string
+	AgentID, PersonID, SpaceID, ChannelID ids.ID
+	// Grant is set for the two grant kinds.
+	Grant              *Grant
+	Rules              []string
+	CredentialHolderID ids.ID
+	TriggerSet         []ids.ID
+}
+
+// AccessLabel names a group or a space of a page (OpenAPI AccessLabel).
+type AccessLabel struct {
+	ID   ids.ID
+	Name string
+}
+
+// ChannelLabel names a channel of a page with its space (OpenAPI ChannelLabel).
+type ChannelLabel struct {
+	ID, SpaceID ids.ID
+	Name        string
+}
+
+// AccessLabels are the names of what a page of hints or expiring access names (OpenAPI
+// AccessLabels): the public views of the principals and the names of groups, spaces and
+// channels, each ascending by id and never nil; never content.
+type AccessLabels struct {
+	Principals []PrincipalRef
+	Groups     []AccessLabel
+	Spaces     []AccessLabel
+	Channels   []ChannelLabel
+}
+
+// HintPage is one page of permission hints; NextCursor is empty on the last page.
+type HintPage struct {
+	Items      []PermissionHint
+	Labels     AccessLabels
+	NextCursor string
+}
+
+// ExpiringQuery is the input of ListExpiringAccess (OpenAPI listExpiringAccess): a zero SpaceID
+// lists the instance (owners), otherwise the space.
+type ExpiringQuery struct {
+	PageQuery
+	SpaceID ids.ID
+}
+
+// ExpiringItem is one entry of "Expiring soon" (OpenAPI ExpiringAccessItem, 07 section 9.4):
+// Kind grant carries Grant; membership names MembershipID, GroupID and UserID; token names
+// TokenID and the holder PrincipalID (an agent or an app), never the token value.
+type ExpiringItem struct {
+	Kind      string
+	ExpiresAt time.Time
+	// Grant is set for kind grant.
+	Grant                         *Grant
+	MembershipID, GroupID, UserID ids.ID
+	TokenID, PrincipalID          ids.ID
+}
+
+// ExpiringPage is one page of "Expiring soon"; NextCursor is empty on the last page.
+type ExpiringPage struct {
+	Items      []ExpiringItem
+	Labels     AccessLabels
+	NextCursor string
+}
+
 // Admin is the incoming port of authz for groups, memberships and grants (05 section 4.4). Every
 // method takes the caller as actor.Actor, loads the resource, calls authorize with the action
 // before any write, runs in one unit of work (rights changes with permission_version, I1, SR8 and
@@ -389,6 +467,18 @@ type Admin interface {
 	// (access.view_as, 07 section 9.2, M1-49): owner, step-up, audit of allow and deny. An unknown
 	// id or a principal that is not a person is 404.
 	ViewAs(ctx context.Context, caller actor.Actor, userID ids.ID) (ViewAsSnapshot, error)
+	// ListPermissionHints lists "Permission hints" (access.hints.read, 07 section 9.5, M6-07):
+	// H1, grants to disabled principals, trigger grants SR2 or SR3 block, agents in mode personal
+	// with their trigger set, computed with the snapshot code of authorize and ordered by kind and
+	// key. Without a space the instance (owner); with a space its agents, channels and grants
+	// (owner or manage): an unreadable space is 404, a readable one without manage 403. No
+	// step-up, no audit.
+	ListPermissionHints(ctx context.Context, caller actor.Actor, q HintsQuery) (HintPage, error)
+	// ListExpiringAccess lists "Expiring soon" (access.hints.read, 07 section 9.4, M6-07): grants
+	// and memberships expiring within authz.expiry_reminder_lead and, for owners on the instance,
+	// the tokens of agents and apps in the same window, ordered by expiry, kind and id. Scope and
+	// errors as ListPermissionHints.
+	ListExpiringAccess(ctx context.Context, caller actor.Actor, q ExpiringQuery) (ExpiringPage, error)
 	// ClaimSync reconciles the claim groups at an OIDC login (M1-42).
 	ClaimSync
 }

@@ -65,11 +65,13 @@ type pgWorld struct {
 	rec        *auditapp.Recorder
 	az         *app.Authorizer
 	admin      *app.AdminService
+	adminDeps  app.AdminDeps
 	store      *authzpg.Repository
 	principals authz.PrincipalSource
 	structure  *fake.Structure
 	policies   *fake.Policies
 	creds      *fake.Credentials
+	tokenExp   *fake.Tokens
 	clk        *clock.Fake
 	cfg        app.AuthorizerConfig
 	appender   *syncapp.Appender
@@ -128,7 +130,7 @@ func newPGWorld(t *testing.T) *pgWorld {
 	log := slog.New(slog.DiscardHandler)
 	w := &pgWorld{
 		db: db, pool: pool, clk: clock.NewFake(pgStart), structure: fake.NewStructure(), policies: fake.NewPolicies(),
-		creds: fake.NewCredentials(), store: authzpg.NewRepository(pool),
+		creds: fake.NewCredentials(), tokenExp: fake.NewTokens(), store: authzpg.NewRepository(pool),
 		principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
 		cfg:        app.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: 5 * time.Minute, ViewAsMaxDuration: viewAsMax},
 		sessions:   map[ids.ID]ids.ID{}, devices: map[ids.ID]ids.ID{}, tokens: map[ids.ID]ids.ID{},
@@ -177,11 +179,14 @@ func newPGWorld(t *testing.T) *pgWorld {
 		t.Fatal(err)
 	}
 	w.az = w.newAuthorizer(t)
-	w.admin, err = app.NewAdminService(app.AdminDeps{
+	w.adminDeps = app.AdminDeps{
 		UoW: w.uow, Authorizer: w.az, Store: w.store, Principals: w.principals, Structure: w.structure, Rights: hook,
 		Audit: w.rec, Clock: w.clk, Events: w.appender, Scopes: w.az, Cursors: authzhttp.Cursors{},
-		Config: app.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3},
-	})
+		Config: app.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3,
+			ExpiryReminderLead: reminderLead},
+		Agents: w.policies, Tokens: w.tokenExp,
+	}
+	w.admin, err = app.NewAdminService(w.adminDeps)
 	if err != nil {
 		t.Fatal(err)
 	}

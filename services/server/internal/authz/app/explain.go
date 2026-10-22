@@ -331,26 +331,40 @@ func (x *explainer) addVia(ctx context.Context, tg explainTarget, agent ids.ID, 
 
 // horizonGaps returns the people of T(agent) who cannot read at least one channel of relevant
 // that is in H(agent), ascending; none for an agent that is unknown, not active or without a
-// policy.
+// policy. The gaps come from domain.ReadHorizonGaps, the one H1 function the list "Permission
+// hints" uses too (M6-07).
 func (x *explainer) horizonGaps(ctx context.Context, world domain.World, agent ids.ID, relevant []domain.Path) ([]ids.ID, error) {
+	gaps, err := x.readHorizon(ctx, world, agent, relevant)
+	if err != nil {
+		return nil, err
+	}
+	var out []ids.ID
+	for _, h := range gaps {
+		out = append(out, h.PersonID)
+	}
+	return uniqueIDs(out), nil
+}
+
+// readHorizon returns the H1 hints of agent over the channels of relevant (07 section 6): the
+// channels of relevant in H(agent), T(agent) from world at x.t, and the snapshots of those people
+// built like the snapshots of authorize (state). None for an agent that is unknown, not active or
+// without a policy.
+func (x *explainer) readHorizon(ctx context.Context, world domain.World, agent ids.ID, relevant []domain.Path) ([]domain.Hint, error) {
 	ks, class, served, err := x.agentReach(ctx, agent, relevant)
 	if err != nil || len(ks) == 0 {
 		return nil, err
 	}
 	world.Served = map[ids.ID][]domain.ServedTarget{agent: served}
-	var out []ids.ID
-	for _, p := range domain.Triggerers(world, agent, class, x.t) {
+	triggerers := domain.Triggerers(world, agent, class, x.t)
+	readers := make(map[ids.ID]domain.Snapshot, len(triggerers))
+	for _, p := range triggerers {
 		ps, err := x.state(ctx, p)
 		if err != nil {
 			return nil, err
 		}
-		if slices.ContainsFunc(ks, func(k domain.Path) bool {
-			return domain.Effective(ps.snap, domain.KindUser, p, k).Level < domain.LevelRead
-		}) {
-			out = append(out, p)
-		}
+		readers[p] = ps.snap
 	}
-	return out, nil
+	return domain.ReadHorizonGaps(agent, ks, triggerers, readers), nil
 }
 
 // agentReach returns the channels of relevant in H(agent), the agent's effective tool class and

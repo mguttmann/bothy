@@ -65,3 +65,22 @@ FOR UPDATE OF m;
 UPDATE group_memberships
 SET expiry_reminded_at = @at
 WHERE id = ANY (@ids::uuid[]) AND expiry_reminded_at IS NULL;
+
+-- name: ListExpiringGrants :many
+-- The list "Expiring soon" (07 section 9.4, M6-07): grants not revoked, not of a deleted group,
+-- expiring in (at, until]; a read without lock, ordered by expiry, then id.
+SELECT sqlc.embed(g)
+FROM grants g
+WHERE g.revoked_at IS NULL AND g.expires_at IS NOT NULL AND g.expires_at > @at AND g.expires_at <= @until
+  AND NOT EXISTS (SELECT 1 FROM groups d WHERE d.id = g.subject_group_id AND d.deleted_at IS NOT NULL)
+ORDER BY g.expires_at, g.id;
+
+-- name: ListExpiringMemberships :many
+-- The list "Expiring soon" (M6-07): memberships not removed of live groups expiring in
+-- (at, until]; a read without lock, ordered by expiry, then id.
+SELECT sqlc.embed(m), sqlc.embed(g)
+FROM group_memberships m
+JOIN groups g ON g.id = m.group_id
+WHERE m.removed_at IS NULL AND m.expires_at IS NOT NULL AND m.expires_at > @at AND m.expires_at <= @until
+  AND g.deleted_at IS NULL
+ORDER BY m.expires_at, m.id;

@@ -35,6 +35,9 @@ type AdminConfig struct {
 	// ReasonMaxChars is audit.reason_max_chars, the longest reason of the guided flow resolve_i1
 	// (SEC-AUD-5, M2-21); internal/wire passes it to the Resolver.
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
+	// ExpiryReminderLead is authz.expiry_reminder_lead, the window of the list "Expiring soon"
+	// (07 section 9.4, M6-07); zero or less refuses that list with kind internal.
+	ExpiryReminderLead time.Duration `config:"authz.expiry_reminder_lead"`
 }
 
 // Limits returns the group text limits of c.
@@ -90,6 +93,12 @@ type AdminDeps struct {
 	// Resolver runs the guided flow resolve_i1 of createGrant, addGroupMember and previewGrant
 	// (M2-21); nil refuses a request with resolve_i1 with kind internal (fail closed).
 	Resolver *Resolver
+	// Agents lists every agent for the list "Permission hints" (M6-07); nil refuses that list
+	// with kind internal.
+	Agents authz.AgentDirectory
+	// Tokens gives "Expiring soon" the tokens of agents and apps (M6-07); nil refuses that list
+	// with kind internal.
+	Tokens authz.TokenExpirySource
 }
 
 // AdminService implements authz.Admin (brief M1-29 scope 5). It is safe for concurrent use.
