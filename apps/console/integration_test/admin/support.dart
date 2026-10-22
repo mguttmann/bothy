@@ -286,17 +286,45 @@ Future<Object?> askRunner(String action, Map<String, Object?> params) async {
   return answer.dartify();
 }
 
-/// Taps "Choose file" ([pickKey]) and has the runner set its manifest file [name] on the file
-/// input the console appended (`data-bothy-file-input="manifest"`): without a user activation
-/// Chromium opens no dialog, so the runner sets the file (platform action `e2eSetManifestFile`).
+/// Taps "Choose file" ([pickKey]), asks the runner for its manifest file [name] (platform action
+/// `e2eSetManifestFile`: name, MIME type and text) and sets it on the file input the console
+/// appended (`data-bothy-file-input="manifest"`), then fires the input's `change` event. Without a
+/// user activation Chromium opens no dialog, and the runner cannot touch the page while the
+/// binding call is pending, so the page sets the file itself.
 Future<void> chooseManifest(
   PatrolIntegrationTester $,
   String name, {
   String pickKey = 'install.pick',
 }) async {
   await tapKey($, pickKey);
-  await askRunner('e2eSetManifestFile', {'name': name});
+  final answer = await askRunner('e2eSetManifestFile', {'name': name});
+  if (answer is! Map) throw _failure('no manifest file $name from the runner');
+  final input = await _manifestInput($);
+  final file = web.File(
+    [(answer['text'] as String).toJS].toJS,
+    answer['name'] as String,
+    web.FilePropertyBag(type: answer['mimeType'] as String),
+  );
+  final transfer = web.DataTransfer()..items.add(file);
+  input
+    ..files = transfer.files
+    ..dispatchEvent(web.Event('change'));
   await $.tester.pump(const Duration(milliseconds: 300));
+}
+
+/// The manifest input the console appends on "Choose file", once it is in the page.
+Future<web.HTMLInputElement> _manifestInput(
+  PatrolIntegrationTester $, {
+  Duration timeout = const Duration(seconds: 60),
+}) async {
+  const selector = 'input[data-bothy-file-input="manifest"]';
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    final input = web.document.querySelector(selector);
+    if (input != null) return input as web.HTMLInputElement;
+    await $.tester.pump(const Duration(milliseconds: 200));
+  }
+  throw _failure('timed out waiting for $selector; ${screenText()}');
 }
 
 /// The state of the checkbox with [key]: its value and whether it takes a tap. The key may sit

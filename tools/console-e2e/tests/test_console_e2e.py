@@ -856,15 +856,19 @@ def test_platform_handler_answers_lifecycle_and_rejects_unknown_actions() -> Non
     assert lines[0] == "platform action startTest"
 
 
-def test_platform_handler_sets_the_manifest_file_on_the_console_input() -> None:
-    page = _FakePage()
-    handler = admin.PlatformHandler(page, lambda _line: None)  # type: ignore[arg-type]
+class _NoPage:
+    """A page every call of which fails: the binding runs inside a pending page.evaluate, where a
+    nested call of the sync API never returns (it hung phase 2 until the job timeout)."""
+
+    def __getattr__(self, name: str) -> object:
+        raise AssertionError(f"the platform handler called page.{name}")
+
+
+def test_platform_handler_answers_the_manifest_file_without_calling_the_page() -> None:
+    handler = admin.PlatformHandler(_NoPage(), lambda _line: None)  # type: ignore[arg-type]
     params = {"name": "repo-bridge.json"}
-    assert handler(None, {"action": "e2eSetManifestFile", "params": params}) is None
-    selector = 'input[data-bothy-file-input="manifest"]'
-    # The console appends the input on "Choose file"; the runner waits until it is attached.
-    assert page.waited == [(selector, "attached", admin.STEP_TIMEOUT_MS)]
-    assert page.files == [(selector, [admin.manifest_file("repo-bridge.json")])]
+    answer = handler(None, {"action": "e2eSetManifestFile", "params": params})
+    assert answer == admin.manifest_file("repo-bridge.json")
     assert handler.unknown == []
     with pytest.raises(admin.CheckError, match=r"other\.json"):
         handler(None, {"action": "e2eSetManifestFile", "params": {"name": "other.json"}})
@@ -874,7 +878,7 @@ def test_manifest_file_is_the_repo_bridge_manifest_as_json() -> None:
     payload = admin.manifest_file("repo-bridge.json")
     assert payload["name"] == "repo-bridge.json"
     assert payload["mimeType"] == "application/json"
-    assert json.loads(payload["buffer"]) == admin.repo_bridge_manifest()
+    assert json.loads(payload["text"]) == admin.repo_bridge_manifest()
     with pytest.raises(admin.CheckError, match="no manifest"):
         admin.manifest_file("../etc/passwd")
 

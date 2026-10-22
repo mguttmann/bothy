@@ -19,8 +19,9 @@ step-up of every flow needs. Steps:
 4. patrol's protocol: list the tests with ``__patrol__getTests``, then per test a fresh load of
    the bundle with the seed and the initialisation, and ``__patrol__runTest`` (up to 5 minutes).
    The suite of brief M6-08 asks for its manifest file with the platform action
-   ``e2eSetManifestFile``: the runner sets the manifest of ``repo_bridge_manifest`` (events to the
-   receiver ``webhook-receiver`` of the Compose network) on the console's file input.
+   ``e2eSetManifestFile``: the runner answers the manifest of ``repo_bridge_manifest`` (events to
+   the receiver ``webhook-receiver`` of the Compose network), and the suite sets it on the
+   console's file input.
 
 The result goes to ``/out/results/admin.json`` (per test its name, result and details, the
 violations, console CSP errors, foreign origins and downloads; never a secret, code or token).
@@ -65,7 +66,6 @@ from console_headless import (
 from playwright.sync_api import (
     ConsoleMessage,
     Download,
-    FilePayload,
     Page,
     Playwright,
     sync_playwright,
@@ -83,10 +83,6 @@ PERMISSIONS = ["clipboard-read", "clipboard-write"]
 # implemented in PlatformHandler or fails the run with its name.
 LIFECYCLE_ACTIONS = frozenset({"startTest"})
 TOTP_PERIOD = 30
-# The file input the console appends for a manifest (apps/console browser_web.dart
-# InputFileChooser, tag manifest); without a user activation Chromium opens no dialog, so the
-# runner sets the file on the input itself.
-MANIFEST_INPUT = 'input[data-bothy-file-input="manifest"]'
 # The receiver of the outgoing webhooks inside the Compose network (brief M6-08); the E2E
 # configuration lists it in webhook.allowed_hosts.
 RECEIVER_URL = "https://webhook-receiver:8443"
@@ -274,10 +270,11 @@ def repo_bridge_manifest() -> dict[str, Any]:
 MANIFESTS: dict[str, Callable[[], dict[str, Any]]] = {"repo-bridge.json": repo_bridge_manifest}
 
 
-def manifest_file(name: str) -> FilePayload:
-    """The file ``name`` of MANIFESTS as Playwright's file payload (JSON, UTF-8).
+def manifest_file(name: str) -> dict[str, str]:
+    """The file ``name`` of MANIFESTS as the answer of ``e2eSetManifestFile``.
 
-    Raises CheckError for any other name, so a suite can never make the runner read a path.
+    The answer holds the name, the MIME type and the text (JSON). Raises CheckError for any other
+    name, so a suite can never make the runner read a path.
     """
     build = MANIFESTS.get(name)
     if build is None:
@@ -285,7 +282,7 @@ def manifest_file(name: str) -> FilePayload:
     return {
         "name": name,
         "mimeType": "application/json",
-        "buffer": json.dumps(build(), indent=2).encode(),
+        "text": json.dumps(build(), indent=2),
     }
 
 
@@ -821,8 +818,9 @@ class PlatformHandler:
 
     The Dart side calls it with ``{"action", "params"}``. Every action is logged; the lifecycle
     actions answer None, the clipboard, download and permission actions are answered like
-    patrol's own web runner (web_runner/tests/actions), ``e2eSetManifestFile`` sets the manifest
-    ``params.name`` on the console's file input (brief M6-08), and an unknown action raises in the
+    patrol's own web runner (web_runner/tests/actions), ``e2eSetManifestFile`` answers the manifest
+    ``params.name`` (name, MIME type, text) for the Dart side to set on the console's file input
+    (brief M6-08), and an unknown action raises in the
     page and is recorded, which fails the run with its name.
     """
 
@@ -860,11 +858,10 @@ class PlatformHandler:
             self.page.emulate_media(color_scheme="dark" if action == "enableDarkMode" else "light")
             return None
         if action == "e2eSetManifestFile":
-            payload = manifest_file(str(params.get("name") or ""))
-            # The console appends the input on "Choose file" and waits for its change event.
-            self.page.wait_for_selector(MANIFEST_INPUT, state="attached", timeout=STEP_TIMEOUT_MS)
-            self.page.set_input_files(MANIFEST_INPUT, files=[payload])
-            return None
+            # Answer only: the binding runs inside the pending page.evaluate of the test, where a
+            # nested call of the sync API on the page never returns. The Dart side sets the file
+            # on the console's input (support.dart chooseManifest).
+            return manifest_file(str(params.get("name") or ""))
         self.unknown.append(action)
         raise CheckError(f"patrol platform action {action} is not supported by the runner")
 
