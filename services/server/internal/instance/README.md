@@ -85,8 +85,8 @@ to the instance row (R-DM-50). `RecordMigration` fills both while they are empty
 stored identity or `sync_epoch`. `State.CheckIdentity` compares the stored identity with the current
 one (`domain.IdentityMismatch`: an empty stored identity never mismatches); `internal/wire` runs it
 at start and, unless `database.restore_guard` is `off`, registers the readiness check
-`restore_not_finalized` on a mismatch and starts no log tail, River jobs, worker consumers or
-public listener. PostgreSQL 18 grants `EXECUTE` on both control functions to
+`restore_not_finalized` on a mismatch and starts no log tail, presence tracker (no start rule or
+flush loop), River jobs, worker consumers or public listener. PostgreSQL 18 grants `EXECUTE` on both control functions to
 `PUBLIC`, so `bothy_app` reads them without a grant.
 
 `Restore.Finalize` (`app.NewRestore`, `RestoreDeps`) is `bothy restore finalize`, run as the schema
