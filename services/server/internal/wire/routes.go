@@ -124,6 +124,9 @@ type Handlers struct {
 	*terminalhttp.Hosts
 	// Local implements loginWithPassword and setMyLocalCredential (identity, M1-39).
 	*identityhttp.Local
+	// Console implements getConsoleSession, endViewAs, stepUpWithPassword,
+	// beginStepUpOidcReauth and completeStepUpOidcReauth (identity, M6-01).
+	*identityhttp.Console
 	// Apps implements listApps, installApp, validateManifest, getApp, upgradeAppManifest,
 	// setAppScopes, suspendApp, resumeApp and uninstallApp (apps, M2-24).
 	*appshttp.Apps

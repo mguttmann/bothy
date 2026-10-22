@@ -37,6 +37,13 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 - `NewSchemaValidator(spec, names)` and `SchemaValidator.Validate(name, body)`: a JSON value
   against one named schema of the contract with the field codes of the request validator; the
   gateway checks the body of every client frame with it (M1-64).
+- Console cookie (M6-01): `StageAuthenticate` reads `__Host-console_session` into
+  `actor.Credentials.ConsoleCookie`; a request the cookie authenticated then passes ConsoleGuard
+  before every later stage: methods other than `GET`, `HEAD` and `OPTIONS` need
+  `X-Console-Request: 1` (`HeaderConsoleRequest`) and an `Origin` equal to the origin of
+  `server.public_url` (`SameOrigin`), else `403 forbidden` with reason `csrf_check_failed`
+  (`ReasonCSRFCheckFailed`), logged with the reason only. Requests with an `Authorization` header
+  are not checked. `httpservertest.Actors.SetCookie` and `LogCapture.Contains` serve the tests.
 - `Operation.AuthorizedInBand`: the one route that authenticates and authorizes on the connection
   it opens (`GET /api/v1/gateway`, M1-64); `Chain.Wrap` runs no per-route stage for it, only the
   outer steps 1 to 4, and puts the operation into the context.

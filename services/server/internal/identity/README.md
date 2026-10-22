@@ -899,6 +899,52 @@ fail closed with `internal`, so a writer wired without the configuration never w
 by accident. `wire.NewIdentity` builds its `Directory` that way from `IdentityWrites.Search` and
 `Settings` (`wire.NewSearchDirectory`).
 
+### Console session of the web console (M6-01)
+
+The web console never holds a token (08 section 7.5, BFF pattern). `app/console.go` (`Console`) and
+the pure rules of `domain/consolesession` implement it; `adapters/httpapi/console.go` holds the
+cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithPassword`,
+`beginStepUpOidcReauth` and `completeStepUpOidcReauth`.
+
+- Login: the four login operations take `client: console` (no `device`, no DPoP proof). The login
+  completion registers an active web device without keys (`name = "Web console"`) and starts a
+  session with `client_component = 'console'` through `Console.Start`: no refresh family, no token,
+  answer `200 ConsoleSession` with `Set-Cookie`. The allow entry of `auth.login.complete` carries
+  `client_component = console`. A pending person does not log in to the console. An OIDC console
+  login must use the redirect `/console/login/callback` on the origin of `server.public_url`, and a
+  console flow completes only in the console form. Enrollment codes and pairing refuse the form.
+- Cookie: `__Host-console_session`, 32 random bytes base64url, stored only as HMAC-SHA-256 with the
+  token pepper in `auth_sessions.cookie_hash`; attributes `Secure; HttpOnly; SameSite=Strict;
+  Path=/` and `Max-Age` up to the session end. Every step-up of a console session writes a new hash
+  in the transaction of `step_up_at` and answers with the new cookie; `logout` and every refused
+  cookie answer with the clearing cookie.
+- Authentication: `Authenticator` takes the cookie as the second credential kind. A request with
+  both the cookie and `Authorization` is `400`. The lookup by hash requires a console session that
+  is not revoked, before `auth.console_session_max_age`, not idle, on an active device of an active
+  person (and, for `trusted_header`, still bound to the header login). The actor has
+  `ClientComponent = console`, no key binding and the stored view.
+- CSRF: the chain's ConsoleGuard (`platform/httpserver`) requires `X-Console-Request: 1` and the own
+  `Origin` on every cookie request except `GET`, `HEAD`, `OPTIONS` (`403 forbidden` with reason `csrf_check_failed`); the
+  gateway refuses an upgrade with the cookie and no or a foreign `Origin`.
+- Gate before the first step-up: only `self.read`, `auth.step_up`, `auth.logout`, the discovery and
+  the public login actions pass (`consolesession.PassesGate`); everything else is
+  `401 step_up_required` with reason `console_step_up_required`.
+- Step-up methods: passkey (`completeStepUpWithPasskey`), password with TOTP
+  (`stepUpWithPassword`, the lockout of the login counts) and a new OIDC login with `prompt=login`
+  and `max_age=0` (`beginStepUpOidcReauth`, `completeStepUpOidcReauth`; the flow is a link-mode
+  flow of the person whose stored redirect names the challenge; the identity must be the person's
+  and `auth_time` not before the second of the challenge). `step_up_method` records the method.
+- Idle rule: `last_seen_at` is written only when older than one hundredth of
+  `auth.console_session_idle_timeout`; a session is idle from `last_seen_at` plus the timeout plus
+  that hundredth on. The request that finds an idle or expired session and the job
+  `identity.auth_cleanup` revoke it with `expired` and write one entry of `session.revoke` (cause
+  `idle` or `absolute`).
+- View as person: `viewAsUser` from a console session stores the view through
+  `ConsoleViews.StartView` (the authz port `ConsoleViews`); the authenticator sets `actor.ViewAs`
+  from it, and the first request after `authz.view_as_max_duration` ends it (entry
+  `access.view_as.end`, `ended_reason = expired`) and answers `401 step_up_required`. `endViewAs`
+  ends it with `ended_reason = ended`.
+
 ## People by id list (M3-18)
 
 - Port: `Directory.Users(ctx, ids)` returns the people among a list of ids in one read (`ListUsersByIDs`), keyed by id; unknown ids and principals that are not people are absent, like `Principals`. It does not authorize: `notify` loads `users.time_zone` for the quiet hours of people it already selected.

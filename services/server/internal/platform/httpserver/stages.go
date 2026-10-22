@@ -80,7 +80,8 @@ func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 // authenticateStage is StageAuthenticate: the Authenticator gets the method, the htu built from
 // server.public_url and the escaped path (never from the Host header), Authorization, DPoP and the
 // client IP; the TCP peer, the header and the route's action go into the context as
-// reqmeta.Transport (M1-43). Without Authorization it returns the anonymous actor; its error becomes the problem
+// reqmeta.Transport (M1-43), and the console cookie (M6-01). Without credentials it returns the
+// anonymous actor; a request the cookie authenticated then passes ConsoleGuard (consoleGuard). Its error becomes the problem
 // (after the failed-credentials hook, when one is set). A request with credentials passes the precheck
 // of M1-19 first, whose settle function gets the result of the Authenticator. The actor, the DPoP
 // facts of the request (reqmeta.Proof) and a setter of response headers go into the context.
@@ -94,6 +95,7 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 			DPoP:          r.Header.Get(headerDPoP),
 			DPoPProofs:    r.Header.Values(headerDPoP),
 			ClientIP:      ip,
+			ConsoleCookie: consoleCookie(r),
 		}
 		// The DPoP facts go to the handlers of the login and refresh endpoints, and the
 		// Authenticator and the use cases set DPoP-Nonce without the response writer (M1-34).
@@ -126,6 +128,12 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 		}
 		// The request span names the principal kind and, for a person, its pseudonym (DP-T09).
 		otel.AnnotatePrincipal(r.Context(), string(a.Kind), a.ID.String())
+		// ConsoleGuard (M6-01): a request the cookie authenticated passes the CSRF check before
+		// any later stage and the handler see it.
+		if err := c.consoleGuard(r, creds, a); err != nil {
+			WriteProblem(w, r, err)
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(actor.WithActor(r.Context(), a)))
 	})
 }

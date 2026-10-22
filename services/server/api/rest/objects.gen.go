@@ -89,6 +89,9 @@ func (response ListAgents401ApplicationProblemPlusJSONResponse) VisitListAgentsR
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -241,6 +244,9 @@ func (response CreateAgent401ApplicationProblemPlusJSONResponse) VisitCreateAgen
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -412,6 +418,9 @@ func (response ListServedChannels401ApplicationProblemPlusJSONResponse) VisitLis
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -567,6 +576,9 @@ func (response GetServedChannelConfig401ApplicationProblemPlusJSONResponse) Visi
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -738,6 +750,9 @@ func (response GetConsumerState401ApplicationProblemPlusJSONResponse) VisitGetCo
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -911,6 +926,9 @@ func (response AckAgentEvents401ApplicationProblemPlusJSONResponse) VisitAckAgen
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -1082,6 +1100,9 @@ func (response PollAgentEvents401ApplicationProblemPlusJSONResponse) VisitPollAg
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -1277,6 +1298,9 @@ func (response GetAgent401ApplicationProblemPlusJSONResponse) VisitGetAgentRespo
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -1453,6 +1477,9 @@ func (response UpdateAgent401ApplicationProblemPlusJSONResponse) VisitUpdateAgen
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -1688,6 +1715,9 @@ func (response SetAgentBillingMode401ApplicationProblemPlusJSONResponse) VisitSe
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -1922,6 +1952,9 @@ func (response SetCredentialHolder401ApplicationProblemPlusJSONResponse) VisitSe
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -2152,6 +2185,9 @@ func (response DisableAgent401ApplicationProblemPlusJSONResponse) VisitDisableAg
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -2343,6 +2379,9 @@ func (response EnableAgent401ApplicationProblemPlusJSONResponse) VisitEnableAgen
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -2558,6 +2597,9 @@ func (response SetAgentToolClass401ApplicationProblemPlusJSONResponse) VisitSetA
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -2787,6 +2829,9 @@ func (response ValidateManifest401ApplicationProblemPlusJSONResponse) VisitValid
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -2938,6 +2983,9 @@ func (response ListApps401ApplicationProblemPlusJSONResponse) VisitListAppsRespo
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -3091,6 +3139,9 @@ func (response InstallApp401ApplicationProblemPlusJSONResponse) VisitInstallAppR
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -3282,6 +3333,9 @@ func (response GetApp401ApplicationProblemPlusJSONResponse) VisitGetAppResponse(
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -3454,6 +3508,9 @@ func (response UpgradeAppManifest401ApplicationProblemPlusJSONResponse) VisitUpg
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -3617,6 +3674,9 @@ func (response ResumeApp401ApplicationProblemPlusJSONResponse) VisitResumeAppRes
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -3809,6 +3869,9 @@ func (response SetAppScopes401ApplicationProblemPlusJSONResponse) VisitSetAppSco
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -3972,6 +4035,9 @@ func (response SuspendApp401ApplicationProblemPlusJSONResponse) VisitSuspendAppR
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -4156,6 +4222,9 @@ func (response UninstallApp401ApplicationProblemPlusJSONResponse) VisitUninstall
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -4347,6 +4416,9 @@ func (response ListWebhookSubscriptions401ApplicationProblemPlusJSONResponse) Vi
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -4519,6 +4591,9 @@ func (response CreateWebhookSubscription401ApplicationProblemPlusJSONResponse) V
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -4729,6 +4804,9 @@ func (response ListAuditEvents401ApplicationProblemPlusJSONResponse) VisitListAu
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -4908,6 +4986,9 @@ func (response ExportAuditEvents401ApplicationProblemPlusJSONResponse) VisitExpo
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -5059,6 +5140,9 @@ func (response VerifyAuditChain401ApplicationProblemPlusJSONResponse) VisitVerif
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -5212,6 +5296,9 @@ func (response BeginEnrollment401ApplicationProblemPlusJSONResponse) VisitBeginE
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -5345,6 +5432,9 @@ func (response CompleteEnrollment401ApplicationProblemPlusJSONResponse) VisitCom
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -5480,6 +5570,9 @@ func (response RedeemEnrollmentCode401ApplicationProblemPlusJSONResponse) VisitR
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -5557,6 +5650,7 @@ func (response RedeemEnrollmentCodedefaultApplicationProblemPlusJSONResponse) Vi
 }
 
 type LogoutRequestObject struct {
+	Params LogoutParams
 }
 
 type LogoutResponseObject interface {
@@ -5567,6 +5661,7 @@ type Logout204ResponseHeaders struct {
 	CorrelationId   *CorrelationId
 	RateLimit       *string
 	RateLimitPolicy *string
+	SetCookie       *string
 }
 
 type Logout204Response struct {
@@ -5582,6 +5677,9 @@ func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) err
 	}
 	if response.Headers.RateLimitPolicy != nil {
 		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	w.WriteHeader(204)
 	return nil
@@ -5603,6 +5701,9 @@ func (response Logout401ApplicationProblemPlusJSONResponse) VisitLogoutResponse(
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -5756,6 +5857,9 @@ func (response BeginOidcLogin401ApplicationProblemPlusJSONResponse) VisitBeginOi
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -5904,6 +6008,9 @@ func (response HandleOidcCallback401ApplicationProblemPlusJSONResponse) VisitHan
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -5968,6 +6075,26 @@ type CompleteOidcLoginRequestObject struct {
 
 type CompleteOidcLoginResponseObject interface {
 	VisitCompleteOidcLoginResponse(w http.ResponseWriter) error
+}
+
+type CompleteOidcLogin200JSONResponse struct{ ConsoleLoginJSONResponse }
+
+func (response CompleteOidcLogin200JSONResponse) VisitCompleteOidcLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CompleteOidcLogin201ResponseHeaders struct {
@@ -6037,6 +6164,9 @@ func (response CompleteOidcLogin401ApplicationProblemPlusJSONResponse) VisitComp
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -6190,6 +6320,9 @@ func (response BeginPairing401ApplicationProblemPlusJSONResponse) VisitBeginPair
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -6357,6 +6490,9 @@ func (response CompletePairing401ApplicationProblemPlusJSONResponse) VisitComple
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -6509,6 +6645,9 @@ func (response BeginPasskeyLogin401ApplicationProblemPlusJSONResponse) VisitBegi
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -6573,6 +6712,26 @@ type CompletePasskeyLoginRequestObject struct {
 
 type CompletePasskeyLoginResponseObject interface {
 	VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error
+}
+
+type CompletePasskeyLogin200JSONResponse struct{ ConsoleLoginJSONResponse }
+
+func (response CompletePasskeyLogin200JSONResponse) VisitCompletePasskeyLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CompletePasskeyLogin201ResponseHeaders struct {
@@ -6643,6 +6802,9 @@ func (response CompletePasskeyLogin401ApplicationProblemPlusJSONResponse) VisitC
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -6707,6 +6869,26 @@ type LoginWithPasswordRequestObject struct {
 
 type LoginWithPasswordResponseObject interface {
 	VisitLoginWithPasswordResponse(w http.ResponseWriter) error
+}
+
+type LoginWithPassword200JSONResponse struct{ ConsoleLoginJSONResponse }
+
+func (response LoginWithPassword200JSONResponse) VisitLoginWithPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type LoginWithPassword201ResponseHeaders struct {
@@ -6776,6 +6958,9 @@ func (response LoginWithPassword401ApplicationProblemPlusJSONResponse) VisitLogi
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -6854,6 +7039,7 @@ func (response LoginWithPassworddefaultApplicationProblemPlusJSONResponse) Visit
 }
 
 type CreateStepUpChallengeRequestObject struct {
+	Params CreateStepUpChallengeParams
 }
 
 type CreateStepUpChallengeResponseObject interface {
@@ -6908,6 +7094,9 @@ func (response CreateStepUpChallenge401ApplicationProblemPlusJSONResponse) Visit
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -7061,6 +7250,9 @@ func (response CompleteStepUpWithDeviceKey401ApplicationProblemPlusJSONResponse)
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -7137,24 +7329,214 @@ func (response CompleteStepUpWithDeviceKeydefaultApplicationProblemPlusJSONRespo
 	return err
 }
 
+type BeginStepUpOidcReauthRequestObject struct {
+	Params BeginStepUpOidcReauthParams
+	Body   *BeginStepUpOidcReauthJSONRequestBody
+}
+
+type BeginStepUpOidcReauthResponseObject interface {
+	VisitBeginStepUpOidcReauthResponse(w http.ResponseWriter) error
+}
+
+type BeginStepUpOidcReauth200ResponseHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type BeginStepUpOidcReauth200JSONResponse struct {
+	Body    OidcBeginResponse
+	Headers BeginStepUpOidcReauth200ResponseHeaders
+}
+
+func (response BeginStepUpOidcReauth200JSONResponse) VisitBeginStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginStepUpOidcReauth401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response BeginStepUpOidcReauth401ApplicationProblemPlusJSONResponse) VisitBeginStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginStepUpOidcReauth403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response BeginStepUpOidcReauth403ApplicationProblemPlusJSONResponse) VisitBeginStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginStepUpOidcReauthdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response BeginStepUpOidcReauthdefaultApplicationProblemPlusJSONResponse) VisitBeginStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpOidcReauthRequestObject struct {
+	Params CompleteStepUpOidcReauthParams
+	Body   *CompleteStepUpOidcReauthJSONRequestBody
+}
+
+type CompleteStepUpOidcReauthResponseObject interface {
+	VisitCompleteStepUpOidcReauthResponse(w http.ResponseWriter) error
+}
+
+type CompleteStepUpOidcReauth200JSONResponse struct{ StepUpDoneJSONResponse }
+
+func (response CompleteStepUpOidcReauth200JSONResponse) VisitCompleteStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpOidcReauth401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteStepUpOidcReauth401ApplicationProblemPlusJSONResponse) VisitCompleteStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpOidcReauth403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CompleteStepUpOidcReauth403ApplicationProblemPlusJSONResponse) VisitCompleteStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteStepUpOidcReauthdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CompleteStepUpOidcReauthdefaultApplicationProblemPlusJSONResponse) VisitCompleteStepUpOidcReauthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CompleteStepUpWithPasskeyRequestObject struct {
-	Body *CompleteStepUpWithPasskeyJSONRequestBody
+	Params CompleteStepUpWithPasskeyParams
+	Body   *CompleteStepUpWithPasskeyJSONRequestBody
 }
 
 type CompleteStepUpWithPasskeyResponseObject interface {
 	VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error
 }
 
-type CompleteStepUpWithPasskey200ResponseHeaders struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-type CompleteStepUpWithPasskey200JSONResponse struct {
-	Body    StepUpResult
-	Headers CompleteStepUpWithPasskey200ResponseHeaders
-}
+type CompleteStepUpWithPasskey200JSONResponse struct{ StepUpDoneJSONResponse }
 
 func (response CompleteStepUpWithPasskey200JSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
 
@@ -7166,11 +7548,8 @@ func (response CompleteStepUpWithPasskey200JSONResponse) VisitCompleteStepUpWith
 	if response.Headers.CorrelationId != nil {
 		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
 	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
@@ -7212,6 +7591,9 @@ func (response CompleteStepUpWithPasskey401ApplicationProblemPlusJSONResponse) V
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -7275,6 +7657,103 @@ type CompleteStepUpWithPasskeydefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CompleteStepUpWithPasskeydefaultApplicationProblemPlusJSONResponse) VisitCompleteStepUpWithPasskeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StepUpWithPasswordRequestObject struct {
+	Params StepUpWithPasswordParams
+	Body   *StepUpWithPasswordJSONRequestBody
+}
+
+type StepUpWithPasswordResponseObject interface {
+	VisitStepUpWithPasswordResponse(w http.ResponseWriter) error
+}
+
+type StepUpWithPassword200JSONResponse struct{ StepUpDoneJSONResponse }
+
+func (response StepUpWithPassword200JSONResponse) VisitStepUpWithPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StepUpWithPassword401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response StepUpWithPassword401ApplicationProblemPlusJSONResponse) VisitStepUpWithPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StepUpWithPassword403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StepUpWithPassword403ApplicationProblemPlusJSONResponse) VisitStepUpWithPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StepUpWithPassworddefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response StepUpWithPassworddefaultApplicationProblemPlusJSONResponse) VisitStepUpWithPasswordResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -7366,6 +7845,9 @@ func (response RefreshToken401ApplicationProblemPlusJSONResponse) VisitRefreshTo
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -7430,6 +7912,26 @@ type LoginWithTrustedHeaderRequestObject struct {
 
 type LoginWithTrustedHeaderResponseObject interface {
 	VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error
+}
+
+type LoginWithTrustedHeader200JSONResponse struct{ ConsoleLoginJSONResponse }
+
+func (response LoginWithTrustedHeader200JSONResponse) VisitLoginWithTrustedHeaderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type LoginWithTrustedHeader201ResponseHeaders struct {
@@ -7499,6 +8001,9 @@ func (response LoginWithTrustedHeader401ApplicationProblemPlusJSONResponse) Visi
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -7655,6 +8160,9 @@ func (response GetChannel401ApplicationProblemPlusJSONResponse) VisitGetChannelR
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -7832,6 +8340,9 @@ func (response UpdateChannel401ApplicationProblemPlusJSONResponse) VisitUpdateCh
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -8080,6 +8591,9 @@ func (response ExplainChannelAccess401ApplicationProblemPlusJSONResponse) VisitE
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -8252,6 +8766,9 @@ func (response ArchiveChannel401ApplicationProblemPlusJSONResponse) VisitArchive
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -8447,6 +8964,9 @@ func (response GetChannelBehavior401ApplicationProblemPlusJSONResponse) VisitGet
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -8623,6 +9143,9 @@ func (response PutChannelBehavior401ApplicationProblemPlusJSONResponse) VisitPut
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -8825,6 +9348,9 @@ func (response DeleteChannelDraft401ApplicationProblemPlusJSONResponse) VisitDel
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -8996,6 +9522,9 @@ func (response PutChannelDraft401ApplicationProblemPlusJSONResponse) VisitPutCha
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -9169,6 +9698,9 @@ func (response MoveChannel401ApplicationProblemPlusJSONResponse) VisitMoveChanne
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -9365,6 +9897,9 @@ func (response SetChannelOperator401ApplicationProblemPlusJSONResponse) VisitSet
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -9586,6 +10121,9 @@ func (response DeleteProjectBinding401ApplicationProblemPlusJSONResponse) VisitD
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -9781,6 +10319,9 @@ func (response PutProjectBinding401ApplicationProblemPlusJSONResponse) VisitPutP
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -9991,6 +10532,9 @@ func (response ListForumTags401ApplicationProblemPlusJSONResponse) VisitListForu
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -10163,6 +10707,9 @@ func (response CreateForumTag401ApplicationProblemPlusJSONResponse) VisitCreateF
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -10366,6 +10913,9 @@ func (response DeleteForumTag401ApplicationProblemPlusJSONResponse) VisitDeleteF
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -10539,6 +11089,9 @@ func (response UpdateForumTag401ApplicationProblemPlusJSONResponse) VisitUpdateF
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -10752,6 +11305,9 @@ func (response MoveForumTag401ApplicationProblemPlusJSONResponse) VisitMoveForum
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -10961,6 +11517,9 @@ func (response ListTemplates401ApplicationProblemPlusJSONResponse) VisitListTemp
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -11133,6 +11692,9 @@ func (response CreateChannelTemplate401ApplicationProblemPlusJSONResponse) Visit
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -11324,6 +11886,9 @@ func (response ListChannelThreads401ApplicationProblemPlusJSONResponse) VisitLis
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -11533,6 +12098,9 @@ func (response CreateThread401ApplicationProblemPlusJSONResponse) VisitCreateThr
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -11744,6 +12312,9 @@ func (response CreateUpload401ApplicationProblemPlusJSONResponse) VisitCreateUpl
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -11984,6 +12555,9 @@ func (response SubmitClientMetrics401ApplicationProblemPlusJSONResponse) VisitSu
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -12079,6 +12653,193 @@ func (response SubmitClientMetricsdefaultApplicationProblemPlusJSONResponse) Vis
 	return err
 }
 
+type GetConsoleSessionRequestObject struct {
+}
+
+type GetConsoleSessionResponseObject interface {
+	VisitGetConsoleSessionResponse(w http.ResponseWriter) error
+}
+
+type GetConsoleSession200JSONResponse struct{ ConsoleLoginJSONResponse }
+
+func (response GetConsoleSession200JSONResponse) VisitGetConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleSession401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetConsoleSession401ApplicationProblemPlusJSONResponse) VisitGetConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleSession403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetConsoleSession403ApplicationProblemPlusJSONResponse) VisitGetConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConsoleSessiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetConsoleSessiondefaultApplicationProblemPlusJSONResponse) VisitGetConsoleSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndViewAsRequestObject struct {
+	Params EndViewAsParams
+}
+
+type EndViewAsResponseObject interface {
+	VisitEndViewAsResponse(w http.ResponseWriter) error
+}
+
+type EndViewAs204ResponseHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type EndViewAs204Response struct {
+	Headers EndViewAs204ResponseHeaders
+}
+
+func (response EndViewAs204Response) VisitEndViewAsResponse(w http.ResponseWriter) error {
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type EndViewAs401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response EndViewAs401ApplicationProblemPlusJSONResponse) VisitEndViewAsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndViewAs403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response EndViewAs403ApplicationProblemPlusJSONResponse) VisitEndViewAsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EndViewAsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response EndViewAsdefaultApplicationProblemPlusJSONResponse) VisitEndViewAsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetDeviceRequestObject struct {
 	DeviceId DeviceIdPath `json:"device_id"`
 }
@@ -12154,6 +12915,9 @@ func (response GetDevice401ApplicationProblemPlusJSONResponse) VisitGetDeviceRes
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -12327,6 +13091,9 @@ func (response ApproveDevice401ApplicationProblemPlusJSONResponse) VisitApproveD
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -12539,6 +13306,9 @@ func (response RevokeDevice401ApplicationProblemPlusJSONResponse) VisitRevokeDev
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -12729,6 +13499,9 @@ func (response ListEvents401ApplicationProblemPlusJSONResponse) VisitListEventsR
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -12879,6 +13652,9 @@ func (response ListFeatureFlags401ApplicationProblemPlusJSONResponse) VisitListF
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -13037,6 +13813,9 @@ func (response PutFeatureFlag401ApplicationProblemPlusJSONResponse) VisitPutFeat
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -13228,6 +14007,9 @@ func (response GetFile401ApplicationProblemPlusJSONResponse) VisitGetFileRespons
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -13399,6 +14181,9 @@ func (response ListGrants401ApplicationProblemPlusJSONResponse) VisitListGrantsR
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -13551,6 +14336,9 @@ func (response CreateGrant401ApplicationProblemPlusJSONResponse) VisitCreateGran
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -13742,6 +14530,9 @@ func (response PreviewGrant401ApplicationProblemPlusJSONResponse) VisitPreviewGr
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -13893,6 +14684,9 @@ func (response GetGrant401ApplicationProblemPlusJSONResponse) VisitGetGrantRespo
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -14066,6 +14860,9 @@ func (response RevokeGrant401ApplicationProblemPlusJSONResponse) VisitRevokeGran
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -14276,6 +15073,9 @@ func (response ListGroups401ApplicationProblemPlusJSONResponse) VisitListGroupsR
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -14428,6 +15228,9 @@ func (response CreateGroup401ApplicationProblemPlusJSONResponse) VisitCreateGrou
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -14610,6 +15413,9 @@ func (response DeleteGroup401ApplicationProblemPlusJSONResponse) VisitDeleteGrou
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -14801,6 +15607,9 @@ func (response GetGroup401ApplicationProblemPlusJSONResponse) VisitGetGroupRespo
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -14973,6 +15782,9 @@ func (response UpdateGroup401ApplicationProblemPlusJSONResponse) VisitUpdateGrou
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -15184,6 +15996,9 @@ func (response ListGroupMembers401ApplicationProblemPlusJSONResponse) VisitListG
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -15356,6 +16171,9 @@ func (response AddGroupMember401ApplicationProblemPlusJSONResponse) VisitAddGrou
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -15559,6 +16377,9 @@ func (response RemoveGroupMember401ApplicationProblemPlusJSONResponse) VisitRemo
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -15749,6 +16570,9 @@ func (response ListHosts401ApplicationProblemPlusJSONResponse) VisitListHostsRes
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -15901,6 +16725,9 @@ func (response CreateHost401ApplicationProblemPlusJSONResponse) VisitCreateHostR
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -16092,6 +16919,9 @@ func (response PairHost401ApplicationProblemPlusJSONResponse) VisitPairHostRespo
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -16247,6 +17077,9 @@ func (response GetHost401ApplicationProblemPlusJSONResponse) VisitGetHostRespons
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -16424,6 +17257,9 @@ func (response UpdateHost401ApplicationProblemPlusJSONResponse) VisitUpdateHostR
 	}
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
 	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
@@ -16659,6 +17495,9 @@ func (response ConfirmHost401ApplicationProblemPlusJSONResponse) VisitConfirmHos
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -16893,6 +17732,9 @@ func (response SetHostLlmCredentials401ApplicationProblemPlusJSONResponse) Visit
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -17123,6 +17965,9 @@ func (response IssueHostPairingCode401ApplicationProblemPlusJSONResponse) VisitI
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -17338,6 +18183,9 @@ func (response SetHostState401ApplicationProblemPlusJSONResponse) VisitSetHostSt
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -17546,6 +18394,9 @@ func (response ListIdentityProviders401ApplicationProblemPlusJSONResponse) Visit
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -17699,6 +18550,9 @@ func (response CreateIdentityProvider401ApplicationProblemPlusJSONResponse) Visi
 	if response.Headers.DPoPNonce != nil {
 		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
 	}
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
 	if response.Headers.WWWAuthenticate != nil {
 		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
 	}
@@ -17799,359 +18653,6 @@ type CreateIdentityProviderdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CreateIdentityProviderdefaultApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(response.StatusCode)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteIdentityProviderRequestObject struct {
-	ProviderId ProviderIdPath `json:"provider_id"`
-}
-
-type DeleteIdentityProviderResponseObject interface {
-	VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error
-}
-
-type DeleteIdentityProvider204ResponseHeaders struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-type DeleteIdentityProvider204Response struct {
-	Headers DeleteIdentityProvider204ResponseHeaders
-}
-
-func (response DeleteIdentityProvider204Response) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	w.WriteHeader(204)
-	return nil
-}
-
-type DeleteIdentityProvider400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response DeleteIdentityProvider400ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteIdentityProvider401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response DeleteIdentityProvider401ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.DPoPNonce != nil {
-		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
-	}
-	if response.Headers.WWWAuthenticate != nil {
-		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
-	}
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteIdentityProvider403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response DeleteIdentityProvider403ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteIdentityProvider404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response DeleteIdentityProvider404ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteIdentityProvider409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response DeleteIdentityProvider409ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteIdentityProvider429ApplicationProblemPlusJSONResponse struct {
-	TooManyRequestsApplicationProblemPlusJSONResponse
-}
-
-func (response DeleteIdentityProvider429ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	if response.Headers.RetryAfter != nil {
-		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
-	}
-	w.WriteHeader(429)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeleteIdentityProviderdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	Headers    ErrorResponseHeaders
-	StatusCode int
-}
-
-func (response DeleteIdentityProviderdefaultApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(response.StatusCode)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetIdentityProviderRequestObject struct {
-	ProviderId ProviderIdPath `json:"provider_id"`
-}
-
-type GetIdentityProviderResponseObject interface {
-	VisitGetIdentityProviderResponse(w http.ResponseWriter) error
-}
-
-type GetIdentityProvider200ResponseHeaders struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-type GetIdentityProvider200JSONResponse struct {
-	Body    IdentityProvider
-	Headers GetIdentityProvider200ResponseHeaders
-}
-
-func (response GetIdentityProvider200JSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetIdentityProvider400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response GetIdentityProvider400ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetIdentityProvider401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response GetIdentityProvider401ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.DPoPNonce != nil {
-		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
-	}
-	if response.Headers.WWWAuthenticate != nil {
-		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
-	}
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetIdentityProvider403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response GetIdentityProvider403ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetIdentityProvider404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response GetIdentityProvider404ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetIdentityProvider429ApplicationProblemPlusJSONResponse struct {
-	TooManyRequestsApplicationProblemPlusJSONResponse
-}
-
-func (response GetIdentityProvider429ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	if response.Headers.CorrelationId != nil {
-		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
-	}
-	if response.Headers.RateLimit != nil {
-		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
-	}
-	if response.Headers.RateLimitPolicy != nil {
-		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
-	}
-	if response.Headers.RetryAfter != nil {
-		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
-	}
-	w.WriteHeader(429)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetIdentityProviderdefaultApplicationProblemPlusJSONResponse struct {
-	Body       Problem
-	Headers    ErrorResponseHeaders
-	StatusCode int
-}
-
-func (response GetIdentityProviderdefaultApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {

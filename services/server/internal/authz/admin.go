@@ -282,6 +282,17 @@ type ChannelView struct {
 	Capabilities []string
 }
 
+// ConsoleViews stores "View as person" on a console session (R-DM-49, M6-01): viewAsUser from the
+// console keeps the view on the session, so every later request of that session carries it until
+// access.view_as.end or authz.view_as_max_duration. identity implements it, because the state lives
+// on auth_sessions.
+type ConsoleViews interface {
+	// StartView stores the view of userID started at at on the console session sessionID inside
+	// the ambient unit of work. Errors: 401 session_revoked when the session is no longer an open
+	// console session, and the store errors.
+	StartView(ctx context.Context, sessionID, userID ids.ID, at time.Time) error
+}
+
 // ViewAsSnapshot is the answer of access.view_as (OpenAPI ViewAsSnapshot, 07 section 9.2).
 type ViewAsSnapshot struct {
 	User PrincipalRef

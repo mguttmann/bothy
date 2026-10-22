@@ -555,6 +555,24 @@ requires an `auth_time` after the start of the challenge. Local accounts without
 password with TOTP. The operations for the last two methods come with the console session
 (PLAN M6-01), spec first; native apps always have a step-up key and do not need them.
 
+Console step-up operations (M6-01, docs/DECISIONS.md D-M6-01-6): every console step-up starts with
+`createStepUpChallenge`. The passkey uses `completeStepUpWithPasskey` as for apps (every passkey
+ceremony of this server asks `userVerification = required`). Password with TOTP uses
+`stepUpWithPassword` (`POST /api/v1/auth/step-up/password`, body `challenge_id`, `password`,
+`totp_code`): only for a console session of a person with a local account while
+`auth.local_password_enabled` is true; password and code are checked like the login of section 2.5
+with the same lockout, and `step_up_method = password_totp`. The OIDC re-login uses
+`beginStepUpOidcReauth` (`POST /api/v1/auth/step-up/oidc`, body `challenge_id`, `provider_id`,
+`app_redirect_uri`, `client_challenge`; the redirect must be `/console/step-up/callback` on the
+origin of `server.public_url`) and `completeStepUpOidcReauth` (`POST
+/api/v1/auth/step-up/oidc/complete`, body `login_code`, `client_verifier`). The flow asks the
+provider for `prompt=login` and `max_age=0`; the identity must be one of the person's linked
+identities (same issuer and subject) and its `auth_time` must not lie before the second in which
+the challenge was created (`auth_time` has whole seconds); then `step_up_method = oidc_reauth`. A
+wrong password, code, identity or `auth_time` fails the challenge and counts toward
+`auth.step_up_fail_limit`. From any other session the two operations answer `403 forbidden`. Every
+successful step-up of a console session sets a new cookie value (section 7.5).
+
 Only people in a session can provide step-up (07, SR5). The confirmation applies only to the
 session in which it was provided, that is, to one device.
 
@@ -717,6 +735,40 @@ most secure one and recommends it for applications with personal data
   existing session at the identity provider. Browsers can use passkeys also for domains
   without public reachability; the limit from Baseline R-Passkeys only affects native
   Apple apps [derived].
+
+Operations and rules of the console session (M6-01, docs/DECISIONS.md D-M6-01-1 to D-M6-01-8):
+
+- Login: `completeOidcLogin`, `completePasskeyLogin`, `loginWithPassword` and
+  `loginWithTrustedHeader` take the member `client` (`app` or `console`, default `app`). The
+  console form sends no `device` and no DPoP proof; the server registers a device `{platform: web,
+  state: active, name: "Web console"}` without keys, starts the session with `client_component =
+  'console'`, issues no token and no refresh family, and answers `200` with the schema
+  `ConsoleSession` and the cookie. For OIDC, `beginOidcLogin` with `client = console` needs
+  `app_redirect_uri` = `/console/login/callback` on the origin of `server.public_url`, and a flow
+  begun that way completes only in the console form (and an app flow only in the app form).
+  Enrollment codes and device pairing never take the console form (`400 validation_failed`).
+- Cookie: name `__Host-console_session`, value 32 random bytes as base64url without padding,
+  stored only as HMAC-SHA-256 with the token pepper. Attributes exactly `Secure; HttpOnly;
+  SameSite=Strict; Path=/` with `Max-Age` up to `expires_at`; every answer of the API carries
+  `Cache-Control: no-store` (SEC-HDR-2). `logout` with the cookie and every `401` for an unknown,
+  revoked, expired or idle cookie answer with the clearing cookie (empty value, `Max-Age=0`).
+- CSRF: every request with the cookie and a method other than `GET`, `HEAD` and `OPTIONS` carries
+  `X-Console-Request: 1` (parameter `ConsoleRequest` of openapi.yaml) and an `Origin` equal to the
+  origin of `server.public_url`; otherwise `403 forbidden` with reason `csrf_check_failed` before
+  the handler. A WebSocket upgrade with the cookie and a missing or foreign `Origin` is `403`
+  before the upgrade. A request with the cookie and an `Authorization` header is `400
+  validation_failed`.
+- Before the first step-up of the session only `self.read` (`getMe`, `getConsoleSession`),
+  `auth.step_up`, `auth.logout`, the discovery and the public login operations pass; every other
+  operation is `401 step_up_required` with reason `console_step_up_required`.
+- Idle: a request writes `last_seen_at` only when the stored value is older than one hundredth of
+  `auth.console_session_idle_timeout`; a session is idle from `last_seen_at +
+  auth.console_session_idle_timeout` plus that hundredth on. An idle session or one past
+  `auth.console_session_max_age` is revoked with `revoke_reason = 'expired'` by the request that
+  finds it or by the job `identity.auth_cleanup`, with one audit entry.
+- "View as person" from the console is stored on the session ([07-permissions.md](07-permissions.md),
+  section 9.2); `getConsoleSession` (`GET /api/v1/console/session`) shows it with its end, and
+  `endViewAs` (`DELETE /api/v1/console/session/view-as`) ends it.
 
 ## 8. Session duration
 

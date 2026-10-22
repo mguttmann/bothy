@@ -387,6 +387,10 @@ authorize(p, action, ref) -> Decision:
   return ALLOW
 ```
 
+While a view is stored on a console session, `access.view_as.end`, `auth.logout` and
+`auth.step_up` on the person's own session and `self.read` on the person themselves are decided
+without `view_as` (R-AZ-32; steps 4 and 7 would otherwise deny them).
+
 After that, not in `authorize`, come the audit and the rate-limit counting according to the columns
 in 05. Rate limits are checked by a separate layer before `authorize` (05, section 2.5).
 
@@ -937,11 +941,16 @@ would give. The view needs `owner` or `manage` (05).
   every decision ends with `step_up_required`.
 - The console shows a banner with name and remaining time throughout.
 - Purpose: check what a person sees and can trigger, without knowing their credentials.
-- In M1 "View as person" is a snapshot: `viewAsUser` returns the spaces and
-  channels that the person sees, with level and `expires_at`; `view_as` lives only within this
-  request. Browsing content as another person in the console needs state on
-  the console session (target person, start) and operations to start and end it; both are
-  added to the console session (PLAN M6-01) in the core contract before it is built.
+- Stored view (M6-01, R-DM-49, R-AZ-32): `viewAsUser` called from a console session stores the
+  target person and the start on the session (`auth_sessions.view_as_user_id`,
+  `view_as_started_at`) in the transaction of its audit entry (`target_user_id`, `started_at`,
+  `expires_at`). Every later request of that session carries `view_as` until `endViewAs`
+  (`access.view_as.end`, audit `ended_reason = ended`) or until `authz.view_as_max_duration` has
+  passed; the first request after that ends the view (audit `ended_reason = expired`) and answers
+  `401 step_up_required`. Starting a new view while one is stored is a write and is denied; the
+  console ends the current view first. Called from any other session, `viewAsUser` stays a
+  snapshot that lives only in that request. `getConsoleSession` shows the stored view with its
+  end.
 
 ### 9.3 Plain-text preview
 

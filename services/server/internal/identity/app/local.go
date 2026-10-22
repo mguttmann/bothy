@@ -397,7 +397,7 @@ func (l *LocalCredentials) LoginWithPassword(ctx context.Context, in identity.Pa
 	if err := d.Err(); err != nil {
 		return identity.RedeemResult{}, err
 	}
-	proof, err := l.d.DPoP.Verify(ctx, in.Proof)
+	proof, err := l.d.Logins.verifyLoginProof(ctx, in.Console, in.Proof)
 	if err != nil {
 		return identity.RedeemResult{}, err
 	}
@@ -419,7 +419,7 @@ func (l *LocalCredentials) LoginWithPassword(ctx context.Context, in identity.Pa
 		_ = l.d.Audit.RecordDenial(ctx, passwordDenial(at))
 		return identity.RedeemResult{}, errs.New(errs.CodeUnauthenticated, "")
 	}
-	res := identity.RedeemResult{Tokens: at.login.Tokens}
+	res := at.login.Result()
 	if proof.NonceStale {
 		res.Nonce = l.d.DPoP.CurrentNonce()
 	}
@@ -597,7 +597,7 @@ func (l *LocalCredentials) succeed(ctx context.Context, at passwordAttempt, rec 
 	identityID := at.identity
 	out, err := l.d.Logins.completeLogin(ctx, LoginCompletion{
 		UserID: at.userID, IdentityID: &identityID, AuthMethod: identity.AuthPasswordTOTP, Device: in.Device,
-		ProofJKT: jkt, Trust: TrustUnconfirmed, ClientIP: in.ClientIP,
+		ProofJKT: jkt, Trust: TrustUnconfirmed, ClientIP: in.ClientIP, Console: in.Console,
 	})
 	if err != nil {
 		return passwordAttempt{}, err

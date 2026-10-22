@@ -36,7 +36,7 @@ func TestLoginWithTrustedHeaderHandler(t *testing.T) {
 	if _, err := h.LoginWithTrustedHeader(ctx, rest.LoginWithTrustedHeaderRequestObject{}); errs.KindOf(err) != errs.KindBadRequest {
 		t.Errorf("no body = %v", err)
 	}
-	body := &rest.LoginWithTrustedHeaderJSONRequestBody{Device: rest.DeviceRegistration{PublicJwk: rest.JsonObject{"x": func() {}}}}
+	body := &rest.LoginWithTrustedHeaderJSONRequestBody{Device: &rest.DeviceRegistration{PublicJwk: rest.JsonObject{"x": func() {}}}}
 	if _, err := h.LoginWithTrustedHeader(ctx, rest.LoginWithTrustedHeaderRequestObject{Body: body}); errs.KindOf(err) != errs.KindBadRequest {
 		t.Errorf("bad registration = %v", err)
 	}

@@ -8,23 +8,26 @@ part of 'password_login_request.dart';
 
 class _$PasswordLoginRequest extends PasswordLoginRequest {
   @override
+  final LoginClient? client;
+  @override
   final String loginName;
   @override
   final String password;
   @override
   final String totpCode;
   @override
-  final DeviceRegistration device;
+  final DeviceRegistration? device;
 
   factory _$PasswordLoginRequest([
     void Function(PasswordLoginRequestBuilder)? updates,
   ]) => (PasswordLoginRequestBuilder()..update(updates))._build();
 
   _$PasswordLoginRequest._({
+    this.client,
     required this.loginName,
     required this.password,
     required this.totpCode,
-    required this.device,
+    this.device,
   }) : super._();
   @override
   PasswordLoginRequest rebuild(
@@ -39,6 +42,7 @@ class _$PasswordLoginRequest extends PasswordLoginRequest {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is PasswordLoginRequest &&
+        client == other.client &&
         loginName == other.loginName &&
         password == other.password &&
         totpCode == other.totpCode &&
@@ -48,6 +52,7 @@ class _$PasswordLoginRequest extends PasswordLoginRequest {
   @override
   int get hashCode {
     var _$hash = 0;
+    _$hash = $jc(_$hash, client.hashCode);
     _$hash = $jc(_$hash, loginName.hashCode);
     _$hash = $jc(_$hash, password.hashCode);
     _$hash = $jc(_$hash, totpCode.hashCode);
@@ -59,6 +64,7 @@ class _$PasswordLoginRequest extends PasswordLoginRequest {
   @override
   String toString() {
     return (newBuiltValueToStringHelper(r'PasswordLoginRequest')
+          ..add('client', client)
           ..add('loginName', loginName)
           ..add('password', password)
           ..add('totpCode', totpCode)
@@ -70,6 +76,10 @@ class _$PasswordLoginRequest extends PasswordLoginRequest {
 class PasswordLoginRequestBuilder
     implements Builder<PasswordLoginRequest, PasswordLoginRequestBuilder> {
   _$PasswordLoginRequest? _$v;
+
+  LoginClient? _client;
+  LoginClient? get client => _$this._client;
+  set client(LoginClient? client) => _$this._client = client;
 
   String? _loginName;
   String? get loginName => _$this._loginName;
@@ -95,10 +105,11 @@ class PasswordLoginRequestBuilder
   PasswordLoginRequestBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
+      _client = $v.client;
       _loginName = $v.loginName;
       _password = $v.password;
       _totpCode = $v.totpCode;
-      _device = $v.device.toBuilder();
+      _device = $v.device?.toBuilder();
       _$v = null;
     }
     return this;
@@ -123,6 +134,7 @@ class PasswordLoginRequestBuilder
       _$result =
           _$v ??
           _$PasswordLoginRequest._(
+            client: client,
             loginName: BuiltValueNullFieldError.checkNotNull(
               loginName,
               r'PasswordLoginRequest',
@@ -138,13 +150,13 @@ class PasswordLoginRequestBuilder
               r'PasswordLoginRequest',
               'totpCode',
             ),
-            device: device.build(),
+            device: _device?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'device';
-        device.build();
+        _device?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'PasswordLoginRequest',

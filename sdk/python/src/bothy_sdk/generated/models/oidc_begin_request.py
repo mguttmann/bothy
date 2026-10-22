@@ -6,6 +6,7 @@ from uuid import UUID
 
 from attrs import define as _attrs_define
 
+from ..models.login_client import LoginClient
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="OidcBeginRequest")
@@ -20,6 +21,7 @@ class OidcBeginRequest:
             list of the provider.
         client_challenge (str): Base64url SHA-256 of a client verifier, binds the later `login_code` to this app
             instance.
+        client (LoginClient | Unset): `console`: no `device` or DPoP; cookie, no token (08, 7.5).
         enrollment_code (str | Unset): Optional enrollment code (purpose `first_login`, `recovery` or `identity_link`).
             Checked at begin, consumed at complete; an unknown subject is then linked to the person of the code (08, 3.1).
     """
@@ -27,6 +29,7 @@ class OidcBeginRequest:
     provider_id: UUID
     app_redirect_uri: str
     client_challenge: str
+    client: LoginClient | Unset = UNSET
     enrollment_code: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -35,6 +38,10 @@ class OidcBeginRequest:
         app_redirect_uri = self.app_redirect_uri
 
         client_challenge = self.client_challenge
+
+        client: str | Unset = UNSET
+        if not isinstance(self.client, Unset):
+            client = self.client.value
 
         enrollment_code = self.enrollment_code
 
@@ -47,6 +54,8 @@ class OidcBeginRequest:
                 "client_challenge": client_challenge,
             }
         )
+        if client is not UNSET:
+            field_dict["client"] = client
         if enrollment_code is not UNSET:
             field_dict["enrollment_code"] = enrollment_code
 
@@ -61,12 +70,20 @@ class OidcBeginRequest:
 
         client_challenge = d.pop("client_challenge")
 
+        _client = d.pop("client", UNSET)
+        client: LoginClient | Unset
+        if isinstance(_client, Unset):
+            client = UNSET
+        else:
+            client = LoginClient(_client)
+
         enrollment_code = d.pop("enrollment_code", UNSET)
 
         oidc_begin_request = cls(
             provider_id=provider_id,
             app_redirect_uri=app_redirect_uri,
             client_challenge=client_challenge,
+            client=client,
             enrollment_code=enrollment_code,
         )
 

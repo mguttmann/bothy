@@ -105,7 +105,7 @@ func TestLoginAgainstRealServer(t *testing.T) {
 		t.Errorf("platform = %q, want cli", platform)
 	}
 
-	ch, err := c.CreateStepUpChallengeWithResponse(t.Context())
+	ch, err := c.CreateStepUpChallengeWithResponse(t.Context(), &restclient.CreateStepUpChallengeParams{})
 	if err != nil {
 		t.Fatal(err)
 	}

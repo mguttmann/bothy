@@ -54,6 +54,12 @@ class AuditApi {
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
         ],
@@ -157,6 +163,12 @@ class AuditApi {
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
         ],
@@ -288,6 +300,12 @@ class AuditApi {
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
           {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
           {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
         ],

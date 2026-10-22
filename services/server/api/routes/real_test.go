@@ -797,6 +797,26 @@ func (stubServer) SetAgentToolClass(context.Context, rest.SetAgentToolClassReque
 	return nil, nil
 }
 
+func (stubServer) GetConsoleSession(context.Context, rest.GetConsoleSessionRequestObject) (rest.GetConsoleSessionResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) EndViewAs(context.Context, rest.EndViewAsRequestObject) (rest.EndViewAsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) StepUpWithPassword(context.Context, rest.StepUpWithPasswordRequestObject) (rest.StepUpWithPasswordResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) BeginStepUpOidcReauth(context.Context, rest.BeginStepUpOidcReauthRequestObject) (rest.BeginStepUpOidcReauthResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteStepUpOidcReauth(context.Context, rest.CompleteStepUpOidcReauthRequestObject) (rest.CompleteStepUpOidcReauthResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) LoginWithPassword(context.Context, rest.LoginWithPasswordRequestObject) (rest.LoginWithPasswordResponseObject, error) {
 	return nil, nil
 }
@@ -1092,6 +1112,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M2-03
 		"putProjectBinding":    {"PUT /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
 		"deleteProjectBinding": {"DELETE /api/v1/channels/{channel_id}/project-binding", "channel.project.bind", "rl.admin"},
+		// M6-01
+		"getConsoleSession":        {"GET /api/v1/console/session", "self.read", "rl.read"},
+		"endViewAs":                {"DELETE /api/v1/console/session/view-as", "access.view_as.end", "rl.admin"},
+		"stepUpWithPassword":       {"POST /api/v1/auth/step-up/password", "auth.step_up", "rl.public_auth"},
+		"beginStepUpOidcReauth":    {"POST /api/v1/auth/step-up/oidc", "auth.step_up", "rl.public_auth"},
+		"completeStepUpOidcReauth": {"POST /api/v1/auth/step-up/oidc/complete", "auth.step_up", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

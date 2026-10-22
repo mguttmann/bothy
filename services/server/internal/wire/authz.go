@@ -313,7 +313,7 @@ func NewAuthzAdmin(pool *pg.Pool, cfg authzapp.AdminConfig, a *Audit, sy *Sync, 
 		UoW: a.UoW(), Authorizer: az, Store: authzpg.NewRepository(pool),
 		Principals: identityapp.NewPrincipalSource(identitypg.NewRepository(pool)), Structure: NewStructureSource(pool), Hosts: NewHostSource(pool),
 		Rights: a.RightsHook(), Audit: a.Recorder(), Clock: clk, Events: sy.Appender(), Scopes: az, Cursors: authzhttp.Cursors{},
-		Config: cfg,
+		Config: cfg, Views: identityapp.NewConsoleViews(identitypg.NewRepository(pool)),
 	})
 	if err != nil {
 		return nil, err

@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:api_client/src/generated/model/device_registration.dart';
+import 'package:api_client/src/generated/model/login_client.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
 
@@ -12,12 +13,17 @@ part 'oidc_complete_request.g.dart';
 /// OidcCompleteRequest
 ///
 /// Properties:
+/// * [client]
 /// * [loginCode] - One-time code the server appended to `app_redirect_uri` after the provider callback.
 /// * [clientVerifier]
 /// * [device]
 @BuiltValue()
 abstract class OidcCompleteRequest
     implements Built<OidcCompleteRequest, OidcCompleteRequestBuilder> {
+  @BuiltValueField(wireName: r'client')
+  LoginClient? get client;
+  // enum clientEnum {  app,  console,  };
+
   /// One-time code the server appended to `app_redirect_uri` after the provider callback.
   @BuiltValueField(wireName: r'login_code')
   String get loginCode;
@@ -26,7 +32,7 @@ abstract class OidcCompleteRequest
   String get clientVerifier;
 
   @BuiltValueField(wireName: r'device')
-  DeviceRegistration get device;
+  DeviceRegistration? get device;
 
   OidcCompleteRequest._();
 
@@ -57,6 +63,13 @@ class _$OidcCompleteRequestSerializer
     OidcCompleteRequest object, {
     FullType specifiedType = FullType.unspecified,
   }) sync* {
+    if (object.client != null) {
+      yield r'client';
+      yield serializers.serialize(
+        object.client,
+        specifiedType: const FullType(LoginClient),
+      );
+    }
     yield r'login_code';
     yield serializers.serialize(
       object.loginCode,
@@ -67,11 +80,13 @@ class _$OidcCompleteRequestSerializer
       object.clientVerifier,
       specifiedType: const FullType(String),
     );
-    yield r'device';
-    yield serializers.serialize(
-      object.device,
-      specifiedType: const FullType(DeviceRegistration),
-    );
+    if (object.device != null) {
+      yield r'device';
+      yield serializers.serialize(
+        object.device,
+        specifiedType: const FullType(DeviceRegistration),
+      );
+    }
   }
 
   @override
@@ -99,6 +114,14 @@ class _$OidcCompleteRequestSerializer
       final key = serializedList[i] as String;
       final value = serializedList[i + 1];
       switch (key) {
+        case r'client':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(LoginClient),
+          ) as LoginClient?;
+          if (valueDes == null) continue;
+          result.client = valueDes;
+          break;
         case r'login_code':
           final valueDes = serializers.deserialize(
             value,
@@ -116,8 +139,9 @@ class _$OidcCompleteRequestSerializer
         case r'device':
           final valueDes = serializers.deserialize(
             value,
-            specifiedType: const FullType(DeviceRegistration),
-          ) as DeviceRegistration;
+            specifiedType: const FullType.nullable(DeviceRegistration),
+          ) as DeviceRegistration?;
+          if (valueDes == null) continue;
           result.device.replace(valueDes);
           break;
         default:

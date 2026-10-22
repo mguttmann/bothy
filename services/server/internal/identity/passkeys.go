@@ -32,6 +32,9 @@ type WebAuthnChallenge struct {
 // PasskeyLogin is the input of Passkeys.CompletePasskeyLogin (schema PasskeyLoginCompleteRequest
 // plus the request facts).
 type PasskeyLogin struct {
+	// Console selects the console form (client = console, M6-01): no Device and no Proof; the
+	// login registers a web device and starts a console session with a cookie instead of tokens.
+	Console bool
 	// ChallengeID is the challenge of beginPasskeyLogin.
 	ChallengeID ids.ID
 	// Credential is the PublicKeyCredential with an assertion response in JSON form.

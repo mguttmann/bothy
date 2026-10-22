@@ -57,17 +57,22 @@ func (h *Passkeys) CompletePasskeyLogin(ctx context.Context, req rest.CompletePa
 	if err != nil {
 		return nil, err
 	}
-	reg, err := registration(req.Body.Device)
+	console := consoleForm(req.Body.Client)
+	reg, err := loginDevice(console, req.Body.Device)
 	if err != nil {
 		return nil, err
 	}
-	in := identity.PasskeyLogin{ChallengeID: ids.ID(req.Body.ChallengeId), Credential: cred, Device: reg, Proof: loginProof(ctx, req.Params.DPoP)}
+	in := identity.PasskeyLogin{ChallengeID: ids.ID(req.Body.ChallengeId), Credential: cred, Device: reg,
+		Proof: loginProof(ctx, dpopHeader(req.Params.DPoP)), Console: console}
 	if ip, ok := reqmeta.ClientIP(ctx); ok {
 		in.ClientIP = ip
 	}
 	out, err := h.passkeys.CompletePasskeyLogin(ctx, in)
 	if err != nil {
 		return nil, err
+	}
+	if c := out.Console; c != nil {
+		return rest.CompletePasskeyLogin200JSONResponse{ConsoleLoginJSONResponse: consoleLogin(c)}, nil
 	}
 	if out.Nonce != "" {
 		reqmeta.SetResponseHeader(ctx, headerDPoPNonce, out.Nonce)
@@ -177,7 +182,7 @@ func (h *Passkeys) CompleteStepUpWithPasskey(ctx context.Context, req rest.Compl
 	if err != nil {
 		return nil, err
 	}
-	return rest.CompleteStepUpWithPasskey200JSONResponse{Body: rest.StepUpResult{StepUpAt: ms(r.StepUpAt), ValidUntil: ms(r.ValidUntil)}}, nil
+	return rest.CompleteStepUpWithPasskey200JSONResponse{StepUpDoneJSONResponse: stepUpDone(r)}, nil
 }
 
 // webAuthnChallenge converts a ceremony challenge (schema WebAuthnChallenge).
