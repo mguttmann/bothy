@@ -72,10 +72,15 @@ printf '%s\n' "$internal_base" | grep -Eq '^http://[A-Za-z0-9.-]+(:[0-9]+)?$' ||
 # Read the URL without echoing it on a terminal.
 url=
 if [ -t 0 ]; then
-	printf 'Paste the URL for %s (input hidden): ' "$kind" >&2
+	# Restore the terminal on every way out, also on Ctrl-C at the prompt.
+	old_tty=$(stty -g)
+	trap 'stty "$old_tty"' EXIT
+	trap 'exit 130' INT TERM
 	stty -echo
+	printf 'Paste the URL for %s (input hidden): ' "$kind" >&2
 	IFS= read -r url || true
-	stty echo
+	stty "$old_tty"
+	trap - EXIT INT TERM
 	echo >&2
 else
 	IFS= read -r url || true

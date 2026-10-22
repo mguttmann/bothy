@@ -11,6 +11,7 @@ import hashlib
 import os
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -230,3 +231,50 @@ def test_every_receiver_reads_its_url_from_a_file_of_the_catalogue() -> None:
     )
     assert files == sorted(f"/run/bothy/secrets/{n}" for n in ALL)
     assert all("url" not in cfg for r in spec["receivers"] for cfg in r["webhook_configs"])
+
+
+def test_interrupt_at_the_hidden_prompt_restores_echo() -> None:
+    """Ctrl-C at the hidden prompt leaves the terminal with echo on (CodeRabbit on M7-20)."""
+    import pty
+    import signal
+    import termios
+
+    # A shell started from a background job inherits SIGINT ignored and cannot trap it (POSIX);
+    # the wrapper resets it to the default action and execs sh, as under an interactive shell.
+    reset = (
+        "import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); "
+        "os.execvp('sh', sys.argv[1:])"
+    )
+    master, slave = pty.openpty()
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            reset,
+            "sh",
+            str(SETUP),
+            "--secrets-dir",
+            "/nonexistent-alert-setup-test",
+            "channel",
+        ],
+        stdin=slave,
+        stdout=subprocess.DEVNULL,
+        stderr=slave,
+    )
+    try:
+        seen = b""
+        while b"(input hidden): " not in seen:
+            chunk = os.read(master, 1024)
+            assert chunk, "the prompt never appeared"
+            seen += chunk
+        # The prompt comes after stty -echo, so echo is off now.
+        assert not termios.tcgetattr(slave)[3] & termios.ECHO
+        proc.send_signal(signal.SIGINT)
+        assert proc.wait() != 0
+        assert termios.tcgetattr(slave)[3] & termios.ECHO
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        os.close(master)
+        os.close(slave)
