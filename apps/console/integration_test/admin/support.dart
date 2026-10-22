@@ -7,18 +7,32 @@
 ///
 /// The flows run in the bundle `admin_bundle.dart`, served by the server under its enforced CSP
 /// (`make console-e2e`, phase 2). They share one server, so they run in the order of the bundle.
+///
+/// The flows of apps and webhooks (brief M6-08) also ask the runner for a manifest file
+/// ([chooseManifest]), call the API from the page with the console session or without any
+/// credential ([consoleApi], [postWithoutSession]), and check that a secret shown once leaves no
+/// trace on screen ([expectNoTrace]); a secret never reaches a log or a failure message
+/// ([hideInFailures]).
 library;
 
 import 'dart:convert';
 import 'dart:js_interop';
+import 'dart:math';
 
 import 'package:console/console.dart';
+import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
+import 'package:web/web.dart' as web;
 
 @JS('__e2eSeed')
 external JSString? get _seedJson;
+
+/// patrol's binding to the runner (tools/console-e2e PlatformHandler); the same binding patrol's
+/// own web actions use.
+@JS('__patrol__platformHandler')
+external JSPromise<JSAny?> _platformHandler(JSAny? request);
 
 /// One seeded object: its ID and its name.
 final class Seeded {
@@ -147,13 +161,34 @@ TestFailure _failure(String message) {
 }
 
 /// The texts on screen, for the message of a failed wait (the runner prints the details of a
-/// failed test).
+/// failed test). A value given to [hideInFailures] is replaced by `[hidden]`.
 String screenText() {
   final texts = <String>[
     for (final e in find.byType(Text).evaluate())
       if ((e.widget as Text).data case final t? when t.trim().isNotEmpty) t,
   ];
-  return 'screen: ${texts.take(80).join(' | ')}';
+  return _hide('screen: ${texts.take(80).join(' | ')}');
+}
+
+/// The secrets of the running flow that a failure message must not show.
+final Set<String> _hidden = {};
+
+/// Keeps [secret] out of every failure message of this file (`screenText`): the runner prints
+/// the details of a failed test and keeps the console of the page as a CI artifact, and a token
+/// shown once must never reach either (brief M6-08 requirement 17). [forgetHidden] drops them.
+void hideInFailures(String secret) {
+  if (secret.isNotEmpty) _hidden.add(secret);
+}
+
+/// Forgets the secrets of [hideInFailures]; a flow calls it at its end.
+void forgetHidden() => _hidden.clear();
+
+String _hide(String text) {
+  var out = text;
+  for (final s in _hidden) {
+    out = out.replaceAll(s, '[hidden]');
+  }
+  return out;
 }
 
 /// Pumps until [finder] finds nothing any more (step-ups are confirmed on the way).
@@ -241,6 +276,167 @@ Future<void> _settleStepUp(PatrolIntegrationTester $) async {
 /// Fails unless the flow confirmed at least one step-up through the console's adapter.
 void expectStepUp() =>
     expect(stepUps, greaterThan(0), reason: 'no step-up was asked');
+
+/// Asks the runner for the platform action [action] with [params] through patrol's binding and
+/// returns its answer. The runner fails a test that asks for an action it does not know.
+Future<Object?> askRunner(String action, Map<String, Object?> params) async {
+  final answer = await _platformHandler(
+    {'action': action, 'params': params}.jsify(),
+  ).toDart;
+  return answer.dartify();
+}
+
+/// Taps "Choose file" ([pickKey]) and has the runner set its manifest file [name] on the file
+/// input the console appended (`data-bothy-file-input="manifest"`): without a user activation
+/// Chromium opens no dialog, so the runner sets the file (platform action `e2eSetManifestFile`).
+Future<void> chooseManifest(
+  PatrolIntegrationTester $,
+  String name, {
+  String pickKey = 'install.pick',
+}) async {
+  await tapKey($, pickKey);
+  await askRunner('e2eSetManifestFile', {'name': name});
+  await $.tester.pump(const Duration(milliseconds: 300));
+}
+
+/// The state of the checkbox with [key]: its value and whether it takes a tap. The key may sit
+/// on a Checkbox, a CheckboxListTile or a widget around one of them.
+({bool? value, bool enabled}) checkboxOf(String key) {
+  final widget = byKey(key).evaluate().single.widget;
+  if (widget is CheckboxListTile) {
+    return (value: widget.value, enabled: widget.onChanged != null);
+  }
+  if (widget is Checkbox) {
+    return (value: widget.value, enabled: widget.onChanged != null);
+  }
+  final inner = find.descendant(
+    of: byKey(key),
+    matching: find.byType(Checkbox),
+  );
+  final box = inner.evaluate().single.widget as Checkbox;
+  return (value: box.value, enabled: box.onChanged != null);
+}
+
+/// Taps the checkbox with [key] until its value is [value].
+Future<void> setCheckbox(
+  PatrolIntegrationTester $,
+  String key,
+  bool value,
+) async {
+  await waitFor($, byKey(key));
+  if (checkboxOf(key).value != value) await tapKey($, key);
+  expect(checkboxOf(key).value, value, reason: '$key did not change');
+}
+
+/// The text of the SelectableText with [key] (the secret of `OnceOnlySecret`). The caller keeps
+/// it in a local variable only and passes it to [hideInFailures] at once.
+String selectableTextOf(String key) {
+  final widget = byKey(key).evaluate().single.widget;
+  final text = widget is SelectableText
+      ? widget.data ?? widget.textSpan?.toPlainText() ?? ''
+      : '';
+  if (text.isEmpty) throw _failure('$key shows no text');
+  return text;
+}
+
+/// The texts of every widget on screen: rendered text, text fields and selectable text.
+List<String> _textsOnScreen() => [
+  for (final e in find.byType(RichText).evaluate())
+    (e.widget as RichText).text.toPlainText(),
+  for (final e in find.byType(EditableText).evaluate())
+    (e.widget as EditableText).controller.text,
+  for (final e in find.byType(SelectableText).evaluate())
+    (e.widget as SelectableText).data ?? '',
+];
+
+/// The pieces of [secret] that [expectNoTrace] looks for: every run of 8 characters after its
+/// fixed prefix (for example `bothy_whi_`), which a screen may show to name the kind of token.
+List<String> _pieces(String secret) {
+  final body = secret.replaceFirst(RegExp(r'^[a-z]+(?:_[a-z]+)*_'), '');
+  const n = 8;
+  if (body.length <= n) return [body];
+  return [for (var i = 0; i + n <= body.length; i++) body.substring(i, i + n)];
+}
+
+/// Fails when any widget on screen shows any part of [secret] (a run of 8 of its characters
+/// after the prefix). The failure names the kind ([what]), never the secret.
+void expectNoTrace(String secret, String what) {
+  final pieces = _pieces(secret);
+  final shown = _textsOnScreen().any((t) => pieces.any(t.contains));
+  expect(shown, isFalse, reason: 'a widget still shows a part of the $what');
+}
+
+/// An answer of the API: the status and the JSON body (null when there is none).
+typedef ApiAnswer = ({int status, Object? json});
+
+final _uuid = Uuid7Generator(
+  nowMillis: () => DateTime.now().millisecondsSinceEpoch,
+  // pow, not a shift: on the web a shift by 32 gives 0.
+  random: (bits) => Random.secure().nextInt(pow(2, bits).toInt()),
+);
+
+/// A fresh UUIDv7 for a client_msg_id or an Idempotency-Key (06 3).
+String uuid7() => _uuid.next();
+
+Future<ApiAnswer> _fetch(
+  String url,
+  String method,
+  String credentials,
+  Map<String, String> headers,
+  Object? body,
+) async {
+  final h = web.Headers()..append('Accept', 'application/json');
+  // A lambda: dart2js refuses a tear-off of an external interop member.
+  headers.forEach((name, value) => h.append(name, value));
+  if (body != null) h.append('Content-Type', 'application/json');
+  final response = await web.window
+      .fetch(
+        url.toJS,
+        web.RequestInit(
+          method: method,
+          credentials: credentials,
+          headers: h,
+          body: body == null ? null : jsonEncode(body).toJS,
+        ),
+      )
+      .toDart;
+  final text = (await response.text().toDart).toDart;
+  Object? json;
+  try {
+    json = text.isEmpty ? null : jsonDecode(text);
+  } on FormatException {
+    json = null;
+  }
+  return (status: response.status, json: json);
+}
+
+/// A request of the console session to the API path [path] (below `/api/v1`): the cookie of
+/// the page (`credentials: same-origin`) and the CSRF header `X-Console-Request: 1`; a changing
+/// operation that takes an Idempotency-Key gets a fresh one with [idempotent]. A step-up the
+/// server asks for fails the request; the flows call only operations without one here.
+Future<ApiAnswer> consoleApi(
+  String method,
+  String path, {
+  Object? body,
+  bool idempotent = false,
+}) => _fetch('/api/v1$path', method, 'same-origin', {
+  'X-Console-Request': '1',
+  if (idempotent) 'Idempotency-Key': uuid7(),
+}, body);
+
+/// A POST of [body] to [url] without any credential of the page (`credentials: omit`, no
+/// cookie, no CSRF header): the call of an incoming webhook by an outside sender (11 8.4).
+Future<ApiAnswer> postWithoutSession(String url, Object body) =>
+    _fetch(url, 'POST', 'omit', const {}, body);
+
+/// The `items` of a list answer, or a failure naming [what].
+List<Map<String, Object?>> itemsOf(ApiAnswer answer, String what) {
+  final json = answer.json;
+  if (answer.status != 200 || json is! Map || json['items'] is! List) {
+    throw _failure('$what answered ${answer.status}');
+  }
+  return [for (final i in json['items']! as List) (i as Map).cast()];
+}
 
 /// A day as `YYYY-MM-DD`, [days] after today.
 String dayFromToday(int days) {
