@@ -315,7 +315,7 @@ channels:
       client_action: 'session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a fresh step-up'
     - code: 4102
       name: terminal_host_unavailable
-      client_action: 'the other side is missing (host offline or no counterpart on this node): an opening session ends with `open_failed`, open a new session; a started one is `detached`, attach again later'
+      client_action: 'the other side is missing (host offline or no counterpart on this node within `terminal.open_timeout`): an opening session ended `open_failed` (open again); a detached session stays `detached` (attach again later)'
     - code: 4103
       name: terminal_replaced
       client_action: another device attached; do not reconnect on your own
@@ -449,6 +449,9 @@ channels:
     - code: 4101
       name: terminal_token_stale
       client_action: 'sent by the host service (M2-44): it refused the handshake because the session token expired (`token_expired`) or was already used (`token_replayed`); the relay hands the code to the device stream'
+    - code: 4102
+      name: terminal_host_unavailable
+      client_action: 'no counterpart on this node within `terminal.open_timeout`; do not reopen this data connection, wait for the next `session.open`'
     - code: 4104
       name: terminal_handshake_failed
       client_action: 'sent by the host service (M2-44): it refused the token or the handshake for any other reason of 24 5.3, and ends the PTY of a started session; the relay hands the code to the device stream'

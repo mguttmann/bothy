@@ -1141,7 +1141,7 @@
       ],
       "min": "",
       "max": "",
-      "chapter": "02-architektur.md",
+      "chapter": "02-architecture.md",
       "doc": "single or multi (several api nodes behind a proxy that routes both terminal stream paths of a session to one node)."
     },
     {

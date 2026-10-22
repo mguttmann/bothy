@@ -4,7 +4,7 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
-// The values of cluster.mode (docs/spec/02-architektur.md section 22).
+// The values of cluster.mode (docs/spec/02-architecture.md section 22).
 const (
 	keyClusterMode     = "cluster.mode"
 	clusterModeSingle  = "single"

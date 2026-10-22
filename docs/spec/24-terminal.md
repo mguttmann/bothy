@@ -803,6 +803,37 @@ Build details (M2-43, docs/DECISIONS.md D-M2-43-6 and D-M2-43-7):
   runs only within the node that holds the older connection; the registry sits behind the port
   `ControlLinks`, so M2-47 adds the path across nodes without changing callers.
 
+Several nodes (M2-47, docs/DECISIONS.md D-M2-47-7). With `cluster.mode = multi` the probe runs on
+the node of the older connection, which the bullet "One node" above left to this ticket:
+
+- **Order of two connections.** Every node gives each accepted control connection a connection ID
+  (`conn_id`), a UUIDv7 from the clock of the accepting node; the older of two connections of a host
+  is the one with the smaller ID. The order across nodes rests on the clocks of the nodes: servers
+  run with synchronized clocks, and only overlapping connections of one host are compared. A node
+  ignores the announcement of its own connections; two connections of a host on one node stay the
+  local case of M2-43.
+- **Rule b (the node of the older connection probes).** A node that holds a control connection of
+  the host older than an announced one (`terminal.host_present`, section 9) runs the probe above
+  on it, at most one probe per connection at a time. No answer within
+  `terminal.host_duplicate_probe_timeout`: it closes its connection with `4009`, writes the audit
+  entry of a replaced connection and withdraws it (`terminal.host_gone`). An answer: the duplicate
+  verdict above in one unit of work, which stages `terminal.host_close`, so every node closes the
+  control connections of the host with the code of the state it reads (`4112` for `disabled` with
+  `duplicate_connection`; a host in `confirming` falls back to `pairing`, so the other nodes close
+  with `4110` and the probing node closes its own connections with `4112`, D-M2-47-13).
+- **Rule c (the node of the newer connection answers).** A node that hears the announcement of an
+  older connection while it holds a newer one announces its own at once, so the node of the older
+  one probes it after rule b. Every connection announces itself again after each `heartbeat`, which
+  repeats a lost announcement.
+- **Probation.** A new control connection gets no `session.open` before the end of its probation:
+  twice `terminal.host_duplicate_probe_timeout` after its first announcement (the probe window of
+  the other node plus the same again for notification and commit). A `session.open` due during the
+  probation waits and is checked again at its end against the database (the session not `closed`,
+  the host still `active`, the connection still the open one of the host); the session's own
+  `terminal.open_timeout` keeps running. Reason: otherwise a host service with copied keys on
+  another node could receive `session.open` and finish the handshake before the probe decides
+  (T-TM-05).
+
 ### 3.5 Control connection
 
 Built by M2-43 (docs/DECISIONS.md D-M2-43-1 to D-M2-43-15). The host service holds exactly one
@@ -1166,6 +1197,9 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
    rest itself and ends a refused or unanswered opening with `session.ended` `open_failed`; a
    pairing that ends before `session.started` gives the slot a new deadline of
    `terminal.open_timeout` from that moment.
+   M2-47 (D-M2-47-8, D-M2-47-14): each side of the relay has its own timer of
+   `terminal.open_timeout` from the acceptance of its `identify`, and what happens to a side
+   without its counterpart follows the phase rule of section 9.
 7. After message 2 and the frame `start`, the host service starts the PTY; it reports
    `session.started` over the control connection; the server sets `state = 'active'`. M2-44: a
    `session.started` without a paired device side makes the session `detached` at once.
@@ -1575,6 +1609,108 @@ applies (Ruling T6):
 Reason: [02-architecture.md](02-architecture.md) forbids a broker, and the event log is not suitable
 for byte streams. With one node, everything is trivial.
 
+Build details (M2-47; the rows `D-M2-47-<n>` of [DECISIONS.md](../DECISIONS.md) give the reasons).
+With `cluster.mode = single` nothing of this runs and no `NOTIFY` is sent; one node uses the same
+handler with a local transport (D-M2-47-4).
+
+**Signals between nodes** (D-M2-47-3, R-TM-31). A use case that acts on a live connection after its
+commit stages a signal in its transaction; with several nodes it is a `NOTIFY ephemeral` in that
+transaction, which PostgreSQL delivers only after the commit and never after a rollback, and every
+node, the sender included, receives it through its listener. A signal is compact JSON with exactly
+`kind`, `host_id` and, per kind, `session_id` or `conn_id`, each a UUID; never a token, `jti`,
+profile, name, path, address or byte of a stream (03, section 6.6). Decoding is strict: unknown or
+missing members, a value that is no UUID or an unknown kind with the prefix `terminal.` drop the
+payload with one log record; a kind outside that prefix is ignored, because M7-17 adds its own kinds
+to the channel. A receiver always reads the state from the database, so a signal that arrives late,
+twice, out of order or forged causes nothing the committed rows do not allow.
+
+| Kind | Sent by | Receivers |
+|---|---|---|
+| `terminal.session_open` (`host_id`, `session_id`) | the units of `terminal.open` and `terminal.attach` (in their transaction) | every api node registers the expectation of a session of that host that is not `closed`, with the device of the row and its own receipt time as the grant time of the deadline, so the node the edge hashes the session to holds it, whichever node served the request; the node with an eligible control connection of an `active` host also sends `session.open` (D-M2-47-12), after the probation of 3.4 |
+| `terminal.host_close` (`host_id`) | every transition out of `active`, a re-pairing, the fallback of the confirmation after `terminal.fingerprint_max_attempts` and the duplicate verdict of 3.4 (in their transaction) | every node closes the control connections of the host it holds with the code of the state read now: `4110` back in `pairing`, `4111` `disabled` or `retired`, `4112` `disabled` with `duplicate_connection`; a host that may stay connected keeps them (D-M2-47-13) |
+| `terminal.host_present` (`host_id`, `conn_id`) | the node of a control connection after its first `report` and after each `heartbeat` (outside any unit) | every other node renews the entry in its presence view; rules b and c of 3.4 |
+| `terminal.host_gone` (`host_id`, `conn_id`) | the node of a control connection when it closes (outside any unit) | every node removes this one entry |
+| `terminal.session_paired` (`host_id`, `session_id`) | the node whose relay pairs both sides of a session in `opening` on a host with `require_local_confirm = true` (outside any unit) | every other node marks its expectation of that session as paired elsewhere |
+
+The end of a session has no signal. Every end, from any module, process or node, writes
+`terminal_session.changed` in its transaction; the log tail of every api process (02, section 11.2)
+hands it to the relay, which closes the device stream and the host data connection held there and
+sends `session.close` on the node of the control connection. That path reaches every api process in
+both modes, also for an end committed in a worker; data connections and device streams of a host
+that leaves `active` close the same way, because the transition ends the sessions in the same
+transaction.
+
+**Presence across nodes** (D-M2-47-6). "Host connected" (6.1 point 2, 13) is an eligible control
+connection on this node or a counting entry of another node in the node's presence view. An entry
+counts while no more than `terminal.host_heartbeat_interval` times
+`terminal.host_heartbeat_miss_limit` has passed since its last `terminal.host_present`: the silence
+after which the holder closes the connection itself. A node that dies without `terminal.host_gone`
+keeps its entries counting for at most that window; an opening let through in it ends `open_failed`
+with `close_detail = open_timeout`. After a start or a reconnect of the listener the view is
+complete within one `terminal.host_heartbeat_interval`; until then an opening may get
+`409 host_unavailable` for a host connected elsewhere, which the next attempt corrects.
+
+**The lone side and the phase rule** (D-M2-47-8, D-M2-47-14, D-M2-47-15). The same rules hold on one
+node and on several. A side whose `identify` was accepted and that finds no counterpart on its
+node has its own timer of `terminal.open_timeout` from that acceptance; at the deadline, inclusive,
+it is unpaired, closes with `4102`, is counted in `bothy.terminal.relay.unpaired` with
+`bothy.terminal.side` (`client` or `host`) and writes one log record without any ID. A side that
+was paired once never counts as unpaired. What else happens depends on the phase of the session as
+the node knows it (phase rule):
+
+- `opening`: a lone device stream and a lone host data connection both close with `4102`, and the
+  session ends `open_failed` with `close_detail = open_timeout`. The end is a compare-and-swap on
+  `opening`, so when both sides time out on two nodes the second end writes nothing (one audit
+  entry `terminal.terminate`, one event).
+- started (`active` or `detached`): a lone device stream closes with `4102` and the session stays
+  `detached` (attach again later); a host data connection waits for an attaching device until the
+  session ends (`terminal.detach_grace`) and is not unpaired.
+
+A node counts a session as started once it has seen `session.started` (only the node of the control
+connection does), once its log tail delivered `terminal_session.changed` with `active` or
+`detached` (D-M2-47-22), or once the deadline of its expectation read a state other than `opening`
+from the database. A side that reaches a node before `terminal.session_open` did builds the
+expectation of the current grant from the row; an expectation carries its grant (the token `jti`),
+and the same grant again changes nothing, so the signal and the side may arrive in either order
+(D-M2-47-21). A node that still relays both sides of a started session makes it `active` again when
+another node detached it because its control connection of the host ended (D-M2-47-25). The deadline of an expectation waits while an unpaired side is present, because that
+side's own timer decides; an expectation without sides ends a session still in `opening` through the
+same compare-and-swap. On a host whose last `report` says `require_local_confirm = true` an
+expectation without sides that received `terminal.session_paired` only removes itself at its
+deadline, because the pairing met the opening deadline on its own node and the host service bounds
+consent itself (6.1 step 6). With several nodes `session.started` detaches a session only on the
+node that paired it. Frames of a lone side never leave its node: not into the database, the event
+log, a signal or another node. No readiness check is involved; `/readyz` stays ready.
+
+**Listener** (D-M2-47-5). Every api process (roles `api` and `all`) with `cluster.mode = multi`
+holds one connection of its own with `LISTEN ephemeral` (application name
+`bothy-terminal-ephemeral`), reads the notifications in order and hands each terminal signal to the
+relay. The worker sends signals but runs no listener, because it holds no connection. On the loss
+of the connection the listener logs once, tries again at once and then every
+`database.listen_reconnect_backoff_cap`. Only after `LISTEN` succeeded again, so nothing committed
+in between is missed later, the node reconciles: it reads the state of the hosts of all its control
+connections and relay sides, closes the control connections of every host that is no longer
+`active` with the codes above, and announces each of its eligible control connections at once. The
+listener is a soft dependency like the `LISTEN` of the log tail (02, section 14.4): no readiness
+check, `/readyz` unchanged; it stops with the log tail (02, section 15.3).
+
+What is lost while a node's `LISTEN ephemeral` connection is down: `NOTIFY` keeps no backlog, so the
+node misses every signal sent meanwhile. Its control connections of a host disabled, retired or
+re-paired elsewhere stay open until the reconciliation (the sessions of that host still end on every
+node through the log tail, which has its own `LISTEN` and poll); an opening whose `session.open` should
+go through its control connection is not sent and ends `open_failed` with
+`close_detail = open_timeout` (its sides still build their expectation from the row); its presence view ages, so its entries expire after the window above
+and a newer control connection on another node is probed only after the reconnect and the next
+announcement; a missed `terminal.session_paired` lets a side-less expectation end an opening that
+waits for local confirmation on another node. Signals the node itself sends still reach the other
+nodes.
+
+**Edge requirement.** Several nodes need an edge that routes both stream paths of a session by
+consistent hashing over `{session_id}` to one node, with the timeouts of
+[16-operations.md](16-operations.md), section 4.4; `infra/compose/compose.multi-node.yaml` with
+`infra/compose/edge/nginx.conf` is the example. A side the edge sends elsewhere fails visibly with
+`4102` after `terminal.open_timeout` (TM-T15).
+
 ## 10. Audit, events, privacy
 
 ### 10.1 Audit
@@ -1714,7 +1850,7 @@ Close codes of the terminal channels (source of the names and client reactions i
 | `4000` | `unknown_error` | control and data connection | internal error of the server (a panic, an error without a better code); reconnect with backoff (M2-43) |
 | `4100` | `terminal_closed` | stream, data connection | session ended, reason in `close_reason` (10.3); do not reconnect, the host service ends the PTY |
 | `4101` | `terminal_token_stale` | stream; data connection, from the host service (M2-44) | terminal session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a new step-up (5.3) |
-| `4102` | `terminal_host_unavailable` | stream | counterpart missing (host service disconnected or no counterpart on this node, 9); a started session is `detached`, attach later; an opening ends with `open_failed` (M2-44), open a new session |
+| `4102` | `terminal_host_unavailable` | stream, data connection (M2-47) | counterpart missing (host service disconnected or no counterpart on this node, 9); a started session is `detached`, attach later; an opening ends with `open_failed` (M2-44), open a new session. M2-47 (D-M2-47-8), phase rule of 9: an `opening` session ended `open_failed` with `close_detail = open_timeout` (open again), a `detached` one stays `detached` (attach again later); on the data connection: do not reopen it, wait for the next `session.open` |
 | `4103` | `terminal_replaced` | stream | another device has attached (6.2); do not reconnect automatically |
 | `4104` | `terminal_handshake_failed` | stream; data connection, from the host service (M2-44) | any other error of the token or of the handshake (5.3); hard warning, no new attempt |
 | `4110` | `host_unpaired` | control and data connection | key unknown or replaced by a re-pairing (3.3); stop, run `bothy-host pair` again |
@@ -1806,6 +1942,7 @@ Red team points at the end of M2, M4, M5 and M6 (threat model, section 6.7).
 | R-TM-28 | HD11 during operation: a violation at a location for all ends all sessions and allows no new ones; the check of the entries runs per session user, only that user waits for it, `host_service.entry_scan_timeout` limits it, and only a later full run lifts its finding. | For a location for all no consequence during operation was defined; a large home should hold up only its own session user, and only this check sees whether an entry is still there (D-W-89). |
 | R-TM-29 | `bothy-host doctor` names the affected names on the host and ends with an exit code other than 0; if it refuses the start at startup, the host service first reports the result with `report` and exits without a session, with its own exit code after which the service manager does not restart it. | Otherwise, after a hit at start, the console would show only a disconnected host, and the names from HD6 and HD11 would not reach the instance operator; a restart fixes none of these violations (D-W-91). |
 | R-TM-30 | Rule for names: If a person with a terminal, also a former one, can cause a violation, the message to the server names the account in which the instance operator has to search (HD6, HD10 with a wrong peer, HD11 at a location of a session user, HD9 for a former session user); names of other users never go to the server. After `bothy-host session-user remove` the instance operator deletes the user together with its long-running processes; locking alone is not enough. | A long-running process of a former session user can reopen its home after `remove` and so prevent the start of the whole host through HD9, and a process of a person that takes the place of their helper brings the host to a standstill through HD10; without a name the instance operator would find the account only on the host. One rule instead of an addition per check. Locking ends no running process (D-W-109). |
+| R-TM-31 | Signals between api nodes through `NOTIFY ephemeral` only with kind and IDs, also for state transitions, probe and presence; the end of a session reaches every node through the log tail; one path for one and for several nodes (M2-47, D-M2-47-3, D-M2-47-4). | The receiver reads the state from the database, so a late, repeated, reordered or forged signal causes nothing the committed rows do not allow, and no token or content leaves a node; the log tail already reaches every api process in both modes, also for an end committed in a worker, so a second path for ends would act twice; one handler for both modes keeps the single-node behaviour the multi-node behaviour with a local transport. |
 
 ## 17. Configuration values of this chapter
 

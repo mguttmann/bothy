@@ -978,6 +978,18 @@ therefore do not go through `NOTIFY`; the receiving node reads them from the dat
 commit [Q2, verified] and a single node does not need it (03, section 6.6). `notification.created`
 and `command.autocomplete_requested` take the same path with IDs.
 
+Terminal signals (M2-47, D-M2-47-3, D-M2-47-4; [24-terminal.md](24-terminal.md), section 9). The
+module `terminal` sends its own internal signals on the channel `ephemeral`: `terminal.session_open`
+(host and session ID), `terminal.host_close` (host ID), `terminal.host_present` and
+`terminal.host_gone` (host and connection ID) and `terminal.session_paired` (host and session ID).
+They are no event types of 05, so the table above has no rows for them. With one node a use case
+hands its signal to the local handler after the commit; with several nodes it stages
+`NOTIFY ephemeral` in its transaction (presence and pairing go out in their own statement), and
+every node, the sender included, receives it. The end of a terminal session goes through the log
+tail (11.2), not through these signals. The module `terminal` holds its own `LISTEN ephemeral`
+connection per api process until M7-17 shares one per process; the namespaced kinds (prefix
+`terminal.`) allow that.
+
 ### 11.7 Cost of serialization
 
 All transactions with durable events serialize at the end on `event_seq` (04, 3.2).
@@ -1233,6 +1245,7 @@ covers the client's retry.
 |---|---|---|
 | PostgreSQL | api reports not ready, requests `503`; gateway keeps connections, delivers nothing; worker pauses; recovery without intervention | fail closed |
 | `LISTEN` connection | reconnect with backoff, polling bridges the gap; no loss (gapless `seq`) | soft |
+| `LISTEN` connection of the terminal (M2-47, `cluster.mode = multi`) | reconnect at once, then every `database.listen_reconnect_backoff_cap`; after `LISTEN` succeeded again a reconciliation of the node's connections against the host states; ends of sessions still arrive through the log tail; no readiness check (24, section 9) | soft |
 | object storage | upload and download `503`; messages without files continue | partial |
 | clamd | scan jobs retry; files stay `pending` and are not served | fail closed |
 | push services | jobs retry; message path unaffected | soft |
@@ -1389,6 +1402,7 @@ Multiple nodes in detail (level 2):
   instance operator divides the values or sets affinity at the proxy. Reason: no shared counter
   service.
 - Presence and typing: via `NOTIFY ephemeral` (section 11.6).
+- Terminal: [24-terminal.md](24-terminal.md), section 9 (M2-47).
 
 A module is split off only when all three conditions hold:
 

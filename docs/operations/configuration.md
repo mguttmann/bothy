@@ -150,7 +150,7 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server |  | `single` | `single` or `multi` (several api nodes) | planned (M2) |
+| `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server | enum(single, multi) | `single` | `single` or `multi` (several api nodes) | active |
 | `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | duration | `5s` | deadline for headers | active |
 | `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server | duration | `15s` | context deadline of normal requests | active |
 | `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server | duration | `10m` | deadline for upload and download | active |

@@ -1,4 +1,4 @@
-# Overlay with two api nodes behind an example edge (docs/spec/16-betrieb.md 4.4,
+# Overlay with two api nodes behind an example edge (docs/spec/16-operations.md 4.4,
 # docs/operations/install-compose.md 5.3).
 #
 #   docker compose -f compose.yaml -f compose.multi-node.yaml up -d
@@ -9,7 +9,7 @@
 # publish no port; only the edge publishes on 127.0.0.1 of the host.
 #
 # The operator's TLS edge stays in front of this edge. The server then sees the address of this
-# edge, which appends the gateway's address to X-Forwarded-For (docs/spec/16-betrieb.md 4.3), so
+# edge, which appends the gateway's address to X-Forwarded-For (docs/spec/16-operations.md 4.3), so
 # BOTHY_TRUSTED_PROXIES names the subnet of the network <project>_default (field Subnet of
 # `docker network inspect <project>_default`), not only its gateway.
 #

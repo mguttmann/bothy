@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package edge proves the example edge and the Compose overlay for several api nodes (brief
-// M2-47, design notes 11 and 12; docs/spec/16-betrieb.md 4.4): infra/compose/edge/nginx.conf in
+// M2-47, design notes 11 and 12; docs/spec/16-operations.md 4.4): infra/compose/edge/nginx.conf in
 // the pinned image nginxinc/nginx-unprivileged routes both stream paths of a session to the same
 // node, carries the timeouts of the configuration defaults and runs without root; and
 // infra/compose/compose.multi-node.yaml renders as the brief describes.
