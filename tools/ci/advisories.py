@@ -44,6 +44,8 @@ from typing import Any
 OsvKey = tuple[str, str, str, str]
 # (OSV id, module, version)
 GoKey = tuple[str, str, str]
+# Prefix of a finding the merge base has too; the full scan of main and the daily one fail on it.
+OLD_NOTE = "advisory the base has too (main and the daily scan fail on it)"
 
 
 class GateError(Exception):
@@ -153,7 +155,7 @@ def osv_gate(repo: Path, base: str, cmd: list[str], locks: list[str]) -> list[st
         src, eco, name, version = key
         line = f"{src}: {eco} {name} {version}: {', '.join(ids)}"
         if key in old:
-            print(f"::warning::advisory already on the base, fixed on main: {line}")
+            print(f"::warning::{OLD_NOTE}: {line}")
         else:
             errors.append(f"vulnerable dependency added or changed by this pull request: {line}")
     return errors
@@ -215,7 +217,7 @@ def go_gate(repo: Path, base: str, cmd: list[str], modules: list[str]) -> list[s
                         f" (fixed in {fixed})" if fixed else ""
                     )
                     if key in old:
-                        print(f"::warning::advisory already on the base, fixed on main: {line}")
+                        print(f"::warning::{OLD_NOTE}: {line}")
                     else:
                         errors.append(f"reachable vulnerability added by this pull request: {line}")
         finally:
