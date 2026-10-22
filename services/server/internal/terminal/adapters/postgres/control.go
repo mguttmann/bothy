@@ -160,5 +160,6 @@ func session(row sqlcgen.TerminalSession) domain.Session {
 		c := int(row.ExitCode.Int32)
 		s.ExitCode = &c
 	}
+	sessionGrantColumns(&s, row)
 	return s
 }

@@ -12,7 +12,7 @@ part 'terminal_session_open.g.dart';
 ///
 /// Properties:
 /// * [profile]
-/// * [workdirIndex] - Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1).
+/// * [workdirIndex] - Required exactly with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). A `claude` profile without a valid index, or an index with another profile, gives 403 `terminal_denied` with `reason: profile_unknown`; other profiles omit it. The token carries it as `wdi` (24, 5.3, 11.1).
 /// * [cols]
 /// * [rows]
 /// * [clientEphemeralKeyHash] - SHA-256 of the ephemeral X25519 public key the device sends in Noise message 1, base64url without padding; becomes the claim `cek`.
@@ -23,7 +23,7 @@ abstract class TerminalSessionOpen
   @BuiltValueField(wireName: r'profile')
   String get profile;
 
-  /// Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1).
+  /// Required exactly with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). A `claude` profile without a valid index, or an index with another profile, gives 403 `terminal_denied` with `reason: profile_unknown`; other profiles omit it. The token carries it as `wdi` (24, 5.3, 11.1).
   @BuiltValueField(wireName: r'workdir_index')
   int? get workdirIndex;
 

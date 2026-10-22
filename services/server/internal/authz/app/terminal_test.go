@@ -92,7 +92,15 @@ func (w *termWorld) person(who ids.ID) actor.Actor {
 // the person in its world session, in state with detachedAt.
 func (w *termWorld) session(owner, host ids.ID, state string, detachedAt time.Time) authorize.Resource {
 	return authorize.Resource{Kind: authorize.ResourceTerminalSession, ID: ids.New(), HostID: host, OwnerID: owner,
-		Terminal: &authorize.TerminalFacts{SessionState: state, SessionDeviceID: w.devices[owner], SessionAuthSessionID: w.sessions[owner], DetachedAt: detachedAt}}
+		Terminal: &authorize.TerminalFacts{SessionState: state, SessionDeviceID: w.devices[owner], SessionAuthSessionID: w.sessions[owner], DetachedAt: detachedAt, HostConnected: true}}
+}
+
+// hostOpen is the resource of terminal.open on the host id with a connected host service and a
+// known profile (M2-44).
+func hostOpen(id ids.ID) authorize.Resource {
+	r := host(id)
+	r.Terminal = &authorize.TerminalFacts{HostConnected: true, ProfileKnown: true}
+	return r
 }
 
 // actOpen is terminal.open.
@@ -102,7 +110,7 @@ var actOpen = authorize.ActionTerminalOpen
 func TestAZ_M54_AlexOpensOwnHost(t *testing.T) {
 	t.Parallel()
 	w := newTermWorld(t)
-	w.allow(t, w.person(w.alex), actOpen, host(w.r1))
+	w.allow(t, w.person(w.alex), actOpen, hostOpen(w.r1))
 }
 
 // TestAZ_M55_SamOnForeignHost (AZ-M55, SR10): Sam with a grant and an assignment on R1 is not its
@@ -110,7 +118,7 @@ func TestAZ_M54_AlexOpensOwnHost(t *testing.T) {
 func TestAZ_M55_SamOnForeignHost(t *testing.T) {
 	t.Parallel()
 	w := newTermWorld(t)
-	w.expect(t, w.person(w.sam), actOpen, host(w.r1), authorize.OutcomeForbidden, "terminal_not_host_assignee")
+	w.expect(t, w.person(w.sam), actOpen, hostOpen(w.r1), authorize.OutcomeForbidden, "terminal_not_host_assignee")
 }
 
 // TestAZ_M56_SecondOwnerOnPersonalHost (AZ-M56, SR11): with Robin as a second owner the Owner may
@@ -120,8 +128,8 @@ func TestAZ_M56_SecondOwnerOnPersonalHost(t *testing.T) {
 	w := newTermWorld(t)
 	w.principals.Put(authz.PrincipalFacts{ID: w.robin, Kind: actor.KindUser, Status: authz.PrincipalActive, IsOwner: true})
 	w.versions.Bump()
-	w.expect(t, w.person(w.owner), actOpen, host(w.r2), authorize.OutcomeForbidden, "i6_holder_only")
-	w.allow(t, w.person(w.robin), actOpen, host(w.r2))
+	w.expect(t, w.person(w.owner), actOpen, hostOpen(w.r2), authorize.OutcomeForbidden, "i6_holder_only")
+	w.allow(t, w.person(w.robin), actOpen, hostOpen(w.r2))
 }
 
 // TestAZ_M58_ConsumedStepUp (AZ-M58): a step-up consumed by another opening is not fresh.
@@ -130,8 +138,8 @@ func TestAZ_M58_ConsumedStepUp(t *testing.T) {
 	w := newTermWorld(t)
 	a := w.person(w.alex)
 	a.StepUpConsumedAt = a.StepUpAt
-	w.expect(t, a, actOpen, host(w.r1), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
-	d := w.decide(t, context.Background(), a, actOpen, host(w.r1))
+	w.expect(t, a, actOpen, hostOpen(w.r1), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
+	d := w.decide(t, context.Background(), a, actOpen, hostOpen(w.r1))
 	if e, _ := errs.As(d.Err()); e == nil || e.Code != errs.CodeStepUpRequired || e.Reason != "" {
 		t.Fatalf("problem %+v, want 401 step_up_required without a reason", e)
 	}
@@ -161,30 +169,30 @@ func TestAZ_M60_InstanceGrantGivesNoTerminal(t *testing.T) {
 	w.grant(t, domain.Subject{Kind: domain.SubjectUser, PrincipalID: w.alex}, domain.Target{Kind: domain.TargetInstance}, domain.LevelTrigger,
 		time.Time{}, domain.CapApproveActions, domain.CapUpload, domain.CapExport, domain.CapManage)
 	w.versions.Bump()
-	w.expect(t, w.person(w.alex), actOpen, host(r5), authorize.OutcomeNotFound, "no_grant")
-	w.expect(t, w.person(w.alex), actOpen, host(ids.New()), authorize.OutcomeNotFound, "no_grant")
+	w.expect(t, w.person(w.alex), actOpen, hostOpen(r5), authorize.OutcomeNotFound, "no_grant")
+	w.expect(t, w.person(w.alex), actOpen, hostOpen(ids.New()), authorize.OutcomeNotFound, "no_grant")
 }
 
 // TestAZ_M61_OwnerWithoutSessionUser (AZ-M61, SR12): the Owner has no assignment on R1.
 func TestAZ_M61_OwnerWithoutSessionUser(t *testing.T) {
 	t.Parallel()
 	w := newTermWorld(t)
-	w.expect(t, w.person(w.owner), actOpen, host(w.r1), authorize.OutcomeForbidden, "terminal_no_session_user")
+	w.expect(t, w.person(w.owner), actOpen, hostOpen(w.r1), authorize.OutcomeForbidden, "terminal_no_session_user")
 }
 
 // TestTMT08_SR10 (TM-T08): the assignee rule and the server host, declared and reported.
 func TestTMT08_SR10(t *testing.T) {
 	t.Parallel()
 	w := newTermWorld(t)
-	w.expect(t, w.person(w.sam), actOpen, host(w.r1), authorize.OutcomeForbidden, "terminal_not_host_assignee")
-	w.allow(t, w.person(w.alex), actOpen, host(w.r1))
-	w.expect(t, w.person(w.sam), actOpen, host(w.r3), authorize.OutcomeForbidden, "terminal_server_host_owner_only")
-	w.allow(t, w.person(w.owner), actOpen, host(w.r3))
+	w.expect(t, w.person(w.sam), actOpen, hostOpen(w.r1), authorize.OutcomeForbidden, "terminal_not_host_assignee")
+	w.allow(t, w.person(w.alex), actOpen, hostOpen(w.r1))
+	w.expect(t, w.person(w.sam), actOpen, hostOpen(w.r3), authorize.OutcomeForbidden, "terminal_server_host_owner_only")
+	w.allow(t, w.person(w.owner), actOpen, hostOpen(w.r3))
 	// The same with the report of the host service instead of the declaration; it raises no rights
 	// version and is read fresh per call.
 	w.hosts.Put(authz.HostFacts{ID: w.r3, State: "active", AssignedUserID: w.sam, LLMCredentials: "organization", ReportedIsServerHost: true})
-	w.expect(t, w.person(w.sam), actOpen, host(w.r3), authorize.OutcomeForbidden, "terminal_server_host_owner_only")
-	w.allow(t, w.person(w.owner), actOpen, host(w.r3))
+	w.expect(t, w.person(w.sam), actOpen, hostOpen(w.r3), authorize.OutcomeForbidden, "terminal_server_host_owner_only")
+	w.allow(t, w.person(w.owner), actOpen, hostOpen(w.r3))
 }
 
 // TestTMT28a_NoSessionUser (TM-T28 (a), AZ-P13): the Owner and Alex after the end of the assignment
@@ -196,7 +204,7 @@ func TestTMT28a_NoSessionUser(t *testing.T) {
 	w.versions.Bump()
 	before, _ := w.rec.counts()
 	for _, who := range []ids.ID{w.owner, w.alex} {
-		d := w.decide(t, context.Background(), w.person(who), actOpen, host(w.r1))
+		d := w.decide(t, context.Background(), w.person(who), actOpen, hostOpen(w.r1))
 		if d.Outcome != authorize.OutcomeForbidden || d.Reason != "terminal_no_session_user" {
 			t.Fatalf("%s: %+v", who, d)
 		}
@@ -217,7 +225,7 @@ func TestTMT28a_NoSessionUser(t *testing.T) {
 	// A name the host no longer reports counts like no assignment (07 SR12).
 	w.assign(w.alex, w.r1, "bothy-s-alex", false)
 	w.versions.Bump()
-	w.expect(t, w.person(w.alex), actOpen, host(w.r1), authorize.OutcomeForbidden, "terminal_no_session_user")
+	w.expect(t, w.person(w.alex), actOpen, hostOpen(w.r1), authorize.OutcomeForbidden, "terminal_no_session_user")
 }
 
 // TestTerminalDecisionOrder (Design note 5): step-up before the guards, visibility before both.
@@ -229,14 +237,14 @@ func TestTerminalDecisionOrder(t *testing.T) {
 		a.StepUpAt = time.Time{}
 		return a
 	}
-	w.expect(t, stale(w.sam), actOpen, host(w.r1), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
-	w.expect(t, w.person(w.sam), actOpen, host(w.r2), authorize.OutcomeNotFound, "no_grant")
-	w.expect(t, stale(w.owner), actOpen, host(w.r2), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
+	w.expect(t, stale(w.sam), actOpen, hostOpen(w.r1), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
+	w.expect(t, w.person(w.sam), actOpen, hostOpen(w.r2), authorize.OutcomeNotFound, "no_grant")
+	w.expect(t, stale(w.owner), actOpen, hostOpen(w.r2), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
 	// Fresh step-up ignores auth.step_up_max_age: a step-up older than terminal.step_up_max_age
 	// but younger than auth.step_up_max_age is stale.
 	old := w.person(w.alex)
 	old.StepUpAt = w.clk.Now().Add(-termFresh - time.Second)
-	w.expect(t, old, actOpen, host(w.r1), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
+	w.expect(t, old, actOpen, hostOpen(w.r1), authorize.OutcomeStepUpRequired, "terminal_step_up_not_fresh")
 }
 
 // TestTerminalAttachStreamReadClose (Design notes 1, 3 and 4): attach with a fresh step-up, with
@@ -330,16 +338,16 @@ func TestTerminalSnapshotVersion(t *testing.T) {
 	t.Parallel()
 	w := newTermWorld(t)
 	owner := w.person(w.owner)
-	w.allow(t, owner, actOpen, host(w.r3))
+	w.allow(t, owner, actOpen, hostOpen(w.r3))
 	p0, u0 := w.hosts.Calls()
-	w.allow(t, owner, actOpen, host(w.r3))
+	w.allow(t, owner, actOpen, hostOpen(w.r3))
 	if p, u := w.hosts.Calls(); p != p0 || u != u0 {
 		t.Fatalf("the same version read the sources again: %d/%d after %d/%d", p, u, p0, u0)
 	}
 	w.hosts.RemoveSessionUser(w.owner, w.r3)
-	w.allow(t, owner, actOpen, host(w.r3))
+	w.allow(t, owner, actOpen, hostOpen(w.r3))
 	w.versions.Bump()
-	w.expect(t, owner, actOpen, host(w.r3), authorize.OutcomeForbidden, "terminal_no_session_user")
+	w.expect(t, owner, actOpen, hostOpen(w.r3), authorize.OutcomeForbidden, "terminal_no_session_user")
 	if p, u := w.hosts.Calls(); p != p0+1 || u != u0+1 {
 		t.Fatalf("a new version did not rebuild once: %d/%d after %d/%d", p, u, p0, u0)
 	}
@@ -401,5 +409,115 @@ func TestAZ_M57_GroupGrantOnPersonalHost(t *testing.T) {
 	}
 	if e, _ := errs.As(v.Err()); e == nil || e.Code != errs.CodeI6Violation || e.Hint != authz.HintI6 {
 		t.Fatalf("Err = %v", v.Err())
+	}
+}
+
+// TestTerminalGuard_HostNotActive (M2-44, 24 section 6.1 step 2): a host that is not active, or
+// active without a reported control connection, gives host_not_active after SR12, mapped to 409
+// host_unavailable; a nil descriptor counts as not connected.
+func TestTerminalGuard_HostNotActive(t *testing.T) {
+	t.Parallel()
+	w := newTermWorld(t)
+	attach := authorize.ActionTerminalAttach
+	for _, state := range []string{"disabled", "retired", "pairing"} {
+		w.hosts.Put(authz.HostFacts{ID: w.r1, State: state, AssignedUserID: w.alex, LLMCredentials: "organization", Name: "R1"})
+		w.expect(t, w.person(w.alex), actOpen, hostOpen(w.r1), authorize.OutcomeForbidden, "host_not_active")
+		w.expect(t, w.person(w.alex), attach, w.session(w.alex, w.r1, "detached", w.clk.Now()), authorize.OutcomeForbidden, "host_not_active")
+	}
+	w.hosts.Put(authz.HostFacts{ID: w.r1, State: "active", AssignedUserID: w.alex, LLMCredentials: "organization", Name: "R1"})
+	off := hostOpen(w.r1)
+	off.Terminal.HostConnected = false
+	d := w.decide(t, context.Background(), w.person(w.alex), actOpen, off)
+	if d.Outcome != authorize.OutcomeForbidden || d.Reason != "host_not_active" {
+		t.Fatalf("not connected: %+v", d)
+	}
+	if e, _ := errs.As(d.Err()); e == nil || e.Code != errs.CodeHostUnavailable {
+		t.Fatalf("problem %+v, want 409 host_unavailable", e)
+	}
+	w.expect(t, w.person(w.alex), actOpen, host(w.r1), authorize.OutcomeForbidden, "host_not_active")
+	ses := w.session(w.alex, w.r1, "detached", w.clk.Now())
+	ses.Terminal.HostConnected = false
+	w.expect(t, w.person(w.alex), attach, ses, authorize.OutcomeForbidden, "host_not_active")
+	// The guard runs after SR12: Sam is still refused by SR10 first.
+	w.expect(t, w.person(w.sam), actOpen, off, authorize.OutcomeForbidden, "terminal_not_host_assignee")
+}
+
+// TestTerminalGuard_ProfileUnknown (M2-44): the profile verdict decides only terminal.open, after
+// host_not_active.
+func TestTerminalGuard_ProfileUnknown(t *testing.T) {
+	t.Parallel()
+	w := newTermWorld(t)
+	r := hostOpen(w.r1)
+	r.Terminal.ProfileKnown = false
+	d := w.decide(t, context.Background(), w.person(w.alex), actOpen, r)
+	if d.Outcome != authorize.OutcomeForbidden || d.Reason != "terminal_profile_unknown" {
+		t.Fatalf("%+v", d)
+	}
+	if e, _ := errs.As(d.Err()); e == nil || e.Code != errs.CodeTerminalDenied || e.Reason != "profile_unknown" {
+		t.Fatalf("problem %+v", e)
+	}
+	r.Terminal.HostConnected = false
+	w.expect(t, w.person(w.alex), actOpen, r, authorize.OutcomeForbidden, "host_not_active")
+	ses := w.session(w.alex, w.r1, "detached", w.clk.Now())
+	ses.Terminal.ProfileKnown = false
+	w.allow(t, w.person(w.alex), authorize.ActionTerminalAttach, ses)
+}
+
+// TestTerminalStream_OtherDeviceNotSelf (M2-44, 05 terminal.stream): only the device of the
+// current session token passes; another device of the person is forbidden not_self.
+func TestTerminalStream_OtherDeviceNotSelf(t *testing.T) {
+	t.Parallel()
+	w := newTermWorld(t)
+	stream := authorize.ActionTerminalStream
+	ses := w.session(w.alex, w.r1, "active", time.Time{})
+	w.allow(t, w.person(w.alex), stream, ses)
+	other := ses
+	other.Terminal = &authorize.TerminalFacts{SessionState: "active", SessionDeviceID: ids.New(), SessionAuthSessionID: w.sessions[w.alex], HostConnected: true}
+	w.expect(t, w.person(w.alex), stream, other, authorize.OutcomeForbidden, "not_self")
+	bare := ses
+	bare.Terminal = nil
+	if _, err := w.az.Authorize(context.Background(), w.person(w.alex), stream, bare); errs.KindOf(err) != errs.KindInternal {
+		t.Fatalf("stream without its facts: %v", err)
+	}
+}
+
+// TestRecheck_PassesStepUpOnly (M2-44, Design note 12): under authorize.Recheck a consumed
+// step-up still allows, every other denial still denies, and no denial is recorded.
+func TestRecheck_PassesStepUpOnly(t *testing.T) {
+	t.Parallel()
+	w := newTermWorld(t)
+	ctx := authorize.Recheck(context.Background())
+	consumed := w.person(w.alex)
+	consumed.StepUpConsumedAt = consumed.StepUpAt
+	before, _ := w.rec.counts()
+	if d := w.decide(t, ctx, consumed, actOpen, hostOpen(w.r1)); !d.Allowed() {
+		t.Fatalf("recheck with a consumed step-up: %+v", d)
+	}
+	none := w.person(w.alex)
+	none.StepUpAt = time.Time{}
+	if d := w.decide(t, ctx, none, authorize.ActionTerminalAttach, w.session(w.alex, w.r1, "active", time.Time{})); !d.Allowed() {
+		t.Fatalf("recheck of an attach: %+v", d)
+	}
+	for _, c := range []struct {
+		who    actor.Actor
+		r      authorize.Resource
+		reason string
+	}{
+		{w.person(w.sam), hostOpen(w.r1), "terminal_not_host_assignee"},
+		{w.person(w.owner), hostOpen(w.r1), "terminal_no_session_user"},
+		{w.person(w.owner), hostOpen(w.r2), "i6_holder_only"},
+		{w.person(w.sam), hostOpen(w.r3), "terminal_server_host_owner_only"},
+		{w.agent(w.lotse), hostOpen(w.r1), "subject_kind_not_allowed"},
+		{w.person(w.alex), host(w.r1), "host_not_active"},
+	} {
+		d := w.decide(t, ctx, c.who, actOpen, c.r)
+		if d.Allowed() || string(d.Reason) != c.reason {
+			t.Errorf("recheck %s: %+v, want %s", c.reason, d, c.reason)
+		}
+	}
+	w.expect(t, w.person(w.alex), actOpen, hostOpen(ids.New()), authorize.OutcomeNotFound, "no_grant")
+	after, _ := w.rec.counts()
+	if after-before != 1 {
+		t.Fatalf("%d deny entries, want only the one outside the recheck", after-before)
 	}
 }

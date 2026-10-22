@@ -7,6 +7,16 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateAgentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateAgentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
 func (r UpdateAgentResponse) GetApplicationproblemJSON412() *PreconditionFailed {
 	return r.ApplicationproblemJSON412
@@ -25905,20 +25915,4 @@ func (r ListMySessionsResponse) GetApplicationproblemJSONDefault() *Error {
 // GetBody returns the raw response body bytes
 func (r ListMySessionsResponse) GetBody() []byte {
 	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListMySessionsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListMySessionsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }

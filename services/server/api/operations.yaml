@@ -17,6 +17,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - approvePairing
   - archiveChannel
   - archiveSpace
+  - attachTerminalSession
   - beginEnrollment
   - beginIdentityLink
   - beginOidcLogin
@@ -24,6 +25,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPasskeyLogin
   - beginPasskeyRegistration
   - beginStepUpOidcReauth
+  - closeTerminalSession
   - closeThread
   - completeEnrollment
   - completeIdentityLink
@@ -100,6 +102,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getServedChannelConfig
   - getSnapshot
   - getSpace
+  - getTerminalSession
   - getThread
   - getUpload
   - getUser
@@ -140,6 +143,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listSpaceChannels
   - listSpaces
   - listTemplates
+  - listTerminalSessions
   - listThreadMessages
   - listThreadRuns
   - listTokens
@@ -156,6 +160,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - moveForumTag
   - moveSpace
   - moveThread
+  - openTerminalSession
   - pairHost
   - pinMessage
   - pollAgentEvents
@@ -232,9 +237,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: applyImportBatch
     milestone: M8
     ticket: M8-03
-  - operation_id: attachTerminalSession
-    milestone: M2
-    ticket: M2-44
   - operation_id: autocompleteCommand
     milestone: M2
     ticket: M2-17
@@ -253,9 +255,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: closePrice
     milestone: M2
     ticket: M2-22
-  - operation_id: closeTerminalSession
-    milestone: M2
-    ticket: M2-44
   - operation_id: completeImport
     milestone: M8
     ticket: M8-03
@@ -363,9 +362,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getStatus
     milestone: M7
     ticket: M7-09
-  - operation_id: getTerminalSession
-    milestone: M2
-    ticket: M2-44
   - operation_id: getThreadCosts
     milestone: M2
     ticket: M2-22
@@ -412,12 +408,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listPrices
     milestone: M2
     ticket: M2-22
-  - operation_id: listTerminalSessions
-    milestone: M2
-    ticket: M2-44
-  - operation_id: openTerminalSession
-    milestone: M2
-    ticket: M2-44
   - operation_id: patchRun
     milestone: M2
     ticket: M2-10

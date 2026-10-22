@@ -25,6 +25,10 @@ func Register(r *authorize.Registry) {
 	for _, op := range []authorize.ChannelOp{
 		authorize.ChannelOpHostControlIdentify, authorize.ChannelOpHostControlHeartbeat, authorize.ChannelOpHostControlReport,
 		authorize.ChannelOpHostControlSessionStarted, authorize.ChannelOpHostControlSessionEnded,
+		// The device stream and the data connection of the sessions (M2-44, AZ-P2).
+		authorize.ChannelOpTerminalStreamHello, authorize.ChannelOpTerminalStreamIdentify, authorize.ChannelOpTerminalStreamError,
+		authorize.ChannelOpTerminalStreamNoiseFrame, authorize.ChannelOpHostDataHello, authorize.ChannelOpHostDataIdentify,
+		authorize.ChannelOpHostDataError, authorize.ChannelOpHostDataNoiseFrame,
 	} {
 		r.ChannelOp("terminal", op)
 	}

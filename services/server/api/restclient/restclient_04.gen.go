@@ -13,6 +13,22 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Status returns HTTPResponse.Status
+func (r ListMySessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMySessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListMySessionsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
@@ -22636,7 +22652,7 @@ func (c *ClientWithResponses) GetTerminalSessionWithResponse(ctx context.Context
 
 // AttachTerminalSessionWithBodyWithResponse Attach to an own session again
 //
-// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -22651,7 +22667,7 @@ func (c *ClientWithResponses) AttachTerminalSessionWithBodyWithResponse(ctx cont
 
 // AttachTerminalSessionWithResponse Attach to an own session again
 //
-// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

@@ -14574,7 +14574,7 @@ type TerminalSessionOpen struct {
 	Profile string `json:"profile"`
 	Rows    int    `json:"rows"`
 
-	// WorkdirIndex Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1).
+	// WorkdirIndex Required exactly with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). A `claude` profile without a valid index, or an index with another profile, gives 403 `terminal_denied` with `reason: profile_unknown`; other profiles omit it. The token carries it as `wdi` (24, 5.3, 11.1).
 	WorkdirIndex *int `json:"workdir_index,omitempty"`
 }
 
@@ -16662,6 +16662,25 @@ type UpdateTemplateParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ListTerminalSessionsParams defines parameters for ListTerminalSessions.
+type ListTerminalSessionsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// HostId Only sessions on this host.
+	HostId *HostIdQuery `form:"host_id,omitempty" json:"host_id,omitempty"`
+
+	// State Only sessions in this state; without it, all states.
+	State *TerminalSessionStateQuery `form:"state,omitempty" json:"state,omitempty"`
+}
+
+// CloseTerminalSessionParams defines parameters for CloseTerminalSession.
+type CloseTerminalSessionParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // CloseThreadParams defines parameters for CloseThread.
 type CloseThreadParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -17003,6 +17022,9 @@ type IssueHostPairingCodeJSONRequestBody = ReasonBody
 // SetHostStateJSONRequestBody defines body for SetHostState for application/json ContentType.
 type SetHostStateJSONRequestBody = HostStateSet
 
+// OpenTerminalSessionJSONRequestBody defines body for OpenTerminalSession for application/json ContentType.
+type OpenTerminalSessionJSONRequestBody = TerminalSessionOpen
+
 // CreateIdentityProviderJSONRequestBody defines body for CreateIdentityProvider for application/json ContentType.
 type CreateIdentityProviderJSONRequestBody = IdentityProviderCreate
 
@@ -17092,6 +17114,12 @@ type SetSpaceOperatorJSONRequestBody = OperatorSet
 
 // UpdateTemplateJSONRequestBody defines body for UpdateTemplate for application/json ContentType.
 type UpdateTemplateJSONRequestBody = TemplateUpdate
+
+// AttachTerminalSessionJSONRequestBody defines body for AttachTerminalSession for application/json ContentType.
+type AttachTerminalSessionJSONRequestBody = TerminalSessionAttach
+
+// CloseTerminalSessionJSONRequestBody defines body for CloseTerminalSession for application/json ContentType.
+type CloseTerminalSessionJSONRequestBody = ReasonBody
 
 // PutThreadDraftJSONRequestBody defines body for PutThreadDraft for application/json ContentType.
 type PutThreadDraftJSONRequestBody = DraftPut

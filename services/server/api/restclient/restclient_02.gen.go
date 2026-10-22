@@ -4983,7 +4983,7 @@ func (c *Client) GetTerminalSession(ctx context.Context, sessionId TerminalSessi
 
 // AttachTerminalSessionWithBody Attach to an own session again
 //
-// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 //
 // Takes any type of body and a specified content type.
 //
@@ -5002,7 +5002,7 @@ func (c *Client) AttachTerminalSessionWithBody(ctx context.Context, sessionId Te
 
 // AttachTerminalSession Attach to an own session again
 //
-// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -25274,7 +25274,7 @@ type ClientWithResponsesInterface interface {
 
 	// AttachTerminalSessionWithBodyWithResponse Attach to an own session again
 	//
-	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -25283,7 +25283,7 @@ type ClientWithResponsesInterface interface {
 
 	// AttachTerminalSessionWithResponse Attach to an own session again
 	//
-	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27213,14 +27213,4 @@ func (r UpdateAgentResponse) GetApplicationproblemJSON400() *BadRequest {
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r UpdateAgentResponse) GetApplicationproblemJSON401() *Unauthorized {
 	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
 }

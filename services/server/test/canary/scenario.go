@@ -18,6 +18,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/test/harness"
+	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
 
 // Exempt lists enabled operations the scenario does not call, each with its reason. The brief
@@ -88,7 +89,10 @@ func StartRun(t testing.TB, o RunOptions) *Run {
 	redirectStdLoggers(t, NewLineWriter(r.Sinks, SinkLog, "std logger"))
 	opts := harness.Options{
 		Config: cfg, LogWriter: r.Logs, Telemetry: r.Tel,
-		ProofObserver: func(p string) { r.Reg.Register(p, ClassSecret, "", "DPoP proof") },
+		// The deadlines of the terminal relay never fire on their own (M2-44): the terminal step
+		// opens and attaches without a device stream, so a slow runner must not end the opening.
+		TerminalTimers: &fakehost.Timers{},
+		ProofObserver:  func(p string) { r.Reg.Register(p, ClassSecret, "", "DPoP proof") },
 		TokenObserver: func(access, refresh string) {
 			r.Reg.Register(access, ClassSecret, "", "access token")
 			r.Reg.Register(refresh, ClassSecret, "", "refresh token")

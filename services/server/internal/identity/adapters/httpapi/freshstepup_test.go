@@ -62,7 +62,8 @@ func newFreshWorld(t *testing.T) *freshWorld {
 // decideOpen authorizes terminal.open on H for a.
 func (w *freshWorld) decideOpen(a actor.Actor) authorize.Decision {
 	w.t.Helper()
-	d, err := w.az.Authorize(context.Background(), a, authorize.ActionTerminalOpen, authorize.Resource{Kind: authorize.ResourceHost, ID: w.host})
+	d, err := w.az.Authorize(context.Background(), a, authorize.ActionTerminalOpen, authorize.Resource{Kind: authorize.ResourceHost, ID: w.host,
+		Terminal: &authorize.TerminalFacts{HostConnected: true, ProfileKnown: true}})
 	if err != nil {
 		w.t.Fatal(err)
 	}

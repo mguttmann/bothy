@@ -4774,7 +4774,7 @@ export interface paths {
         put?: never;
         /**
          * Attach to an own session again
-         * @description For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+         * @description For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
          */
         post: operations["attachTerminalSession"];
         delete?: never;
@@ -10434,7 +10434,7 @@ export interface components {
         TerminalSessionOpen: {
             /** @example shell */
             profile: string;
-            /** @description Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1). */
+            /** @description Required exactly with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). A `claude` profile without a valid index, or an index with another profile, gives 403 `terminal_denied` with `reason: profile_unknown`; other profiles omit it. The token carries it as `wdi` (24, 5.3, 11.1). */
             workdir_index?: number;
             cols: number;
             rows: number;

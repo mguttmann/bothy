@@ -377,7 +377,9 @@ func (g *Gateway) StopConnections() lifecycle.StopStep {
 //
 // Before the batch reaches the hub, the hub learns that the tail knows its events (Hub.Known), the
 // start of bothy.event.fanout.lag.
-func DeliverySink(az authorize.Authorizer, hub *gatewayapp.Hub, versions instance.Versions) sync.Sink {
+//
+// The observers (the terminal relay, M2-44) get every event after the hub, in the same order.
+func DeliverySink(az authorize.Authorizer, hub *gatewayapp.Hub, versions instance.Versions, observers ...LogObserver) sync.Sink {
 	return func(ctx context.Context, batch []sync.Event) error {
 		if hub != nil && len(batch) > 0 {
 			hub.Known(batch[len(batch)-1].Seq)
@@ -388,12 +390,21 @@ func DeliverySink(az authorize.Authorizer, hub *gatewayapp.Hub, versions instanc
 			}
 		}
 		for _, ev := range batch {
-			az.Observe(ctx, authorize.LogEvent{Seq: ev.Seq, Type: ev.Type, PermissionVersion: ev.PermissionVersion, Audience: ev.AudiencePrincipalID})
-			if hub != nil {
-				hub.Dispatch(ctx, ev)
-			}
+			deliver(ctx, az, hub, observers, ev)
 		}
 		return nil
+	}
+}
+
+// deliver hands one event of the tail to Authorizer.Observe, the hub (nil: none) and the
+// observers, in this order.
+func deliver(ctx context.Context, az authorize.Authorizer, hub *gatewayapp.Hub, observers []LogObserver, ev sync.Event) {
+	az.Observe(ctx, authorize.LogEvent{Seq: ev.Seq, Type: ev.Type, PermissionVersion: ev.PermissionVersion, Audience: ev.AudiencePrincipalID})
+	if hub != nil {
+		hub.Dispatch(ctx, ev)
+	}
+	for _, o := range observers {
+		o(ctx, ev)
 	}
 }
 

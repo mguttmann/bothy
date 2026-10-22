@@ -53,6 +53,10 @@ type Identify struct {
 	// presence of live_sessions and session_id.
 	LiveSessions                  []ids.ID
 	HasLiveSessions, HasSessionID bool
+	// SessionID is session_id of a data connection; Data marks the identify of a data connection
+	// (M2-44), which must carry session_id and no live_sessions.
+	SessionID ids.ID
+	Data      bool
 }
 
 // Exchange is what the connection sent in hello: the challenge and server_time.
@@ -164,7 +168,7 @@ func (s *Service) AuthFailed(ctx context.Context) error {
 // authorize.
 func (s *Service) Authenticate(ctx context.Context, x Exchange, in Identify) (Login, domain.CloseCode, error) {
 	facts := domain.IdentifyFacts{ProtocolVersion: in.ProtocolVersion, LiveSessions: in.HasLiveSessions, SessionID: in.HasSessionID,
-		HostVersion: in.HostVersion, Proof: domain.ProofValid, State: domain.StateActive}
+		HostVersion: in.HostVersion, Proof: domain.ProofValid, State: domain.StateActive, Data: in.Data}
 	if code := domain.IdentifyOutcome(facts); code != 0 {
 		return Login{}, code, nil
 	}

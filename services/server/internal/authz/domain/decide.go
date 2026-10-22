@@ -181,6 +181,8 @@ type HostFacts struct {
 	CredentialHolderID ids.ID
 	// DeclaredServerHost and ReportedIsServerHost mark the server host (24 section 2.3).
 	DeclaredServerHost, ReportedIsServerHost bool
+	// State is the host state of 24 section 3.1; the guard host_not_active reads it (M2-44).
+	State string
 }
 
 // TargetFacts are the facts of the second target (thread.move).
@@ -247,6 +249,13 @@ type Input struct {
 	Reattach *ReattachFacts
 	// Terminal are the facts of the guards of terminal.open and terminal.attach; nil otherwise.
 	Terminal *TerminalGuardFacts
+	// Live are the live facts of terminal.open, terminal.attach and terminal.stream (M2-44): the
+	// connection of the host, the profile verdict and the device of the current session token;
+	// nil otherwise.
+	Live *TerminalLiveFacts
+	// Recheck marks the check after the commit of a terminal opening or attach (M2-44,
+	// authorize.Recheck): step 8 passes for a fresh step-up.
+	Recheck bool
 	// quickReattach records that step 8 passed through the quick reattach.
 	quickReattach bool
 }
@@ -410,6 +419,11 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 // passes without step-up and is recorded for the decision; otherwise the step-up must be fresh and
 // unconsumed (FreshStepUp), else step_up_required with terminal_step_up_not_fresh.
 func decideFresh(in *Input) (Decision, bool) {
+	if in.Recheck {
+		// The check after the commit of the decision that consumed the step-up (M2-44, Design
+		// note 12): only the step-up passes, every other step decides as before.
+		return Decision{}, false
+	}
 	if in.Reattach != nil && QuickReattach(*in.Reattach, in.Now, in.ReattachWindow) {
 		in.quickReattach = true
 		return Decision{}, false

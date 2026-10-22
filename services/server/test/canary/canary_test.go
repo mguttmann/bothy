@@ -251,6 +251,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.auth(idp)
 	sc.apps()
 	sc.hosts()
+	sc.terminalSessions()
 	sc.errorPaths()
 	sc.gatewayOps()
 	sc.FinishObservers()

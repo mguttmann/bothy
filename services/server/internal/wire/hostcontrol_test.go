@@ -32,7 +32,13 @@ func TestWire_RouteRolesAndRegistrations(t *testing.T) {
 		}
 	}
 	want := []authorize.ChannelOp{authorize.ChannelOpHostControlHeartbeat, authorize.ChannelOpHostControlIdentify,
-		authorize.ChannelOpHostControlReport, authorize.ChannelOpHostControlSessionEnded, authorize.ChannelOpHostControlSessionStarted}
+		authorize.ChannelOpHostControlReport, authorize.ChannelOpHostControlSessionEnded, authorize.ChannelOpHostControlSessionStarted,
+		// M2-44: the device stream and the data connection.
+		authorize.ChannelOpHostDataError, authorize.ChannelOpHostDataHello, authorize.ChannelOpHostDataIdentify, authorize.ChannelOpHostDataNoiseFrame,
+		authorize.ChannelOpTerminalStreamError, authorize.ChannelOpTerminalStreamHello, authorize.ChannelOpTerminalStreamIdentify,
+		authorize.ChannelOpTerminalStreamNoiseFrame}
+	slices.Sort(ops)
+	slices.Sort(want)
 	if !slices.Equal(ops, want) {
 		t.Errorf("channel ops %v, want %v", ops, want)
 	}
@@ -46,6 +52,7 @@ func TestWire_RouteRolesAndRegistrations(t *testing.T) {
 		}
 	}
 	bindings := append(wire.RouteBindings(routes.Enabled()), wire.GatewayRouteBinding(), wire.HostConnectRouteBinding())
+	bindings = append(bindings, wire.TerminalStreamRouteBindings()...)
 	if err := authzapp.NewCatalog(nil).VerifyRegistrations(bindings, reg); err != nil {
 		t.Fatalf("catalogue check: %v", err)
 	}

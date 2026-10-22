@@ -18150,7 +18150,7 @@ paths:
       summary: Attach to an own session again
       tags: [Terminal]
       description: |-
-        For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+        For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
       x-authz-action: terminal.attach
       x-rate-limit-class: rl.terminal
       x-idempotency-exempt: auth_flow
@@ -29861,7 +29861,7 @@ components:
         workdir_index:
           type: integer
           minimum: 0
-          description: 'Only with a `claude` profile: index into `workdirs` of the caller''s own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1).'
+          description: 'Required exactly with a `claude` profile: index into `workdirs` of the caller''s own entry in `reported_session_users` (ruling T13). A `claude` profile without a valid index, or an index with another profile, gives 403 `terminal_denied` with `reason: profile_unknown`; other profiles omit it. The token carries it as `wdi` (24, 5.3, 11.1).'
         cols:
           type: integer
           minimum: 1
@@ -29872,6 +29872,7 @@ components:
           maximum: 65535
         client_ephemeral_key_hash:
           type: string
+          pattern: '^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$'
           description: SHA-256 of the ephemeral X25519 public key the device sends in Noise message 1, base64url without padding; becomes the claim `cek`.
         pin_changed:
           type: boolean
@@ -29892,6 +29893,7 @@ components:
           maximum: 65535
         client_ephemeral_key_hash:
           type: string
+          pattern: '^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$'
         pin_changed:
           type: boolean
           default: false
