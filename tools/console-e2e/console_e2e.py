@@ -14,6 +14,11 @@ recreated with the overlay ``compose.console-e2e-admin.yaml``, which serves the 
 patrol suites of the console administration (built from the target ``console-e2e-web`` of
 ``services/server/Dockerfile`` into the temp directory) as the console and holds a step-up for 3 s;
 then the TLS sidecar and the browser container with ``E2E_MODE=admin`` (headless/admin_suites.py).
+Phase 2 also starts the worker, which delivers the outgoing webhooks, and the receiver
+``webhook-receiver`` of brief M6-08 on the Compose network (HTTPS with a certificate of the test
+CA, every POST answered 200 and logged); api and the worker trust the test CA through a bundle of
+the system roots of the server image and the test CA (``SSL_CERT_FILE``). After the suites the
+receiver must have logged a delivery with a ``webhook-id`` header.
 
 Exit codes: 0 pass, 1 a check failed, 2 a precondition is missing (Docker, Compose, the image).
 Each step is announced as ``console-e2e: <step>`` on stderr; no secret is ever printed.
@@ -29,6 +34,7 @@ import base64
 import datetime
 import hashlib
 import ipaddress
+import json
 import os
 import re
 import secrets
@@ -53,11 +59,19 @@ MIN_COMPOSE = (2, 26, 0)
 # The log message of the server for an accepted report (instance/app.LogCSPViolation).
 REPORT_LOG = "csp violation reported"
 # The services whose last log lines a failure prints.
-DIAGNOSE_SERVICES = ("api", "migrate", "tls")
+DIAGNOSE_SERVICES = ("api", "worker", "migrate", "tls", "webhook-receiver")
 # The overlay of phase 2 (brief M6-04 Design note 4) and the directory of the bundle in the temp
 # directory of the run.
 ADMIN_OVERLAY = COMPOSE_DIR / "test" / "compose.console-e2e-admin.yaml"
 ADMIN_BUNDLE = "admin-bundle"
+# The receiver of the outgoing webhooks of phase 2 (brief M6-08): its Compose service name, which
+# the leaf certificate also names, and the trust bundle of api and the worker in the certs
+# directory (the overlay mounts it as SSL_CERT_FILE).
+RECEIVER = "webhook-receiver"
+TRUST_BUNDLE = "ca-bundle.pem"
+# The CA file of the distroless server image (Debian's ca-certificates).
+IMAGE_ROOTS = "/etc/ssl/certs/ca-certificates.crt"
+PEM_CERT = b"-----BEGIN CERTIFICATE-----"
 
 
 class PreconditionError(Exception):
@@ -101,12 +115,14 @@ class Certs:
 
 
 def make_certs(directory: Path, now: datetime.datetime | None = None) -> Certs:
-    """Writes a test CA and a leaf for ``localhost``, ``api`` and 127.0.0.1 into ``directory``.
+    """Writes a test CA and a leaf for ``localhost``, ``api``, the receiver and 127.0.0.1.
 
-    The keys are P-256 and exist only for this run; the leaf is valid for one day. Chromium trusts
-    the leaf by its SPKI hash (``--ignore-certificate-errors-spki-list``), which treats the
-    connection as a valid certificate, so WebAuthn and the secure context behave as with a public
-    certificate (docs/DECISIONS.md D-M6-03-6).
+    The receiver of phase 2 (``webhook-receiver``) serves the same leaf, so the server's webhook
+    client verifies it against the test CA in its trust bundle. The keys are P-256 and exist only
+    for this run; the leaf is valid for one day. Chromium trusts the leaf by its SPKI hash
+    (``--ignore-certificate-errors-spki-list``), which treats the connection as a valid
+    certificate, so WebAuthn and the secure context behave as with a public certificate
+    (docs/DECISIONS.md D-M6-03-6).
     """
     now = now or datetime.datetime.now(datetime.UTC)
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -137,6 +153,7 @@ def make_certs(directory: Path, now: datetime.datetime | None = None) -> Certs:
                 [
                     x509.DNSName("localhost"),
                     x509.DNSName("api"),
+                    x509.DNSName(RECEIVER),
                     x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
                 ]
             ),
@@ -378,24 +395,126 @@ def build_bundle(stack: Stack, tmp: Path, version: str) -> None:
     share_bundle(tmp / ADMIN_BUNDLE)
 
 
+def system_roots(image: str, scratch: Path, run: Runner = _run) -> bytes:
+    """The CA file of the server image, copied out of a container that never starts.
+
+    ``docker create`` plus ``docker cp`` read the roots the image itself trusts (Debian's
+    ca-certificates of the distroless base), so the trust bundle adds the test CA to exactly the
+    roots of a release; the container is removed by its ID and the copy in ``scratch`` is read and
+    deleted. Raises StepError when the container cannot be created or the file not copied.
+    """
+    created = run(["docker", "create", "--pull", "never", image], capture_output=True)
+    cid = created.stdout.strip()
+    if created.returncode != 0 or not cid:
+        raise StepError(f"docker create of {image} failed with exit code {created.returncode}")
+    copy = scratch / "image-roots.pem"
+    try:
+        res = run(["docker", "cp", "-L", f"{cid}:{IMAGE_ROOTS}", str(copy)], capture_output=True)
+        if res.returncode != 0 or not copy.is_file():
+            raise StepError(f"docker cp of the CA file {IMAGE_ROOTS} failed")
+        return copy.read_bytes()
+    finally:
+        copy.unlink(missing_ok=True)
+        run(["docker", "rm", cid], capture_output=True)
+
+
+def write_trust_bundle(certs: Path, roots: bytes) -> Path:
+    """Writes ``ca-bundle.pem``: the system roots followed by the test CA of this run.
+
+    api and the worker read it as ``SSL_CERT_FILE`` (Go's crypto/x509 on Linux), so the webhook
+    client trusts the receiver and every public root as before; their user (65532) reads the file,
+    hence mode 0644. Raises StepError when ``roots`` holds no certificate.
+    """
+    if PEM_CERT not in roots:
+        raise StepError("the CA file of the server image holds no certificate")
+    bundle = certs / TRUST_BUNDLE
+    bundle.write_bytes(roots.rstrip(b"\n") + b"\n" + (certs / "ca.pem").read_bytes())
+    bundle.chmod(0o644)
+    return bundle
+
+
+@dataclass(frozen=True)
+class Delivery:
+    """One request the webhook receiver logged: method, path, ``webhook-id`` and the status."""
+
+    method: str
+    path: str
+    webhook_id: str
+    status: int
+
+
+def deliveries(logs: str) -> list[Delivery]:
+    """The requests in the JSON access log of the receiver (caddy), in their order.
+
+    A line may carry a prefix of ``docker compose logs``; lines that are no access log entry are
+    skipped. Header names are compared without case, as HTTP does (Go sends ``Webhook-Id``).
+    """
+    out: list[Delivery] = []
+    for line in logs.splitlines():
+        start = line.find("{")
+        if start < 0:
+            continue
+        try:
+            entry = json.loads(line[start:])
+        except ValueError:
+            continue
+        request = entry.get("request") if isinstance(entry, dict) else None
+        if not isinstance(request, dict):
+            continue
+        headers = request.get("headers") or {}
+        ids: list[Any] = next(
+            (list(v) for k, v in headers.items() if k.lower() == "webhook-id"), []
+        )
+        out.append(
+            Delivery(
+                method=str(request.get("method") or ""),
+                path=str(request.get("uri") or ""),
+                webhook_id=str(ids[0]) if ids else "",
+                status=int(entry.get("status") or 0),
+            )
+        )
+    return out
+
+
+def check_deliveries(seen: Sequence[Delivery]) -> None:
+    """Raises StepError unless the receiver answered 2xx to a POST with a ``webhook-id`` header."""
+    if not any(d.method == "POST" and d.webhook_id and 200 <= d.status < 300 for d in seen):
+        raise StepError("the receiver recorded no delivered POST with a webhook-id header")
+
+
 def run_admin(stack: Stack) -> None:
     """Phase 2.
 
-    Api with the admin overlay, the sidecar after it (it shares the network namespace of api, so it
-    must follow the new container), then the patrol suites.
+    The trust bundle, the webhook receiver, api with the admin overlay and the worker (it delivers
+    the webhooks), the sidecar after api (it shares the network namespace of api, so it must
+    follow the new container), the patrol suites, then the deliveries the receiver logged.
     """
+    say("phase 2: trust bundle (the roots of the server image and the test CA)")
+    certs = Path(stack.env["E2E_CERTS"])
+    write_trust_bundle(certs, system_roots(stack.env["SMOKE_SERVER_IMAGE"], certs, stack.run))
     stack.files.append(ADMIN_OVERLAY)
     stack.env["E2E_MODE"] = "admin"
-    say("phase 2: api with the admin bundle and a step-up of 3 s")
+    say("phase 2: the webhook receiver")
+    stack.compose("up", "--detach", "--no-deps", RECEIVER)
+    say("phase 2: api with the admin bundle and a step-up of 3 s, the worker")
     stack.compose(
-        "up", "--detach", "--wait", "--wait-timeout", "240", "--no-deps", "--force-recreate", "api"
-    )
+        "up", "--detach", "--wait", "--wait-timeout", "240", "--no-deps", "--force-recreate",
+        "api", "worker",
+    )  # fmt: skip
     say("phase 2: restart the TLS sidecar")
     stack.compose("up", "--detach", "--no-deps", "--force-recreate", "tls")
     say("phase 2: patrol suites of the console administration (chromium)")
     res = stack.compose("run", "--rm", "--no-deps", "console-browser", check=False)
     if res.returncode != 0:
         raise StepError("the patrol suites failed; see the lines above and out/results/admin.json")
+    say("phase 2: deliveries at the webhook receiver")
+    logs = stack.compose(
+        "logs", "--no-color", "--no-log-prefix", RECEIVER, capture_output=True
+    ).stdout
+    seen = deliveries(logs)
+    check_deliveries(seen)
+    paths = sorted({d.path for d in seen if d.webhook_id})
+    say(f"phase 2: the receiver logged {len(seen)} requests at {', '.join(paths)}")
 
 
 def run_test(stack: Stack, tmp: Path, version: str) -> None:

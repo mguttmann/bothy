@@ -58,6 +58,28 @@ pytest==9.1.1 \\
     --hash=sha256:fff
 """
 
+# The CA file of the server image, as docker cp copies it out (a stand-in with one certificate).
+ROOTS_PEM = "-----BEGIN CERTIFICATE-----\nTUlJ\n-----END CERTIFICATE-----\n"
+
+
+def receiver_line(path: str, webhook_id: str | None, status: int = 200) -> str:
+    """One access log line of the webhook receiver (caddy's JSON access log)."""
+    headers: dict[str, list[str]] = {"Content-Type": ["application/json"]}
+    if webhook_id is not None:
+        headers["Webhook-Id"] = [webhook_id]
+    return json.dumps(
+        {
+            "level": "info",
+            "logger": "http.log.access",
+            "msg": "handled request",
+            "request": {"method": "POST", "uri": path, "headers": headers},
+            "status": status,
+        }
+    )
+
+
+RECEIVER_LOG = receiver_line("/hooks/second", "msg_0192f4a0") + "\n"
+
 
 class FakeDocker:
     """Records every command and its environment; ``fail_on`` makes the compose subcommand of
@@ -71,8 +93,12 @@ class FakeDocker:
         leftovers: str = "",
         fail_admin: str | None = None,
         fail_bundle: bool = False,
+        receiver_log: str = RECEIVER_LOG,
+        fail_roots: bool = False,
     ) -> None:
         self.calls: list[list[str]] = []
+        self.receiver_log = receiver_log
+        self.fail_roots = fail_roots
         self.envs: list[dict[str, str]] = []
         self.fail_on = fail_on
         self.fail_admin = fail_admin
@@ -100,6 +126,12 @@ class FakeDocker:
             out = EXPORT
         elif args[:2] == ["docker", "ps"]:
             out = self.leftovers
+        elif args[:2] == ["docker", "create"]:
+            out = "cid0roots\n"
+        elif args[:2] == ["docker", "cp"]:
+            rc = 1 if self.fail_roots else 0
+            if not self.fail_roots:
+                Path(args[-1]).write_text(ROOTS_PEM, encoding="utf-8")
         elif args[:2] == ["docker", "compose"]:
             sub = next(
                 (
@@ -114,7 +146,11 @@ class FakeDocker:
             if sub == self.fail_admin and str(ADMIN_OVERLAY) in args:
                 rc = 1
             if sub == "logs":
-                out = REPORT_LINE % "script-src-elem"
+                out = (
+                    self.receiver_log
+                    if args[-1] == "webhook-receiver"
+                    else REPORT_LINE % "script-src-elem"
+                )
         stdout = kwargs.get("stdout")
         if hasattr(stdout, "write"):
             stdout.write("")
@@ -212,7 +248,8 @@ def test_certs_name_the_origins_and_pin_the_leaf(tmp_path: Path) -> None:
     certs = e2e.make_certs(tmp_path / "c", now)
     leaf, ca = x509.load_pem_x509_certificates((certs.directory / "leaf.pem").read_bytes())
     sans = leaf.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
-    assert set(sans.get_values_for_type(x509.DNSName)) == {"localhost", "api"}
+    # webhook-receiver: the receiver of the outgoing webhooks of phase 2 (brief M6-08).
+    assert set(sans.get_values_for_type(x509.DNSName)) == {"localhost", "api", "webhook-receiver"}
     assert leaf.issuer == ca.subject
     spki = leaf.public_key().public_bytes(
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
@@ -239,6 +276,34 @@ def test_overlay_images_are_pinned_and_match_the_lock() -> None:
         assert "ports" not in svc, name
         assert svc["read_only"] is True, name
         assert svc["cap_drop"] == ["ALL"], name
+
+
+def test_webhook_receiver_is_hardened_and_unpublished() -> None:
+    data = yaml.safe_load(OVERLAY.read_text(encoding="utf-8"))
+    tls = data["services"]["tls"]
+    svc = data["services"]["webhook-receiver"]
+    # The same pinned caddy image as the TLS sidecar, test only, on the Compose network.
+    assert svc["image"] == tls["image"]
+    assert svc["profiles"] == ["console-e2e"]
+    assert "network_mode" not in svc
+    assert "ports" not in svc
+    assert "expose" not in svc
+    for key in ("user", "read_only", "cap_drop", "cap_add", "security_opt", "tmpfs"):
+        assert svc[key] == tls[key], key
+    assert svc["volumes"] == [
+        "./test/console-e2e/receiver.Caddyfile:/etc/caddy-e2e/Caddyfile:ro",
+        "${E2E_CERTS:?set by console_e2e.py}:/certs:ro",
+    ]
+    assert svc["command"] == tls["command"]
+
+
+def test_receiver_caddyfile_serves_https_and_logs_every_request() -> None:
+    text = (OVERLAY.parent / "console-e2e" / "receiver.Caddyfile").read_text(encoding="utf-8")
+    assert "https://:8443 {" in text
+    assert "tls /certs/leaf.pem /certs/leaf.key" in text
+    assert re.search(r"log \{\s*output stdout\s*format json\s*\}", text)
+    assert re.search(r"respond @post 200", text)
+    assert "reverse_proxy" not in text
 
 
 def test_ci_job_is_pinned_read_only_and_feeds_ci_ok() -> None:
@@ -320,18 +385,27 @@ def test_phase_two_adds_the_admin_overlay_after_phase_one(environ: dict[str, str
     assert files == [str(f) for f in e2e.Stack(project="x", env={}).files] + [str(ADMIN_OVERLAY)]
     phase2 = [c for c, _ in calls if str(ADMIN_OVERLAY) in c]
     ups = [c for c in phase2 if "up" in c]
-    # api first (with --wait), then the sidecar in its network namespace; both recreated.
-    assert ups[0][-1] == "api"
-    assert "--wait" in ups[0]
-    assert "--force-recreate" in ups[0]
-    assert ups[1][-1] == "tls"
+    # The webhook receiver first, so the first delivery finds it; then api and the worker (which
+    # runs the deliveries) with --wait, then the sidecar in the network namespace of api.
+    assert ups[0][-1] == "webhook-receiver"
+    assert "--no-deps" in ups[0]
+    assert ups[1][-2:] == ["api", "worker"]
+    assert "--wait" in ups[1]
     assert "--force-recreate" in ups[1]
-    assert phase2.index(ups[0]) < phase2.index(ups[1])
+    assert "--no-deps" in ups[1]
+    assert ups[2][-1] == "tls"
+    assert "--force-recreate" in ups[2]
+    assert phase2.index(ups[0]) < phase2.index(ups[1]) < phase2.index(ups[2])
     runs = [(c, e) for c, e in calls if str(ADMIN_OVERLAY) in c and "run" in c]
     assert len(runs) == 1
     assert runs[0][0][-1] == "console-browser"
     assert runs[0][1]["E2E_MODE"] == "admin"
-    assert phase2.index(ups[1]) < phase2.index(runs[0][0])
+    assert phase2.index(ups[2]) < phase2.index(runs[0][0])
+    # The deliveries the receiver recorded are read after the suites.
+    receiver_logs = [c for c in phase2 if "logs" in c and c[-1] == "webhook-receiver"]
+    assert len(receiver_logs) == 1
+    assert "--no-log-prefix" in receiver_logs[0]
+    assert phase2.index(runs[0][0]) < phase2.index(receiver_logs[0])
     # Phase 1 never sees E2E_MODE=admin.
     for c, env in calls:
         if str(ADMIN_OVERLAY) not in c and "run" in c:
@@ -393,17 +467,30 @@ def test_admin_overlay_pins() -> None:
     text = ADMIN_OVERLAY.read_text(encoding="utf-8")
     assert "TEST ONLY" in text
     data = yaml.safe_load(text)
-    assert set(data["services"]) == {"api", "console-browser"}
+    assert set(data["services"]) == {"api", "worker", "console-browser"}
     for name, svc in data["services"].items():
         assert "ports" not in svc, name
+    # The receiver of the outgoing webhooks (brief M6-08): api checks the addresses, the worker
+    # delivers; both trust the test CA through the bundle the runner writes.
+    hooks = {
+        "BOTHY_WEBHOOK__ALLOWED_HOSTS": "webhook-receiver:8443",
+        "BOTHY_EGRESS__ALLOWED_HOSTS": "webhook-receiver:8443;allow_private",
+        "SSL_CERT_FILE": "/etc/bothy-e2e/ca-bundle.pem",
+    }
+    bundle = "${E2E_CERTS:?set by console_e2e.py}/ca-bundle.pem:/etc/bothy-e2e/ca-bundle.pem:ro"
     api = data["services"]["api"]
     assert api["environment"] == {
         "BOTHY_CONSOLE__ASSETS_DIR": "/usr/share/bothy/console-e2e",
         "BOTHY_AUTH__STEP_UP_MAX_AGE": "3s",
+        **hooks,
     }
     assert api["volumes"] == [
-        "${E2E_ADMIN_BUNDLE:?set by console_e2e.py}:/usr/share/bothy/console-e2e:ro"
+        "${E2E_ADMIN_BUNDLE:?set by console_e2e.py}:/usr/share/bothy/console-e2e:ro",
+        bundle,
     ]
+    worker = data["services"]["worker"]
+    assert worker["environment"] == hooks
+    assert worker["volumes"] == [bundle]
     assert data["services"]["console-browser"]["environment"] == {"E2E_MODE": "${E2E_MODE:-}"}
 
 
@@ -411,9 +498,101 @@ def test_admin_overlay_sets_only_existing_configuration_keys() -> None:
     data = yaml.safe_load(ADMIN_OVERLAY.read_text(encoding="utf-8"))
     keys = ROOT / "services" / "server" / "internal" / "wire"
     names = "".join(p.read_text(encoding="utf-8") for p in keys.glob("configkeys_*.go"))
-    for var in data["services"]["api"]["environment"]:
-        key = var.removeprefix("BOTHY_").lower().replace("__", ".")
-        assert f'Name: "{key}"' in names, key
+    for svc in ("api", "worker"):
+        for var in data["services"][svc]["environment"]:
+            if not var.startswith("BOTHY_"):
+                assert var == "SSL_CERT_FILE", var  # read by Go's crypto/x509, not the server
+                continue
+            key = var.removeprefix("BOTHY_").lower().replace("__", ".")
+            # A key is named in its Name field or in a constant of the same files.
+            assert f'"{key}"' in names, key
+
+
+# ---- phase 2: the webhook receiver and the trust of the test CA (brief M6-08) --------------
+
+
+def test_system_roots_come_from_the_server_image_and_the_container_goes(tmp_path: Path) -> None:
+    fake = FakeDocker()
+    pem = e2e.system_roots("img:1", tmp_path, fake)
+    assert pem == ROOTS_PEM.encode()
+    assert fake.calls[0][:2] == ["docker", "create"]
+    assert "img:1" in fake.calls[0]
+    assert fake.calls[1][:3] == ["docker", "cp", "-L"]
+    assert fake.calls[1][3] == "cid0roots:/etc/ssl/certs/ca-certificates.crt"
+    assert fake.calls[-1] == ["docker", "rm", "cid0roots"]
+    assert list(tmp_path.iterdir()) == []  # the copy is read and removed
+
+
+def test_system_roots_failure_removes_the_container(tmp_path: Path) -> None:
+    fake = FakeDocker(fail_roots=True)
+    with pytest.raises(e2e.StepError, match="CA file"):
+        e2e.system_roots("img:1", tmp_path, fake)
+    assert fake.calls[-1] == ["docker", "rm", "cid0roots"]
+
+
+def test_trust_bundle_holds_the_roots_and_the_test_ca(tmp_path: Path) -> None:
+    certs = e2e.make_certs(tmp_path / "c")
+    bundle = e2e.write_trust_bundle(certs.directory, ROOTS_PEM.encode())
+    text = bundle.read_text(encoding="utf-8")
+    assert bundle == certs.directory / "ca-bundle.pem"
+    assert text.startswith(ROOTS_PEM)
+    assert text.endswith((certs.directory / "ca.pem").read_text(encoding="utf-8"))
+    assert bundle.stat().st_mode & 0o777 == 0o644  # api and worker run as 65532
+    with pytest.raises(e2e.StepError, match="no certificate"):
+        e2e.write_trust_bundle(certs.directory, b"")
+
+
+def test_deliveries_read_method_path_and_webhook_id() -> None:
+    logs = "\n".join(
+        [
+            "not json",
+            '{"level":"warn","msg":"something else"}',
+            receiver_line("/hooks/events", "msg_1"),
+            receiver_line("/hooks/second", None),
+            receiver_line("/hooks/second", "msg_2", status=500),
+            "x | " + receiver_line("/hooks/second", "msg_3"),
+        ]
+    )
+    got = e2e.deliveries(logs)
+    assert got == [
+        e2e.Delivery("POST", "/hooks/events", "msg_1", 200),
+        e2e.Delivery("POST", "/hooks/second", "", 200),
+        e2e.Delivery("POST", "/hooks/second", "msg_2", 500),
+        e2e.Delivery("POST", "/hooks/second", "msg_3", 200),
+    ]
+
+
+def test_check_deliveries_needs_a_signed_delivery() -> None:
+    e2e.check_deliveries([e2e.Delivery("POST", "/hooks/second", "msg_1", 200)])
+    for bad in (
+        [],
+        [e2e.Delivery("POST", "/hooks/second", "", 200)],
+        [e2e.Delivery("GET", "/hooks/second", "msg_1", 200)],
+        [e2e.Delivery("POST", "/hooks/second", "msg_1", 500)],
+    ):
+        with pytest.raises(e2e.StepError, match="webhook-id"):
+            e2e.check_deliveries(bad)
+
+
+def test_phase_two_writes_the_trust_bundle_before_api_starts(environ: dict[str, str]) -> None:
+    fake = FakeDocker()
+    assert e2e.main([], environ, fake) == 0
+    create = next(i for i, c in enumerate(fake.calls) if c[:2] == ["docker", "create"])
+    removed = next(i for i, c in enumerate(fake.calls) if c == ["docker", "rm", "cid0roots"])
+    first_admin = next(i for i, c in enumerate(fake.calls) if str(ADMIN_OVERLAY) in c)
+    assert create < removed < first_admin
+    assert "img:1" in fake.calls[create]
+
+
+def test_no_delivery_at_the_receiver_fails_the_run(environ: dict[str, str], tmp_path: Path) -> None:
+    fake = FakeDocker(receiver_log=receiver_line("/hooks/second", None) + "\n")
+    assert e2e.main([], environ, fake) == 1
+    assert "down" in fake.compose_subcommands()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_failure_logs_name_the_worker_and_the_receiver() -> None:
+    assert {"api", "worker", "webhook-receiver"} <= set(e2e.DIAGNOSE_SERVICES)
 
 
 def _stages(text: str) -> list[tuple[str, str]]:
@@ -638,6 +817,14 @@ class _FakePage:
         self.context = _FakeContext()
         self.evaluated: list[tuple[str, object]] = []
         self.media: list[str] = []
+        self.waited: list[tuple[str, str, float]] = []
+        self.files: list[tuple[str, object]] = []
+
+    def wait_for_selector(self, selector: str, *, state: str, timeout: float) -> None:
+        self.waited.append((selector, state, timeout))
+
+    def set_input_files(self, selector: str, files: object) -> None:
+        self.files.append((selector, files))
 
     def evaluate(self, script: str, arg: object = None) -> object:
         self.evaluated.append((script, arg))
@@ -667,6 +854,61 @@ def test_platform_handler_answers_lifecycle_and_rejects_unknown_actions() -> Non
         handler(None, {"action": "tap", "params": {}})
     assert handler.unknown == ["tap"]
     assert lines[0] == "platform action startTest"
+
+
+def test_platform_handler_sets_the_manifest_file_on_the_console_input() -> None:
+    page = _FakePage()
+    handler = admin.PlatformHandler(page, lambda _line: None)  # type: ignore[arg-type]
+    params = {"name": "repo-bridge.json"}
+    assert handler(None, {"action": "e2eSetManifestFile", "params": params}) is None
+    selector = 'input[data-bothy-file-input="manifest"]'
+    # The console appends the input on "Choose file"; the runner waits until it is attached.
+    assert page.waited == [(selector, "attached", admin.STEP_TIMEOUT_MS)]
+    assert page.files == [(selector, [admin.manifest_file("repo-bridge.json")])]
+    assert handler.unknown == []
+    with pytest.raises(admin.CheckError, match=r"other\.json"):
+        handler(None, {"action": "e2eSetManifestFile", "params": {"name": "other.json"}})
+
+
+def test_manifest_file_is_the_repo_bridge_manifest_as_json() -> None:
+    payload = admin.manifest_file("repo-bridge.json")
+    assert payload["name"] == "repo-bridge.json"
+    assert payload["mimeType"] == "application/json"
+    assert json.loads(payload["buffer"]) == admin.repo_bridge_manifest()
+    with pytest.raises(admin.CheckError, match="no manifest"):
+        admin.manifest_file("../etc/passwd")
+
+
+def test_repo_bridge_manifest_points_at_the_receiver() -> None:
+    m = admin.repo_bridge_manifest()
+    assert m["schema_version"] == 1
+    assert m["slug"] == "repo-bridge"
+    assert m["name"] == "Repo Bridge"
+    assert m["min_api_version"] == "0.2"
+    assert m["scopes"] == {
+        "required": ["messages:write"],
+        "optional": ["messages:read", "events:subscribe"],
+    }
+    assert m["events"] == ["message.created"]
+    assert m["delivery"] == {
+        "mode": "webhook",
+        "events_url": "https://webhook-receiver:8443/hooks/events",
+    }
+    assert m["requested_grants"] == [
+        {
+            "target_kind": "channel",
+            "level": "write",
+            "capabilities": [],
+            "purpose": "Post build results",
+        }
+    ]
+    assert m["data_egress"]
+    # White label: example texts only, no other host than the receiver and example.com.
+    hosts = set(re.findall(r"https://([^/:\"]+)", json.dumps(m)))
+    assert hosts <= {"webhook-receiver", "bridge.example.com"}
+    # Commands or components would need an interactions_url (11 3.2); the flow has none.
+    assert "commands" not in m
+    assert "components" not in m
 
 
 def test_judge_fails_on_every_kind_of_failure() -> None:

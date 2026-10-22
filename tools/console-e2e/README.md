@@ -4,8 +4,9 @@ The headless browser test of the web console (brief M6-03, [19-security.md](../.
 5 and 14, SEC-T05): the console of the real server image runs with its Content Security Policy
 enforced in Chromium, Firefox and WebKit, and the test fails on any violation, on any request to an
 origin other than the console origin and on a WebSocket the policy blocks (phase 1). Phase 2 (brief
-M6-04 Design note 4) runs the `patrol` web suites of the console administration (A1 to A6) in
-Chromium under the same enforced CSP against the same stack. `make console-e2e` runs both;
+M6-04 Design note 4) runs the `patrol` web suites of the console administration (A1 to A6, and A7
+and A8 of brief M6-08: apps, outgoing and incoming webhooks) in Chromium under the same enforced
+CSP against the same stack. `make console-e2e` runs both;
 it is not part of `make gates`. The CI job `console-e2e` of `.github/workflows/ci.yml` runs it on
 every change of the component `apps` or `server` and feeds `ci-ok`.
 
@@ -21,7 +22,7 @@ every change of the component `apps` or `server` and feeds `ci-ok`.
 The stack is the Compose smoke stack of M1-73 (`infra/compose/compose.yaml`,
 `infra/compose/test/compose.smoke.yaml`, `smoke.env`) with the overlay
 `infra/compose/test/compose.console-e2e.yaml` and `console-e2e.env`; phase 2 adds
-`infra/compose/test/compose.console-e2e-admin.yaml`.
+`infra/compose/test/compose.console-e2e-admin.yaml` and starts the worker and the webhook receiver.
 
 ## Prerequisites
 
@@ -41,8 +42,8 @@ A missing precondition exits with code 2 and a message that names the fix.
 1. Preflight: Docker, Compose and their versions, the server image.
 2. Workspace: `mktemp -d` with `secrets-input`, `out`, `logs`, `browser` and `certs`; the
    requirements of the browser image (`playwright`, `greenlet`, `pyee`, `typing-extensions` with
-   the hashes of `tools/uv.lock`); a test CA and a leaf certificate for `localhost`, `api` and
-   127.0.0.1, valid for one day, created for this run only.
+   the hashes of `tools/uv.lock`); a test CA and a leaf certificate for `localhost`, `api`,
+   `webhook-receiver` and 127.0.0.1, valid for one day, created for this run only.
 3. `compose config`; build of the probe image (`bothy-smoke`) and of the browser image
    (`bothy-console-browser`, the Playwright image pinned by digest plus the locked packages); pull of
    PostgreSQL and the sidecar image; the web bundle of the patrol suites (target `console-e2e-web`
@@ -96,15 +97,30 @@ stage `console-e2e-web` holds only the built files. No release image contains th
 
 The runner then:
 
-1. adds the overlay `compose.console-e2e-admin.yaml` to the files of the project and recreates `api`
-   (`--no-deps --force-recreate --wait`); the overlay mounts the bundle read-only at
-   `/usr/share/bothy/console-e2e` and sets two existing configuration keys:
+1. writes the trust bundle `certs/ca-bundle.pem`: the CA file of the server image
+   (`/etc/ssl/certs/ca-certificates.crt`, copied with `docker create` and `docker cp` from a
+   container that never starts and is removed by its ID) followed by the test CA of the run;
+2. adds the overlay `compose.console-e2e-admin.yaml` to the files of the project and starts the
+   webhook receiver `webhook-receiver` (brief M6-08): the pinned Caddy image of the sidecar with the
+   same hardening, on the Compose network without a published port, TLS on 8443 with the leaf of
+   the run (it names `webhook-receiver`), every POST answered 200 and logged in its JSON access log
+   (method, path, headers, never a body);
+3. recreates `api` and starts the worker (`--no-deps --force-recreate --wait`); the overlay mounts
+   the bundle read-only at `/usr/share/bothy/console-e2e` and sets existing configuration keys:
    `BOTHY_CONSOLE__ASSETS_DIR` to that path (the server serves the bundle with the headers and the
    CSP of the console) and `BOTHY_AUTH__STEP_UP_MAX_AGE=3s`, so every changing action of a flow needs
-   a fresh step-up through the console's step-up adapter;
-2. recreates the TLS sidecar, which shares the network namespace of `api` and must follow the new
+   a fresh step-up through the console's step-up adapter; for `api` (which checks manifest and
+   subscription addresses) and the worker (which delivers) `BOTHY_WEBHOOK__ALLOWED_HOSTS` and
+   `BOTHY_EGRESS__ALLOWED_HOSTS` list `webhook-receiver:8443` (the egress entry with
+   `allow_private`, because the receiver has a private Compose address), and `SSL_CERT_FILE` points
+   to the trust bundle, which Go's crypto/x509 reads on Linux; the release image and the
+   installation bundle stay unchanged;
+4. recreates the TLS sidecar, which shares the network namespace of `api` and must follow the new
    container;
-3. runs `console-browser` with `E2E_MODE=admin`; its exit code is the result of the phase.
+5. runs `console-browser` with `E2E_MODE=admin`; its exit code is the result of the phase;
+6. reads the access log of the receiver (`compose logs --no-log-prefix webhook-receiver`) and fails
+   unless it holds a POST answered 2xx with a `webhook-id` header; it prints the number of requests
+   and the paths, never an ID.
 
 In the browser (`admin_suites.py`, Chromium only, because only Chromium has the virtual
 authenticator):
@@ -135,11 +151,36 @@ authenticator):
    `TEST_TIMEOUT_MS` of `headless/admin_suites.py`. The fresh load is patrol's own rule (its web runner does the same): one load runs every
    test of the bundle once and executes only the requested one. Console lines starting with `PATROL_LOG` (patrol's step log) go to stderr. The
    platform handler answers `startTest`, `verifyFileDownloads`, `getClipboard`, `setClipboard`,
-   `grantPermissions`, `enableDarkMode` and `disableDarkMode`; any other action fails the run with
-   its name.
+   `grantPermissions`, `enableDarkMode`, `disableDarkMode` and `e2eSetManifestFile`; any other
+   action fails the run with its name. `e2eSetManifestFile` with `{"name": "repo-bridge.json"}`
+   waits until the console has appended its file input
+   (`input[data-bothy-file-input="manifest"]`) and sets the file on it: without a user activation
+   Chromium opens no file dialog for the console's `click()`. The file is the manifest of
+   `repo_bridge_manifest` (the app Repo Bridge: required scope `messages:write`, optional
+   `messages:read` and `events:subscribe`, the event `message.created` delivered to
+   `https://webhook-receiver:8443/hooks/events`, one requested grant of level write on a channel,
+   `min_api_version` 0.2); the runner serves no other name.
+
+The suites of brief M6-08:
+
+- A7 installs Repo Bridge from that file with the consent of 11 4.1 (the optional scopes and the
+  event kept, the grant on Engineering/builds, a token for 30 days), sees the server's preview of
+  the grant, confirms with step-up and sees the app token and the key ID once; after the close no
+  widget shows any part of the token. On the app page it creates a subscription to
+  `https://webhook-receiver:8443/hooks/second` for `message.created`, posts a message into
+  Engineering/builds with the console session (`createMessage`, cookie and `X-Console-Request: 1`)
+  and reloads the deliveries of the subscription until one shows succeeded.
+- A8 creates an incoming webhook on Support/general with a new incoming app (the owner's option of
+  11 8.1), reads its address from the once-only dialog into a local variable, closes it, posts a
+  native message to the address from the page without any credential (`201`), reads the message
+  through the API with the console session, checks that the reopened screen shows no part of the
+  token, revokes the webhook with the confirmation and expects `404` for the next post.
+
+A token or the webhook address is never printed: the Dart helpers keep it out of every failure
+message (`hideInFailures` in `support.dart`), and a check that fails names only the kind of secret.
 
 The phase fails on a failed or skipped test, on an empty test list, on an unsupported platform
-action, on any CSP violation, console CSP error or foreign origin, and when no download ends with
+action, when the webhook receiver logged no delivery with a `webhook-id` header, on any CSP violation, console CSP error or foreign origin, and when no download ends with
 `.csv` and has `occurred_at` in its first line (the export of A6). The result is
 `out/results/admin.json`: per test its name, result and details (cut to `DETAILS_MAX` characters), the
 platform actions called, the downloads (file name and first line), violations, console CSP errors,
@@ -170,5 +211,8 @@ Linux Playwright image locally as in CI), the passkey step-up in Firefox and Web
 terminal stream under the CSP (M6-18 runs this test with an open terminal).
 
 Phase 2 runs only in Chromium, so the administration screens are not proven in Firefox or WebKit;
+the manifest file reaches the console through Playwright's file input API, not through a file
+dialog a person uses; the webhook receiver checks no signature (the server's signing is proven by
+the tests of M2-26);
 it tests the bundle of the suites, which shares the code but not the entry point of the console
 build in the image; and the seed creates its objects through the API, not through the screens.
