@@ -262,7 +262,7 @@ If-Match, tokens, visibility, badge) and `migrations/agents_test.go`.
 ## Slash command register (M2-16)
 
 `Commands` (`commands.go`, implemented by `app/commands.go`, `CommandService`) is the register of
-09 section 10 over the table `commands` (migration `00054`, queries `adapters/postgres/queries/commands.sql`).
+09 section 10 over the table `commands` (migration `00055`, queries `adapters/postgres/queries/commands.sql`).
 The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand` and
 `listChannelCommands` are `adapters/httpapi/commands.go`.
 
