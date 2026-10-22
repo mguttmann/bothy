@@ -875,8 +875,8 @@ docs/decisions.d/M7-03.md D-M7-03-1 to D-M7-03-9):
    `audit.RowsVerifier` over the rows of the copy, with the checkpoints of its `audit_checkpoints`.
    Checks 5 and 6 draw their samples at random per test; check 6 samples files with
    `deleted_at IS NULL`, `upload_state = 'complete'` and `scan_status` `clean` or `skipped` and
-   fetches the objects with restic from the
-   newest object backup; with the driver `s3` it is `skipped` with `objects_driver_s3`.
+   fetches the objects with restic from the newest object backup; with the driver `s3` it is
+   `skipped` with `objects_driver_s3`.
 5. Metrics: `bothy.backup.restore_test.duration` and `bothy.backup.duration` with
    `bothy.backup.kind = restore_test`, `bothy.backup.restore_test.last_success.timestamp` after a
    test without a failed check, and one `bothy.backup.restore_test.failures` per failed check with

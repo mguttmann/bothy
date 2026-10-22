@@ -45,7 +45,7 @@ func (e *Executor) PgBackRestVerify(ctx context.Context) error {
 // ResticRestore restores the files includes (absolute paths as stored) of the newest restic
 // snapshot with tag and the backed-up path into target for the file sample of the restore test
 // (16 8.3 item 6). The path selects the object backup itself: the manifest of an objects run is
-// a snapshot with the same tag (docs/DECISIONS.md D-M7-02-6). It reads the repository of the
+// a snapshot with the same tag (docs/decisions.d/M7-02.md D-M7-02-6). It reads the repository of the
 // instance like ResticBackup and never changes it. The error is an *app.ExecError
 // (restic_exit_<n>, restic_request_invalid).
 func (e *Executor) ResticRestore(ctx context.Context, tag, path string, includes []string, target string) error {

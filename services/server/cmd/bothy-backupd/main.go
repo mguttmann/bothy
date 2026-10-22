@@ -81,7 +81,7 @@ expire       --offsite --credentials DIR: the owner's expiry of the off-site tar
 
 restore-test runs the automatic restore test now: restores the latest pg_full or pg_diff into
              /var/lib/bothy-backup/restore, starts a PostgreSQL there on a Unix socket only, runs
-             the seven checks (docs/spec/16-betrieb.md 8.3), clears the directory and writes a
+             the seven checks (docs/spec/16-operations.md 8.3), clears the directory and writes a
              restore_test row of backup_runs. Exit 0 when every check passed, 1 otherwise.
 
 healthcheck  succeeds when the TLS server completes a handshake with the client certificate

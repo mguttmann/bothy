@@ -74,7 +74,7 @@ var (
 		"runtime_error", "adapter_error", "runtime_not_authenticated", "user_disabled",
 	}
 	// restoreChecks are bothy.reason of bothy.backup.restore_test.failures: the seven checks of
-	// docs/spec/16-betrieb.md 8.3 as internal/status/domain names them (M7-03).
+	// docs/spec/16-operations.md 8.3 as internal/status/domain names them (M7-03).
 	restoreChecks = []string{"pgbackrest", "manifest", "event_log", "audit_chain", "thread_sample", "file_sample", "duration"}
 )
 
@@ -360,7 +360,7 @@ var (
 		Description: "Duration of the last automatic restore test.",
 	}
 	// BackupRestoreTestFailures is bothy.backup.restore_test.failures (4.6, M7-03): one per failed
-	// check of a restore test, bothy.reason the name of the check (docs/spec/16-betrieb.md 8.3).
+	// check of a restore test, bothy.reason the name of the check (docs/spec/16-operations.md 8.3).
 	BackupRestoreTestFailures = Spec{
 		Name: "bothy.backup.restore_test.failures", Kind: KindCounter, Unit: "{check}",
 		Description: "Failed checks of automatic restore tests.",

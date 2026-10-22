@@ -94,7 +94,7 @@ func expireCommand(ctx context.Context, args, env []string, stderr io.Writer) in
 }
 
 // restoreTestCommand runs "bothy-backupd restore-test [--config FILE]": the automatic restore
-// test once now (docs/spec/16-betrieb.md 8.3, brief M7-03), for the runbook and the tests. It
+// test once now (docs/spec/16-operations.md 8.3, brief M7-03), for the runbook and the tests. It
 // returns 0 when every check passed, 1 when a check failed or a test runs already, 2 for a usage
 // or configuration error. The test writes its restore_test row of backup_runs; its metrics are
 // exported before the command ends.

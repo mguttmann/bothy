@@ -213,7 +213,7 @@ func listeningPorts(dump string) []string {
 // manipulated copy (one event_log row deleted in the middle of its partition, one stored audit
 // hash changed, the bytes of one restored object replaced) fails with its check and reason; the
 // deleted event row also changes the row count of event_log, which check 2 compares with the
-// manifest (docs/DECISIONS.md D-M7-03-6).
+// manifest (docs/decisions.d/M7-03.md D-M7-03-6).
 func TestRestoreTest(t *testing.T) {
 	w := newWorld(t)
 	bin := buildServerBinary(t)

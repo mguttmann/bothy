@@ -14,7 +14,7 @@ import (
 const PurposeAuditCheckpoint = "audit_checkpoint"
 
 // VerificationKey is the public part of one server signing key as server_signing_keys stores it
-// (docs/spec/03-datenmodell.md 4.1): the restore test reads it from the restored copy.
+// (docs/spec/03-data-model.md 4.1): the restore test reads it from the restored copy.
 type VerificationKey struct {
 	// KID is the key id of the JWS header.
 	KID string

@@ -11,10 +11,10 @@ import (
 )
 
 // RestoreChecksSchema is the schema name of backup_runs.checks of a restore test
-// (docs/spec/03-datenmodell.md 4.12).
+// (docs/spec/03-data-model.md 4.12).
 const RestoreChecksSchema = "restore_test_checks.v1"
 
-// CheckName names one of the seven checks of the restore test (docs/spec/16-betrieb.md 8.3).
+// CheckName names one of the seven checks of the restore test (docs/spec/16-operations.md 8.3).
 type CheckName string
 
 // The checks of 16 8.3, in their order.

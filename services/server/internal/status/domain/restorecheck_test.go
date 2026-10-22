@@ -25,7 +25,7 @@ func validChecks() domain.RestoreChecks {
 	return c
 }
 
-// TestRestoreChecksSchema holds restore_test_checks.v1 (docs/spec/03-datenmodell.md 4.12
+// TestRestoreChecksSchema holds restore_test_checks.v1 (docs/spec/03-data-model.md 4.12
 // backup_runs.checks, 16 8.3): the seven checks in the order of 8.3, each with its own result
 // (passed, failed, skipped) and duration; failed and skipped carry a reason code, passed none;
 // unknown keys, other names, another order and text in place of a code fail.

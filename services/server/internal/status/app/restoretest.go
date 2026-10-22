@@ -64,13 +64,13 @@ const (
 // heads: every row of them carries the number of its log, so equal heads mean equal counts in an
 // undamaged copy. Other tables change without an event or audit row (sessions, tokens, cleanup
 // jobs, backup_runs itself) while a backup runs, so their counts are not compared
-// (docs/DECISIONS.md D-M7-03-3).
+// (docs/decisions.d/M7-03.md D-M7-03-3).
 var countedTables = []string{"audit_events", "event_log"}
 
 // errRestoreNotConfigured reports a service built without Scratch.
 var errRestoreNotConfigured = errors.New("status: the restore test needs a scratch area and the audit verifier")
 
-// RestoreTest runs the automatic restore test once now (docs/spec/16-betrieb.md 8.3,
+// RestoreTest runs the automatic restore test once now (docs/spec/16-operations.md 8.3,
 // docs/operations/backup-restore.md 4, brief M7-03): it records a running restore_test row,
 // restores the latest succeeded pg_full or pg_diff by the pgBackRest label of its manifest into
 // the scratch area, runs the seven checks of 8.3, each with its own result and duration, clears
@@ -323,11 +323,11 @@ func (t *restoreRun) restore() (ScratchDB, domain.Manifest, domain.CheckResult) 
 
 // checkManifest is check 2: the copy against the manifest of its backup. Schema version,
 // instance and sync epoch must be equal and the copy holds exactly the tables of row_counts. The
-// manifest was read after the backup step (docs/DECISIONS.md D-M7-02-6), so the copy may lag it
+// manifest was read after the backup step (docs/decisions.d/M7-02.md D-M7-02-6), so the copy may lag it
 // but never lead it: its event_log head and audit head are not above those of the manifest, and
 // at the same audit head the hash is the same. When both heads are equal no write reached the
 // event or audit log in between, and the counts of countedTables must be equal
-// (docs/DECISIONS.md D-M7-03-3).
+// (docs/decisions.d/M7-03.md D-M7-03-3).
 func (t *restoreRun) checkManifest(db ScratchDB, m domain.Manifest) domain.CheckResult {
 	f, err := db.Facts(t.ctx)
 	if err != nil {
@@ -442,7 +442,7 @@ func (t *restoreRun) checkThreads(db ScratchDB) domain.CheckResult {
 // checkFiles is check 6: a sample of backup.restore_test.sample_files files is fetched from the
 // object backup and its SHA-256 compared with files.sha256. With the driver s3 the objects lie
 // in the mirror of the off-site bucket, which this build does not fetch: the check is skipped
-// with objects_driver_s3 (docs/DECISIONS.md D-M7-03-4).
+// with objects_driver_s3 (docs/decisions.d/M7-03.md D-M7-03-4).
 func (t *restoreRun) checkFiles(db ScratchDB) domain.CheckResult {
 	if t.s.cfg.ObjectsDriver == "s3" {
 		return domain.CheckResult{Result: domain.ResultSkipped, Reason: reasonObjectsDriverS3}
