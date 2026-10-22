@@ -364,7 +364,9 @@ Consequences:
    deprecation policy (ADR 0014, team B). Release notes name the date.
 4. The server is the leading side: a server upgrade never sets the minimum version higher than
    the oldest app that is still supported according to the deprecation policy.
-5. Adapters report their version in the heartbeat (`reported_runtime_version`); the admin console
+5. Adapters report their version in the heartbeat in `details.adapter.version` (stored in
+   `agents.reported_details`); `reported_runtime_version` (heartbeat member `runtime_version`) is
+   the version of the runtime ([09-agents.md](09-agents.md) section 4.8). The admin console
    shows adapters whose SDK version is no longer supported.
 
 ### 9.1 Host service and server

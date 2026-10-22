@@ -227,7 +227,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | duration | `14d` | lifetime of a refresh token | active |
 | `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server | duration | `5m` | a step-up confirmation counts as fresh for this long | active |
 | `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server | duration | `30s` | grace period for the immediately preceding refresh generation with the same DPoP key | active |
-| `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server |  | `60s` | heartbeat fields are stored at most this often | planned (M2) |
+| `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server | duration | `60s` | heartbeat fields are stored at most this often | active |
 | `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server | int | `20` | default for `history_backfill_limit` | active |
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | int | `200` | upper limit for `history_backfill_limit` | active |
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server | int | `32768` | size of a channel prompt | active |
@@ -287,7 +287,7 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server | duration | `1s` | `acked_seq` is stored at least this often | active |
 | `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | int | `100` | unacknowledged events per consumer | active |
 | `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server |  | `500ms` | adapter throttle for `run.update` | planned (M2) |
-| `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server |  | `90s` | without a heartbeat, the agent counts as `offline` | planned (M2) |
+| `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server | duration | `90s` | without a heartbeat, the agent counts as `offline` | active |
 | `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server |  | `30s` | time for the adapter to report a cancellation | planned (M2) |
 
 ### 05 Authorization action catalogue
@@ -455,7 +455,7 @@ Source: [10-backend-policy.md](../spec/10-backend-policy.md), section 17.
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
 | `billing.show_personal_estimates` | `BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES` | Server |  | `false` | Show amounts in mode `personal` too, as information | planned (M2) |
-| `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server |  | `5m` | how long the reported mode may deviate from the configured mode before an alert goes out | planned (M2) |
+| `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server | duration | `5m` | how long the reported mode may deviate from the configured mode before an alert goes out | active |
 | `reconciler.min_request_interval` |  | Reconciliation app |  | `60s` | Interval between requests to the Cost API |  |
 | `reconciler.lookback` |  | Reconciliation app |  | `3d` | this many days back are reconciled |  |
 | `reconciler.workspace_map` |  | Reconciliation app |  | empty | Assignment of workspace to agent |  |

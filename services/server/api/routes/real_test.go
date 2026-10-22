@@ -745,6 +745,10 @@ func (stubServer) SetHostLlmCredentials(context.Context, rest.SetHostLlmCredenti
 	return nil, nil
 }
 
+func (stubServer) SendHeartbeat(context.Context, rest.SendHeartbeatRequestObject) (rest.SendHeartbeatResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -1118,6 +1122,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"stepUpWithPassword":       {"POST /api/v1/auth/step-up/password", "auth.step_up", "rl.public_auth"},
 		"beginStepUpOidcReauth":    {"POST /api/v1/auth/step-up/oidc", "auth.step_up", "rl.public_auth"},
 		"completeStepUpOidcReauth": {"POST /api/v1/auth/step-up/oidc/complete", "auth.step_up", "rl.public_auth"},
+		// M2-20
+		"sendHeartbeat": {"POST /api/v1/agents/me/heartbeat", "agent.heartbeat", "rl.agent_runtime"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

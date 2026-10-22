@@ -771,11 +771,12 @@ const (
 // the instant of reauth_required and past the expiry, so no setup on a loaded host can reach the
 // lifetime of a token. The heartbeat deadline is beyond every move (an interval of an hour), and
 // the clients beat by hand, which also makes the gateway tick at once after a move. The subtests
-// share the clock and run one after the other.
+// share the clock and run one after the other. agent.presence_timeout lies above that interval,
+// as the cross-check presence_timeout_above_heartbeat_interval requires (M2-20).
 func TestGatewayTokenExpiry(t *testing.T) {
 	t.Parallel()
 	clk := &shiftClock{}
-	w := newGatewayWorldWith(t, wire.Deps{Clock: clk}, append(patientWindows(time.Hour),
+	w := newGatewayWorldWith(t, wire.Deps{Clock: clk}, append(patientWindows(time.Hour), "BOTHY_AGENT__PRESENCE_TIMEOUT=2h",
 		"BOTHY_AUTH__ACCESS_TOKEN_TTL=10m", "BOTHY_AUTH__CLOCK_LEEWAY=0s", "BOTHY_SYNC__REAUTH_LEAD_TIME=60s")...)
 	ctx := context.Background()
 	next := func(t *testing.T, c *wstest.Client) (string, []byte) {

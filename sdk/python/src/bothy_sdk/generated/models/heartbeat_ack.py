@@ -18,7 +18,7 @@ class HeartbeatAck:
     """
     Attributes:
         presence (AgentRuntimeStatus): Reported state of the agent runtime (heartbeat), not the configured state.
-        interval_ms (int): Interval the adapter should keep.
+        interval_ms (int): Interval the adapter should keep, `sync.heartbeat_interval`.
     """
 
     presence: AgentRuntimeStatus

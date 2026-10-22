@@ -19,20 +19,21 @@ part 'heartbeat.g.dart';
 ///
 /// Properties:
 /// * [state]
-/// * [runtimeVersion]
+/// * [runtimeVersion] - Version of the agent runtime (column `reported_runtime_version`); the adapter's own version is `details.adapter.version`.
 /// * [reportedBillingMode] - Absent when the adapter follows the configured mode per run; then `billing_modes_supported` names both modes and the per-run check binds (ruling L8).
 /// * [billingModesSupported]
 /// * [billingEvidence]
 /// * [reportedToolClass]
-/// * [rateLimit]
-/// * [details] - Further fields of schema `agent_heartbeat.v1` (capabilities, active runs). No secrets, no content.
-/// * [projectReadiness]
+/// * [rateLimit] - Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field.
+/// * [details] - Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
+/// * [projectReadiness] - Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means \"unchanged\".
 @BuiltValue()
 abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   @BuiltValueField(wireName: r'state')
   HeartbeatStateEnum get state;
   // enum stateEnum {  online,  degraded,  };
 
+  /// Version of the agent runtime (column `reported_runtime_version`); the adapter's own version is `details.adapter.version`.
   @BuiltValueField(wireName: r'runtime_version')
   String? get runtimeVersion;
 
@@ -51,13 +52,15 @@ abstract class Heartbeat implements Built<Heartbeat, HeartbeatBuilder> {
   ToolClass? get reportedToolClass;
   // enum reportedToolClassEnum {  chat,  scoped,  host,  };
 
+  /// Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field.
   @BuiltValueField(wireName: r'rate_limit')
   AgentRateLimitState? get rateLimit;
 
-  /// Further fields of schema `agent_heartbeat.v1` (capabilities, active runs). No secrets, no content.
+  /// Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
   @BuiltValueField(wireName: r'details')
   BuiltMap<String, JsonObject?>? get details;
 
+  /// Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means \"unchanged\".
   @BuiltValueField(wireName: r'project_readiness')
   BuiltList<ProjectReadiness>? get projectReadiness;
 

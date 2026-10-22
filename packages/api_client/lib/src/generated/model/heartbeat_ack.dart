@@ -13,14 +13,14 @@ part 'heartbeat_ack.g.dart';
 ///
 /// Properties:
 /// * [presence]
-/// * [intervalMs] - Interval the adapter should keep.
+/// * [intervalMs] - Interval the adapter should keep, `sync.heartbeat_interval`.
 @BuiltValue()
 abstract class HeartbeatAck
     implements Built<HeartbeatAck, HeartbeatAckBuilder> {
   @BuiltValueField(wireName: r'presence')
   AgentRuntimeStatus get presence;
 
-  /// Interval the adapter should keep.
+  /// Interval the adapter should keep, `sync.heartbeat_interval`.
   @BuiltValueField(wireName: r'interval_ms')
   int get intervalMs;
 

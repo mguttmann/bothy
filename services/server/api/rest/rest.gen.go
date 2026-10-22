@@ -38,6 +38,9 @@ type ServerInterface interface {
 	// PollAgentEvents Fetch events for a consumer without WebSocket
 	// (GET /agents/me/consumers/{consumer}/events)
 	PollAgentEvents(w http.ResponseWriter, r *http.Request, consumer ConsumerPath, params PollAgentEventsParams)
+	// SendHeartbeat Report state and actual billing mode
+	// (POST /agents/me/heartbeat)
+	SendHeartbeat(w http.ResponseWriter, r *http.Request)
 	// GetAgent Read an agent with reported state
 	// (GET /agents/{agent_id})
 	GetAgent(w http.ResponseWriter, r *http.Request, agentId AgentIdPath)
@@ -867,6 +870,20 @@ func (siw *ServerInterfaceWrapper) PollAgentEvents(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PollAgentEvents(w, r, consumer, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendHeartbeat operation middleware
+func (siw *ServerInterfaceWrapper) SendHeartbeat(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendHeartbeat(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9041,6 +9058,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/billing-mode", wrapper.SetAgentBillingMode)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/credential-holder", wrapper.SetCredentialHolder)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/agents/{agent_id}/tool-class", wrapper.SetAgentToolClass)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/heartbeat", wrapper.SendHeartbeat)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}", wrapper.GetConsumerState)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/agents/me/consumers/{consumer}/events", wrapper.PollAgentEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/agents/me/consumers/{consumer}/ack", wrapper.AckAgentEvents)
@@ -9262,6 +9280,9 @@ type StrictServerInterface interface {
 	// PollAgentEvents Fetch events for a consumer without WebSocket
 	// (GET /agents/me/consumers/{consumer}/events)
 	PollAgentEvents(ctx context.Context, request PollAgentEventsRequestObject) (PollAgentEventsResponseObject, error)
+	// SendHeartbeat Report state and actual billing mode
+	// (POST /agents/me/heartbeat)
+	SendHeartbeat(ctx context.Context, request SendHeartbeatRequestObject) (SendHeartbeatResponseObject, error)
 	// GetAgent Read an agent with reported state
 	// (GET /agents/{agent_id})
 	GetAgent(ctx context.Context, request GetAgentRequestObject) (GetAgentResponseObject, error)
@@ -10097,6 +10118,37 @@ func (sh *strictHandler) PollAgentEvents(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PollAgentEventsResponseObject); ok {
 		if err := validResponse.VisitPollAgentEventsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SendHeartbeat operation middleware
+func (sh *strictHandler) SendHeartbeat(w http.ResponseWriter, r *http.Request) {
+	var request SendHeartbeatRequestObject
+
+	var body SendHeartbeatJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SendHeartbeat(ctx, request.(SendHeartbeatRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SendHeartbeat")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SendHeartbeatResponseObject); ok {
+		if err := validResponse.VisitSendHeartbeatResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

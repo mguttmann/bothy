@@ -129,6 +129,11 @@ func (sc *Scenario) agents() {
 		}
 	}
 	sc.post(lotse, "/agents/me/consumers/default/ack", map[string]any{"seq": seq}, http.StatusOK, http.StatusNotFound, http.StatusBadRequest)
+	// The heartbeat of the agent (M2-20) with a canary runtime version: it may appear only in the
+	// answers HeartbeatAck, getAgent and listAgents and in agents.reported_runtime_version, never in
+	// logs, traces, metrics, events or audit.
+	sc.post(lotse, "/agents/me/heartbeat", map[string]any{"state": "online", "reported_billing_mode": "organization",
+		"runtime_version": sc.Reg.New(ClassContent, "", "runtime version")}, ok...)
 }
 
 // settings drives the personal and instance settings, feature flags, branding, notification
