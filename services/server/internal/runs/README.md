@@ -178,7 +178,8 @@ neither creates a run or a cost entry (R-AG-14).
   (`domain.ValidateAutocompleteQuery`). An agent owner without a target thread gets an empty list
   at once. An app command is `404` until M2-25, because `Resolve` hides it (D-M2-16-20); the
   use case would answer an empty list for an app owner and the requirement already decides it. Otherwise the payload of `command.autocomplete_requested`
-  (`400` `too_long` with an empty pointer above `sync.event_payload_max_bytes`), a fresh token with
+  (`400 validation_failed` with the field code `too_long` and an empty pointer above
+  `sync.event_payload_max_bytes`), a fresh token with
   `trigger_kind = autocomplete`, no `run_id`, the command and the target thread
   (`domain.AutocompleteGrant`, target billing mode and tool class of the agent), the request in the
   registry, and the source port `AutocompleteRelay` (implemented by
