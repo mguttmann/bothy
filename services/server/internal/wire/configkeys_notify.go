@@ -7,8 +7,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 )
 
-// notifyConfigKeys returns the keys of the notify module that are built (13 "Konfigurationswerte
-// dieses Kapitels"): notify.user_default_level, the last step of the effective level (M3-18), and
+// notifyConfigKeys returns the keys of the notify module that are built (13 "Configuration values
+// of this chapter"): notify.user_default_level, the last step of the effective level (M3-18), and
 // the keys of the push path (M3-19): the bundling window, the mobile delay, the defaults of the
 // personal switches and the interval of the badge sync.
 func notifyConfigKeys() []config.Key {

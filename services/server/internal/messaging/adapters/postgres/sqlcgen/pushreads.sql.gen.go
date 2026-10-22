@@ -90,7 +90,7 @@ type LastAnchorBeforeRow struct {
 
 // SPDX-License-Identifier: Apache-2.0
 // The reads of the consumer push of notify (M3-19 design notes 5 and 9 d; docs/spec/13-push-
-// benachrichtigungen.md section 2.1). None carries the visible channel predicate: the consumer
+// notifications.md section 2.1). None carries the visible channel predicate: the consumer
 // has no principal, it reads like the log tail, and notify checks every hint with push.deliver
 // (07 7.4 rule 1). They return positions only, never content.
 // The newest live box anchor of a run (kind run, the only rows with run_id; 09 section 5.4) in the

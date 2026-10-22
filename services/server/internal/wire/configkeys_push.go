@@ -4,8 +4,8 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
-// pushConfigKeys returns the keys of the job notify.push_send (13 "Konfigurationswerte dieses
-// Kapitels", 03 section 9 for push.max_consecutive_failures; M3-19). The provider keys push.ttl,
+// pushConfigKeys returns the keys of the job notify.push_send (13 "Configuration values of this
+// chapter", 03 section 9 for push.max_consecutive_failures; M3-19). The provider keys push.ttl,
 // push.apns.* and push.fcm.* come with M3-20 and M3-21.
 func pushConfigKeys() []config.Key {
 	return []config.Key{
