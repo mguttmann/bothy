@@ -25,6 +25,8 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 	tclog "github.com/testcontainers/testcontainers-go/log"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The label of every container and network of this package.
@@ -37,8 +39,8 @@ const (
 // infra/compose/.env.example, so the tests prove the version the overlay runs.
 const nginxRepository = "nginxinc/nginx-unprivileged"
 
-// runtimeWait bounds the check for a container runtime before the tests run.
-const runtimeWait = 30 * time.Second
+// runtimeWait bounds the check for a container runtime before the tests run (testkit.Patience).
+const runtimeWait = testkit.Patience
 
 // TestMain disables Ryuk, whose reaper would publish its port beyond 127.0.0.1, and fails the
 // binary with the reason when no container runtime answers.

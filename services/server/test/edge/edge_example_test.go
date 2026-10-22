@@ -38,10 +38,10 @@ const nodeHeader = "X-Test-Node"
 const nginxPort = "8080/tcp"
 
 const (
-	// startTimeout bounds the start of one container, including the image pull.
-	startTimeout = 3 * time.Minute
-	// requestTimeout bounds one request through the edge.
-	requestTimeout = 10 * time.Second
+	// startTimeout bounds the start of one container, including the image pull (testkit.Patience).
+	startTimeout = testkit.Patience
+	// requestTimeout bounds one request through the edge (testkit.Patience).
+	requestTimeout = testkit.Patience
 	// sessionCount is the number of session IDs routed; with two nodes the chance that all
 	// land on one node is 2^-63.
 	sessionCount = 64

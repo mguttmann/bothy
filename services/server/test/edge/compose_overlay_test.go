@@ -12,11 +12,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
-// composeTimeout bounds one docker compose config call.
-const composeTimeout = 2 * time.Minute
+// composeTimeout bounds one docker compose config call (testkit.Patience).
+const composeTimeout = testkit.Patience
 
 // overlayFile is the overlay under test, relative to the repository root.
 const overlayFile = "infra/compose/compose.multi-node.yaml"
