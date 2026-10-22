@@ -98,45 +98,62 @@ type legacyReport struct {
 //	// v[0].BlockedOrigin == "inline"
 func ParseCSPReports(format CSPReportFormat, body []byte) ([]CSPViolation, error) {
 	if format == CSPLegacy {
-		// Exactly the one member csp-report (CspReportLegacy of the contract); the members of
-		// the report itself that the server does not read are ignored.
-		var top map[string]json.RawMessage
-		if err := json.Unmarshal(body, &top); err != nil || len(top) != 1 {
-			return nil, ErrCSPReport
-		}
-		var r legacyReport
-		if err := json.Unmarshal(body, &r); err != nil || r.Report == nil {
-			return nil, ErrCSPReport
-		}
-		directive := r.Report.EffectiveDirective
-		if directive == "" {
-			directive, _, _ = strings.Cut(r.Report.ViolatedDirective, " ")
-		}
-		return []CSPViolation{violation(directive, r.Report.Disposition, r.Report.BlockedURI)}, nil
+		return parseLegacyReport(body)
 	}
+	return parseReportingAPIReports(body)
+}
+
+// parseLegacyReport reads the body of report-uri: exactly the one member csp-report
+// (CspReportLegacy of the contract); the members of the report itself that the server does not
+// read are ignored.
+func parseLegacyReport(body []byte) ([]CSPViolation, error) {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(body, &top); err != nil || len(top) != 1 {
+		return nil, ErrCSPReport
+	}
+	var r legacyReport
+	if err := json.Unmarshal(body, &r); err != nil || r.Report == nil {
+		return nil, ErrCSPReport
+	}
+	directive := r.Report.EffectiveDirective
+	if directive == "" {
+		directive, _, _ = strings.Cut(r.Report.ViolatedDirective, " ")
+	}
+	return []CSPViolation{violation(directive, r.Report.Disposition, r.Report.BlockedURI)}, nil
+}
+
+// parseReportingAPIReports reads an array of reports of the Reporting API; every item is an
+// object (CspReportList of the contract), null and other values are no report.
+func parseReportingAPIReports(body []byte) ([]CSPViolation, error) {
 	var items []json.RawMessage
 	if err := json.Unmarshal(body, &items); err != nil || items == nil {
 		return nil, ErrCSPReport
 	}
 	out := []CSPViolation{}
 	for _, raw := range items {
-		// Every item is an object (CspReportList of the contract); null and other values are
-		// no report of the Reporting API.
 		var object map[string]json.RawMessage
 		if json.Unmarshal(raw, &object) != nil || object == nil {
 			return nil, ErrCSPReport
 		}
-		var r reportingAPIReport
-		if json.Unmarshal(raw, &r) != nil || r.Type != "csp-violation" {
-			continue
+		if v, ok := cspViolationOf(raw); ok {
+			out = append(out, v)
 		}
-		var b reportingAPIBody
-		if json.Unmarshal(r.Body, &b) != nil {
-			continue
-		}
-		out = append(out, violation(b.EffectiveDirective, b.Disposition, b.BlockedURL))
 	}
 	return out, nil
+}
+
+// cspViolationOf returns the violation of one report object, false for a report of another type
+// or a body that is no object.
+func cspViolationOf(raw json.RawMessage) (CSPViolation, bool) {
+	var r reportingAPIReport
+	if json.Unmarshal(raw, &r) != nil || r.Type != "csp-violation" {
+		return CSPViolation{}, false
+	}
+	var b reportingAPIBody
+	if json.Unmarshal(r.Body, &b) != nil {
+		return CSPViolation{}, false
+	}
+	return violation(b.EffectiveDirective, b.Disposition, b.BlockedURL), true
 }
 
 // CSPViolationCount is one distinct violation of a report body and how often it occurs there.
