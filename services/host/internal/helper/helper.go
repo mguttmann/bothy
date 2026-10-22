@@ -5,7 +5,8 @@
 // protects its memory, serves its local channel to the service user only, and runs the
 // helper-side checks of doctor as its session user: HD3, HD6, the helper part of HD8, HD9, the
 // places of HD11 with the entry scan, and the identities of the working directories for HD7.
-// Results carry codes, names and identities, never paths or contents. M2-45 adds the PTY.
+// Results carry codes, names and identities, never paths or contents. M2-45 adds the PTYs: the
+// session ops pty.start, pty.resize and pty.stop with the frames of kind 0x01 (ServeSessions).
 package helper
 
 import (
@@ -26,11 +27,20 @@ type Options struct {
 	ServiceUID string
 	// Env is the operating system as the session user sees it.
 	Env doctor.HelperEnv
+	// Session serves the session ops and PTYs of M2-45; nil answers the checks only.
+	Session *SessionEnv
 }
 
-// Serve answers the service on the channel until ctx ends.
+// Serve answers the service on its channels until ctx ends. With o.Session every channel is a
+// session channel (ServeSessions): the PTYs started on it end with their trees when it breaks.
 func Serve(ctx context.Context, o Options) error {
-	return localchan.ServeHelper(ctx, o.Listener, o.ServiceUID, Handler(o.Env))
+	if o.Session == nil {
+		return localchan.ServeHelper(ctx, o.Listener, o.ServiceUID, Handler(o.Env))
+	}
+	st := &State{}
+	return localchan.ServeHelperConns(ctx, o.Listener, o.ServiceUID, func(ctx context.Context, c *localchan.Conn) {
+		ServeSessions(ctx, c, *o.Session, st)
+	})
 }
 
 // Handler returns the handler of the ops hello, check.run and scan.run. Any other op, or a body

@@ -325,7 +325,7 @@ channels:
   hostControl:
     address: /hosts/connect
     title: Control connection of a host service
-    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing (24, 3.5); `identify` lists the sessions the host service still knows (`live_sessions`), and the server ends every other session of the host in `active` or `detached` with `host_restarted` (24, 6.2). The server sends `ready` after the login and again on every change of the declaration `llm_credentials`; the host service treats each `ready` as the current declaration and evaluates check HD6 with it (24, 2.2 and 7.4). After `ready` the host service sends `report` (profiles, session users, self-checks) before it accepts any `session.open`, and the server sends `session.open` only after that `report` (24, 2.2). An invalid `report` is answered with `error` (`validation_failed`), stores nothing and keeps the connection. When `doctor` refused the start, the host service sends that `report` and closes the connection without accepting `session.open`. `heartbeat_ack` carries `jwks` whenever the set of purpose `terminal` changed since the last set sent on the connection (24, 5.3). The server sends `session.open` per session; the host service answers with a data connection.'
+    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing (24, 3.5); `hello` carries the server values `auth.clock_leeway`, `terminal.idle_timeout` and `terminal.detach_grace` (`clock_leeway_ms`, `idle_timeout_ms`, `detach_grace_ms`), which the host service applies to the session of each data connection from the `hello` of that connection; `identify` lists the sessions the host service still knows (`live_sessions`), and the server ends every other session of the host in `active` or `detached` with `host_restarted` (24, 6.2). The server sends `ready` after the login and again on every change of the declaration `llm_credentials`; the host service treats each `ready` as the current declaration and evaluates check HD6 with it (24, 2.2 and 7.4). After `ready` the host service sends `report` (profiles, session users, self-checks) before it accepts any `session.open`, and the server sends `session.open` only after that `report` (24, 2.2). An invalid `report` is answered with `error` (`validation_failed`), stores nothing and keeps the connection. When `doctor` refused the start, the host service sends that `report` and closes the connection without accepting `session.open`. `heartbeat_ack` carries `jwks` whenever the set of purpose `terminal` changed since the last set sent on the connection (24, 5.3). The server sends `session.open` per session; the host service answers with a data connection.'
     x-protocol-versions: [1]
     messages:
       host.hello:
@@ -400,7 +400,7 @@ channels:
   hostData:
     address: /hosts/sessions/{session_id}/stream
     title: Data connection of a host service for one session
-    description: 'Opened by the host service after `session.open`, exactly one data connection per `session.open`. After `hello` and `identify` (with `session_id`) only binary Noise frames, forwarded unchanged to and from the device stream of the same session. The host service refuses a handshake by closing the connection with `4101` (`token_expired`, `token_replayed`) or `4104` (every other detail of 24 section 5.3) and the `close_detail` code as the close reason; the server hands the same code and reason to the device.'
+    description: 'Opened by the host service after `session.open`, exactly one data connection per `session.open`. The `clock_leeway_ms`, `idle_timeout_ms` and `detach_grace_ms` of its `hello` apply to that session: the leeway to `exp` and the `jti` memory of the session token, idle and detach to the timers of the session. After `hello` and `identify` (with `session_id`) only binary Noise frames, forwarded unchanged to and from the device stream of the same session. The host service refuses a handshake by closing the connection with `4101` (`token_expired`, `token_replayed`) or `4104` (every other detail of 24 section 5.3) and the `close_detail` code as the close reason; the server hands the same code and reason to the device.'
     x-protocol-versions: [1]
     parameters:
       session_id:
@@ -439,7 +439,7 @@ channels:
       client_action: reconnect with backoff
     - code: 4013
       name: server_restart
-      client_action: reconnect at once with a random delay; keep PTYs until `terminal.detach_grace`
+      client_action: 'keep the PTY detached until `terminal.detach_grace`; wait for the next `session.open`'
     - code: 4014
       name: slow_consumer
       client_action: 'relay buffer full: keep the PTY and wait for the next `session.open`'

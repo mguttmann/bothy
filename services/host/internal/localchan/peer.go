@@ -40,8 +40,10 @@ func VerifyPeer(got Peer, want Expect) error {
 
 // Conn is a verified channel: one request at a time.
 type Conn struct {
-	rwc  io.ReadWriteCloser
-	mu   sync.Mutex
+	rwc io.ReadWriteCloser
+	mu  sync.Mutex
+	// wmu serialises Send and SendFrame of a session channel, which several goroutines write.
+	wmu  sync.Mutex
 	next atomic.Uint64
 	// Peer is the verified peer.
 	Peer Peer

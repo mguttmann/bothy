@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net"
+	"reflect"
 	"sync"
 
 	"github.com/OWNER/bothy/services/host/internal/config"
@@ -41,6 +42,9 @@ type Deps struct {
 	OSVersion, Platform, HostVersion string
 	// Pair is pairing.Pair; tests replace it.
 	Pair func(ctx context.Context, o pairing.Options) (pairing.Result, error)
+	// Offered builds the profile list of report from a result (profiles.Offered, M2-45); nil
+	// reports the profiles after HD7 as they are.
+	Offered func(*doctor.Result) []doctor.Profile
 }
 
 // PairRequest is the op pair.run of the admin endpoint: an administrator pairs the running
@@ -70,6 +74,8 @@ type Service struct {
 	started bool
 	end     chan int
 	once    sync.Once
+	// published is the last report Publish sent.
+	published *Report
 }
 
 // DoctorAnswer is the answer of the op doctor.run of the admin endpoint.
@@ -107,7 +113,11 @@ func (s *Service) send(ctx context.Context, res *doctor.Result) {
 }
 
 func (s *Service) toReport(res *doctor.Result) Report {
-	return Report{Profiles: res.Profiles, SessionUsers: res.SessionUsers, Doctor: res.Report(), IsServerHost: res.IsServerHost,
+	profiles := res.Profiles
+	if s.d.Offered != nil {
+		profiles = s.d.Offered(res)
+	}
+	return Report{Profiles: profiles, SessionUsers: res.SessionUsers, Doctor: res.Report(), IsServerHost: res.IsServerHost,
 		RequireLocalConfirm: s.d.Config.RequireLocalConfirm, OSVersion: s.d.OSVersion}
 }
 
@@ -199,6 +209,26 @@ func (s *Service) OnReady(ctx context.Context, r Ready) *doctor.Result {
 	res := s.applyDeclaration(ctx, r.LLMCredentials)
 	s.report(ctx, res)
 	return res
+}
+
+// Publish sends the report of res when it differs from the last one Publish sent (M2-45: every
+// change of a result of HD6, HD10 or HD11 in operation sends report, 24 7.4). It sends nothing
+// before the login.
+func (s *Service) Publish(ctx context.Context, res *doctor.Result) {
+	r := s.toReport(res)
+	s.mu.Lock()
+	in := s.loggedIn
+	same := s.published != nil && reflect.DeepEqual(*s.published, r)
+	if in && !same {
+		s.published = &r
+	}
+	s.mu.Unlock()
+	if !in || same {
+		return
+	}
+	if err := s.d.Control.Report(ctx, r); err != nil {
+		s.d.Log.WarnContext(ctx, "report failed")
+	}
 }
 
 // Readiness tells M2-45 whether the host may give sessions and whether sessionUser may get them.

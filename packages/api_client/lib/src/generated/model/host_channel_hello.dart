@@ -10,7 +10,7 @@ import 'package:built_value/serializer.dart';
 
 part 'host_channel_hello.g.dart';
 
-/// First text frame on the control and data connections of a host service.
+/// First text frame on the control and data connections of a host service. It carries server values the host service applies; the values of the `hello` of a data connection apply to the session of that connection (24, 5.3, 6.2 and 6.3).
 ///
 /// Properties:
 /// * [protocolVersions]
@@ -18,6 +18,9 @@ part 'host_channel_hello.g.dart';
 /// * [serverTime] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [heartbeatIntervalMs]
 /// * [heartbeatMissLimit]
+/// * [clockLeewayMs] - `auth.clock_leeway` in milliseconds. The host service applies it to the session of this data connection: the tolerance on `exp` of the session token and how long it remembers the `jti` after `exp` (24, 5.3).
+/// * [idleTimeoutMs] - `terminal.idle_timeout` in milliseconds. The host service applies it to the idle timer of the session of this data connection (24, 6.3).
+/// * [detachGraceMs] - `terminal.detach_grace` in milliseconds. The host service applies it to the detach timer of the session of this data connection (24, 6.2).
 /// * [jwks] - Public keys with purpose `terminal` for checking session tokens.
 @BuiltValue()
 abstract class HostChannelHello
@@ -38,6 +41,18 @@ abstract class HostChannelHello
 
   @BuiltValueField(wireName: r'heartbeat_miss_limit')
   int get heartbeatMissLimit;
+
+  /// `auth.clock_leeway` in milliseconds. The host service applies it to the session of this data connection: the tolerance on `exp` of the session token and how long it remembers the `jti` after `exp` (24, 5.3).
+  @BuiltValueField(wireName: r'clock_leeway_ms')
+  int get clockLeewayMs;
+
+  /// `terminal.idle_timeout` in milliseconds. The host service applies it to the idle timer of the session of this data connection (24, 6.3).
+  @BuiltValueField(wireName: r'idle_timeout_ms')
+  int get idleTimeoutMs;
+
+  /// `terminal.detach_grace` in milliseconds. The host service applies it to the detach timer of the session of this data connection (24, 6.2).
+  @BuiltValueField(wireName: r'detach_grace_ms')
+  int get detachGraceMs;
 
   /// Public keys with purpose `terminal` for checking session tokens.
   @BuiltValueField(wireName: r'jwks')
@@ -92,6 +107,21 @@ class _$HostChannelHelloSerializer
     yield r'heartbeat_miss_limit';
     yield serializers.serialize(
       object.heartbeatMissLimit,
+      specifiedType: const FullType(int),
+    );
+    yield r'clock_leeway_ms';
+    yield serializers.serialize(
+      object.clockLeewayMs,
+      specifiedType: const FullType(int),
+    );
+    yield r'idle_timeout_ms';
+    yield serializers.serialize(
+      object.idleTimeoutMs,
+      specifiedType: const FullType(int),
+    );
+    yield r'detach_grace_ms';
+    yield serializers.serialize(
+      object.detachGraceMs,
       specifiedType: const FullType(int),
     );
     yield r'jwks';
@@ -160,6 +190,27 @@ class _$HostChannelHelloSerializer
             specifiedType: const FullType(int),
           ) as int;
           result.heartbeatMissLimit = valueDes;
+          break;
+        case r'clock_leeway_ms':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.clockLeewayMs = valueDes;
+          break;
+        case r'idle_timeout_ms':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.idleTimeoutMs = valueDes;
+          break;
+        case r'detach_grace_ms':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(int),
+          ) as int;
+          result.detachGraceMs = valueDes;
           break;
         case r'jwks':
           final valueDes = serializers.deserialize(

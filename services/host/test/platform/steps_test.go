@@ -100,13 +100,41 @@ func chownTo(t *testing.T, p, user string) {
 	}
 }
 
+// pendingOwners are ownership changes for session users that install has not created yet;
+// newWorld applies them right after install, before pair restarts the host service.
+var pendingOwners []func(t *testing.T)
+
+// userExists reports whether the operating system knows user.
+func userExists(user string) bool {
+	if runtime.GOOS == "windows" {
+		_, code := try("net", "user", user)
+		return code == 0
+	}
+	_, code := try("/usr/bin/id", "-u", user)
+	return code == 0
+}
+
+// applyPendingOwners runs the ownership changes recorded before the users existed.
+func applyPendingOwners(t *testing.T) {
+	t.Helper()
+	pend := pendingOwners
+	pendingOwners = nil
+	for _, f := range pend {
+		f(t)
+	}
+}
+
 func mkdirOwned(t *testing.T, p, user string) {
 	t.Helper()
 	if err := os.MkdirAll(p, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	chownTo(t, p, user)
 	t.Cleanup(func() { _ = os.RemoveAll(p) })
+	if !userExists(user) {
+		pendingOwners = append(pendingOwners, func(t *testing.T) { t.Helper(); chownTo(t, p, user) })
+		return
+	}
+	chownTo(t, p, user)
 }
 
 func writeOwned(t *testing.T, p, user string) {

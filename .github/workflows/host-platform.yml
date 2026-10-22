@@ -38,13 +38,33 @@ jobs:
         with:
           go-version-file: services/host/go.mod
           cache: false
-      - name: Platform suite (Linux and macOS, as root)
+      # The unit tests as the normal runner user first, so a platform run also proves them on
+      # each system (brief M2-45 "Platform runs"); Windows has no cgo for the race detector.
+      - name: Unit tests (Linux and macOS, runner user)
         if: runner.os != 'Windows'
         shell: bash
-        # sudo resets PATH to secure_path; env hands the Go of setup-go to make.
-        run: sudo env "PATH=$PATH" "GOPATH=$(go env GOPATH)" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" BOTHY_PLATFORM_DISPOSABLE=1 make -C services/host platform-test
-      - name: Platform suite (Windows, elevated)
+        run: cd services/host && go test -race -count=1 ./...
+      # The packages of the terminal sessions (M2-45) whose tests run on Windows; the tests of the
+      # M2-42 packages and of internal/profiles simulate Unix paths and do not run on Windows yet.
+      - name: Unit tests (Windows, runner user)
         if: runner.os == 'Windows'
+        shell: bash
+        run: cd services/host && go test -count=1 ./internal/session/... ./internal/pty/... ./internal/confirm/...
+      # TestPlatform_TMT25 traces the file opens and local channels of the service user on Linux.
+      - name: Install strace (Linux)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends strace
+      # The suite runs even when a unit test failed: both results are kept.
+      - name: Platform suite (Linux and macOS, as root)
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        shell: bash
+        # sudo resets PATH to secure_path; env hands the Go of setup-go to make.
+        # The binaries go to a folder every user can traverse: the service user and the session users
+        # run them, and the home of the runner user is closed to them.
+        run: sudo env "PATH=$PATH" "GOPATH=$(go env GOPATH)" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" BOTHY_PLATFORM_DISPOSABLE=1 PLATFORM_OUT=/opt/bothy-platform make -C services/host platform-test
+      - name: Platform suite (Windows, elevated)
+        if: ${{ !cancelled() && runner.os == 'Windows' }}
         shell: bash
         env:
           BOTHY_PLATFORM_DISPOSABLE: "1"
@@ -54,5 +74,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: host-platform-${{ matrix.os }}
-          path: services/host/.platform/result-*.json
+          path: |
+            services/host/.platform/result-*.json
+            /opt/bothy-platform/result-*.json
           if-no-files-found: warn

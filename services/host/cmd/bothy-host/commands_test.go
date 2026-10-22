@@ -91,7 +91,7 @@ func TestCommandsRegistered(t *testing.T) {
 		names = append(names, c.name)
 	}
 	slices.Sort(names)
-	if strings.Join(names, " ") != "doctor install pair pty-helper restart run session-user" {
+	if strings.Join(names, " ") != "confirm-agent doctor install pair pty-helper restart run session-user" {
 		t.Errorf("commands %v", names)
 	}
 	_, out, _ := runCmd("--help")

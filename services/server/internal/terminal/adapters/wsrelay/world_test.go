@@ -33,8 +33,12 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
 
 // The deadlines of the control connections of the tests: short, so the timing tests are quick.
 const (
-	hbInterval   = 2 * time.Second
-	hbMissLimit  = 2
+	hbInterval  = 2 * time.Second
+	hbMissLimit = 2
+	// The server values of hello (M2-45): none equals its default, so the tests see the binding.
+	clockLeeway  = 7 * time.Second
+	idleTimeout  = 41 * time.Minute
+	detachGrace  = 9 * time.Minute
 	authTimeout  = 400 * time.Millisecond
 	probeTimeout = 400 * time.Millisecond
 	maxFrame     = 8192
@@ -44,6 +48,7 @@ const (
 // hostCfg is the configuration of the control connection in the tests.
 var hostCfg = wire.HostControlConfig{
 	HeartbeatInterval: hbInterval, HeartbeatMissLimit: hbMissLimit, AuthTimeout: authTimeout, DuplicateProbeTimeout: probeTimeout,
+	ClockLeeway: clockLeeway, IdleTimeout: idleTimeout, DetachGrace: detachGrace,
 	MaxFrameBytes: maxFrame, MaxJSONDepth: 32, OutboundQueueMax: 64, WriteTimeout: 5 * time.Second,
 }
 
