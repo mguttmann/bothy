@@ -47,7 +47,7 @@ const (
 	tokenPathParam      = "{token}"
 	// tokenPlaceholder replaces a {token} segment in instance: the template segment percent-encoded,
 	// because instance is a uri-reference (RFC 3986), which has no braces.
-	tokenPlaceholder    = "%7Btoken%7D"
+	tokenPlaceholder    = "%7Btoken%7D" //nolint:gosec // G101: the placeholder written instead of a token, no credential
 	defaultRetryAfter   = 5 * time.Second
 	keyMaxJSONBodyBytes = "http.max_json_body_bytes"
 	keyMaxUploadBytes   = "file.max_upload_bytes"
