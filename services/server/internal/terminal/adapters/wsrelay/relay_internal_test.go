@@ -35,6 +35,10 @@ type fakeRelayUC struct {
 	failCounters bool
 	// okWritten are the counts of the writes that succeeded.
 	okWritten []app.Counts
+	// entered receives one value when a RelayCounters write starts and hold, when set, keeps the
+	// write waiting until it is closed (a progress write in flight, M2-46).
+	entered chan struct{}
+	hold    chan struct{}
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -51,6 +55,13 @@ func (f *fakeRelayUC) RelayOpenFailed(_ context.Context, _ ids.ID, d domain.Clos
 }
 func (f *fakeRelayUC) RelayCounters(_ context.Context, _ ids.ID, c app.Counts) error {
 	f.add("counters")
+	if f.entered != nil {
+		f.entered <- struct{}{}
+	}
+	if f.hold != nil {
+		<-f.hold
+		f.add("counters_done")
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.written = append(f.written, c)

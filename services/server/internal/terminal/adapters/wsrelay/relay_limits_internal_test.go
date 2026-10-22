@@ -9,6 +9,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
@@ -419,5 +420,57 @@ func TestRelayLimits_FailedWriteThenSilenceIsRetried(t *testing.T) {
 	defer uc.mu.Unlock()
 	if len(uc.okWritten) != 1 || !uc.okWritten[0].LastInput.Equal(typed) || uc.okWritten[0].In != 1 {
 		t.Fatalf("written after the grace %v, want the input at %v once", uc.okWritten, typed.Sub(t0))
+	}
+}
+
+// TestRelayLimits_EndWaitsForWriteInFlight (M2-46, D-M2-46-24): a limit end of the relay waits for
+// the progress write of the session that is still in flight, so that write reaches the row before
+// the end commits; otherwise the write would find the session closed and its counts would be lost
+// for the row and for terminal.terminate.
+func TestRelayLimits_EndWaitsForWriteInFlight(t *testing.T) {
+	t.Parallel()
+	r, uc, timers := limitRelay(t)
+	t0 := timers.Clock.Now()
+	id := ids.New()
+	r.Expect(app.Expectation{SessionID: id, HostID: ids.New(), DeviceID: ids.New(), Deadline: t0.Add(farDeadline), Started: true,
+		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}})
+	r.mu.Lock()
+	dev, hst := r.newSide(domain.SideClient, id, nil), r.newSide(domain.SideHost, id, nil)
+	r.slots[id].dev, r.slots[id].hst, r.slots[id].paired = dev, hst, true
+	r.hold(r.slots[id])
+	r.mu.Unlock()
+	r.forward(dev, []byte("handshake-1"))
+	r.forward(hst, []byte("handshake-2"))
+	uc.entered, uc.hold = make(chan struct{}, 8), make(chan struct{})
+	r.forward(dev, []byte("abc")) // the first input is written at once
+	testkit.Receive(t, "the first progress write", uc.entered)
+	advanced := make(chan struct{})
+	go func() {
+		defer close(advanced)
+		timers.Advance(limitWindows.Idle + limitWindows.IdleGrace)
+	}()
+	select {
+	case <-advanced:
+		t.Fatalf("the idle end ran while a progress write was in flight: %v", uc.ends())
+	case <-time.After(100 * time.Millisecond): // must not happen; a slow host can only pass this
+	}
+	close(uc.hold)
+	testkit.Receive(t, "the idle end", advanced)
+	r.writes.Wait()
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	done, end := slices.Index(uc.calls, "counters_done"), slices.Index(uc.calls, "end:idle_timeout")
+	if done < 0 || end < 0 || done > end {
+		t.Fatalf("calls %v: the write must finish before the end", uc.calls)
+	}
+	var in int64
+	for _, c := range uc.okWritten {
+		in += c.In
+	}
+	for _, p := range uc.progress {
+		in += p.BytesIn
+	}
+	if in != int64(len("abc")) {
+		t.Fatalf("bytes_in %d over the writes and the end, want %d", in, len("abc"))
 	}
 }

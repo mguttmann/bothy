@@ -101,6 +101,8 @@ type Relay struct {
 	idle *gosync.Cond
 	// writes counts the progress writes in flight, each until its counts are back after a failure.
 	writes gosync.WaitGroup
+	// settled is signalled when a progress write of a slot finished (slot.pending, limitDeadline).
+	settled *gosync.Cond
 }
 
 // Compile-time check: the outgoing port of the use cases.
@@ -137,6 +139,7 @@ func NewRelay(cfg RelayConfig, uc RelayUseCases, links app.ControlLinks, timers 
 	}
 	r := &Relay{cfg: cfg, uc: uc, links: links, timers: timers, clk: clk, log: log, slots: map[ids.ID]*slot{}, sides: map[*side]bool{}}
 	r.idle = gosync.NewCond(&r.mu)
+	r.settled = gosync.NewCond(&r.mu)
 	return r, nil
 }
 
@@ -188,6 +191,11 @@ type slot struct {
 	// the log tail (the active row of a reattach before the closed row) must not start it again,
 	// because a second end would carry no counts. A new grant clears it.
 	limitEnded bool
+	// pending counts the progress writes of this slot in flight (taken from the slot, not yet
+	// stored or given back); ending stops new progress writes while the limit end waits for them
+	// (D-M2-46-24).
+	pending int
+	ending  bool
 }
 
 // queue is one direction of a slot, bounded by terminal.relay_buffer_max_bytes.
@@ -303,23 +311,70 @@ func (r *Relay) armLimit(s *slot) {
 // after the commit through the log tail (4100 with the reason).
 func (r *Relay) limitDeadline(id ids.ID, gen int) {
 	r.mu.Lock()
-	s := r.slots[id]
-	if s == nil || s.limitGen != gen || !s.held {
+	var marked *slot
+	for {
+		s := r.slots[id]
+		if s == nil || s.limitGen != gen || !s.held {
+			if marked != nil {
+				marked.ending = false
+			}
+			r.mu.Unlock()
+			return
+		}
+		at, reason := domain.RelayDeadline(s.times, s.lastDev, r.cfg.Windows)
+		if !domain.Reached(at, r.clk.Now()) {
+			if marked != nil {
+				marked.ending = false
+			}
+			r.armLimit(s)
+			r.mu.Unlock()
+			return
+		}
+		if s.pending > 0 {
+			// A progress write of this session is in flight: it must reach the row before the end
+			// commits, or it would find the session closed and its counts would be lost; a failed
+			// one gives its counts back for the end (D-M2-46-24).
+			s.ending, marked = true, s
+			r.settled.Wait()
+			continue
+		}
+		c := s.take()
+		s.limitGen++
+		s.limitEnded = true
 		r.mu.Unlock()
+		ctx := context.Background()
+		r.call(ctx, r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput}))
 		return
 	}
-	at, reason := domain.RelayDeadline(s.times, s.lastDev, r.cfg.Windows)
-	if !domain.Reached(at, r.clk.Now()) {
-		r.armLimit(s)
-		r.mu.Unlock()
-		return
+}
+
+// startWrite starts a progress write of the counts c of s, which persist or apply took from the
+// slot: the write is pending on s until wrote. r.mu is held.
+func (r *Relay) startWrite(s *slot, c app.Counts) func(context.Context) {
+	s.pending++
+	id := s.id
+	return func(ctx context.Context) {
+		err := r.uc.RelayCounters(ctx, id, c)
+		if err != nil {
+			r.call(ctx, err)
+		}
+		r.wrote(s, c, err)
 	}
-	c := s.take()
-	s.limitGen++
-	s.limitEnded = true
+}
+
+// wrote ends a progress write of s started by startWrite: a failed write gives its counts back to
+// the slot of the session (and lets persist schedule the retry), then the write is no longer
+// pending and a waiting limit end goes on.
+func (r *Relay) wrote(s *slot, c app.Counts, err error) {
+	var fx effects
+	r.mu.Lock()
+	if err != nil {
+		fx = r.giveBackLocked(s.id, c)
+	}
+	s.pending--
+	r.settled.Broadcast()
 	r.mu.Unlock()
-	ctx := context.Background()
-	r.call(ctx, r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput}))
+	fx.run(context.Background())
 }
 
 // hold marks s as held by this node and starts its limits, once per grant; r.mu is held.
@@ -480,13 +535,7 @@ func (r *Relay) apply(s *slot, acts []domain.RelayAction) effects {
 		s.paired = false
 	}
 	if wasPaired && !s.paired && !dropped {
-		id, c := s.id, s.take()
-		fx = append([]func(context.Context){func(ctx context.Context) {
-			if err := r.uc.RelayCounters(ctx, id, c); err != nil {
-				r.call(ctx, err)
-				r.giveBack(id, c)
-			}
-		}}, fx...)
+		fx = append([]func(context.Context){r.startWrite(s, s.take())}, fx...)
 	}
 	if s.dev == nil && s.hst == nil && !dropped {
 		// A session without a connection on this node is not held here (M2-46 Design note 12 b).
@@ -841,7 +890,7 @@ func (r *Relay) forward(sd *side, msg []byte) {
 // last_input_at lags the true one by less than the grace while the store works, and the relay
 // writes at most twice per grace. r.mu is held.
 func (r *Relay) persist(s *slot) effects {
-	if r.cfg.Windows.Idle <= 0 || r.closing || (s.in == 0 && s.out == 0 && s.lastInput.IsZero()) {
+	if r.cfg.Windows.Idle <= 0 || r.closing || s.ending || (s.in == 0 && s.out == 0 && s.lastInput.IsZero()) {
 		return nil
 	}
 	now, grace := r.clk.Now(), r.cfg.Windows.IdleGrace
@@ -856,18 +905,16 @@ func (r *Relay) persist(s *slot) effects {
 	}
 	s.stopFlush()
 	s.persisted = now
-	id, c := s.id, s.take()
+	c := s.take()
 	if !c.LastInput.IsZero() {
 		s.storedInput = c.LastInput
 	}
+	write := r.startWrite(s, c)
 	r.writes.Add(1)
 	return effects{func(ctx context.Context) {
 		go func() {
 			defer r.writes.Done()
-			if err := r.uc.RelayCounters(ctx, id, c); err != nil {
-				r.call(ctx, err)
-				r.giveBack(id, c)
-			}
+			write(ctx)
 		}()
 	}}
 }
@@ -895,22 +942,19 @@ func (s *slot) stopFlush() {
 	s.flushGen++
 }
 
-// giveBack adds counts of a failed write back to the slot of the session, if it still exists, and
-// lets persist schedule the retry.
-func (r *Relay) giveBack(id ids.ID, c app.Counts) {
-	r.mu.Lock()
+// giveBackLocked adds counts of a failed write back to the slot of the session, if it still exists, and
+// lets persist schedule the retry; r.mu is held.
+func (r *Relay) giveBackLocked(id ids.ID, c app.Counts) effects {
 	s := r.slots[id]
-	var fx effects
-	if s != nil {
-		s.in += c.In
-		s.out += c.Out
-		if c.LastInput.After(s.lastInput) {
-			s.lastInput = c.LastInput
-		}
-		fx = r.persist(s)
+	if s == nil {
+		return nil
 	}
-	r.mu.Unlock()
-	fx.run(context.Background())
+	s.in += c.In
+	s.out += c.Out
+	if c.LastInput.After(s.lastInput) {
+		s.lastInput = c.LastInput
+	}
+	return r.persist(s)
 }
 
 // count adds a message of n bytes from kind to the counters of s; r.mu is held.
