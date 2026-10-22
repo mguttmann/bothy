@@ -20,12 +20,14 @@ const _golden = {
       'Upload files: no. Confirm approval cards: no.\n'
       'Note: Texter also reads Marketing/Intern. Sam may not read Marketing/Intern but can '
       'learn its contents through Texter.',
+  // language-check: off
   'de':
       'Sam erhält bis 31.12.2026 die Stufe "Auslösen" im Kanal Marketing/Kampagnen.\n'
       'Sam kann damit: Nachrichten lesen und schreiben, Threads anlegen, Agent Texter auslösen.\n'
       'Dateien hochladen: nein. Freigabe-Karten bestätigen: nein.\n'
       'Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht lesen, '
       'kann aber über Texter Inhalte daraus erfahren.',
+  // language-check: on
 };
 
 String _previewText(PatrolIntegrationTester $) {

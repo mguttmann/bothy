@@ -180,9 +180,9 @@ class ConsoleViewAsPage extends StatelessWidget {
   }
 }
 
-/// The banner of the stored view on every page of the console (07 9.2: "Die Konsole zeigt
-/// durchgehend einen Hinweisbalken mit Name und Restzeit"): name, remaining time (updated every
-/// second) and "End view". When the end time passes, the console reads its session again and
+/// The banner of the stored view on every page of the console (07 9.2: "The console shows a
+/// banner with name and remaining time throughout"): name, remaining time (updated every second)
+/// and "End view". When the end time passes, the console reads its session again and
 /// the banner goes away.
 class ConsoleViewAsBanner extends StatefulWidget {
   /// Creates the banner over [admin].
