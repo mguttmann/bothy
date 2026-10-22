@@ -18,6 +18,7 @@ dependencies:
   flutter:
     sdk: flutter
   l10n: any
+  yaml: ^3.1.4
 
 dev_dependencies:
   alchemist: ^0.14.1

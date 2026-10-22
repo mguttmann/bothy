@@ -78,6 +78,7 @@ export 'src/common/problem_banner.dart';
 export 'src/data/access_repository.dart';
 export 'src/data/admin_repository.dart';
 export 'src/data/agents_repository.dart';
+export 'src/data/apps_repository.dart';
 export 'src/data/hosts_repository.dart';
 export 'src/data/self_repository.dart';
 export 'src/devices/approve_device_dialog.dart';
