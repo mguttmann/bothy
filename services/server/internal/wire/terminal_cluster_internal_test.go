@@ -9,7 +9,7 @@ import (
 
 // componentNames returns the names of the start sequence of role with cluster.mode mode.
 func clusterComponents(role Role, mode string) []string {
-	s := &server{role: role, plan: TerminalClusterPlan(mode, role)}
+	s := &server{role: role, terminalState: terminalState{plan: TerminalClusterPlan(mode, role)}}
 	var out []string
 	for _, c := range s.components() {
 		out = append(out, c.Name())

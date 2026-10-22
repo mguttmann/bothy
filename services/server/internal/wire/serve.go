@@ -22,23 +22,15 @@ import (
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
-	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
-	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
-	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
-	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
-	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/trustedheader"
-	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
-	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
-	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
@@ -49,13 +41,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
-	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
-	"github.com/OWNER/bothy/services/server/internal/runs"
-	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
-	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
-	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
@@ -187,73 +174,25 @@ type server struct {
 	public      *http.Server
 	mux         *http.ServeMux
 	required    int64
-	instance    instance.Record
 	jobsCfg     jobs.Config
 	jobsRT      *jobs.Runtime
-	// audit is the audit module (M1-24); later tickets hand its recorder to the modules.
-	audit *Audit
-	// authorizer is the kernel/authorize.Authorizer of the process (M1-28); the use cases of later
-	// tickets receive it.
-	authorizer authorize.Authorizer
-	// authzAdmin is the group and grant management of authz with its REST handlers (M1-48).
-	authzAdmin *AuthzAdmin
-	// syncCfg and sync are the event log (M1-16): its appender for the modules, the partition
-	// maintenance of the job and the log tail of api and all.
-	syncCfg SyncConfig
-	sync    *Sync
-	// identity is the identity module (M1-33): devices, the DPoP verifier and the REST handlers.
-	identity *Identity
-	// totpBox seals the TOTP secrets of local accounts with auth.totp_key_ref (M1-39), resolved in
-	// the identity step and bound with the sessions.
-	totpBox *secretbox.Box
-	// settings are the instance settings, branding and discovery (M1-46); identity reads
-	// locale.default through them.
-	settings *InstanceSettings
-	// agents is the agents module (M1-51): the agent records and their REST handlers.
-	agents *Agents
-	// chat is the chat module (M1-52): spaces, the sidebar and their REST handlers.
-	chat *Chat
-	// files is the files module (M3-03): the upload sessions over the object store, built in the
-	// files step after chat.
-	files *Files
-	// terminal is the terminal module (M2-39): the host records and their REST handlers.
-	terminal *Terminal
-	// terminalStreams are the relay and the stream routes of api and all (M2-44); the log tail
-	// feeds the relay.
-	terminalStreams *TerminalStreams
-	// plan is what cluster.mode means for the role (M2-47); terminalLocal are the local signals of
-	// one node, whose handler the hub becomes; terminalHub is the handler of the signals of an api
-	// process with its configuration hubCfg.
-	plan          ClusterPlan
-	terminalLocal *terminalapp.LocalSignals
-	terminalHub   *wsrelay.Hub
-	hubCfg        ClusterHubConfig
-	// apps is the module apps (M2-24): the app use cases and their REST handlers.
-	apps *Apps
-	// messaging is the messaging module (M1-56), built in the chat step over the threads of chat.
-	messaging *Messaging
-	// runs is the runs module (M2-05), built in the chat step over messaging, chat and agents; the
-	// chat step binds the acceptance of the unit of work to it.
-	runs *Runs
-	// personal is the personal data of sync (M1-61), built in the chat step over chat and messaging.
-	personal *Personal
-	// syncReads is catch-up and snapshot of sync (M1-63), built in the chat step after personal.
-	syncReads *SyncReads
-	// notify is the notify module (M3-18), built in the chat step over chat, sync and identity.
-	notify *Notify
-	// stats is the client metrics part of the stats module (M4-31), built in the chat step.
-	stats *Stats
-	// gateway is the WebSocket gateway of api and all (M1-64) with the hub the log tail feeds
-	// (M1-65).
-	gateway *Gateway
-	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
-	signingKeys *SigningKeys
-	keyCheck    time.Duration
-	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
-	blocked bool
-	// restorePending is set by the start lock of R-DM-50 (restore_not_finalized, M7-04): the
-	// process then serves and processes nothing, see whileFinalized.
-	restorePending bool
+	// The state of each module lives in its module file (module_<name>.go); each module's
+	// start parts fill it.
+	agentsState
+	appsState
+	auditState
+	authzState
+	chatState
+	filesState
+	gatewayState
+	identityState
+	instanceState
+	messagingState
+	notifyState
+	runsState
+	statsState
+	syncState
+	terminalState
 	// search is the language configuration of full-text search (search.languages,
 	// search.locale_map; M3-13): identity answers the language of new messages and threads with
 	// it, and the step schema checks its configurations against the database.
@@ -460,59 +399,37 @@ func (s *server) egressDeps() egress.Deps {
 // logger returns the current process logger.
 func (s *server) logger() *slog.Logger { return slog.New(s.log) }
 
-// components returns the start sequence of the role in the order Serve documents.
-func (s *server) components() []lifecycle.Component {
-	cs := []lifecycle.Component{
-		step("telemetry", s.startTelemetry),
-		step("secrets", s.startSecrets),
-		step("internal_listener", s.startInternal),
-		step("database", s.startDatabase),
-		step("schema", s.checkSchema),
-		step("instance", s.loadInstance),
-		step("audit", s.startAudit),
-		step("sync", s.startSync),
-		step("authz", s.startAuthz),
-		step("settings", s.startSettings),
-		step("identity", s.startIdentity),
-		step("agents", s.startAgents),
-		step("chat", s.startChat),
-		step("files", s.startFiles),
-		step("terminal", s.startTerminal),
-		step("apps", s.startApps),
-		step("signing_keys", s.startSigningKeys),
-		step("audit_log", s.startAuditLog),
-		step("sessions", s.startSessions),
-		step("routes", s.mountRoutes),
-	}
-	if s.api() {
-		cs = append(cs, step("log_tail", s.whileFinalized(s.startLogTail)), step("agent_presence", s.whileFinalized(s.startPresence)))
-	}
-	cs = append(cs, step("jobs", s.whileFinalized(s.startJobs)))
-	if s.worker() {
-		// 02 "Start" step 8: the worker consumers start after River (M2-01).
-		cs = append(cs, step("event_consumers", s.whileFinalized(s.startEventConsumers)), step("scan_health", s.startScanHealth))
-	}
-	if s.api() {
-		cs = append(cs, step("public_listener", s.whileFinalized(s.startPublic)))
-	}
-	if s.plan.Listener {
-		// M2-47: the LISTEN ephemeral connection after the HTTP listeners (soft dependency).
-		cs = append(cs, step("terminal_ephemeral", s.startTerminalEphemeral))
-	}
-	return append(cs, step("ready", s.ready))
+// stepJobs is the name of the start step and of the stop step of River.
+const stepJobs = "jobs"
+
+// processWiring returns the start steps of the process itself, around those of the modules: the
+// platform before the modules, the routes and the jobs after them, the public listener and
+// readiness last. The order keys of the modules lie between them (module_<name>.go).
+func processWiring() moduleWiring {
+	return moduleWiring{parts: []part{
+		{order: 100, step: "telemetry", start: (*server).startTelemetry},
+		{order: 200, step: "secrets", start: (*server).startSecrets},
+		{order: 300, step: "internal_listener", start: (*server).startInternal},
+		{order: 400, step: "database", start: (*server).startDatabase},
+		{order: 500, step: "schema", start: (*server).checkSchema},
+		{order: 2000, step: "routes", start: (*server).mountRoutes},
+		{order: 2300, step: stepJobs, start: whileFinalized((*server).startJobs)},
+		{order: 2600, step: "public_listener", when: (*server).api, start: whileFinalized((*server).startPublic)},
+		{order: 2700, step: "ready", start: (*server).ready},
+	}}
 }
 
-// whileFinalized returns start, or a step that starts nothing while the start lock of R-DM-50
+// whileFinalized returns start, or a part that starts nothing while the start lock of R-DM-50
 // holds (restore_not_finalized, M7-04): a restored database whose restore was not finalized must
 // neither take writes on the public listener nor deliver from the log tail, River or the worker
 // consumers, because they would mix the old and the new timeline. Only the internal listener
 // stays, so /readyz names the reason; the stop steps handle the parts that never started.
-func (s *server) whileFinalized(start func(ctx context.Context) error) func(ctx context.Context) error {
-	return func(ctx context.Context) error {
+func whileFinalized(start func(s *server, ctx context.Context) error) func(s *server, ctx context.Context) error {
+	return func(s *server, ctx context.Context) error {
 		if !s.finalized() {
 			return nil
 		}
-		return start(ctx)
+		return start(s, ctx)
 	}
 }
 
@@ -707,609 +624,14 @@ func (s *server) startDatabase(ctx context.Context) error {
 	return err
 }
 
-// startAudit is start step 6a: it checks the key-encryption key, builds the audit module over the
-// pool of the role and starts its aggregator with the stop step that flushes it (Audit.Start;
-// the pool step is registered earlier, so the flush runs before the pool closes).
-func (s *server) startAudit(ctx context.Context) error {
-	cfg, err := AuditConfig(s.values)
-	if err != nil {
-		return err
-	}
-	unitCfg, err := UnitConfig(s.values)
-	if err != nil {
-		return err
-	}
-	kek := SecretsKEK{Provider: s.sp}
-	if err := checkAuditKEK(ctx, kek, cfg.IPKEKRef); err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool := s.pool
-	s.mu.Unlock()
-	a, err := NewAudit(pool, unitCfg, cfg, kek, s.logger())
-	if err != nil {
-		return err
-	}
-	a.Start(s.runner)
-	s.mu.Lock()
-	s.audit = a
-	s.mu.Unlock()
-	return nil
-}
-
-// startAuthz is start step 6c (M1-28): it builds the Authorizer of authz over the pool with the
-// recorder of the audit module (NewAuthorizer) and keeps it for the use cases of later tickets,
-// binds the rights hooks to the appender of sync and the recorder (M1-29), and builds the group
-// and grant management with its REST handlers (M1-48).
-func (s *server) startAuthz(context.Context) error {
-	cfg, err := AuthzConfig(s.values)
-	if err != nil {
-		return err
-	}
-	log := s.logger()
-	cat, err := NewAuthzCatalog(log)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, sy := s.pool, s.audit, s.sync
-	s.mu.Unlock()
-	az, err := NewAuthorizer(pool, cfg, cat, a.Recorder(), s.deps.Clock, log)
-	if err != nil {
-		return err
-	}
-	if sy == nil {
-		return errors.New("wire: the authz step needs the event log of the sync step")
-	}
-	adminCfg, err := AuthzAdminConfig(s.values)
-	if err != nil {
-		return err
-	}
-	admin, err := NewAuthzAdmin(pool, adminCfg, a, sy, az, s.deps.Clock)
-	if err != nil {
-		return err
-	}
-	// The rights hooks of the unit of work need the appender and the recorder, which need the unit
-	// of work themselves; they are bound here, before any route or job runs (M1-29).
-	if err := a.RightsHook().Bind(authzapp.RightsBindings{Events: sy.Appender(), Audit: a.Recorder()}); err != nil {
-		return err
-	}
-	if err := a.SyncSubscribers().Bind(sy.Appender()); err != nil {
-		return err
-	}
-	s.mu.Lock()
-	s.authorizer, s.authzAdmin = az, admin
-	s.mu.Unlock()
-	return nil
-}
-
-// resolver returns the guided flow of authz (M2-21) as the port identity and chat call; nil
-// before startAuthz, which identity and chat then refuse with kind internal.
-func (s *server) resolver() authz.I1Resolver {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.authzAdmin == nil || s.authzAdmin.Resolver == nil {
-		return nil
-	}
-	return s.authzAdmin.Resolver
-}
-
-// startSettings is start step 6d (M1-46): the instance settings,
-// branding and discovery over the pool, the unit of work and recorder of audit, the appender of
-// sync and the Authorizer. It comes before identity, because createUser reads locale.default
-// through the port instance.Settings.
-func (s *server) startSettings(context.Context) error {
-	cfg, err := InstanceConfig(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, az, sy := s.pool, s.audit, s.authorizer, s.sync
-	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil {
-		return errors.New("wire: the settings step needs the unit of work and recorder of audit, the appender of sync and the Authorizer")
-	}
-	st, err := NewInstanceSettings(cfg, LocalPasswordEnabled(s.values), pool, a.UoW(), az,
-		SettingsWrites{Audit: a.Recorder(), Events: sy.Appender()}, s.deps.Clock)
-	if err != nil {
-		return err
-	}
-	if st.CSPReports, err = NewCSPReports(az, s.logger(), nil, int(s.values.Int(KeyCSPReportMaxRecords))); err != nil {
-		return err
-	}
-	s.mu.Lock()
-	s.settings = st
-	s.mu.Unlock()
-	return nil
-}
-
-// startIdentity is start step 6e (M1-33): the identity module over the pool, the unit of work and
-// the recorder of the audit step, the appender of the sync step (M1-31) and the Authorizer of
-// step 6c, with the token pepper resolved once.
-func (s *server) startIdentity(ctx context.Context) error {
-	cfg, err := IdentityConfig(s.values)
-	if err != nil {
-		return err
-	}
-	pepper, err := TokenPepper(ctx, s.sp, cfg.TokenPepperRef)
-	if err != nil {
-		return err
-	}
-	// The TOTP key is resolved once here: a missing key or one that is not 32 bytes stops the
-	// start (M1-39), not the first password login.
-	box, err := TOTPBox(ctx, s.sp, cfg.TOTPKeyRef)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, az, sy, st := s.pool, s.audit, s.authorizer, s.sync, s.settings
-	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil || st == nil {
-		return errors.New("wire: the identity step needs the unit of work and recorder of audit, the appender of sync, the Authorizer and the instance settings")
-	}
-	fresh, err := FreshStepUpCheck(s.values)
-	if err != nil {
-		return err
-	}
-	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin,
-		Fresh: fresh, Apps: NewAppInstallations(pool), Search: s.search, Resolver: s.resolver()}, pepper, s.deps.Clock, s.logger())
-	if err != nil {
-		return err
-	}
-	id.Start(s.runner)
-	s.mu.Lock()
-	s.identity, s.totpBox = id, box
-	s.mu.Unlock()
-	return nil
-}
-
-// startAgents is start step 6e (M1-51): the agents module over the pool, the unit of work, the
-// recorder and the rights hook of the audit step, the appender of the sync step, the Authorizer
-// and the identity module; it binds the switch of the module into the guided flow of authz
-// (M2-21, bindGuidedFlow).
-func (s *server) startAgents(context.Context) error {
-	cfg, err := AgentsConfig(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, az, sy, id := s.pool, s.audit, s.authorizer, s.sync, s.identity
-	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil || id == nil {
-		return errors.New("wire: the agents step needs audit, sync, the Authorizer and identity")
-	}
-	ag, err := NewAgents(cfg, pool, a.UoW(), az, a.RightsHook(), IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock, s.logger())
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	admin := s.authzAdmin
-	s.mu.Unlock()
-	if err := bindGuidedFlow(admin, ag); err != nil {
-		return err
-	}
-	pcfg, err := PresenceConfigFrom(s.values)
-	if err != nil {
-		return err
-	}
-	if err := ag.BindPresence(pcfg, pool, PresenceDeps{UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Clock: s.deps.Clock,
-		Log: s.logger()}); err != nil {
-		return err
-	}
-	if s.api() {
-		// Registered before the gateway's stop steps (mountGateway), so it runs after them: no
-		// heartbeat arrives once it flushes (D-M2-20-5).
-		s.runner.OnStop(ag.PresenceStopStep())
-	}
-	s.mu.Lock()
-	s.agents = ag
-	s.mu.Unlock()
-	return nil
-}
-
-// bindGuidedFlow binds the switch of the agents module ag into the resolver of the guided flow of
-// admin (M2-21): from then on resolve_i1 switches agents through the agents module. It fails the
-// start when the resolver still holds authz.EmptyAgentPolicySwitch afterwards, so the production
-// graph never serves the guided flow with the empty switch.
-func bindGuidedFlow(admin *AuthzAdmin, ag *Agents) error {
-	if admin == nil || admin.Resolver == nil || ag == nil || ag.Switch == nil {
-		return errors.New("wire: the guided flow needs the resolver of authz and the switch of the agents module")
-	}
-	admin.BindAgentPolicySwitch(ag.Switch)
-	if admin.Resolver.UsesEmptySwitch() {
-		return errors.New("wire: the guided flow still uses the empty agent policy switch")
-	}
-	return nil
-}
-
-// startPresence starts the presence tracker of the agents in the roles api and all (M2-20): the
-// start rule, the flush loop and the presence gauges.
-func (s *server) startPresence(ctx context.Context) error {
-	s.mu.Lock()
-	ag := s.agents
-	s.mu.Unlock()
-	return ag.StartPresence(ctx, s.deps.PresenceGauges)
-}
-
-// startChat is start step 6f (M1-52): the chat module over the pool, the unit of work and the
-// recorder of the audit step, the appender of the sync step and the Authorizer, and the messaging
-// module over the threads of chat (M1-56).
-func (s *server) startChat(context.Context) error {
-	cfg, err := ChatConfig(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, az, sy, id := s.pool, s.audit, s.authorizer, s.sync, s.identity
-	s.mu.Unlock()
-	rights, ok := az.(authz.RightsQuery)
-	if a == nil || sy == nil || !ok || id == nil {
-		return errors.New("wire: the chat step needs audit, sync, the Authorizer of authz and identity")
-	}
-	c, err := NewChat(cfg, pool, a.UoW(), az, rights, ChatWrites{Audit: a.Recorder(), Events: sy.Appender(), Rights: a.RightsHook(),
-		Directory: id.Directory, Resolver: s.resolver()}, nil, s.deps.Clock)
-	if err != nil {
-		return err
-	}
-	mcfg, err := MessagingConfig(s.values)
-	if err != nil {
-		return err
-	}
-	m, err := NewMessaging(mcfg, pool, a.UoW(), az, MessagingWrites{Events: sy.Appender(), Redactor: sy.Redactor(), Audit: a.Recorder()},
-		c.Service, id.Directory, s.deps.Clock, s.logger())
-	if err != nil {
-		return err
-	}
-	rn, err := s.buildRuns(pool, a, az, sy, c, m)
-	if err != nil {
-		return err
-	}
-	pcfg, err := PersonalConfig(s.values)
-	if err != nil {
-		return err
-	}
-	p, err := NewPersonal(pcfg, pool, a.UoW(), az, sy.Appender(), c.Service, m.Service, s.deps.Clock)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	ag := s.agents
-	s.mu.Unlock()
-	if ag != nil && ag.Presence != nil {
-		// The heartbeat applies project readiness through chat (M2-03, D-M2-20-10).
-		ag.Presence.BindReadiness(c.Service)
-	}
-	r, err := s.buildSyncReads(pool, a.UoW(), az, c, m, p, rn)
-	if err != nil {
-		return err
-	}
-	n, err := s.startNotify(pool, a, az, sy, c, p, id)
-	if err != nil {
-		return err
-	}
-	st, err := NewStats(az, p.Service.Settings())
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	s.chat, s.messaging, s.runs, s.personal, s.syncReads, s.notify, s.stats = c, m, rn, p, r, n, st
-	s.mu.Unlock()
-	return nil
-}
-
-// buildRuns builds the runs module (M2-05) in the chat step over messaging (anchor and trigger
-// state), the threads and channel facts of chat and the agent facts of the agents step, binds the
-// acceptance of the unit of work to it and, in the worker role, registers the gauge
-// bothy.run.active on the global meter provider.
-func (s *server) buildRuns(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, m *Messaging) (*Runs, error) {
-	cfg, err := RunsConfig(s.values)
-	if err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	ag := s.agents
-	s.mu.Unlock()
-	if ag == nil {
-		return nil, errors.New("wire: the runs module needs the agents step")
-	}
-	rn, err := NewRuns(cfg, pool, a.UoW(), az, RunsDeps{
-		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
-		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(),
-	}, s.deps.Clock, s.logger())
-	if err != nil {
-		return nil, err
-	}
-	if err := s.bindCommands(pool, a, az, sy, c, ag, rn); err != nil {
-		return nil, err
-	}
-	if err := a.RunsAcceptor().Bind(rn.Service); err != nil {
-		return nil, err
-	}
-	if s.worker() {
-		if err := rn.RegisterActiveGauge(); err != nil {
-			return nil, err
-		}
-	}
-	return rn, nil
-}
-
-// bindCommands builds the command register of agents over chat and binds it to the command
-// execution of runs (M2-16).
-func (s *server) bindCommands(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, ag *Agents, rn *Runs) error {
-	cfg, err := CommandsConfig(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	id := s.identity
-	s.mu.Unlock()
-	if id == nil || id.Principals == nil {
-		return errors.New("wire: the command register needs the identity module")
-	}
-	if err := ag.BindCommands(cfg, pool, CommandDeps{UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Events: sy.Appender(),
-		Principals: id.Principals, Channels: c.Service}); err != nil {
-		return err
-	}
-	return rn.Service.BindCommands(ag.Commands)
-}
-
-// startNotify builds the notify module (M3-18) in the chat step over the chat service, the
-// settings of the personal data of sync and the directory of identity, and binds the
-// in-transaction subscribers of notify of the unit of work to the appender and the chat paths.
-func (s *server) startNotify(pool *pg.Pool, a *Audit, az authorize.Authorizer, sy *Sync, c *Chat, p *Personal, id *Identity) (*Notify, error) {
-	cfg, err := NotifyConfig(s.values)
-	if err != nil {
-		return nil, err
-	}
-	n, err := NewNotify(cfg, pool, a.UoW(), az, sy.Appender(), NotifyDeps{Chat: c.Service, Settings: p.Service.Settings(), Users: id.Directory},
-		s.deps.Clock, s.logger())
-	if err != nil {
-		return nil, err
-	}
-	if err := a.NotifySubscribers().Bind(sy.Appender(), c.Service); err != nil {
-		return nil, err
-	}
-	return n, nil
-}
-
-// startTerminal is start step 6g (M2-39): the terminal module over the pool, the unit of work and
-// the recorder of the audit step, the appender of the sync step, the Authorizer and the identity
-// module.
-func (s *server) startTerminal(context.Context) error {
-	cfg, err := TerminalConfig(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, az, sy, id := s.pool, s.audit, s.authorizer, s.sync, s.identity
-	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil || id == nil {
-		return errors.New("wire: the terminal step needs audit, sync, the Authorizer and identity")
-	}
-	tm, err := NewTerminal(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock,
-		s.deps.TerminalBeforeOpenCommit, s.logger())
-	if err != nil {
-		return err
-	}
-	sig, local := terminalSignals(s.plan, pool, s.deps.TerminalSignals)
-	tm.Service.BindSignals(sig)
-	if s.deps.TerminalModule != nil {
-		s.deps.TerminalModule(tm.Service)
-	}
-	s.mu.Lock()
-	s.terminal, s.terminalLocal = tm, local
-	s.mu.Unlock()
-	return nil
-}
-
-// startApps is start step 6h (M2-24, M2-26): the module apps over the pool, the unit of work,
-// rights hook and recorder of the audit step, the Authorizer and identity, with the outgoing
-// webhooks over the egress configuration, the master key of the v1 secrets (resolved once, so a
-// missing or malformed key ends the start), the instance row and the log reader of sync. The
-// signing keys and the job runtime start later and are bound then (BindKeys, BindJobs).
-func (s *server) startApps(ctx context.Context) error {
-	cfg, err := AppsConfig(s.values)
-	if err != nil {
-		return err
-	}
-	wcfg, masterRef, err := WebhooksConfig(s.values)
-	if err != nil {
-		return err
-	}
-	eg, err := EgressConfig(s.values)
-	if err != nil {
-		return err
-	}
-	sender, err := NewWebhookSender(eg, wcfg, egress.Deps{Logger: s.logger()})
-	if err != nil {
-		return err
-	}
-	master := NewHMACMasterKey(s.sp, masterRef)
-	if err := master.Check(ctx); err != nil {
-		return err
-	}
-	icfg, err := IncomingConfig(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, az, admin, id, sy, ch, msg := s.pool, s.audit, s.authorizer, s.authzAdmin, s.identity, s.sync, s.chat, s.messaging
-	s.mu.Unlock()
-	if a == nil || az == nil || admin == nil || id == nil || sy == nil || ch == nil || msg == nil {
-		return errors.New("wire: the apps step needs the audit step, sync, the Authorizer, the authz Admin, identity, chat and messaging")
-	}
-	state := instanceapp.NewState(instancepg.NewRepository(pool), a.UoW())
-	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id,
-		Grants: admin.Admin, Clock: s.deps.Clock, Webhooks: WebhookDeps{
-			Config: wcfg, State: state, Log: sy.LogReader(), Master: master, Sender: sender, Logger: s.logger(),
-		}, Incoming: icfg, Chat: ch, Messages: msg})
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	s.apps = ap
-	s.mu.Unlock()
-	return nil
-}
-
-// buildSyncReads builds catch-up and snapshot of sync (M1-63) over the chat and messaging modules
-// and the personal data of the chat step, the agents step, the principal directory of identity
-// and the instance settings (feature flags).
-func (s *server) buildSyncReads(pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, c *Chat, m *Messaging, p *Personal,
-	rn *Runs) (*SyncReads, error) {
-	cfg, err := CatchUpConfig(s.values)
-	if err != nil {
-		return nil, err
-	}
-	s.mu.Lock()
-	ag, st := s.agents, s.settings
-	s.mu.Unlock()
-	if ag == nil || st == nil {
-		return nil, errors.New("wire: catch-up and snapshot need the agents and settings steps")
-	}
-	return NewSyncReads(cfg, SyncReadDeps{Pool: pool, UoW: uow, Authorizer: az, Chat: c.Service, Messaging: m.Service, Personal: p.Service,
-		Runs:   rn.Service,
-		Agents: ag.Service, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Flags: st.Admin})
-}
-
-// startSessions is the second extension point of start step 7 (M1-34): the session part of
-// identity over the signing keys of the previous step and the instance id, the issuer of access
-// tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
-func (s *server) startSessions(context.Context) error {
-	s.mu.Lock()
-	id, keys, rec, admin, box := s.identity, s.signingKeys, s.instance, s.authzAdmin, s.totpBox
-	s.mu.Unlock()
-	if id == nil || keys == nil || admin == nil {
-		return errors.New("wire: the sessions need the identity step, the signing keys and the authz admin")
-	}
-	if err := id.BindSessions(keys.Keys, rec.InstanceID); err != nil {
-		return err
-	}
-	eg, err := EgressConfig(s.values)
-	if err != nil {
-		return err
-	}
-	sec, err := NewProviderSecrets(s.sp, s.values)
-	if err != nil {
-		return err
-	}
-	if err := id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin, EgressDenyAll: s.deps.EgressDenyAll,
-		RootCAs: s.deps.OIDCRootCAs}); err != nil {
-		return err
-	}
-	return id.BindLocal(box, nil)
-}
-
-// authenticator returns the Authenticator of the HTTP chain: identity's after startSessions,
-// actor.AnonymousOnly before (fail closed).
-func (s *server) authenticator() actor.Authenticator {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.identity != nil && s.identity.Authenticator != nil {
-		return s.identity.Authenticator
-	}
-	return actor.AnonymousOnly{}
-}
-
 // handlers returns deps.Handlers with every nil module handler replaced by the one the start
 // built (tests inject their own).
 func (s *server) handlers() Handlers {
 	h := s.deps.Handlers
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.identity != nil {
-		s.identity.fillHandlers(&h)
-	}
-	if h.Agents == nil && s.agents != nil {
-		h.Agents = s.agents.Handlers
-	}
-	if h.Commands == nil && s.agents != nil {
-		h.Commands = s.agents.CommandHandlers
-	}
-	if s.chat != nil {
-		s.chat.fillHandlers(&h)
-	}
-	s.messaging.fillHandlers(&h)
-	s.runs.fillHandlers(&h)
-	s.personal.fillHandlers(&h)
-	s.syncReads.fillHandlers(&h)
-	s.notify.fillHandlers(&h)
-	s.stats.fillHandlers(&h)
-	s.files.fillHandlers(&h)
-	s.terminal.fillHandlers(&h)
-	if h.Keys == nil && s.signingKeys != nil {
-		h.Keys = s.signingKeys.Handlers
-	}
-	if h.Log == nil && s.audit != nil {
-		h.Log = s.audit.Handlers()
-	}
-	if s.settings != nil {
-		s.settings.fillHandlers(&h)
-	}
-	if h.Access == nil && s.authzAdmin != nil {
-		h.Access = s.authzAdmin.Handlers
-	}
-	s.apps.fillHandlers(&h)
+	s.fillModuleHandlers(&h)
 	return h
-}
-
-// fillHandlers sets every nil identity handler of h to the one id built (M1-44/18).
-func (id *Identity) fillHandlers(h *Handlers) {
-	fill(&h.Devices, id.Handlers)
-	fill(&h.People, id.PeopleHandlers)
-	fill(&h.Sessions, id.SessionHandlers)
-	fill(&h.StepUps, id.StepUpHandlers)
-	fill(&h.Providers, id.ProviderHandlers)
-	fill(&h.Credentials, id.CredentialHandlers)
-	fill(&h.Tokens, id.TokenHandlers)
-	fill(&h.Enrollment, id.EnrollmentHandlers)
-	fill(&h.Approval, id.ApprovalHandlers)
-	fill(&h.Passkeys, id.PasskeyHandlers)
-	fill(&h.OIDC, id.OIDCHandlers)
-	fill(&h.TrustedHeader, id.TrustedHeaderHandlers)
-	fill(&h.Lifecycle, id.LifecycleHandlers)
-	fill(&h.Local, id.LocalHandlers)
-	fill(&h.Console, id.ConsoleHandlers)
-}
-
-// fill sets *dst to built when *dst is nil, so an injected handler stays.
-func fill[T any](dst **T, built *T) {
-	if *dst == nil {
-		*dst = built
-	}
-}
-
-// startAuditLog is the second extension point of start step 7 (M1-50): the query, export and
-// verification of the audit log and the job audit.chain_verify over the signing keys of the
-// previous step, the Authorizer and the instance ID. The sink of audit.checkpoint_sink is built
-// here; an object store target without an effective retention lock stops the start (M7-22).
-// Processes that run jobs write the warning audit_checkpoint_sink_not_configured once here when
-// no sink is configured (19 SEC-AUD-2).
-func (s *server) startAuditLog(ctx context.Context) error {
-	s.mu.Lock()
-	a, keys, az, rec := s.audit, s.signingKeys, s.authorizer, s.instance
-	s.mu.Unlock()
-	if a == nil || keys == nil || az == nil {
-		return errors.New("wire: the audit log needs the audit step, the signing keys and the Authorizer")
-	}
-	sink, err := CheckpointSink(ctx, s.values, rec.InstanceID, CheckpointSinkDeps{Secrets: s.sp, Egress: s.egressDeps()})
-	if err != nil {
-		return err
-	}
-	if err := a.BindLog(keys.Keys, az, rec.InstanceID, s.deps.Clock, sink); err != nil {
-		return err
-	}
-	if s.worker() {
-		a.WarnWithoutSink(ctx)
-	}
-	return nil
-}
-
-// authorizerOf returns the Authorizer of the process, nil before the step authz ran.
-func (s *server) authorizerOf() authorize.Authorizer {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.authorizer
 }
 
 // checkSchema is start step 5: the schema version (pg.CheckSchema), then the text search of the
@@ -1366,8 +688,7 @@ func (s *server) mountRoutes(ctx context.Context) error {
 	if s.api() {
 		mount = func() error { return s.mountAPI(ctx, cat, log) }
 	}
-	bindings := append(RouteBindings(routes.Enabled()), GatewayRouteBinding(), HostConnectRouteBinding())
-	bindings = append(bindings, TerminalStreamRouteBindings()...)
+	bindings := append(RouteBindings(routes.Enabled()), moduleRouteBindings()...)
 	if err := startRoutes(bindings, BuildRegistry(s.deps.Registrations), cat, log, mount); err != nil {
 		return err
 	}
@@ -1377,7 +698,7 @@ func (s *server) mountRoutes(ctx context.Context) error {
 
 // mountAPI is the mount part of mountRoutes for api and all: the chain, the rate limiter with its
 // sweeper, the Idempotency-Key stage, the setup gate, the REST routes, the web console of
-// console.assets_dir (M6-02) and the gateway.
+// console.assets_dir (M6-02) and the mounts of the modules (gateway, terminal; their module files).
 func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.Logger) error {
 	chain, err := NewChain(s.chainCfg, s.authenticator(), log)
 	if err != nil {
@@ -1414,124 +735,7 @@ func (s *server) mountAPI(ctx context.Context, cat *authzapp.Catalog, log *slog.
 	if err := MountConsole(mux, s.values); err != nil {
 		return err
 	}
-	if err := s.mountGateway(mux, chain, limiter, log); err != nil {
-		return err
-	}
-	return s.mountHostControl(ctx, mux, chain, log)
-}
-
-// mountHostControl builds the control connection of the host services (M2-43) over the terminal
-// module, the ephemeral publisher of the gateway and the signing keys, mounts GET
-// /api/v1/hosts/connect on mux and registers its stop step.
-func (s *server) mountHostControl(ctx context.Context, mux Mux, chain *httpserver.Chain, log *slog.Logger) error {
-	cfg, err := HostControlConfigFrom(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	tm, gw, keys := s.terminal, s.gateway, s.signingKeys
-	s.mu.Unlock()
-	if tm == nil || gw == nil || keys == nil {
-		return errors.New("wire: the control connection needs the terminal module, the gateway and the signing keys")
-	}
-	hc, err := NewHostControl(cfg, tm, gw.Publisher, keys.Keys, s.deps.Clock, log)
-	if err != nil {
-		return err
-	}
-	hc.Mount(mux, chain)
-	s.runner.OnStop(hc.StopConnections())
-	return s.mountTerminalStreams(ctx, mux, chain, tm, hc, log)
-}
-
-// mountTerminalStreams builds the relay and the two stream routes of the terminal sessions
-// (M2-44) over the module, the control connection, identity's authenticator and nonces and the
-// signing keys, builds the hub of the signals across nodes (M2-47), reconciles the sessions of the
-// previous process (Design note 14, only with cluster.mode single, and only while the start lock
-// of R-DM-50 is free), mounts both routes on mux and registers the stop step of the relay.
-func (s *server) mountTerminalStreams(ctx context.Context, mux Mux, chain *httpserver.Chain, tm *Terminal, hc *HostControl, log *slog.Logger) error {
-	cfg, err := TerminalStreamsConfigFrom(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	id, keys := s.identity, s.signingKeys
-	s.mu.Unlock()
-	if id == nil || id.Authenticator == nil || id.DPoP == nil || keys == nil {
-		return errors.New("wire: the terminal streams need identity's authenticator and nonces and the signing keys")
-	}
-	ts, err := NewTerminalStreams(cfg, tm, hc, TerminalStreamsDeps{Authenticator: id.Authenticator, Nonces: id.DPoP, Signer: keys.Keys,
-		Timers: s.deps.TerminalTimers, Metrics: s.deps.TerminalMetrics, Clock: s.deps.Clock, Log: log, Multi: s.plan.Multi})
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	local := s.terminalLocal
-	s.mu.Unlock()
-	hub, hubCfg, err := newTerminalHub(s.values, s.plan, tm, hc, ts, local, s.deps.Clock, log)
-	if err != nil {
-		return err
-	}
-	if !s.plan.Multi && s.finalized() {
-		// One node: the slots and connections of the previous process are gone (M2-44 Design
-		// note 14); with several nodes the other nodes still hold theirs. The reconcile ends and
-		// detaches sessions with audit entries and events, so while the start lock holds it waits
-		// for the next start after bothy restore finalize.
-		if err := tm.Service.Reconcile(ctx); err != nil {
-			return err
-		}
-	}
-	ts.Mount(mux, chain)
-	s.runner.OnStop(ts.StopConnections())
-	s.mu.Lock()
-	s.terminalStreams, s.terminalHub, s.hubCfg = ts, hub, hubCfg
-	s.mu.Unlock()
-	return nil
-}
-
-// mountGateway builds the WebSocket gateway (M1-64) over identity's Authenticator and DPoP
-// nonces, the Authorizer, the limiter of the chain (classes rl.gateway_connect, rl.read and
-// rl.typing), catch-up and snapshot of sync, the instance row and the threads of chat (M1-66),
-// mounts GET /api/v1/gateway on mux and starts the sweeper of the gateway sessions with its stop
-// step.
-func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelimit.Limiter, log *slog.Logger) error {
-	cfg, err := GatewayConfigFrom(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	id, az, reads, pool, a, ch, ag, rn := s.identity, s.authorizer, s.syncReads, s.pool, s.audit, s.chat, s.agents, s.runs
-	s.mu.Unlock()
-	var invocations runs.Delivery
-	if rn != nil {
-		invocations = rn.Service
-	}
-	if id == nil || id.Authenticator == nil || az == nil || reads == nil || a == nil || ch == nil || ag == nil {
-		return errors.New("wire: the gateway needs identity, the Authorizer, catch-up and snapshot, the unit of work, chat and agents")
-	}
-	gw, err := NewGateway(cfg, GatewayDeps{
-		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
-		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers,
-		Presence: ag.Presence, Invocations: invocations, Clock: s.deps.Clock, Log: log,
-	})
-	if err != nil {
-		return err
-	}
-	if ag.Presence != nil {
-		// agent.presence_changed goes through the hub of this process (M1-66, D-M2-20-1).
-		ag.Presence.BindPublisher(gw.Publisher)
-	}
-	if gw.Engine != nil {
-		// The REST consumer operations read through the engine (agents.ConsumerFeed, M2-07).
-		ag.Consumers.SetFeed(gw.Engine)
-	}
-	gw.Mount(mux, chain)
-	s.runner.OnStop(gw.StartSweeper())
-	s.runner.OnStop(gw.StartConsumerSaver())
-	s.runner.OnStop(gw.StopConnections())
-	s.mu.Lock()
-	s.gateway = gw
-	s.mu.Unlock()
-	return nil
+	return s.mountModules(ctx, mux, chain, limiter, log)
 }
 
 // NewChain builds the HTTP chain of the public listener for the enabled operations: the validator
@@ -1583,7 +787,7 @@ func (s *server) jobsStopSteps() []lifecycle.StopStep {
 	if wait := jobsWaitBudget(s.cfg, s.role, s.jobsCfg.SoftStopTimeout); wait > 0 {
 		steps = append(steps, lifecycle.StopStep{Name: "jobs_wait", Phase: lifecycle.PhaseJobs, Budget: wait, Run: s.stopJobs})
 	}
-	return append(steps, lifecycle.StopStep{Name: "jobs", Phase: lifecycle.PhaseJobs, Budget: s.jobsCfg.SoftStopTimeout, Run: s.stopJobs})
+	return append(steps, lifecycle.StopStep{Name: stepJobs, Phase: lifecycle.PhaseJobs, Budget: s.jobsCfg.SoftStopTimeout, Run: s.stopJobs})
 }
 
 // jobsWaitBudget returns the budget of the stop step jobs_wait for role: shutdown.total_timeout
@@ -1598,117 +802,21 @@ func jobsWaitBudget(cfg ServeConfig, role Role, soft time.Duration) time.Duratio
 	return max(cfg.TotalTimeout-fixed, 0)
 }
 
-// startSync is start step 6b: it builds the event log over the pool and the unit of work of the
-// audit step, whose registry holds the sync hook (M1-16), and registers the lag gauges of the
-// worker consumers in every role, so a stopped or missing worker still shows a growing lag
-// (M2-01, D-M2-01-5).
-func (s *server) startSync(context.Context) error {
-	s.mu.Lock()
-	pool, a := s.pool, s.audit
-	s.mu.Unlock()
-	if a == nil {
-		return errors.New("wire: the sync step needs the unit of work of the audit step")
-	}
-	sy, err := NewSync(pool, a.UoW(), s.syncCfg, nil, s.logger())
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	s.sync = sy
-	s.mu.Unlock()
-	gauges := s.deps.ConsumerGauges
-	if gauges == nil {
-		gauges = func(c sync.Consumers) error {
-			_, err := otelmetrics.RegisterConsumerGauges(nil, c, s.deps.Clock)
-			return err
-		}
-	}
-	return gauges(sy.Consumers())
-}
-
-// startEventConsumers starts the worker consumers of worker and all after River
-// (startConsumers) with the production handlers or those of Deps.ConsumerHandlers.
-func (s *server) startEventConsumers(ctx context.Context) error {
-	s.mu.Lock()
-	sy, ap := s.sync, s.apps
-	s.mu.Unlock()
-	handlers := consumerHandlers(ap)
-	if s.deps.ConsumerHandlers != nil {
-		handlers = s.deps.ConsumerHandlers
-	}
-	return startConsumers(ctx, s.runner, sy, handlers)
-}
-
-// startLogTail starts the log tail of api and all (02 "Start and graceful shutdown" step 8, startTail).
-func (s *server) startLogTail(ctx context.Context) error {
-	s.mu.Lock()
-	pool, sy, az, gw, ts := s.pool, s.sync, s.authorizer, s.gateway, s.terminalStreams
-	s.mu.Unlock()
-	var hub *gatewayapp.Hub
-	if gw != nil {
-		hub = gw.Hub
-	}
-	var observers []LogObserver
-	if ts != nil {
-		observers = append(observers, ts.Observer())
-	}
-	versions := instanceapp.NewVersions(instancepg.NewRepository(pool))
-	tail := sy.NewTail(DeliverySink(az, hub, versions, observers...))
-	if err := startTail(ctx, s.runner, s.reg, tail); err != nil {
-		return err
-	}
-	if hub != nil {
-		// The hub position starts at the head the tail started at (agent consumers, M2-07).
-		hub.Seed(tail.Head())
-	}
-	return nil
-}
-
 // startJobs checks River's migrations, builds the job registry with the jobs of the modules and
 // the runtime of the role and starts River for worker and all; a River client that later stops
 // on its own ends the process.
 func (s *server) startJobs(ctx context.Context) error {
 	s.mu.Lock()
-	pool, sy, a, keys, keyCheck, id, ap, files, rn := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck, s.identity, s.apps, s.files, s.runs
+	pool := s.pool
 	s.mu.Unlock()
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
 	}
-	if ap == nil {
-		return errors.New("wire: the jobs step needs the apps step")
-	}
-	if keys == nil {
-		return errors.New("wire: the jobs step needs the signing keys step")
-	}
-	if id == nil || id.AuthCleanup == nil {
-		return errors.New("wire: the jobs step needs the sessions step")
-	}
-	if a.Log() == nil {
-		return errors.New("wire: the jobs step needs the audit log step")
-	}
-	expiryCfg, err := AuthzExpiryConfig(s.values)
-	if err != nil {
+	var modules JobModules
+	if err := s.moduleJobs(&modules); err != nil {
 		return err
 	}
-	expiry, err := NewExpiryService(pool, a, sy, expiryCfg, s.logger())
-	if err != nil {
-		return err
-	}
-	var queuedExpiry runsjobs.Expirer
-	if rn != nil {
-		queuedExpiry = rn.Service
-	}
-	reg, err := NewJobRegistry(&JobModules{
-		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
-		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
-		Expiry: expiry, ExpiryInterval: expiryCfg.Interval,
-		KeyRotation: keys.Keys, KeyRotationInterval: keyCheck,
-		AuthCleanup: id.AuthCleanup, AuthCleanupInterval: id.cfg.CleanupInterval,
-		ChainVerify: a.Log(), ChainVerifyInterval: a.cfg.CheckpointInterval,
-		Deliveries: ap.Webhooks,
-		FilesScan:  files.ScanRunner(), QueuedExpiry: queuedExpiry,
-		FilesImages: files.ImageRunner(), FilesImageTimeout: s.imageTimeout(),
-	})
+	reg, err := NewJobRegistry(&modules)
 	if err != nil {
 		return err
 	}
@@ -1716,18 +824,14 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	ap.BindJobs(rt.Inserter())
-	files.BindJobs(rt.Inserter())
-	if rn != nil {
-		rn.BindJobs(rt.Inserter())
-	}
+	s.bindModuleJobs(rt.Inserter())
 	s.mu.Lock()
 	s.jobsRT = rt
 	s.mu.Unlock()
 	if err := rt.Start(ctx); err != nil {
 		return err
 	}
-	s.runner.FailOn("jobs", rt.Failed())
+	s.runner.FailOn(stepJobs, rt.Failed())
 	return nil
 }
 
@@ -1811,118 +915,4 @@ func (s *server) stopDatabase(context.Context) error {
 	}
 	// The object store of the files module goes with the database: no request uses it any more.
 	return files.Close()
-}
-
-// startFiles is start step 6f' (M3-03): it opens the object store of file.storage.driver
-// (FilesObjectStore: the driver fs checks file.fs.root, the driver s3 its keys, secrets and egress)
-// and builds the files module over the pool, the unit of work of the audit step, the Authorizer,
-// the appender of sync and the structure of chat. A root that fs.Open refuses ends the start.
-func (s *server) startFiles(ctx context.Context) error {
-	cfg, err := FilesConfig(s.values)
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	pool, a, az, sy, c := s.pool, s.audit, s.authorizer, s.sync, s.chat
-	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil || c == nil {
-		return errors.New("wire: the files step needs audit, the Authorizer, sync and chat")
-	}
-	store, err := FilesObjectStore(ctx, s.values, FilesDeps{Secrets: s.sp, Egress: s.egressDeps()})
-	if err != nil {
-		return err
-	}
-	f, err := NewFiles(cfg, s.values.String(keyStorageDriver), store, pool, a.UoW(), az, FilesWrites{Events: sy.Appender()},
-		c.Service, s.deps.Clock, s.logger())
-	if err != nil {
-		if cl, ok := store.(io.Closer); ok {
-			_ = cl.Close()
-		}
-		return err
-	}
-	if s.api() {
-		// Downloads, tickets and transcripts are served by the roles with routes; the ticket key
-		// must exist and be long enough before such a role starts (D-M3-05-15).
-		if err := s.enableDownloads(ctx, f); err != nil {
-			_ = f.Close()
-			return err
-		}
-	}
-	if s.worker() {
-		if err := s.enableFilesJobs(f, a.Recorder()); err != nil {
-			_ = f.Close()
-			return err
-		}
-	}
-	s.mu.Lock()
-	s.files = f
-	s.mu.Unlock()
-	return nil
-}
-
-// enableDownloads binds the download keys and the ticket key source and adds the downloads to f.
-func (s *server) enableDownloads(ctx context.Context, f *Files) error {
-	cfg, err := DownloadConfig(s.values)
-	if err != nil {
-		return err
-	}
-	keys, err := NewTicketKeys(ctx, s.sp, s.values.String(keyTicketKeyRef))
-	if err != nil {
-		return err
-	}
-	s.mu.Lock()
-	id := s.identity
-	s.mu.Unlock()
-	return f.EnableDownloads(cfg, id, keys)
-}
-
-// enableFilesJobs builds the use cases of files.scan (M3-04) and files.thumbnail (M3-06) in a
-// role that runs jobs.
-func (s *server) enableFilesJobs(f *Files, audit auditing.Recorder) error {
-	scanCfg, clamdCfg, err := ScanConfigs(s.values)
-	if err != nil {
-		return err
-	}
-	if err := f.EnableScan(scanCfg, clamdCfg, audit, s.deps.Clock, s.logger()); err != nil {
-		return err
-	}
-	imgCfg, err := ImageConfig(s.values)
-	if err != nil {
-		return err
-	}
-	return f.EnableImages(imgCfg, s.logger(), s.deps.FilesImageHooks)
-}
-
-// imageTimeout is file.image.processing_timeout, the River timeout of files.thumbnail in every
-// role (M3-06).
-func (s *server) imageTimeout() time.Duration {
-	return s.values.Duration("file.image.processing_timeout")
-}
-
-// startScanHealth starts the health monitor of the virus scanner in the roles worker and all
-// (M3-04, 12 5.3): a loop that pings clamd every file.scan.health_interval until the stop step
-// scan_health ends it. It never changes readiness.
-func (s *server) startScanHealth(context.Context) error {
-	s.mu.Lock()
-	f := s.files
-	s.mu.Unlock()
-	if f == nil || f.Health == nil {
-		return errors.New("wire: the scan health step needs the scan pass of the files step")
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		f.Health.Run(ctx)
-	}()
-	s.runner.OnStop(lifecycle.StopStep{Name: "scan_health", Phase: lifecycle.PhaseJobs, Run: func(stop context.Context) error {
-		cancel()
-		select {
-		case <-done:
-			return nil
-		case <-stop.Done():
-			return stop.Err()
-		}
-	}})
-	return nil
 }
