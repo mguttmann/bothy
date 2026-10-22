@@ -7,6 +7,7 @@ import 'package:api_client/src/generated/model/tool_class.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:api_client/src/generated/model/billing_mode.dart';
 import 'package:api_client/src/generated/model/agent_runtime_state.dart';
+import 'package:api_client/src/generated/model/billing_evidence.dart';
 import 'package:api_client/src/generated/model/agent_rate_limit_state.dart';
 import 'package:built_value/built_value.dart';
 import 'package:built_value/serializer.dart';
@@ -24,6 +25,8 @@ part 'agent_runtime_status.g.dart';
 /// * [reportedToolClass]
 /// * [billingModeMatches] - False when the reported mode differs from the configured `billing_mode`.
 /// * [rateLimit]
+/// * [billingEvidence]
+/// * [warnings] - Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`.
 @BuiltValue()
 abstract class AgentRuntimeStatus
     implements Built<AgentRuntimeStatus, AgentRuntimeStatusBuilder> {
@@ -55,6 +58,13 @@ abstract class AgentRuntimeStatus
 
   @BuiltValueField(wireName: r'rate_limit')
   AgentRateLimitState? get rateLimit;
+
+  @BuiltValueField(wireName: r'billing_evidence')
+  BillingEvidence? get billingEvidence;
+
+  /// Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`.
+  @BuiltValueField(wireName: r'warnings')
+  BuiltList<String>? get warnings;
 
   AgentRuntimeStatus._();
 
@@ -134,6 +144,20 @@ class _$AgentRuntimeStatusSerializer
       yield serializers.serialize(
         object.rateLimit,
         specifiedType: const FullType(AgentRateLimitState),
+      );
+    }
+    if (object.billingEvidence != null) {
+      yield r'billing_evidence';
+      yield serializers.serialize(
+        object.billingEvidence,
+        specifiedType: const FullType(BillingEvidence),
+      );
+    }
+    if (object.warnings != null) {
+      yield r'warnings';
+      yield serializers.serialize(
+        object.warnings,
+        specifiedType: const FullType(BuiltList, [FullType(String)]),
       );
     }
   }
@@ -227,6 +251,24 @@ class _$AgentRuntimeStatusSerializer
           ) as AgentRateLimitState?;
           if (valueDes == null) continue;
           result.rateLimit.replace(valueDes);
+          break;
+        case r'billing_evidence':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BillingEvidence),
+          ) as BillingEvidence?;
+          if (valueDes == null) continue;
+          result.billingEvidence.replace(valueDes);
+          break;
+        case r'warnings':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltList, [
+              FullType(String),
+            ]),
+          ) as BuiltList<String>?;
+          if (valueDes == null) continue;
+          result.warnings.replace(valueDes);
           break;
         default:
           unhandled.add(key);

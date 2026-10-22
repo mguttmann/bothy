@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -45,7 +46,8 @@ func SetStrict(report func(error)) (restore func()) {
 type binder struct {
 	spec  Spec
 	sets  []map[string]bool
-	cache sync.Map // string -> attribute.Set
+	forms []*regexp.Regexp // the form of a form source, nil for a list
+	cache sync.Map         // string -> attribute.Set
 }
 
 // newBinder checks s against kind and builds the closed sets from the literal values and v.
@@ -60,10 +62,12 @@ func newBinder(s Spec, kinds []Kind, v Values) (*binder, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %s is a %s", ErrSpec, s.Name, s.Kind)
 	}
-	b := &binder{spec: s, sets: make([]map[string]bool, len(s.Attrs))}
+	b := &binder{spec: s, sets: make([]map[string]bool, len(s.Attrs)), forms: make([]*regexp.Regexp, len(s.Attrs))}
 	for i, a := range s.Attrs {
 		vals := a.Values
-		if a.Source != "" {
+		if re, ok := formSources[a.Source]; ok {
+			b.forms[i], vals = re, nil
+		} else if a.Source != "" {
 			got, given := v[a.Source]
 			if !given {
 				return nil, fmt.Errorf("%w: %s: no values for the source %s of %s", ErrSpec, s.Name, a.Source, a.Key)
@@ -92,7 +96,7 @@ func (b *binder) attrs(values []string) attribute.Set {
 		if i < len(values) {
 			v = values[i]
 		}
-		if (v != "" || !a.Optional) && !b.sets[i][v] {
+		if (v != "" || !a.Optional) && !b.sets[i][v] && (b.forms[i] == nil || !b.forms[i].MatchString(v)) {
 			report(fmt.Errorf("metrics: %s: value %q of %s is not in its closed set", b.spec.Name, v, a.Key))
 			v = Other
 		}

@@ -149,6 +149,23 @@ source port `agents.ConsumerFeed`, which it implements.
 - `access.changed` revalidates, re-indexes and purges agent sessions as for people; the purge also
   releases the window budget of the removed targets.
 
+## Agent heartbeat (M2-20)
+
+The op `heartbeat` keeps the action `gateway.connect` and the liveness rules of M1-64 first
+(revalidation, `heartbeat_ack`, reset of the `4009` deadline). Then, when the member `agent` is
+present: the rate limit `rl.agent_runtime` keyed by the principal through the port
+`AgentLimiter` (as for `ack`), then `agents.Presence.Heartbeat` with the raw member in the
+session's actor context, the same use case as `sendHeartbeat`. Errors of the agent part
+(`forbidden` for the owner, `not_found` for any other person or app, `validation_failed`, `rate_limited` with `retry_after`,
+`internal_error`) answer `error {op: "heartbeat", code}` and keep the connection; the
+`heartbeat_ack` is sent before. A violation of the frame schema found by the decoder still closes
+with `4002`. A heartbeat of an agent without the member `agent` keeps the connection alive and
+changes no presence, because presence needs the state report. The hub publishes the tracker's
+`agent.presence_changed` like every ephemeral event (receive action `agent.read`, never before
+`catchup.complete`). The stop step `agent_presence` of the tracker runs after the gateway's step,
+so no gateway heartbeat arrives after the presence is flushed. Rulings: docs/DECISIONS.md
+D-M2-20-9. Tests: `app/heartbeat_agent_test.go`.
+
 ## Revocation and shutdown
 
 - `access.changed` of principal P, before it is dispatched: every connection of P is revalidated

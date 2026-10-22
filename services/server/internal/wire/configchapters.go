@@ -16,6 +16,7 @@ const (
 	chapter07 = "07-permissions.md"
 	chapter08 = "08-identity.md"
 	chapter09 = "09-agents.md"
+	chapter10 = "10-backend-policy.md"
 	chapter11 = "11-extensions.md"
 	chapter12 = "12-files.md"
 	chapter13 = "13-push-notifications.md"

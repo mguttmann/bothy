@@ -163,9 +163,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	want := "# configuration file: " + path + "\n" +
 		"agent.ack_persist_interval = 1s  # default\n" +
 		"agent.ack_timeout = 30s  # default\n" +
+		"agent.heartbeat_persist_interval = 1m  # default\n" +
 		"agent.invocation_token_ttl = 1m  # default\n" +
 		"agent.jwks_max_age = 1h  # default\n" +
 		"agent.max_inflight_events = 100  # default\n" +
+		"agent.presence_timeout = 90s  # default\n" +
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +
@@ -227,6 +229,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"authz.expiry_sweep_interval = 1m  # default\n" +
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
 		"authz.view_as_max_duration = 15m  # default\n" +
+		"billing.mismatch_alert_after = 5m  # default\n" +
 		"branding.product_name_max_chars = 64  # default\n" +
 		"channel.history_backfill_limit_default = 20  # default\n" +
 		"channel.history_backfill_limit_max = 200  # default\n" +

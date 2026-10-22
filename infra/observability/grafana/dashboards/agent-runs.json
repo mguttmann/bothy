@@ -702,6 +702,50 @@
           "sort": "desc"
         }
       }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Reported billing mode differs",
+      "description": "Seconds since the configured and the heartbeat-reported billing mode began to differ, 0 without a difference. The alarm BothyBillingModeMismatch fires above billing.mismatch_alert_after.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 46
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (bothy_agent_handle) (bothy_agent_billing_mode_mismatch_age_seconds{job=\"bothy/bothy-server\",deployment_environment_name=~\"$env\",bothy_agent_handle=~\"$agent\"})",
+          "legendFormat": "{{bothy_agent_handle}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     }
   ]
 }

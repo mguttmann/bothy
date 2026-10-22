@@ -21,6 +21,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
@@ -111,6 +112,10 @@ type Deps struct {
 	// otelmetrics.RegisterConsumerGauges on the global meter provider of otel.Setup. Tests read
 	// the gauges of a role through their own meter provider here.
 	ConsumerGauges func(consumers sync.Consumers) error
+	// PresenceGauges registers the presence gauges of the agents in the roles api and all (M2-20)
+	// over the samples of the tracker; nil means agents/adapters/otelmetrics.RegisterPresence on the
+	// global meter provider of otel.Setup. Tests read the gauges through their own meter provider.
+	PresenceGauges func(samples func() []agentsapp.GaugeSample) error
 	// EgressDenyAll makes every outgoing client of the process (OIDC providers and the audit
 	// checkpoint sink) refuse every target before resolution (egress.Deps.DenyAll). Only
 	// test servers set it (the contract server of G7, M1-71); production leaves it false.
@@ -429,7 +434,7 @@ func (s *server) components() []lifecycle.Component {
 		step("routes", s.mountRoutes),
 	}
 	if s.api() {
-		cs = append(cs, step("log_tail", s.startLogTail))
+		cs = append(cs, step("log_tail", s.startLogTail), step("agent_presence", s.startPresence))
 	}
 	cs = append(cs, step("jobs", s.startJobs))
 	if s.worker() {
@@ -783,10 +788,32 @@ func (s *server) startAgents(context.Context) error {
 	if err != nil {
 		return err
 	}
+	pcfg, err := PresenceConfigFrom(s.values)
+	if err != nil {
+		return err
+	}
+	if err := ag.BindPresence(pcfg, pool, PresenceDeps{UoW: a.UoW(), Authorizer: az, Audit: a.Recorder(), Clock: s.deps.Clock,
+		Log: s.logger()}); err != nil {
+		return err
+	}
+	if s.api() {
+		// Registered before the gateway's stop steps (mountGateway), so it runs after them: no
+		// heartbeat arrives once it flushes (D-M2-20-5).
+		s.runner.OnStop(ag.PresenceStopStep())
+	}
 	s.mu.Lock()
 	s.agents = ag
 	s.mu.Unlock()
 	return nil
+}
+
+// startPresence starts the presence tracker of the agents in the roles api and all (M2-20): the
+// start rule, the flush loop and the presence gauges.
+func (s *server) startPresence(ctx context.Context) error {
+	s.mu.Lock()
+	ag := s.agents
+	s.mu.Unlock()
+	return ag.StartPresence(ctx, s.deps.PresenceGauges)
 }
 
 // startChat is start step 6f (M1-52): the chat module over the pool, the unit of work and the
@@ -825,6 +852,13 @@ func (s *server) startChat(context.Context) error {
 	p, err := NewPersonal(pcfg, pool, a.UoW(), az, sy.Appender(), c.Service, m.Service, s.deps.Clock)
 	if err != nil {
 		return err
+	}
+	s.mu.Lock()
+	ag := s.agents
+	s.mu.Unlock()
+	if ag != nil && ag.Presence != nil {
+		// The heartbeat applies project readiness through chat (M2-03, D-M2-20-10).
+		ag.Presence.BindReadiness(c.Service)
 	}
 	r, err := s.buildSyncReads(pool, a.UoW(), az, c, m, p)
 	if err != nil {
@@ -1223,10 +1257,15 @@ func (s *server) mountGateway(mux Mux, chain *httpserver.Chain, limiter *ratelim
 	}
 	gw, err := NewGateway(cfg, GatewayDeps{
 		Authenticator: id.Authenticator, Authorizer: az, Nonces: id.DPoP, Limiter: limiter, Reads: reads,
-		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers, Clock: s.deps.Clock, Log: log,
+		Instance: instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()), Threads: ch.Service, Consumers: ag.Consumers,
+		Presence: ag.Presence, Clock: s.deps.Clock, Log: log,
 	})
 	if err != nil {
 		return err
+	}
+	if ag.Presence != nil {
+		// agent.presence_changed goes through the hub of this process (M1-66, D-M2-20-1).
+		ag.Presence.BindPublisher(gw.Publisher)
 	}
 	if gw.Engine != nil {
 		// The REST consumer operations read through the engine (agents.ConsumerFeed, M2-07).

@@ -296,8 +296,38 @@ Warnings on the agent card and in the console:
 | Configured mode not in `billing_modes_supported` | "Adapter cannot prove this mode" | as above |
 | `billing_evidence.key_type = unknown` | "Login type of the runtime unknown" | all invocations fail |
 
+The server compares the heartbeat with the configured values at each heartbeat
+([09-agents.md](09-agents.md) section 4.8) and shows the three rows above as codes of
+`AgentRuntimeStatus.warnings` on the agent card (`getAgent`, `listAgents`, `HeartbeatAck.presence`),
+only while the agent is `online` or `degraded`:
+
+| Row | Code | Delay |
+|---|---|---|
+| 1: `reported_billing_mode` set and unequal to the configured mode | `billing_mode_mismatch` | only after the difference has held for longer than `billing.mismatch_alert_after` |
+| 2: no `reported_billing_mode`, configured mode not in `billing_modes_supported` | `billing_mode_unsupported` | at once |
+| 3: `billing_evidence.key_type = unknown` | `billing_evidence_unknown` | at once |
+
+The unknown mode (`key_type` `unknown`) counts as a difference to every configured mode (section
+7), also when no `reported_billing_mode` is reported. A warning disappears with the heartbeat that
+ends its cause. A different reported tool class gives `tool_class_mismatch`
+([09-agents.md](09-agents.md) section 2.4).
+
+Alarm: the api process exports the gauge `bothy.agent.billing_mode.mismatch_age`
+([signals.md](../observability/signals.md) 4.3): per tracked active agent the seconds since a
+difference of any of the three rows began, 0 without a difference. The alarm
+`BothyBillingModeMismatch` ([alerting.md](../observability/alerting.md) 3.2, severity `page`) fires
+when the gauge exceeds `billing.mismatch_alert_after` (the rule holds its default, checked by
+`alert-thresholds`), or at once when a run hits the adapter check
+(I3, counter `bothy.agent.billing_mode_mismatch`). The heartbeat evidence serves display, warning,
+audit and alarm and is never a permission; the binding checks are I3 in the adapter and BR-06 at
+`run.start`.
+
 A change of `reported_billing_mode` writes an audit entry (action `agent.heartbeat`,
-`decision = allow`, old and new values in the details; 05, `agent.heartbeat`). Reason: the
+`decision = allow`, old and new values in the details; 05, `agent.heartbeat`). The entry is
+written in the transaction that stores the change, at once, also for a change from or to "not
+reported"; its details are `billing_mode_old`, `billing_mode_new`, `tool_class_old`,
+`tool_class_new` (for the changed column, each only when the value exists) and `key_type` and
+`method` of `billing_evidence`. Reason: the
 reported mode is the evidence for I3; its history must be auditable.
 
 ## 9. Switching (I4)

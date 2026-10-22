@@ -66,7 +66,7 @@ alerts of `bothy-alerts.yaml`.
 | `BothyEventConsumerLag` | page | the oldest unprocessed event of a worker consumer is older than `consumer.pending_alert_after` | `consumer.pending_alert_after` |
 | `BothyAgentConsumerLag` | ticket | consumer backlog of over 1000 events | |
 | `BothyAgentOffline` | ticket | no heartbeat for 5 minutes | above `agent.presence_timeout` |
-| `BothyBillingModeMismatch` | page | reported mode differs from the configured mode (I3) | |
+| `BothyBillingModeMismatch` | page | reported mode differs from the configured mode, according to the heartbeat for longer than the threshold or at a run (I3) | `billing.mismatch_alert_after` |
 | `BothyAuthzError` | page | permission check reports a programming error (`authz_not_checked`, `unknown_action`) or a difference between the SQL filter and `authorize` (`filter_mismatch`) | |
 | `BothySecretRefreshFailing` | ticket | re-reading a secret fails | |
 | `BothyMalwareScanFailing` | ticket | only errors, no result | |
@@ -121,6 +121,7 @@ Check the adapter process and its runtime; status of the agent's component.
 ### bothybillingmodemismatch
 Check immediately: is an agent with `personal` running against an organization key or vice versa?
 Configuration of the adapter's runtime; change nothing on the server before the cause is clear.
+The heartbeat cause comes from the gauge of the heartbeat comparison (`bothy_agent_billing_mode_mismatch_age_seconds`): the agent card (`getAgent`) names the kind in `presence.warnings` (`billing_mode_mismatch`, `billing_mode_unsupported`, `billing_evidence_unknown`), and the audit entries `agent.heartbeat` show when the reported mode changed.
 
 ### bothyauthzerror
 Treat as an error with a security impact: a route answered without its permission check

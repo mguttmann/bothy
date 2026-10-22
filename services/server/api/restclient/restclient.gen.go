@@ -6180,6 +6180,9 @@ type AgentRuntimeState string
 
 // AgentRuntimeStatus Reported state of the agent runtime (heartbeat), not the configured state.
 type AgentRuntimeStatus struct {
+	// BillingEvidence How the runtime proves its actual billing mode. Never a key value or prefix (schema `billing_evidence.v1`).
+	BillingEvidence *BillingEvidence `json:"billing_evidence,omitempty"`
+
 	// BillingModeMatches False when the reported mode differs from the configured `billing_mode`.
 	BillingModeMatches    *bool          `json:"billing_mode_matches,omitempty"`
 	BillingModesSupported *[]BillingMode `json:"billing_modes_supported,omitempty"`
@@ -6201,6 +6204,9 @@ type AgentRuntimeStatus struct {
 
 	// State State derived from heartbeats.
 	State AgentRuntimeState `json:"state"`
+
+	// Warnings Known values `billing_mode_mismatch` (the reported mode has differed from the configured one for longer than `billing.mismatch_alert_after`), `billing_mode_unsupported` (no reported mode and the configured one is not in `billing_modes_supported`), `billing_evidence_unknown` (`billing_evidence.key_type` is `unknown`) and `tool_class_mismatch` (the reported tool class differs from the configured one). Only while the state is `online` or `degraded`.
+	Warnings *[]string `json:"warnings,omitempty"`
 }
 
 // AgentSession defines model for AgentSession.
@@ -8832,7 +8838,7 @@ type GatewayFocus struct {
 
 // GatewayHeartbeat defines model for GatewayHeartbeat.
 type GatewayHeartbeat struct {
-	// Agent Agents only; equivalent to `POST /agents/me/heartbeat`.
+	// Agent Agents only; equivalent to `POST /agents/me/heartbeat`. The liveness rules of the op run first (`heartbeat_ack`); then the agent part passes `rl.agent_runtime` and `agent.heartbeat`. Its errors (`forbidden`, `validation_failed`, `rate_limited`, `internal_error`) answer `error` and keep the connection. A heartbeat of an agent without this member changes no presence.
 	Agent   *Heartbeat `json:"agent,omitempty"`
 	LastSeq int64      `json:"last_seq"`
 }
@@ -9548,11 +9554,13 @@ type Heartbeat struct {
 	BillingEvidence       *BillingEvidence `json:"billing_evidence,omitempty"`
 	BillingModesSupported *[]BillingMode   `json:"billing_modes_supported,omitempty"`
 
-	// Details Further fields of schema `agent_heartbeat.v1` (capabilities, active runs). No secrets, no content.
-	Details          *JsonObject         `json:"details,omitempty"`
+	// Details Further fields of schema `agent_heartbeat.v1`, a closed object; any other key, also inside `capabilities`, `adapter` and `runtime`, is refused. Keys: `capabilities` (object: `followups` `steer` or `queue`; `components`, `voice_input`, `title`, `files_out` booleans), `active_runs` (distinct run ids), `degraded_reasons` (distinct codes), `adapter` (`name` required, `version` optional), `runtime` (`name` required), `protocol_version` (integer, at least 1). Names match `^[a-z0-9][a-z0-9._-]*$`, versions `^[0-9A-Za-z][0-9A-Za-z.+_-]*$`, codes `^[a-z0-9][a-z0-9_.:-]*$`. No secrets, no content, no paths.
+	Details *JsonObject `json:"details,omitempty"`
+
+	// ProjectReadiness Readiness per bound forum of a runner (M2-03); the channels must be distinct. Applied only when present and different from the last list this server process applied; absent means "unchanged".
 	ProjectReadiness *[]ProjectReadiness `json:"project_readiness,omitempty"`
 
-	// RateLimit Rate-limit state of the agent runtime at its provider as reported by the adapter (`agent_heartbeat.v1`). Never quotas of an account, keys or subscription names.
+	// RateLimit Not accepted yet; the server answers `errors[].code` `not_enabled` at `/rate_limit` until M6-14 builds the field.
 	RateLimit *AgentRateLimitState `json:"rate_limit,omitempty"`
 
 	// ReportedBillingMode Absent when the adapter follows the configured mode per run; then `billing_modes_supported` names both modes and the per-run check binds (ruling L8).
@@ -9561,7 +9569,9 @@ type Heartbeat struct {
 	// ReportedToolClass Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
 	ReportedToolClass *ToolClass `json:"reported_tool_class,omitempty"`
 
-	// RuntimeVersion Examples: 2.3.1
+	// RuntimeVersion Version of the agent runtime (column `reported_runtime_version`); the adapter's own version is `details.adapter.version`.
+	//
+	// Examples: 2.3.1
 	RuntimeVersion *string        `json:"runtime_version,omitempty"`
 	State          HeartbeatState `json:"state"`
 }
@@ -9571,7 +9581,7 @@ type HeartbeatState string
 
 // HeartbeatAck defines model for HeartbeatAck.
 type HeartbeatAck struct {
-	// IntervalMs Interval the adapter should keep.
+	// IntervalMs Interval the adapter should keep, `sync.heartbeat_interval`.
 	IntervalMs int64 `json:"interval_ms"`
 
 	// Presence Reported state of the agent runtime (heartbeat), not the configured state.
@@ -20338,12 +20348,20 @@ type ClientInterface interface {
 
 	// SendHeartbeatWithBody Report state and actual billing mode
 	//
+	// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+	//
+	// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
 	SendHeartbeatWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SendHeartbeat Report state and actual billing mode
+	//
+	// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+	//
+	// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23798,6 +23816,10 @@ func (c *Client) PollAgentEvents(ctx context.Context, consumer ConsumerPath, par
 
 // SendHeartbeatWithBody Report state and actual billing mode
 //
+// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+//
+// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
@@ -23814,6 +23836,10 @@ func (c *Client) SendHeartbeatWithBody(ctx context.Context, contentType string, 
 }
 
 // SendHeartbeat Report state and actual billing mode
+//
+// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+//
+// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -25775,182 +25801,6 @@ func (c *Client) DeleteForumTag(ctx context.Context, channelId ChannelIdPath, ta
 // Corresponds with PATCH /channels/{channel_id}/tags/{tag_id} (the `UpdateForumTag` operationId).
 func (c *Client) UpdateForumTagWithBody(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *UpdateForumTagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateForumTagRequestWithBody(c.Server, channelId, tagId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateForumTag Change a forum tag
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PATCH /channels/{channel_id}/tags/{tag_id} (the `UpdateForumTag` operationId).
-func (c *Client) UpdateForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *UpdateForumTagParams, body UpdateForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateForumTagRequest(c.Server, channelId, tagId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// MoveForumTagWithBody Change the position of a forum tag
-//
-// Sets `sort_key` relative to sibling tags of the same forum; bumps the channel version and writes `channel.updated` like every tag change (03 `forum_tags`).
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/tags/{tag_id}/move (the `MoveForumTag` operationId).
-func (c *Client) MoveForumTagWithBody(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *MoveForumTagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewMoveForumTagRequestWithBody(c.Server, channelId, tagId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// MoveForumTag Change the position of a forum tag
-//
-// Sets `sort_key` relative to sibling tags of the same forum; bumps the channel version and writes `channel.updated` like every tag change (03 `forum_tags`).
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/tags/{tag_id}/move (the `MoveForumTag` operationId).
-func (c *Client) MoveForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *MoveForumTagParams, body MoveForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewMoveForumTagRequest(c.Server, channelId, tagId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListTemplates List own and channel templates
-//
-// Corresponds with GET /channels/{channel_id}/templates (the `ListTemplates` operationId).
-func (c *Client) ListTemplates(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListTemplatesRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateChannelTemplateWithBody Create a channel template
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/templates (the `CreateChannelTemplate` operationId).
-func (c *Client) CreateChannelTemplateWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateChannelTemplateParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateChannelTemplateRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateChannelTemplate Create a channel template
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/templates (the `CreateChannelTemplate` operationId).
-func (c *Client) CreateChannelTemplate(ctx context.Context, channelId ChannelIdPath, params *CreateChannelTemplateParams, body CreateChannelTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateChannelTemplateRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListChannelThreads List threads or forum posts of a channel
-//
-// Corresponds with GET /channels/{channel_id}/threads (the `ListChannelThreads` operationId).
-func (c *Client) ListChannelThreads(ctx context.Context, channelId ChannelIdPath, params *ListChannelThreadsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListChannelThreadsRequest(c.Server, channelId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateThreadWithBody Create a forum post or a thread from a message
-//
-// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
-func (c *Client) CreateThreadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateThreadRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateThread Create a forum post or a thread from a message
-//
-// A `first_message` uses its `client_msg_id` for idempotency; without it, send `Idempotency-Key`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /channels/{channel_id}/threads (the `CreateThread` operationId).
-func (c *Client) CreateThread(ctx context.Context, channelId ChannelIdPath, params *CreateThreadParams, body CreateThreadJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateThreadRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateUploadWithBody Start an upload
-//
-// Checks in this order (12, 3.1): size against `file.max_upload_bytes` (413 `payload_too_large`), quota `file.quota_bytes_per_principal` (409 `conflict` with `reason` `quota_exceeded`), open sessions (429), free space of the file system driver (503 `unavailable` with `reason` `storage_full`). A denied type answers 415 `unsupported_media_type` with `reason` `file_type_denied`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/uploads (the `CreateUpload` operationId).
-func (c *Client) CreateUploadWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateUploadParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateUploadRequestWithBody(c.Server, channelId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

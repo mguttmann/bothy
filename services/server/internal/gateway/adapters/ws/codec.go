@@ -117,11 +117,7 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 		return app.Resume{SessionID: ids.ID(f.GatewaySessionId), AccessToken: deref(f.AccessToken), APIToken: deref(f.ApiToken),
 			DPoP: deref(f.Dpop), Cursor: f.Cursor, SyncEpoch: optionalID(f.SyncEpoch)}, nil
 	case "heartbeat":
-		var f rest.GatewayHeartbeat
-		if err := strictUnmarshal(raw, &f); err != nil {
-			return nil, err
-		}
-		return app.Heartbeat{LastSeq: f.LastSeq, Agent: f.Agent != nil}, nil
+		return decodeHeartbeat(raw)
 	case "ack":
 		return decodeAck(raw)
 	case "reauth":
@@ -140,6 +136,23 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 		return app.Typing{ThreadID: ids.ID(f.ThreadId)}, nil
 	}
 	return nil, fmt.Errorf("gateway: no frame type for the op %q", op)
+}
+
+// decodeHeartbeat decodes the body of heartbeat strictly into its frame. The member agent goes on
+// raw: agents.Presence is the only mapping of the heartbeat body (brief M2-20 note 1); the schema
+// check of Decode already covered it.
+func decodeHeartbeat(raw json.RawMessage) (app.Heartbeat, error) {
+	var f rest.GatewayHeartbeat
+	if err := strictUnmarshal(raw, &f); err != nil {
+		return app.Heartbeat{}, err
+	}
+	var member struct {
+		Agent json.RawMessage `json:"agent"`
+	}
+	if err := json.Unmarshal(raw, &member); err != nil {
+		return app.Heartbeat{}, err
+	}
+	return app.Heartbeat{LastSeq: f.LastSeq, Agent: member.Agent}, nil
 }
 
 // decodeAck decodes the body of ack strictly into its frame.
