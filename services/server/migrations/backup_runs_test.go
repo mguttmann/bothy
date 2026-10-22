@@ -122,7 +122,7 @@ func TestMigrationBackupRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 48); err != nil {
+	if _, err := provider.DownTo(ctx, 49); err != nil {
 		t.Fatalf("down to 48: %v", err)
 	}
 	var exists bool
