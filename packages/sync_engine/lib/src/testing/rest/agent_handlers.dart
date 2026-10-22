@@ -363,8 +363,9 @@ void registerAgentHandlers(
 ) {
   final world = rest.world;
   final guard = FakeI1Guard(world, audit);
-  final random = Random(28);
-  // 06 7, ADR 0061 point 3: the token secret is shown exactly once.
+  // 06 7, ADR 0061 point 3: the token secret is a one-time secret shown exactly once; it comes
+  // from the secure generator like the server's, and no test depends on its letters.
+  final random = Random.secure();
   rest.oneTimeSecrets.add('createToken');
 
   void owner(FakeRequest r) {
