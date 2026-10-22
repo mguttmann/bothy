@@ -31,7 +31,8 @@ func TestHandlers_FillsBuiltAndKeepsInjected(t *testing.T) {
 	injected := &identityhttp.Tokens{}
 
 	access := &authzhttp.Access{}
-	s := &server{identity: id, signingKeys: keys, audit: &Audit{handlers: log}, authzAdmin: &AuthzAdmin{Handlers: access}}
+	s := &server{identityState: identityState{identity: id}, instanceState: instanceState{signingKeys: keys},
+		auditState: auditState{audit: &Audit{handlers: log}}, authzState: authzState{authzAdmin: &AuthzAdmin{Handlers: access}}}
 	s.deps.Handlers.Tokens = injected
 	h := s.handlers()
 

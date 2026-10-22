@@ -29,7 +29,7 @@ func TestWire_HostSource(t *testing.T) {
 		t.Fatal("NoConnections reports a connection")
 	}
 	hosts := &terminalhttp.Hosts{}
-	s := &server{terminal: &Terminal{Handlers: hosts}}
+	s := &server{terminalState: terminalState{terminal: &Terminal{Handlers: hosts}}}
 	if h := s.handlers(); h.Hosts != hosts {
 		t.Fatal("the start does not fill the host handlers")
 	}

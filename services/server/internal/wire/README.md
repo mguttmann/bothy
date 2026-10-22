@@ -24,7 +24,9 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `authz.go` | catalogue start check (M1-25): `BuildRegistry` over the module `Register` functions (`Deps.Registrations` replaces them in tests), `RouteBindings`, `NewAuthzCatalog` (closed catalogue with `bothy.authz.errors`); every role checks routes and registrations before the routes are mounted, one ERROR line `registration check failed` per violation; `moduleRegistrations` holds `authz.Register` (`access.changed`, M1-29); `NewRightsHook` with `RightsSources` builds the rights hooks of authz (M1-29) |
 | `incoming.go` | `InstallWebhookToken` (the token check of the incoming webhooks at `httpserver.StageWebhookToken`) and `mountInternalHooks` (their routes on the internal listener, M2-27, below) |
 | `ratelimit.go`, `configkeys_ratelimit.go` | `RateLimitConfig`, `InstallRateLimits` and the start check (M1-19); the keys `ratelimit.*` |
-| `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
+| `serve.go` | `Serve`, `ServeConfig`, `Deps`: the process steps (`processWiring`) and stop steps of `bothy serve` |
+| `wiring.go` | `moduleWiring` and the list `moduleWirings`: how each module plugs into `bothy serve` (PL/28) |
+| `module_<name>.go` | one file per wired module of `architecture/modules.yaml`: its state in `server`, its start parts with their order keys, handlers, route bindings, mounts and jobs |
 | `setup.go` | `InstallSetupGate` and `RouteActions` (the setup gate over the instance row, M1-37); `Setup` (`NewSetup`, `BootstrapOwner`, `IssueRecoveryCode`, `Close`): the parts of the server `bothy setup` needs, as `bothy_app` |
 | `restore.go` | `RestoreFinalize` (`NewRestoreFinalize`, `Finalize`, `Close`): `bothy restore finalize` as `database.user` (the schema owner); `NewRestoreService`, `RestoreCursors` (the cursor ports of agents, apps and sync, in this order), `ParseRelocationManifest` (`backup_manifest.v1`); the start lock `checkRestoreGuard` with the readiness check `restore_not_finalized` and `database.restore_guard`; while it holds, `whileFinalized` skips the steps `log_tail`, `agent_presence`, `jobs`, `event_consumers` and `public_listener`, and the terminal reconcile of `routes` waits too (M7-04, R-DM-50, D-M7-04-7) |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
@@ -145,8 +147,15 @@ queue `maintenance`, every `sync.partition_maintenance_interval`, `RunOnStart`).
 
 ## Extension points
 
-A later ticket adds its part in `components` of `serve.go` (the start sequence `register`
-adds), at the marked place, with its stop step:
+Each module wires itself in its own file `module_<name>.go` (PL/28): a function `<name>Wiring`
+returns its `moduleWiring`, listed once in `moduleWirings` (`wiring.go`). A part names its start
+step and an order key; parts of one step with adjacent keys form one start component (the step
+`chat` runs the parts of chat, messaging, runs, sync, agents, notify and stats), and `serve.go`
+only iterates. New wiring code goes into the file of its module, not into `serve.go`; a new
+module adds its file and one line in `moduleWirings` and leaves `notWiredYet` of
+`wiring_internal_test.go`, which checks that every module of the register is wired exactly once.
+`TestStartSequenceUnchanged` pins the start components of each role. The table names the earlier
+extension points:
 
 | Ticket | Component | Place | Stop phase |
 |---|---|---|---|

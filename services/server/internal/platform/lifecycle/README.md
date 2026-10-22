@@ -73,9 +73,10 @@ handlers keep no error text.
 
 ## Adding a component or a stop step
 
-A later ticket adds its part in `internal/wire` (`serve.go`, function `register`): `Add` a
-component at its place in the start order and `OnStop` its step with the phase from the table
-and its budget key. A step whose budget comes from configuration is registered before `Run`,
+A later ticket adds its part in `internal/wire`, in the file of its module (`module_<name>.go`,
+docs/DECISIONS.md PL/28): a start part with its order key becomes a component at its place in
+the start order, and `OnStop` registers its step with the phase from the table and its budget
+key. A step whose budget comes from configuration is registered before `Run`,
 so the budget check sees it. A part that fails at run time (a panic in the log tail) calls
 `Fail`; a part that reports its loss on a channel (the River client of `platform/jobs`,
 `Runtime.Failed`) is watched with `FailOn(name, ch)`: an error on the channel ends the process
