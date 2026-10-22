@@ -4,6 +4,7 @@ package wire
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -192,5 +193,37 @@ func TestModuleMountsAndBindingsOrder(t *testing.T) {
 	want := append([]authorize.RouteBinding{GatewayRouteBinding(), HostConnectRouteBinding()}, TerminalStreamRouteBindings()...)
 	if !slices.Equal(bindings, want) {
 		t.Fatalf("module route bindings:\n got %v\nwant %v", bindings, want)
+	}
+}
+
+// TestModulePartsRefuseMissingDependencies: a start part whose earlier steps did not run (no
+// audit, sync, Authorizer, identity, chat and so on) fails the start with an error instead of
+// panicking, and so do the job hooks of apps, identity and the signing keys (fail closed).
+func TestModulePartsRefuseMissingDependencies(t *testing.T) {
+	t.Parallel()
+	values := loadValues(t)
+	parts := map[string]func(*server, context.Context) error{
+		"agents": (*server).startAgents, "audit_log": (*server).startAuditLog, "chat": (*server).startChat,
+		"files": (*server).startFiles, "messaging": (*server).startMessaging, "notify": (*server).startNotify,
+		"personal": (*server).startPersonal, "runs": (*server).startRuns, "scan_health": (*server).startScanHealth,
+		"sessions": (*server).startSessions, "settings": (*server).startSettings, "stats": (*server).startStats,
+		"sync": (*server).startSync, "sync_reads": (*server).startSyncReads, "terminal": (*server).startTerminal,
+	}
+	for name, start := range parts {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			s := &server{values: values, log: newSwitchLogger(slog.New(slog.DiscardHandler))}
+			if err := start(s, t.Context()); err == nil {
+				t.Fatalf("part %s started without its dependencies", name)
+			}
+		})
+	}
+	for _, w := range []moduleWiring{appsWiring(), identityWiring(), instanceWiring()} {
+		t.Run("jobs_"+w.module, func(t *testing.T) {
+			t.Parallel()
+			if err := w.jobs(&server{values: values}, &JobModules{}); err == nil {
+				t.Fatalf("the job hook of %s accepted a server without the module", w.module)
+			}
+		})
 	}
 }
