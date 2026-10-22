@@ -156,7 +156,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `apps-platform` (not in `gates`) | `tools/ci/apps_platform.py` | the platform tests that a member lists in `platform-tests.json` (argument lists per system, no shell) for the host system, in the member folder; SKIP for the other system and without such a member; the system `android` runs on any host when `adb devices` lists exactly one device or emulator (`SKIP ... android: no device` without one, a failure with two or more; `--system android` runs only it); needs a desktop session or a device, so CI runs it in the jobs `apps (macOS)` (`macos-15`), `apps (Windows)` (`windows-2025`), `apps (Android API 26)` and `apps (Android API 36)` (`ubuntu-24.04` with hardware acceleration, x86_64 Google APIs emulator images that `tools/ci/android_sdk.py` installs with retries before the emulator action, PL/18; only in the public phase), which `ci-ok` accepts as `skipped` only when the plan does not need them (section "Jobs a change needs") | | SKIP until the first member has platform tests (M4-10) |
 | `semgrep` | Semgrep with `.semgrep/` | project rules and their rule tests | | yes |
 | `trivy` | Trivy `config` on a copy of the tracked and not ignored files (`tools/ci/tracked_tree.py`) | misconfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | once such files exist |
-| `osv` | OSV-Scanner, govulncheck | known vulnerabilities of all lock files; reachable Go vulnerabilities | | yes |
+| `osv` | OSV-Scanner, govulncheck; in a pull request through `tools/ci/advisories.py` | known vulnerabilities of all lock files; reachable Go vulnerabilities; a pull request fails only for what it adds or changes (section "Advisories") | | yes |
 | `licenses` | `tools/ci/license_check.py`, OSV-Scanner `--licenses`, go-licenses | license text, SPDX header lines, licenses of shipped dependencies; a list without a license is an error (if it were empty, `--licenses=` and `--allowed_licenses=` would no longer restrict the licenses: OSV-Scanner v2.6.0 then prints only a summary, [getters.go](https://github.com/google/osv-scanner/blob/v2.6.0/cmd/osv-scanner/internal/helper/getters.go#L17-L21), and go-licenses v2.0.1 rejects only forbidden and unknown licenses, [check.go](https://github.com/google/go-licenses/blob/v2.0.1/check.go#L64-L68), both retrieved 2026-10-12; M1-05/23) | `quality/licenses/allowed.txt`, `license.spdx_header_lines` | yes (dependencies from the first component) |
 | `denylist` | `tools/denylist/denylist_scan.py` | white label in contents, names, commits, identities, refs, and the pull request title and body (`PR_TITLE`, `PR_BODY`, `PR_BODY_FILE`) | | yes, needs the private list |
 | `sonar` | SonarScanner (npm) against the local server or SonarQube Cloud | gate "Bothy way" | `quality.sonar.*` | from the first product code |
@@ -294,6 +294,33 @@ Where the list is:
   keeps the issue body as the list of every flaky test, the most frequent first. It uses only
   the `GITHUB_TOKEN` (`actions: read`, `issues: write`). Close the issue when its list is fixed;
   the runs it reported stay reported, and the next run with a flake opens a new issue.
+
+## Advisories
+
+A new public advisory makes a dependency vulnerable that `main` and every open pull request
+already have. So that it does not stop every landing at once, the advisory gate `osv` of a pull
+request fails only for vulnerable dependencies the pull request itself adds or changes (PL/25):
+
+* `ci.yml` sets `OSV_BASE` to the base commit of the pull request in the job
+  `gates (security and supply chain)`, and `make osv` then runs `tools/ci/advisories.py`
+  (tests `tools/ci/tests/test_advisories.py`) against the merge base of `HEAD` and `OSV_BASE`.
+* OSV-Scanner scans the lock files of `HEAD` as in the full scan. When it fails, each failing
+  package counts as new unless the same lock file of the merge base has the same package at the
+  same version; the base lock files (with the `osv-scanner.toml` files of the base) are scanned
+  in the same run, against the same database. An added package, a changed version and a lock
+  file new to the pull request fail.
+* govulncheck runs per Go module in JSON mode. A called finding counts as new unless the merge
+  base, checked out in a temporary worktree, has the same finding (OSV entry, module, version),
+  so a new call into a vulnerable dependency fails too. The base runs only when `HEAD` has a
+  called finding.
+* Findings the merge base has too are printed as warnings. A scanner error, a failing scan
+  without a readable finding and a failed scan of the base fail the gate.
+* A push to `main` (`ci.yml`) and the daily workflow `advisories.yml` run the full scan without
+  `OSV_BASE`; local runs scan in full too. When either fails on a new advisory, the keeper opens
+  the update pull request at once.
+
+Trivy runs as `trivy config` with `--skip-check-update` (misconfiguration, no advisory
+database) and is not affected; `trivy-image` of the release scans the built images in full.
 
 ## Fragments
 

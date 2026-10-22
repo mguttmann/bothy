@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Daily full advisory scan of main (docs/quality/gates.md, section "Advisories"; PL/25). A pull
+# request fails `osv` only for vulnerable dependencies it adds or changes, so a new public
+# advisory for a dependency that main already has no longer stops every landing at once. This
+# run and the push to main (ci.yml) scan every lock file and Go module in full; when either
+# fails, the keeper opens the update pull request.
+
+name: advisories
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: advisories
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: advisories (full scan of main)
+    if: github.event.repository.visibility == 'public' || (github.event_name == 'schedule' && vars.BOTHY_VISIBILITY == 'public')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - if: hashFiles('services/*/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      - name: Restore pinned binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/tools
+          key: advisories-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json') }}
+      - name: make osv
+        run: make osv COMPONENTS=all

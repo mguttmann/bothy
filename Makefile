@@ -725,12 +725,19 @@ trivy-image: ## Trivy vulnerability scan of a built image: make trivy-image IMAG
 	@[ -n "$${IMAGE:-}" ] || { echo "usage: make trivy-image IMAGE=<ref@digest>"; exit 2; }
 	$(call tool,trivy) image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed --quiet "$$IMAGE"
 
-osv: ## Known vulnerabilities: every lock file (OSV-Scanner), Go call graphs (govulncheck)
+osv: ## Known vulnerabilities: every lock file (OSV-Scanner), Go call graphs (govulncheck); with OSV_BASE only what HEAD adds (PL/25)
+	@# OSV_BASE (ci.yml sets it to the base of a pull request): the findings of the merge base
+	@# do not fail (tools/ci/advisories.py); without it the full scan, as on main and daily.
 	@locks=$$(git ls-files -- $(foreach n,$(LOCK_NAMES),'*$(n)')); \
+	if [ -n "$${OSV_BASE:-}" ]; then osv=$(call tool,osv-scanner) || exit 1; args=(); \
+	  for l in $$locks; do args+=(--lock "$$l"); done; \
+	  for m in $(if $(GO_ON),$(GO_MODS)); do args+=(--go-module "$$m"); done; \
+	  $(UVRUN) python tools/ci/advisories.py --base "$$OSV_BASE" --osv-scanner "$$osv" \
+	    --govulncheck "go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)" "$${args[@]}"; exit; fi; \
 	if [ -z "$$locks" ]; then $(call skip,osv,no lock file tracked); \
 	else args=(); for l in $$locks; do args+=(-L "$$l"); done; \
 	  $(call tool,osv-scanner) scan source --format table "$${args[@]}"; fi
-	@if [ -z "$(GO_ON)" ]; then $(call skip,govulncheck,no Go module selected); \
+	@if [ -n "$${OSV_BASE:-}" ]; then :; elif [ -z "$(GO_ON)" ]; then $(call skip,govulncheck,no Go module selected); \
 	else for m in $(GO_MODS); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...) || exit 1; done; fi
 
 licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of shipped components
