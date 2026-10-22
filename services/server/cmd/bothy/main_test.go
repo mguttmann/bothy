@@ -29,6 +29,7 @@ func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 		"  healthcheck  Probe a loopback health endpoint for a container without shell\n" +
 		"  import       Log the import tool in or out (device pairing as a cli device)\n" +
 		"  migrate      Apply, list or validate the database migrations\n" +
+		"  restore      Finish a restore or a relocation before api and worker start\n" +
 		"  secrets      Create the secrets of the Compose stack or export them encrypted\n" +
 		"  serve        Start the server in the role api, worker or all\n" +
 		"  setup        Create the first owner or a recovery code on the host\n" +

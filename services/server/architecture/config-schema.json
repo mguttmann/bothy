@@ -1337,6 +1337,21 @@
       "doc": "Port of the database in the network of the server."
     },
     {
+      "name": "database.restore_guard",
+      "env": "BOTHY_DATABASE__RESTORE_GUARD",
+      "kind": "enum",
+      "default": "on",
+      "required": false,
+      "enum": [
+        "on",
+        "off"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Whether a server whose database identity differs from the stored one stays not ready (restore_not_finalized) until bothy restore finalize; off only where a failover loses no committed transaction."
+    },
+    {
       "name": "database.sslmode",
       "env": "BOTHY_DATABASE__SSLMODE",
       "kind": "enum",

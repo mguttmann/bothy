@@ -27,6 +27,13 @@ Apps and manifests, installations, scopes, outgoing webhooks with consumer and d
 - `services/server/test/appsworld/` (M2-24): the integration world (PostgreSQL, the real modules, the full HTTP chain); the integration tests of `app`, `adapters/httpapi` and `adapters/postgres` share it, so each package is measured by its own tests (D-M2-24-23).
 - Their components come from `tools/archgen` and `architecture/modules.yaml`; a package outside these layers fails in `make arch`.
 
+- Restore cursors (M7-04): the port `RestoreCursors` (`restore.go`) with `MoveCursorsTo(ctx,
+  headSeq)`, implemented by `app.NewRestoreCursors` over the outgoing port `CursorMoveStore`
+  (`adapters/postgres`, query `MoveAllSubscriptionCursors`): it sets `webhook_subscriptions.last_delivered_seq` of every row to the
+  head of the restored log inside the caller's unit of work and refuses to run outside one.
+  `bothy restore finalize` calls it through `internal/wire` (`RestoreCursors`) in the transaction
+  that sets the new sync epoch (docs/spec/03-data-model.md 6.7 item 1).
+
 ## Port (root package `internal/apps`)
 
 - Inbound: `Apps`, `Webhooks`, `IncomingWebhooks`.

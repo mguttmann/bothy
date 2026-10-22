@@ -47,6 +47,8 @@ func databaseConfigKeys() []config.Key {
 			Doc: "Retries of a unit of work after a deadlock or a lock timeout."},
 		{Name: "database.listen_reconnect_backoff_cap", Kind: config.KindDuration, Default: defaultTenSeconds, Min: minDeadline, Chapter: chapter02,
 			Doc: "Longest pause between attempts to reconnect the LISTEN connection."},
+		{Name: "database.restore_guard", Kind: config.KindEnum, Default: "on", Enum: []string{"on", "off"}, Chapter: chapter16,
+			Doc: "Whether a server whose database identity differs from the stored one stays not ready (restore_not_finalized) until bothy restore finalize; off only where a failover loses no committed transaction."},
 		{Name: "startup.dependency_wait", Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: chapter02,
 			Doc: "How long the start and bothy migrate wait for the database before they give up."},
 	}

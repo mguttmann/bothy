@@ -22,6 +22,8 @@ type fakeRepo struct {
 	row     *instance.Record
 	ensured int
 	err     error
+	// cluster is the current identity ClusterIdentity returns.
+	cluster instance.DatabaseIdentity
 }
 
 func newFakeRepo() *fakeRepo {
@@ -77,6 +79,18 @@ func (f *fakeRepo) SetVersions(_ context.Context, schemaVersion int64, minServer
 		f.row.SchemaVersion, f.row.MinServerVersion = schemaVersion, minServerVersion
 	}
 	return f.err
+}
+
+func (f *fakeRepo) ClusterIdentity(context.Context) (instance.DatabaseIdentity, error) {
+	return f.cluster, f.err
+}
+
+func (f *fakeRepo) FillIdentity(_ context.Context, id instance.DatabaseIdentity) (bool, error) {
+	if f.err != nil || f.row == nil || f.row.DatabaseIdentity != (instance.DatabaseIdentity{}) {
+		return false, f.err
+	}
+	f.row.DatabaseIdentity = id
+	return true, nil
 }
 
 // fakeUOW runs fn inside a txn unit in the work phase, like platform/pg without a database.

@@ -244,6 +244,9 @@ type server struct {
 	keyCheck    time.Duration
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
+	// restorePending is set by the start lock of R-DM-50 (restore_not_finalized, M7-04): the
+	// process then serves and processes nothing, see whileFinalized.
+	restorePending bool
 	// search is the language configuration of full-text search (search.languages,
 	// search.locale_map; M3-13): identity answers the language of new messages and threads with
 	// it, and the step schema checks its configurations against the database.
@@ -475,21 +478,38 @@ func (s *server) components() []lifecycle.Component {
 		step("routes", s.mountRoutes),
 	}
 	if s.api() {
-		cs = append(cs, step("log_tail", s.startLogTail), step("agent_presence", s.startPresence))
+		cs = append(cs, step("log_tail", s.whileFinalized(s.startLogTail)), step("agent_presence", s.whileFinalized(s.startPresence)))
 	}
-	cs = append(cs, step("jobs", s.startJobs))
+	cs = append(cs, step("jobs", s.whileFinalized(s.startJobs)))
 	if s.worker() {
 		// 02 "Start" step 8: the worker consumers start after River (M2-01).
-		cs = append(cs, step("event_consumers", s.startEventConsumers), step("scan_health", s.startScanHealth))
+		cs = append(cs, step("event_consumers", s.whileFinalized(s.startEventConsumers)), step("scan_health", s.startScanHealth))
 	}
 	if s.api() {
-		cs = append(cs, step("public_listener", s.startPublic))
+		cs = append(cs, step("public_listener", s.whileFinalized(s.startPublic)))
 	}
 	if s.plan.Listener {
 		// M2-47: the LISTEN ephemeral connection after the HTTP listeners (soft dependency).
 		cs = append(cs, step("terminal_ephemeral", s.startTerminalEphemeral))
 	}
 	return append(cs, step("ready", s.ready))
+}
+
+// whileFinalized returns start, or a step that starts nothing while the start lock of R-DM-50
+// holds (restore_not_finalized, M7-04): a restored database whose restore was not finalized must
+// neither take writes on the public listener nor deliver from the log tail, River or the worker
+// consumers, because they would mix the old and the new timeline. Only the internal listener
+// stays, so /readyz names the reason; the stop steps handle the parts that never started.
+func (s *server) whileFinalized(start func(ctx context.Context) error) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		s.mu.Lock()
+		pending := s.restorePending
+		s.mu.Unlock()
+		if pending {
+			return nil
+		}
+		return start(ctx)
+	}
 }
 
 // register adds the components and stop steps in the order Serve documents.

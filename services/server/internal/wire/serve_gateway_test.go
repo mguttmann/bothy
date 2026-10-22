@@ -61,6 +61,9 @@ type gwWorld struct {
 	mu      gosync.Mutex
 	secrets []string
 	reasons []string
+	// app is the bothy_app pool of the side identity; the restore tests close it, because
+	// bothy restore finalize refuses while a bothy_app session is connected (M7-04).
+	app *pg.Pool
 }
 
 // gwHeartbeatInterval is the sync.heartbeat_interval of a gateway world: the default of the key.
@@ -163,7 +166,7 @@ func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld
 	if clk == nil {
 		clk = clock.System()
 	}
-	return &gwWorld{t: t, db: db, owner: owner, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env, clk: clk}
+	return &gwWorld{t: t, db: db, owner: owner, p: p, base: "http://127.0.0.1:" + strconv.Itoa(public), id: id, pepper: pepper, cfg: gcfg, env: env, clk: clk, app: pool}
 }
 
 // sql runs a statement as the schema owner.

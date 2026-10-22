@@ -37,3 +37,8 @@ RETURNING acked_seq;
 
 -- name: GetConsumer :one
 SELECT acked_seq FROM agent_consumer_cursors WHERE agent_id = @agent_id AND consumer_name = @consumer_name;
+
+-- name: MoveAllConsumers :execrows
+-- bothy restore finalize (M7-04, 03 6.7 item 1): every consumer of every agent to the head of the
+-- restored log, in the caller's transaction, so no adapter catches up events of the old timeline.
+UPDATE agent_consumer_cursors SET acked_seq = @head_seq, updated_at = now();

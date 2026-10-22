@@ -95,7 +95,7 @@ name only commands from here.
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | setup: first owner by server command (system action `instance.bootstrap`), enrollment code for recovery | [08-identity.md](08-identity.md) |
 | `bothy config check\|print` | check the configuration, print it redacted; `check --secrets` also resolves every reference `*_ref` through the secret provider and names per key only `ok` or the error code | section 13 |
 | `bothy import login\|logout`, `bothy import discord ...` | login of the import tool as a `cli` device through device pairing; import and read mirror through the import API (`import.read`, `import.apply`) | [22-import-migration.md](22-import-migration.md) |
-| `bothy restore finalize` | after a restore: new sync epoch, cursors to `head_seq`, audit | [16-operations.md](16-operations.md), [03-data-model.md](03-data-model.md) 6.7 |
+| `bothy restore finalize [--relocation <manifest>]` | after a restore: new sync epoch, cursors to `head_seq`, stored database identity (R-DM-50), audit, in one transaction; as the schema owner and only while no `bothy_app` session is connected (exit `1` otherwise). `--relocation` takes the manifest of the final backup of a relocation without data loss: when `event_log.head_seq`, the audit head and `sync_epoch` equal it, only the identity is stored and epoch and cursors stay; a difference is exit `1` naming the field | [16-operations.md](16-operations.md) 8.4, [03-data-model.md](03-data-model.md) 6.7 |
 | `bothy secrets init\|export` | create and back up secrets: `init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...] [--adopt-source]` reconciles the store `_store/` with the source and copies per service; `export --from DIR --age-recipient KEY [--age-recipient ...] [--signing-key-dir DIR] [--output FILE\|-] [--armor]` writes the age-encrypted bundle (with the key store under `signing-keys/`); both read only their flags, without a configuration file and database | [16-operations.md](16-operations.md) 5.3, 5.4 |
 | `bothy healthcheck --url URL [--timeout DURATION]` | health check against the internal listener for containers without a shell. `--url` takes only `http://` with a loopback host (`127.0.0.0/8`, `::1`, `localhost`), anything else is exit `2`; `--timeout` bounds the whole request (default `5s`, the timeout of the Compose healthcheck); no configuration, secrets or database; exit `0` for `2xx`, else `1` with one line naming the status code or the error class | [16-operations.md](16-operations.md) |
 | `bothy files rescan` | maintenance: have files checked again | [12-files.md](12-files.md) |
@@ -1295,7 +1295,14 @@ orchestrator restarts, clients resume according to 04.
    setup, otherwise an orchestrator would never open the way to redeeming the code.
    If
    `instance.min_server_version` requires a newer version than its own, the process keeps running,
-   but never becomes ready: `/readyz` fails with `schema_requires_newer_server`.
+   but never becomes ready: `/readyz` fails with `schema_requires_newer_server`. The same holds
+   for the start lock of R-DM-50 ([16-operations.md](16-operations.md) 8.4, M7-04): unless
+   `database.restore_guard` is `off`, a database identity (`pg_control_system().system_identifier`,
+   `pg_control_checkpoint().timeline_id`) that differs from the one stored in `instance` keeps
+   every role not ready with `restore_not_finalized` and logs once that `bothy restore finalize`
+   must run; the process then skips step 8 (no log tail, presence tracker, River, worker consumers
+   or public listener), so it takes no writes and delivers nothing. An empty stored identity
+   never blocks.
 6. Ensure signing keys: every purpose without an `active` key gets one
    ([19-security.md](19-security.md), section 10; [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)).
    Keys whose private file is missing from the key store are retired first, so the purpose gets
@@ -1329,7 +1336,8 @@ On the internal listener `server.internal_listen_addr`, not in the public API
   14.5); that is why `/healthz` needs no check of its own for this. The same holds for the runner
   of the worker consumers (worker, M2-01); a failing round is no such end (11.5 item 7).
 - `/readyz` (ready): start completed (`startup`), database reachable (`database`), version
-  matching the schema (`schema_requires_newer_server`), one active signing key per purpose
+  matching the schema (`schema_requires_newer_server`), the database identity as stored or the
+  restore finalized (`restore_not_finalized`, 16 8.4), one active signing key per purpose
   (`signing_keys`), no shutdown started (`shutting_down`). The domain chapters bring further
   checks (for example `trusted_header_requires_loopback`, 16 section 4.3). Response format:
   16, section 4.2.
