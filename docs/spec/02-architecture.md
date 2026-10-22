@@ -1054,7 +1054,7 @@ Reason: every other job would write state that would be missing on the target.
 | Job | Module | Trigger | Queue | Domain rule in |
 |---|---|---|---|---|
 | `files.scan` | `files` | `InsertTx` when an upload completes | `files` | 12 |
-| `files.thumbnail` | `files` | after `clean` | `files` | 12 |
+| `files.thumbnail` | `files` | after `clean` or `skipped`: image originals (12 7.1), thumbnails (12 7.3), dimensions and duration of MP4 and QuickTime | `files` | 12 |
 | `files.extract_text` | `files` | after `clean`, supported type | `files` | 14 |
 | `files.transcribe` | `files` | `file.transcribe` with server transcription | `files` | 09, 12 |
 | `files.cleanup_pending` | `files` | periodic | `maintenance` | 12 |

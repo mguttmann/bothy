@@ -241,8 +241,13 @@ func TestScan(t *testing.T) {
 		u := send(t, alex, ch, "picture.txt", "text/plain", pngBytes, pngBytes)
 		u.complete(t, alex, "")
 		r := waitFinal(t, db, u.FileID)
-		if r.UploadState != "complete" || r.ScanStatus != "clean" || r.MIMEType != "image/png" {
+		// An image stays pending until files.thumbnail stored its cleaned original (M3-06 design
+		// note 1c); the job then makes it complete, possibly before this poll saw the row.
+		if r.UploadState == "failed" || r.ScanStatus != "clean" || r.MIMEType != "image/png" || thumbnailJobs(t, db, u.FileID) != 1 {
 			t.Fatalf("row %+v", r)
+		}
+		if r := waitComplete(t, db, u.FileID); r.UploadState != "complete" || r.MIMEType != "image/png" {
+			t.Fatalf("after files.thumbnail: %+v", r)
 		}
 	})
 
@@ -360,8 +365,12 @@ func TestScanModeOff(t *testing.T) {
 	u := send(t, alex, w.Channels["Support/Allgemein"], "skip.png", "", pngBytes, pngBytes)
 	u.complete(t, alex, "")
 	r := waitFinal(t, db, u.FileID)
-	if r.UploadState != "complete" || r.ScanStatus != "skipped" || r.MIMEType != "image/png" || r.ScanEngine != nil || r.ScannedAt != nil {
+	if r.UploadState == "failed" || r.ScanStatus != "skipped" || r.MIMEType != "image/png" || r.ScanEngine != nil || r.ScannedAt != nil ||
+		thumbnailJobs(t, db, u.FileID) != 1 {
 		t.Fatalf("row %+v", r)
+	}
+	if r := waitComplete(t, db, u.FileID); r.UploadState != "complete" {
+		t.Fatalf("after files.thumbnail: %+v", r)
 	}
 	if !strings.Contains(logs.String(), "virus scan is off") {
 		t.Error("no warning that the virus scan is off")

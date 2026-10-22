@@ -42,16 +42,6 @@ func (c DownloadConfig) check() error {
 	return nil
 }
 
-// ThumbnailRecord is a row of file_thumbnails (03 4.7).
-type ThumbnailRecord struct {
-	FileID        ids.ID
-	Variant       string
-	ObjectKey     string
-	MIMEType      string
-	Width, Height int
-	SizeBytes     int64
-}
-
 // DeliveryReader is the outgoing port of the read path of downloads (adapters/postgres, queries
 // download.sql). Both reads are keyed by the file id (07 7.4 rule 1).
 type DeliveryReader interface {

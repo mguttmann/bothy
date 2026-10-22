@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package jobs is the job adapter of the files module (docs/spec/02-architecture.md 12.3 "Job catalogue"):
-// the arguments and the handler of files.scan on the queue files, and the ScanQueue of the use
-// cases over jobs.Inserter.InsertTx.
+// the arguments and the handlers of files.scan and files.thumbnail on the queue files, and the
+// ScanQueue of the use cases over jobs.Inserter.InsertTx.
 //
 // Example:
 //

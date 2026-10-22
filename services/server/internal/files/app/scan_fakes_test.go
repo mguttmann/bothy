@@ -79,10 +79,27 @@ func (r *repo) setDeleted(fileID ids.ID) {
 	r.files[fileID] = f
 }
 
-// scanQueue records the inserted files.scan jobs; it needs a unit of work.
+// scanQueue records the inserted files.scan and files.thumbnail jobs; it needs a unit of work.
 type scanQueue struct {
-	mu   sync.Mutex
-	jobs []scanJob
+	mu     sync.Mutex
+	jobs   []scanJob
+	thumbs []ids.ID
+}
+
+func (q *scanQueue) EnqueueThumbnail(ctx context.Context, fileID ids.ID) error {
+	if err := needUnit(ctx); err != nil {
+		return err
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.thumbs = append(q.thumbs, fileID)
+	return nil
+}
+
+func (q *scanQueue) thumbnails() []ids.ID {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return append([]ids.ID(nil), q.thumbs...)
 }
 
 type scanJob struct {

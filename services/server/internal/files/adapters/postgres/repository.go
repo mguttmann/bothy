@@ -205,15 +205,25 @@ func (r *Repository) AbortSession(ctx context.Context, fileID ids.ID) error {
 	return mapError(q.DeleteParts(ctx, uuid(fileID)), "deleting parts")
 }
 
-// File implements app.Repository.
+// File implements app.Repository: the file with its thumbnails (M3-06).
 func (r *Repository) File(ctx context.Context, fileID ids.ID) (app.FileRecord, bool, error) {
-	row, err := r.read(ctx).GetFile(ctx, uuid(fileID))
+	q := r.read(ctx)
+	row, err := q.GetFile(ctx, uuid(fileID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return app.FileRecord{}, false, nil
 	}
 	if err != nil {
 		return app.FileRecord{}, false, mapError(err, "reading a file")
 	}
+	f := fileRecord(row)
+	if f.Thumbnails, err = thumbnails(ctx, q, row.ID); err != nil {
+		return app.FileRecord{}, false, err
+	}
+	return f, true, nil
+}
+
+// fileRecord converts a files row.
+func fileRecord(row sqlcgen.GetFileRow) app.FileRecord {
 	return app.FileRecord{
 		ID: idOf(row.ID), ObjectKey: row.ObjectKey, SHA256: digest(row.Sha256), SizeBytes: row.SizeBytes, MIMEType: row.MimeType,
 		DeclaredMIMEType: row.DeclaredMimeType.String, OriginalName: row.OriginalName, UploadedBy: idOf(row.UploadedBy),
@@ -221,7 +231,7 @@ func (r *Repository) File(ctx context.Context, fileID ids.ID) (app.FileRecord, b
 		Width: int(row.Width.Int32), Height: int(row.Height.Int32), DurationMS: row.DurationMs.Int64,
 		TranscriptStatus: row.TranscriptStatus, TranscriptLanguage: row.TranscriptLanguage.String,
 		TranscriptSource: row.TranscriptSource.String, CreatedAt: timeOf(row.CreatedAt),
-	}, true, nil
+	}
 }
 
 // oneSession converts the result of a session read; no row is found = false.
