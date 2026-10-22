@@ -6633,5 +6633,479 @@
   "consoleStepUpOidcAction": "This change needs a new login at your login service. Confirm there, then make the change again.",
   "@consoleStepUpOidcAction": {
     "description": "Step-up of an action in the console when only the OIDC login is available: the tab leaves, so the change is not repeated (08 section 6.2)."
+  },
+  "terminalHeaderConnected": "Connected",
+  "@terminalHeaderConnected": {
+    "description": "Connection text in the header of the terminal view (components.md 12)."
+  },
+  "terminalHeaderConnecting": "Connecting",
+  "@terminalHeaderConnecting": {
+    "description": "Connection text while the terminal stream and handshake run."
+  },
+  "terminalHeaderOffline": "Not connected",
+  "@terminalHeaderOffline": {
+    "description": "Connection text of the header when the terminal stream is closed."
+  },
+  "terminalHeaderFingerprint": "Fp {value}",
+  "@terminalHeaderFingerprint": {
+    "description": "Start of the host key fingerprint in the terminal header (screen D11).",
+    "placeholders": {
+      "value": {
+        "type": "String",
+        "example": "7KQ2 9XTA .."
+      }
+    }
+  },
+  "terminalHeaderFingerprintLabel": "Fingerprint of the host: {fingerprint}",
+  "@terminalHeaderFingerprintLabel": {
+    "description": "Screen reader label of the fingerprint in the terminal header.",
+    "placeholders": {
+      "fingerprint": {
+        "type": "String",
+        "example": "7KQ2 9XTA M4PB"
+      }
+    }
+  },
+  "terminalHeaderRemaining": "Left {time}",
+  "@terminalHeaderRemaining": {
+    "description": "Remaining time until terminal.max_session_duration in the terminal header (screen D11).",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "11:42"
+      }
+    }
+  },
+  "terminalLlmLoginNone": "No LLM login",
+  "@terminalLlmLoginNone": {
+    "description": "Badge of the LLM login of a host with llm_credentials none (24 section 12)."
+  },
+  "terminalTabLabel": "{profile} {number}",
+  "@terminalTabLabel": {
+    "description": "Label of one terminal session tab: profile and running number.",
+    "placeholders": {
+      "profile": {
+        "type": "String",
+        "example": "shell"
+      },
+      "number": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  "terminalDetach": "Detach",
+  "@terminalDetach": {
+    "description": "Button that detaches the terminal session; it keeps running on the host."
+  },
+  "terminalEnd": "End",
+  "@terminalEnd": {
+    "description": "Button that ends the terminal session."
+  },
+  "terminalReattach": "Reattach",
+  "@terminalReattach": {
+    "description": "Button that attaches to a detached terminal session again."
+  },
+  "terminalStateConnecting": "Opening the encrypted connection to the host",
+  "@terminalStateConnecting": {
+    "description": "Banner while the terminal session opens."
+  },
+  "terminalStateDetached": "Detached. The terminal session keeps going on the host.",
+  "@terminalStateDetached": {
+    "description": "Banner of a terminal session the person detached."
+  },
+  "terminalStateDetachedLost": "The connection broke. The terminal session keeps going on the host.",
+  "@terminalStateDetachedLost": {
+    "description": "Banner of a detached terminal session after the stream broke."
+  },
+  "terminalStateDetachedHostUnavailable": "The host is not connected. Try to reattach later.",
+  "@terminalStateDetachedHostUnavailable": {
+    "description": "Banner after close code 4102."
+  },
+  "terminalStateDetachedTokenStale": "The session token expired or was already used. Reattach confirms again.",
+  "@terminalStateDetachedTokenStale": {
+    "description": "Banner after close code 4101; reattaching asks for a new step-up."
+  },
+  "terminalStateDetachedReplaced": "Another device attached to this terminal session.",
+  "@terminalStateDetachedReplaced": {
+    "description": "Banner after close code 4103; no automatic new attempt."
+  },
+  "terminalStateDetachedServer": "The server restarted. The terminal session keeps going on the host.",
+  "@terminalStateDetachedServer": {
+    "description": "Banner after close codes 1001 and 4013."
+  },
+  "terminalStateDetachedSlow": "The connection could not keep up. The terminal session keeps going on the host.",
+  "@terminalStateDetachedSlow": {
+    "description": "Banner after close code 4014."
+  },
+  "terminalStateDetachedAuth": "The login of the connection failed. Sign in again, then reattach.",
+  "@terminalStateDetachedAuth": {
+    "description": "Banner after close code 4004."
+  },
+  "terminalStateDetachedRateLimited": "Too many attempts. Wait a moment, then reattach.",
+  "@terminalStateDetachedRateLimited": {
+    "description": "Banner after close code 4008."
+  },
+  "terminalStateExited": "The process exited with code {code}.",
+  "@terminalStateExited": {
+    "description": "Banner after the frame exit; the tab stays open.",
+    "placeholders": {
+      "code": {
+        "type": "int",
+        "example": "0"
+      }
+    }
+  },
+  "terminalStateEnded": "The terminal session ended: {reason}",
+  "@terminalStateEnded": {
+    "description": "Banner of an ended terminal session; the screen stays readable.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "ended by you"
+      }
+    }
+  },
+  "terminalStateBlockedRevoked": "Access ended: {reason}",
+  "@terminalStateBlockedRevoked": {
+    "description": "Danger banner of a revoked terminal session.",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "access was revoked"
+      }
+    }
+  },
+  "terminalStateBlockedHandshake": "The encrypted connection failed its check. Someone may have tampered with it. No new attempt is made.",
+  "@terminalStateBlockedHandshake": {
+    "description": "Hard warning after close code 4104 or a Noise or frame error."
+  },
+  "terminalStateBlockedKeyMismatch": "The server sent a different host key than the checked one. The terminal session was closed.",
+  "@terminalStateBlockedKeyMismatch": {
+    "description": "Hard warning when the key of the grant differs from the checked one (15 23.2 item 3)."
+  },
+  "terminalStateBlockedProtocol": "The connection broke the terminal protocol. No new attempt is made.",
+  "@terminalStateBlockedProtocol": {
+    "description": "Hard warning after close code 4002 or an unexpected message."
+  },
+  "terminalStateFailed": "The terminal could not be opened: {problem}",
+  "@terminalStateFailed": {
+    "description": "Banner of a refused opening with the problem text.",
+    "placeholders": {
+      "problem": {
+        "type": "String",
+        "example": "The host is not connected"
+      }
+    }
+  },
+  "terminalCloseReason": "{reason, select, client_closed{ended by you} closed_by_owner{ended by an owner} process_exited{the process exited} idle_timeout{no input for too long} max_duration{the maximum duration was reached} detach_expired{it was detached for too long} access_revoked{access was revoked} i6_violation{the LLM login of the host changed} host_disabled{the host was disabled} host_retired{the host was retired} host_rekeyed{the host was paired again} host_restarted{the host service restarted} user_disabled{the account was disabled} device_revoked{this device was removed} session_revoked{the login was ended} logout{you signed out} open_failed{the opening failed} host_policy_violation{a check on the host failed} other{no reason given}}",
+  "@terminalCloseReason": {
+    "description": "Text of a close_reason of a terminal session (24 section 10.3).",
+    "placeholders": {
+      "reason": {
+        "type": "String",
+        "example": "client_closed"
+      }
+    }
+  },
+  "terminalFooterEncrypted": "End-to-end encrypted",
+  "@terminalFooterEncrypted": {
+    "description": "Footer of the terminal view with a lock icon."
+  },
+  "terminalFooterProfile": "Profile {profile}",
+  "@terminalFooterProfile": {
+    "description": "Footer of the terminal view: profile of the session.",
+    "placeholders": {
+      "profile": {
+        "type": "String",
+        "example": "shell"
+      }
+    }
+  },
+  "terminalFooterIdle": "Idle timeout active",
+  "@terminalFooterIdle": {
+    "description": "Footer of the terminal view: the idle limit of the host applies."
+  },
+  "terminalOpenTitle": "Open terminal",
+  "@terminalOpenTitle": {
+    "description": "Title of the dialog that confirms an opening (screen D11)."
+  },
+  "terminalOpenHost": "Host",
+  "@terminalOpenHost": {
+    "description": "Label of the host in the dialog Open terminal."
+  },
+  "terminalOpenProfile": "Profile",
+  "@terminalOpenProfile": {
+    "description": "Label of the profile choice in the dialog Open terminal."
+  },
+  "terminalOpenWorkdir": "Working folder",
+  "@terminalOpenWorkdir": {
+    "description": "Label of the working folder choice for a profile of kind claude."
+  },
+  "terminalOpenLogin": "LLM login",
+  "@terminalOpenLogin": {
+    "description": "Label of the LLM login badge in the dialog Open terminal."
+  },
+  "terminalOpenLogged": "Every opening is logged.",
+  "@terminalOpenLogged": {
+    "description": "Note in the dialog Open terminal."
+  },
+  "terminalOpenConfirm": "Confirm with passkey or device key",
+  "@terminalOpenConfirm": {
+    "description": "Main button of the dialog Open terminal; the step-up follows."
+  },
+  "terminalCancel": "Cancel",
+  "@terminalCancel": {
+    "description": "Cancel button of the terminal dialogs."
+  },
+  "terminalKeyChangedTitle": "The host's key has changed",
+  "@terminalKeyChangedTitle": {
+    "description": "Title of the hard warning of a changed host key (24 section 5.5)."
+  },
+  "terminalKeyChangedStored": "Stored",
+  "@terminalKeyChangedStored": {
+    "description": "Label of the pinned fingerprint in the key change warning."
+  },
+  "terminalKeyChangedNow": "Now",
+  "@terminalKeyChangedNow": {
+    "description": "Label of the current fingerprint in the key change warning."
+  },
+  "terminalKeyChangedBody": "Without pairing again by an owner, this is a sign of an attack. Connect only after you have checked the new fingerprint on the host.",
+  "@terminalKeyChangedBody": {
+    "description": "Body of the key change warning."
+  },
+  "terminalKeyChangedReject": "Do not connect",
+  "@terminalKeyChangedReject": {
+    "description": "Main action of the key change warning; opens nothing."
+  },
+  "terminalKeyChangedAccept": "Accept new key",
+  "@terminalKeyChangedAccept": {
+    "description": "Secondary action of the key change warning; opens with pin_changed."
+  },
+  "terminalForeignTitle": "This host belongs to another person",
+  "@terminalForeignTitle": {
+    "description": "Title of the warning of 24 section 8.4 before the step-up."
+  },
+  "terminalForeignBody": "{host} is assigned to another person. Your terminal session works in your own session user, but that person sets up the host and could read along through a local privilege escalation. Do not type secrets here unless you trust the host.",
+  "@terminalForeignBody": {
+    "description": "Body of the warning of 24 section 8.4.",
+    "placeholders": {
+      "host": {
+        "type": "String",
+        "example": "Build host"
+      }
+    }
+  },
+  "terminalForeignConfirm": "Connect anyway",
+  "@terminalForeignConfirm": {
+    "description": "Button of the warning of 24 section 8.4 that continues to the step-up."
+  },
+  "terminalLinkTitle": "Open link?",
+  "@terminalLinkTitle": {
+    "description": "Title of the confirmation before a terminal hyperlink opens (24 section 11.2)."
+  },
+  "terminalLinkBody": "The program in the terminal links to this address:",
+  "@terminalLinkBody": {
+    "description": "Body of the link confirmation; the full target follows."
+  },
+  "terminalLinkOpen": "Open link",
+  "@terminalLinkOpen": {
+    "description": "Button that opens the confirmed link."
+  },
+  "terminalLinkUnsupported": "Only https and http links open. This address stays closed.",
+  "@terminalLinkUnsupported": {
+    "description": "Note in the link confirmation for any other scheme."
+  },
+  "terminalLinkHover": "Link: {target}",
+  "@terminalLinkHover": {
+    "description": "Hint with the target of a terminal hyperlink under the pointer.",
+    "placeholders": {
+      "target": {
+        "type": "String",
+        "example": "https://example.com"
+      }
+    }
+  },
+  "terminalPasteTitle": "Paste with line breaks?",
+  "@terminalPasteTitle": {
+    "description": "Title of the confirmation before pasting text with line breaks (15 23.4)."
+  },
+  "terminalPasteBody": "The text has {count, plural, =1{1 line} other{{count} lines}}. Every line break can start a command.",
+  "@terminalPasteBody": {
+    "description": "Body of the paste confirmation.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "3"
+      }
+    }
+  },
+  "terminalPasteConfirm": "Paste",
+  "@terminalPasteConfirm": {
+    "description": "Button that pastes the text."
+  },
+  "terminalReadScreen": "Read screen",
+  "@terminalReadScreen": {
+    "description": "Screen reader action that reads the visible terminal screen (01 section 8)."
+  },
+  "terminalScreenLabel": "Terminal, line at the cursor: {line}",
+  "@terminalScreenLabel": {
+    "description": "Screen reader label of the terminal screen.",
+    "placeholders": {
+      "line": {
+        "type": "String",
+        "example": "~ $"
+      }
+    }
+  },
+  "terminalExtraKeys": "Extra keys bar",
+  "@terminalExtraKeys": {
+    "description": "Screen reader label of the extra keys bar (01 screen M8)."
+  },
+  "terminalKeyEsc": "Esc",
+  "@terminalKeyEsc": {
+    "description": "Visible label of the extra key Escape."
+  },
+  "terminalKeyTab": "Tab",
+  "@terminalKeyTab": {
+    "description": "Visible label of the extra key Tab."
+  },
+  "terminalKeyCtrl": "Ctrl",
+  "@terminalKeyCtrl": {
+    "description": "Visible label of the extra key Control."
+  },
+  "terminalKeyAlt": "Alt",
+  "@terminalKeyAlt": {
+    "description": "Visible label of the extra key Alt."
+  },
+  "terminalKeyUp": "↑",
+  "@terminalKeyUp": {
+    "description": "Visible label of the extra key Arrow up."
+  },
+  "terminalKeyDown": "↓",
+  "@terminalKeyDown": {
+    "description": "Visible label of the extra key Arrow down."
+  },
+  "terminalKeyLeft": "←",
+  "@terminalKeyLeft": {
+    "description": "Visible label of the extra key Arrow left."
+  },
+  "terminalKeyRight": "→",
+  "@terminalKeyRight": {
+    "description": "Visible label of the extra key Arrow right."
+  },
+  "terminalKeyPipe": "|",
+  "@terminalKeyPipe": {
+    "description": "Visible label of the extra key Vertical bar."
+  },
+  "terminalKeyTilde": "~",
+  "@terminalKeyTilde": {
+    "description": "Visible label of the extra key Tilde."
+  },
+  "terminalKeySlash": "/",
+  "@terminalKeySlash": {
+    "description": "Visible label of the extra key Slash."
+  },
+  "terminalKeyMinus": "-",
+  "@terminalKeyMinus": {
+    "description": "Visible label of the extra key Minus."
+  },
+  "terminalKeyEscName": "Escape",
+  "@terminalKeyEscName": {
+    "description": "Screen reader label of the extra key Escape."
+  },
+  "terminalKeyTabName": "Tab",
+  "@terminalKeyTabName": {
+    "description": "Screen reader label of the extra key Tab."
+  },
+  "terminalKeyCtrlName": "Control",
+  "@terminalKeyCtrlName": {
+    "description": "Screen reader label of the extra key Control."
+  },
+  "terminalKeyAltName": "Alt",
+  "@terminalKeyAltName": {
+    "description": "Screen reader label of the extra key Alt."
+  },
+  "terminalKeyUpName": "Arrow up",
+  "@terminalKeyUpName": {
+    "description": "Screen reader label of the extra key Arrow up."
+  },
+  "terminalKeyDownName": "Arrow down",
+  "@terminalKeyDownName": {
+    "description": "Screen reader label of the extra key Arrow down."
+  },
+  "terminalKeyLeftName": "Arrow left",
+  "@terminalKeyLeftName": {
+    "description": "Screen reader label of the extra key Arrow left."
+  },
+  "terminalKeyRightName": "Arrow right",
+  "@terminalKeyRightName": {
+    "description": "Screen reader label of the extra key Arrow right."
+  },
+  "terminalKeyPipeName": "Vertical bar",
+  "@terminalKeyPipeName": {
+    "description": "Screen reader label of the extra key Vertical bar."
+  },
+  "terminalKeyTildeName": "Tilde",
+  "@terminalKeyTildeName": {
+    "description": "Screen reader label of the extra key Tilde."
+  },
+  "terminalKeySlashName": "Slash",
+  "@terminalKeySlashName": {
+    "description": "Screen reader label of the extra key Slash."
+  },
+  "terminalKeyMinusName": "Minus",
+  "@terminalKeyMinusName": {
+    "description": "Screen reader label of the extra key Minus."
+  },
+  "terminalKeyLatched": "{key}, latched",
+  "@terminalKeyLatched": {
+    "description": "Screen reader label of a modifier that applies to the next key only.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "Control"
+      }
+    }
+  },
+  "terminalKeyHeld": "{key}, held",
+  "@terminalKeyHeld": {
+    "description": "Screen reader label of a modifier that stays on until tapped again.",
+    "placeholders": {
+      "key": {
+        "type": "String",
+        "example": "Control"
+      }
+    }
+  },
+  "terminalStepUpOpen": "Open a terminal on {name}",
+  "@terminalStepUpOpen": {
+    "description": "Step-up purpose of terminal.open.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build host"
+      }
+    }
+  },
+  "terminalStepUpAttach": "Reattach to the terminal on {name}",
+  "@terminalStepUpAttach": {
+    "description": "Step-up purpose of terminal.attach.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Build host"
+      }
+    }
+  },
+  "terminalLinkHost": "Host: {name}",
+  "@terminalLinkHost": {
+    "description": "The host of a terminal link in the link confirmation, shown before the full target.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "example.com"
+      }
+    }
   }
 }

@@ -240,6 +240,20 @@ def test_test_library_inside_test_folders_passes(tree: Tree) -> None:
     assert code == 0, lines
 
 
+def test_test_library_inside_a_test_library_passes(tree: Tree) -> None:
+    # A test library may build on the test library of a member it reaches (brief M4-35: the
+    # fake host of terminal_ui runs the responder of bothy_noise/testing.dart); production
+    # code still cannot reach either.
+    tree.source("terminal_ui", "lib/testing.dart", "import 'package:bothy_noise/testing.dart';\n")
+    tree.source(
+        "terminal_ui",
+        "lib/src/testing/host.dart",
+        "import 'package:design_system/testing.dart';\n",
+    )
+    code, lines = tree.run()
+    assert code == 0, lines
+
+
 def test_test_libraries_entry_is_checked(tmp_path: Path) -> None:
     data = yaml.safe_load(RULES.read_text(encoding="utf-8"))
     data["test_libraries"] = {"rule": 10, "library": "testing"}

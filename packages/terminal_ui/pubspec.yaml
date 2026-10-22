@@ -10,11 +10,25 @@ environment:
   sdk: ^3.13.5
   flutter: 3.47.7
 
+# The members of 15 3.1 rule 7 (design_system, auth, api_client, bothy_noise, domain) and,
+# through design_system, l10n; xterm is the renderer of 24 12 (latest release, assessed in
+# docs/spec/24-terminal.md 12); built_collection and cryptography are the types of the
+# api_client and bothy_noise surfaces this package touches, already in the workspace lock.
 dependencies:
+  api_client: any
+  auth: any
+  bothy_noise: any
+  built_collection: ^5.1.2
+  cryptography: ^2.9.0
+  design_system: any
+  domain: any
   flutter:
     sdk: flutter
+  l10n: any
+  xterm: ^4.0.0
 
 dev_dependencies:
+  alchemist: ^0.14.1
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter

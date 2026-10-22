@@ -208,7 +208,7 @@ name = "equatable"
 version = "2.1.0"
 ecosystem = "Pub"
 license.override = ["MIT"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of alchemist and patrol; patrol 4.10.0 needs ^2.1.0 (M6-04)."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of alchemist, patrol and xterm; patrol 4.10.0 needs ^2.1.0 (M6-04), xterm 4.0.0 needs ^2.0.3 (M4-35)."
 
 [[PackageOverrides]]
 name = "fake_async"
@@ -1221,3 +1221,20 @@ version = "0.10.1"
 ecosystem = "Pub"
 license.override = ["Apache-2.0"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive package of patrol, test only (M6-04)."
+
+# The renderer of the terminal view (M4-35, docs/decisions.d/M4-35.md D-M4-35-5), checked against the
+# LICENSE files of these versions on pub.dev on 2026-10-20.
+
+[[PackageOverrides]]
+name = "xterm"
+version = "4.0.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT (TerminalStudio). Runtime dependency of terminal_ui."
+
+[[PackageOverrides]]
+name = "zmodem"
+version = "0.0.6"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive runtime package of xterm."
