@@ -22,16 +22,14 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
 func TestMain(m *testing.M) { os.Exit(harness.Main(m)) }
 
-// The limits of the test servers.
-const (
-	partBytes = 16384
-	waitScan  = 2 * time.Minute
-)
+// partBytes is the part size of the test servers.
+const partBytes = 16384
 
 // env is one test server with its world and its scripted clamd.
 type env struct {
@@ -95,7 +93,7 @@ func start(t *testing.T, opts harness.Options, extra map[string]string) *env {
 	s := harness.Start(t, opts)
 	w := harness.BuildMatrixWorld(t, s)
 	return &env{s: s, w: w, clamd: fake, db: s.AdminDB(), logs: logs, ch: w.Channels["Support/Allgemein"],
-		alex: w.People["Alex"], sam: w.People["Sam"], robin: w.People["Robin"], plain: &http.Client{Timeout: time.Minute}}
+		alex: w.People["Alex"], sam: w.People["Sam"], robin: w.People["Robin"], plain: &http.Client{Timeout: testkit.Patience}}
 }
 
 // duration reads a duration key of the server ("720h", "7s", also "30d").
@@ -179,20 +177,16 @@ func (e *env) state(t *testing.T, id string) string {
 	return up + "/" + scan
 }
 
-// waitFinal waits until the file left upload_state and scan_status pending and returns its state.
+// waitFinal waits until the file left upload_state and scan_status pending and returns its state;
+// testkit.Patience bounds the wait.
 func (e *env) waitFinal(t *testing.T, id string) string {
 	t.Helper()
-	deadline := time.Now().Add(waitScan)
-	for {
-		st := e.state(t, id)
-		if st != "pending/pending" {
-			return st
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("file %s still pending after %v", id, waitScan)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+	var st string
+	testkit.Until(t, "file "+id+" leaves pending/pending", func() bool {
+		st = e.state(t, id)
+		return st != "pending/pending"
+	})
+	return st
 }
 
 // exec runs a statement of the test setup.

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -38,13 +39,15 @@ func TestTicket(t *testing.T) {
 	var tickets []string
 	issue := func(t *testing.T, c *harness.Client) ticket {
 		t.Helper()
-		before := time.Now()
+		before := time.Now().Truncate(time.Second)
 		tk := newTicket(t, c, file, "original")
+		after := time.Now()
 		if !strings.HasPrefix(tk.URL, "/api/v1/files/"+file+"/content?ticket=") {
 			t.Fatalf("url prefix %q", strings.SplitN(tk.URL, "?", 2)[0])
 		}
-		if d := tk.ExpiresAt.Sub(before.Add(ttl)); d < -time.Second || d > 2*time.Second {
-			t.Errorf("expires_at is %v off now plus file.ticket_ttl", d)
+		// The server mints between before and after and stores whole seconds.
+		if tk.ExpiresAt.Before(before.Add(ttl)) || tk.ExpiresAt.After(after.Add(ttl)) {
+			t.Errorf("expires_at %v is outside [%v, %v] plus file.ticket_ttl", tk.ExpiresAt, before, after)
 		}
 		tickets = append(tickets, strings.SplitN(tk.URL, "?ticket=", 2)[1])
 		return tk
@@ -93,17 +96,9 @@ func TestTicket(t *testing.T) {
 		time.Sleep(time.Until(tk.ExpiresAt))
 		same404(t, e.fetch(t, tk.URL, nil), "after the expiry")
 
-		deadline := time.Now().Add(30 * time.Second)
-		for {
-			noGrant, revoked := e.denials(t, "no_grant"), e.denials(t, "session_revoked")
-			if noGrant > 0 && revoked > 0 {
-				break
-			}
-			if time.Now().After(deadline) {
-				t.Fatalf("file.read denials of Alex: no_grant %d, session_revoked %d", noGrant, revoked)
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
+		testkit.Until(t, "file.read denials of Alex with no_grant and session_revoked", func() bool {
+			return e.denials(t, "no_grant") > 0 && e.denials(t, "session_revoked") > 0
+		})
 		e.alex = alex
 	})
 

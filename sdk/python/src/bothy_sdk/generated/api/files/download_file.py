@@ -121,8 +121,8 @@ def sync_detailed(
     Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
     instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
     for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
-    gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
-    416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+    gives 206, several ranges are ignored (200 with the whole file), a range outside the file
+    gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
     `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
     CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
     only (ADR 0048).
@@ -169,8 +169,8 @@ def sync(
     Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
     instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
     for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
-    gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
-    416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+    gives 206, several ranges are ignored (200 with the whole file), a range outside the file
+    gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
     `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
     CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
     only (ADR 0048).
@@ -212,8 +212,8 @@ async def asyncio_detailed(
     Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
     instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
     for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
-    gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
-    416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+    gives 206, several ranges are ignored (200 with the whole file), a range outside the file
+    gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
     `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
     CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
     only (ADR 0048).
@@ -258,8 +258,8 @@ async def asyncio(
     Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
     instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
     for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
-    gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
-    416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+    gives 206, several ranges are ignored (200 with the whole file), a range outside the file
+    gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
     `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
     CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
     only (ADR 0048).

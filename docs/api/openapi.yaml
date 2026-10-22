@@ -10354,8 +10354,8 @@ paths:
         Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
         instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
         for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
-        gives 206, several ranges are ignored (200 with the whole file), a range outside the file gives
-        416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+        gives 206, several ranges are ignored (200 with the whole file), a range outside the file
+        gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
         `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
         CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
         only (ADR 0048).
@@ -10610,8 +10610,8 @@ paths:
         checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
         session of the caller: a principal without a session (agent, app, API token) gets 403
         `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
-        deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have gives
-        404. A repeated call mints a new ticket.
+        deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+        gives 404. A repeated call mints a new ticket.
       x-authz-action: file.read
       x-rate-limit-class: rl.read
       x-idempotency-exempt: read_only
