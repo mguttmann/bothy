@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- interactions (docs/spec/03-datenmodell.md section 4.8, M2-15). The table has no channel_id:
+-- interactions (docs/spec/03-data-model.md section 4.8, M2-15). The table has no channel_id:
 -- every read names one interaction, or one (principal, client_interaction_id), whose component
 -- path the use case checked with authorize first, or that a delivery names
 -- (tools/lint/sql_visibility.yaml lists each read, 07 7.4 rule 1).

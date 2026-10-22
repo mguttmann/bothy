@@ -147,7 +147,7 @@ type InsertComponentParams struct {
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// message_components (docs/spec/03-datenmodell.md section 4.8, M2-15). The table has no
+// message_components (docs/spec/03-data-model.md section 4.8, M2-15). The table has no
 // channel_id: every read names the card messages or the components of a message whose visibility
 // the use case checked first (authorize on the message or the component path), or that
 // messaging loaded for an event of the same transaction, or that a job or the end of a run names

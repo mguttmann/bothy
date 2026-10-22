@@ -123,7 +123,7 @@ func TestCheckValues_Accepts(t *testing.T) {
 		{"select with min_values zero and an empty list", "select", valOpen, `{"selected":[]}`},
 		{"form minimal", "form", valForm, `{"subject":"Hi"}`},
 		{"form full", "form", valForm, `{"colour":"Blue","urgent":false,"count":-3.5e2,"body":"Line one\nLine two","subject":"Héllo"}`},
-		{"form with max_length in code points", "form", valForm, `{"subject":"üüüüü"}`},
+		{"form with max_length in code points", "form", valForm, `{"subject":"ééééé"}`},
 		{"form optional empty textarea", "form", valForm, `{"subject":"Hi","body":""}`},
 	}
 	for _, tc := range cases {
