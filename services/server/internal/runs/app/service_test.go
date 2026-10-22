@@ -18,7 +18,7 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{},
 	}
-	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour}
+	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536}
 	if _, err := app.New(good, app.Deps{}); err == nil {
 		t.Fatal("New without collaborators: no error")
 	}
@@ -28,10 +28,11 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 		t.Fatal("New without Cursors: no error")
 	}
 	for name, cfg := range map[string]app.Config{
-		"default below 1":     {PageSizeDefault: 0, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour},
-		"default above max":   {PageSizeDefault: 6, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour},
-		"step detail below 1": {PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 0, QueuedMaxAge: time.Hour},
-		"queued age zero":     {PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256},
+		"default below 1":     {PageSizeDefault: 0, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536},
+		"default above max":   {PageSizeDefault: 6, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536},
+		"step detail below 1": {PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 0, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536},
+		"queued age zero":     {PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, EventPayloadMaxBytes: 65536},
+		"payload below 1":     {PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour},
 	} {
 		if _, err := app.New(cfg, full); err == nil {
 			t.Errorf("%s: no error", name)

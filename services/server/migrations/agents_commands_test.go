@@ -4,8 +4,11 @@ package migrations_test
 
 import (
 	"context"
+	"io/fs"
 	"reflect"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,8 +114,9 @@ func TestMigration_Commands(t *testing.T) {
 	wantState(t, exec(app, `DELETE FROM commands WHERE id = $1`, c4), "42501", "a delete by bothy_app")
 }
 
-// TestMigration_CommandsDown: down to version 55 removes commands and the foreign key of runs; up
-// applies again.
+// TestMigration_CommandsDown: down to the version before agents_commands removes commands and the
+// foreign key of runs; up applies again. The version comes from the file name, so a renumbering
+// of the migration (ADR 0007 rule 4) cannot leave the test pointing past it.
 func TestMigration_CommandsDown(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -124,8 +128,9 @@ func TestMigration_CommandsDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 55); err != nil {
-		t.Fatalf("down to 55: %v", err)
+	before := migrationVersion(t, "agents_commands") - 1
+	if _, err := provider.DownTo(ctx, before); err != nil {
+		t.Fatalf("down to %d: %v", before, err)
 	}
 	var left int
 	if err := sqlDB.QueryRowContext(ctx, `SELECT (to_regclass('commands') IS NOT NULL)::int
@@ -138,4 +143,18 @@ func TestMigration_CommandsDown(t *testing.T) {
 	if _, err := provider.Up(ctx); err != nil {
 		t.Fatalf("up again: %v", err)
 	}
+}
+
+// migrationVersion returns the version of the migration file NNNNN_<slug>.sql in migrations.FS.
+func migrationVersion(t *testing.T, slug string) int64 {
+	t.Helper()
+	files, err := fs.Glob(migrations.FS, "*_"+slug+".sql")
+	if err != nil || len(files) != 1 {
+		t.Fatalf("migration %s: %v %v", slug, files, err)
+	}
+	v, err := strconv.ParseInt(strings.SplitN(files[0], "_", 2)[0], 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
 }
