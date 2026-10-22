@@ -307,7 +307,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"agent.presence_timeout":           {Kind: config.KindDuration, Default: "90s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		"agent.heartbeat_persist_interval": {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "03-data-model.md"},
 		"billing.mismatch_alert_after":     {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "10-backend-policy.md"},
-		"run.step_detail_max_bytes":  {Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: "03-data-model.md"},
+		"run.step_detail_max_bytes":        {Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: "03-data-model.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protocol.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protocol.md"},
