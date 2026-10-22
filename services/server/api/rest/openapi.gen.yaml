@@ -4748,6 +4748,146 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /access/hints:
+    get:
+      operationId: listPermissionHints
+      summary: List the permission hints
+      tags: [Access]
+      description: 'The list "Permission hints" of 07 section 9.5, computed from the permission state that `authorize` uses: `h1_read_horizon` for every agent, person of its trigger set and channel of its read horizon the person cannot read (07 section 6), `grant_to_disabled` for grants whose subject is disabled, `trigger_blocked` for `trigger` grants whose triggering SR2 or SR3 blocks on every operated channel they reach, `agent_personal` for agents in mode `personal` with their trigger set. Ordered by kind in this order, then by agent, person and channel, by grant ID or by agent ID. Without `space_id` the instance (owners); with it the space (owner or `manage`), limited to its agents, channels and grants. A space the caller cannot read gives `404`, readable without `manage` `403`. Hints never name content; `labels` carries the names of the principals, groups, spaces and channels of the page.'
+      x-authz-action: access.hints.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - name: space_id
+        in: query
+        description: Only the hints of this space; without it the whole instance (owners only).
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - name: kind
+        in: query
+        description: Only hints of this kind.
+        schema:
+          $ref: '#/components/schemas/PermissionHintKind'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionHintPage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - kind: h1_read_horizon
+                      agent_id: 0192f4a0-7b1c-7a11-8c2e-1d4e5f6a7b8c
+                      person_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bd
+                      space_id: 0192f4a0-7b1c-7fd5-831e-d4370e087874
+                      channel_id: 0192f4a0-7b1c-7c33-9e4f-2a3b4c5d6e7f
+                    labels:
+                      principals:
+                      - id: 0192f4a0-7b1c-7a11-8c2e-1d4e5f6a7b8c
+                        kind: agent
+                        handle: texter
+                        display_name: Texter
+                      - id: 0192f4a0-7b1c-7f89-8d6b-6960453241bd
+                        kind: user
+                        handle: sam
+                        display_name: Sam
+                      groups: []
+                      spaces:
+                      - id: 0192f4a0-7b1c-7fd5-831e-d4370e087874
+                        name: Marketing
+                      channels:
+                      - id: 0192f4a0-7b1c-7c33-9e4f-2a3b4c5d6e7f
+                        space_id: 0192f4a0-7b1c-7fd5-831e-d4370e087874
+                        name: Intern
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /access/expiring:
+    get:
+      operationId: listExpiringAccess
+      summary: List the access that expires soon
+      tags: [Access]
+      description: 'The list "Expiring soon" of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose `expires_at` lies within `authz.expiry_reminder_lead` from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. "Extend" is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without `space_id` the instance (owners); with it the space (owner or `manage`): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives `404`, readable without `manage` `403`.'
+      x-authz-action: access.hints.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - name: space_id
+        in: query
+        description: Only the access within this space; without it the whole instance (owners only).
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpiringAccessPage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - kind: membership
+                      expires_at: '2026-10-12T09:30:00.000Z'
+                      membership_id: 0192f4a0-7b1c-7b22-8d3e-4f5a6b7c8d9e
+                      group_id: 0192f4a0-7b1c-7e44-9a5b-6c7d8e9f0a1b
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bd
+                    labels:
+                      principals:
+                      - id: 0192f4a0-7b1c-7f89-8d6b-6960453241bd
+                        kind: user
+                        handle: sam
+                        display_name: Sam
+                      groups:
+                      - id: 0192f4a0-7b1c-7e44-9a5b-6c7d8e9f0a1b
+                        name: Support
+                      spaces: []
+                      channels: []
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /instance:
     get:
       operationId: getInstance
@@ -29958,6 +30098,130 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GroupMember'
+        next_cursor:
+          $ref: '#/components/schemas/Cursor'
+    PermissionHintKind:
+      type: string
+      description: Kind of a permission hint (07 section 9.5), in the order of the list.
+      enum: [h1_read_horizon, grant_to_disabled, trigger_blocked, agent_personal]
+    PermissionHint:
+      type: object
+      description: 'One permission hint. `h1_read_horizon` names `agent_id`, `person_id`, `space_id` and `channel_id` (the person can learn content of the channel through the agent, 07 section 6). `grant_to_disabled` and `trigger_blocked` carry the `grant`; `trigger_blocked` names the blocking `rules` (SR2 tool class, SR3 dev isolation). `agent_personal` names `agent_id`, `credential_holder_id` (absent when the agent has none) and the `trigger_set` (I1 asks for exactly the holder).'
+      required: [kind]
+      properties:
+        kind:
+          $ref: '#/components/schemas/PermissionHintKind'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        person_id:
+          $ref: '#/components/schemas/Uuid'
+        space_id:
+          $ref: '#/components/schemas/Uuid'
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        grant:
+          $ref: '#/components/schemas/Grant'
+        rules:
+          type: array
+          items:
+            type: string
+            enum: [sr2, sr3]
+        credential_holder_id:
+          $ref: '#/components/schemas/Uuid'
+        trigger_set:
+          type: array
+          description: The people with effective `trigger` on a target the agent serves, ascending.
+          items:
+            $ref: '#/components/schemas/Uuid'
+    AccessLabel:
+      type: object
+      description: Name of a group or space named on a page.
+      required: [id, name]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+          examples: [Support]
+    ChannelLabel:
+      type: object
+      description: Name and space of a channel named on a page.
+      required: [id, space_id, name]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        space_id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+          examples: [Intern]
+    AccessLabels:
+      type: object
+      description: The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content.
+      required: [principals, groups, spaces, channels]
+      properties:
+        principals:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrincipalRef'
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessLabel'
+        spaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessLabel'
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelLabel'
+    PermissionHintPage:
+      type: object
+      description: One page. `next_cursor` is absent on the last page.
+      required: [items, labels]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionHint'
+        labels:
+          $ref: '#/components/schemas/AccessLabels'
+        next_cursor:
+          $ref: '#/components/schemas/Cursor'
+    ExpiringAccessItem:
+      type: object
+      description: 'One access that expires within `authz.expiry_reminder_lead`. `grant` carries the `grant`; `membership` names `membership_id`, `group_id` and `user_id`; `token` names `token_id` and the holder `principal_id` (an agent or an app), never the token value.'
+      required: [kind, expires_at]
+      properties:
+        kind:
+          type: string
+          enum: [grant, membership, token]
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+        grant:
+          $ref: '#/components/schemas/Grant'
+        membership_id:
+          $ref: '#/components/schemas/Uuid'
+        group_id:
+          $ref: '#/components/schemas/Uuid'
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        token_id:
+          $ref: '#/components/schemas/Uuid'
+        principal_id:
+          $ref: '#/components/schemas/Uuid'
+    ExpiringAccessPage:
+      type: object
+      description: One page. `next_cursor` is absent on the last page.
+      required: [items, labels]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpiringAccessItem'
+        labels:
+          $ref: '#/components/schemas/AccessLabels'
         next_cursor:
           $ref: '#/components/schemas/Cursor'
     GrantPage:

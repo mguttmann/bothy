@@ -131,16 +131,16 @@ func (e AccessSourceKind) Valid() bool {
 
 // Defines values for AccessSourceRule.
 const (
-	Sr2 AccessSourceRule = "sr2"
-	Sr3 AccessSourceRule = "sr3"
+	AccessSourceRuleSr2 AccessSourceRule = "sr2"
+	AccessSourceRuleSr3 AccessSourceRule = "sr3"
 )
 
 // Valid indicates whether the value is a known member of the AccessSourceRule enum.
 func (e AccessSourceRule) Valid() bool {
 	switch e {
-	case Sr2:
+	case AccessSourceRuleSr2:
 		return true
-	case Sr3:
+	case AccessSourceRuleSr3:
 		return true
 	default:
 		return false
@@ -1509,6 +1509,27 @@ const (
 func (e EventEnvelopeAudience) Valid() bool {
 	switch e {
 	case EventEnvelopeAudienceSelf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExpiringAccessItemKind.
+const (
+	ExpiringAccessItemKindGrant      ExpiringAccessItemKind = "grant"
+	ExpiringAccessItemKindMembership ExpiringAccessItemKind = "membership"
+	ExpiringAccessItemKindToken      ExpiringAccessItemKind = "token"
+)
+
+// Valid indicates whether the value is a known member of the ExpiringAccessItemKind enum.
+func (e ExpiringAccessItemKind) Valid() bool {
+	switch e {
+	case ExpiringAccessItemKindGrant:
+		return true
+	case ExpiringAccessItemKindMembership:
+		return true
+	case ExpiringAccessItemKindToken:
 		return true
 	default:
 		return false
@@ -3060,6 +3081,48 @@ const (
 func (e PairingStatusStatus) Valid() bool {
 	switch e {
 	case PairingStatusStatusRequested:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PermissionHintRules.
+const (
+	PermissionHintRulesSr2 PermissionHintRules = "sr2"
+	PermissionHintRulesSr3 PermissionHintRules = "sr3"
+)
+
+// Valid indicates whether the value is a known member of the PermissionHintRules enum.
+func (e PermissionHintRules) Valid() bool {
+	switch e {
+	case PermissionHintRulesSr2:
+		return true
+	case PermissionHintRulesSr3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PermissionHintKind.
+const (
+	AgentPersonal   PermissionHintKind = "agent_personal"
+	GrantToDisabled PermissionHintKind = "grant_to_disabled"
+	H1ReadHorizon   PermissionHintKind = "h1_read_horizon"
+	TriggerBlocked  PermissionHintKind = "trigger_blocked"
+)
+
+// Valid indicates whether the value is a known member of the PermissionHintKind enum.
+func (e PermissionHintKind) Valid() bool {
+	switch e {
+	case AgentPersonal:
+		return true
+	case GrantToDisabled:
+		return true
+	case H1ReadHorizon:
+		return true
+	case TriggerBlocked:
 		return true
 	default:
 		return false
@@ -5684,6 +5747,23 @@ type AccessExplanation struct {
 	TargetKind AccessTargetKind `json:"target_kind"`
 }
 
+// AccessLabel Name of a group or space named on a page.
+type AccessLabel struct {
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// Name Examples: Support
+	Name string `json:"name"`
+}
+
+// AccessLabels The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content.
+type AccessLabels struct {
+	Channels   []ChannelLabel `json:"channels"`
+	Groups     []AccessLabel  `json:"groups"`
+	Principals []PrincipalRef `json:"principals"`
+	Spaces     []AccessLabel  `json:"spaces"`
+}
+
 // AccessSource defines model for AccessSource.
 type AccessSource struct {
 	// AgentId Agent of an `operator`, `via_agent` or `guard_blocked` source.
@@ -7087,6 +7167,18 @@ type ChannelCreatedEventType string
 
 // ChannelKind defines model for ChannelKind.
 type ChannelKind string
+
+// ChannelLabel Name and space of a channel named on a page.
+type ChannelLabel struct {
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// Name Examples: Intern
+	Name string `json:"name"`
+
+	// SpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	SpaceId Uuid `json:"space_id"`
+}
 
 // ChannelOperator defines model for ChannelOperator.
 type ChannelOperator struct {
@@ -8530,6 +8622,45 @@ type EventScope struct {
 
 	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
 	ThreadId *Uuid `json:"thread_id,omitempty"`
+}
+
+// ExpiringAccessItem One access that expires within `authz.expiry_reminder_lead`. `grant` carries the `grant`; `membership` names `membership_id`, `group_id` and `user_id`; `token` names `token_id` and the holder `principal_id` (an agent or an app), never the token value.
+type ExpiringAccessItem struct {
+	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	ExpiresAt Timestamp `json:"expires_at"`
+	Grant     *Grant    `json:"grant,omitempty"`
+
+	// GroupId UUIDv7 (RFC 9562), lowercase canonical form.
+	GroupId *Uuid                  `json:"group_id,omitempty"`
+	Kind    ExpiringAccessItemKind `json:"kind"`
+
+	// MembershipId UUIDv7 (RFC 9562), lowercase canonical form.
+	MembershipId *Uuid `json:"membership_id,omitempty"`
+
+	// PrincipalId UUIDv7 (RFC 9562), lowercase canonical form.
+	PrincipalId *Uuid `json:"principal_id,omitempty"`
+
+	// TokenId UUIDv7 (RFC 9562), lowercase canonical form.
+	TokenId *Uuid `json:"token_id,omitempty"`
+
+	// UserId UUIDv7 (RFC 9562), lowercase canonical form.
+	UserId *Uuid `json:"user_id,omitempty"`
+}
+
+// ExpiringAccessItemKind defines model for ExpiringAccessItem.Kind.
+type ExpiringAccessItemKind string
+
+// ExpiringAccessPage One page. `next_cursor` is absent on the last page.
+type ExpiringAccessPage struct {
+	Items []ExpiringAccessItem `json:"items"`
+
+	// Labels The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content.
+	Labels AccessLabels `json:"labels"`
+
+	// NextCursor Opaque pagination cursor. Clients must not parse or build cursors.
+	//
+	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
+	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
 
 // ExtensionSessionCreate Child session of the calling app session for an app extension with its own refresh family (08, 7.4).
@@ -11810,6 +11941,51 @@ type PasswordLoginRequest struct {
 
 	// TotpCode Examples: 492039
 	TotpCode string `json:"totp_code"`
+}
+
+// PermissionHint One permission hint. `h1_read_horizon` names `agent_id`, `person_id`, `space_id` and `channel_id` (the person can learn content of the channel through the agent, 07 section 6). `grant_to_disabled` and `trigger_blocked` carry the `grant`; `trigger_blocked` names the blocking `rules` (SR2 tool class, SR3 dev isolation). `agent_personal` names `agent_id`, `credential_holder_id` (absent when the agent has none) and the `trigger_set` (I1 asks for exactly the holder).
+type PermissionHint struct {
+	// AgentId UUIDv7 (RFC 9562), lowercase canonical form.
+	AgentId *Uuid `json:"agent_id,omitempty"`
+
+	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ChannelId *Uuid `json:"channel_id,omitempty"`
+
+	// CredentialHolderId UUIDv7 (RFC 9562), lowercase canonical form.
+	CredentialHolderId *Uuid  `json:"credential_holder_id,omitempty"`
+	Grant              *Grant `json:"grant,omitempty"`
+
+	// Kind Kind of a permission hint (07 section 9.5), in the order of the list.
+	Kind PermissionHintKind `json:"kind"`
+
+	// PersonId UUIDv7 (RFC 9562), lowercase canonical form.
+	PersonId *Uuid                  `json:"person_id,omitempty"`
+	Rules    *[]PermissionHintRules `json:"rules,omitempty"`
+
+	// SpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	SpaceId *Uuid `json:"space_id,omitempty"`
+
+	// TriggerSet The people with effective `trigger` on a target the agent serves, ascending.
+	TriggerSet *[]Uuid `json:"trigger_set,omitempty"`
+}
+
+// PermissionHintRules defines model for PermissionHint.Rules.
+type PermissionHintRules string
+
+// PermissionHintKind Kind of a permission hint (07 section 9.5), in the order of the list.
+type PermissionHintKind string
+
+// PermissionHintPage One page. `next_cursor` is absent on the last page.
+type PermissionHintPage struct {
+	Items []PermissionHint `json:"items"`
+
+	// Labels The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content.
+	Labels AccessLabels `json:"labels"`
+
+	// NextCursor Opaque pagination cursor. Clients must not parse or build cursors.
+	//
+	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
+	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
 
 // Pin defines model for Pin.
@@ -16152,6 +16328,29 @@ type UnprocessableEntity = Problem
 // UnsupportedMediaType Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type UnsupportedMediaType = Problem
+
+// ListExpiringAccessParams defines parameters for ListExpiringAccess.
+type ListExpiringAccessParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// SpaceId Only the access within this space; without it the whole instance (owners only).
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+}
+
+// ListPermissionHintsParams defines parameters for ListPermissionHints.
+type ListPermissionHintsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// SpaceId Only the hints of this space; without it the whole instance (owners only).
+	SpaceId *Uuid `form:"space_id,omitempty" json:"space_id,omitempty"`
+
+	// Kind Only hints of this kind.
+	Kind *PermissionHintKind `form:"kind,omitempty" json:"kind,omitempty"`
+}
 
 // ListAgentsParams defines parameters for ListAgents.
 type ListAgentsParams struct {

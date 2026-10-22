@@ -1401,6 +1401,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/access/hints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the permission hints
+         * @description The list "Permission hints" of 07 section 9.5, computed from the permission state that `authorize` uses: `h1_read_horizon` for every agent, person of its trigger set and channel of its read horizon the person cannot read (07 section 6), `grant_to_disabled` for grants whose subject is disabled, `trigger_blocked` for `trigger` grants whose triggering SR2 or SR3 blocks on every operated channel they reach, `agent_personal` for agents in mode `personal` with their trigger set. Ordered by kind in this order, then by agent, person and channel, by grant ID or by agent ID. Without `space_id` the instance (owners); with it the space (owner or `manage`), limited to its agents, channels and grants. A space the caller cannot read gives `404`, readable without `manage` `403`. Hints never name content; `labels` carries the names of the principals, groups, spaces and channels of the page.
+         */
+        get: operations["listPermissionHints"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/access/expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the access that expires soon
+         * @description The list "Expiring soon" of 07 section 9.4: grants that are not revoked and memberships that are not removed (of groups that are not deleted) whose `expires_at` lies within `authz.expiry_reminder_lead` from now, and for owners the API tokens of agents and apps that are not revoked and expire within the same lead (never personal tokens, never a token value), ordered by expiry, then kind, then ID. "Extend" is a revocation plus a new grant with a new reason (07 section 2.5), a token is renewed by creating a new one and revoking the old one. Without `space_id` the instance (owners); with it the space (owner or `manage`): only grants on the space and its channels and memberships of groups that hold such a grant, no tokens. A space the caller cannot read gives `404`, readable without `manage` `403`.
+         */
+        get: operations["listExpiringAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instance": {
         parameters: {
             query?: never;
@@ -10358,6 +10398,68 @@ export interface components {
             items: components["schemas"]["GroupMember"][];
             next_cursor?: components["schemas"]["Cursor"];
         };
+        /**
+         * @description Kind of a permission hint (07 section 9.5), in the order of the list.
+         * @enum {string}
+         */
+        PermissionHintKind: "h1_read_horizon" | "grant_to_disabled" | "trigger_blocked" | "agent_personal";
+        /** @description One permission hint. `h1_read_horizon` names `agent_id`, `person_id`, `space_id` and `channel_id` (the person can learn content of the channel through the agent, 07 section 6). `grant_to_disabled` and `trigger_blocked` carry the `grant`; `trigger_blocked` names the blocking `rules` (SR2 tool class, SR3 dev isolation). `agent_personal` names `agent_id`, `credential_holder_id` (absent when the agent has none) and the `trigger_set` (I1 asks for exactly the holder). */
+        PermissionHint: {
+            kind: components["schemas"]["PermissionHintKind"];
+            agent_id?: components["schemas"]["Uuid"];
+            person_id?: components["schemas"]["Uuid"];
+            space_id?: components["schemas"]["Uuid"];
+            channel_id?: components["schemas"]["Uuid"];
+            grant?: components["schemas"]["Grant"];
+            rules?: ("sr2" | "sr3")[];
+            credential_holder_id?: components["schemas"]["Uuid"];
+            /** @description The people with effective `trigger` on a target the agent serves, ascending. */
+            trigger_set?: components["schemas"]["Uuid"][];
+        };
+        /** @description Name of a group or space named on a page. */
+        AccessLabel: {
+            id: components["schemas"]["Uuid"];
+            /** @example Support */
+            name: string;
+        };
+        /** @description Name and space of a channel named on a page. */
+        ChannelLabel: {
+            id: components["schemas"]["Uuid"];
+            space_id: components["schemas"]["Uuid"];
+            /** @example Intern */
+            name: string;
+        };
+        /** @description The names of the principals, groups, spaces and channels a page of hints or expiring access names, as the administration lists show them; never content. */
+        AccessLabels: {
+            principals: components["schemas"]["PrincipalRef"][];
+            groups: components["schemas"]["AccessLabel"][];
+            spaces: components["schemas"]["AccessLabel"][];
+            channels: components["schemas"]["ChannelLabel"][];
+        };
+        /** @description One page. `next_cursor` is absent on the last page. */
+        PermissionHintPage: {
+            items: components["schemas"]["PermissionHint"][];
+            labels: components["schemas"]["AccessLabels"];
+            next_cursor?: components["schemas"]["Cursor"];
+        };
+        /** @description One access that expires within `authz.expiry_reminder_lead`. `grant` carries the `grant`; `membership` names `membership_id`, `group_id` and `user_id`; `token` names `token_id` and the holder `principal_id` (an agent or an app), never the token value. */
+        ExpiringAccessItem: {
+            /** @enum {string} */
+            kind: "grant" | "membership" | "token";
+            expires_at: components["schemas"]["Timestamp"];
+            grant?: components["schemas"]["Grant"];
+            membership_id?: components["schemas"]["Uuid"];
+            group_id?: components["schemas"]["Uuid"];
+            user_id?: components["schemas"]["Uuid"];
+            token_id?: components["schemas"]["Uuid"];
+            principal_id?: components["schemas"]["Uuid"];
+        };
+        /** @description One page. `next_cursor` is absent on the last page. */
+        ExpiringAccessPage: {
+            items: components["schemas"]["ExpiringAccessItem"][];
+            labels: components["schemas"]["AccessLabels"];
+            next_cursor?: components["schemas"]["Cursor"];
+        };
         /** @description One page. `next_cursor` is absent on the last page. */
         GrantPage: {
             items: components["schemas"]["Grant"][];
@@ -14032,6 +14134,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccessExplanation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listPermissionHints: {
+        parameters: {
+            query?: {
+                /** @description Cursor from `next_cursor` of the previous page. */
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Only the hints of this space; without it the whole instance (owners only). */
+                space_id?: components["schemas"]["Uuid"];
+                /** @description Only hints of this kind. */
+                kind?: components["schemas"]["PermissionHintKind"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionHintPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listExpiringAccess: {
+        parameters: {
+            query?: {
+                /** @description Cursor from `next_cursor` of the previous page. */
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Only the access within this space; without it the whole instance (owners only). */
+                space_id?: components["schemas"]["Uuid"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpiringAccessPage"];
                 };
             };
             400: components["responses"]["BadRequest"];

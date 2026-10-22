@@ -828,6 +828,8 @@ Generated from openapi.yaml.
 | POST | `/api/v1/grants/{grant_id}/revoke` | `revokeGrant` | `grant.revoke` | Revoke a grant |
 | GET | `/api/v1/spaces/{space_id}/access` | `explainSpaceAccess` | `access.explain` | Who has access to a space |
 | GET | `/api/v1/channels/{channel_id}/access` | `explainChannelAccess` | `access.explain` | Who has access to a channel |
+| GET | `/api/v1/access/hints` | `listPermissionHints` | `access.hints.read` | List the permission hints |
+| GET | `/api/v1/access/expiring` | `listExpiringAccess` | `access.hints.read` | List the access that expires soon |
 
 #### Admin
 
