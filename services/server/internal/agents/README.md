@@ -34,7 +34,8 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
   `setCredentialHolder` and `setAgentToolClass`; they set `ETag` from `version` where the
   contract declares it, and `Cursors` (the list cursors of `platform/httpserver`).
 - `adapters/authzsource/`: `Source`, the `authz.AgentPolicySource` of the process (wired by
-  `wire.NewAgentPolicySource` into the Authorizer and the rights hooks).
+  `wire.NewAgentPolicySource` into the Authorizer and the rights hooks) and the
+  `authz.AgentDirectory` of the permission hints (`AgentIDs`, every agent ascending, M6-07).
 - Migration `migrations/00022_agents.sql`: the table `agents` as 03 section 4.4 states it, with the
   trigger `agents_kind_check` (an agents row only for a principal of kind `agent`, SQLSTATE
   `23514`). `bothy_app` may read, insert and update, not delete.

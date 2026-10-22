@@ -981,7 +981,7 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
 - Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24); declares `AvatarFiles`, `AppInstallations` (M2-24).
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
-- Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (with `HasActivePasskey`, M1-40), `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (with `HasActivePasskey`, M1-40), `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `authz.TokenExpirySource` (`app.TokenExpiry`: the agent and app tokens expiring within a window for "Expiring soon", ids and expiry only, never personal tokens or token values, M6-07), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
 
 ## Dependencies
 

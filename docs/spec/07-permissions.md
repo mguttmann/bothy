@@ -1055,12 +1055,46 @@ for memberships, to the member and to `added_by`. For grants on the instance
 "Extend" (revocation plus a new grant with a new reason). There are no emails (Baseline
 section 4).
 
+The list "Expiring soon" is the operation `listExpiringAccess` (`GET /api/v1/access/expiring`,
+action `access.hints.read`, R-AZ-34). It holds grants that are not revoked and memberships that
+are not removed (of groups that are not deleted) whose `expires_at` lies in
+`(now, now + authz.expiry_reminder_lead]`, whether reminded or not, and for owners on the
+instance the API tokens of agents and apps that are not revoked and expire in the same window;
+personal tokens and token values never appear. The entries are ordered by expiry, then grant
+before membership before token, then ID. With `space_id` a person with `manage` on the space
+sees only grants on the space and its channels and the memberships of groups that hold such a
+grant in effect, and no tokens. "Extend" opens the grant wizard with subject, target, level and
+capabilities of the old grant, an empty reason and a new expiry; confirming creates the new
+grant first and then revokes the old one, so the access never lapses in between. A token is
+renewed by creating a new one (its secret shown once) and revoking the old one.
+
 ### 9.5 Further obligations
 
 - Revoking takes effect immediately and says so in the confirmation.
 - Every grant and every revocation needs a reason (03, `grants.reason` and `grants.revoke_reason`); deleting a group revokes its grants with the reason `group_deleted` (M1-48).
 - List "Permission hints": H1, grants to disabled principals, `trigger` without possible
-  triggering (SR2, SR3), agents with `personal` and their trigger set.
+  triggering (SR2, SR3), agents with `personal` and their trigger set. It is the operation
+  `listPermissionHints` (`GET /api/v1/access/hints`, action `access.hints.read`, R-AZ-34),
+  computed per request with the snapshot code of `authorize`, never a second rule set, and it
+  never names content:
+  - `h1_read_horizon`: for every agent A, every person P in T(A) and every channel K in H(A)
+    that P cannot read (section 6), the same function as the source `via_agent` of section 9.1.
+  - `grant_to_disabled`: a grant in effect whose subject person, agent or app is `disabled` or
+    `deleted` (SR7); a pending person's grants take effect and do not count.
+  - `trigger_blocked`: a grant in effect with level `trigger` to an active person or a group
+    that reaches at least one channel with an operator, where on every such channel SR2 (an
+    operator of tool class `host`) or SR3 (a project binding) keeps the subject from
+    triggering because it is no owner and has no ready dev environment of its own there; the
+    hint names the blocking rules.
+  - `agent_personal`: every active agent with `billing_mode = personal`, its credential holder
+    and its trigger set of SR1; I1 asks for exactly the holder.
+
+  The hints come in this order of kinds, within a kind by agent, person and channel (H1), by
+  grant ID or by agent ID, and a page carries the names of the principals, groups, spaces and
+  channels it names. Without `space_id` the list covers the instance and needs the owner role;
+  with `space_id` the space and `manage` there (a space without read gives `404`, with read but
+  without `manage` `403`): H1 over the channels of the space for every agent, the grants on the
+  space and its channels, and the personal agents that serve a target in the space.
 - Filterable log from the audit log (`audit.read`), [ADR 0021](../adr/0021-hash-chained-audit-log-separate-from-telemetry.md).
 
 ## 10. Examples

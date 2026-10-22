@@ -51,12 +51,9 @@ func (s *AdminService) ListPermissionHints(ctx context.Context, caller actor.Act
 	if s.d.Agents == nil {
 		return authz.HintPage{}, internal("the permission hints need the agent directory")
 	}
-	kinds := domain.HintKinds
-	if q.Kind != "" {
-		if domain.KindRank(domain.HintKind(q.Kind)) < 0 {
-			return authz.HintPage{}, fieldErr("/kind", "an unknown kind of permission hint")
-		}
-		kinds = []domain.HintKind{domain.HintKind(q.Kind)}
+	kinds, err := hintKinds(q.Kind)
+	if err != nil {
+		return authz.HintPage{}, err
 	}
 	if err := s.checkHints(ctx, caller, q.SpaceID); err != nil {
 		return authz.HintPage{}, err
@@ -71,23 +68,9 @@ func (s *AdminService) ListPermissionHints(ctx context.Context, caller actor.Act
 		return authz.HintPage{}, err
 	}
 	limit := s.pageLimit(q.PageQuery)
-	var items []domain.Hint
-	for _, k := range kinds {
-		rank := domain.KindRank(k)
-		if pos.started && rank < pos.rank {
-			continue
-		}
-		var after *domain.HintKey
-		if pos.started && rank == pos.rank {
-			after = &pos.key
-		}
-		more, err := h.list(ctx, k, after, limit+1-len(items))
-		if err != nil {
-			return authz.HintPage{}, err
-		}
-		if items = append(items, more...); len(items) > limit {
-			break
-		}
+	items, err := h.collect(ctx, kinds, pos, limit+1)
+	if err != nil {
+		return authz.HintPage{}, err
 	}
 	full := len(items) > limit
 	items = items[:min(len(items), limit)]
@@ -102,6 +85,41 @@ func (s *AdminService) ListPermissionHints(ctx context.Context, caller actor.Act
 		out.NextCursor, err = s.hintNext(bind, items[len(items)-1])
 	}
 	return out, err
+}
+
+// hintKinds returns the kinds a query lists: all of them, or the one of kind. Errors:
+// validation_failed on /kind for an unknown kind.
+func hintKinds(kind string) ([]domain.HintKind, error) {
+	if kind == "" {
+		return domain.HintKinds, nil
+	}
+	if domain.KindRank(domain.HintKind(kind)) < 0 {
+		return nil, fieldErr("/kind", "an unknown kind of permission hint")
+	}
+	return []domain.HintKind{domain.HintKind(kind)}, nil
+}
+
+// collect returns at most need hints of kinds after pos, in the order of the list.
+func (h *hinter) collect(ctx context.Context, kinds []domain.HintKind, pos hintPos, need int) ([]domain.Hint, error) {
+	var items []domain.Hint
+	for _, k := range kinds {
+		rank := domain.KindRank(k)
+		if pos.started && rank < pos.rank {
+			continue
+		}
+		var after *domain.HintKey
+		if pos.started && rank == pos.rank {
+			after = &pos.key
+		}
+		more, err := h.list(ctx, k, after, need-len(items))
+		if err != nil {
+			return nil, err
+		}
+		if items = append(items, more...); len(items) >= need {
+			break
+		}
+	}
+	return items, nil
 }
 
 // checkHints authorizes access.hints.read on the instance (zero space) or on the space: no read
@@ -426,20 +444,27 @@ func (h *hinter) reach(ctx context.Context, g domain.Grant, people []ids.ID) ([]
 		if !found {
 			continue
 		}
-		c := domain.TriggerChannel{ChannelID: f.ID, ToolClass: class, ProjectBound: f.ProjectBound}
-		for _, person := range people {
-			ready, err := h.x.a.policies.DevEnvironmentReady(ctx, person, f.ID)
-			if err != nil {
-				return nil, sourceError("agent policy source", err)
-			}
-			if ready {
-				c.DevReady = true
-				break
-			}
+		ready, err := h.devReady(ctx, people, f.ID)
+		if err != nil {
+			return nil, err
 		}
-		out = append(out, c)
+		out = append(out, domain.TriggerChannel{ChannelID: f.ID, ToolClass: class, ProjectBound: f.ProjectBound, DevReady: ready})
 	}
 	return out, nil
+}
+
+// devReady reports a ready own dev environment of one of people for channel (SR3).
+func (h *hinter) devReady(ctx context.Context, people []ids.ID, channel ids.ID) (bool, error) {
+	for _, person := range people {
+		ready, err := h.x.a.policies.DevEnvironmentReady(ctx, person, channel)
+		if err != nil {
+			return false, sourceError("agent policy source", err)
+		}
+		if ready {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // servedOf returns the served targets of agent, read once per request.
@@ -531,36 +556,56 @@ func pageLabels(ctx context.Context, eng *Authorizer, store Store, r labelRefs) 
 			out.Principals = append(out.Principals, p.PrincipalRef)
 		}
 	}
-	for _, id := range uniqueIDs(r.groups) {
+	if out.Groups, err = groupLabels(ctx, store, r.groups); err != nil {
+		return authz.AccessLabels{}, err
+	}
+	if out.Spaces, out.Channels, err = structureLabels(ctx, eng.structure, r.spaces, r.channels); err != nil {
+		return authz.AccessLabels{}, err
+	}
+	return out, nil
+}
+
+// groupLabels returns the names of the known groups among list, ascending by id.
+func groupLabels(ctx context.Context, store Store, list []ids.ID) ([]authz.AccessLabel, error) {
+	out := []authz.AccessLabel{}
+	for _, id := range uniqueIDs(list) {
 		g, found, err := store.GetGroup(ctx, id)
 		if err != nil {
-			return authz.AccessLabels{}, sourceError("grant store", err)
+			return nil, sourceError("grant store", err)
 		}
 		if found {
-			out.Groups = append(out.Groups, authz.AccessLabel{ID: g.ID, Name: g.Name})
-		}
-	}
-	chans, err := eng.structure.ChannelDetails(ctx, uniqueIDs(r.channels))
-	if err != nil {
-		return authz.AccessLabels{}, sourceError("structure source", err)
-	}
-	spaces := slices.Clone(r.spaces)
-	for _, id := range uniqueIDs(r.channels) {
-		if c, ok := chans[id]; ok {
-			out.Channels = append(out.Channels, authz.ChannelLabel{ID: c.ID, SpaceID: c.SpaceID, Name: c.Name})
-			spaces = append(spaces, c.SpaceID)
-		}
-	}
-	details, err := eng.structure.SpaceDetails(ctx, uniqueIDs(spaces))
-	if err != nil {
-		return authz.AccessLabels{}, sourceError("structure source", err)
-	}
-	for _, id := range uniqueIDs(spaces) {
-		if d, ok := details[id]; ok {
-			out.Spaces = append(out.Spaces, authz.AccessLabel{ID: d.ID, Name: d.Name})
+			out = append(out, authz.AccessLabel{ID: g.ID, Name: g.Name})
 		}
 	}
 	return out, nil
+}
+
+// structureLabels returns the names of the known spaces and channels, the space of every channel
+// among the spaces, ascending by id.
+func structureLabels(ctx context.Context, structure authz.StructureSource, spaceIDs, channelIDs []ids.ID) ([]authz.AccessLabel, []authz.ChannelLabel, error) {
+	chans, err := structure.ChannelDetails(ctx, uniqueIDs(channelIDs))
+	if err != nil {
+		return nil, nil, sourceError("structure source", err)
+	}
+	channels := []authz.ChannelLabel{}
+	all := slices.Clone(spaceIDs)
+	for _, id := range uniqueIDs(channelIDs) {
+		if c, ok := chans[id]; ok {
+			channels = append(channels, authz.ChannelLabel{ID: c.ID, SpaceID: c.SpaceID, Name: c.Name})
+			all = append(all, c.SpaceID)
+		}
+	}
+	details, err := structure.SpaceDetails(ctx, uniqueIDs(all))
+	if err != nil {
+		return nil, nil, sourceError("structure source", err)
+	}
+	spaces := []authz.AccessLabel{}
+	for _, id := range uniqueIDs(all) {
+		if d, ok := details[id]; ok {
+			spaces = append(spaces, authz.AccessLabel{ID: d.ID, Name: d.Name})
+		}
+	}
+	return spaces, channels, nil
 }
 
 // hintOut converts a hint for the port.
