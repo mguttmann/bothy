@@ -16,16 +16,19 @@ import (
 // The regression tests of the lock cycle of M2-21 (docs/DECISIONS.md D-M2-21-11): a request that
 // holds the agents row or a channel row in its unit of work and reads or updates the presence
 // tracker, against a storm of heartbeats of the same agent that wait for that row. Before the fix
-// both sides waited until a lock timeout and answered 5xx after 15 s. The worlds run one after
-// the other (cb2a50f21: parallel worlds overload the shared runner).
+// both sides waited until a lock timeout and answered 5xx after 15 s, so the status codes alone
+// show the cycle and no test bounds a duration. The worlds run one after the other (cb2a50f21:
+// parallel worlds overload the shared runner).
 
 // lockCycleRounds is the number of storms per case; the cycle showed in 5 to 8 of 8 rounds.
 const lockCycleRounds = 3
 
 // heartbeatStorm sends heartbeats of name with the bodies in turn until stop and returns every
-// answer of 500 or more and, unless allow4xx, every other answer that is not 200.
+// answer of 500 or more and, unless allow4xx, every other answer that is not 200. It returns once
+// the first heartbeat of the storm has been answered, so the storm runs when the caller starts.
 func (w *world) heartbeatStorm(name string, bodies []string, allow4xx bool) (stop func() []string) {
 	done := make(chan struct{})
+	running := make(chan struct{})
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var bad []string
@@ -45,9 +48,12 @@ func (w *world) heartbeatStorm(name string, bodies []string, allow4xx bool) (sto
 				bad = append(bad, fmt.Sprintf("heartbeat %d after %v: %s", r.StatusCode, time.Since(s), r.Body))
 				mu.Unlock()
 			}
+			if n == 0 {
+				close(running)
+			}
 		}
 	}()
-	time.Sleep(20 * time.Millisecond)
+	<-running
 	return func() []string {
 		close(done)
 		wg.Wait()
@@ -57,8 +63,8 @@ func (w *world) heartbeatStorm(name string, bodies []string, allow4xx bool) (sto
 	}
 }
 
-// underStorm runs req once against a storm of heartbeats of name and requires want within 5 s and
-// no failed heartbeat.
+// underStorm runs req once against a storm of heartbeats of name and requires want and no failed
+// heartbeat.
 func underStorm(t *testing.T, name string, bodies []string, allow4xx bool, want int, req func(w *world) *httpservertest.Response) {
 	t.Helper()
 	for i := range lockCycleRounds {
@@ -69,7 +75,7 @@ func underStorm(t *testing.T, name string, bodies []string, allow4xx bool, want 
 		r := req(w)
 		took := time.Since(s)
 		bad := stop()
-		if r.StatusCode != want || len(bad) > 0 || took > 5*time.Second {
+		if r.StatusCode != want || len(bad) > 0 {
 			t.Fatalf("round %d: %d after %v: %s\nheartbeats: %v", i, r.StatusCode, took, r.Body, bad)
 		}
 	}
@@ -109,7 +115,7 @@ func TestLockCycle_GuidedOperatorVsReadinessStorm(t *testing.T) {
 			with(agentBody(w.assistent), resolveJSON("Guided", w.assistent)), ifMatch(w.channelVersion(w.allgemein))...)
 		took := time.Since(s)
 		bad := stop()
-		if r.StatusCode != http.StatusOK || len(bad) > 0 || took > 5*time.Second {
+		if r.StatusCode != http.StatusOK || len(bad) > 0 {
 			t.Fatalf("round %d: guided operator.set %d after %v: %s\nheartbeats: %v", i, r.StatusCode, took, r.Body, bad)
 		}
 		if p := w.policy(w.assistent); !strings.HasPrefix(p, "organization") {
