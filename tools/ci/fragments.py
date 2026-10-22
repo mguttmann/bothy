@@ -215,17 +215,20 @@ def _git(repo: Path, *args: str, check: bool = True) -> str:
     return out.stdout
 
 
-def _tracked(repo: Path) -> list[str]:
-    return _git(repo, "ls-files", "-z").split("\0")
+def _files(repo: Path) -> list[str]:
+    """Return the tracked and untracked, not ignored files of `repo` that exist.
+
+    A fragment that release-prep deleted before the release commit is gone.
+    """
+    out = _git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+    return sorted({rel for rel in out.split("\0") if rel and (repo / rel).is_file()})
 
 
 def check_tree(repo: Path) -> list[str]:
-    """Return the problems of the tracked fragment files of `repo`."""
+    """Return the problems of the fragment files and the ruling log of `repo`."""
     problems: list[str] = []
     allowed = {"" if d == "." else d for d in changelog_dirs()}
-    for rel in _tracked(repo):
-        if not rel:
-            continue
+    for rel in _files(repo):
         path = Path(rel)
         if path.parent.name == CHANGELOG_DIR:
             owner = path.parent.parent.as_posix()

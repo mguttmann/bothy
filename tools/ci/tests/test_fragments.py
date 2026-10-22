@@ -252,3 +252,19 @@ def test_the_command_line_reports_and_assembles(
     commit(repo, "direct")
     assert fragments.main(["check", "--range", "main..HEAD", "--repo", str(repo)]) == 1
     assert "adds '- Direct.'" in capsys.readouterr().err
+
+
+def test_an_untracked_fragment_is_checked(repo: Path) -> None:
+    write(repo, "changelog.d/M2-05.md", "### Nope\n\n- x\n")
+    [problem] = fragments.check_tree(repo)
+    assert "not one of" in problem
+
+
+def test_a_fragment_deleted_but_not_committed_is_skipped(repo: Path) -> None:
+    """release-prep deletes the fragments it assembled before the release commit."""
+    write(repo, "services/server/changelog.d/M2-05.md", "### Fixed\n\n- x\n")
+    write(repo, "docs/decisions.d/M2-05.md", "# M2-05 Runs\n")
+    commit(repo, "fragments")
+    (repo / "services/server/changelog.d/M2-05.md").unlink()
+    (repo / "docs/decisions.d/M2-05.md").unlink()
+    assert fragments.check_tree(repo) == []
