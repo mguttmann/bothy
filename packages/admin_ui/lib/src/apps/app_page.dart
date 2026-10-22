@@ -3,20 +3,16 @@
 /// The page of one app (docs/spec/01-product.md 5.2; 11 4.2, 4.3, 7; brief M6-08).
 library;
 
-import 'package:api_client/api_client.dart' show ApiProblem;
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
 import '../common/admin_action.dart';
-import '../common/confirm_change.dart';
+import '../common/principal_tokens.dart';
 import '../common/problem_banner.dart';
 import '../data/admin_repository.dart';
-import '../data/agents_repository.dart' show AgentToken;
 import '../data/apps_repository.dart';
-import '../grants/grant_labels.dart' show lastDayLabel;
 import '../secrets/once_only_secret.dart';
-import '../self/device_tile.dart' show activityText;
 import '../self/self_feedback.dart';
 import 'app_labels.dart';
 import 'lifecycle_dialog.dart';
@@ -359,9 +355,12 @@ class _AppPageState extends State<AppPage> with AdminActionState<AppPage> {
             Text(l.adminAppConsentNoEgress, style: secondary),
         ]),
         const SizedBox(height: DsSpace.s20),
-        _AppTokens(
+        PrincipalTokens(
           repository: widget.repository,
-          app: a,
+          principalId: a.id,
+          principalName: a.displayName,
+          style: _appTokens,
+          canCreate: a.state != AppInstallState.uninstalled,
           timeZone: widget.timeZone,
           clock: widget.clock,
         ),
@@ -378,330 +377,22 @@ class _AppPageState extends State<AppPage> with AdminActionState<AppPage> {
   }
 }
 
-/// The API tokens of an app: the list (newest first) with prefix, validity and last use, "New
-/// token" with the secret shown once, "Revoke" per active token (08 12; Ruling 6).
-///
-/// `AgentTokens` does not fit an app: its texts speak of an adapter and it requires the DPoP
-/// thumbprint, which `auth.dpop_required_for` asks only of agents by default. The secret of a
-/// new token is a local of the method that shows it, so after "Close" nothing holds it.
-class _AppTokens extends StatefulWidget {
-  const _AppTokens({
-    required this.repository,
-    required this.app,
-    required this.timeZone,
-    required this.clock,
-  });
-
-  final AdminRepository repository;
-
-  final AppRecord app;
-
-  final String timeZone;
-
-  final DateTime Function() clock;
-
-  @override
-  State<_AppTokens> createState() => _AppTokensState();
-}
-
-class _AppTokensState extends State<_AppTokens>
-    with AdminActionState<_AppTokens> {
-  List<AgentToken>? _tokens;
-  ApiProblem? _problem;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void didUpdateWidget(_AppTokens old) {
-    super.didUpdateWidget(old);
-    if (old.app.id != widget.app.id) _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final tokens = await widget.repository.tokens(widget.app.id);
-      // Newest first; the server's order is not part of the contract.
-      tokens.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      if (mounted) {
-        setState(() {
-          _tokens = tokens;
-          _problem = null;
-        });
-      }
-    } on Object catch (e) {
-      if (mounted) setState(() => _problem = loadProblem(e));
-    }
-  }
-
-  Future<void> _create() async {
-    final l = AppLocalizations.of(context);
-    final name = widget.app.displayName;
-    final request = await showDialog<_TokenRequest>(
-      context: context,
-      builder: (_) => _TokenForm(appName: name, timeZone: widget.timeZone),
-    );
-    if (request == null || !mounted) return;
-    String? secret;
-    await runChange('create', () async {
-      secret = (await widget.repository.createToken(
-        widget.app.id,
-        name: request.name,
-        expiresAt: request.expiresAt,
-        dpopJkt: request.dpopJkt,
-        purpose: l.adminAppPurposeToken(name),
-      )).secret;
-      return null;
-    });
-    final shown = secret;
-    // Dropped before the dialog opens, so only the dialog holds the secret (Design note 4).
-    secret = null;
-    if (shown != null && mounted) {
-      await OnceOnlySecret.show(
-        context,
-        title: l.adminAppTokenSecretTitle(name),
-        label: l.adminTokenSecretLabel,
-        notice: l.adminAppTokenSecretOnce,
-        secret: shown,
-        keyPrefix: 'appToken',
-      );
-    }
-    if (mounted) await _load();
-  }
-
-  Future<void> _revoke(AgentToken token) async {
-    final l = AppLocalizations.of(context);
-    final ok = await ConfirmChange.show(
-      context,
-      title: l.adminTokenRevokeTitle(token.name),
-      body: l.adminAppTokenRevokeBody,
-      confirmLabel: l.adminTokenRevoke,
-      destructive: true,
-    );
-    if (ok == null || !mounted) return;
-    // `token.revoke` has no step-up (05).
-    await runChange('${token.id}.revoke', () async {
-      await widget.repository.revokeToken(token.id);
-      return SelfNotice(l.adminTokenRevokedNotice(token.name));
-    });
-    if (mounted) await _load();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final colors = context.dsColors;
-    final tokens = _tokens;
-    final live = widget.app.state != AppInstallState.uninstalled;
-    return Column(
-      key: const ValueKey('appTokens'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Semantics(
-                header: true,
-                child: Text(
-                  l.adminTokensTitle,
-                  style: dsTextStyle(DsType.heading)
-                      .copyWith(color: colors.textPrimary),
-                ),
-              ),
-            ),
-            if (tokens != null && live && !denied.contains('create'))
-              OutlinedButton(
-                key: const ValueKey('appTokens.create'),
-                onPressed: busy ? null : _create,
-                child: Text(l.adminAppTokenNew),
-              ),
-          ],
-        ),
-        const SizedBox(height: DsSpace.s8),
-        noticeBanner(),
-        if (_problem case final problem?)
-          ProblemBanner(problem: problem, onRetry: _load)
-        else if (tokens != null) ...[
-          if (tokens.isEmpty)
-            Text(
-              l.adminTokensEmpty,
-              style: dsTextStyle(DsType.body)
-                  .copyWith(color: colors.textSecondary),
-            ),
-          for (final token in tokens) ...[
-            _row(context, l, colors, token),
-            Divider(height: 1, color: colors.borderSubtle),
-          ],
-        ],
-      ],
-    );
-  }
-
-  Widget _row(
-    BuildContext context,
-    AppLocalizations l,
-    DsColors colors,
-    AgentToken token,
-  ) {
-    final details = [
-      if (token.revokedAt != null) l.adminTokenRevokedLabel,
-      if (token.expiresAt case final end?)
-        l.adminTokenValidUntil(
-          lastDayLabel(
-            context,
-            end,
-            now: widget.clock(),
-            timeZone: widget.timeZone,
-          ),
-        ),
-      if (token.lastUsedAt case final used?)
-        l.adminTokenLastUsed(
-          activityText(
-            context,
-            used,
-            now: widget.clock(),
-            timeZone: widget.timeZone,
-          ),
-        ),
-      if (token.dpopBound) l.adminTokenBound,
-    ];
-    final secondary = dsTextStyle(DsType.bodySm)
-        .copyWith(color: colors.textSecondary);
-    return Padding(
-      key: ValueKey('appToken.${token.id}'),
-      padding: const EdgeInsets.symmetric(vertical: DsSpace.s8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  token.name,
-                  style: dsTextStyle(DsType.bodyStrong)
-                      .copyWith(color: colors.textPrimary),
-                ),
-                // The prefix only (ADR 0061): it names the token, it is no secret.
-                Text(
-                  token.prefix,
-                  style: dsTextStyle(DsType.code)
-                      .copyWith(color: colors.textSecondary),
-                ),
-                Wrap(
-                  spacing: DsSpace.s12,
-                  children: [
-                    for (final d in details) Text(d, style: secondary),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (token.revokedAt == null && !denied.contains('${token.id}.revoke'))
-            OutlinedButton(
-              key: ValueKey('appToken.${token.id}.revoke'),
-              onPressed: busy ? null : () => _revoke(token),
-              child: Text(l.adminTokenRevoke),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// What the token form asks for.
-final class _TokenRequest {
-  const _TokenRequest(this.name, this.expiresAt, this.dpopJkt);
-
-  final String name;
-
-  final DateTime expiresAt;
-
-  final String? dpopJkt;
-}
-
-/// The form "New token" of an app: name, last day (`YYYY-MM-DD`) and an optional DPoP
-/// thumbprint (Ruling 6); pops a [_TokenRequest] or null.
-class _TokenForm extends StatefulWidget {
-  const _TokenForm({required this.appName, required this.timeZone});
-
-  final String appName;
-
-  final String timeZone;
-
-  @override
-  State<_TokenForm> createState() => _TokenFormState();
-}
-
-class _TokenFormState extends State<_TokenForm> {
-  final TextEditingController _name = TextEditingController();
-  final TextEditingController _lastDay = TextEditingController();
-  final TextEditingController _dpop = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    for (final c in [_name, _lastDay, _dpop]) {
-      c.addListener(() => setState(() {}));
-    }
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _lastDay.dispose();
-    _dpop.dispose();
-    super.dispose();
-  }
-
-  DateTime? _expiresAt(BuildContext context) =>
-      tokenExpiry(context, _lastDay.text, widget.timeZone);
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final name = _name.text.trim();
-    final dayText = _lastDay.text.trim();
-    final expiresAt = _expiresAt(context);
-    final dpop = _dpop.text.trim();
-    return ConfirmChange(
-      title: l.adminAppTokenCreateTitle(widget.appName),
-      body: l.adminAppTokenBody,
-      confirmLabel: l.adminAppTokenNew,
-      canConfirm: name.isNotEmpty && expiresAt != null,
-      onConfirm: (_) =>
-          Navigator.of(context)
-              .pop(_TokenRequest(name, expiresAt!, dpop.isEmpty ? null : dpop)),
-      fields: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            key: const ValueKey('appTokenForm.name'),
-            controller: _name,
-            decoration: InputDecoration(labelText: l.adminTokenName),
-          ),
-          TextField(
-            key: const ValueKey('appTokenForm.lastDay'),
-            controller: _lastDay,
-            keyboardType: TextInputType.datetime,
-            decoration: InputDecoration(
-              labelText: l.adminTokenLastDay,
-              errorText: dayText.isEmpty || expiresAt != null
-                  ? null
-                  : l.adminTokenLastDayInvalid,
-            ),
-          ),
-          TextField(
-            key: const ValueKey('appTokenForm.dpop'),
-            controller: _dpop,
-            decoration: InputDecoration(labelText: l.adminAppTokenDpop),
-          ),
-        ],
-      ),
-    );
-  }
-}
+/// The texts and keys of an app's tokens (Ruling 6): the DPoP thumbprint is optional, because
+/// `auth.dpop_required_for` asks it only of agents by default; the secret of a new token is shown
+/// once with the keys `appToken.*`.
+final PrincipalTokensStyle _appTokens = PrincipalTokensStyle(
+  sectionKey: 'appTokens',
+  createKey: 'appTokens.create',
+  rowKey: 'appToken',
+  formKey: 'appTokenForm',
+  secretKey: 'appToken',
+  dpopRequired: false,
+  createLabel: (l) => l.adminAppTokenNew,
+  formTitle: (l, name) => l.adminAppTokenCreateTitle(name),
+  formBody: (l, _) => l.adminAppTokenBody,
+  dpopLabel: (l) => l.adminAppTokenDpop,
+  purpose: (l, name) => l.adminAppPurposeToken(name),
+  secretTitle: (l, name, _) => l.adminAppTokenSecretTitle(name),
+  secretNotice: (l) => l.adminAppTokenSecretOnce,
+  revokeBody: (l) => l.adminAppTokenRevokeBody,
+);

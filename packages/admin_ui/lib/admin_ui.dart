@@ -92,6 +92,7 @@ export 'src/audit/chain_check.dart';
 export 'src/common/admin_action.dart';
 export 'src/common/code_text.dart';
 export 'src/common/confirm_change.dart';
+export 'src/common/principal_tokens.dart';
 export 'src/common/problem_banner.dart';
 export 'src/data/access_repository.dart';
 export 'src/data/admin_repository.dart';

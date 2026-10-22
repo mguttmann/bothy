@@ -372,7 +372,14 @@ final class ManifestUpload {
     if (doc is! Map<String, Object?>) {
       throw const ManifestFileError(ManifestFileProblem.notObject);
     }
-    return ManifestUpload._(fileName, jsonEncode(doc), doc);
+    final String json;
+    try {
+      json = jsonEncode(doc);
+    } on JsonUnsupportedObjectError {
+      // NaN and infinity are YAML numbers that JSON cannot carry.
+      throw const ManifestFileError(ManifestFileProblem.notJsonOrYaml);
+    }
+    return ManifestUpload._(fileName, json, doc);
   }
 
   /// Creates an upload of the object [data] (the built-in manifest of an "incoming app",
@@ -393,12 +400,14 @@ final class ManifestUpload {
   AppManifestInfo get info => AppManifestInfo.fromJson(data);
 
   /// The plain Dart value of a YAML node: maps with string keys, lists and scalars. A key that
-  /// is no string makes the document no object.
+  /// is no string has no JSON form, so the file is refused ([ManifestFileError]).
   static Object? _plain(Object? node) => switch (node) {
     final YamlMap m when m.keys.every((k) => k is String) => <String, Object?>{
       for (final e in m.entries) e.key as String: _plain(e.value),
     },
-    YamlMap() => const <Object?>[],
+    YamlMap() => throw const ManifestFileError(
+      ManifestFileProblem.notJsonOrYaml,
+    ),
     final YamlList l => [for (final e in l) _plain(e)],
     _ => node,
   };

@@ -348,6 +348,22 @@ requested_grants:
           ),
           fails(ManifestFileProblem.notJsonOrYaml),
         );
+        // YAML values JSON cannot carry and keys that are no strings are refused, never
+        // changed.
+        for (final yaml in [
+          'limit: .nan\n',
+          'limit: .inf\n',
+          'scopes: {1: x}\n',
+        ]) {
+          expect(
+            () => ManifestUpload.read(
+              'a.yaml',
+              Uint8List.fromList(utf8.encode(yaml)),
+            ),
+            fails(ManifestFileProblem.notJsonOrYaml),
+            reason: yaml,
+          );
+        }
       },
     );
 

@@ -307,140 +307,147 @@ class _CreateIncomingDialogState extends State<CreateIncomingDialog> {
     final colors = context.dsColors;
     final body = dsTextStyle(DsType.body).copyWith(color: colors.textSecondary);
     final locked = _busy || _started;
-    return AlertDialog(
-      key: const ValueKey('incoming.dialog'),
-      backgroundColor: colors.surfaceRaised,
-      title: Text(
-        l.adminIncomingDialogTitle(widget.channel.path),
-        style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(l.adminIncomingDialogBody, style: body),
-              if (_notice case final n?) ...[
-                const SizedBox(height: DsSpace.s8),
-                selfNoticeBanner(n),
-              ],
-              const SizedBox(height: DsSpace.s16),
-              TextField(
-                key: const ValueKey('incoming.name'),
-                controller: _name,
-                enabled: !locked,
-                decoration: InputDecoration(labelText: l.adminIncomingName),
-              ),
-              const SizedBox(height: DsSpace.s16),
-              Wrap(
-                spacing: DsSpace.s8,
-                children: [
-                  ChoiceChip(
-                    key: const ValueKey('incoming.mode.existing'),
-                    label: Text(l.adminIncomingModeExisting),
-                    selected: !_newApp,
-                    onSelected: locked
-                        ? null
-                        : (_) => setState(() => _newApp = false),
-                  ),
-                  if (widget.offerIncomingApp)
+    // A back action of the system or the browser must not close the dialog while a run
+    // is in progress: the address it returns is shown once.
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        key: const ValueKey('incoming.dialog'),
+        backgroundColor: colors.surfaceRaised,
+        title: Text(
+          l.adminIncomingDialogTitle(widget.channel.path),
+          style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(l.adminIncomingDialogBody, style: body),
+                if (_notice case final n?) ...[
+                  const SizedBox(height: DsSpace.s8),
+                  selfNoticeBanner(n),
+                ],
+                const SizedBox(height: DsSpace.s16),
+                TextField(
+                  key: const ValueKey('incoming.name'),
+                  controller: _name,
+                  enabled: !locked,
+                  decoration: InputDecoration(labelText: l.adminIncomingName),
+                ),
+                const SizedBox(height: DsSpace.s16),
+                Wrap(
+                  spacing: DsSpace.s8,
+                  children: [
                     ChoiceChip(
-                      key: const ValueKey('incoming.mode.newApp'),
-                      label: Text(l.adminIncomingModeNewApp),
-                      selected: _newApp,
+                      key: const ValueKey('incoming.mode.existing'),
+                      label: Text(l.adminIncomingModeExisting),
+                      selected: !_newApp,
                       onSelected: locked
                           ? null
-                          : (_) => setState(() => _newApp = true),
+                          : (_) => setState(() => _newApp = false),
                     ),
-                ],
-              ),
-              const SizedBox(height: DsSpace.s8),
-              if (_newApp) ...[
-                Text(l.adminIncomingNewAppBody, style: body),
-                TextField(
-                  key: const ValueKey('incoming.reason'),
-                  controller: _reason,
-                  enabled: !locked,
-                  decoration: InputDecoration(labelText: l.adminReason),
-                ),
-              ] else if (widget.apps.isEmpty)
-                Text(l.adminIncomingNoApps, style: body)
-              else
-                DropdownButton<String>(
-                  key: const ValueKey('incoming.app'),
-                  isExpanded: true,
-                  value: _appId,
-                  hint: Text(l.adminIncomingApp),
-                  onChanged: locked ? null : (v) => setState(() => _appId = v),
-                  items: [
-                    for (final a in widget.apps)
-                      DropdownMenuItem(
-                        key: ValueKey('incoming.app.${a.id}'),
-                        value: a.id,
-                        child: Text(a.displayName),
+                    if (widget.offerIncomingApp)
+                      ChoiceChip(
+                        key: const ValueKey('incoming.mode.newApp'),
+                        label: Text(l.adminIncomingModeNewApp),
+                        selected: _newApp,
+                        onSelected: locked
+                            ? null
+                            : (_) => setState(() => _newApp = true),
                       ),
                   ],
                 ),
-              if (_started && _newApp) ...[
-                const SizedBox(height: DsSpace.s16),
-                for (final (key, label, step) in [
-                  ('install', l.adminIncomingStepInstall, _install),
-                  (
-                    'grant',
-                    l.adminIncomingStepGrant(widget.channel.path),
-                    _grant,
-                  ),
-                  ('webhook', l.adminIncomingStepWebhook, _webhook),
-                ])
-                  Text(
-                    _stepText(l, label, step),
-                    key: ValueKey('incoming.step.$key'),
-                    style: dsTextStyle(DsType.body).copyWith(
-                      color: step == _Step.failed
-                          ? colors.dangerFg
-                          : colors.textPrimary,
-                    ),
-                  ),
-              ] else if (_webhook == _Step.failed && _failure != null) ...[
                 const SizedBox(height: DsSpace.s8),
-                DsBanner(
-                  tone: DsTone.danger,
-                  text: _failure!,
-                  liveRegion: true,
-                ),
+                if (_newApp) ...[
+                  Text(l.adminIncomingNewAppBody, style: body),
+                  TextField(
+                    key: const ValueKey('incoming.reason'),
+                    controller: _reason,
+                    enabled: !locked,
+                    decoration: InputDecoration(labelText: l.adminReason),
+                  ),
+                ] else if (widget.apps.isEmpty)
+                  Text(l.adminIncomingNoApps, style: body)
+                else
+                  DropdownButton<String>(
+                    key: const ValueKey('incoming.app'),
+                    isExpanded: true,
+                    value: _appId,
+                    hint: Text(l.adminIncomingApp),
+                    onChanged: locked
+                        ? null
+                        : (v) => setState(() => _appId = v),
+                    items: [
+                      for (final a in widget.apps)
+                        DropdownMenuItem(
+                          key: ValueKey('incoming.app.${a.id}'),
+                          value: a.id,
+                          child: Text(a.displayName),
+                        ),
+                    ],
+                  ),
+                if (_started && _newApp) ...[
+                  const SizedBox(height: DsSpace.s16),
+                  for (final (key, label, step) in [
+                    ('install', l.adminIncomingStepInstall, _install),
+                    (
+                      'grant',
+                      l.adminIncomingStepGrant(widget.channel.path),
+                      _grant,
+                    ),
+                    ('webhook', l.adminIncomingStepWebhook, _webhook),
+                  ])
+                    Text(
+                      _stepText(l, label, step),
+                      key: ValueKey('incoming.step.$key'),
+                      style: dsTextStyle(DsType.body).copyWith(
+                        color: step == _Step.failed
+                            ? colors.dangerFg
+                            : colors.textPrimary,
+                      ),
+                    ),
+                ] else if (_webhook == _Step.failed && _failure != null) ...[
+                  const SizedBox(height: DsSpace.s8),
+                  DsBanner(
+                    tone: DsTone.danger,
+                    text: _failure!,
+                    liveRegion: true,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
-      ),
-      actions: [
-        if (_started && _newApp && !_busy && _installedAppId != null)
+        actions: [
+          if (_started && _newApp && !_busy && _installedAppId != null)
+            TextButton(
+              key: const ValueKey('incoming.uninstall'),
+              onPressed: _uninstall,
+              child: Text(l.adminIncomingUninstall),
+            ),
           TextButton(
-            key: const ValueKey('incoming.uninstall'),
-            onPressed: _uninstall,
-            child: Text(l.adminIncomingUninstall),
+            key: const ValueKey('incoming.cancel'),
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: Text(l.selfCancel),
           ),
-        TextButton(
-          key: const ValueKey('incoming.cancel'),
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: Text(l.selfCancel),
-        ),
-        // A run that stopped (a failure, or a cancelled step-up) continues where it stopped.
-        if (_started && _newApp && !_busy)
-          FilledButton(
-            key: const ValueKey('incoming.retry'),
-            onPressed: _run,
-            child: Text(l.adminIncomingRetry),
-          )
-        else
-          FilledButton(
-            key: const ValueKey('incoming.submit'),
-            onPressed: _canSubmit ? _run : null,
-            child: Text(l.adminIncomingSubmit),
-          ),
-      ],
+          // A run that stopped (a failure, or a cancelled step-up) continues where it stopped.
+          if (_started && _newApp && !_busy)
+            FilledButton(
+              key: const ValueKey('incoming.retry'),
+              onPressed: _run,
+              child: Text(l.adminIncomingRetry),
+            )
+          else
+            FilledButton(
+              key: const ValueKey('incoming.submit'),
+              onPressed: _canSubmit ? _run : null,
+              child: Text(l.adminIncomingSubmit),
+            ),
+        ],
+      ),
     );
   }
 }

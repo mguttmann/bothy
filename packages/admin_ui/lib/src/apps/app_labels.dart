@@ -12,7 +12,6 @@ import 'package:l10n/l10n.dart';
 import '../data/access_repository.dart';
 import '../data/apps_repository.dart';
 import '../grants/grant_labels.dart' show levelWithCapabilities;
-import '../groups/member_editor.dart' show parseDay;
 
 /// The meaning of the scopes of 05 2.6 by wire name. The table there is the only source of
 /// which actions a scope allows; these texts say it in plain words for the consent.
@@ -88,23 +87,6 @@ String appGrantAskLabel(AppLocalizations l, AppGrantAsk ask) {
   };
 }
 
-/// The end of a token whose last day the person typed as `YYYY-MM-DD` in [text]: the start of
-/// the next day in [timeZone] (UTC for a zone this build does not know), so the token holds
-/// through the typed day; null for a text that is no day.
-///
-/// Example: `tokenExpiry(context, '2026-12-31', 'Europe/Berlin')` is 2026-12-31 23:00 UTC.
-DateTime? tokenExpiry(BuildContext context, String text, String timeZone) {
-  final day = parseDay(text);
-  if (day == null) return null;
-  final next = DateTime.utc(day.year, day.month, day.day + 1);
-  final format = L10nFormat(Localizations.localeOf(context));
-  try {
-    return format.dayStart(next.year, next.month, next.day, timeZone: timeZone);
-  } on ArgumentError {
-    return next;
-  }
-}
-
 /// The badge of an installation state: active plain, suspended as a warning, uninstalled and
 /// unknown as information.
 ///
@@ -154,7 +136,7 @@ enum AppLifecycleAction {
   uninstall,
 }
 
-/// One row of the table of effects: the [part] that is affected and the [effect] on it.
+/// One row of the table of effects: the `part` that is affected and the `effect` on it.
 typedef AppEffectRow = ({String part, String effect});
 
 /// The column of the table of 11 4.3 for [action], in the rows of the table: tokens,

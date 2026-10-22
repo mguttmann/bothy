@@ -157,6 +157,36 @@ void main() {
     expect(changes, 1);
   });
 
+  testWidgets(
+    'a back action cannot close the dialog while a run is in progress',
+    (tester) async {
+      bool canPop() => (tester.widget(
+        find
+            .ancestor(
+              of: find.byKey(const ValueKey('incoming.dialog')),
+              matching: find.byWidgetPredicate((w) => w is PopScope),
+            )
+            .first,
+      ) as PopScope).canPop;
+      await view(tester);
+      await tap(tester, 'incoming.create');
+      expect(canPop(), isTrue);
+      await type(tester, 'incoming.name', 'Deploy alerts');
+      await tap(tester, 'incoming.mode.existing');
+      await tap(tester, 'incoming.app');
+      await tap(tester, 'incoming.app.app-repo-bridge');
+      await tap(tester, 'incoming.submit');
+      // The run waits for the step-up: the address it will return must not be lost.
+      expect(find.byKey(const ValueKey('stepUp.dialog')), findsOneWidget);
+      expect(canPop(), isFalse);
+      await tap(tester, 'stepUp.continue');
+      expect(
+        find.byKey(const ValueKey('incoming.secretDialog')),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('create with the incoming app: install, grant write on exactly '
       'this channel, webhook, in this order with one step-up', (tester) async {
     await view(tester);

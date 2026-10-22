@@ -10,6 +10,7 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import '../common/principal_tokens.dart' show tokenExpiry;
 import '../common/problem_banner.dart';
 import '../data/access_repository.dart';
 import '../data/admin_repository.dart';
