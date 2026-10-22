@@ -156,6 +156,11 @@ sequenceDiagram
   creates neither a token nor a grant: grants follow per target with `grant.create`, tokens with
   `token.create` (`createToken`). The diagram above shows the whole consent flow, not one
   transaction (docs/DECISIONS.md D-M2-24-8).
+- The preview of a grant (`previewGrant`, "Who has access") runs the apply step of `grant.create`
+  and therefore needs an existing subject. The administration (desktop and console) previews the
+  grants of the chosen targets right after `app.install` and creates them with a second
+  confirmation; a step that fails stops the flow, shows what succeeded and offers to repeat the
+  failed step or to uninstall the app (docs/decisions.d/M6-08.md D-M6-08-1).
 - The token appears exactly once. Rotation: create a new token, revoke the old one
   (`token.create`, `token.revoke`).
 
@@ -270,7 +275,10 @@ receiver does not allow forged webhooks.
   channel. It always writes as an app (`incoming_webhooks.app_id`) with `write` on the channel. An
   owner can, in the same confirmed action, create an "incoming app" with a built-in
   minimal manifest (only `messages:write`, grant `write` on exactly this channel);
-  others choose an existing app, because `app.install` is reserved for the owner.
+  others choose an existing app, because `app.install` is reserved for the owner. The API has no
+  combined operation for this; the administration composes it from `installApp` with the
+  built-in manifest, `createGrant` and `createIncomingWebhook` under one confirmation
+  (docs/decisions.d/M6-08.md D-M6-08-4).
 - Call: `POST` to the webhook address with `Authorization: Bearer <token>`. For senders without
   headers, the server allows the token as the last path segment; access logs redact
   this segment. An unknown webhook and a wrong token produce the same response `404`.
