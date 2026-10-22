@@ -159,7 +159,7 @@ func post(ctx context.Context, c *harness.Client, thread, clientMsgID, key, text
 // findEvent pages listEvents as c from the start of the log until it finds the message.created
 // event of message id, and returns that event as raw JSON. Catch-up is how a client that missed
 // the gateway learns of the message, so it must carry the same origin.
-func findEvent(t *testing.T, ctx context.Context, c *harness.Client, id string) []byte {
+func findEvent(t *testing.T, c *harness.Client, id string) []byte {
 	t.Helper()
 	after := int64(0)
 	for range 1000 {
@@ -276,7 +276,7 @@ func TestAgentMessage_OriginEverywhere(t *testing.T) {
 		t.Errorf("event_log: actor_kind %v, want agent", actorKind)
 	}
 
-	listed := findEvent(t, ctx, alex, id)
+	listed := findEvent(t, alex, id)
 	var le event
 	if err := json.Unmarshal(listed, &le); err != nil {
 		t.Fatal(err)
