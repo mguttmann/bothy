@@ -51,12 +51,19 @@ func TestTMT10_SessionCloseEndsProcessTree(t *testing.T) {
 		dev, dc := r.open(id, "shell")
 		r.note.wait(t, "started", func() bool { return r.note.startedCount(id) == 1 })
 		leader := r.startedPIDs()[len(r.startedPIDs())-1]
-		dir := t.TempDir()
+		dir := shortTempDir(t)
 		sidFile, nohupFile := filepath.Join(dir, "setsid.pid"), filepath.Join(dir, "nohup.pid")
-		cmd := strings.ReplaceAll(setsidLine, "%s", sidFile) + "\n" +
-			"nohup sleep 300 >/dev/null 2>&1 & echo $! > " + nohupFile + "\n" +
-			"echo RE''ADY\n"
-		r.send(dc, dev, frame.Data([]byte(cmd)))
+		// The commands come from a script the shell sources, so they still start as jobs of the
+		// shell, but the PTY echoes one short line: the echo of the long commands could fill the send
+		// queue of the data connection on a slow machine, and the host drops a device that reads too
+		// slowly (dataconn.go sendQueue).
+		script := filepath.Join(dir, "start.sh")
+		body := strings.ReplaceAll(setsidLine, "%s", sidFile) + "\n" +
+			"nohup sleep 300 >/dev/null 2>&1 & echo $! > " + nohupFile + "\n"
+		if err := os.WriteFile(script, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		r.send(dc, dev, frame.Data([]byte(". "+script+"; echo RE''ADY\n")))
 		r.readUntil(dc, dev, "READY")
 		detached, nohup := readPID(t, sidFile), readPID(t, nohupFile)
 		for _, pid := range []int{leader, detached, nohup} {
@@ -106,10 +113,12 @@ func TestTMT10_SessionCloseEndsProcessTree(t *testing.T) {
 
 // loginControl starts a control client of srv with the manager of r as its sessions, answers
 // hello and identify with ready and returns the connection of the fake server.
+// BackoffCap bounds the wait for the first ready and every write before it, so it is testkit.Patience:
+// a loaded build machine may need longer than any short reconnect cap for the TLS login.
 func loginControl(t *testing.T, r *rig, srv *controltest.Server) *controltest.Conn {
 	t.Helper()
 	c, err := control.New(control.Config{ServerURL: srv.URL, HostID: hostID, AuthKey: r.auth, HostVersion: "1.2.3",
-		BackoffBase: 20 * time.Millisecond, BackoffCap: 400 * time.Millisecond, RootCAs: srv.Pool}, r.mgr)
+		BackoffBase: 20 * time.Millisecond, BackoffCap: testkit.Patience, RootCAs: srv.Pool}, r.mgr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,12 +142,24 @@ func loginControl(t *testing.T, r *rig, srv *controltest.Server) *controltest.Co
 	return conn
 }
 
+// shortTempDir returns a new folder under /tmp, removed after the test: its path is part of the
+// line the shell echoes, and the temporary folder of the test user can be long.
+func shortTempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/tmp", "tmt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
 // readPID waits until the shell wrote a PID to path and returns it.
 func readPID(t *testing.T, path string) int {
 	t.Helper()
 	var pid int
 	waitFor(t, "PID file "+filepath.Base(path), func() bool {
-		b, err := os.ReadFile(path) //nolint:gosec // a file of t.TempDir
+		b, err := os.ReadFile(path) //nolint:gosec // a file of shortTempDir
 		if err != nil {
 			return false
 		}
