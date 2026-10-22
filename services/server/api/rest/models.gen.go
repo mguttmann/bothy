@@ -11714,8 +11714,8 @@ type ProjectBinding struct {
 	RepositoryUrl *string `json:"repository_url,omitempty"`
 
 	// RunnerConfig Schema `project_runner_config.v1`. No secrets.
-	RunnerConfig JsonObject `json:"runner_config"`
-	Version      int64      `json:"version"`
+	RunnerConfig ProjectRunnerConfig `json:"runner_config"`
+	Version      int64               `json:"version"`
 
 	// WorkspaceRef Opaque reference the runner resolves; never a server path.
 	//
@@ -11734,8 +11734,8 @@ type ProjectBindingPut struct {
 	// RepositoryUrl Examples: https://git.example.com/team/website
 	RepositoryUrl *string `json:"repository_url,omitempty"`
 
-	// RunnerConfig Free-form JSON object whose schema is named in the field description.
-	RunnerConfig *JsonObject `json:"runner_config,omitempty"`
+	// RunnerConfig Schema `project_runner_config.v1`. No secrets.
+	RunnerConfig *ProjectRunnerConfig `json:"runner_config,omitempty"`
 
 	// WorkspaceRef Examples: website
 	WorkspaceRef string `json:"workspace_ref"`
@@ -11746,6 +11746,12 @@ type ProjectReadiness struct {
 	// ChannelId UUIDv7 (RFC 9562), lowercase canonical form.
 	ChannelId Uuid `json:"channel_id"`
 	Ready     bool `json:"ready"`
+}
+
+// ProjectRunnerConfig Schema `project_runner_config.v1`. No secrets.
+type ProjectRunnerConfig struct {
+	AllowedTools *[]string `json:"allowed_tools,omitempty"`
+	Model        *string   `json:"model,omitempty"`
 }
 
 // PublicBranding defines model for PublicBranding.
@@ -15881,6 +15887,12 @@ type SetChannelOperatorParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// PutProjectBindingParams defines parameters for PutProjectBinding.
+type PutProjectBindingParams struct {
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
 // CreateForumTagParams defines parameters for CreateForumTag.
 type CreateForumTagParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16518,6 +16530,9 @@ type MoveChannelJSONRequestBody = MovePosition
 
 // SetChannelOperatorJSONRequestBody defines body for SetChannelOperator for application/json ContentType.
 type SetChannelOperatorJSONRequestBody = OperatorSet
+
+// PutProjectBindingJSONRequestBody defines body for PutProjectBinding for application/json ContentType.
+type PutProjectBindingJSONRequestBody = ProjectBindingPut
 
 // CreateForumTagJSONRequestBody defines body for CreateForumTag for application/json ContentType.
 type CreateForumTagJSONRequestBody = ForumTagCreate

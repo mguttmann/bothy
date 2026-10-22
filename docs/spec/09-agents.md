@@ -1442,6 +1442,20 @@ every row from the facts, and a test keeps table and evidence equal.
 - Readiness: the runner reports `ready` per `workspace_ref` in the heartbeat (folder exists,
   Git working tree, permissions fit). The server sets `project_bindings.ready`; without `ready`,
   `agent.invoke` rejects with `project_not_ready`.
+- Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
+  `ProjectRunnerConfig`, M2-03): a closed JSON object (unknown members are rejected) with the
+  optional members `model` (string, not empty, not starting with `-`; the runner passes it as
+  `--model`) and `allowed_tools` (array of distinct strings, each not empty and not starting with
+  `-`). It holds no secrets. The server checks only this shape and the length limit
+  `project.binding_text_max_chars`; it never interprets a tool name. The runner never widens its
+  configured tool class with this list: it derives its flags from `agents.tool_class` (18.2) and
+  only narrows them by `allowed_tools`, so the rule "within `agents.tool_class`" of 03 is enforced
+  by the runner.
+- Binding changes (`putProjectBinding`, `deleteProjectBinding`, M2-03): every effective change of
+  the binding and every change of the effective operator of the forum sets `ready` to `false`; an
+  identical PUT changes nothing. Only reports of the effective operator for a bound forum that is
+  not archived and not in an archived space are applied; a readiness change writes no event, no audit entry and no new
+  `settings_version`.
 - A thread is a Claude Code session. The runner assigns the session ID in advance as a UUID; the
   first turn starts with `--session-id <uuid>`, every further one with `--resume <uuid>` (chosen via
   `agent_sessions.started`, 9.1).
@@ -1721,6 +1735,7 @@ configuration of the respective program outside the server.
 | `component.max_per_message` | Server | `25` | components per message |
 | `component.custom_id_max_chars` | Server | `100` | length of `custom_id` |
 | `component.form_max_fields` | Server | `10` | fields per form |
+| `project.binding_text_max_chars` | Server | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) |
 | `thread.placeholder_titles` | Server | `["Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | reload JWKS at most this often |

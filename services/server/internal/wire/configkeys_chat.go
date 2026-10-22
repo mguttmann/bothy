@@ -8,7 +8,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // "Configuration values of this chapter": the space name limit (M1-52), the channel and tag text
 // limits and the history backfill limits of a channel (M1-53), the tag limit of a thread (M1-55),
 // the prompt limit of a channel (M2-02);
-// and from docs/spec/09-agents.md the placeholder titles (M1-55). thread.title_max_chars is
+// and from docs/spec/09-agents.md the placeholder titles (M1-55) and the text limit of a project
+// binding (M2-03). thread.title_max_chars is
 // declared with messaging (configkeys_messaging.go), the page sizes with the API keys.
 func chatConfigKeys() []config.Key {
 	return []config.Key{
@@ -21,6 +22,14 @@ func chatConfigKeys() []config.Key {
 			Name: "channel.name_max_chars", Kind: config.KindInt, Default: "100", Min: "1",
 			Doc:     "Longest channel name in Unicode characters.",
 			Chapter: chapter03,
+		},
+		{
+			// 512 characters of at most 4 bytes in UTF-8, also after lower(), stay below the
+			// PostgreSQL B-tree entry limit of the unique index on lower(workspace_ref); the
+			// maximum keeps that true for every configured value (docs/DECISIONS.md D-M2-03-2).
+			Name: "project.binding_text_max_chars", Kind: config.KindInt, Default: "512", Min: "1", Max: "600",
+			Doc:     "Longest workspace_ref, repository_url, default_branch, model and tool name of a project binding in Unicode characters (M2-03).",
+			Chapter: chapter09,
 		},
 		{
 			Name: "channel.topic_max_chars", Kind: config.KindInt, Default: "1024", Min: "1",

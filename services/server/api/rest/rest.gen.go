@@ -182,6 +182,12 @@ type ServerInterface interface {
 	// SetChannelOperator Set or inherit the operator of a channel
 	// (PUT /channels/{channel_id}/operator)
 	SetChannelOperator(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params SetChannelOperatorParams)
+	// DeleteProjectBinding Remove the project binding
+	// (DELETE /channels/{channel_id}/project-binding)
+	DeleteProjectBinding(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// PutProjectBinding Bind a forum to a project
+	// (PUT /channels/{channel_id}/project-binding)
+	PutProjectBinding(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params PutProjectBindingParams)
 	// ListForumTags List forum tags
 	// (GET /channels/{channel_id}/tags)
 	ListForumTags(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -2795,6 +2801,82 @@ func (siw *ServerInterfaceWrapper) SetChannelOperator(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetChannelOperator(w, r, channelId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteProjectBinding operation middleware
+func (siw *ServerInterfaceWrapper) DeleteProjectBinding(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteProjectBinding(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutProjectBinding operation middleware
+func (siw *ServerInterfaceWrapper) PutProjectBinding(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutProjectBindingParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchOptional
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutProjectBinding(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8629,6 +8711,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/behavior", wrapper.GetChannelBehavior)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/behavior", wrapper.PutChannelBehavior)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/operator", wrapper.SetChannelOperator)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/channels/{channel_id}/project-binding", wrapper.DeleteProjectBinding)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/channels/{channel_id}/project-binding", wrapper.PutProjectBinding)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/tags", wrapper.ListForumTags)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/tags", wrapper.CreateForumTag)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/channels/{channel_id}/tags/{tag_id}", wrapper.DeleteForumTag)
@@ -9038,6 +9122,12 @@ type StrictServerInterface interface {
 	// SetChannelOperator Set or inherit the operator of a channel
 	// (PUT /channels/{channel_id}/operator)
 	SetChannelOperator(ctx context.Context, request SetChannelOperatorRequestObject) (SetChannelOperatorResponseObject, error)
+	// DeleteProjectBinding Remove the project binding
+	// (DELETE /channels/{channel_id}/project-binding)
+	DeleteProjectBinding(ctx context.Context, request DeleteProjectBindingRequestObject) (DeleteProjectBindingResponseObject, error)
+	// PutProjectBinding Bind a forum to a project
+	// (PUT /channels/{channel_id}/project-binding)
+	PutProjectBinding(ctx context.Context, request PutProjectBindingRequestObject) (PutProjectBindingResponseObject, error)
 	// ListForumTags List forum tags
 	// (GET /channels/{channel_id}/tags)
 	ListForumTags(ctx context.Context, request ListForumTagsRequestObject) (ListForumTagsResponseObject, error)
@@ -11184,6 +11274,66 @@ func (sh *strictHandler) SetChannelOperator(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetChannelOperatorResponseObject); ok {
 		if err := validResponse.VisitSetChannelOperatorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteProjectBinding operation middleware
+func (sh *strictHandler) DeleteProjectBinding(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath) {
+	var request DeleteProjectBindingRequestObject
+
+	request.ChannelId = channelId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteProjectBinding(ctx, request.(DeleteProjectBindingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteProjectBinding")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteProjectBindingResponseObject); ok {
+		if err := validResponse.VisitDeleteProjectBindingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutProjectBinding operation middleware
+func (sh *strictHandler) PutProjectBinding(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params PutProjectBindingParams) {
+	var request PutProjectBindingRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	var body PutProjectBindingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutProjectBinding(ctx, request.(PutProjectBindingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutProjectBinding")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutProjectBindingResponseObject); ok {
+		if err := validResponse.VisitPutProjectBindingResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

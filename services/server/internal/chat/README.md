@@ -1,6 +1,6 @@
 # Module `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62) and channel behaviour with agent configuration (M2-02) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62), channel behaviour with agent configuration (M2-02) and the project binding with readiness (M2-03) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -310,7 +310,7 @@ internal/wire, HTTP through the chain with response validation).
 
 ## Port (root package `internal/chat`)
 
-- Inbound: `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info), `AgentConfig`.
+- Inbound: `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info), `AgentConfig`, `ProjectBindings`.
 - Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`.
@@ -358,6 +358,46 @@ Reason: the operator is an active agent principal, DM participants are people; i
 Rulings: docs/DECISIONS.md D-M2-02-1 to D-M2-02-13. Tests: `domain/behavior_test.go` (with
 `FuzzValidateBehavior`), `app/behavior_internal_test.go`, `test/integration/behavior` and the
 canary class `manage_only` of `test/canary`.
+
+## Project binding and readiness (M2-03)
+
+- Port `chat.ProjectBindings` (`projectbinding.go`): `PutProjectBinding`, `DeleteProjectBinding`
+  and `ApplyProjectReadiness` with `ProjectBinding`, `RunnerConfig`, `PutProjectBindingCmd` and
+  `ProjectReadiness`; the caller comes from `kernel/actor` in the context. `ChannelBehavior` and
+  `ServedChannelConfig` carry `ProjectBinding` for a bound forum.
+- Table `project_bindings` (migration `00048`): PK `channel_id`, unique `lower(workspace_ref)`,
+  `runner_config` of schema `project_runner_config.v1`, `ready`, `version`. Only forums get a row;
+  the use case enforces it (`400 validation_failed` with `not_a_forum` on `#path/channel_id`).
+- Domain (`domain/project_binding.go`): `ValidateProjectBinding` (limits
+  `project.binding_text_max_chars` and `audit.reason_max_chars` at request time) and
+  `PlanBindingPut` (`created`, `replaced` with `ready = false`, `unchanged` without a write).
+- Use cases (`app/project_binding.go`) over `app.BindingStore`. Order of a PUT: the channel and
+  `channel.project.bind` (owner, step-up), `not_a_forum`, the field rules, then in one unit of work
+  the space `FOR SHARE`, the channel `FOR UPDATE` (`409` when archived), the binding `FOR UPDATE`,
+  the optional `If-Match` (`412`, with `current` when a binding exists), the plan, the write
+  (`409` for a taken `workspace_ref`), `settingsChanged` and the audit entry (`channel_id`, `op`,
+  `version`, `ready_reset`, `reason`; a DELETE `channel_id` and `op`). DELETE without a binding is
+  `404` without an audit entry.
+- Readiness: `ApplyProjectReadiness` is the only writer of `ready` besides the resets; it applies
+  only reports of the effective operator for a bound forum that is not archived, locks spaces,
+  channels and bindings in this order and ascending id, and writes no event, no audit entry and no
+  `settings_version`. `SetChannelOperator` and `SetSpaceOperator` reset `ready` of the bound forums
+  whose effective operator changed.
+- Facts: every channel query `LEFT JOIN`s `project_bindings` for `ChannelFacts.ProjectBound` and
+  `ProjectReady` of `authz.StructureSource`; `agent.invoke` gives `project_not_ready` while a bound
+  forum is not ready.
+- Query exceptions of `tools/lint/sql_visibility.yaml`: `chat.LockProjectBinding`
+  (`after_authorize`); the channel and behaviour queries keep their existing entries;
+  `LockReportedBindings` carries `channel_id = ANY`.
+
+| Operation | Action | Event |
+|---|---|---|
+| `putProjectBinding` | `channel.project.bind` (owner, step-up, optional If-Match on the binding version) | `channel.settings_changed`, `agent.config_changed` to the effective operator |
+| `deleteProjectBinding` | `channel.project.bind` (owner, step-up) | the same |
+
+Rulings: docs/DECISIONS.md D-M2-03-1 to D-M2-03-13. Tests: `domain/project_binding_test.go`,
+`test/integration/project_binding_test.go`, `migrations/chat_project_bindings_test.go` and the
+canary scenario `test/canary/scenario_project.go`.
 
 ## Port (root package `internal/chat`)
 
