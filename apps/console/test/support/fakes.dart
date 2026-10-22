@@ -258,6 +258,9 @@ class TestBrowser {
   /// The downloads of the tab.
   final FakeDownloads downloads = FakeDownloads();
 
+  /// The file input of the tab.
+  final FakeFileChooser files = FakeFileChooser();
+
   /// The console environment over these fakes, at the origin of the harness.
   ConsoleEnvironment get environment => ConsoleEnvironment(
     origin: Uri.parse('https://chat.example.com'),
@@ -265,6 +268,25 @@ class TestBrowser {
     navigation: navigation,
     passkeys: passkeys,
     downloads: downloads,
+    files: files,
     adapter: server,
   );
+}
+
+/// A file input that answers with [next] and records each choice's accept list and tag.
+class FakeFileChooser implements FileChooser {
+  /// The file of the next choice, or null for a cancel.
+  ChosenFile? next;
+
+  /// The `accept` and `tag` of every choice, in order.
+  final List<(String, String)> choices = [];
+
+  @override
+  Future<ChosenFile?> choose({
+    required String accept,
+    required String tag,
+  }) async {
+    choices.add((accept, tag));
+    return next;
+  }
 }
