@@ -21,6 +21,20 @@ const (
 	keyTicketKeyRef = "file.ticket_key_ref"
 )
 
+// The keys of the thumbnail check of M3-06 (docs/DECISIONS.md D-M3-06-11).
+const (
+	keyThumbnailSmallPx  = "file.thumbnail.small_px"
+	keyThumbnailMediumPx = "file.thumbnail.medium_px"
+	keyThumbnailLargePx  = "file.thumbnail.large_px"
+)
+
+// jpegQualityMin and jpegQualityMax are the quality range of Go's image/jpeg Options (1 to 100), the
+// bounds of file.image.jpeg_quality and file.thumbnail.jpeg_quality.
+const (
+	jpegQualityMin = "1"
+	jpegQualityMax = "100"
+)
+
 // The keys of the upload checks of M3-03 (docs/DECISIONS.md D-M3-03-19).
 const (
 	keyMaxUploadBytes  = "file.max_upload_bytes"
@@ -47,6 +61,10 @@ const (
 // The keys of the downloads (M3-05) follow: file.ticket_ttl and file.ticket_key_ref of the
 // download tickets, file.not_ready_retry_after of 409 file_not_ready, and client.cache_max_age of
 // chapter 04, the max-age of an authenticated download (12 9.3).
+// The keys of the job files.thumbnail (M3-06) follow: file.image.* without
+// file.image.libvips_enabled, whose build does not exist, and file.thumbnail.*; the cross-check
+// thumbnail_sizes_ordered holds small below medium below large. file.poster_max_bytes enters with
+// the poster of a video, which UploadCreate cannot carry yet.
 //
 // voice.max_duration is here because getInstance reports it as a client limit (M1-46) before the
 // voice messages of M3 read it.
@@ -203,6 +221,46 @@ func filesConfigKeys() []config.Key {
 			Name: "client.cache_max_age", Kind: config.KindDuration, Default: sessionMaxAgeDefault, Min: "1s",
 			Doc:     "Age after which clients drop unused cache entries; the max-age of an authenticated file download.",
 			Chapter: chapter04,
+		},
+		{
+			Name: "file.image.max_pixels", Kind: config.KindInt, Default: "50000000", Min: "1",
+			Doc:     "Largest number of pixels (width times height, for GIF times frames) the server decodes; larger images get no thumbnails.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.image.jpeg_quality", Kind: config.KindInt, Default: "90", Min: jpegQualityMin, Max: jpegQualityMax,
+			Doc:     "JPEG quality of a still WebP without alpha that the server stores as JPEG.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.image.processing_timeout", Kind: config.KindDuration, Default: sixtySeconds, Min: "1s",
+			Doc:     "Time limit of one run of the image job files.thumbnail.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.image.max_concurrent", Kind: config.KindInt, Default: "2", Min: "1",
+			Doc:     "Image jobs that one worker process runs at the same time.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyThumbnailSmallPx, Kind: config.KindInt, Default: "320", Min: "1",
+			Doc:     "Longest edge of the thumbnail variant small in pixels.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyThumbnailMediumPx, Kind: config.KindInt, Default: "1024", Min: "1",
+			Doc:     "Longest edge of the thumbnail variant medium in pixels.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyThumbnailLargePx, Kind: config.KindInt, Default: "2048", Min: "1",
+			Doc:     "Longest edge of the thumbnail variant large in pixels.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.thumbnail.jpeg_quality", Kind: config.KindInt, Default: "82", Min: jpegQualityMin, Max: jpegQualityMax,
+			Doc:     "JPEG quality of the thumbnails of images without alpha.",
+			Chapter: chapter12,
 		},
 		{
 			Name: "file.s3.access_key_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/s3_access_key",

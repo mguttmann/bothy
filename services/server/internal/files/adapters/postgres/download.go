@@ -10,6 +10,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/files/app"
+	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -43,6 +44,6 @@ func (r *Repository) Thumbnail(ctx context.Context, fileID ids.ID, variant strin
 	if err != nil {
 		return app.ThumbnailRecord{}, false, mapError(err, "reading a thumbnail")
 	}
-	return app.ThumbnailRecord{FileID: idOf(row.FileID), Variant: row.Variant, ObjectKey: row.ObjectKey, MIMEType: row.MimeType,
+	return app.ThumbnailRecord{FileID: idOf(row.FileID), Variant: domain.Variant(row.Variant), ObjectKey: row.ObjectKey, MIMEType: row.MimeType,
 		Width: int(row.Width), Height: int(row.Height), SizeBytes: row.SizeBytes}, true, nil
 }

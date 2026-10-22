@@ -44,6 +44,12 @@ type scanEnv struct {
 
 func newScanEnv(t *testing.T, cfg app.ScanConfig) *scanEnv {
 	t.Helper()
+	return newScanEnvTypes(t, cfg, detector{})
+}
+
+// newScanEnvTypes is newScanEnv with the type detection types.
+func newScanEnvTypes(t *testing.T, cfg app.ScanConfig, types app.TypeDetector) *scanEnv {
+	t.Helper()
 	e := &scanEnv{repo: newRepo(), store: newCountingStore(newStore(t)), scanner: &scanner{verdict: domain.Verdict{Kind: domain.VerdictClean}},
 		queue: &scanQueue{}, audit: &audit{}, events: &events{}, metrics: &scanMetrics{},
 		clk: clock.NewFake(time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)), logs: &bytes.Buffer{}}
@@ -56,7 +62,7 @@ func newScanEnv(t *testing.T, cfg app.ScanConfig) *scanEnv {
 		})
 	})
 	p, err := app.NewScanPass(cfg, app.ScanDeps{Repo: e.repo, Scans: e.repo, Store: e.store, UoW: u, Events: e.events, Audit: e.audit,
-		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: detector{}, Queue: e.queue, Metrics: e.metrics, Clock: e.clk,
+		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: types, Queue: e.queue, Metrics: e.metrics, Clock: e.clk,
 		Log: slog.New(slog.NewJSONHandler(e.logs, nil))})
 	if err != nil {
 		t.Fatal(err)
@@ -211,15 +217,20 @@ func TestScanPassModeOff(t *testing.T) {
 	if scans, pings := e.scanner.counts(); scans != 0 || pings != 0 {
 		t.Errorf("scanner called: %d scans, %d pings", scans, pings)
 	}
+	// A PNG stays pending until files.thumbnail stored its cleaned original (M3-06 design note 1c):
+	// the scan queues the job and publishes no FileFinalized.
 	f := e.file(s.FileID)
-	if f.ScanStatus != "skipped" || f.UploadState != "complete" || f.MIMEType != "image/png" {
+	if f.ScanStatus != "skipped" || f.UploadState != "pending" || f.MIMEType != "image/png" {
 		t.Errorf("file %+v", f)
 	}
 	if r := e.repo.finished[0]; r.ScanEngine != "" || !r.ScannedAt.IsZero() {
 		t.Errorf("skipped result %+v sets the engine", r)
 	}
-	if !e.store.has(s.File.ObjectKey) || e.finalCount(s.FileID) != 1 {
-		t.Error("object or event missing")
+	if !e.store.has(s.File.ObjectKey) || e.finalCount(s.FileID) != 0 || len(e.events.list) != 1 {
+		t.Error("object or event missing, or the image finalized by the scan")
+	}
+	if got := e.queue.thumbnails(); len(got) != 1 || got[0] != s.FileID {
+		t.Errorf("files.thumbnail jobs %v", got)
 	}
 	if got := e.metrics.outcomes; len(got) != 1 || got[0] != "skipped" {
 		t.Errorf("metrics %v", got)

@@ -158,6 +158,15 @@ exceptions:
   - query: files.CountAwaitingScan
     category: system_job
     reason: "the health monitor of the worker counts the files awaiting the scan for bothy.file.scan.queue; only a number, no content (M3-04)"
+  - query: files.GetImageFile
+    category: system_job
+    reason: "the job files.thumbnail reads the one file it was inserted for by id, without a principal; it serves nothing to a reader (M3-06)"
+  - query: files.LockImageFile
+    category: system_job
+    reason: "the job files.thumbnail locks the one file it processes by id, without a principal (03 section 6.3, M3-06)"
+  - query: files.ListFileThumbnails
+    category: after_authorize
+    reason: "the thumbnails of the one file getFile returns after file.read allowed it, or of the one file the job files.thumbnail processes (M3-06)"
   - query: messaging.ListMentions
     category: after_authorize
     reason: "the mentioned principals of the one message authorize allowed (Message.mention_ids)"

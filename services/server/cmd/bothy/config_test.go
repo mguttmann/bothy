@@ -316,6 +316,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.denied_mime_types =   # default\n" +
 		"file.fs.min_free_bytes = 2147483648  # default\n" +
 		"file.fs.root = /var/lib/bothy/files  # default\n" +
+		"file.image.jpeg_quality = 90  # default\n" +
+		"file.image.max_concurrent = 2  # default\n" +
+		"file.image.max_pixels = 50000000  # default\n" +
+		"file.image.processing_timeout = 1m  # default\n" +
 		"file.max_upload_bytes = 104857600  # default\n" +
 		"file.name_max_bytes = 255  # default\n" +
 		"file.not_ready_retry_after = 5s  # default\n" +
@@ -339,6 +343,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.scan.timeout = 2m  # default\n" +
 		"file.sniff_bytes = 1048576  # default\n" +
 		"file.storage.driver = fs  # default\n" +
+		"file.thumbnail.jpeg_quality = 82  # default\n" +
+		"file.thumbnail.large_px = 2048  # default\n" +
+		"file.thumbnail.medium_px = 1024  # default\n" +
+		"file.thumbnail.small_px = 320  # default\n" +
 		"file.ticket_key_ref = file:/run/bothy/secrets/file_ticket_key  # default\n" +
 		"file.ticket_ttl = 5m  # default\n" +
 		"file.upload_max_open_sessions = 20  # default\n" +

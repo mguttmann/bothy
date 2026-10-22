@@ -30,12 +30,15 @@ type TypeDetector interface {
 	Detect(head []byte) string
 }
 
-// ScanQueue inserts the job files.scan (02 12.3 "Job catalogue"); adapters/jobs implements it over the
-// job runtime. It must be called inside a unit of work, so the job exists exactly when the change
-// that needs it commits.
+// ScanQueue inserts the jobs files.scan and files.thumbnail (02 12.3 "Job catalogue");
+// adapters/jobs implements it over the job runtime. It must be called inside a unit of work, so the
+// job exists exactly when the change that needs it commits.
 type ScanQueue interface {
 	// EnqueueScan inserts files.scan for fileID with the retry round; a zero at means now.
 	EnqueueScan(ctx context.Context, fileID ids.ID, round int64, at time.Time) error
+	// EnqueueThumbnail inserts files.thumbnail for fileID (M3-06), in the final unit of work of
+	// the scan.
+	EnqueueThumbnail(ctx context.Context, fileID ids.ID) error
 }
 
 // ScanResult is what the result unit of work of the scan pass writes (brief M3-04 design note 6b).

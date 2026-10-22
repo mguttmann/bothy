@@ -45,10 +45,26 @@ sequenceDiagram
     SJ->>OBJ: delete parts
   else stream: OK
     AV-->>SJ: OK
-    SJ->>DB: upload_state complete, scan_status clean, mime_type, scanned_at, file.updated, FileFinalized
-    SJ->>OBJ: delete parts
-    TJ->>OBJ: read, decode, re-encode (metadata removed), write variants (M3-06)
-    TJ->>DB: file_thumbnails, file.updated
+    alt JPEG, PNG, GIF or WebP
+      SJ->>DB: scan_status clean, upload_state stays pending, mime_type, file.updated, job files.thumbnail
+      SJ->>OBJ: delete parts
+      TJ->>OBJ: read orig-1 twice through the allow-list filter (GIF, WebP: decode and encode), write orig-2
+      alt structure broken (JPEG, PNG)
+        TJ->>DB: upload_state failed, image_malformed, file.updated, FileFinalized
+        TJ->>OBJ: delete orig-1 and orig-2
+      else cleaned
+        TJ->>DB: object_key orig-2, sha256, size, width, height, upload_state complete, file.updated, FileFinalized
+        TJ->>OBJ: delete orig-1, read orig-2, write small, medium, large (unless above file.image.max_pixels)
+        TJ->>DB: file_thumbnails, file.updated
+      end
+    else other types
+      SJ->>DB: upload_state complete, scan_status clean, mime_type, scanned_at, file.updated, FileFinalized
+      SJ->>OBJ: delete parts
+      opt MP4 or QuickTime
+        TJ->>OBJ: read the boxes mvhd and tkhd
+        TJ->>DB: width, height, duration_ms, file.updated
+      end
+    end
   else FOUND
     AV-->>SJ: FOUND
     SJ->>DB: scan_status infected, audit entry, file.updated, FileFinalized

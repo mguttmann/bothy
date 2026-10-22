@@ -519,14 +519,14 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.scan.clamd_stream_max_bytes` | `BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES` | Server | int | `104857600` | mirror of clamd `StreamMaxLength` | active |
 | `file.invocation_hold_max` | `BOTHY_FILE__INVOCATION_HOLD_MAX` | Server |  | `120s` | longest wait of the agent invocation for attachments | planned (M3) |
 | `file.image.libvips_enabled` | `BOTHY_FILE__IMAGE__LIBVIPS_ENABLED` | Server |  | `false` | use the libvips build | planned (M3) |
-| `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server |  | `50000000` | largest decoded pixel count | planned (M3) |
-| `file.image.jpeg_quality` | `BOTHY_FILE__IMAGE__JPEG_QUALITY` | Server |  | `90` | quality when converting still WebP images without alpha to JPEG | planned (M3) |
-| `file.image.processing_timeout` | `BOTHY_FILE__IMAGE__PROCESSING_TIMEOUT` | Server |  | `60s` | time limit of an image job | planned (M3) |
-| `file.image.max_concurrent` | `BOTHY_FILE__IMAGE__MAX_CONCURRENT` | Server |  | `2` | image jobs per worker process | planned (M3) |
-| `file.thumbnail.small_px` | `BOTHY_FILE__THUMBNAIL__SMALL_PX` | Server |  | `320` | longest edge `small` | planned (M3) |
-| `file.thumbnail.medium_px` | `BOTHY_FILE__THUMBNAIL__MEDIUM_PX` | Server |  | `1024` | longest edge `medium` | planned (M3) |
-| `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server |  | `2048` | longest edge `large` | planned (M3) |
-| `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server |  | `82` | quality of the thumbnails | planned (M3) |
+| `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server | int | `50000000` | largest decoded pixel count | active |
+| `file.image.jpeg_quality` | `BOTHY_FILE__IMAGE__JPEG_QUALITY` | Server | int | `90` | quality when converting still WebP images without alpha to JPEG | active |
+| `file.image.processing_timeout` | `BOTHY_FILE__IMAGE__PROCESSING_TIMEOUT` | Server | duration | `60s` | time limit of an image job | active |
+| `file.image.max_concurrent` | `BOTHY_FILE__IMAGE__MAX_CONCURRENT` | Server | int | `2` | image jobs per worker process | active |
+| `file.thumbnail.small_px` | `BOTHY_FILE__THUMBNAIL__SMALL_PX` | Server | int | `320` | longest edge `small` | active |
+| `file.thumbnail.medium_px` | `BOTHY_FILE__THUMBNAIL__MEDIUM_PX` | Server | int | `1024` | longest edge `medium` | active |
+| `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server | int | `2048` | longest edge `large` | active |
+| `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server | int | `82` | quality of the thumbnails | active |
 | `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server | duration | `5m` | validity of a file ticket | active |
 | `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/file_ticket_key` | reference to the ticket key in the secret provider | active |
 | `file.not_ready_retry_after` | `BOTHY_FILE__NOT_READY_RETRY_AFTER` | Server | duration | `5s` | `Retry-After` of the `409 file_not_ready` responses (in whole seconds) | active |

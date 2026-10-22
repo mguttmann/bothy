@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
+	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -20,17 +21,35 @@ const uploadStateComplete = "complete"
 
 // FileView converts a row into the port DTO (schema File). sha256 is set only once upload_state
 // is complete, because before the verify pass only the declared value exists (D-M3-03-18);
-// thumbnails stay empty until M3-06.
+// thumbnails lists the rows of file_thumbnails in the order small, medium, large, poster
+// (docs/DECISIONS.md D-M3-06-10), an empty list while there are none.
 func FileView(f FileRecord) files.File {
 	out := files.File{
 		ID: f.ID, SizeBytes: f.SizeBytes, MIMEType: f.MIMEType, OriginalName: f.OriginalName, UploadedBy: f.UploadedBy,
 		Purpose: f.Purpose, ScopeChannelID: f.ScopeChannelID, UploadState: f.UploadState, ScanStatus: f.ScanStatus,
 		Width: f.Width, Height: f.Height, DurationMS: f.DurationMS, TranscriptStatus: f.TranscriptStatus,
-		TranscriptLanguage: f.TranscriptLanguage, TranscriptSource: f.TranscriptSource, Thumbnails: []files.Thumbnail{},
+		TranscriptLanguage: f.TranscriptLanguage, TranscriptSource: f.TranscriptSource, Thumbnails: thumbnailViews(f.Thumbnails),
 		CreatedAt: f.CreatedAt,
 	}
 	if f.UploadState == uploadStateComplete {
 		out.SHA256 = hex.EncodeToString(f.SHA256[:])
+	}
+	return out
+}
+
+// variantOrder is the order of File.thumbnails (D-M3-06-10).
+var variantOrder = []domain.Variant{domain.VariantSmall, domain.VariantMedium, domain.VariantLarge, domain.VariantPoster}
+
+// thumbnailViews orders the thumbnail rows by variantOrder; rows of another variant are left out.
+func thumbnailViews(rows []ThumbnailRecord) []files.Thumbnail {
+	out := make([]files.Thumbnail, 0, len(rows))
+	for _, v := range variantOrder {
+		for _, r := range rows {
+			if r.Variant == v {
+				out = append(out, files.Thumbnail{Variant: string(r.Variant), MIMEType: r.MIMEType, Width: r.Width, Height: r.Height})
+				break
+			}
+		}
 	}
 	return out
 }

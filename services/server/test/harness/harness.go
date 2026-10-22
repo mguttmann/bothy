@@ -44,6 +44,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -133,6 +134,9 @@ type Options struct {
 	// OnListen, when set, receives the origin of the own public listener before the server starts
 	// (an edge in front of several nodes routes to it, M2-47).
 	OnListen func(listenURL string)
+	// FilesImageHooks are the test seams of the job files.thumbnail (wire.Deps.FilesImageHooks,
+	// M3-06): hold, fail or observe a run; nil in every other test.
+	FilesImageHooks *filesapp.ImageHooks
 }
 
 // Server is a running harness server.
@@ -294,7 +298,8 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
 		TerminalTimers: opts.TerminalTimers, TerminalBeforeOpenCommit: opts.TerminalBeforeOpenCommit,
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
-		TerminalModule: opts.TerminalModule,
+		TerminalModule:  opts.TerminalModule,
+		FilesImageHooks: opts.FilesImageHooks,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

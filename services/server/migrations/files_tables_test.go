@@ -196,3 +196,65 @@ func TestMigrationFilesTables(t *testing.T) {
 		t.Errorf("attachment with a scope channel: %v", err)
 	}
 }
+
+// TestMigrationFileThumbnails holds file_thumbnails against docs/spec/03-data-model.md
+// (file_thumbnails) column by column with every key and check (M3-06), and that the variant check
+// refuses a variant outside the four of 03.
+func TestMigrationFileThumbnails(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	conn := db.SuperConn(t)
+	cols := []principalColumn{
+		{"file_id", "uuid", false, ""}, {"variant", "text", false, ""}, {"object_key", "text", false, ""},
+		{"mime_type", "text", false, ""}, {"width", "integer", false, ""}, {"height", "integer", false, ""},
+		{"size_bytes", "bigint", false, ""},
+	}
+	if got := principalColumns(t, conn, "file_thumbnails"); !reflect.DeepEqual(got, cols) {
+		t.Errorf("file_thumbnails columns:\n got %+v\nwant %+v", got, cols)
+	}
+	wantCons := []string{
+		"CHECK ((variant = ANY (ARRAY['small'::text, 'medium'::text, 'large'::text, 'poster'::text])))",
+		"FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE",
+		"PRIMARY KEY (file_id, variant)",
+		"UNIQUE (object_key)",
+	}
+	cons := principalConstraints(t, conn, "file_thumbnails")
+	slices.Sort(cons)
+	if !reflect.DeepEqual(cons, wantCons) {
+		t.Errorf("file_thumbnails constraints:\n got %q\nwant %q", cons, wantCons)
+	}
+	wantIdx := []string{
+		"CREATE UNIQUE INDEX file_thumbnails_object_key_key ON public.file_thumbnails USING btree (object_key)",
+		"CREATE UNIQUE INDEX file_thumbnails_pkey ON public.file_thumbnails USING btree (file_id, variant)",
+	}
+	idx := indexes(t, conn, "file_thumbnails")
+	slices.Sort(idx)
+	if !reflect.DeepEqual(idx, wantIdx) {
+		t.Errorf("file_thumbnails indexes:\n got %q\nwant %q", idx, wantIdx)
+	}
+	for _, stmt := range []string{
+		`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ('0192f4a0-7b1c-7000-8a00-000000000001', 'user', 'active', 'alex', 'Alex')`,
+		`INSERT INTO files (id, object_key, sha256, size_bytes, mime_type, original_name, uploaded_by, purpose)
+			VALUES ('0192f4a0-7b1c-7000-8a00-000000000009', 'k', '\x00', 1, 'image/png', 'a.png', '0192f4a0-7b1c-7000-8a00-000000000001', 'avatar')`,
+	} {
+		if _, err := conn.Exec(ctx, stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	insert := `INSERT INTO file_thumbnails (file_id, variant, object_key, mime_type, width, height, size_bytes)
+		VALUES ('0192f4a0-7b1c-7000-8a00-000000000009', $1, $2, 'image/jpeg', 1, 1, 1)`
+	if _, err := conn.Exec(ctx, insert, "huge", "k-huge"); err == nil || !strings.Contains(err.Error(), "file_thumbnails_variant_check") {
+		t.Errorf("variant huge: %v, want the variant check", err)
+	}
+	if _, err := conn.Exec(ctx, insert, "small", "k-small"); err != nil {
+		t.Errorf("variant small: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM files WHERE id = '0192f4a0-7b1c-7000-8a00-000000000009'`); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM file_thumbnails`).Scan(&n); err != nil || n != 0 {
+		t.Errorf("rows after the deletion of the file: %d, %v", n, err)
+	}
+}

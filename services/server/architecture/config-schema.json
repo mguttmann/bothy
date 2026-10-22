@@ -1547,6 +1547,54 @@
       "doc": "Root directory of the file system driver, used only by the server and owned by its user with mode 0700."
     },
     {
+      "name": "file.image.jpeg_quality",
+      "env": "BOTHY_FILE__IMAGE__JPEG_QUALITY",
+      "kind": "int",
+      "default": "90",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100",
+      "chapter": "12-files.md",
+      "doc": "JPEG quality of a still WebP without alpha that the server stores as JPEG."
+    },
+    {
+      "name": "file.image.max_concurrent",
+      "env": "BOTHY_FILE__IMAGE__MAX_CONCURRENT",
+      "kind": "int",
+      "default": "2",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Image jobs that one worker process runs at the same time."
+    },
+    {
+      "name": "file.image.max_pixels",
+      "env": "BOTHY_FILE__IMAGE__MAX_PIXELS",
+      "kind": "int",
+      "default": "50000000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Largest number of pixels (width times height, for GIF times frames) the server decodes; larger images get no thumbnails."
+    },
+    {
+      "name": "file.image.processing_timeout",
+      "env": "BOTHY_FILE__IMAGE__PROCESSING_TIMEOUT",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Time limit of one run of the image job files.thumbnail."
+    },
+    {
       "name": "file.max_upload_bytes",
       "env": "BOTHY_FILE__MAX_UPLOAD_BYTES",
       "kind": "int",
@@ -1830,6 +1878,54 @@
       "max": "",
       "chapter": "12-files.md",
       "doc": "Driver of the object storage of files: fs for a directory of the server, s3 for an S3-compatible service."
+    },
+    {
+      "name": "file.thumbnail.jpeg_quality",
+      "env": "BOTHY_FILE__THUMBNAIL__JPEG_QUALITY",
+      "kind": "int",
+      "default": "82",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "100",
+      "chapter": "12-files.md",
+      "doc": "JPEG quality of the thumbnails of images without alpha."
+    },
+    {
+      "name": "file.thumbnail.large_px",
+      "env": "BOTHY_FILE__THUMBNAIL__LARGE_PX",
+      "kind": "int",
+      "default": "2048",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Longest edge of the thumbnail variant large in pixels."
+    },
+    {
+      "name": "file.thumbnail.medium_px",
+      "env": "BOTHY_FILE__THUMBNAIL__MEDIUM_PX",
+      "kind": "int",
+      "default": "1024",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Longest edge of the thumbnail variant medium in pixels."
+    },
+    {
+      "name": "file.thumbnail.small_px",
+      "env": "BOTHY_FILE__THUMBNAIL__SMALL_PX",
+      "kind": "int",
+      "default": "320",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Longest edge of the thumbnail variant small in pixels."
     },
     {
       "name": "file.ticket_key_ref",
