@@ -134,6 +134,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	writeSecret(t, dir, "totp_key", strings.Repeat("5d", 32), 0o600)
 	// and webhook.hmac_master_key_ref (M2-26).
 	writeSecret(t, dir, "webhook_hmac_master_key", strings.Repeat("4e", 32), 0o600)
+	// and file.ticket_key_ref (M3-05).
+	writeSecret(t, dir, "file_ticket_key", strings.Repeat("3f", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
 		// check warns about the empty backup.offsite.target of the defaults, print never warns.
@@ -157,6 +159,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret database.password_ref: ok\n" +
 		"secret file.s3.access_key_ref" + s3Skipped +
 		"secret file.s3.secret_key_ref" + s3Skipped +
+		"secret file.ticket_key_ref: ok\n" +
 		"secret migrate.app_password_ref" + skipped +
 		"secret migrate.backup_password_ref" + skipped +
 		"secret migrate.bootstrap_password_ref" + skipped +

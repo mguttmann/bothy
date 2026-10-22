@@ -15980,6 +15980,9 @@ type EmojiPath = string
 // FileIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type FileIdPath = Uuid
 
+// FileTicketQuery defines model for FileTicketQuery.
+type FileTicketQuery = string
+
 // GrantIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type GrantIdPath = Uuid
 
@@ -15997,6 +16000,9 @@ type IdempotencyKey = Uuid
 
 // IdentityIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type IdentityIdPath = Uuid
+
+// IfRange defines model for If-Range.
+type IfRange = string
 
 // IfMatchOptional Examples: "7"
 type IfMatchOptional = string
@@ -16036,6 +16042,9 @@ type PrincipalIdPath = Uuid
 
 // ProviderIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type ProviderIdPath = Uuid
+
+// Range defines model for Range.
+type Range = string
 
 // RegistrationIdPath UUIDv7 (RFC 9562), lowercase canonical form.
 type RegistrationIdPath = Uuid
@@ -16117,6 +16126,10 @@ type ConsoleLogin = ConsoleSession
 // Error Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
 type Error = Problem
+
+// FileConflict Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
+// path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
+type FileConflict = Problem
 
 // Forbidden Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
 // path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
@@ -16646,6 +16659,40 @@ type ListEventsParams struct {
 type PutFeatureFlagParams struct {
 	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
 	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
+// DownloadFileParams defines parameters for DownloadFile.
+type DownloadFileParams struct {
+	// Ticket Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+	// `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+	// bearer secret: never logged.
+	Ticket *FileTicketQuery `form:"ticket,omitempty" json:"ticket,omitempty"`
+
+	// Range One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+	// `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+	// a range that starts at or after the end gives 416 (12, 9.3).
+	Range *Range `json:"Range,omitempty"`
+
+	// IfRange Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+	// included, gives the whole variant (200).
+	IfRange *IfRange `json:"If-Range,omitempty"`
+}
+
+// DownloadThumbnailParams defines parameters for DownloadThumbnail.
+type DownloadThumbnailParams struct {
+	// Ticket Fetch ticket of `createFileTicket` (security scheme `fileTicket`, 12 9.2). Accepted only by
+	// `downloadFile` and `downloadThumbnail`; ignored when the request carries `Authorization`. A
+	// bearer secret: never logged.
+	Ticket *FileTicketQuery `form:"ticket,omitempty" json:"ticket,omitempty"`
+
+	// Range One byte range (RFC 9110 section 14), for example `bytes=0-1023`, `bytes=1024-` or
+	// `bytes=-500`. Exactly one range gives 206; several ranges and invalid values are ignored (200);
+	// a range that starts at or after the end gives 416 (12, 9.3).
+	Range *Range `json:"Range,omitempty"`
+
+	// IfRange Applies `Range` only when equal to the current strong `ETag`; any other value, an HTTP date
+	// included, gives the whole variant (200).
+	IfRange *IfRange `json:"If-Range,omitempty"`
 }
 
 // DownloadThumbnailParamsVariant defines parameters for DownloadThumbnail.
@@ -21735,21 +21782,34 @@ type ClientInterface interface {
 	// Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
 	// Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
 	// instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
-	// for blocked or failed files; without read access always 404 (12, 9.3).
+	// for blocked or failed files; without read access always 404 (12, 9.3). Exactly one byte range
+	// gives 206, several ranges are ignored (200 with the whole file), a range outside the file
+	// gives 416. Types outside the inline list of 12 9.3 (HTML, SVG, PDF and every other type) are sent as
+	// `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and the sandbox
+	// CSP. An `Authorization` header wins over a `ticket` parameter. Pass-through via the server
+	// only (ADR 0048).
 	//
 	// Corresponds with GET /files/{file_id}/content (the `DownloadFile` operationId).
-	DownloadFile(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFile(ctx context.Context, fileId FileIdPath, params *DownloadFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadThumbnail Download a thumbnail
 	//
-	// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`.
+	// Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview
+	// `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`; a variant
+	// the file does not have gives 404. Thumbnails are always inline with their own type; range,
+	// headers and caching as for `downloadFile` (12, 9.3).
 	//
 	// Corresponds with GET /files/{file_id}/thumbnails/{variant} (the `DownloadThumbnail` operationId).
-	DownloadThumbnail(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadThumbnail(ctx context.Context, fileId FileIdPath, variant DownloadThumbnailParamsVariant, params *DownloadThumbnailParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateFileTicketWithBody Create a short-lived fetch ticket
 	//
-	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+	// gives 404. A repeated call mints a new ticket.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -21758,7 +21818,12 @@ type ClientInterface interface {
 
 	// CreateFileTicket Create a short-lived fetch ticket
 	//
-	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+	// For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+	// checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+	// session of the caller: a principal without a session (agent, app, API token) gets 403
+	// `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+	// deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+	// gives 404. A repeated call mints a new ticket.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21774,7 +21839,7 @@ type ClientInterface interface {
 
 	// GetTranscript Read the transcript of a voice message
 	//
-	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3).
+	// 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3). Normal authentication only, never a fetch ticket. `text`, `language` and `source` are present only with `status` `done`.
 	//
 	// Corresponds with GET /files/{file_id}/transcript (the `GetTranscript` operationId).
 	GetTranscript(ctx context.Context, fileId FileIdPath, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -25485,91 +25550,6 @@ func (c *Client) LoginWithTrustedHeaderWithBody(ctx context.Context, params *Log
 // Corresponds with POST /auth/trusted-header/login (the `LoginWithTrustedHeader` operationId).
 func (c *Client) LoginWithTrustedHeader(ctx context.Context, params *LoginWithTrustedHeaderParams, body LoginWithTrustedHeaderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewLoginWithTrustedHeaderRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetChannel Read a channel
-//
-// Corresponds with GET /channels/{channel_id} (the `GetChannel` operationId).
-func (c *Client) GetChannel(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetChannelRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateChannelWithBody Change name or topic
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
-func (c *Client) UpdateChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateChannelRequestWithBody(c.Server, channelId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpdateChannel Change name or topic
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PATCH /channels/{channel_id} (the `UpdateChannel` operationId).
-func (c *Client) UpdateChannel(ctx context.Context, channelId ChannelIdPath, params *UpdateChannelParams, body UpdateChannelJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateChannelRequest(c.Server, channelId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ExplainChannelAccess Who has access to a channel
-//
-// Every principal with access and the chain of sources (direct, group, inherited, operator, direct-message participant, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).
-//
-// Corresponds with GET /channels/{channel_id}/access (the `ExplainChannelAccess` operationId).
-func (c *Client) ExplainChannelAccess(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewExplainChannelAccessRequest(c.Server, channelId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ArchiveChannelWithBody Archive a channel
-//
-// Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /channels/{channel_id}/archive (the `ArchiveChannel` operationId).
-func (c *Client) ArchiveChannelWithBody(ctx context.Context, channelId ChannelIdPath, params *ArchiveChannelParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewArchiveChannelRequestWithBody(c.Server, channelId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

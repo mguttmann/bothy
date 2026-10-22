@@ -284,7 +284,7 @@ reveals nothing (never with `404`).
 | `delegation_exceeds_own_level` | `forbidden` | delegation beyond one's own level |
 | `delegation_exceeds_own_capabilities` | `forbidden` | delegation beyond one's own capabilities |
 | `step_up_required` | `step_up_required` | fresh confirmation missing |
-| `step_up_not_possible` | `forbidden` | token without a session (agent, app, personal token) |
+| `step_up_not_possible` | `forbidden` | token without a session (agent, app, personal token); also `createFileTicket` without a login session, because a download ticket binds to a login session ([12-files.md](12-files.md) section 9.2) |
 | `view_as_read_only` | `forbidden` | writing action during "View as person" |
 | `i1_violation` | `invariant_violation` | the change would violate I1 |
 | `last_owner` | `invariant_violation` | the change would leave no active owner |

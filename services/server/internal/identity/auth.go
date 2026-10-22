@@ -237,4 +237,15 @@ type Auth interface {
 	// children included, newest first. Errors: not_found for another person or an unknown one,
 	// device_pending from a pending device, cursor_invalid.
 	ListSessions(ctx context.Context, a actor.Actor, userID ids.ID, p Page) (SessionPage, error)
+	// SessionActor builds the actor of a download ticket of userID issued in sessionID (M3-05
+	// design note 6): kind user with the session, its device, device state, client component and
+	// auth method, read per call so a revocation takes effect on the next fetch (04 section 8.5).
+	// SessionActive is true only for a session of userID that is not revoked and has not ended;
+	// DeviceKeyActive only when the device's active dpop key is the key of the session's active
+	// refresh family; a pending device past auth.device_pending_ttl is revoked; there is no
+	// step-up time and no key thumbprint. It never rejects on these flags, so authorize
+	// (check_active) refuses and audits the reason: an unknown session or one of another person
+	// gives an actor without session, device or key (DeviceState unknown). Errors: only store
+	// failures. Example: a, err := auth.SessionActor(ctx, ticket.PrincipalID, ticket.SessionID).
+	SessionActor(ctx context.Context, userID, sessionID ids.ID) (actor.Actor, error)
 }

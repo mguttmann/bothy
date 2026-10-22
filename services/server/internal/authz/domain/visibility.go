@@ -22,8 +22,13 @@ const (
 	kindTerminalSession = "terminal_session"
 	// kindFile is a file (M3-03): its visibility depends on its purpose and attachment.
 	kindFile = "file"
-	// purposeAttachment is files.purpose of a file uploaded into a channel.
+	// purposeAttachment is files.purpose of a file uploaded into a channel; purposeAvatar and
+	// purposeBranding are the files of a profile picture and of the instance branding (M3-05).
 	purposeAttachment = "attachment"
+	purposeAvatar     = "avatar"
+	purposeBranding   = "branding"
+	// actionFileRead is the one action that reads a file of every purpose (M3-05).
+	actionFileRead = "file.read"
 )
 
 // channelPathKinds are the kinds that live in a channel: a dm channel is visible to participants
@@ -168,18 +173,21 @@ func channelReadable(in Input) bool {
 	return in.Eff.Level >= LevelRead
 }
 
-// fileVisible is the visibility of kind file (05 section 2.2, docs/DECISIONS.md D-M3-03-17): an
-// attachment not attached yet only to its uploader with read on its scope channel, an attached one
-// to every reader of the path of its message; avatar, branding and gdpr_export to nobody until
-// M3-10 and M7-06 define their read rules (fail closed). Without facts (an event decided in filter
-// or delivery mode, where the application layer allows it) the path of the event decides.
+// fileVisible is the visibility of kind file (05 section 2.2, docs/DECISIONS.md D-M3-03-17, brief
+// M3-05 design note 7): an attachment not attached yet only to its uploader with read on its scope
+// channel, an attached one to every reader of the path of its message. Only file.read sees the
+// other purposes: an avatar every authenticated principal, a branding file everybody, a gdpr_export
+// nobody (it leaves only through gdpr.export.download); every other action keeps them invisible
+// (fail closed). Without facts (an event decided in filter or delivery mode, where the application
+// layer allows it) the path of the event decides.
 func fileVisible(in Input) bool {
 	f := in.Resource.File
 	switch {
 	case f == nil:
 		return channelReadable(in)
 	case f.Purpose != purposeAttachment:
-		return false
+		return in.Action == actionFileRead && (f.Purpose == purposeBranding ||
+			f.Purpose == purposeAvatar && in.Principal.Kind != KindAnonymous)
 	case f.Attached:
 		return channelReadable(in)
 	}

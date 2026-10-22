@@ -25,8 +25,6 @@ rules:
     milestone: M2
   - match: client.app_lock_after  # M5-08
     milestone: M5
-  - match: client.cache_max_age  # M3-05
-    milestone: M3
   - match: client.outbox_retry_base  # M4-15
     milestone: M4
   - match: client.outbox_retry_cap  # M4-15

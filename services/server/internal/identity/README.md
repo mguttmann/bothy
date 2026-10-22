@@ -967,6 +967,11 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
 
 - Port: `Directory.Users(ctx, ids)` returns the people among a list of ids in one read (`ListUsersByIDs`), keyed by id; unknown ids and principals that are not people are absent, like `Principals`. It does not authorize: `notify` loads `users.time_zone` for the quiet hours of people it already selected.
 
+## Actor of a download ticket (M3-05)
+
+- Port: `Auth.SessionActor(ctx, userID, sessionID)` builds the actor of a download ticket with the same session, device and dpop key query as the Authenticator (`SessionStore.AuthState`) plus the session's active refresh family (`ActiveFamily`), read per call so a revoked session takes effect on the next fetch in every process (04 section 8.5). Kind `user`, `ID`, `SessionID`, `DeviceID`, `DeviceState` (a pending device past `auth.device_pending_ttl` is `revoked`), `ClientComponent` and `AuthMethod` from the session. `SessionActive` only for a session of `userID` that is not revoked and has not ended; `DeviceKeyActive` only when the device's active dpop key is the family's key (the binding `cnf.jkt` proves) and the device is not inactive (`auth.device_inactive_revoke_after`); no `KeyThumbprint`, no step-up time; `CredentialInactive` as for an access token. An unknown session or one of another person gives an actor that keeps the `SessionID` of the ticket but has `SessionActive` false, no device or key and `DeviceState` `unknown`. It never rejects on the flags: `authorize` (`check_active`) refuses and audits the reason. Errors: only store failures.
+- Test: `TestSessionActor_ActiveRevokedExpiredForeignUnknown` (`app/sessionactor_test.go`, PostgreSQL 18).
+
 ## Port (root package `internal/identity`)
 
 - Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24); declares `AvatarFiles`, `AppInstallations` (M2-24).

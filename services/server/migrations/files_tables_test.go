@@ -17,7 +17,8 @@ import (
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
-// TestMigrationFilesTables holds files, file_upload_sessions and file_upload_parts against
+// TestMigrationFilesTables holds files, file_upload_sessions, file_upload_parts and file_thumbnails
+// (M3-05) against
 // docs/spec/03-data-model.md section 4.7 column by column with every key, check and index
 // (M3-03), files.search_vector as the stored generated column of section 5 with its GIN index,
 // and the deferred foreign key principals.avatar_file_id (M1-26), validated by the second
@@ -102,6 +103,25 @@ func TestMigrationFilesTables(t *testing.T) {
 			},
 			idx: []string{
 				"CREATE UNIQUE INDEX file_upload_parts_pkey ON public.file_upload_parts USING btree (file_id, part_number)",
+			},
+		},
+		{
+			// file_thumbnails (M3-05): the read path of downloadThumbnail; M3-06 writes it.
+			table: "file_thumbnails",
+			cols: []principalColumn{
+				{"file_id", "uuid", false, ""}, {"variant", "text", false, ""}, {"object_key", "text", false, ""},
+				{"mime_type", "text", false, ""}, {"width", "integer", false, ""}, {"height", "integer", false, ""},
+				{"size_bytes", "bigint", false, ""},
+			},
+			cons: []string{
+				"CHECK ((variant = ANY (ARRAY['small'::text, 'medium'::text, 'large'::text, 'poster'::text])))",
+				"FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE",
+				"PRIMARY KEY (file_id, variant)",
+				"UNIQUE (object_key)",
+			},
+			idx: []string{
+				"CREATE UNIQUE INDEX file_thumbnails_object_key_key ON public.file_thumbnails USING btree (object_key)",
+				"CREATE UNIQUE INDEX file_thumbnails_pkey ON public.file_thumbnails USING btree (file_id, variant)",
 			},
 		},
 	} {

@@ -128,6 +128,12 @@ exceptions:
   - query: files.GetFile
     category: authorize_resolution
     reason: "resolves one file by its id (scope channel, uploader, purpose) for authorize; getFile returns it only after file.read allowed it (M3-03)"
+  - query: files.GetFileForDelivery
+    category: authorize_resolution
+    reason: "resolves one file by its id (scope channel, uploader, purpose, states) for authorize; downloads, tickets and transcripts serve it only after file.read allowed it (M3-05)"
+  - query: files.GetThumbnail
+    category: after_authorize
+    reason: "one thumbnail of the one file file.read allowed, by file id and variant (M3-05)"
   - query: files.QuotaUsedBytes
     category: after_authorize
     reason: "the sum of the sizes of the caller's own files for file.quota_bytes_per_principal after file.upload was allowed; keyed by the uploader, only a number (M3-03)"

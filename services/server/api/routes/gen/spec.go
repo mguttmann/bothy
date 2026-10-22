@@ -94,6 +94,7 @@ type specWalk struct {
 	catalog   map[string]catalogAction // known actions by ID
 	catalogAt string                   // catalogue file, for problem messages
 	root      string                   // key of the root security requirements, see securityKey
+	rootReqs  map[string]bool          // key of each root security requirement alone (fetch tickets, D-M3-05-14)
 	p         *problemsError
 }
 
@@ -114,7 +115,7 @@ func readOperations(specPath string, data []byte, catalogPath string, actions []
 	if doc == nil {
 		return nil, nil
 	}
-	w := &specWalk{path: specPath, catalog: map[string]catalogAction{}, catalogAt: catalogPath, root: securityKey(doc.Security), p: p}
+	w := &specWalk{path: specPath, catalog: map[string]catalogAction{}, catalogAt: catalogPath, root: securityKey(doc.Security), rootReqs: requirementKeys(doc.Security), p: p}
 	for _, a := range actions {
 		w.catalog[a.ID] = a
 	}
@@ -387,7 +388,8 @@ func (w *specWalk) extensions(at string, ext map[string]any) (action, class stri
 
 // security reports whether the operation is public (security: [], the only public form) and
 // whether it overrides the root security with requirements of its own. An empty requirement ({})
-// would mean optional authentication, which the route table has no mode for.
+// would mean optional authentication, which the route table has no mode for. The fetch ticket
+// beside some of the root requirements is no override (fileTicketScheme).
 func (w *specWalk) security(at string, security *openapi3.SecurityRequirements) (public, override bool) {
 	if security == nil {
 		return false, false
@@ -400,7 +402,47 @@ func (w *specWalk) security(at string, security *openapi3.SecurityRequirements) 
 	if len(*security) == 0 {
 		return true, false
 	}
-	return false, securityKey(*security) != w.root
+	rest, ticket := withoutFileTicket(*security)
+	if !ticket {
+		return false, securityKey(*security) != w.root
+	}
+	for k := range requirementKeys(rest) {
+		if !w.rootReqs[k] {
+			return false, true
+		}
+	}
+	return false, len(rest) == 0
+}
+
+// requirementKeys returns the key of every requirement of reqs alone (securityKey of one).
+func requirementKeys(reqs openapi3.SecurityRequirements) map[string]bool {
+	out := map[string]bool{}
+	for _, r := range reqs {
+		out[securityKey(openapi3.SecurityRequirements{r})] = true
+	}
+	return out
+}
+
+// fileTicketScheme is the security scheme of the fetch tickets of downloadFile and
+// downloadThumbnail (docs/spec/12-files.md 9.2, ADR 0048): an alternative to the header
+// credentials that the file handler checks itself, after the chain let the anonymous request
+// through. An operation that lists it beside some of the root requirements is no override; the
+// route table records it as root security (docs/decisions.d/M3-05.md D-M3-05-14).
+const fileTicketScheme = "fileTicket"
+
+// withoutFileTicket returns reqs without the requirement that names only fileTicketScheme and
+// whether reqs had it.
+func withoutFileTicket(reqs openapi3.SecurityRequirements) (openapi3.SecurityRequirements, bool) {
+	out := make(openapi3.SecurityRequirements, 0, len(reqs))
+	found := false
+	for _, r := range reqs {
+		if _, ok := r[fileTicketScheme]; ok && len(r) == 1 {
+			found = true
+			continue
+		}
+		out = append(out, r)
+	}
+	return out, found
 }
 
 // securityKey renders security requirements in a canonical form for comparison: every

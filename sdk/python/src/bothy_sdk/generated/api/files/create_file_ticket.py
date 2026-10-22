@@ -96,8 +96,12 @@ def sync_detailed(
 ) -> Response[FileTicket | Problem]:
     """Create a short-lived fetch ticket
 
-     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks
-    signature, expiry, session and `file.read` again (12, 9.2).
+     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+    checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+    session of the caller: a principal without a session (agent, app, API token) gets 403
+    `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+    deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+    gives 404. A repeated call mints a new ticket.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -131,8 +135,12 @@ def sync(
 ) -> FileTicket | Problem | None:
     """Create a short-lived fetch ticket
 
-     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks
-    signature, expiry, session and `file.read` again (12, 9.2).
+     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+    checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+    session of the caller: a principal without a session (agent, app, API token) gets 403
+    `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+    deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+    gives 404. A repeated call mints a new ticket.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -161,8 +169,12 @@ async def asyncio_detailed(
 ) -> Response[FileTicket | Problem]:
     """Create a short-lived fetch ticket
 
-     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks
-    signature, expiry, session and `file.read` again (12, 9.2).
+     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+    checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+    session of the caller: a principal without a session (agent, app, API token) gets 403
+    `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+    deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+    gives 404. A repeated call mints a new ticket.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -194,8 +206,12 @@ async def asyncio(
 ) -> FileTicket | Problem | None:
     """Create a short-lived fetch ticket
 
-     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks
-    signature, expiry, session and `file.read` again (12, 9.2).
+     For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket
+    checks signature, expiry, session and `file.read` again (12, 9.2). A ticket binds to the login
+    session of the caller: a principal without a session (agent, app, API token) gets 403
+    `forbidden` with `reason` `step_up_not_possible`. No ticket is issued for a file that is not
+    deliverable (409 `file_not_ready` or `file_blocked`), and a variant the file does not have
+    gives 404. A repeated call mints a new ticket.
 
     Args:
         file_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
