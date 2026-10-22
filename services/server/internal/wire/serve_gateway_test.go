@@ -745,15 +745,38 @@ func TestGatewayDeadlines(t *testing.T) {
 	})
 
 	// The token outlives the setup by an hour; the clock of the process then jumps past its
-	// expiry, and the next heartbeat (every gwFastBeat) lets the gateway close with 4011.
+	// expiry, and the next heartbeat lets the gateway close with 4011. ready comes before the
+	// consumer of the agent is taken (4004 on a moved clock) and before its runner checks the
+	// catch-up (4012), so the clock moves only after both have read it: after the heartbeat_ack
+	// of a first heartbeat (the gateway handles the frames of a connection in order, so identify,
+	// the take included, has returned) and after the consumer's catchup.complete (sent once that
+	// check passed), in either order.
 	t.Run("TestClose4011AgentTokenExpired", func(t *testing.T) {
 		t.Parallel()
 		clk := &shiftClock{}
 		w := newGatewayWorldWith(t, wire.Deps{Clock: clk}, patientWindows(gwFastBeat)...)
 		agent := w.newAgent()
 		tok := w.agentToken(agent, nil, time.Now().Add(time.Hour))
-		c, _ := w.ready(t, wstest.IdentifyParams{APIToken: tok})
+		c, _ := w.ready(t, wstest.IdentifyParams{APIToken: tok}, wstest.WithoutHeartbeat())
+		if err := c.Send("heartbeat", map[string]any{"last_seq": 0}); err != nil {
+			t.Fatalf("heartbeat: %v", err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+		defer cancel()
+		for acked, complete := false, false; !acked || !complete; {
+			op, _, err := c.Next(ctx)
+			switch {
+			case err != nil:
+				t.Fatalf("waiting for heartbeat_ack and catchup.complete: %v", err)
+			case op == "heartbeat_ack":
+				acked = true
+			case op == "catchup.complete":
+				complete = true
+			}
+		}
 		clk.Advance(time.Hour + time.Minute)
+		// A tick of the gateway may close before this heartbeat is written; the close decides.
+		_ = c.Send("heartbeat", map[string]any{"last_seq": 0})
 		w.expectClose(t, c, 4011)
 	})
 }
