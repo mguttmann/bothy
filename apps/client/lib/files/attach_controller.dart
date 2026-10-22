@@ -234,7 +234,8 @@ final class AttachController extends ChangeNotifier {
     return false;
   }
 
-  /// Removes the attachment [key] and discards its upload entry.
+  /// Removes the attachment [key], discards its upload entry and deletes its copy in the
+  /// outgoing folder.
   Future<void> remove(String key) async {
     final i = _items.indexWhere((a) => a.key == key);
     if (i < 0) return;
@@ -242,6 +243,14 @@ final class AttachController extends ChangeNotifier {
     refusal = null;
     notifyListeners();
     await _outbox.discard(item.entryId);
+    final copy = Directory(
+      '${(await _outgoing()).path}${Platform.pathSeparator}$key',
+    );
+    try {
+      if (copy.existsSync()) await copy.delete(recursive: true);
+    } on FileSystemException {
+      // A copy that cannot be deleted now goes with the instance folder (D-M4-22-5).
+    }
   }
 
   /// "Upload again": a failed upload of [key] becomes a new entry with a new session

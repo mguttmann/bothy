@@ -202,8 +202,13 @@ final class DownloadService {
     }
   }
 
-  /// Fetches [file] and opens it with the system through [opener].
+  /// Fetches [file] and opens it with the system through [opener]; a program or a script
+  /// (by the extension of its name) is refused with `open_refused` and never fetched or
+  /// launched, Save as stays (D-M4-22-14).
   Future<DownloadResult> open(FileMeta file, FileOpener opener) async {
+    if (isExecutableName(file.originalName)) {
+      return const DownloadFailed('open_refused');
+    }
     final result = await fetch(file.id, name: file.originalName);
     if (result is! Downloaded) return result;
     try {
@@ -267,4 +272,70 @@ final class _DigestSink implements Sink<Digest> {
 
   @override
   void close() {}
+}
+
+/// The extensions the desktop systems run as a program or a script when a file is opened.
+const Set<String> executableExtensions = {
+  'app',
+  'appimage',
+  'apk',
+  'application',
+  'bat',
+  'cmd',
+  'com',
+  'command',
+  'cpl',
+  'csh',
+  'deb',
+  'desktop',
+  'dmg',
+  'exe',
+  'gadget',
+  'hta',
+  'inf',
+  'ins',
+  'jar',
+  'js',
+  'jse',
+  'ksh',
+  'lnk',
+  'msc',
+  'msi',
+  'msix',
+  'msp',
+  'pif',
+  'pkg',
+  'ps1',
+  'psm1',
+  'py',
+  'rb',
+  'reg',
+  'rpm',
+  'run',
+  'scf',
+  'scr',
+  'sct',
+  'sh',
+  'shb',
+  'terminal',
+  'tool',
+  'url',
+  'vb',
+  'vbe',
+  'vbs',
+  'workflow',
+  'ws',
+  'wsc',
+  'wsf',
+  'wsh',
+  'zsh',
+};
+
+/// Whether [name] ends with one of [executableExtensions], in any case.
+bool isExecutableName(String name) {
+  final dot = name.lastIndexOf('.');
+  if (dot < 0) return false;
+  return executableExtensions.contains(
+    name.substring(dot + 1).trim().toLowerCase(),
+  );
 }

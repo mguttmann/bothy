@@ -48,6 +48,15 @@ final class UploadProgress extends ChangeNotifier {
   /// The file ID of the session of [key], or null before the session exists.
   String? sessionFileOf(String key) => _fileIds[key];
 
+  /// Records [confirmed] of [total] bytes of [key] as the executor does, for tests of the
+  /// views that show the progress.
+  @visibleForTesting
+  void debugReport(String key, {required int confirmed, required int total}) {
+    _total[key] = total;
+    _confirmed[key] = confirmed;
+    notifyListeners();
+  }
+
   void _begin(String key, int total) {
     _total[key] = total;
     _confirmed[key] = 0;

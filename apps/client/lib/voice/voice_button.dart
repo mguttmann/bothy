@@ -182,14 +182,21 @@ final class VoiceController extends ChangeNotifier {
     _set(VoicePhase.idle);
   }
 
-  /// Sends the stopped recording (stopping a running one first).
+  /// Sends the stopped recording (stopping a running one first); a send that fails keeps the
+  /// recording for another try.
   Future<void> send() async {
     if (phase == VoicePhase.recording) await stop();
     final file = recorded;
     if (file == null) return;
     recorded = null;
     _set(VoicePhase.idle);
-    await _onSend(file);
+    try {
+      await _onSend(file);
+    } on Object {
+      if (_disposed || phase != VoicePhase.idle) return;
+      recorded = file;
+      _set(VoicePhase.recorded);
+    }
   }
 
   @override

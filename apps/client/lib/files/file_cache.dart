@@ -47,15 +47,22 @@ final class FileCache implements FileCacheEraser {
     return File(safe == null ? base : '$base$sep$safe');
   }
 
-  /// [name] as one path segment: without separators, control characters and leading dots;
-  /// `file` when nothing is left.
+  /// [name] as one path segment on every desktop system: without separators, control
+  /// characters, leading dots and spaces or trailing dots and spaces; a Windows device name
+  /// (`CON`, `lpt1.txt`) gets the prefix `_`; `file` when nothing is left.
   static String safeFileName(String name) {
     final cleaned = name
         .replaceAll(RegExp(r'[/\\:*?"<>|\x00-\x1f\x7f]'), '_')
-        .replaceFirst(RegExp(r'^\.+'), '')
-        .trim();
-    return cleaned.isEmpty ? 'file' : cleaned;
+        .replaceFirst(RegExp(r'^[\s.]+'), '')
+        .replaceFirst(RegExp(r'[\s.]+$'), '');
+    if (cleaned.isEmpty) return 'file';
+    return _windowsDevice.hasMatch(cleaned) ? '_$cleaned' : cleaned;
   }
+
+  static final RegExp _windowsDevice = RegExp(
+    r'^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)',
+    caseSensitive: false,
+  );
 
   /// A new temporary file for a download in progress, in the cache's own folder so the final
   /// rename stays on one file system.

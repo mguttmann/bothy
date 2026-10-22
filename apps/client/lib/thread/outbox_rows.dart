@@ -139,10 +139,21 @@ class PendingRow extends StatelessWidget {
     final files = _files(l);
     final message = _message(l, delivery);
     if (files == null) return message;
+    final live = progress;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
-      children: [message, files],
+      children: [
+        message,
+        // The chips follow every confirmed part, as in the composer.
+        if (live == null)
+          files
+        else
+          ListenableBuilder(
+            listenable: live,
+            builder: (context, _) => _files(l) ?? const SizedBox.shrink(),
+          ),
+      ],
     );
   }
 

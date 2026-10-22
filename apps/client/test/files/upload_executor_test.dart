@@ -328,6 +328,16 @@ void main() {
       );
     });
 
+    test('a removed attachment leaves no copy behind', () async {
+      expect(await attach.add([await picked('a.bin', 5)]), isTrue);
+      final key = attach.attachments.single.key;
+      final copy = Directory('${h.folder.path}/outgoing/$key');
+      expect(copy.existsSync(), isTrue);
+      await attach.remove(key);
+      expect(await h.db.outboxDao.allEntries(), isEmpty);
+      expect(copy.existsSync(), isFalse);
+    });
+
     test('files within the limits become upload entries', () async {
       final ok = await attach.add([await picked('a.bin', 3)]);
       expect(ok, isTrue);

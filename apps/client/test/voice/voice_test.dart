@@ -104,6 +104,26 @@ void main() {
       voice.dispose();
     });
 
+    testWidgets('a failed send keeps the recording for another try', (
+      tester,
+    ) async {
+      final voice = VoiceController(
+        recorder: FakeRecorder.new,
+        bitRate: 64000,
+        scratch: () async => scratch,
+        onSend: (_) async => throw const FileSystemException('unreadable'),
+      );
+      await tester.runAsync(() async {
+        await voice.start();
+        await voice.stop();
+      });
+      final first = voice.recorded;
+      await tester.runAsync(voice.send);
+      expect(voice.phase, VoicePhase.recorded);
+      expect(voice.recorded, same(first));
+      voice.dispose();
+    });
+
     testWidgets('the microphone keeps a recording that waits to be sent', (
       tester,
     ) async {

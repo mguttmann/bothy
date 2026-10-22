@@ -136,6 +136,41 @@ void main() {
     );
   });
 
+  test(
+    'Open refuses programs and scripts and never hands them to the system',
+    () async {
+      final id = ready();
+      final opener = FakeOpener();
+      for (final name in [
+        'setup.exe',
+        'run.BAT',
+        'tool.ps1',
+        'App.app',
+        'x.command',
+      ]) {
+        final meta = FileMeta(
+          id: id,
+          sizeBytes: bytes.length,
+          mimeType: 'application/octet-stream',
+          originalName: name,
+          uploadedBy: PrincipalId.parse(h.seed.alex.id),
+          purpose: FilePurpose.attachment,
+          uploadState: UploadState.complete,
+          scanStatus: ScanStatus.clean,
+          transcriptStatus: TranscriptStatus.none,
+          thumbnails: const [],
+          createdAt: DateTime.utc(2026, 10, 17),
+        );
+        expect(
+          await downloads.open(meta, opener),
+          isA<DownloadFailed>().having((r) => r.code, 'code', 'open_refused'),
+          reason: name,
+        );
+      }
+      expect(opener.opened, isEmpty);
+    },
+  );
+
   test('a ticket URL reaches the player and never a log', () async {
     final id = ready();
     final lines = <String>[];

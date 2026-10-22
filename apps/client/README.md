@@ -153,7 +153,7 @@ Attaching by the attachment button, drag and drop or paste checks the size again
 `file_max_upload_bytes` and the count against `message_max_attachments` and then writes one
 `upload` entry per file into the outbox, before the message (`lib/files/attach_controller.dart`).
 The executor (`upload_executor.dart`) creates the session with the entry ID as
-`Idempotency-Key`, sends the parts `getUpload` has not confirmed, at most two at a time and each
+`Idempotency-Key`, sends the parts `getUpload` has not confirmed, at most `UploadOps.parallelParts` at a time and each
 with `Content-Digest`, and completes the session; the message then attaches the files
 (12 3.4, D-M4-22-1). The SHA-256 is computed in a background isolate while the file streams.
 Attachments show the states of 12 2 (`attachment_mapping.dart`, `attachment_tile.dart`); images
@@ -162,7 +162,7 @@ show thumbnails from `downloadThumbnail` only, never from a URL in the content (
 Downloads (`download_service.dart`) stream into the file cache (`file_cache.dart`,
 `<instance folder>/files`) and keep only bytes that match `Repr-Digest`; audio and video play
 through file tickets (`ticket_player.dart`). Voice messages (`lib/voice/`) record AAC-LC mono in
-`.m4a` at `client.voice.bitrate` up to `voice_max_duration_ms`, play at 1, 1.5 and 2 and show the
+`.m4a` at `client.voice.bitrate` up to `voice_max_duration_ms`, play at the speeds of `voiceSpeeds` and show the
 transcript when `file.updated` reports it. Every outside dependency is a port in
 `lib/files/file_ports.dart` (`AppPorts.files`), so the tests use a fake recorder, fake players
 and no dialogs. On macOS the runner declares `NSMicrophoneUsageDescription`, the audio input
