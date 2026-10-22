@@ -272,7 +272,7 @@ The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand
 - `Register`: rules, then `authorize(command.register)` with the command facts of the submitted
   definition (the target rule of `authz`), then the reserved names (`409` with
   `command_name_reserved`), the lock of the owner's `principals` row (`identity.PrincipalWriter.LockPrincipal`)
-  and the count against `command.max_per_principal` (`400` `limit_reached`), the insert (`409` without
+  and the count against `command.max_per_principal` (`400 validation_failed`, field code `limit_reached`), the insert (`409` without
   reason on a taken name) and in the same unit one audit entry and one `command.changed`.
 - `Update`: rules, load, `command.read` on the stored command, `command.register` on the new
   definition, `If-Match`, reserved names, a no-op for an identical definition, otherwise a
