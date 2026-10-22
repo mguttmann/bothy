@@ -64,6 +64,7 @@ reports the metrics `bothy.backup.*` and `bothy.storage.volume.*`. One kind by h
    every WAL segment into repo2 as well. While the off-site target cannot be reached,
    `archive-push` fails and PostgreSQL keeps the segments in `pg_wal` and retries
    (`BothyWalArchiveStale`); the volume `pgdata` grows until the target answers again.
+
 3. `docker compose up -d backup`; on its first start `bothy-backupd` creates the pgBackRest stanza and
    the restic repository. It retries `stanza-create` until the database and its pgBackRest
    server answer; its log line `stanza bothy is ready` and the health check of `backup` (a TLS

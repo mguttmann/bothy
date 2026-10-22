@@ -337,10 +337,9 @@ func buildServerBinary(t *testing.T) string {
 		t.Fatalf("no Go architecture for the Docker daemon architecture %q", arch)
 	}
 	dir := t.TempDir()
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
-	defer cancel()
+	// The build ends with the test; no own time limit (a slow runner may need longer than Patience).
 	//nolint:gosec // G204: the Go toolchain of this test run builds this repository's command.
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", filepath.Join(dir, "bothy"), "../../cmd/bothy")
+	cmd := exec.CommandContext(t.Context(), "go", "build", "-trimpath", "-o", filepath.Join(dir, "bothy"), "../../cmd/bothy")
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+goarch) //nolint:forbidigo // the toolchain's environment
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build ./cmd/bothy: %v\n%s", err, out)

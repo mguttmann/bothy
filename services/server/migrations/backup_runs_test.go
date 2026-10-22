@@ -123,7 +123,7 @@ func TestMigrationBackupRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := provider.DownTo(ctx, 49); err != nil {
-		t.Fatalf("down to 48: %v", err)
+		t.Fatalf("down to 49: %v", err)
 	}
 	var exists bool
 	if err := conn.QueryRow(ctx, `SELECT to_regclass('backup_runs') IS NOT NULL`).Scan(&exists); err != nil || exists {

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/metrics"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // TestSetupMetrics_ServiceNameAndReader: the meter telemetry of bothy-backupd carries
@@ -88,9 +88,7 @@ func TestSetupMetrics_ExporterNone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := tel.Shutdown(ctx); err != nil {
+	if err := tel.Shutdown(testkit.Context(t)); err != nil {
 		t.Fatal(err)
 	}
 }
