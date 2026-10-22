@@ -9759,14 +9759,23 @@ type Host struct {
 // HostDisabledReason Present exactly with `state = disabled`. `duplicate_connection` means a second live control connection with the same keys; only re-pairing helps (24, 3.4).
 type HostDisabledReason string
 
-// HostChannelHello First text frame on the control and data connections of a host service.
+// HostChannelHello First text frame on the control and data connections of a host service. It carries server values the host service applies; the values of the `hello` of a data connection apply to the session of that connection (24, 5.3, 6.2 and 6.3).
 type HostChannelHello struct {
 	// Challenge Random value; the host signs it with its Ed25519 key in `identify`.
 	Challenge string `json:"challenge"`
 
+	// ClockLeewayMs `auth.clock_leeway` in milliseconds. The host service applies it to the session of this data connection: the tolerance on `exp` of the session token and how long it remembers the `jti` after `exp` (24, 5.3).
+	ClockLeewayMs int64 `json:"clock_leeway_ms"`
+
+	// DetachGraceMs `terminal.detach_grace` in milliseconds. The host service applies it to the detach timer of the session of this data connection (24, 6.2).
+	DetachGraceMs int64 `json:"detach_grace_ms"`
+
 	// HeartbeatIntervalMs Examples: 20000
 	HeartbeatIntervalMs int64 `json:"heartbeat_interval_ms"`
 	HeartbeatMissLimit  int   `json:"heartbeat_miss_limit"`
+
+	// IdleTimeoutMs `terminal.idle_timeout` in milliseconds. The host service applies it to the idle timer of the session of this data connection (24, 6.3).
+	IdleTimeoutMs int64 `json:"idle_timeout_ms"`
 
 	// Jwks Public keys with purpose `terminal` for checking session tokens.
 	Jwks             Jwks  `json:"jwks"`
@@ -25500,28 +25509,6 @@ func (c *Client) StepUpWithPasswordWithBody(ctx context.Context, params *StepUpW
 // Corresponds with POST /auth/step-up/password (the `StepUpWithPassword` operationId).
 func (c *Client) StepUpWithPassword(ctx context.Context, params *StepUpWithPasswordParams, body StepUpWithPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStepUpWithPasswordRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RefreshTokenWithBody Rotate the refresh token
-//
-// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
-// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
-// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
-// server issues a new access token and returns the same refresh token, without rotation.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
-func (c *Client) RefreshTokenWithBody(ctx context.Context, params *RefreshTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRefreshTokenRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
