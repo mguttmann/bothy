@@ -421,7 +421,7 @@ or the pre-push hook:
 | `perf` | load tests of the performance targets of 02 and the chaos tests of the event path, on `perf.reference_profile` (section above, ADR 0063) | end of a milestone, release, tickets that touch a performance target (PLAN P-07) |
 | `portability` | the whole stack from images on a fresh machine plus the smoke test (`infra/compose/smoke.sh`) | release workflow |
 | `tofu-vm-test` | the OpenTofu module `generic-vm` on a local VM: the product trial, a pinned Ubuntu cloud image in QEMU (KVM, HVF or TCG) with the rendered user data, the smoke probe against the stack, a second delivery over SSH that changes nothing, a wrong checksum and a wrong signature that stop the setup ([infra/tofu/test/generic-vm/README.md](../../infra/tofu/test/generic-vm/README.md)); needs QEMU on the build host and refuses to run under GitHub Actions (D-W-127) | build host, tickets that change `infra/tofu/modules/generic-vm` or the bundle |
-| `console-e2e` | SEC-T05: the web console of the server image under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (`tools/console-e2e`, M6-03) | CI job `console-e2e` of `ci.yml` and `build-verify.yml` when the plan lists it ("Jobs a change needs"), feeding `ci-ok` |
+| `console-e2e` | SEC-T05: the web console of the server image under its CSP in Chromium, Firefox and WebKit against the Compose smoke stack (`tools/console-e2e`, M6-03) | CI job `console-e2e` of `ci.yml` and `build-verify.yml` when the plan lists it ("Jobs a change needs"), feeding `ci-ok` and `build-verify-ok` |
 
 ## Migrations
 

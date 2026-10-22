@@ -24,7 +24,9 @@ func TestParseCSPReports(t *testing.T) {
 			{"type":"deprecation","body":{"id":"x"}},
 			{"type":"csp-violation","body":{"blockedURL":"inline","effectiveDirective":"style-src-attr","disposition":"report"}},
 			{"type":"csp-violation","body":{"blockedURL":"trusted-types-policy","effectiveDirective":"trusted-types","disposition":"enforce"}},
-			{"type":"csp-violation","body":"not an object"}
+			{"type":"csp-violation","body":"not an object"},
+			{"type":"csp-violation","body":null},
+			{"type":"csp-violation"}
 		]`, []domain.CSPViolation{
 			{Directive: "script-src-elem", Disposition: "enforce", BlockedOrigin: "https://cdn.example.com:8443"},
 			{Directive: "style-src-attr", Disposition: "report", BlockedOrigin: "inline"},

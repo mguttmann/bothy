@@ -143,10 +143,14 @@ func parseReportingAPIReports(body []byte) ([]CSPViolation, error) {
 }
 
 // cspViolationOf returns the violation of one report object, false for a report of another type
-// or a body that is no object.
+// or a body that is missing, null or no object.
 func cspViolationOf(raw json.RawMessage) (CSPViolation, bool) {
 	var r reportingAPIReport
 	if json.Unmarshal(raw, &r) != nil || r.Type != "csp-violation" {
+		return CSPViolation{}, false
+	}
+	var object map[string]json.RawMessage
+	if json.Unmarshal(r.Body, &object) != nil || object == nil {
 		return CSPViolation{}, false
 	}
 	var b reportingAPIBody
