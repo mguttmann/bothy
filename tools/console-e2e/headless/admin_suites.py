@@ -866,6 +866,17 @@ class PlatformHandler:
         raise CheckError(f"patrol platform action {action} is not supported by the runner")
 
 
+def intercept_file_choosers(page: Page) -> None:
+    """Has Playwright intercept the page's file choosers, with a listener that does nothing.
+
+    Without a listener headless Chromium answers the console's ``click()`` on its file input with
+    an immediate ``cancel`` and the console removes the input before the suite of brief M6-08 can
+    set the manifest on it. The listener runs inside the pending ``page.evaluate`` of a test, so
+    it must not call the page.
+    """
+    page.on("filechooser", lambda _chooser: None)
+
+
 def record_download(
     handler: PlatformHandler, downloads: list[Download]
 ) -> Callable[[Download], None]:
@@ -972,6 +983,7 @@ def run_admin(pw: Playwright, login: Login, spki: str) -> dict[str, Any]:
         session.context.expose_binding("__patrol__platformHandler", handler)
         page.on("console", console_log(result.setdefault("console", [])))
         page.on("download", record_download(handler, downloads))
+        intercept_file_choosers(page)
         add_virtual_authenticator(session)
         page.goto(CONSOLE)
         say("log in as the owner, step-up, passkey")

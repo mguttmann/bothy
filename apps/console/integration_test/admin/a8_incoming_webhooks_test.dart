@@ -81,7 +81,6 @@ void main() {
     expectNoTrace(token, 'webhook token');
 
     await tapKey($, 'incoming.revoke.$webhookId');
-    await typeKey($, 'confirm.reason', 'The monitoring moved');
     await tapKey($, 'confirm.submit');
     await waitGone($, byKey('incoming.row.$webhookId'));
     expectStepUp();

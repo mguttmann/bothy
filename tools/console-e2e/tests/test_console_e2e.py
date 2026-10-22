@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tomllib
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 
 import components
@@ -872,6 +873,24 @@ def test_platform_handler_answers_the_manifest_file_without_calling_the_page() -
     assert handler.unknown == []
     with pytest.raises(admin.CheckError, match=r"other\.json"):
         handler(None, {"action": "e2eSetManifestFile", "params": {"name": "other.json"}})
+
+
+class _ListenPage:
+    def __init__(self) -> None:
+        self.listeners: dict[str, Callable[[object], None]] = {}
+
+    def on(self, event: str, listener: Callable[[object], None]) -> None:
+        self.listeners[event] = listener
+
+
+def test_file_choosers_are_intercepted_so_the_console_input_stays() -> None:
+    # Headless Chromium fires "cancel" at once on a file input's click() unless the page
+    # intercepts file choosers; the console then removes its input before the suite sets the file.
+    page = _ListenPage()
+    admin.intercept_file_choosers(page)  # type: ignore[arg-type]
+    listener = page.listeners["filechooser"]
+    # The listener runs inside the pending page.evaluate of a test: it must not call anything.
+    listener(_NoPage())
 
 
 def test_manifest_file_is_the_repo_bridge_manifest_as_json() -> None:

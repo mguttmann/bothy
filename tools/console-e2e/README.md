@@ -157,8 +157,9 @@ authenticator):
    pending `page.evaluate` of the test, where a nested call of the sync API never returns. The
    suite (`chooseManifest` of `integration_test/admin/support.dart`) sets the file on the input the
    console appended (`input[data-bothy-file-input="manifest"]`) with a `DataTransfer` and fires its
-   `change` event: without a user activation Chromium opens no file dialog for the console's
-   `click()`. The file is the manifest of
+   `change` event. The runner intercepts the page's file choosers with a listener that does
+   nothing (`intercept_file_choosers`): otherwise headless Chromium answers the console's `click()`
+   with an immediate `cancel` and the console removes its input. The file is the manifest of
    `repo_bridge_manifest` (the app Repo Bridge: required scope `messages:write`, optional
    `messages:read` and `events:subscribe`, the event `message.created` delivered to
    `https://webhook-receiver:8443/hooks/events`, one requested grant of level write on a channel,
