@@ -29,7 +29,7 @@ once for the components of the plan, the tests split by component
 
 | Job | Make targets | Runs |
 |---|---|---|
-| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint runners-check labels-check release-pins install-options` | always |
+| `gates` | `fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check commitlint fragments-check runners-check labels-check release-pins install-options` | always |
 | `gates (docs and contracts)` | `docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks api-breaking ops-check api-clients tokens` | always |
 | `gates (security and supply chain)` | `gitleaks semgrep trivy osv licenses` | always |
 | `test (tools)` | `test coverage` with no component (the Python tools) | always |
@@ -134,6 +134,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `coverage` | coverage, go tool cover, LCOV evaluation | minimum coverage; Go without the packages under `test/` and `perf/` (test code, chapter 23 "Component contract") and without generated files `*.gen.go`; Dart per member without generated files (`tools/ci/lcov_filter.py`: `*.g.dart`, `*.freezed.dart`, `*.drift.dart`, `lib/src/generated/`, `build/`); Python and TypeScript projects without generated code, threshold in the project's own test configuration (pytest-cov `fail_under`, Vitest `coverage.thresholds`) | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent`, `quality.coverage.python_min_percent`, `quality.coverage.typescript_min_percent` | tools |
 | `contract-test` | Go test `TestG7_SchemathesisAllEnabledOperations` (tags `contract_validate`, `contract_live`) with Schemathesis from `tools/contract/` | G7 (06 "Contract tests and gate"): the server of this tree with a throwaway PostgreSQL and the matrix world; every operation of the enable list as owner and as a plain user, positive and negative cases, the stateful phase over inferred links, SEC-T06; built-in checks plus problem format, `Correlation-Id`, no JSON `null`, 404 equality; every failure prints a `curl` reproduction and the seed ([README](../../services/server/test/contract/README.md)) | `quality.contract.max_examples`, `quality.contract.timeout` | from the first Go module (Docker runtime) |
 | `commitlint` | `tools/hooks/commit_msg.py` | Conventional Commits and DCO of the commits that are not yet on `origin/main`; in CI also the pull request title, and a dependency bot's own commits in its own pull request need no sign-off (`PR_AUTHOR`, D-DEPS-3) | `commit.header_max_length` | from the first remote |
+| `fragments-check` | `tools/ci/fragments.py check` | changelog and ruling fragments (section "Fragments"): name `<ticket>.md`, place next to a release component's `CHANGELOG.md` or in `docs/decisions.d/`, form; no ticket or integration section in `docs/DECISIONS.md`; in a pull request no line added under "Unreleased" of a `CHANGELOG.md`, against the merge base (the range of `commitlint`) | | yes |
 | `docs` | `tools/docs/language_check.py`, `tools/docs/adr_index.py`, `tools/docs/problem_code_refs.py`, `tools/docs/brief_deps.py`, `tools/docs/register_ids.py`, `tools/docs/risk_ranking.py`, `tools/docs/dart_api_docs.py` (`dart doc` per package into the ignored folder `docs/api/dart/`), MkDocs `--strict` with the hooks `tools/docs/mkdocs_repo_links.py` and `tools/docs/mkdocs_api_reference.py`, then `tools/docs/external_assets_check.py` | ADR index up to date, every pair of status and problem code in Markdown and API files appears as such in `x-problem-codes` (06 section 5 item 7), index, waves and graph of the briefs match the plan and no brief calls a `make` target that only a ticket outside its dependencies creates, every ID that a table in `docs/**/*.md` defines in the first column (rulings, tests, guard rules, threats, decisions, risks, open questions, tickets) appears as such exactly once in the whole repository (D-W-60), every table row has as many cells as its header (D-W-71), the overview and the sections of the open questions name the same IDs, the ranking of the largest risks names the rating of the register and leaves out no higher-rated risk (D-W-78), and the list behind its last rank names exactly the remaining risks with that rank's rating (D-W-79), the site builds without a warning; links to existing files outside `docs/` point to the repository in the site, a missing target stays an error; no tracked text file contains German prose or a word with an umlaut, except the exceptions in `tools/docs/language-allow.txt` and text between the marker lines `language-check: off` and `language-check: on` (D-W-94); the REST, schema and gateway reference pages are rendered from `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml` in every build (a committed copy, an unresolved `$ref` or a duplicate anchor fails); the built HTML and CSS reference no script, stylesheet or font of another origin (anchors to external pages stay allowed; requests a bundled script makes at run time are not covered); `dart doc` of every Dart package without a warning or an error, its pages in the site ([Dart API reference](../reference/dart-api.md)); built for every component selection, because the site links them | | yes |
 | `config-doc-check` | `tools/configdoc/configdoc.py --check` | configuration reference (ruling L4): no name twice, every key of the schema with a row, chapter, place `Server` and the same default in its chapter table, every planned server key with a milestone in `tools/configdoc/planned.yaml` and no stale rule, no name retired by W1 (`tools/configdoc/retired.yaml`), Compose waits longer than `shutdown.total_timeout`, no two names with the same environment variable, section 4 current (rules D1 to D10 in [configuration.md](../operations/configuration.md) 10). Reads the committed schema file and needs no Go | | yes |
 | `linkcheck` | lychee `--offline --include-fragments`; `tools/docs/placeholder_links.py` | local links and anchors of all tracked Markdown files; no link outside code to the placeholder repository `OWNER` (P-05), because it leads nowhere after publishing; builds the Dart API pages first when `docs/api/dart/` is missing, because `docs/reference/dart-api.md` links them | | yes |
@@ -293,6 +294,37 @@ Where the list is:
   keeps the issue body as the list of every flaky test, the most frequent first. It uses only
   the `GITHUB_TOKEN` (`actions: read`, `issues: write`). Close the issue when its list is fixed;
   the runs it reported stay reported, and the next run with a flake opens a new issue.
+
+## Fragments
+
+Every ticket writes its changelog entries and its rulings into files of its own, so that pull
+requests that land in parallel do not conflict in one shared file (GitHub's merge ignores git
+merge drivers such as `merge=union`; docs/DECISIONS.md PL/24):
+
+* changelog: `<component>/changelog.d/<ticket>.md` next to the `CHANGELOG.md` of the release
+  component (`changelog.d/<ticket>.md` at the root for the repository as a whole, the
+  directories of `RELEASE_COMPONENTS` in `tools/ci/components.py`). The file holds only Keep a
+  Changelog headings `### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed`
+  and `### Security`, each followed by list items (`- `; a continuation line is indented), for
+  example the line `### Added`, a blank line and `- Runs and their state machine.`.
+  `make release-prep COMPONENT=<name>` puts the entries of the component's fragments at the end
+  of their subsection under "Unreleased" (a missing subsection in Keep a Changelog order),
+  fragments in file name order with numbers compared as numbers, and deletes the fragments;
+  `make changelog-preview COMPONENT=<name>` prints that `CHANGELOG.md` without writing.
+* rulings: `docs/decisions.d/<ticket>.md`, first line `# <ticket> <title>`, then the table of
+  the ticket's rulings as in docs/DECISIONS.md section 10. The site lists the files on the
+  generated page "Ruling log: tickets" (`tools/docs/mkdocs_ruling_fragments.py`); a committed
+  `docs/decisions.d/index.md` fails the build.
+
+`make fragments-check` (CI job `gates`) refuses a fragment with another name, place or form, a
+section of a ticket or an integration wave in `docs/DECISIONS.md` (`## <ticket> ...`,
+`## Integration ...`), and, for the commits of a pull request, a line added under "Unreleased"
+of a `CHANGELOG.md`. Edits and deletions of existing lines pass, and so does a release commit,
+which empties "Unreleased" into a version section. Not covered: two tickets that change the same
+existing line still conflict; a ruling added as a row to a table of `docs/DECISIONS.md` passes
+the gate (section 10 asks for the ticket file); and a conflict resolution that drops another
+ticket's lines loses them unnoticed, so a branch that still has its rulings in
+`docs/DECISIONS.md` moves its section into `docs/decisions.d/<ticket>.md` when it rebases.
 
 ## Performance (`make perf`)
 

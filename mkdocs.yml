@@ -65,6 +65,9 @@ hooks:
   # The REST, schema and gateway reference pages, rendered from docs/api/openapi.yaml and
   # docs/api/asyncapi.yaml at build time; they exist only in the build (M7-19).
   - tools/docs/mkdocs_api_reference.py
+  # The index page of the ruling fragments in docs/decisions.d/; it exists only in the build
+  # (PL/24).
+  - tools/docs/mkdocs_ruling_fragments.py
 
 markdown_extensions:
   - admonition
@@ -101,9 +104,11 @@ validation:
     absolute_links: info
     unrecognized_links: warn
 
-# Deliberately outside the navigation: single ADRs (linked from the ADR index).
+# Deliberately outside the navigation: single ADRs (linked from the ADR index) and the ruling
+# files of the tickets (linked from the generated page decisions.d/index.md).
 not_in_nav: |
   /adr/0*.md
+  /decisions.d/*.md
   /api/dart/
 
 nav:
@@ -200,6 +205,7 @@ nav:
       - Ruling log: DECISIONS.md
       - 'Ruling log: planning and resumption': DECISIONS-PLANNING.md
       - 'Ruling log: foundation tickets': DECISIONS-FOUNDATION.md
+      - 'Ruling log: tickets': decisions.d/index.md
       - Open questions: OPEN-QUESTIONS.md
       - Risks: RISKS.md
   - Build briefs:

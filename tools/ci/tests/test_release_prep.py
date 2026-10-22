@@ -581,3 +581,40 @@ def test_cli_passes_the_server_version(
     assert rc == 0
     assert "BOTHY_VERSION=1.4.0" in fx.read(ENV_EXAMPLE)
     assert ENV_EXAMPLE in out
+
+
+def test_fragments_go_into_the_release_section_and_are_deleted(
+    fx: Fixture, git_cliff: Path
+) -> None:
+    """The tickets' changelog fragments become part of the version section (PL/24)."""
+    released(fx)
+    folder = fx.root / "services/server/changelog.d"
+    folder.mkdir()
+    (folder / "M2-05.md").write_text("### Fixed\n\n- A fixed thing.\n", encoding="utf-8")
+    (folder / "M2-04.md").write_text("### Added\n\n- A new thing.\n", encoding="utf-8")
+    fx.commit("feat(server): with a fragment", "services/server/b.go")
+    without = fx.commit("fix(server): without an entry", "services/server/c.go")
+    result = prep(fx, git_cliff)
+    text = fx.read("services/server/CHANGELOG.md")
+    section = text.split("## [0.2.0] - 2026-10-15", 1)[1].split("\n## [", 1)[0]
+    assert "- Something for users.\n- A new thing.\n" in section
+    assert "### Fixed\n\n- A fixed thing.\n" in section
+    assert not folder.exists() or not any(folder.iterdir())
+    assert result.used_fragments == (
+        "services/server/changelog.d/M2-04.md",
+        "services/server/changelog.d/M2-05.md",
+    )
+    assert [c.sha for c in result.checklist] == [without]
+
+
+def test_a_broken_fragment_writes_nothing(fx: Fixture, git_cliff: Path) -> None:
+    released(fx)
+    folder = fx.root / "services/server/changelog.d"
+    folder.mkdir()
+    (folder / "M2-05.md").write_text("### Improved\n\n- Words.\n", encoding="utf-8")
+    fx.commit("fix(server): a fix", "services/server/b.go")
+    before = fx.read("services/server/CHANGELOG.md")
+    with pytest.raises(release_prep.ReleasePrepError, match="not one of"):
+        prep(fx, git_cliff)
+    assert fx.read("services/server/CHANGELOG.md") == before
+    assert (folder / "M2-05.md").is_file()

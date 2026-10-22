@@ -10,9 +10,11 @@ applies the version rule to them: fix gives a patch, feat a minor, a break a maj
 that rule in two cases: a `BREAKING CHANGE` footer before 1.0.0 gives 1.0.0, and every other
 commit type (docs, chore) gives a patch (docs/DECISIONS.md D-M7-10-6). `CHANNEL=beta` appends
 `-beta.N`, N one above the highest existing beta tag of that version. The section "Unreleased"
-of the component's CHANGELOG.md becomes `[X.Y.Z] - <date>` under a new empty "Unreleased",
-`VERSION` gets the version, and the commits of the component that did not change its
-CHANGELOG.md are printed as a checklist.
+of the component's CHANGELOG.md, with the entries of its `changelog.d/<ticket>.md` fragments
+added (tools/ci/fragments.py; the fragments are deleted), becomes `[X.Y.Z] - <date>` under a
+new empty "Unreleased",
+`VERSION` gets the version, and the commits of the component that changed neither its
+CHANGELOG.md nor a fragment are printed as a checklist.
 
 For the product `bothy` (ADR 0060 item 6, docs/spec/18-release.md section 2.1 rule 1) the
 same run also writes the server version the bundle installs: `--server-version V`
@@ -50,6 +52,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import components
+import fragments
 import install_options_check
 
 CHANNELS = ("stable", "beta")
@@ -92,6 +95,7 @@ class Result:
         checklist: commits since the last stable tag that did not change the changelog.
         other_files: further written files of the product `bothy`: the bundle template and
             the files with the documented installation command.
+        used_fragments: the deleted changelog fragments whose entries the section now holds.
     """
 
     component: str
@@ -101,6 +105,7 @@ class Result:
     version_file: str
     checklist: list[Commit]
     other_files: tuple[str, ...] = ()
+    used_fragments: tuple[str, ...] = ()
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -265,12 +270,18 @@ def release_changelog(text: str, version: str, date: str, stable_of_beta: str | 
 
 
 def checklist(repo: Path, rev_range: str, paths: tuple[str, ...], changelog: str) -> list[Commit]:
-    """Return the commits of `rev_range` under `paths` that did not change `changelog`."""
+    """Return the commits of `rev_range` under `paths` without a changelog entry.
+
+    A commit has one when it changed `changelog` or a fragment in the `changelog.d` folder next
+    to it (tools/ci/fragments.py).
+    """
+    folder = str(Path(changelog).parent / fragments.CHANGELOG_DIR).removeprefix("./") + "/"
     log = _git(repo, "log", "--reverse", "--format=%H%x1f%s", rev_range, "--", *(paths or (".",)))
     out: list[Commit] = []
     for line in log.splitlines():
         sha, _, subject = line.partition("\x1f")
-        if changelog not in _changed_files(repo, sha):
+        changed = _changed_files(repo, sha)
+        if changelog not in changed and not any(f.startswith(folder) for f in changed):
             out.append(Commit(sha, subject))
     return out
 
@@ -466,8 +477,13 @@ def prepare(
     if not changelog_path.is_file():
         raise ReleasePrepError(f"{rel('CHANGELOG.md')} is missing")
     stable_of_beta = f"{stable}-beta.{betas[-1]}" if channel == "stable" and betas else None
+    try:
+        # The fragments of the tickets go under "Unreleased" first (docs/DECISIONS.md PL/24).
+        assembled, used = fragments.assemble_component(repo, component)
+    except fragments.FragmentError as exc:
+        raise ReleasePrepError(str(exc)) from exc
     new_changelog = release_changelog(
-        changelog_path.read_text(encoding="utf-8"),
+        assembled,
         version,
         date or datetime.datetime.now(datetime.UTC).date().isoformat(),
         stable_of_beta,
@@ -478,6 +494,8 @@ def prepare(
     _write(repo / rel("VERSION"), version + "\n")
     for name, text in others.items():
         _write(repo / name, text)
+    for path in used:
+        path.unlink()
     return Result(
         component,
         version,
@@ -486,6 +504,7 @@ def prepare(
         rel("VERSION"),
         todo,
         tuple(others),
+        tuple(p.relative_to(repo).as_posix() for p in used),
     )
 
 
@@ -520,6 +539,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"release-prep: {res.component} {res.version} (tag {res.tag})")
     print(f"  wrote {', '.join((res.version_file, res.changelog, *res.other_files))}")
+    if res.used_fragments:
+        print(f"  assembled and deleted {', '.join(res.used_fragments)}")
     if res.checklist:
         print(f"  commits without a change to {res.changelog} (does the section cover them?):")
         for c in res.checklist:

@@ -1,0 +1,5 @@
+# Integration int/m1-wave11
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| INT-W11/1 | 2026-10-13 | M1-36 enters as one squash onto `5cd89cd` (`int/m1-wave10`); the ticket builds on that base, so there is no conflict and the tree equals the ticket head. On that tree the `coverage` gate fails: `services/server` reaches 79.0 % against the floor of 80 %, because the provider and identity code of `identity/app` and `identity/adapters/postgres` is exercised only by the HTTP tests of another package, which per-package coverage does not count. The integration adds tests in those two packages (`adapters/postgres/providers_test.go`, `app/manage_test.go`, more cases in `app/identities_test.go`) that run every store method and the provider and identity use cases against PostgreSQL; production code is unchanged. | Blocker of the integration: the gate also runs on GitHub CI. The ticket's own `make -k check` skipped `coverage` because its `test` target failed on an unrelated timing flake. Test-only fix, no change of ticket behaviour. |
