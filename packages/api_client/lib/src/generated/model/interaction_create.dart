@@ -14,7 +14,7 @@ part 'interaction_create.g.dart';
 ///
 /// Properties:
 /// * [clientInteractionId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [values] - Selected options or form values, validated against the component definition.
+/// * [values] - Selected options or form values, validated against the component definition (09, 11.1); absent means `{}`. Button: `{}`. Select: `{\"selected\": [<option value>, ...]}` with between `min_values` and `max_values` distinct option values. Form: an object keyed by field `name` (`text` and `textarea` strings, `number` a finite number, `boolean` a boolean, `choice` one of `choices`). A finding gives `400 validation_failed` with code `interaction_values_invalid` and its pointer; values whose `interaction.created` would exceed `sync.event_payload_max_bytes` give `too_long` on `/values`.
 @BuiltValue()
 abstract class InteractionCreate
     implements Built<InteractionCreate, InteractionCreateBuilder> {
@@ -22,7 +22,7 @@ abstract class InteractionCreate
   @BuiltValueField(wireName: r'client_interaction_id')
   String get clientInteractionId;
 
-  /// Selected options or form values, validated against the component definition.
+  /// Selected options or form values, validated against the component definition (09, 11.1); absent means `{}`. Button: `{}`. Select: `{\"selected\": [<option value>, ...]}` with between `min_values` and `max_values` distinct option values. Form: an object keyed by field `name` (`text` and `textarea` strings, `number` a finite number, `boolean` a boolean, `choice` one of `choices`). A finding gives `400 validation_failed` with code `interaction_values_invalid` and its pointer; values whose `interaction.created` would exceed `sync.event_payload_max_bytes` give `too_long` on `/values`.
   @BuiltValueField(wireName: r'values')
   BuiltMap<String, JsonObject?>? get values;
 
