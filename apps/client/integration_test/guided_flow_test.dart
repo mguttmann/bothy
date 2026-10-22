@@ -40,12 +40,7 @@ void main() {
       );
       world.setSpaceOperator(support, agent.id);
 
-      Future<void> tap(String key) async {
-        await app.waitFor(find.byKey(ValueKey(key)));
-        await tester.ensureVisible(find.byKey(ValueKey(key)).first);
-        await tester.tap(find.byKey(ValueKey(key)).first);
-        await tester.pumpAndSettle();
-      }
+      final tap = app.tap;
 
       void go(String path) =>
           GoRouter.of(tester.element(find.byType(Navigator).first)).go(path);

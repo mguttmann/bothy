@@ -26,12 +26,7 @@ void main() {
       final world = server.world;
       final sam = app.fake.seed.sam.id;
 
-      Future<void> tap(String key) async {
-        await app.waitFor(find.byKey(ValueKey(key)));
-        await tester.ensureVisible(find.byKey(ValueKey(key)).first);
-        await tester.tap(find.byKey(ValueKey(key)).first);
-        await tester.pumpAndSettle();
-      }
+      final tap = app.tap;
 
       Future<void> type(String key, String text) async {
         await app.waitFor(find.byKey(ValueKey(key)));
