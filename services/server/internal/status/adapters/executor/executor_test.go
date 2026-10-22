@@ -246,6 +246,42 @@ func TestPgDump(t *testing.T) {
 	}
 }
 
+// TestPgDump_TLS: pg_dump connects with the TLS settings of database.sslmode and
+// database.sslrootcert (SEC-TLS-5): verify-full with a CA file checks against that file,
+// verify-full without one against the system roots, as the pool of the server does, and disable
+// stays disable.
+func TestPgDump_TLS(t *testing.T) {
+	cases := []struct {
+		name, mode, rootCert string
+		want                 map[string]string
+	}{
+		{"verify-full with a CA file", "verify-full", "/run/ca.pem", map[string]string{"PGSSLMODE": "verify-full", "PGSSLROOTCERT": "/run/ca.pem"}},
+		{"verify-full with the system roots", "verify-full", "", map[string]string{"PGSSLMODE": "verify-full", "PGSSLROOTCERT": "system"}},
+		{"disable", "disable", "", map[string]string{"PGSSLMODE": "disable"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pd := pgDumpFake(t, t.TempDir())
+			e := newExecutor(t, executor.Config{PgDump: pd.path, SecretsDir: secretsDir(t, false), DB: executor.DB{
+				Host: "db.example.com", Port: 5432, Name: "bothy", User: "bothy_owner", SSLMode: tc.mode, SSLRootCert: tc.rootCert,
+				Password: func(context.Context) ([]byte, error) { return []byte("EXAMPLE"), nil },
+			}})
+			if _, err := e.PgDump(context.Background(), filepath.Join(t.TempDir(), "logical.dump")); err != nil {
+				t.Fatal(err)
+			}
+			calls := pd.calls(t)
+			if len(calls) != 1 {
+				t.Fatalf("%d calls", len(calls))
+			}
+			want := map[string]string{"PGPASSFILE": calls[0].env["PGPASSFILE"]}
+			for k, v := range tc.want {
+				want[k] = v
+			}
+			checkEnv(t, calls[0], want)
+		})
+	}
+}
+
 // TestPgDump_ExitRemovesPassfile: a failed pg_dump is pg_dump_exit_<n> and leaves no passfile.
 func TestPgDump_ExitRemovesPassfile(t *testing.T) {
 	pd := newFake(t, t.TempDir(), "pg_dump", "exit 1")

@@ -161,6 +161,7 @@ func NewBackupDaemon(ctx context.Context, v *config.Values, o BackupDaemonOption
 		SecretsDir: s.secrets.Dir, Offsite: s.target, OffsiteRegion: s.backup.OffsiteRegion,
 		OffsitePathStyle: s.backup.OffsiteUsePathStyle, LocalResticRepo: o.LocalResticRepo,
 		DB: executor.DB{Host: s.db.Host, Port: s.db.Port, Name: s.db.Name, User: s.migrate.BootstrapUser,
+			SSLMode: s.db.SSLMode, SSLRootCert: s.db.SSLRootCert,
 			Password: secretBytes(provider, s.migrate.BootstrapPasswordRef)},
 		Stderr: o.ToolOutput, Mirror: mirror,
 	})

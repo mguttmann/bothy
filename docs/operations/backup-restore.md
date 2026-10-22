@@ -37,22 +37,24 @@ reports the metrics `bothy.backup.*` and `bothy.storage.volume.*`. One kind by h
 ## 2. Set up
 
 1. Create the off-site target. S3: bucket with versioning and Object Lock (mode Governance or
-   Compliance, period at least `backup.logical.retention`), one key with only write and
+   Compliance, period at least the larger of `backup.logical.retention` and
+   `backup.objects.retention`), one key with only write and
    read for `backup`, a second one with delete only with the owner. SFTP: access without delete, cleanup
    through a second access.
 2. Put the access into `secrets/offsite/`, set `BOTHY_BACKUP_OFFSITE_TARGET`.
 
-   As built (M7-02): only S3-compatible targets are supported (docs/DECISIONS.md D-M7-02-4).
+   As built (M7-02): only S3-compatible targets are supported (docs/decisions.d/M7-02.md D-M7-02-4).
    `BOTHY_BACKUP_OFFSITE_TARGET` (the key `backup.offsite.target`) has the form
    `s3:https://<host>[:<port>]/<bucket>[/<prefix>]`, for example
    `s3:https://s3.example.com/bothy-backup/instance-1`; `backup.offsite.region` and
    `backup.offsite.use_path_style` describe the endpoint. The bucket needs versioning and Object
-   Lock with a default retention in mode Compliance of at least `backup.objects.retention`, and
+   Lock with a default retention in mode Compliance of at least the larger of
+   `backup.logical.retention` and `backup.objects.retention` (one bucket holds both), and
    a lifecycle rule on the whole prefix that expires noncurrent versions
    (`NoncurrentVersionExpiration`, `NoncurrentDays` at least the Object Lock period) and removes
    expired delete markers. Without that rule nothing ever leaves the bucket: on a versioned bucket
    every deletion by restic or pgBackRest, the owner's expiry in section 9 included, only adds a
-   delete marker and keeps the old version (docs/DECISIONS.md D-M7-02-12).
+   delete marker and keeps the old version (docs/decisions.d/M7-02.md D-M7-02-12).
    `secrets/offsite/` holds three files of the key of `backup`: `access_key_id`,
    `secret_access_key` and, for a private CA only, `ca.crt`. That key may list, read and write
    objects (for AWS: `s3:ListBucket`, `s3:ListBucketVersions`, `s3:GetObject`, `s3:PutObject`,

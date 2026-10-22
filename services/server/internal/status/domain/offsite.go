@@ -16,7 +16,7 @@ import (
 var ErrInvalidOffsiteTarget = errors.New("backup.offsite.target must be s3:https://<host>[:<port>]/<bucket>[/<prefix>]")
 
 // OffsiteTarget is a parsed backup.offsite.target: an S3-compatible bucket with versioning and
-// Object Lock (docs/operations/backup-restore.md 2, docs/DECISIONS.md D-M7-02-4). Inside the
+// Object Lock (docs/operations/backup-restore.md 2, docs/decisions.d/M7-02.md D-M7-02-4). Inside the
 // bucket, pgBackRest repo2 lives below <prefix>/pgbackrest, the restic repository below
 // <prefix>/restic and the object mirror of the driver s3 below <prefix>/objects.
 type OffsiteTarget struct {

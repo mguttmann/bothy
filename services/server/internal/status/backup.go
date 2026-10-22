@@ -30,7 +30,7 @@ const (
 
 // ErrNoBackupTable reports a schema that has no table backup_runs yet: it was migrated by a
 // version before M7-02, so no backup run can have been recorded (bothy migrate treats it as
-// exempt from migrate.require_recent_backup, docs/DECISIONS.md D-M7-02-8).
+// exempt from migrate.require_recent_backup, docs/decisions.d/M7-02.md D-M7-02-8).
 var ErrNoBackupTable = errors.New("status: the table backup_runs does not exist yet")
 
 // BackupRuns is the inbound port of the table backup_runs (02 4.5): bothy-backupd records its

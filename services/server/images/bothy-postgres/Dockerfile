@@ -97,7 +97,7 @@ RUN set -eu; \
 # file capability cap_dac_read_search (restic's documented way to back up as a user that does not
 # own the files): the volume files belongs to the server's user 65532 with mode 0700, and the
 # service backup runs as 999 with cap_add DAC_READ_SEARCH (infra/compose/compose.yaml); without
-# that capability in the container the kernel refuses to start restic (docs/DECISIONS.md
+# that capability in the container the kernel refuses to start restic (docs/decisions.d/M7-02.md
 # D-M7-02-10).
 FROM --platform=$BUILDPLATFORM postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336 AS restic
 ARG TARGETARCH

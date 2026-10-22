@@ -24,7 +24,7 @@ Status page, components, incidents, automatic checks, backup runs.
 
 ## Backup service (M7-02)
 
-Normative: [16-operations.md](../../../../docs/spec/16-operations.md) sections 7.1, 8.1, 8.2 and 10, [03-data-model.md](../../../../docs/spec/03-data-model.md) 4.12, [backup-restore.md](../../../../docs/operations/backup-restore.md) sections 2 and 3, the rulings D-M7-02-1 and following in [docs/DECISIONS.md](../../../../docs/DECISIONS.md).
+Normative: [16-operations.md](../../../../docs/spec/16-operations.md) sections 7.1, 8.1, 8.2 and 10, [03-data-model.md](../../../../docs/spec/03-data-model.md) 4.12, [backup-restore.md](../../../../docs/operations/backup-restore.md) sections 2 and 3, the rulings D-M7-02-1 and following in [docs/decisions.d/M7-02.md](../../../../docs/decisions.d/M7-02.md).
 
 - **Port.** `BackupRuns` (`Start`, `Finish`, `LastSuccess`) is the only way to `backup_runs`. `bothy-backupd` records its runs through it with the role `bothy_backup`, which may select, insert and update this table and nothing else; `bothy migrate up` reads the last success of `pg_full`, `pg_diff` or `logical` through `wire.LastBackupSuccess`. `LastSuccess` returns `ErrNoBackupTable` for a schema migrated before M7-02.
 - **Table.** `backup_runs` exactly as 03 4.12 (migration `00050`): a row is `running` exactly while `finished_at` is NULL; `error` holds a code without content (`domain.ValidErrorCode`); a failed run keeps the empty manifest. Retention class `ops` (the job follows with M7-09).

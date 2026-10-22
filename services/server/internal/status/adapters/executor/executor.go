@@ -84,6 +84,11 @@ type DB struct {
 	Port int
 	Name string
 	User string
+	// SSLMode and SSLRootCert are database.sslmode and database.sslrootcert (SEC-TLS-5); pg_dump
+	// gets them as PGSSLMODE and PGSSLROOTCERT, an empty SSLRootCert with verify-full as the
+	// system roots, as the pool of the server uses them. An empty SSLMode leaves libpq's default.
+	SSLMode     string
+	SSLRootCert string
 	// Password returns the password of User on every call, so a rotated secret is used.
 	Password func(ctx context.Context) ([]byte, error)
 }

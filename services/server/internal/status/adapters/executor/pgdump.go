@@ -47,7 +47,7 @@ func (e *Executor) PgDump(ctx context.Context, path string) (int64, error) {
 	}
 	args := []string{"-Fc", "--no-password", "--host=" + db.Host, "--port=" + port,
 		"--username=" + db.User, "--dbname=" + db.Name, "--file=" + path}
-	if _, err := e.run(ctx, toolPgDump, e.cfg.PgDump, args, []string{"PGPASSFILE=" + passfile}, nil); err != nil {
+	if _, err := e.run(ctx, toolPgDump, e.cfg.PgDump, args, append([]string{"PGPASSFILE=" + passfile}, tlsEnv(db)...), nil); err != nil {
 		return 0, err
 	}
 	fi, err := os.Stat(path)
@@ -55,6 +55,22 @@ func (e *Executor) PgDump(ctx context.Context, path string) (int64, error) {
 		return 0, execError(toolPgDump + "_output_invalid")
 	}
 	return fi.Size(), nil
+}
+
+// tlsEnv returns the libpq variables of the TLS settings of db (SEC-TLS-5).
+func tlsEnv(db DB) []string {
+	if db.SSLMode == "" {
+		return nil
+	}
+	env := []string{"PGSSLMODE=" + db.SSLMode}
+	if db.SSLMode == "verify-full" {
+		root := db.SSLRootCert
+		if root == "" {
+			root = "system" // libpq 16 and later: the system roots
+		}
+		env = append(env, "PGSSLROOTCERT="+root)
+	}
+	return env
 }
 
 // passEscape escapes a field of a passfile line: \ and : get a backslash (libpq "The Password

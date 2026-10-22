@@ -11,7 +11,7 @@ import (
 )
 
 // TestParseOffsiteTarget holds the form s3:https://<host>[:<port>]/<bucket>[/<prefix>] of
-// backup.offsite.target (docs/DECISIONS.md D-M7-02-4): the valid forms with their parts, Key and
+// backup.offsite.target (docs/decisions.d/M7-02.md D-M7-02-4): the valid forms with their parts, Key and
 // Endpoint, and the rejected ones (no s3: prefix, http, a bad bucket, a bad port, credentials or
 // a query in the URL, a prefix segment of dots). Errors never echo the value.
 func TestParseOffsiteTarget(t *testing.T) {
