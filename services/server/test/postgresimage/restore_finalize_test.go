@@ -14,13 +14,13 @@ import (
 
 // serveArgs are the docker run arguments of bothy serve --role=api against postgres: the server
 // configuration as bothy_app, the secrets of the service server, a key store and a file root
-// owned by the image's user 999 (the user the secret volumes belong to), telemetry and the scan
-// off because the test network has neither a collector nor clamd.
+// owned by the image's user 999 (the user the secret volumes belong to), telemetry off because
+// the test network has no collector.
 func serveArgs(image, bin, secServer, keys, files string) []string {
 	return append(serverEnv("bothy_app", "db_app_password"),
 		"--user", "999:999",
 		"-e", "BOTHY_TELEMETRY__ENABLED=false", "-e", "BOTHY_TELEMETRY__LOGS__EXPORTER=stdout",
-		"-e", "BOTHY_FILE__SCAN__MODE=off", "-e", "BOTHY_FILE__STORAGE__DRIVER=fs",
+		"-e", "BOTHY_FILE__STORAGE__DRIVER=fs",
 		"-v", secServer+":/run/bothy/secrets:ro", "-v", keys+":/var/lib/bothy/signing-keys",
 		"-v", files+":/var/lib/bothy/files", "-v", bin+":/opt/bothy:ro",
 		"--entrypoint", "/opt/bothy/bothy", image, "serve", "--role=api")
