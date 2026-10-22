@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/designkeys"
 )
@@ -83,7 +85,8 @@ func (sc *Scenario) content() {
 
 	// Threads and messages in Support/Eskalation (Alex has trigger on Support through G-1).
 	mainEsk := str(obj(sc.get(o, "/channels/"+eskalation, ok...)), "channel.main_thread_id")
-	parent := id(sc.post(alex, "/threads/"+mainEsk+"/messages", map[string]any{"client_msg_id": newID(), "content_md": sc.Reg.New(ClassContent, eskalation, "message text")}, created...))
+	parentText := sc.Reg.New(ClassContent, eskalation, "message text")
+	parent := id(sc.post(alex, "/threads/"+mainEsk+"/messages", map[string]any{"client_msg_id": newID(), "content_md": parentText}, created...))
 	th := sc.post(alex, "/channels/"+eskalation+"/threads", map[string]any{
 		"title": sc.Reg.New(ClassContent, eskalation, "thread title"), "parent_message_id": parent,
 		"first_message": map[string]any{"client_msg_id": newID(), "content_md": sc.Reg.New(ClassContent, eskalation, "first message text")},
@@ -112,6 +115,7 @@ func (sc *Scenario) content() {
 	sc.post(o, "/threads/"+thread+"/reopen", nil, ok...)
 	sc.get(o, "/me/mentions", ok...)
 	sc.get(o, "/channels/"+eskalation+"/threads", ok...)
+	sc.export(eskalation, parentText)
 
 	// Read states.
 	seq := lastSeq(sc.get(o, "/threads/"+thread+"/messages", ok...))
@@ -154,6 +158,18 @@ func (sc *Scenario) content() {
 	sc.post(o, "/spaces/"+space+"/archive", map[string]any{"reason": sc.Reg.New(ClassAdminReason, space, "space archive reason")}, ok...)
 	sc.threads = append(sc.threads, thread)
 	sc.messages = append(sc.messages, parent)
+}
+
+// export drives exportChannel (M3-11) as the owner, who has export on every channel: the export
+// of ch over the hour around now carries the canary text of the channel to its authorized reader,
+// and the scan proves it reaches no log, span, metric or audit detail (SEC-T10).
+func (sc *Scenario) export(ch, text string) {
+	sc.T.Helper()
+	now := sc.Server.Clock().Now()
+	r := sc.get(sc.W.Owner, "/channels/"+ch+"/export?from="+url.QueryEscape(timestamp(now.Add(-time.Hour)))+"&to="+url.QueryEscape(timestamp(now.Add(time.Hour))), ok...)
+	if !strings.Contains(string(r.Body), text) {
+		sc.T.Errorf("the export of the channel misses its canary message: %s", clip(r.Body))
+	}
 }
 
 // markUnread sends markThreadUnread one message before the read position of thread in rs, with

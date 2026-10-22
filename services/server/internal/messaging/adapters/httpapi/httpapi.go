@@ -4,18 +4,19 @@
 // rest.StrictServerInterface: createMessage and createThread (M1-56), listThreadMessages and
 // getMessage (M1-57), updateMessage, deleteMessage and listMessageRevisions (M1-58),
 // listMyMentions and the six template operations (M1-60), the three reaction and the three pin
-// operations (M1-59) of docs/api/openapi.yaml. The use cases authorize; the handlers only convert, set Idempotent-Replay
+// operations (M1-59) and exportChannel (M3-11) of docs/api/openapi.yaml. The use cases authorize; the handlers only convert, set Idempotent-Replay
 // on a repetition and ETag on a template change, and pass errors to the problem writer of the
 // chain unchanged.
 //
 // Example:
 //
-//	h := httpapi.New(svc, svc.Mentions(), svc.Templates(), svc.Reactions(), svc.Pins(), threads)
+//	h := httpapi.New(svc, svc.Mentions(), svc.Templates(), svc.Reactions(), svc.Pins(), svc.Export(), threads, log)
 //	built, err := routes.Build(wire.Handlers{Messages: h}, wire.RouteOptions(), cat)
 package httpapi
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
@@ -32,14 +33,21 @@ type Messages struct {
 	templates messaging.Templates
 	reactions messaging.Reactions
 	pins      messaging.Pins
+	export    messaging.Export
 	threads   chat.Threads
+	log       *slog.Logger
 }
 
 // New returns the handlers over the use cases of messaging (sending m, mentions mn, templates
-// tp, reactions rc, pins pn) and the thread port of chat, which gives the thread of a
-// createThread answer.
-func New(m messaging.Messages, mn messaging.Mentions, tp messaging.Templates, rc messaging.Reactions, pn messaging.Pins, t chat.Threads) *Messages {
-	return &Messages{messages: m, mentions: mn, templates: tp, reactions: rc, pins: pn, threads: t}
+// tp, reactions rc, pins pn, the channel export ex) and the thread port of chat, which gives the
+// thread of a createThread answer. log receives the cause of an export aborted after its first
+// byte; nil means slog.Default().
+func New(m messaging.Messages, mn messaging.Mentions, tp messaging.Templates, rc messaging.Reactions, pn messaging.Pins, ex messaging.Export,
+	t chat.Threads, log *slog.Logger) *Messages {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &Messages{messages: m, mentions: mn, templates: tp, reactions: rc, pins: pn, export: ex, threads: t, log: log}
 }
 
 // principal returns the actor of the request; anonymous when the chain set none.

@@ -49,6 +49,9 @@ components:
 	if p := got[1].Build(map[string]string{"thing_id": "a", "part_id": "b"}); p != "/things/a/parts/b" {
 		t.Fatalf("path %s", p)
 	}
+	if p := (Route{OperationID: "exportChannel", Path: "/channels/{channel_id}/export"}).Build(map[string]string{"channel_id": "c"}); p != "/channels/c/export?"+FixedQueries["exportChannel"] {
+		t.Fatalf("path with query %s", p)
+	}
 	for _, bad := range [][2]string{
 		{"version: 2\n", "paths: {}\n"},
 		{"version: 1\nenabled: [x]\n", "paths: {/x/{a}: {get: {operationId: x, parameters: [{$ref: '#/components/parameters/Nope'}]}}}\n"},

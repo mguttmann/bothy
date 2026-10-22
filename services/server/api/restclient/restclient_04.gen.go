@@ -9,6 +9,21 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListHostsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListHostsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ListHostsResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
 // GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
 func (r ListHostsResponse) GetApplicationproblemJSONDefault() *Error {
 	return r.ApplicationproblemJSONDefault
@@ -25975,19 +25990,4 @@ func (c *ClientWithResponses) SendHeartbeatWithResponse(ctx context.Context, bod
 		return nil, err
 	}
 	return ParseSendHeartbeatResponse(rsp)
-}
-
-// GetAgentTriggerersWithResponse List who may trigger this agent
-//
-// Principals with effective `trigger` on a channel the agent operates, with `permission_version`. The adapter keeps it as allow list and reloads on `access.changed` (09, 15).
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
-func (c *ClientWithResponses) GetAgentTriggerersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentTriggerersResponse, error) {
-	rsp, err := c.GetAgentTriggerers(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetAgentTriggerersResponse(rsp)
 }

@@ -111,6 +111,18 @@ type Deps struct {
 	Clock clock.Clock
 	// Metrics counts the created messages (bothy.message.created); nil counts nothing.
 	Metrics Metrics
+	// Credentials checks the session, device and token of the principal of a channel export again
+	// before every batch (brief M3-11 note 7, D-M3-11-5); internal/wire passes identity's
+	// Authenticator. The export refuses to start without it; the other use cases do not use it.
+	Credentials CredentialCheck
+}
+
+// CredentialCheck is the outgoing port that checks an authenticated principal again without a
+// new proof (kernel/actor.Authenticator.Revalidate, M1-34): a revoked session or device does not
+// raise the rights version, so a stream that outlives its request asks the authenticator itself.
+type CredentialCheck interface {
+	// Revalidate returns nil while a is still valid and a 401 error of kernel/errs otherwise.
+	Revalidate(ctx context.Context, a actor.Actor) error
 }
 
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06

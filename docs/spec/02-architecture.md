@@ -317,7 +317,9 @@ Rationale for borderline cases:
   its port.
 - `command.invoke` and `command.autocomplete` belong to `runs` (delivery to the agent with
   `agent.invoke`), the register (`command.register`, `command.remove`, `command.read`) to `agents`.
-- `export.channel` belongs to `messaging`; `files` stores the package.
+- `export.channel` belongs to `messaging`, and the export streams NDJSON without storing a
+  package; export packages in `files` belong only to the privacy export of `privacy` (M7-06)
+  (ruling D-M3-11-8 in [docs/decisions.d/M3-11.md](../decisions.d/M3-11.md)).
 - `client_metrics.submit` belongs to `stats`: the endpoint accepts metrics without content and passes
   them on to telemetry ([ADR 0057](../adr/0057-client-telemetry-through-a-server-endpoint.md)); it writes no table.
 - The dev environment actions belong to `agents`, because the environment is bound to a runner agent
