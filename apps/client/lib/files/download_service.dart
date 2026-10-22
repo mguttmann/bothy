@@ -280,6 +280,8 @@ const Set<String> executableExtensions = {
   'appimage',
   'apk',
   'application',
+  'appref-ms',
+  'chm',
   'bat',
   'cmd',
   'com',
@@ -315,6 +317,7 @@ const Set<String> executableExtensions = {
   'scf',
   'scr',
   'sct',
+  'settingcontent-ms',
   'sh',
   'shb',
   'terminal',
@@ -323,19 +326,23 @@ const Set<String> executableExtensions = {
   'vb',
   'vbe',
   'vbs',
+  'website',
   'workflow',
   'ws',
   'wsc',
   'wsf',
   'wsh',
+  'xll',
   'zsh',
 };
 
-/// Whether [name] ends with one of [executableExtensions], in any case.
+/// Whether [name] ends with one of [executableExtensions], in any case, after the trailing
+/// dots and spaces that the cache and the systems drop ([FileCache.safeFileName]).
 bool isExecutableName(String name) {
-  final dot = name.lastIndexOf('.');
+  final cleaned = FileCache.safeFileName(name);
+  final dot = cleaned.lastIndexOf('.');
   if (dot < 0) return false;
   return executableExtensions.contains(
-    name.substring(dot + 1).trim().toLowerCase(),
+    cleaned.substring(dot + 1).toLowerCase(),
   );
 }

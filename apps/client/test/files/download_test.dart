@@ -147,6 +147,10 @@ void main() {
         'tool.ps1',
         'App.app',
         'x.command',
+        // The systems and the cache drop trailing dots and spaces from a name.
+        'run.bat.',
+        'setup.exe .',
+        'help.CHM',
       ]) {
         final meta = FileMeta(
           id: id,
