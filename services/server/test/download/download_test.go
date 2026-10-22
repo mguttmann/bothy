@@ -35,7 +35,9 @@ const (
 
 // TestDownload runs the cases of brief M3-05 on one server.
 func TestDownload(t *testing.T) {
-	e := start(t, harness.Options{}, nil)
+	// A short DPoP nonce lifetime makes stale nonces, and with them a DPoP-Nonce header on any
+	// response, happen in every run instead of only when a run crosses a rotation.
+	e := start(t, harness.Options{}, map[string]string{"auth.dpop_nonce_ttl": "1s"})
 	maxAge := e.duration(t, "client.cache_max_age")
 	authCache := "private, max-age=" + strconv.FormatInt(int64(maxAge/time.Second), 10) + ", immutable"
 	png := e.ready(t, "Beach day.png", pngBytes)

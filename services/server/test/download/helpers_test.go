@@ -322,7 +322,10 @@ func headerSet(r harness.Response) map[string]string {
 	out := map[string]string{}
 	for k, v := range r.Header {
 		switch k {
-		case "Correlation-Id", "Date", "Ratelimit", "Ratelimit-Policy", "Content-Length":
+		case "Correlation-Id", "Date", "Ratelimit", "Ratelimit-Policy", "Content-Length",
+			// The authenticator adds DPoP-Nonce to any response once the client's nonce is stale
+			// (06 section 3.1); that depends on when the nonce rotates, not on the response.
+			"Dpop-Nonce":
 			continue
 		}
 		out[k] = strings.Join(v, ",")
