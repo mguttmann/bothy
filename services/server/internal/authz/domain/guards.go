@@ -24,6 +24,9 @@ type InvokeFacts struct {
 	MentionsAgent bool
 	// ActiveRunAgentID is the agent of the thread's active run; zero for none.
 	ActiveRunAgentID ids.ID
+	// NewThread marks the auto thread of the trigger: the main-thread mention rule applies (05
+	// section 5 point 3 "for new threads", M2-08).
+	NewThread bool
 	// AgentFound, AgentKind and AgentStatus come from the principal source.
 	AgentFound  bool
 	AgentKind   string
@@ -159,7 +162,7 @@ func reachable(path Path, f *InvokeFacts) bool {
 	if !f.AgentFound || f.AgentKind != KindAgent || f.AgentStatus != "active" || !f.PolicyFound {
 		return false
 	}
-	mainThread := path.ThreadID.IsZero() || path.ThreadMain
+	mainThread := path.ThreadID.IsZero() || path.ThreadMain || f.NewThread
 	mentionRule := f.FreeResponse || f.MentionsAgent || (mainThread && !f.RequireMention) || (!mainThread && !f.ThreadRequireMention)
 	if path.ThreadOperator() == f.AgentID && mentionRule {
 		return true

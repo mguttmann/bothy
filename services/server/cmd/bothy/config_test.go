@@ -418,6 +418,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"reaction.emoji_max_bytes = 64  # default\n" +
 		"reaction.max_distinct_per_message = 20  # default\n" +
 		"retention.audit = 365d  # default\n" +
+		"run.queued_max_age = 2d  # default\n" +
 		"run.step_detail_max_bytes = 16384  # default\n" +
 		"search.languages = german, english  # default\n" +
 		"search.locale_map = {\"de\":\"german\",\"en\":\"english\"}  # default\n" +

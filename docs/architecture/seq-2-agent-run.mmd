@@ -17,15 +17,15 @@ sequenceDiagram
   MSG->>DB: BEGIN, thread sequence, INSERT message (origin human)
   MSG-)RU: in-tx event MessagePosted
   RU->>RU: authorize(Alex, agent.invoke, thread): trigger, operator, mention rule, I2 pre-check
-  RU->>DB: INSERT runs (queued), anchor message kind run, trigger_state queued
+  RU->>DB: INSERT runs (queued), anchor message kind run, trigger_state received, job runs.queued_expiry
   RU->>DB: events message.created, run.state_changed, agent.invocation (to the agent, without token)
   MSG->>DB: finalize event_seq, COMMIT
-  MSG-->>A: 201, trigger_state queued
+  MSG-->>A: 201, trigger_state received
   DB--)GW: NOTIFY, log tail reads
   GW-->>A: dispatch message.created, run.state_changed queued
   GW->>RU: PrepareDelivery(agent.invocation)
-  RU->>RU: authorize(Alex, agent.invoke) with current permissions, I2 again
-  RU->>DB: sign invocation token (JWS, EdDSA), set runs.invocation_jti
+  RU->>RU: authorize(Alex without a session, agent.invoke) with current permissions, I2 and SR2 again
+  RU->>DB: sign invocation token (JWS, EdDSA), set runs.invocation_jti, trigger_state queued
   GW-->>AD: dispatch agent.invocation with token
   AD->>AD: signature via JWKS, aud, reported mode equals billing_mode (I3), tool class at most tool_class
   AD->>AD: event and token into the inbox

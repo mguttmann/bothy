@@ -11,9 +11,11 @@ import (
 )
 
 // Register declares the durable events runs appends (M1-25, docs/spec/05-actions.md section 6):
-// run.state_changed (M2-05). internal/wire lists it in moduleRegistrations.
+// run.state_changed (M2-05) and agent.invocation (M2-08). internal/wire lists it in
+// moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunStateChanged)
+	r.Event("runs", authorize.EventAgentInvocation)
 }
 
 // Money is an amount with its currency (schema Money): AmountMicros in millionths of the unit,

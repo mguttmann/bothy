@@ -97,28 +97,32 @@ type ReasonRow struct {
 	State State
 	// Setter names who may set the code.
 	Setter Setter
+	// AlsoFailed: the server also ends a queued run failed with this cancelled code when
+	// agent.invoke refuses its delivery (M2-08 design note 6, 09 5.2 "failed on denial before
+	// delivery").
+	AlsoFailed bool
 }
 
 // reasonTable is 09 5.2 in the order of the spec, plus user_disabled last (ruling D-M2-05-7).
 var reasonTable = []ReasonRow{
-	{RunReasonUserCancelled, StateCancelled, SetterServer},
-	{RunReasonAccessRevoked, StateCancelled, SetterServer},
-	{RunReasonCancelTimeout, StateCancelled, SetterServer},
-	{RunReasonAgentDisabled, StateCancelled, SetterServer},
-	{RunReasonBillingModePersonalNotHolder, StateFailed, SetterServer},
-	{RunReasonChannelReadOnly, StateCancelled, SetterServer},
-	{RunReasonBillingModeMismatch, StateFailed, SetterBoth},
-	{RunReasonToolClassOwnerOnly, StateFailed, SetterServer},
-	{RunReasonToolClassMismatch, StateFailed, SetterBoth},
-	{RunReasonInvalidInvocationToken, StateFailed, SetterAdapter},
-	{RunReasonProjectNotReady, StateFailed, SetterServer},
-	{RunReasonAgentUnavailable, StateFailed, SetterServer},
-	{RunReasonInterrupted, StateFailed, SetterServer},
-	{RunReasonStale, StateFailed, SetterServer},
-	{RunReasonRuntimeError, StateFailed, SetterAdapter},
-	{RunReasonAdapterError, StateFailed, SetterAdapter},
-	{RunReasonRuntimeNotAuthenticated, StateFailed, SetterAdapter},
-	{RunReasonUserDisabled, StateCancelled, SetterServer},
+	{RunReasonUserCancelled, StateCancelled, SetterServer, false},
+	{RunReasonAccessRevoked, StateCancelled, SetterServer, true},
+	{RunReasonCancelTimeout, StateCancelled, SetterServer, false},
+	{RunReasonAgentDisabled, StateCancelled, SetterServer, true},
+	{RunReasonBillingModePersonalNotHolder, StateFailed, SetterServer, false},
+	{RunReasonChannelReadOnly, StateCancelled, SetterServer, true},
+	{RunReasonBillingModeMismatch, StateFailed, SetterBoth, false},
+	{RunReasonToolClassOwnerOnly, StateFailed, SetterServer, false},
+	{RunReasonToolClassMismatch, StateFailed, SetterBoth, false},
+	{RunReasonInvalidInvocationToken, StateFailed, SetterAdapter, false},
+	{RunReasonProjectNotReady, StateFailed, SetterServer, false},
+	{RunReasonAgentUnavailable, StateFailed, SetterServer, false},
+	{RunReasonInterrupted, StateFailed, SetterServer, false},
+	{RunReasonStale, StateFailed, SetterServer, false},
+	{RunReasonRuntimeError, StateFailed, SetterAdapter, false},
+	{RunReasonAdapterError, StateFailed, SetterAdapter, false},
+	{RunReasonRuntimeNotAuthenticated, StateFailed, SetterAdapter, false},
+	{RunReasonUserDisabled, StateCancelled, SetterServer, true},
 }
 
 // ReasonTable returns the rows of 09 5.2 in the order of the spec, followed by user_disabled
@@ -153,8 +157,8 @@ func ReasonOf(code string) (ReasonRow, bool) {
 var ErrReasonRequired = errors.New("runs: a failed run needs a reason")
 
 // ValidateServerReason checks the reason the server itself sets for a transition to the state to.
-// For failed and cancelled, code must be a row of the reason table with State to and setter
-// server or both. For queued, running, waiting_input and completed, code must be empty.
+// For failed and cancelled, code must be a row of the reason table with State to (or, for failed,
+// a row with AlsoFailed) and setter server or both. For queued, running, waiting_input and completed, code must be empty.
 //
 // Every violation, including an empty code for failed or cancelled and an unknown state, is an
 // *errs.Error with errs.CodeInternalError: the server always knows why it ends a run, so a
@@ -174,7 +178,7 @@ func ValidateServerReason(to State, code string) error {
 		return nil
 	case StateFailed, StateCancelled:
 		r, ok := ReasonOf(code)
-		if !ok || r.State != to || !r.Setter.byServer() {
+		if !ok || (r.State != to && (to != StateFailed || !r.AlsoFailed)) || !r.Setter.byServer() {
 			return errs.New(errs.CodeInternalError, "runs: the server reason does not fit the target state")
 		}
 		return nil

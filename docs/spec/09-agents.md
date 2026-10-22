@@ -157,7 +157,9 @@ For a new message M of a principal P in the thread T of the channel C, the follo
 7. `authorize(P, agent.invoke, {target, candidate, M})` per 05 section 5 (permissions, agent active,
    I2, project ready). On `allow`: run `queued`, live box anchor, event `agent.invocation`,
    `trigger_state = received`. On rejection: M stays stored, `trigger_state = failed` with
-   the reason.
+   the reason. The first successful delivery of `agent.invocation` moves `trigger_state` to
+   `queued`; a denial immediately before the delivery fails the run and sets
+   `trigger_state = failed` with the reason of 5.2 (04 section 15.3 step 2, M2-08).
 
 Order of the check and the auto thread (D-M2-05-2): with `auto_thread` in the main thread the check
 of point 7 names the thread of M, not the new thread, so the mention rule of point 3 and the guard
@@ -252,7 +254,10 @@ and guests are allowed; I1 does not count these channels among its targets
 ### 3.7 Auto-thread from a channel message
 
 The new thread T' gets `parent_message_id = M`, `operator_agent_id` = effective operator of
-C, `title = ''` and `title_source = 'auto'`. Until a title is set, the client shows the first
+C, `title = ''` and `title_source = 'auto'`. T' is written only after the `allow` of 3.4 item 7,
+so a denial creates no empty thread; the check before every delivery decides T' with the
+main-thread mention rule of the channel ("for new threads", 05 section 5 item 3; M2-08). Until a
+title is set, the client shows the first
 line of M. M stays in the main thread and carries the `trigger_state`; run, live box anchor,
 replies and session belong to T'.
 
@@ -768,11 +773,11 @@ stateDiagram-v2
 | Reason | State | Set by | Meaning |
 |---|---|---|---|
 | `user_cancelled` | `cancelled` | Server | A person stopped it |
-| `access_revoked` | `cancelled` | Server | Triggering person lost `trigger` (04 section 8.3) |
+| `access_revoked` | `cancelled`; `failed` on denial before delivery | Server | Triggering person lost `trigger` (04 section 8.3); at delivery every denial of `agent.invoke` without its own code below (AZ-M51) |
 | `cancel_timeout` | `cancelled` | Server | Adapter did not report the cancellation within `agent.cancel_grace` |
-| `agent_disabled` | `cancelled` | Server | Agent disabled |
+| `agent_disabled` | `cancelled`; `failed` on denial before delivery | Server | Agent disabled |
 | `billing_mode_personal_not_holder` | `failed` | Server | I2 at delivery |
-| `channel_read_only` | `cancelled` | Server | Channel became read-only or archived (04 section 8.3) |
+| `channel_read_only` | `cancelled`; `failed` on denial before delivery | Server | Channel became read-only or archived (04 section 8.3) |
 | `billing_mode_mismatch` | `failed` | Adapter or Server | I3 |
 | `tool_class_owner_only` | `failed` | Server | SR2 at delivery or at `run.token.renew` |
 | `tool_class_mismatch` | `failed` | Adapter or Server | actual tool class higher than the `tool_class` of the token (SR2) |
@@ -784,7 +789,7 @@ stateDiagram-v2
 | `runtime_error` | `failed` | Adapter | Runtime reports an error; details in the last step |
 | `adapter_error` | `failed` | Adapter | Error in the adapter itself |
 | `runtime_not_authenticated` | `failed` | Adapter | Runtime has no valid login |
-| `user_disabled` | `cancelled` | Server | The triggering person was disabled (`user.disable`, 02 section 4.3) |
+| `user_disabled` | `cancelled`; `failed` on denial before delivery | Server | The triggering person was disabled (`user.disable`, 02 section 4.3): `cancelled` on revocation, `failed` at delivery |
 
 The server stores a `failed` reason of an adapter that this table does not list for the adapter (an
 unknown code, or a server code such as `stale`) as `adapter_error` (D-M2-05-8). It keeps the
@@ -899,7 +904,11 @@ no emoji ([01-product.md](01-product.md)).
 ## 7. Follow-ups during a run
 
 A message that under 3.4 would trigger the agent of the active run becomes a follow-up
-(`run.followup.create`, 3.4 item 6; 05 section 5 item 7 speaks of "the triggering"). A
+(`run.followup.create`, 3.4 item 6; 05 section 5 item 7 speaks of "the triggering").
+`agent.followup` passes `agent.invoke` for the author of the follow-up immediately before every
+delivery; a denial sends nothing and sets the follow-up message to `trigger_state = failed` with the
+reason, but leaves the run unchanged, because the run's own trigger was checked for its own
+invocation and another person's follow-up must not end it (M2-08). A
 message without triggering (no `trigger`, mention rule not met) stays a normal
 message and reaches the agent only as context of the next run. Reason: a channel with a
 mention requirement should not push conversations between people into a running turn.

@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	syncjobs "github.com/OWNER/bothy/services/server/internal/sync/adapters/jobs"
 )
 
@@ -105,15 +106,17 @@ type JobModules struct {
 	Deliveries appsjobs.Deliverer
 	// FilesScan is the scan pass of files.scan (M3-04); nil in the role api.
 	FilesScan filesjobs.Runner
+	// QueuedExpiry is the use case of runs.queued_expiry (M2-08); nil only where no job runs.
+	QueuedExpiry runsjobs.Expirer
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
 // the same one here, so an api process accepts exactly the kinds a worker runs. It registers
 // sync.partition_maintenance (M1-16), sync.idempotency_cleanup (M1-20), authz.expiry_sweep and
 // authz.expiry_reminder (M1-30), instance.key_rotation (M1-32), identity.auth_cleanup (M1-35) and
-// audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26) and files.scan
-// on the queue files without a River job timeout (M3-04); the error is the first rejected
-// registration.
+// audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
+// on the queue files without a River job timeout (M3-04) and runs.queued_expiry on the queue
+// default (M2-08); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -141,6 +144,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := filesjobs.Register(reg, m.FilesScan); err != nil {
+		return nil, err
+	}
+	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
 		return nil, err
 	}
 	return reg, nil

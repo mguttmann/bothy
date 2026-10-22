@@ -130,6 +130,30 @@ Tests: `TestAuthzObserve_AccessChangedRaisesFloor`,
 `TestAuthzObserve_StructureEventInvalidates`, `TestAuthzObserve_SettingsChangedAdvancesGeneration`,
 `TestAuthzDelivery_DenialWritesNoAudit`.
 
+## Check without a request (M2-08, R-AZ-29)
+
+`actor.Recheck(person)` builds the principal of a check the server runs for a person without the
+person's request: kind `user`, the marker `RecheckPrincipal` and nothing else. `Authorize` refuses
+the marker with an internal error for any action other than `agent.invoke` (M2-25 adds
+`command.invoke` and `interaction.create`) and when the principal carries a session, device,
+token, installation, "view as" or acting-for binding. Liveness comes only from the principal status
+(`principal_inactive`, `principal_pending`); the owner status comes from the current owner list
+without a session (the exception to R-AZ-14 and 05 2.3 point 1). The snapshot has its own cache key
+(`cacheKey.recheck`), so no request principal of the same person, a personal token included, ever
+gets the owner snapshot; the version is the one the caller pins, also in delivery mode. The
+caller is `runs.Delivery` before every invocation-bearing delivery to an agent (D-M2-08-1).
+
+`InvokeFacts.NewThread` (M2-08): the auto thread of the trigger is decided with the channel's
+main-thread mention rule ("in the main thread and for new threads", 05 section 5 point 3), not
+with `thread_require_mention`.
+
+A personal event whose receive action takes the principal kind `agent` (`agent.events.consume` of
+`agent.invocation`, 05 section 6) is decided on its audience only for the page reads of the agent
+consumer engine (`sync.PageInput.AgentConsumer`), which pass every such event through
+`runs.Delivery`: sync then sets `EventScope.AudienceID` after it matched the audience with the
+receiver, and `eventTarget` adds the agent of the audience as the last candidate. The generic
+catch-up `listEvents` never sets it, so an agent never gets an invocation there (D-M2-08-14).
+
 ## Scope of agent.config.read (M2-02)
 
 `Scope` serves `agent.config.read` besides the read-level list actions and `host.read`: for an

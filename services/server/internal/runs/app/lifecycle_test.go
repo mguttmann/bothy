@@ -166,6 +166,9 @@ func TestTransition_Rules(t *testing.T) {
 		for _, c := range w.j.list() {
 			if c.what == "event" {
 				ev := c.arg.(eventlog.Event)
+				if ev.Type == "agent.invocation" {
+					continue // the acceptance's last event (M2-08)
+				}
 				if ev.Type != "run.state_changed" || ev.ReceiveAction != "run.read" || ev.ResourceKind != "run" {
 					t.Fatalf("event %+v", ev)
 				}
