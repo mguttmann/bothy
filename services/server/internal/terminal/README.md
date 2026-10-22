@@ -236,7 +236,7 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
 
 - Cluster mode: `cluster.mode` (`single` or `multi`, `internal/wire/configkeys_cluster.go`). With
   `single` the use cases bind `app.LocalSignals`, no listener runs and no `NOTIFY` is sent; the
-  behaviour of M2-43 and M2-44 stays. With `multi` they bind `adapters/postgres.NotifySignals`; the
+  behavior of M2-43 and M2-44 stays. With `multi` they bind `adapters/postgres.NotifySignals`; the
   roles `api` and `all` run the listener, the role `worker` only sends (it holds no connection).
   `internal/wire` (`terminal_cluster.go`) chooses by the mode; `app.New` binds `LocalSignals` over
   the `Service` itself, so a process without wiring behaves like one node.
