@@ -73,19 +73,44 @@ Rules:
 3. With a managed PostgreSQL service, the provider takes over WAL archiving and
    point-in-time recovery. `bothy-backupd` then only does the logical backup and the
    object backup (section 8.1).
-4. Azure Blob Storage offers no S3 API [assumed, not checked]. The S3 driver (B4) therefore fits
-   on Azure only with SeaweedFS or another S3 service. A separate Blob driver is
-   an option for chapter 12.
+4. Azure Blob Storage offers no S3 API: Microsoft names the Azure Storage REST API, Azure
+   PowerShell, Azure CLI, the Azure Storage client libraries, SFTP and NFS 3.0 as the ways to
+   reach it, and no S3 interface
+   (https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blobs-introduction, retrieved
+   2026-10-20) [verified]. The S3 driver (B4) therefore fits on Azure only with SeaweedFS or
+   another S3 service; the module `azure` offers the volume (driver `fs`) or SeaweedFS (profile
+   `s3`) and never Blob Storage. A separate Blob driver is an option for chapter 12.
 5. Hetzner Object Storage is S3-compatible and supports versioning and Object Lock
    (https://docs.hetzner.com/storage/object-storage, retrieved 2026-10-10) [verified].
-6. Whether the managed services of Azure and AWS offer PostgreSQL 18 is not checked
-   [assumed]. The module ticket checks it before the implementation.
+6. PostgreSQL 18 per managed service, checked on 2026-10-20 (M7-16, docs/DECISIONS.md D-M7-16-3):
+   Amazon RDS for PostgreSQL offers the major version 18 with the minor versions 18.1 to 18.6
+   (https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-versions.html)
+   [verified]; Azure Database for PostgreSQL flexible server supports the major version 18, current
+   minor 18.6, with some extensions not yet available for it
+   (https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-supported-versions)
+   [verified]; Hetzner Cloud has no managed PostgreSQL service (the provider `hetznercloud/hcloud`
+   1.70.0 has no resource for one) [derived]. Even so the modules offer only the container path for
+   now: the setup wizard `install.sh` (3.1) and the Compose stack have no way to use an external
+   database, so a managed service the module created would stay unused (D-M7-16-4).
 7. Minimum versions for Compose: Docker Engine 26 (volume `subpath`) and Compose 2.26 (`configs`
    with `content`, `depends_on.required`). Evidence: release notes Docker Engine 26.0
    (https://docs.docker.com/engine/release-notes/26.0/) and Compose reference
    (https://docs.docker.com/reference/compose-file/configs/), retrieved 2026-10-10 [verified].
 
 OpenTofu modules per target are described in [infra/tofu/README.md](../../infra/tofu/README.md).
+
+As built (M7-16, docs/DECISIONS.md D-M7-16-1 to D-M7-16-6): the modules `hetzner`, `aws` and `azure`
+create a network whose security rules (Hetzner firewall, AWS security group, Azure network
+security group) admit only the edge port 443 from the internet, and only with
+`edge_mode = reverse_proxy`; SSH comes only from the networks the operator names. The host has a
+public address of its own, because it needs egress and a NAT gateway would cost more than the host,
+and the TLS proxy of the edge runs on the host, as with `generic-vm`: the Compose stack publishes on
+`127.0.0.1` only, so neither a load balancer of AWS nor an Application Gateway of Azure could
+reach it, and the modules create neither. Database and files stay in the stack (rule 6 and
+rule 4). Off-site: the module `aws` creates a bucket with Object Lock in compliance mode in
+another region on request; on Hetzner the owner creates the bucket with Object Lock in the
+Console (the provider has no resource for Object Storage); on Azure the target is an S3 bucket
+elsewhere, because `bothy-backupd` writes to S3 only.
 
 ### 3.1 Installation in one command (setup wizard)
 
