@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5" //nolint:gosec // G501: the hash signature format of ClamAV (.hdb) is MD5; no security use
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -148,7 +149,8 @@ func Start(ctx context.Context, o Options) (*Clamd, error) {
 	port := network.MustParsePort(tcpPort)
 	ctr, err := testcontainers.Run(ctx, Image,
 		testcontainers.WithLogger(tclog.NewNoopLogger()),
-		testcontainers.WithName("bothy-clamdtest-"+strconv.FormatInt(time.Now().UnixNano(), 36)),
+		// A random suffix: two test processes that start in the same clock tick get distinct names.
+		testcontainers.WithName("bothy-clamdtest-"+strings.ToLower(rand.Text())),
 		testcontainers.WithLabels(map[string]string{Label: LabelValue}),
 		testcontainers.WithEntrypoint("clamd"),
 		testcontainers.WithCmd("--foreground", "--config-file="+confPath),
