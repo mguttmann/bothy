@@ -844,7 +844,7 @@ class WebhooksApi {
   }
 
   /// Post a message through an incoming webhook
-  /// The token in the path authenticates the call; servers redact it in logs. Messages have &#x60;origin &#x3D; app&#x60; and never trigger agents. Unknown or revoked webhooks give 404.
+  /// The token is the last path segment; &#x60;Authorization&#x60; is ignored. Servers write the path only as its pattern &#x60;/api/v1/hooks/{webhook_id}/{token}&#x60; in logs, traces and &#x60;Problem.instance&#x60;, and reverse proxies must redact it (16 4.3).  The format is recognised per request from the body: a body with at least one Alertmanager member (&#x60;version&#x60;, &#x60;groupKey&#x60;, &#x60;truncatedAlerts&#x60;, &#x60;status&#x60;, &#x60;receiver&#x60;, &#x60;groupLabels&#x60;, &#x60;commonLabels&#x60;, &#x60;commonAnnotations&#x60;, &#x60;externalURL&#x60;, &#x60;alerts&#x60;) is the unchanged webhook payload of Prometheus Alertmanager and gives one message per notification; it must carry no native member (&#x60;400 validation_failed&#x60;, &#x60;format_mixed&#x60;). Every other body is &#x60;native&#x60;: Markdown in &#x60;content_md&#x60; with optional &#x60;title&#x60;, &#x60;thread_id&#x60; and &#x60;client_msg_id&#x60;. A format outside &#x60;webhook_in.formats_enabled&#x60; gives &#x60;400 validation_failed&#x60; with &#x60;format_disabled&#x60;.  Order of checks (11 8.4): &#x60;rl.webhook_in&#x60; of the webhook (&#x60;429&#x60;), the token (&#x60;404&#x60;), the body up to &#x60;webhook_in.max_body_bytes&#x60; (&#x60;413&#x60;), the format (&#x60;400&#x60;), &#x60;authorize&#x60; of the app (&#x60;404&#x60;), then the message (&#x60;201&#x60;). An unknown or revoked webhook, a wrong or malformed token, a suspended or uninstalled app and every refusal of the app&#39;s rights give the same &#x60;404&#x60;. A failed token check counts against &#x60;rl.public_auth&#x60; of the client IP.  The message has &#x60;origin &#x3D; app&#x60; with the app as author, resolves no mentions and never triggers an agent. &#x60;native&#x60; with &#x60;client_msg_id&#x60; is idempotent: a repeat answers &#x60;200&#x60; with the original and &#x60;Idempotent-Replay: true&#x60;, other content with the same &#x60;client_msg_id&#x60; &#x60;422 idempotency_key_reuse&#x60;. Senders inside the stack reach the same path on the internal listener.
   ///
   /// Parameters:
   /// * [webhookId]
@@ -895,6 +895,119 @@ class WebhooksApi {
       method: r'POST',
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(IncomingWebhookPost);
+      _bodyData = _serializers.serialize(
+        incomingWebhookPost,
+        specifiedType: _type,
+      );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    IncomingWebhookResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(IncomingWebhookResult),
+            ) as IncomingWebhookResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<IncomingWebhookResult>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Post a message through an incoming webhook with the token in Authorization
+  /// The token of the incoming webhook is sent as &#x60;Authorization: Bearer &lt;token&gt;&#x60;; the path ends with the webhook ID. Use this variant where the sender can set a header, so the token never appears in a URL. Of the root security only &#x60;bearerAuth&#x60; applies here, with the token of the incoming webhook; any other scheme or credential counts as a wrong token (&#x60;404&#x60;).  The format is recognised per request from the body: a body with at least one Alertmanager member (&#x60;version&#x60;, &#x60;groupKey&#x60;, &#x60;truncatedAlerts&#x60;, &#x60;status&#x60;, &#x60;receiver&#x60;, &#x60;groupLabels&#x60;, &#x60;commonLabels&#x60;, &#x60;commonAnnotations&#x60;, &#x60;externalURL&#x60;, &#x60;alerts&#x60;) is the unchanged webhook payload of Prometheus Alertmanager and gives one message per notification; it must carry no native member (&#x60;400 validation_failed&#x60;, &#x60;format_mixed&#x60;). Every other body is &#x60;native&#x60;: Markdown in &#x60;content_md&#x60; with optional &#x60;title&#x60;, &#x60;thread_id&#x60; and &#x60;client_msg_id&#x60;. A format outside &#x60;webhook_in.formats_enabled&#x60; gives &#x60;400 validation_failed&#x60; with &#x60;format_disabled&#x60;.  Order of checks (11 8.4): &#x60;rl.webhook_in&#x60; of the webhook (&#x60;429&#x60;), the token (&#x60;404&#x60;), the body up to &#x60;webhook_in.max_body_bytes&#x60; (&#x60;413&#x60;), the format (&#x60;400&#x60;), &#x60;authorize&#x60; of the app (&#x60;404&#x60;), then the message (&#x60;201&#x60;). An unknown or revoked webhook, a wrong or malformed token, a suspended or uninstalled app and every refusal of the app&#39;s rights give the same &#x60;404&#x60;. A failed token check counts against &#x60;rl.public_auth&#x60; of the client IP.  The message has &#x60;origin &#x3D; app&#x60; with the app as author, resolves no mentions and never triggers an agent. &#x60;native&#x60; with &#x60;client_msg_id&#x60; is idempotent: a repeat answers &#x60;200&#x60; with the original and &#x60;Idempotent-Replay: true&#x60;, other content with the same &#x60;client_msg_id&#x60; &#x60;422 idempotency_key_reuse&#x60;. Senders inside the stack reach the same path on the internal listener.
+  ///
+  /// Parameters:
+  /// * [webhookId]
+  /// * [incomingWebhookPost]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [IncomingWebhookResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<IncomingWebhookResult>> postIncomingWebhookWithBearer({
+    required String webhookId,
+    required IncomingWebhookPost incomingWebhookPost,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/hooks/{webhook_id}'.replaceAll(
+      '{'
+      r'webhook_id'
+      '}',
+      encodeQueryParameter(
+        _serializers,
+        webhookId,
+        const FullType(String),
+      ).toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
       contentType: 'application/json',
       validateStatus: validateStatus,
     );

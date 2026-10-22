@@ -36,10 +36,7 @@ func (c *Chain) routeStage(op Operation, next http.Handler) http.Handler {
 		h.Set(headerCacheControl, valueNoStore)
 		h.Set(headerCORP, valueSameOrigin)
 
-		limit, timeout := c.cfg.MaxJSONBodyBytes, c.cfg.RequestTimeout
-		if op.RequestBody.transfer() {
-			limit = c.cfg.MaxUploadBytes
-		}
+		limit, timeout := c.bodyLimit(op), c.cfg.RequestTimeout
 		if op.transfer() {
 			timeout = c.cfg.TransferTimeout
 		}
@@ -62,9 +59,10 @@ func (c *Chain) routeStage(op Operation, next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 
 		rw := &routeWriter{w: w, r: r, c: c, op: op}
-		if r.ContentLength > limit {
+		if r.ContentLength > limit && op.BodyLimit <= 0 {
 			// SEC-IN-3: the limit applies before reading; a declared length above it is refused at
-			// once.
+			// once. An operation with its own limit refuses it at the start of StageBody instead,
+			// after the stages that must answer first (11 8.4: token before size).
 			writeProblem(rw, r, payloadTooLarge(ctx))
 			rw.finish()
 			return
@@ -75,6 +73,18 @@ func (c *Chain) routeStage(op Operation, next http.Handler) http.Handler {
 		next.ServeHTTP(rw, r.WithContext(context.WithValue(ctx, routeWriterKey{}, rw)))
 		rw.finish()
 	})
+}
+
+// bodyLimit returns the body limit of op: Operation.BodyLimit when set, file.max_upload_bytes for
+// transfers and http.max_json_body_bytes otherwise.
+func (c *Chain) bodyLimit(op Operation) int64 {
+	switch {
+	case op.BodyLimit > 0:
+		return op.BodyLimit
+	case op.RequestBody.transfer():
+		return c.cfg.MaxUploadBytes
+	}
+	return c.cfg.MaxJSONBodyBytes
 }
 
 type routeWriterKey struct{}

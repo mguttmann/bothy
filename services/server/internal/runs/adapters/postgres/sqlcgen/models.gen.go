@@ -504,6 +504,19 @@ type IdentityProvider struct {
 	UpdatedAt         pgtype.Timestamptz
 }
 
+type IncomingWebhook struct {
+	ID         pgtype.UUID
+	AppID      pgtype.UUID
+	ChannelID  pgtype.UUID
+	ThreadID   pgtype.UUID
+	Name       string
+	TokenHash  []byte
+	CreatedBy  pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	LastUsedAt pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+}
+
 type Instance struct {
 	ID                 int16
 	InstanceID         pgtype.UUID

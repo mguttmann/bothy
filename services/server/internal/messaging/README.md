@@ -413,6 +413,22 @@ list, the message and the filter; the principals come from one directory read. `
 checks each with `message.read` in filter mode (a mismatch is dropped, logged and counted as
 `filter_mismatch`).
 
+## Incoming webhooks (M2-27)
+
+`CreateMessageCmd` has two fields for the posts of incoming webhooks (module apps); a thread with
+its first message takes them from `CreateThreadCmd.FirstMessage`. Their zero values keep the
+behaviour of M1-56.
+
+- `SkipMentions`: the mention scanner does not run, `MentionIDs` is ignored, no `mentions` row is
+  written and `MessagePosted.MentionedIDs` is empty (R-EX-09); the content stays unchanged.
+- `HashContext`: when not empty it replaces the context part of the canonical hash
+  (`thread:<id>` or `new-thread:...`). apps sets the context of the webhook, its body thread and
+  its title, so a `client_msg_id` repeated through another webhook of the same app is
+  `422 idempotency_key_reuse`, not a replay.
+
+Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContextOverride`,
+`TestCreateThread_HashContextOverride`).
+
 ## Notes for the build
 
 - Idempotency through the pair of author and `client_msg_id` (04, 5.1).

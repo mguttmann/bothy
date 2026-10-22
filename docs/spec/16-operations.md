@@ -257,7 +257,16 @@ portability test equal to the second block above and the version of the document
 | Listener | Key | Content |
 |---|---|---|
 | public | `server.listen_addr` | REST and gateway |
-| internal | `server.internal_listen_addr` | `/healthz`, `/readyz`, incoming webhooks from services in the stack (Alertmanager) |
+| internal | `server.internal_listen_addr` | `/healthz`, `/readyz`, incoming webhooks from services in the stack (Alertmanager): `POST /api/v1/hooks/{webhook_id}/{token}` and `POST /api/v1/hooks/{webhook_id}` with `Authorization: Bearer` |
+
+The internal listener serves both post operations of the incoming webhooks (`postIncomingWebhook`,
+`postIncomingWebhookWithBearer`) in every role (`api`, `worker`, `all`) with the same behaviour as
+the public listener; nothing else of the API is mounted there. They run through a chain of their
+own: the client IP is the peer address and forwarded headers are never read
+([19-security.md](19-security.md), R-SE-09), and a rate limiter of its own counts
+`rl.webhook_in` and `rl.public_auth` per listener. Senders inside the stack (Alertmanager) use
+the URL of `createIncomingWebhook` with the host and port of `server.internal_listen_addr`
+([webhooks.md](../api/webhooks.md), section 8).
 
 `/healthz` only reports that the process is alive. `/readyz` reports ready when the startup
 has completed, the database answers, the binary version matches the schema (section 10), an active
@@ -288,6 +297,13 @@ provider stays off (fail closed). Reason: anyone who reaches the listener direct
 headers themselves. Tailscale states this explicitly
 (https://tailscale.com/kb/1312/serve, retrieved 2026-10-10) [verified]. Details:
 [tailscale.md](../operations/tailscale.md).
+
+Reverse proxies in front of the public listener redact the path after `/api/v1/hooks/{webhook_id}/`
+in their access logs, because the token of `postIncomingWebhook` is the last path segment (RK-20,
+[webhooks.md](../api/webhooks.md), section 8 point 5). The server itself logs only the route
+pattern `/api/v1/hooks/{webhook_id}/{token}` and never `Authorization`
+([19-security.md](19-security.md), SEC-LOG-2, SEC-LOG-3). Senders that can set a header use
+`postIncomingWebhookWithBearer`, so the token never appears in a URL.
 
 Access to the host is the root of trust of the instance: whoever can run server commands creates
 the first owner (`bothy setup bootstrap-owner`) and issues owner codes for recovery

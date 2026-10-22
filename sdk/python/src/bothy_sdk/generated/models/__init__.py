@@ -53,6 +53,8 @@ from .agent_triggerers import AgentTriggerers
 from .agent_update import AgentUpdate
 from .agent_updated_event import AgentUpdatedEvent
 from .agent_updated_event_type import AgentUpdatedEventType
+from .alertmanager_alert import AlertmanagerAlert
+from .alertmanager_alert_status import AlertmanagerAlertStatus
 from .api_token import ApiToken
 from .api_token_create import ApiTokenCreate
 from .api_token_created import ApiTokenCreated
@@ -384,6 +386,8 @@ from .incoming_webhook_create import IncomingWebhookCreate
 from .incoming_webhook_created import IncomingWebhookCreated
 from .incoming_webhook_list import IncomingWebhookList
 from .incoming_webhook_post import IncomingWebhookPost
+from .incoming_webhook_post_status import IncomingWebhookPostStatus
+from .incoming_webhook_post_version import IncomingWebhookPostVersion
 from .incoming_webhook_result import IncomingWebhookResult
 from .instance_info import InstanceInfo
 from .instance_limits import InstanceLimits
@@ -814,6 +818,8 @@ __all__ = (
     "AgentUpdate",
     "AgentUpdatedEvent",
     "AgentUpdatedEventType",
+    "AlertmanagerAlert",
+    "AlertmanagerAlertStatus",
     "ApiToken",
     "ApiTokenCreate",
     "ApiTokenCreated",
@@ -1129,6 +1135,8 @@ __all__ = (
     "IncomingWebhookCreated",
     "IncomingWebhookList",
     "IncomingWebhookPost",
+    "IncomingWebhookPostStatus",
+    "IncomingWebhookPostVersion",
     "IncomingWebhookResult",
     "InstanceInfo",
     "InstanceLimits",

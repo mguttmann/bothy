@@ -18,10 +18,11 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `audit.go` | `Audit` (`NewAudit`, `Start`, `UoW`, `Recorder`, `RightsHook`), `AuditConfig`, `SecretsKEK`: the audit module of a role (M1-24) |
 | `txn.go` | `Modules`, `NewModules`, `NewTxnRegistry` (the one list of hooks and subscribers, golden file `testdata/txn_registrations.golden`), `UnitConfig` |
 | `identity.go` | `Identity` (`NewIdentity`, `Start`), `IdentityConfig`, `TokenPepper`: devices, the DPoP verifier with its jti store and the device handlers (M1-33) |
-| `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7, every route through the HTTP chain, CORS preflights), `RouteOptions`, `HTTPOperation` |
+| `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7, every route through the HTTP chain, CORS preflights; optional `RouteOption`s adjust the chain operation of a route before it is wrapped), `RouteOptions`, `HTTPOperation` (sets `AnonymousCredentials` for the operations with action `webhook_in.post`, M2-27), `RouteOption`, `WebhookBodyLimit` |
 | `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the after-step `instance`) |
 | `instance.go` | `MigrationSteps` (the after-step `instance`), `InstanceCounters` and `loadInstance`, the start step `instance` |
 | `authz.go` | catalogue start check (M1-25): `BuildRegistry` over the module `Register` functions (`Deps.Registrations` replaces them in tests), `RouteBindings`, `NewAuthzCatalog` (closed catalogue with `bothy.authz.errors`); every role checks routes and registrations before the routes are mounted, one ERROR line `registration check failed` per violation; `moduleRegistrations` holds `authz.Register` (`access.changed`, M1-29); `NewRightsHook` with `RightsSources` builds the rights hooks of authz (M1-29) |
+| `incoming.go` | `InstallWebhookToken` (the token check of the incoming webhooks at `httpserver.StageWebhookToken`) and `mountInternalHooks` (their routes on the internal listener, M2-27, below) |
 | `ratelimit.go`, `configkeys_ratelimit.go` | `RateLimitConfig`, `InstallRateLimits` and the start check (M1-19); the keys `ratelimit.*` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
 | `setup.go` | `InstallSetupGate` and `RouteActions` (the setup gate over the instance row, M1-37); `Setup` (`NewSetup`, `BootstrapOwner`, `IssueRecoveryCode`, `Close`): the parts of the server `bothy setup` needs, as `bothy_app` |
@@ -44,7 +45,7 @@ components, in start order:
 | `audit` | resolves `privacy.audit_ip_kek_ref` once (fail fast), builds the audit module with the unit of work of the role (`NewAudit`) and starts the aggregator of denials (`Audit.Start`), registering the stop step `audit_denials` (M1-24) | all |
 | `identity` | after `audit`, `sync` and `authz`: resolves `auth.token_pepper_ref` once (32 bytes as hex, fail fast), builds `Identity` over the unit of work of `audit` and the Authorizer, starts the sweeper of the jti store with the stop step `dpop_replay_sweeper` in `PhaseHTTP`; `routes` mounts its device handlers unless `Deps.Handlers` names one (M1-33) | all |
 | `agents` | after `identity`: builds `Agents` (`NewAgents`) over the unit of work, recorder and rights hook of `audit`, the appender of `sync`, the Authorizer and the principal writer, directory and token revocation of identity; `routes` mounts its handlers unless `Deps.Handlers` names one (M1-51) | all |
-| `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, the Authenticator of identity from the step `sessions`, `actor.AnonymousOnly` without it), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19) and `MountRoutes` on the public mux with the `authz` catalogue | api, all (check: every role) |
+| `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, the Authenticator of identity from the step `sessions`, `actor.AnonymousOnly` without it), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19), `InstallWebhookToken` (M2-27) and `MountRoutes` on the public mux with the `authz` catalogue and `WebhookBodyLimit`; then, in every role, `mountInternalHooks` (M2-27, below) | api, all (check and internal webhook routes: every role) |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `event_consumers` | after `jobs`: registers the handlers of `consumerHandlers` (none yet), inserts their cursor rows at the head (`Ensure`), registers the stop step `event_consumers` in `PhaseConsumers` and starts the runner with its own `LISTEN` connection; an unexpected end of the runner calls `Runner.FailOn` (M2-01) | worker, all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
@@ -81,6 +82,40 @@ Thread moves (M1-62): `NewModules` also builds `messagingapp.Subscribers` (requi
 `Modules.MessagingSubscribers`), and `NewTxnRegistry` subscribes `chat.ThreadMoved -> messaging`
 and then `chat.ThreadMoved -> sync`, which change `messages.channel_id` and
 `read_states.channel_id` and `drafts.channel_id` of the moved thread in its transaction.
+
+Incoming webhooks (M2-27): `NewModules` also builds `appsapp.NewArchiveSubscriber` over the apps
+repository (required, `Modules.AppsArchive`; `NewTxnRegistry` refuses Modules without it), and
+`NewTxnRegistry` subscribes `chat.ChannelArchived -> apps` after `messaging.MessagePosted -> runs`:
+`ArchiveSubscriber.OnChannelArchived` revokes the incoming webhooks of the archived channel in its
+transaction (docs/DECISIONS.md D-M2-27-21).
+
+## Incoming webhooks (M2-27)
+
+- Configuration: `configkeys_apps.go` declares `webhook_in.max_body_bytes` and
+  `webhook_in.formats_enabled` (chapter 11); `IncomingConfig` binds `appsapp.IncomingConfig`
+  (`message.max_content_bytes`, `webhook_in.formats_enabled`, `identity.last_active_granularity`,
+  `server.public_url`) in the step `apps`, which now needs chat and messaging (`AppsDeps.Chat`,
+  `AppsDeps.Messages`). The start check `webhook_in_formats` (`configchecks.go`) requires every
+  entry of `webhook_in.formats_enabled` to be `native` or `alertmanager` and to appear once; an
+  empty list switches every format off.
+- `NewApps` builds `appsapp.NewIncoming` (`Apps.Incoming`) and its handlers (`Apps.IncomingHandlers`,
+  `Handlers.Incoming`): `listIncomingWebhooks`, `createIncomingWebhook`, `revokeIncomingWebhook`,
+  `postIncomingWebhook` and `postIncomingWebhookWithBearer`.
+- `HTTPOperation` sets `httpserver.Operation.AnonymousCredentials` for the operations with action
+  `webhook_in.post`, so their token never reaches the authenticator; `WebhookBodyLimit(limit)`
+  sets `BodyLimit` and `BodyLimitKey` (`webhook_in.max_body_bytes`) on them; `mountAPI` passes it to
+  `MountRoutes` with the value of `webhook_in.max_body_bytes`.
+- `InstallWebhookToken(chain, apps, limiter)` installs `appshttp.TokenStage` at
+  `httpserver.StageWebhookToken` with `limiter.FailedCredentialGuard` (the failed-credential
+  token of `rl.public_auth`); `mountAPI` calls it after `InstallRateLimits`, before the routes.
+- `mountInternalHooks` (end of the step `routes`, every role, 16 section 4.2): the step
+  `internal_listener` keeps its mux (`server.internalMux`), and the two post operations are mounted
+  there through a chain of their own: the chain configuration of the public listener with empty
+  `server.trusted_proxies` and CORS origins (the client IP is the peer address, forwarded headers
+  are never read, R-SE-09), `actor.AnonymousOnly` as the authenticator, a request validator of only the two post operations (`internalHooksValidator`, so a worker role does not compile the validator of the whole API before it is ready), its own rate limiter over
+  only these two operations (so `rl.webhook_in` and `rl.public_auth` count per listener; its
+  sweeper registers a second stop step `ratelimit_sweeper`), `InstallWebhookToken` and
+  `WebhookBodyLimit`. Nothing else of the API is mounted there (docs/DECISIONS.md D-M2-27-18).
 
 ## Instance and counters
 
@@ -123,5 +158,6 @@ adds), at the marked place, with its stop step:
 | M1-43 | readiness `trusted_header_requires_loopback` | before `ready` | none |
 | M1-18 | middleware chain around the public mux | `public_listener` | none |
 
-Stack-internal webhooks (Alertmanager) go on the mux of `httpserver.Internal` before
-`internal_listener` starts.
+Stack-internal webhooks (Alertmanager) go on the mux of `httpserver.Internal`; since M2-27 the
+step `routes` adds the two post operations of the incoming webhooks to it after
+`internal_listener` has started (`mountInternalHooks`, see "Incoming webhooks").

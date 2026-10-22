@@ -13,7 +13,8 @@ import (
 )
 
 // Suspend implements apps.Apps (M2-24 design note 9 b): active to suspended; every grant and
-// token stays, the tokens stop working because the installation is not active, and the empty
+// token stays, the tokens stop working because the installation is not active (so do the incoming
+// webhooks, whose rows stay, M2-27 design note 11 b), and the empty
 // snapshot of the app writes access.changed. A suspended app is without effect; an uninstalled
 // one is 409 invalid_state_transition. Deliveries stop and keep their state: the delivery job sends
 // nothing for a suspended installation (M2-26). Later tickets add their parts of 11 section 4.3
@@ -32,8 +33,8 @@ func (s *Service) Resume(ctx context.Context, a actor.Actor, appID ids.ID) error
 // uninstalled_at and uninstalled_by; in the same unit every active token of the app is revoked,
 // every active grant with the app as subject is revoked with the reason, and the principal is
 // disabled; its messages keep their author; every subscription of the installation becomes disabled
-// (M2-26). An uninstalled app is without effect. Later tickets add their parts of 11 section 4.3
-// here (M2-25, M2-27).
+// (M2-26) and every active incoming webhook of the app is revoked (M2-27). An uninstalled app is
+// without effect. Later tickets add their parts of 11 section 4.3 here (M2-25).
 func (s *Service) Uninstall(ctx context.Context, a actor.Actor, appID ids.ID, reason string) error {
 	return s.transition(ctx, a, appID, domain.TransitionUninstall, authorize.ActionAppUninstall, reason)
 }
@@ -119,10 +120,7 @@ func (s *Service) applyTransition(ctx context.Context, a actor.Actor, c stateCha
 	attrs := c.attrs(inst.ID)
 	switch c.t {
 	case domain.TransitionUninstall:
-		if err := s.revokeAll(ctx, a, c.appID, c.reason, attrs); err != nil {
-			return err
-		}
-		if err := s.d.Webhooks.disableInstallation(ctx, inst.ID); err != nil {
+		if err := s.uninstallParts(ctx, a, c, inst.ID, attrs); err != nil {
 			return err
 		}
 	case domain.TransitionResume:
@@ -152,4 +150,17 @@ func (s *Service) revokeAll(ctx context.Context, a actor.Actor, appID ids.ID, re
 	attrs[attrTokensRevoked] = auditing.Int(int64(tokens))
 	attrs[attrGrantsRevoked] = auditing.Int(int64(grants))
 	return nil
+}
+
+// uninstallParts is the uninstall work of 11 section 4.3 inside the rights change: revoke the
+// tokens and grants, disable the subscriptions of the installation (M2-26) and revoke the active
+// incoming webhooks of the app (M2-27 design note 11 a).
+func (s *Service) uninstallParts(ctx context.Context, a actor.Actor, c stateChange, installation ids.ID, attrs auditing.Attrs) error {
+	if err := s.revokeAll(ctx, a, c.appID, c.reason, attrs); err != nil {
+		return err
+	}
+	if err := s.d.Webhooks.disableInstallation(ctx, installation); err != nil {
+		return err
+	}
+	return s.d.Incoming.revokeIncomingForApp(ctx, c.appID)
 }

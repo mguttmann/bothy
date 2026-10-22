@@ -10,7 +10,7 @@ import 'package:built_value/serializer.dart';
 
 part 'incoming_webhook_list.g.dart';
 
-/// IncomingWebhookList
+/// The active incoming webhooks of a channel in creation order; revoked ones are not listed.
 ///
 /// Properties:
 /// * [items]

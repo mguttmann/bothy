@@ -328,7 +328,11 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
 ### API tokens (M1-44)
 
 - Format (`domain/apitoken`, ADR 0061): `bothy_<kind>_<random>_<checksum>`, 60 characters. Kinds
-  `agt` (agent), `app` (app), `pat` (person), `whi` (incoming webhook, format only until M2-27),
+  `agt` (agent), `app` (app), `pat` (person), `whi` (incoming webhook; since M2-27
+  `Tokens.NewIncomingWebhookToken` issues it as a redacting `Token` with its HMAC under the token
+  pepper, and `Tokens.HashIncomingWebhookToken` returns the same HMAC for a well-formed token of
+  kind `whi` and `ErrTokenMalformed` for any other value before computing one; neither reads or
+  writes the database, and the module apps checks the token, never the authenticator),
   `hpc` (pairing code of a terminal host, M2-39: issued by `Tokens.NewHostPairingCode` as a
   redacting `Token` with its HMAC under the token pepper, without a database call; only
   `host.pair` of M2-41 redeems it, and the authenticator refuses it before any lookup like `whi`;
@@ -371,7 +375,9 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   follows only where the rights path computes a difference (a token changes no grant).
 - Authentication (`app/apitokenauth.go`, `Authenticator.AuthenticateAPIToken`, also the entry
   of the gateway `identify` of M1-64): `Bearer` or `DPoP` with a value that starts with `bothy_`.
-  Format, checksum and kind `whi` fail with `401 unauthenticated` before any query; then one
+  Format, checksum and kind `whi` fail with `401 unauthenticated` before any query (also since
+  M2-27: the routes of incoming webhooks never reach the authenticator, their operations carry
+  `AnonymousCredentials`); then one
   query by `token_hash` joined with the principal kind, which must fit the token kind. A revoked
   or expired token yields the actor of its principal with the token id and `CredentialInactive`,
   so `authorize` refuses it in `check_active` with `401 unauthenticated` and the audit reason
@@ -416,7 +422,9 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   PostgreSQL 18 with the real chain, Authenticator, authz, audit and idempotency stage: ID-T23
   (only the hash stored, shown once, expired, revoked, DPoP binding), the body rules, step-up,
   the switch, `not_self`, AZ-M35, SR5, revocation, `RevokeAllForPrincipal`, `last_used_at` and
-  no secret in logs or audit. Rulings: docs/DECISIONS.md M1-44.
+  no secret in logs or audit. Rulings: docs/DECISIONS.md M1-44. The tokens of incoming webhooks
+  (M2-27): `app/incomingtoken_test.go` (`TestIncomingWebhookToken_MintAndHash`,
+  `TestHashIncomingWebhookToken_RejectsWithoutLookup`).
 
 ### First setup, enrollment codes and login completion (M1-37)
 

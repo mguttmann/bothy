@@ -176,6 +176,14 @@ type CreateMessageCmd struct {
 	MentionIDs []ids.ID
 	Silent     bool
 	ClearDraft bool
+	// SkipMentions makes the message resolve no mentions: the scanner does not run, no mentions row is written and
+	// MessagePosted.MentionedIDs is empty (incoming webhooks, R-EX-09, M2-27). The content stays unchanged. MentionIDs
+	// is ignored with it, because the caller of this path never sends mention_ids.
+	SkipMentions bool
+	// HashContext, when not empty, replaces the context part of the request hash (M1-56 D3), so the caller decides what a
+	// repetition of client_msg_id is bound to (M2-27 design note 6c). Empty keeps the thread context of createMessage and
+	// the new-thread context of createThread.
+	HashContext string
 }
 
 // Created is the result of Messages.Create: the message and whether it is the original of an

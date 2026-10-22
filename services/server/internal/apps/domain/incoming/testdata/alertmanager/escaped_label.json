@@ -1,0 +1,31 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"AuthErrors\"}",
+  "truncatedAlerts": 0,
+  "status": "firing",
+  "receiver": "bothy-ops",
+  "groupLabels": {
+    "alertname": "AuthErrors"
+  },
+  "commonLabels": {
+    "alertname": "AuthErrors"
+  },
+  "commonAnnotations": {},
+  "externalURL": "https://alertmanager.example.com",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "AuthErrors",
+        "severity": "page*[now]\n@alex"
+      },
+      "annotations": {
+        "summary": "Failed logins > 100/min"
+      },
+      "startsAt": "2026-10-10T11:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "https://prometheus.example.com/graph?g0.expr=auth_failures_total",
+      "fingerprint": "18293a4b5c6d7e8f"
+    }
+  ]
+}
