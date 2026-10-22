@@ -177,6 +177,7 @@ processors:
       - bothy.signing_key.to_state
       - bothy.space.id
       - bothy.step.kind
+      - bothy.terminal.side
       - bothy.thread.id
       - bothy.version.own
       - bothy.version.required

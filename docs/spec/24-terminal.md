@@ -1077,6 +1077,14 @@ reported list of `osu` point only to an error or tampering in the server.
 Reason for `cek`: a relay cannot put the token into its own handshake, because the hash
 is bound to the ephemeral key of the device.
 
+Refusal by the host service (M2-44, D-M2-44-6): the host service refuses a handshake by closing
+its data connection with `4101` (`token_expired`, `token_replayed`) or `4104` (every other detail
+of the table above) and the `close_detail` code as the close reason; on `4104` for a started
+session it also ends the PTY. The relay hands the same code and reason to the device stream, and an
+opening without a PTY ends with `open_failed` and that detail. A refusal reported through
+`session.ended` instead reaches the device with the same code (`StreamCodeForEnd`), so the device
+gets exactly one code either way.
+
 JWKS refresh (M2-43, D-M2-43-11): `heartbeat_ack` carries `jwks` whenever the set of purpose
 `terminal` differs from the last set sent on the connection, and the host service replaces its
 set. A scheduled rotation publishes the `next` key `agent.jwks_max_age` before it signs, so a
@@ -1142,12 +1150,25 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
    token, stream path, `noise_public_key`, `key_fingerprint`, `key_generation`.
 4. The server instructs the host service over the control connection (`session.open` with session ID
    and data path). The host service opens the data connection
-   `/api/v1/hosts/sessions/{session_id}/stream`.
+   `/api/v1/hosts/sessions/{session_id}/stream`. M2-44: exactly one data connection per
+   `session.open` (D-M2-44-4); `session.open` goes only over a control connection whose `report`
+   was applied, after the commit and after a recheck of the decision (D-M2-44-8); a send that fails
+   after the commit does not fail the request, the deadline of step 6 ends the opening.
 5. The device opens `/api/v1/terminal/sessions/{session_id}/stream` and sends message 1.
 6. The relay connects both sides as soon as both are there; if one side does not arrive within
-   `terminal.open_timeout`, the session ends with `open_failed`.
+   `terminal.open_timeout`, the session ends with `open_failed`. M2-44 (D-M2-44-5): the server
+   cannot see the handshake, so the deadline (grant time plus `terminal.open_timeout`) is met by
+   `session.started` for a session that never started and by the pairing for a started one; at the
+   deadline an opening ends with `open_failed` and `close_detail = open_timeout` (the device gets
+   `4102` without a host side, else `4100`). On a host whose last `report` says
+   `require_local_confirm = true` the pairing meets the deadline of an opening, because the consent
+   window `host_service.local_confirm_timeout` (6.4) may be longer; the host service bounds the
+   rest itself and ends a refused or unanswered opening with `session.ended` `open_failed`; a
+   pairing that ends before `session.started` gives the slot a new deadline of
+   `terminal.open_timeout` from that moment.
 7. After message 2 and the frame `start`, the host service starts the PTY; it reports
-   `session.started` over the control connection; the server sets `state = 'active'`.
+   `session.started` over the control connection; the server sets `state = 'active'`. M2-44: a
+   `session.started` without a paired device side makes the session `detached` at once.
 
 ### 6.2 Detach and reattach
 
@@ -1167,8 +1188,16 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
   fresh passkey for every attach ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)).
 - If another device attaches, the server closes the older connection with `4103`.
 - If the control or data connection of the host service breaks, the server sets the session to
-  `detached`. The host service keeps the PTY and rebuilds the data connection after
-  reconnecting; the device then reattaches with `terminal.attach`.
+  `detached`. The host service keeps the PTY and opens the data connection again as soon as the
+  device attaches (`session.open`); the device then reattaches with `terminal.attach`. M2-44
+  (D-M2-44-4): every grant (open or attach) sends one `session.open`, and the host service opens
+  exactly one data connection per `session.open`, so a new handshake always runs on a fresh pair
+  of connections. Between grants a data connection without an expectation on the node gets `1000`.
+- Attach to a session in `opening` (M2-44, D-M2-44-4): the PTY never started, so the token says
+  `att = open`; for a `claude` profile it carries the `wdi` of the opening, which the relay slot of
+  this node keeps for the life of the opening (03 does not store it); the grant restarts the opening
+  with a new deadline. Without that slot (another node, a restart) the attach answers `409
+  invalid_state_transition`.
 - If the host service restarts (`bothy-host restart`, `bothy-host session-user add` or `remove`,
   a crash, a restart of the host), all sessions of the host end. Every PTY helper
   ends its PTYs including their process tree (6.5) as soon as its channel to the host service
@@ -1684,10 +1713,10 @@ Close codes of the terminal channels (source of the names and client reactions i
 |---|---|---|---|
 | `4000` | `unknown_error` | control and data connection | internal error of the server (a panic, an error without a better code); reconnect with backoff (M2-43) |
 | `4100` | `terminal_closed` | stream, data connection | session ended, reason in `close_reason` (10.3); do not reconnect, the host service ends the PTY |
-| `4101` | `terminal_token_stale` | stream | terminal session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a new step-up (5.3) |
-| `4102` | `terminal_host_unavailable` | stream | counterpart missing (host service disconnected or no counterpart on this node, 9); session `detached`, attach later |
+| `4101` | `terminal_token_stale` | stream; data connection, from the host service (M2-44) | terminal session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a new step-up (5.3) |
+| `4102` | `terminal_host_unavailable` | stream | counterpart missing (host service disconnected or no counterpart on this node, 9); a started session is `detached`, attach later; an opening ends with `open_failed` (M2-44), open a new session |
 | `4103` | `terminal_replaced` | stream | another device has attached (6.2); do not reconnect automatically |
-| `4104` | `terminal_handshake_failed` | stream | any other error of the token or of the handshake (5.3); hard warning, no new attempt |
+| `4104` | `terminal_handshake_failed` | stream; data connection, from the host service (M2-44) | any other error of the token or of the handshake (5.3); hard warning, no new attempt |
 | `4110` | `host_unpaired` | control and data connection | key unknown or replaced by a re-pairing (3.3); stop, run `bothy-host pair` again |
 | `4111` | `host_disabled` | control and data connection | host `disabled` or `retired` (3.1); end all PTYs, reconnect only after a long backoff |
 | `4112` | `host_duplicate` | control and data connection | second live control connection with the same keys (3.4); host disabled, do not reconnect |

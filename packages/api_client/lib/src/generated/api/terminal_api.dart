@@ -26,7 +26,7 @@ class TerminalApi {
   const TerminalApi(this._dio, this._serializers);
 
   /// Attach to an own session again
-  /// For a session in state &#x60;opening&#x60;, &#x60;active&#x60; or &#x60;detached&#x60;. Needs a fresh step-up, except from the same device in the same login session within &#x60;terminal.quick_reattach_window&#x60; after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with &#x60;4103&#x60; (24, 6.2).
+  /// For a session in state &#x60;opening&#x60;, &#x60;active&#x60; or &#x60;detached&#x60;. Needs a fresh step-up, except from the same device in the same login session within &#x60;terminal.quick_reattach_window&#x60; after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with &#x60;4103&#x60; (24, 6.2). An attach to an &#x60;opening&#x60; session restarts the opening (&#x60;att &#x3D; open&#x60;, new deadline).
   ///
   /// Parameters:
   /// * [sessionId]

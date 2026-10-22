@@ -227,18 +227,32 @@ func (c *conn) read(ctx context.Context) (frame, bool) {
 // login runs hello, identify, the duplicate check, the login unit of work and ready (Design notes
 // 3 and 5 of M2-43). It reports whether the connection is logged in.
 func (c *conn) login(ctx context.Context) bool {
+	l, in, ok := c.identify(ctx, false)
+	if !ok {
+		return false
+	}
+	return c.register(ctx, l, in)
+}
+
+// identify is the one login function of the control connection and the data connection (M2-43
+// Design note 3, M2-44 Design note 9): hello with the challenge and the key set, identify within
+// terminal.host_auth_timeout, the proof and authorize host.connect (Authenticate, whose denials
+// authz records). data says which members identify must carry: live_sessions on the control
+// connection, session_id on a data connection. It returns the login and the decoded identify, or
+// false after it closed the connection with its code.
+func (c *conn) identify(ctx context.Context, data bool) (app.Login, app.Identify, bool) {
 	h, k := c.h, c.k
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		c.fail(ctx)
-		return false
+		return app.Login{}, app.Identify{}, false
 	}
 	challenge := base64.RawURLEncoding.EncodeToString(raw)
 	helloAt := stamp(h.d.Clock.Now())
 	keys, err := h.d.UseCases.TerminalJWKS(ctx)
 	if err != nil {
 		c.fail(ctx)
-		return false
+		return app.Login{}, app.Identify{}, false
 	}
 	k.lastJWKS = keySet(keys)
 	k.send(helloFrame(challenge, helloAt, h.cfg.HeartbeatInterval, h.cfg.HeartbeatMissLimit, keys))
@@ -250,27 +264,28 @@ func (c *conn) login(ctx context.Context) bool {
 	})
 	f, ok := c.read(ctx)
 	if !ok || !c.stopTimer() {
-		return false
+		return app.Login{}, app.Identify{}, false
 	}
 	if f.op != opIdentify {
 		if err := h.d.UseCases.AuthFailed(ctx); err != nil {
 			c.fail(ctx)
-			return false
+			return app.Login{}, app.Identify{}, false
 		}
 		k.close(domain.CodeHostAuthFailed)
-		return false
+		return app.Login{}, app.Identify{}, false
 	}
 	in := identifyOf(f.d.(*rest.HostIdentify))
+	in.Data = data
 	l, code, err := h.d.UseCases.Authenticate(ctx, app.Exchange{Challenge: challenge, HelloAt: helloAt}, in)
 	switch {
 	case err != nil:
 		c.fail(ctx)
-		return false
+		return app.Login{}, app.Identify{}, false
 	case code != 0:
 		k.close(code)
-		return false
+		return app.Login{}, app.Identify{}, false
 	}
-	return c.register(ctx, l, in)
+	return l, in, true
 }
 
 // register runs the duplicate check under the per-host lock, the login unit of work, the
@@ -337,6 +352,9 @@ func (c *conn) duplicate(ctx context.Context, hostID ids.ID) bool {
 	}
 	if err != nil {
 		old.close(domain.CodeHeartbeatTimeout)
+		if r := h.d.Links.relayOf(); r != nil {
+			r.ControlLost(hostID, domain.CodeHeartbeatTimeout)
+		}
 		if err := h.d.UseCases.ConnectionLost(ctx, hostID); err != nil {
 			c.fail(ctx)
 			return false
@@ -374,6 +392,10 @@ func (c *conn) ops(ctx context.Context) {
 			id := ids.ID(f.d.(*rest.HostSessionStarted).SessionId)
 			a, code, err := c.h.d.UseCases.SessionStarted(ctx, c.k.login, id)
 			c.answer(ctx, opSessionStarted, a, code, err)
+			if r := c.h.d.Links.relayOf(); r != nil && err == nil && code == 0 && !a.NotFound && a.Close == nil {
+				// The deadline of an opening is met by session.started (Design note 7 of M2-44).
+				r.Started(id)
+			}
 		case opSessionEnded:
 			d := f.d.(*rest.HostSessionEnded)
 			a, code, err := c.h.d.UseCases.SessionEnded(ctx, c.k.login, ids.ID(d.SessionId), endOf(d))
@@ -465,6 +487,11 @@ func (c *conn) end(ctx context.Context) {
 	k.close(domain.CodeNormal)
 	if removed && k.isReported() {
 		c.h.d.Links.publish(k.login.HostID, false)
+	}
+	if r := c.h.d.Links.relayOf(); r != nil && removed {
+		// The relay closes the streams of the host's sessions (Design note 10 of M2-44); it does
+		// nothing for 4110, 4111 and 4112, whose state change ends the sessions.
+		r.ControlLost(k.login.HostID, code)
 	}
 	if !removed || handled || code.ChangesHostState() {
 		return

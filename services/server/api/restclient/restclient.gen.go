@@ -14660,7 +14660,7 @@ type TerminalSessionOpen struct {
 	Profile string `json:"profile"`
 	Rows    int    `json:"rows"`
 
-	// WorkdirIndex Only with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). Another index gives 403 `terminal_denied` with `reason: profile_unknown`. The session token carries it as `wdi` (24, 5.3 and 11.1).
+	// WorkdirIndex Required exactly with a `claude` profile: index into `workdirs` of the caller's own entry in `reported_session_users` (ruling T13). A `claude` profile without a valid index, or an index with another profile, gives 403 `terminal_denied` with `reason: profile_unknown`; other profiles omit it. The token carries it as `wdi` (24, 5.3, 11.1).
 	WorkdirIndex *int `json:"workdir_index,omitempty"`
 }
 
@@ -23289,7 +23289,7 @@ type ClientInterface interface {
 
 	// AttachTerminalSessionWithBody Attach to an own session again
 	//
-	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23298,7 +23298,7 @@ type ClientInterface interface {
 
 	// AttachTerminalSession Attach to an own session again
 	//
-	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+	// For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2). An attach to an `opening` session restarts the opening (`att = open`, new deadline).
 	//
 	// Takes a body of the `application/json` content type.
 	//

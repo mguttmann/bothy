@@ -292,6 +292,7 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.signing_key.kid` | `kid` of a server key (thumbprint per RFC 7638, public) | only in logs of key transitions, never on metrics |
 | `bothy.signing_key.from_state`, `bothy.signing_key.to_state` | `none`, `next`, `active`, `retiring`, `retired` | only in logs of key transitions |
 | `bothy.step.kind` | `tool_call`, `status`, `subagent`, `workflow`, `background_job` | |
+| `bothy.terminal.side` | `client`, `host` | side of a connection in the relay ([24-terminal.md](../spec/24-terminal.md) section 9); on `bothy.terminal.relay.unpaired` and the log records of the relay (M2-44) |
 | `bothy.version.own`, `bothy.version.required` | SemVer of the own server version and of `instance.min_server_version` | only in the start line of the schema check ([02-architecture.md](../spec/02-architecture.md) 15.1, step 5) |
 | `bothy.webhook_subscription.id` | UUID of an outgoing webhook subscription; never on metrics | logs `webhook delivery failed` (info) and `webhook subscription state changed` (warn) of the apps module (M2-26), with `bothy.event.seq`, `bothy.event.type`, `bothy.reason` (the `last_error` code or the cause) and `server.address` |
 

@@ -822,7 +822,7 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.report_max_entries` | `BOTHY_TERMINAL__REPORT_MAX_ENTRIES` | Server | int | `64` | at most this many entries per reported list: profiles, session users, working directories of a session user (3.2) | active |
 | `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | duration | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old | active |
 | `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Validity of a terminal session token | active |
-| `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Deadline until both sides are connected in the relay and the handshake is complete | planned (M2) |
+| `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server | duration | `20s` | Deadline until both sides are connected in the relay and the handshake is complete | active |
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server |  | `15m` | this long a detached session stays attachable | planned (M2) |
 | `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | duration | `60s` | Reattach from the same device without a new step-up within this time after the detach | active |
 | `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server |  | `30m` | without input from the device for this long, the session ends | planned (M2) |
@@ -830,7 +830,7 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server |  | `12h` | Maximum duration of a session | planned (M2) |
 | `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server |  | `5` | open sessions per person | planned (M2) |
 | `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server |  | `10` | open sessions per host | planned (M2) |
-| `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server |  | `262144` | Buffer of the relay per direction and session | planned (M2) |
+| `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | int | `262144` | Buffer of the relay per direction and session | active |
 | `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | duration | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) | active |
 | `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | int | `3` | missing heartbeats until the control connection is closed | active |
 | `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | duration | `10s` | Deadline between `hello` and `identify` of the control and data connection | active |

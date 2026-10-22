@@ -247,7 +247,7 @@ func NewEmpty(t *testing.T) *World {
 		Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 2, PageSizeMax: 3},
 	})
 	must(t, err)
-	tm, err := wire.NewTerminal(HostConfig, pool, w.uow, az, wire.IdentityWrites{Audit: w.Audit, Events: appender}, w.Identity, w.Clk, log)
+	tm, err := wire.NewTerminal(HostConfig, pool, w.uow, az, wire.IdentityWrites{Audit: w.Audit, Events: appender}, w.Identity, w.Clk, nil, log)
 	must(t, err)
 	w.Terminal = tm
 	w.harness(wire.Handlers{Hosts: tm.Handlers, Access: authzhttp.New(admin), People: w.Identity.PeopleHandlers})

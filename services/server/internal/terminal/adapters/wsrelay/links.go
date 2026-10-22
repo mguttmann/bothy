@@ -49,6 +49,24 @@ type Links struct {
 	ready     ReadySource
 	loss      LossHandler
 	closing   bool
+	// relay is the relay of this process (M2-44): it learns of session.started and of the end of
+	// a control connection; nil before BindRelay.
+	relay *Relay
+}
+
+// BindRelay sets the relay the control connections tell of session.started and of their end
+// (Design note 10 of M2-44). internal/wire calls it once before the public listener opens.
+func (l *Links) BindRelay(r *Relay) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.relay = r
+}
+
+// relayOf returns the bound relay, nil before BindRelay.
+func (l *Links) relayOf() *Relay {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.relay
 }
 
 // Compile-time check: the outgoing port of the use cases (the presence of host reads goes through
@@ -314,6 +332,10 @@ func (k *link) closeReason(code domain.CloseCode, reason string) {
 		go func() { _ = k.ws.Close(websocket.StatusCode(code), reason) }()
 	})
 }
+
+// quiet stops the text writer of the link without a close frame: the data connection hands the
+// WebSocket to the relay after its login (M2-44).
+func (k *link) quiet() { k.once.Do(func() { close(k.done) }) }
 
 // isClosing reports a link whose close started.
 func (k *link) isClosing() bool {

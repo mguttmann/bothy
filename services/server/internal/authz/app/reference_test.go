@@ -768,7 +768,8 @@ func TestAZP8_CacheMatchesReference(t *testing.T) {
 				}
 				wantO, wantR = m.decideOpen(p, h)
 				outcomes["terminal.open "+string(wantO)+"/"+wantR]++
-				d, err = m.az.Authorize(context.Background(), a, authorize.ActionTerminalOpen, authorize.Resource{Kind: authorize.ResourceHost, ID: h.id})
+				d, err = m.az.Authorize(context.Background(), a, authorize.ActionTerminalOpen, authorize.Resource{Kind: authorize.ResourceHost, ID: h.id,
+					Terminal: &authorize.TerminalFacts{HostConnected: true, ProfileKnown: true}})
 				if err != nil || d.Outcome != wantO || string(d.Reason) != wantR {
 					t.Fatalf("seed %d, world %d, step %d, %s terminal.open: got %s/%s %v, want %s/%s\ntrail %v",
 						ws, w, step, p.kind, d.Outcome, d.Reason, err, wantO, wantR, trail)
@@ -777,7 +778,7 @@ func TestAZP8_CacheMatchesReference(t *testing.T) {
 				wantO, wantR = m.decideAttach(p, h, owner.id)
 				outcomes["terminal.attach "+string(wantO)+"/"+wantR]++
 				ses := authorize.Resource{Kind: authorize.ResourceTerminalSession, ID: ids.New(), HostID: h.id, OwnerID: owner.id,
-					Terminal: &authorize.TerminalFacts{SessionState: "active", SessionDeviceID: owner.device, SessionAuthSessionID: owner.session}}
+					Terminal: &authorize.TerminalFacts{SessionState: "active", SessionDeviceID: owner.device, SessionAuthSessionID: owner.session, HostConnected: true}}
 				d, err = m.az.Authorize(context.Background(), a, authorize.ActionTerminalAttach, ses)
 				if err != nil || d.Outcome != wantO || string(d.Reason) != wantR {
 					t.Fatalf("seed %d, world %d, step %d, %s terminal.attach: got %s/%s %v, want %s/%s\ntrail %v",

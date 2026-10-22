@@ -108,6 +108,26 @@ type Store interface {
 	// CloseSessionReported closes the session id as the host service ended it: reason, detail
 	// and exit code of end, closed_at = at, detached_at cleared, version raised.
 	CloseSessionReported(ctx context.Context, id ids.ID, end domain.HostSessionEnd, at time.Time) error
+	// InsertSession inserts the session s in opening with the columns of its grant (M2-44).
+	InsertSession(ctx context.Context, s domain.Session) error
+	// Session returns the session id without a lock; found is false for an unknown id (M2-44).
+	Session(ctx context.Context, id ids.ID) (s domain.Session, found bool, err error)
+	// AttachSession writes the grant of an attach (device, login session, token jti, version) of a
+	// session that is not closed (M2-44).
+	AttachSession(ctx context.Context, id, deviceID, authSessionID, jti ids.ID) error
+	// ActivateSession turns the detached session id active again with detached_at cleared (M2-44).
+	ActivateSession(ctx context.Context, id ids.ID) error
+	// AddCounters adds the counts of one pairing to bytes_in and bytes_out and moves last_input_at
+	// forward (zero lastInput leaves it), without an event and without a new version (M2-44).
+	AddCounters(ctx context.Context, id ids.ID, in, out int64, lastInput time.Time) error
+	// CloseSessionByPerson closes the session id as the person by ended it: reason, closed_by,
+	// closed_at = at, no detail, detached_at cleared, version raised (M2-44).
+	CloseSessionByPerson(ctx context.Context, id ids.ID, reason domain.CloseReason, by ids.ID, at time.Time) error
+	// ListSessions returns up to limit sessions in descending id below beforeID (zero: from the
+	// top), of userID (zero: everyone), of hostID (zero: every host) and in state ("": any) (M2-44).
+	ListSessions(ctx context.Context, userID, hostID ids.ID, state string, beforeID ids.ID, limit int) ([]domain.Session, error)
+	// UnfinishedSessions returns the sessions in opening or active, ascending (M2-44).
+	UnfinishedSessions(ctx context.Context) ([]ids.ID, error)
 }
 
 // PairingWrite is what host.pair stores (M2-41, Design note 3h): the checked keys, the

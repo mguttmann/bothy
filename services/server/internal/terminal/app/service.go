@@ -49,6 +49,11 @@ type Config struct {
 	// LastActiveGranularity is identity.last_active_granularity: a heartbeat writes last_seen_at
 	// only when the stored value is older (M2-43).
 	LastActiveGranularity time.Duration `config:"identity.last_active_granularity"`
+	// SessionTokenTTL is terminal.session_token_ttl, the validity of a session token (M2-44).
+	SessionTokenTTL time.Duration `config:"terminal.session_token_ttl"`
+	// OpenTimeout is terminal.open_timeout: the deadline of an opening and HostSessionOpen.expires_at
+	// (M2-44).
+	OpenTimeout time.Duration `config:"terminal.open_timeout"`
 }
 
 // Deps are the collaborators of the host use cases.
@@ -79,6 +84,15 @@ type Deps struct {
 	// Keys reads the keys of purpose terminal for hello and heartbeat_ack (M2-43); nil means an
 	// empty key set.
 	Keys TerminalKeys
+	// StepUps consumes the fresh step-up of an opening and an attach (M2-44); nil fails both
+	// closed.
+	StepUps StepUps
+	// Signer signs the session tokens (M2-44); nil until BindSigner, which fails both closed.
+	Signer TokenSigner
+	// BeforeOpenCommit is a test seam: when set, Open calls it inside its unit of work after the
+	// insert, so a test can commit a revocation between the decision and the commit
+	// (TestOpen_RevocationRaceRecheck). nil in production.
+	BeforeOpenCommit func()
 }
 
 // Service implements terminal.Hosts. It is safe for concurrent use.
@@ -89,6 +103,64 @@ type Service struct {
 	links atomic.Pointer[linksHolder]
 	// keys are the keys of purpose terminal bound after the start of the signing keys.
 	keys atomic.Pointer[keysHolder]
+	// relay is the relay of this process (BindRelay, M2-44); NoRelay until bound.
+	relay atomic.Pointer[relayHolder]
+	// signer signs the session tokens (BindSigner, M2-44).
+	signer atomic.Pointer[signerHolder]
+	// metrics records the instruments of the relay (BindMetrics); NoMetrics until bound.
+	metrics atomic.Pointer[metricsHolder]
+}
+
+// relayHolder, signerHolder and metricsHolder carry the bound ports through the atomic pointers.
+type (
+	relayHolder   struct{ r RelayControl }
+	signerHolder  struct{ s TokenSigner }
+	metricsHolder struct{ m Metrics }
+)
+
+// BindRelay binds the relay of this process (M2-44): internal/wire builds it after the module and
+// binds it before the public listener opens.
+func (s *Service) BindRelay(r RelayControl) {
+	if r == nil {
+		r = NoRelay{}
+	}
+	s.relay.Store(&relayHolder{r: r})
+}
+
+// relayControl returns the bound relay, NoRelay before BindRelay.
+func (s *Service) relayControl() RelayControl {
+	if h := s.relay.Load(); h != nil {
+		return h.r
+	}
+	return NoRelay{}
+}
+
+// BindSigner binds the signer of the session tokens (M2-44); the signing keys start after the
+// module, so internal/wire binds it with the control connection.
+func (s *Service) BindSigner(t TokenSigner) { s.signer.Store(&signerHolder{s: t}) }
+
+// tokenSigner returns the bound signer, else Deps.Signer (nil: none).
+func (s *Service) tokenSigner() TokenSigner {
+	if h := s.signer.Load(); h != nil && h.s != nil {
+		return h.s
+	}
+	return s.d.Signer
+}
+
+// BindMetrics binds the instruments of the relay (M2-44).
+func (s *Service) BindMetrics(m Metrics) {
+	if m == nil {
+		m = NoMetrics{}
+	}
+	s.metrics.Store(&metricsHolder{m: m})
+}
+
+// relayMetrics returns the bound instruments, NoMetrics before BindMetrics.
+func (s *Service) relayMetrics() Metrics {
+	if h := s.metrics.Load(); h != nil {
+		return h.m
+	}
+	return NoMetrics{}
 }
 
 // linksHolder carries the bound ControlLinks through the atomic pointer.
@@ -152,7 +224,8 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if cfg.NameMaxChars < 1 || cfg.OSUserMaxChars < 1 || cfg.ReasonMaxChars < 1 || cfg.PairingCodeTTL <= 0 ||
 		cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault || cfg.FingerprintMaxAttempts < 1 ||
 		cfg.FingerprintConfirmChars < 1 || cfg.FingerprintConfirmChars > domain.FingerprintChars ||
-		cfg.ReportLabelMaxChars < 1 || cfg.ReportMaxEntries < 1 || cfg.ClockLeeway < 0 || cfg.LastActiveGranularity < 0 {
+		cfg.ReportLabelMaxChars < 1 || cfg.ReportMaxEntries < 1 || cfg.ClockLeeway < 0 || cfg.LastActiveGranularity < 0 ||
+		cfg.SessionTokenTTL < 0 || cfg.OpenTimeout < 0 {
 		return nil, errors.New("terminal: the text limits, terminal.pairing_code_ttl, the fingerprint and report keys, the page sizes, " +
 			"auth.clock_leeway and identity.last_active_granularity must be in range")
 	}
@@ -192,6 +265,12 @@ const (
 	attrBytesIn         = "bytes_in"
 	attrBytesOut        = "bytes_out"
 	attrDurationMS      = "duration_ms"
+	attrHostID          = "host_id"
+	attrProfile         = "profile"
+	attrDeviceID        = "device_id"
+	attrPinChanged      = "pin_changed"
+	attrForeignAssignee = "foreign_assignee"
+	attrClosedBy        = "closed_by"
 	opCreate            = "create"
 	opUpdate            = "update"
 	opState             = "state"
