@@ -104,6 +104,30 @@ void main() {
       voice.dispose();
     });
 
+    testWidgets('the microphone keeps a recording that waits to be sent', (
+      tester,
+    ) async {
+      final recorder = FakeRecorder();
+      final voice = VoiceController(
+        recorder: () => recorder,
+        bitRate: 64000,
+        scratch: () async => scratch,
+        onSend: (_) async {},
+      );
+      await tester.runAsync(() async {
+        await voice.start();
+        await voice.stop();
+      });
+      final first = voice.recorded;
+      expect(first, isNotNull);
+      await tester.runAsync(voice.start);
+      expect(voice.phase, VoicePhase.recorded);
+      expect(voice.recorded, same(first));
+      expect(File(first!.path).existsSync(), isTrue);
+      expect(recorder.calls.where((c) => c == 'start'), hasLength(1));
+      voice.dispose();
+    });
+
     test('the audio player logs nothing, so no ticket URL reaches a log', () {
       AudioTicketPlayer.silenceLogs();
       expect(AudioLogger.logLevel, AudioLogLevel.none);

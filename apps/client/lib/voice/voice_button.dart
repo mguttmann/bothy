@@ -102,7 +102,8 @@ final class VoiceController extends ChangeNotifier {
   Future<void>? _starting;
 
   Future<void> _start() async {
-    if (phase == VoicePhase.recording) return;
+    // A stopped recording waits to be sent or discarded; the microphone never drops it.
+    if (phase == VoicePhase.recording || phase == VoicePhase.recorded) return;
     // Timers of an earlier recording never outlive it.
     _ticker?.cancel();
     _stopper?.cancel();
@@ -110,12 +111,15 @@ final class VoiceController extends ChangeNotifier {
     limitReached = false;
     recorded = null;
     elapsed = Duration.zero;
-    if (!await recorder.hasPermission()) {
+    final permitted = await recorder.hasPermission();
+    if (_disposed) return;
+    if (!permitted) {
       _set(VoicePhase.denied);
       return;
     }
     final dir = await _scratch();
     await dir.create(recursive: true);
+    if (_disposed) return;
     final path =
         '${dir.path}${Platform.pathSeparator}'
         'voice-${DateTime.now().toUtc().millisecondsSinceEpoch}.m4a';
