@@ -83,7 +83,7 @@ type InsertCommandParams struct {
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries on commands (agents module, M2-16; docs/spec/03-data-model.md section 4.4). Only this
-// module reads and writes the table (03 Grundsatz 12). The owner kind comes from agents, the other
+// module reads and writes the table (03 principle 12). The owner kind comes from agents, the other
 // table of this module: an owner with an agents row is an agent, any other owner an app (03
 // commands: "registered by agents or apps").
 func (q *Queries) InsertCommand(ctx context.Context, arg InsertCommandParams) (pgtype.Timestamptz, error) {

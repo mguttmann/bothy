@@ -340,7 +340,7 @@ or acknowledges a `seq` that process cannot yet deliver.
 | `agent.invocation` | new run | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, triggering person), `session` (4.9; missing for a guest run), `capabilities_effective`; for `trigger_kind = command` the command ID, its name and the parsed options in the order of the definition (`command_id`, `command_name`, `options`, `command_invocation_id`) instead of a message (M2-16) | yes |
 | `agent.followup` | follow-up (section 7) | `run_id`, `message_id`, triggering person | yes |
 | `interaction.created` | component used | `interaction_id`, `component` (`custom_id`, type), `values`, `run_id`, acting person | yes |
-| `command.invoked` | control command executed (10.4) | `command_id`, `name`, `options`, location, triggering person; `run_id` exactly when the owner has an active run in the thread at execution time, then that run, never the run of another agent (R-AZ-25) | yes |
+| `command.invoked` | control command executed (10.4) | `command_id`, `command_name`, `options`, location, triggering person; `run_id` exactly when the owner has an active run in the thread at execution time, then that run, never the run of another agent (R-AZ-25) | yes |
 | `run.cancel_requested` | cancellation (section 8) | `run_id`, `reason` | no |
 | `agent.config_changed` | prompt, skills, project binding changed | `channel_id`, `settings_version` | no |
 
