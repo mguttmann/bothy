@@ -270,6 +270,9 @@ def test_interrupt_at_the_hidden_prompt_restores_echo() -> None:
         # The prompt comes after stty -echo, so echo is off now.
         assert not termios.tcgetattr(slave)[3] & termios.ECHO
         proc.send_signal(signal.SIGINT)
+        # A signal that lands just before read(2) stays pending until read returns; the line
+        # ends that read, so the trap runs in every interleaving and wait() always returns.
+        os.write(master, b"\n")
         assert proc.wait() != 0
         assert termios.tcgetattr(slave)[3] & termios.ECHO
     finally:
