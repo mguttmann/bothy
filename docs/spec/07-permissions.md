@@ -1077,24 +1077,26 @@ renewed by creating a new one (its secret shown once) and revoking the old one.
   `listPermissionHints` (`GET /api/v1/access/hints`, action `access.hints.read`, R-AZ-34),
   computed per request with the snapshot code of `authorize`, never a second rule set, and it
   never names content:
-  - `h1_read_horizon`: for every agent A, every person P in T(A) and every channel K in H(A)
-    that P cannot read (section 6), the same function as the source `via_agent` of section 9.1.
-  - `grant_to_disabled`: a grant in effect whose subject person, agent or app is `disabled` or
-    `deleted` (SR7); a pending person's grants take effect and do not count.
-  - `trigger_blocked`: a grant in effect with level `trigger` to an active person or a group
-    that reaches at least one channel with an operator, where on every such channel SR2 (an
-    operator of tool class `host`) or SR3 (a project binding) keeps the subject from
-    triggering because it is no owner and has no ready dev environment of its own there; the
-    hint names the blocking rules.
-  - `agent_personal`: every active agent with `billing_mode = personal`, its credential holder
-    and its trigger set of SR1; I1 asks for exactly the holder.
 
-  The hints come in this order of kinds, within a kind by agent, person and channel (H1), by
-  grant ID or by agent ID, and a page carries the names of the principals, groups, spaces and
-  channels it names. Without `space_id` the list covers the instance and needs the owner role;
-  with `space_id` the space and `manage` there (a space without read gives `404`, with read but
-  without `manage` `403`): H1 over the channels of the space for every agent, the grants on the
-  space and its channels, and the personal agents that serve a target in the space.
+    - `h1_read_horizon`: for every agent A, every person P in T(A) and every channel K in H(A)
+      that P cannot read (section 6), the same function as the source `via_agent` of section 9.1.
+    - `grant_to_disabled`: a grant in effect whose subject person, agent or app is `disabled` or
+      `deleted` (SR7); a pending person's grants take effect and do not count.
+    - `trigger_blocked`: a grant in effect with level `trigger` to an active person or a group
+      that reaches at least one channel with an operator, where on every such channel SR2 (an
+      operator of tool class `host`) or SR3 (a project binding) keeps the subject from
+      triggering because it is no owner and has no ready dev environment of its own there; the
+      hint names the blocking rules.
+    - `agent_personal`: every active agent with `billing_mode = personal`, its credential holder
+      and its trigger set of SR1; I1 asks for exactly the holder.
+
+    The hints come in this order of kinds, within a kind by agent, person and channel (H1), by
+    grant ID or by agent ID, and a page carries the names of the principals, groups, spaces and
+    channels it names. Without `space_id` the list covers the instance and needs the owner role;
+    with `space_id` the space and `manage` there (a space without read gives `404`, with read but
+    without `manage` `403`): H1 over the channels of the space for every agent, the grants on the
+    space and its channels, and the personal agents that serve a target in the space.
+
 - Filterable log from the audit log (`audit.read`), [ADR 0021](../adr/0021-hash-chained-audit-log-separate-from-telemetry.md).
 
 ## 10. Examples
