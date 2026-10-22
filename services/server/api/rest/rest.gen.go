@@ -555,6 +555,24 @@ type ServerInterface interface {
 	// GetRun Read the run document
 	// (GET /runs/{run_id})
 	GetRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// AwaitRunInput Wait for input from a person
+	// (POST /runs/{run_id}/await-input)
+	AwaitRunInput(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// CancelRun Cancel a run
+	// (POST /runs/{run_id}/cancel)
+	CancelRun(w http.ResponseWriter, r *http.Request, runId RunIdPath, params CancelRunParams)
+	// FinishRun End a run
+	// (POST /runs/{run_id}/finish)
+	FinishRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// RenewInvocationToken Get a fresh invocation token for an own waiting run
+	// (POST /runs/{run_id}/invocation-token)
+	RenewInvocationToken(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// ResumeRun Resume a run that waited for input
+	// (POST /runs/{run_id}/resume)
+	ResumeRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
+	// StartRun Start a queued run
+	// (POST /runs/{run_id}/start)
+	StartRun(w http.ResponseWriter, r *http.Request, runId RunIdPath)
 	// ListRunSteps List steps in order
 	// (GET /runs/{run_id}/steps)
 	ListRunSteps(w http.ResponseWriter, r *http.Request, runId RunIdPath, params ListRunStepsParams)
@@ -7448,6 +7466,186 @@ func (siw *ServerInterfaceWrapper) GetRun(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// AwaitRunInput operation middleware
+func (siw *ServerInterfaceWrapper) AwaitRunInput(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AwaitRunInput(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelRun operation middleware
+func (siw *ServerInterfaceWrapper) CancelRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CancelRunParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelRun(w, r, runId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FinishRun operation middleware
+func (siw *ServerInterfaceWrapper) FinishRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FinishRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RenewInvocationToken operation middleware
+func (siw *ServerInterfaceWrapper) RenewInvocationToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RenewInvocationToken(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResumeRun operation middleware
+func (siw *ServerInterfaceWrapper) ResumeRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResumeRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartRun operation middleware
+func (siw *ServerInterfaceWrapper) StartRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "run_id" -------------
+	var runId RunIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "run_id", r.PathValue("run_id"), &runId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "run_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartRun(w, r, runId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRunSteps operation middleware
 func (siw *ServerInterfaceWrapper) ListRunSteps(w http.ResponseWriter, r *http.Request) {
 
@@ -10183,6 +10381,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs", wrapper.ListActiveRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}", wrapper.GetRun)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/runs/{run_id}/steps", wrapper.ListRunSteps)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/start", wrapper.StartRun)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/resume", wrapper.ResumeRun)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/invocation-token", wrapper.RenewInvocationToken)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/await-input", wrapper.AwaitRunInput)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/finish", wrapper.FinishRun)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/runs/{run_id}/cancel", wrapper.CancelRun)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/commands", wrapper.ListChannelCommands)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/commands", wrapper.RegisterCommand)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/commands/{command_id}", wrapper.RemoveCommand)
@@ -10937,6 +11141,24 @@ type StrictServerInterface interface {
 	// GetRun Read the run document
 	// (GET /runs/{run_id})
 	GetRun(ctx context.Context, request GetRunRequestObject) (GetRunResponseObject, error)
+	// AwaitRunInput Wait for input from a person
+	// (POST /runs/{run_id}/await-input)
+	AwaitRunInput(ctx context.Context, request AwaitRunInputRequestObject) (AwaitRunInputResponseObject, error)
+	// CancelRun Cancel a run
+	// (POST /runs/{run_id}/cancel)
+	CancelRun(ctx context.Context, request CancelRunRequestObject) (CancelRunResponseObject, error)
+	// FinishRun End a run
+	// (POST /runs/{run_id}/finish)
+	FinishRun(ctx context.Context, request FinishRunRequestObject) (FinishRunResponseObject, error)
+	// RenewInvocationToken Get a fresh invocation token for an own waiting run
+	// (POST /runs/{run_id}/invocation-token)
+	RenewInvocationToken(ctx context.Context, request RenewInvocationTokenRequestObject) (RenewInvocationTokenResponseObject, error)
+	// ResumeRun Resume a run that waited for input
+	// (POST /runs/{run_id}/resume)
+	ResumeRun(ctx context.Context, request ResumeRunRequestObject) (ResumeRunResponseObject, error)
+	// StartRun Start a queued run
+	// (POST /runs/{run_id}/start)
+	StartRun(ctx context.Context, request StartRunRequestObject) (StartRunResponseObject, error)
 	// ListRunSteps List steps in order
 	// (GET /runs/{run_id}/steps)
 	ListRunSteps(ctx context.Context, request ListRunStepsRequestObject) (ListRunStepsResponseObject, error)
@@ -16445,6 +16667,205 @@ func (sh *strictHandler) GetRun(w http.ResponseWriter, r *http.Request, runId Ru
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetRunResponseObject); ok {
 		if err := validResponse.VisitGetRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AwaitRunInput operation middleware
+func (sh *strictHandler) AwaitRunInput(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request AwaitRunInputRequestObject
+
+	request.RunId = runId
+
+	var body AwaitRunInputJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AwaitRunInput(ctx, request.(AwaitRunInputRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AwaitRunInput")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AwaitRunInputResponseObject); ok {
+		if err := validResponse.VisitAwaitRunInputResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelRun operation middleware
+func (sh *strictHandler) CancelRun(w http.ResponseWriter, r *http.Request, runId RunIdPath, params CancelRunParams) {
+	var request CancelRunRequestObject
+
+	request.RunId = runId
+	request.Params = params
+
+	var body CancelRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelRun(ctx, request.(CancelRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelRunResponseObject); ok {
+		if err := validResponse.VisitCancelRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// FinishRun operation middleware
+func (sh *strictHandler) FinishRun(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request FinishRunRequestObject
+
+	request.RunId = runId
+
+	var body FinishRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.FinishRun(ctx, request.(FinishRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "FinishRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(FinishRunResponseObject); ok {
+		if err := validResponse.VisitFinishRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RenewInvocationToken operation middleware
+func (sh *strictHandler) RenewInvocationToken(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request RenewInvocationTokenRequestObject
+
+	request.RunId = runId
+
+	var body RenewInvocationTokenJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RenewInvocationToken(ctx, request.(RenewInvocationTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RenewInvocationToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RenewInvocationTokenResponseObject); ok {
+		if err := validResponse.VisitRenewInvocationTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResumeRun operation middleware
+func (sh *strictHandler) ResumeRun(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request ResumeRunRequestObject
+
+	request.RunId = runId
+
+	var body ResumeRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResumeRun(ctx, request.(ResumeRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResumeRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResumeRunResponseObject); ok {
+		if err := validResponse.VisitResumeRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartRun operation middleware
+func (sh *strictHandler) StartRun(w http.ResponseWriter, r *http.Request, runId RunIdPath) {
+	var request StartRunRequestObject
+
+	request.RunId = runId
+
+	var body StartRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartRun(ctx, request.(StartRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartRunResponseObject); ok {
+		if err := validResponse.VisitStartRunResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

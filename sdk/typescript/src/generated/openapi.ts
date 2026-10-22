@@ -9017,7 +9017,7 @@ export interface components {
             run_id: components["schemas"]["Uuid"];
             thread_id: components["schemas"]["Uuid"];
             /** @enum {string} */
-            reason: "user_cancelled" | "access_revoked" | "agent_disabled" | "user_disabled";
+            reason: "user_cancelled" | "access_revoked" | "agent_disabled" | "user_disabled" | "channel_read_only";
             requested_by?: components["schemas"]["Uuid"];
         };
         InteractionCreatedPayload: {
@@ -19093,10 +19093,11 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK. */
+            /** @description OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5). */
             200: {
                 headers: {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
                     [name: string]: unknown;
@@ -19129,10 +19130,11 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK. */
+            /** @description OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5). */
             200: {
                 headers: {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
+                    "Idempotent-Replay": components["headers"]["Idempotent-Replay"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
                     [name: string]: unknown;

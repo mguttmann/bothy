@@ -150,8 +150,10 @@ var requirementGroups = []struct {
 		"run.cancel",
 	}},
 	{"write and `agent.invoke`", Deferred("M2"), []string{"run.followup.create"}},
-	{"agent-self and token valid", Deferred("M2"), []string{"run.start"}},
-	{"agent-self and token current", Deferred("M2"), []string{"run.token.renew"}},
+	// The invocation token (M2-09): runs computes the verdict, Token decides on it; a valid token
+	// starts a run, a valid or expired one renews it.
+	{"agent-self and token valid", All(AgentSelf, Token(InvocationValid)), []string{"run.start"}},
+	{"agent-self and token current", All(AgentSelf, Token(InvocationValid, InvocationExpired)), []string{"run.token.renew"}},
 	{"auth and self", All(Auth, Self), []string{"self.read"}},
 	{"owner or manage", ByKind(map[string]Expr{kindInstance: Owner, kindSpace: Any(Owner, HasCap(CapManage))}), []string{
 		"access.hints.read", "stats.read",

@@ -23,8 +23,8 @@ type runsState struct {
 // moduleRuns is the name of the module in architecture/modules.yaml and of its start step, where it has one.
 const moduleRuns = "runs"
 
-// runsWiring wires the runs module into the start step chat, after messaging, and its job
-// runs.queued_expiry (M2-08).
+// runsWiring wires the runs module into the start step chat, after messaging, and its jobs
+// runs.queued_expiry (M2-08), runs.cancel_timeout and runs.stall_check (M2-09).
 func runsWiring() moduleWiring {
 	return moduleWiring{
 		module:   moduleRuns,
@@ -35,8 +35,10 @@ func runsWiring() moduleWiring {
 			rn := s.runs
 			s.mu.Unlock()
 			if rn != nil {
-				m.QueuedExpiry = rn.Service
+				m.QueuedExpiry, m.RunsLifecycle = rn.Service, rn.Service
 			}
+			// runs.stall_check runs every agent.presence_timeout (M2-09, D-M2-09-19).
+			m.StallInterval = s.values.Duration(keyPresenceTimeout)
 			return nil
 		},
 		bindJobs: func(s *server, ins jobs.Inserter) {

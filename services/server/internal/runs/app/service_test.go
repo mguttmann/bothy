@@ -18,7 +18,8 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{},
 	}
-	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536}
+	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536,
+		CancelGrace: time.Second, PresenceTimeout: time.Second, OrphanTimeout: time.Minute, ReasonMaxChars: 10}
 	if _, err := app.New(good, app.Deps{}); err == nil {
 		t.Fatal("New without collaborators: no error")
 	}
@@ -34,6 +35,21 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 		"queued age zero":     {PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, EventPayloadMaxBytes: 65536},
 		"payload below 1":     {PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour},
 	} {
+		cfg.CancelGrace, cfg.PresenceTimeout, cfg.OrphanTimeout, cfg.ReasonMaxChars = good.CancelGrace, good.PresenceTimeout, good.OrphanTimeout, good.ReasonMaxChars
+		if _, err := app.New(cfg, full); err == nil {
+			t.Errorf("%s: no error", name)
+		}
+	}
+	// M2-09: the limits of start, cancel and the stall check.
+	for name, mut := range map[string]func(*app.Config){
+		"negative leeway":    func(c *app.Config) { c.ClockLeeway = -time.Second },
+		"cancel grace zero":  func(c *app.Config) { c.CancelGrace = 0 },
+		"presence zero":      func(c *app.Config) { c.PresenceTimeout = 0 },
+		"orphan zero":        func(c *app.Config) { c.OrphanTimeout = 0 },
+		"reason length zero": func(c *app.Config) { c.ReasonMaxChars = 0 },
+	} {
+		cfg := good
+		mut(&cfg)
 		if _, err := app.New(cfg, full); err == nil {
 			t.Errorf("%s: no error", name)
 		}

@@ -38,7 +38,17 @@ SET state = sqlc.arg(to_state)::text,
     finished_at = CASE WHEN sqlc.arg(to_state)::text IN ('completed', 'failed', 'cancelled')
         THEN sqlc.arg(at)::timestamptz ELSE finished_at END,
     duration_ms = CASE WHEN sqlc.arg(to_state)::text IN ('completed', 'failed', 'cancelled') AND started_at IS NOT NULL
-        THEN floor(extract(epoch FROM (sqlc.arg(at)::timestamptz - started_at)) * 1000)::bigint ELSE duration_ms END
+        THEN floor(extract(epoch FROM (sqlc.arg(at)::timestamptz - started_at)) * 1000)::bigint ELSE duration_ms END,
+    -- The columns a start, a wait or an end of M2-09 store with the same swap; NULL keeps the
+    -- column. A start stores started_jti and clears renewed_from_jti (09 4.5.1).
+    started_jti = COALESCE(sqlc.narg(started_jti)::uuid, started_jti),
+    renewed_from_jti = CASE WHEN sqlc.narg(started_jti)::uuid IS NOT NULL THEN NULL ELSE renewed_from_jti END,
+    billing_mode_used = COALESCE(sqlc.narg(billing_mode_used)::text, billing_mode_used),
+    billing_evidence = COALESCE(sqlc.narg(billing_evidence)::jsonb, billing_evidence),
+    model = COALESCE(sqlc.narg(model)::text, model),
+    status_line = COALESCE(sqlc.narg(status_line)::text, status_line),
+    metrics = COALESCE(sqlc.narg(metrics)::jsonb, metrics),
+    summary = COALESCE(sqlc.narg(summary)::text, summary)
 WHERE id = sqlc.arg(id) AND state = sqlc.arg(from_state)::text AND version = sqlc.arg(version)
 RETURNING *;
 

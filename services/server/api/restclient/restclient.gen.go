@@ -3420,10 +3420,11 @@ func (e RunCancelRequestedEventType) Valid() bool {
 
 // Defines values for RunCancelRequestedPayloadReason.
 const (
-	RunCancelRequestedPayloadReasonAccessRevoked RunCancelRequestedPayloadReason = "access_revoked"
-	RunCancelRequestedPayloadReasonAgentDisabled RunCancelRequestedPayloadReason = "agent_disabled"
-	RunCancelRequestedPayloadReasonUserCancelled RunCancelRequestedPayloadReason = "user_cancelled"
-	RunCancelRequestedPayloadReasonUserDisabled  RunCancelRequestedPayloadReason = "user_disabled"
+	RunCancelRequestedPayloadReasonAccessRevoked   RunCancelRequestedPayloadReason = "access_revoked"
+	RunCancelRequestedPayloadReasonAgentDisabled   RunCancelRequestedPayloadReason = "agent_disabled"
+	RunCancelRequestedPayloadReasonChannelReadOnly RunCancelRequestedPayloadReason = "channel_read_only"
+	RunCancelRequestedPayloadReasonUserCancelled   RunCancelRequestedPayloadReason = "user_cancelled"
+	RunCancelRequestedPayloadReasonUserDisabled    RunCancelRequestedPayloadReason = "user_disabled"
 )
 
 // Valid indicates whether the value is a known member of the RunCancelRequestedPayloadReason enum.
@@ -3432,6 +3433,8 @@ func (e RunCancelRequestedPayloadReason) Valid() bool {
 	case RunCancelRequestedPayloadReasonAccessRevoked:
 		return true
 	case RunCancelRequestedPayloadReasonAgentDisabled:
+		return true
+	case RunCancelRequestedPayloadReasonChannelReadOnly:
 		return true
 	case RunCancelRequestedPayloadReasonUserCancelled:
 		return true

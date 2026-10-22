@@ -6851,9 +6851,10 @@ func (r RenewInvocationTokenResponse) ContentType() string {
 
 // ResumeRunResponse200Headers the declared response headers of an HTTP 200 response for ResumeRun
 type ResumeRunResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
+	CorrelationId    *CorrelationId
+	IdempotentReplay *bool
+	RateLimit        *string
+	RateLimitPolicy  *string
 }
 
 // ResumeRunResponse400Headers the declared response headers of an HTTP 400 response for ResumeRun
@@ -7005,9 +7006,10 @@ func (r ResumeRunResponse) ContentType() string {
 
 // StartRunResponse200Headers the declared response headers of an HTTP 200 response for StartRun
 type StartRunResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
+	CorrelationId    *CorrelationId
+	IdempotentReplay *bool
+	RateLimit        *string
+	RateLimitPolicy  *string
 }
 
 // StartRunResponse400Headers the declared response headers of an HTTP 400 response for StartRun

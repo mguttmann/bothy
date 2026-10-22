@@ -3418,10 +3418,11 @@ func (e RunCancelRequestedEventType) Valid() bool {
 
 // Defines values for RunCancelRequestedPayloadReason.
 const (
-	RunCancelRequestedPayloadReasonAccessRevoked RunCancelRequestedPayloadReason = "access_revoked"
-	RunCancelRequestedPayloadReasonAgentDisabled RunCancelRequestedPayloadReason = "agent_disabled"
-	RunCancelRequestedPayloadReasonUserCancelled RunCancelRequestedPayloadReason = "user_cancelled"
-	RunCancelRequestedPayloadReasonUserDisabled  RunCancelRequestedPayloadReason = "user_disabled"
+	RunCancelRequestedPayloadReasonAccessRevoked   RunCancelRequestedPayloadReason = "access_revoked"
+	RunCancelRequestedPayloadReasonAgentDisabled   RunCancelRequestedPayloadReason = "agent_disabled"
+	RunCancelRequestedPayloadReasonChannelReadOnly RunCancelRequestedPayloadReason = "channel_read_only"
+	RunCancelRequestedPayloadReasonUserCancelled   RunCancelRequestedPayloadReason = "user_cancelled"
+	RunCancelRequestedPayloadReasonUserDisabled    RunCancelRequestedPayloadReason = "user_disabled"
 )
 
 // Valid indicates whether the value is a known member of the RunCancelRequestedPayloadReason enum.
@@ -3430,6 +3431,8 @@ func (e RunCancelRequestedPayloadReason) Valid() bool {
 	case RunCancelRequestedPayloadReasonAccessRevoked:
 		return true
 	case RunCancelRequestedPayloadReasonAgentDisabled:
+		return true
+	case RunCancelRequestedPayloadReasonChannelReadOnly:
 		return true
 	case RunCancelRequestedPayloadReasonUserCancelled:
 		return true
@@ -16843,6 +16846,12 @@ type ListActiveRunsParams struct {
 	AgentId *Uuid `form:"agent_id,omitempty" json:"agent_id,omitempty"`
 }
 
+// CancelRunParams defines parameters for CancelRun.
+type CancelRunParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListRunStepsParams defines parameters for ListRunSteps.
 type ListRunStepsParams struct {
 	// Cursor Cursor from the previous page.
@@ -17364,6 +17373,24 @@ type RevokeOwnerJSONRequestBody = ReasonBody
 
 // CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
 type CreateTokenJSONRequestBody = ApiTokenCreate
+
+// AwaitRunInputJSONRequestBody defines body for AwaitRunInput for application/json ContentType.
+type AwaitRunInputJSONRequestBody = RunAwaitInput
+
+// CancelRunJSONRequestBody defines body for CancelRun for application/json ContentType.
+type CancelRunJSONRequestBody = RunCancel
+
+// FinishRunJSONRequestBody defines body for FinishRun for application/json ContentType.
+type FinishRunJSONRequestBody = RunFinish
+
+// RenewInvocationTokenJSONRequestBody defines body for RenewInvocationToken for application/json ContentType.
+type RenewInvocationTokenJSONRequestBody = InvocationTokenRenew
+
+// ResumeRunJSONRequestBody defines body for ResumeRun for application/json ContentType.
+type ResumeRunJSONRequestBody = RunStart
+
+// StartRunJSONRequestBody defines body for StartRun for application/json ContentType.
+type StartRunJSONRequestBody = RunStart
 
 // RotateSigningKeyJSONRequestBody defines body for RotateSigningKey for application/json ContentType.
 type RotateSigningKeyJSONRequestBody = SigningKeyRotate

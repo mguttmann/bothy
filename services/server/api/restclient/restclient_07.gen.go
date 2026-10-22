@@ -2477,6 +2477,13 @@ func ParseResumeRunResponse(rsp *http.Response) (*ResumeRunResponse, error) {
 			}
 			headers.CorrelationId = &value
 		}
+		if values := rsp.Header.Values("Idempotent-Replay"); len(values) > 0 {
+			var value bool
+			if err := runtime.BindStyledParameterWithOptions("simple", "Idempotent-Replay", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.IdempotentReplay = &value
+		}
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -2690,6 +2697,13 @@ func ParseStartRunResponse(rsp *http.Response) (*StartRunResponse, error) {
 				return nil, err
 			}
 			headers.CorrelationId = &value
+		}
+		if values := rsp.Header.Values("Idempotent-Replay"); len(values) > 0 {
+			var value bool
+			if err := runtime.BindStyledParameterWithOptions("simple", "Idempotent-Replay", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.IdempotentReplay = &value
 		}
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string

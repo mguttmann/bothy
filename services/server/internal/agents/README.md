@@ -1,6 +1,6 @@
 # Module `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); commands, agent sessions and dev environments follow with the tickets of the milestone.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); commands, agent sessions and dev environments follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -180,6 +180,26 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 - `app/facts.go`: `Service` implements it (compile-time check `var _ agents.Facts`), with one
   read of the records (`Store.Agents`, query `GetAgents`, `principal_id = ANY` ascending, no
   lock) and one `identity.Directory.Principals` call; people, apps and unknown ids are absent.
+
+## Persisted heartbeats (M2-09)
+
+- Port (`heartbeats.go`): `Heartbeats` with `HeartbeatStates(ctx, agentIDs)`, the DTO
+  `HeartbeatState {AgentID, LastHeartbeatAt, ActiveRunIDs, ActiveRunsReported}`. It reads only the
+  stored columns `last_heartbeat_at` and `reported_details.active_runs`, ascending by id, unknown
+  ids absent, in the ambient transaction of `ctx` when there is one; no authorization (the caller
+  is the job `runs.stall_check` of `runs`). `ActiveRunsReported` is false when the stored heartbeat
+  carried no `active_runs`, so no run counts as missing from it.
+- `app/heartbeats.go`: `HeartbeatReader`, built with `NewHeartbeatReader(store PresenceStore)`
+  over the postgres repository. It is separate from the `Tracker`, because the role `worker`
+  starts no tracker and must see the same persisted state in every process (lagging the live
+  heartbeat by up to `agent.heartbeat_persist_interval`). It reuses `GetPresenceRows` and the
+  decoder of `reported_details` (`domain.ReportFromStore`); no new query.
+- Test helper `adapters/agentstest`: `PersistHeartbeat(tb, db, agentID, at, activeRuns)` writes a
+  heartbeat into the agents row as given (nil `activeRuns` stores none, an empty slice a reported
+  empty list), for the integration tests of the stall check. Only tests import it;
+  `TestAgentstest_NotInBinary` keeps it out of `cmd/bothy`.
+- Tests: `app/heartbeats_test.go` (reader over the fake store), `adapters/agentstest/agentstest_test.go`
+  (helper and reader against PostgreSQL through `pgtest`).
 
 ## The use cases (M1-51)
 

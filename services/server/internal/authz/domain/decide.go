@@ -25,10 +25,14 @@ const (
 // Decision is an outcome with its reason; the empty Reason belongs to allow. QuickReattach is true
 // exactly when the step-up rule of an action with fresh step-up was waived by the quick reattach (M2-40):
 // the use case then consumes no step-up.
+//
+// Detail is the sub-reason of a decision whose problem reason differs from the audit reason: the
+// token verdict of invocation_token_invalid (M2-09); empty otherwise.
 type Decision struct {
 	Outcome       Outcome
 	Reason        Reason
 	QuickReattach bool
+	Detail        string
 }
 
 // Allow is the allowing decision.
@@ -242,6 +246,9 @@ type Input struct {
 	Token                                                      *TokenFacts
 	// Command are the facts of a command resource and of command.invoke (M2-16); nil otherwise.
 	Command *CommandFacts
+	// Invocation are the facts of the invocation token of run.start and run.token.renew (M2-09);
+	// nil for every other action.
+	Invocation *InvocationFacts
 	// Host are the facts of a host resource, and of the host of a terminal_session; nil for every
 	// other kind.
 	Host *HostFacts
@@ -305,10 +312,15 @@ func humanSession(p Principal) bool { return p.Kind == KindUser && p.HasSession 
 // read-only channel, the delegation limits of grant.create and grant.revoke (part of the
 // requirement, brief M1-48), "view as" read-only, step-up, guards. Liveness and pending checks run
 // before (CheckLiveness, CheckPending). The error reports facts that cannot be evaluated (an
-// unknown resource kind, a deferred or system requirement, a missing descriptor); it is never an
-// allow.
+// unknown resource kind, a deferred or system requirement, a missing descriptor, missing token
+// facts of a requirement with Token on any path); it is never an allow.
 func Decide(in Input) (Decision, error) {
 	in.Req = fileReadRequirement(in)
+	if in.Req.Contains(Token()) {
+		if err := checkInvocation(&in); err != nil {
+			return Decision{}, err
+		}
+	}
 	if d, done, err := decideVisibility(&in); done || err != nil {
 		return d, err
 	}
@@ -384,7 +396,7 @@ func decideRequirement(in *Input) (Decision, bool, error) {
 				reason = ReasonActingForInsufficient
 			}
 		}
-		return deny(OutcomeForbidden, reason), true, nil
+		return tokenDetail(in, deny(OutcomeForbidden, reason)), true, nil
 	}
 	if in.Principal.Kind == KindApp {
 		if r := CheckAppScope(in.Action, in.Principal.GrantedScopes, in.Principal.TokenScopes, in.Principal.HasToken); r != "" {
@@ -572,6 +584,7 @@ func init() {
 		opCommandLevel: func(v evaluator, _ Expr) (bool, Reason, error) {
 			return v.commandLevel()
 		},
+		opToken: func(v evaluator, e Expr) (bool, Reason, error) { return v.tokenAtom(e) },
 	}
 }
 

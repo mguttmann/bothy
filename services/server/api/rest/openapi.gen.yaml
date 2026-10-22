@@ -13309,10 +13309,12 @@ paths:
                   model: model-large
       responses:
         '200':
-          description: OK.
+          description: 'OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5).'
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
+            Idempotent-Replay:
+              $ref: '#/components/headers/Idempotent-Replay'
             RateLimit:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
@@ -13330,7 +13332,7 @@ paths:
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     triggered_by: 0192f4a0-7b1c-7db7-8afc-99f48568ad99
-                    state: queued
+                    state: running
                     version: 3
                     billing_mode_expected: personal
                     model: model-large
@@ -13398,10 +13400,12 @@ paths:
                   model: model-large
       responses:
         '200':
-          description: OK.
+          description: 'OK. A repeated start with the same token while the run is `running` answers the current run with `Idempotent-Replay: true` and changes nothing (06 section 7 point 5).'
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
+            Idempotent-Replay:
+              $ref: '#/components/headers/Idempotent-Replay'
             RateLimit:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
@@ -13419,7 +13423,7 @@ paths:
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     triggered_by: 0192f4a0-7b1c-7db7-8afc-99f48568ad99
-                    state: queued
+                    state: running
                     version: 3
                     billing_mode_expected: personal
                     model: model-large
@@ -27979,7 +27983,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         reason:
           type: string
-          enum: [user_cancelled, access_revoked, agent_disabled, user_disabled]
+          enum: [user_cancelled, access_revoked, agent_disabled, user_disabled, channel_read_only]
         requested_by:
           $ref: '#/components/schemas/Uuid'
     InteractionCreatedPayload:

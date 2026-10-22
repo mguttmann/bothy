@@ -17,6 +17,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
@@ -166,6 +167,13 @@ type world struct {
 	metrics *transitions
 	// log captures the log of the modules.
 	log *httpservertest.LogCapture
+	// cancels records the jobs runs.cancel_timeout the runs module schedules (M2-09); keys and
+	// issuer sign and name the invocation tokens.
+	cancels *cancelJobs
+	keys    *testKeys
+	issuer  ids.ID
+	// heartbeats wraps the persisted heartbeat reader of agents for the stall check (M2-09).
+	heartbeats *heartbeatReads
 
 	owner, alex, sam, robin                    ids.ID
 	support, marketing, engineering, research  ids.ID
@@ -214,7 +222,8 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
 	w := &world{t: t, pool: pool, db: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), actors: httpservertest.NewActors(),
-		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}, log: capture, metrics: &transitions{}}
+		acts: map[string]actor.Actor{}, versions: map[ids.ID]int64{}, log: capture, metrics: &transitions{},
+		cancels: &cancelJobs{}, issuer: ids.New(), heartbeats: &heartbeatReads{}}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
 	w.creds = &creds{fake: fake.NewCredentials(), real: identityapp.NewCredentialSource(repo, repo, repo), own: map[ids.ID]bool{}}
@@ -237,8 +246,11 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, txn.Subscribe(reg, mods.SyncSubscribers.OnMessagePosted))
 	must(t, txn.Subscribe(reg, mods.MessagingSubscribers.OnThreadMoved))
 	must(t, txn.Subscribe(reg, mods.SyncSubscribers.OnThreadMoved))
-	// The acceptance of runs after the existing subscribers (M2-05, registerTxn).
+	// The acceptance of runs after the existing subscribers (M2-05, registerTxn), then the
+	// revocation and the disabled agent (M2-09).
 	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnMessagePosted))
+	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAccessChanged))
+	must(t, txn.Subscribe(reg, mods.RunsAcceptor.OnAgentDisabled))
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
 	w.uow = uow
@@ -292,14 +304,23 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	personal, err := wire.NewPersonal(syncapp.PersonalConfig{MaxContentBytes: 4096, MaxAttachments: 3, EventPayloadMaxBytes: 65536},
 		pool, uow, w.az, appender, c.Service, m.Service, w.clk)
 	must(t, err)
+	hb, err := agentsapp.NewHeartbeatReader(agentspg.NewRepository(pool))
+	must(t, err)
+	w.heartbeats.reader = hb
 	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
-		EventPayloadMaxBytes: 65536}, pool, uow, w.az, wire.RunsDeps{
+		EventPayloadMaxBytes: 65536,
+		ClockLeeway:          30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
+		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, pool, uow, w.az, wire.RunsDeps{
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,
-		Expiry: noExpiry{},
+		Expiry: noExpiry{}, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: w.rec, CancelTimeouts: w.cancels,
+		Heartbeats: w.heartbeats,
 	}, w.clk, log)
 	must(t, err)
 	must(t, mods.RunsAcceptor.Bind(rn.Service))
 	w.runs = rn.Service
+	// The invocation tokens of M2-06 over in-memory keys and a fixed issuer (M2-09).
+	w.keys = newTestKeys(t)
+	must(t, rn.BindInvocationTokens(tokenConfig, w.keys, fixedInstance{id: w.issuer}, w.clk))
 	reads, err := wire.NewSyncReads(syncapp.CatchUpConfig{PageSize: 500, MaxEvents: 100000},
 		wire.SyncReadDeps{Pool: pool, UoW: uow, Authorizer: w.az, Chat: c.Service, Messaging: m.Service, Personal: personal.Service, Agents: ag.Service,
 			Directory: w.id.Directory, Flags: settings.Admin, Runs: rn.Service})

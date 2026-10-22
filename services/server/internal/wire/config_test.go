@@ -347,6 +347,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"run.step_detail_max_bytes":        {Kind: config.KindInt, Default: "16384", Min: "64", Max: "1048576", Chapter: "03-data-model.md"},
 		// M2-08
 		"run.queued_max_age": {Kind: config.KindDuration, Default: "48h", Min: "1s", Chapter: "09-agents.md"},
+		// M2-09
+		"agent.cancel_grace": {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protocol.md"},
+		"run.orphan_timeout": {Kind: config.KindDuration, Default: "15m", Min: "1ms", Chapter: "09-agents.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protocol.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protocol.md"},
@@ -1225,6 +1228,36 @@ func TestConfigCheck_FormatsEnabled(t *testing.T) {
 			if !strings.Contains(msg, "webhook_in.formats_enabled") || strings.Contains(msg, "slackish") {
 				t.Errorf("%s: problem %q does not name the key or names the value", c.env, msg)
 			}
+		}
+	}
+}
+
+// TestConfig_HeartbeatPersistBelowOrphanTimeout: agent.heartbeat_persist_interval must be below
+// run.orphan_timeout (cross-check heartbeat_persist_below_orphan_timeout, M2-09, D-M2-09-21):
+// equal or larger values abort the start with a problem naming both keys and no value.
+func TestConfig_HeartbeatPersistBelowOrphanTimeout(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		persist, orphan string
+		ok              bool
+	}{
+		{"60s", "15m", true},
+		{"14m", "15m", true},
+		{"15m", "15m", false},
+		{"20m", "15m", false},
+	} {
+		got := load(t, "BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL="+c.persist, "BOTHY_RUN__ORPHAN_TIMEOUT="+c.orphan)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("persist %s, orphan %s: problems %v, want ok %v", c.persist, c.orphan, got, c.ok)
+			continue
+		}
+		if len(got) == 0 {
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "agent.heartbeat_persist_interval") || !strings.Contains(msg, "run.orphan_timeout") ||
+			strings.Contains(msg, " "+c.persist) {
+			t.Errorf("problem %q", msg)
 		}
 	}
 }

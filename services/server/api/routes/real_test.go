@@ -617,6 +617,30 @@ func (stubServer) ListRunSteps(context.Context, rest.ListRunStepsRequestObject) 
 	return nil, nil
 }
 
+func (stubServer) StartRun(context.Context, rest.StartRunRequestObject) (rest.StartRunResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ResumeRun(context.Context, rest.ResumeRunRequestObject) (rest.ResumeRunResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RenewInvocationToken(context.Context, rest.RenewInvocationTokenRequestObject) (rest.RenewInvocationTokenResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AwaitRunInput(context.Context, rest.AwaitRunInputRequestObject) (rest.AwaitRunInputResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) FinishRun(context.Context, rest.FinishRunRequestObject) (rest.FinishRunResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CancelRun(context.Context, rest.CancelRunRequestObject) (rest.CancelRunResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListActiveRuns(context.Context, rest.ListActiveRunsRequestObject) (rest.ListActiveRunsResponseObject, error) {
 	return nil, nil
 }
@@ -1161,6 +1185,13 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listWebhookDeliveries":     {"GET /api/v1/webhooks/{subscription_id}/deliveries", "webhook_out.read", "rl.read"},
 		"redeliverWebhook":          {"POST /api/v1/webhook-deliveries/{delivery_id}/redeliver", "webhook_out.redeliver", "rl.admin"},
 
+		// M2-09
+		"startRun":             {"POST /api/v1/runs/{run_id}/start", "run.start", "rl.agent_runtime"},
+		"resumeRun":            {"POST /api/v1/runs/{run_id}/resume", "run.start", "rl.agent_runtime"},
+		"renewInvocationToken": {"POST /api/v1/runs/{run_id}/invocation-token", "run.token.renew", "rl.agent_runtime"},
+		"awaitRunInput":        {"POST /api/v1/runs/{run_id}/await-input", "run.finish", "rl.agent_runtime"},
+		"finishRun":            {"POST /api/v1/runs/{run_id}/finish", "run.finish", "rl.agent_runtime"},
+		"cancelRun":            {"POST /api/v1/runs/{run_id}/cancel", "run.cancel", "rl.trigger"},
 		// M1-58
 		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
 		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},

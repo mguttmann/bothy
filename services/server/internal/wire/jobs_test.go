@@ -16,7 +16,7 @@ import (
 // already. Empty until M1-16 registers the first handler.
 func TestWireJobArgsOnlyIDs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestJobRoleMapping(t *testing.T) {
 func TestJobRegistryHasAuthCleanup(t *testing.T) {
 	t.Parallel()
 	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
-		AuthCleanupInterval: 3 * time.Hour, ChainVerifyInterval: time.Hour}
+		AuthCleanupInterval: 3 * time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestJobRegistryHasAuthCleanup(t *testing.T) {
 func TestJobRegistryHasChainVerify(t *testing.T) {
 	t.Parallel()
 	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
-		AuthCleanupInterval: time.Hour, ChainVerifyInterval: 2 * time.Hour}
+		AuthCleanupInterval: time.Hour, ChainVerifyInterval: 2 * time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
 		t.Fatal(err)
@@ -113,5 +113,39 @@ func TestJobRegistryHasChainVerify(t *testing.T) {
 	m.ChainVerifyInterval = 0
 	if _, err := wire.NewJobRegistry(&m); err == nil {
 		t.Fatal("a registry without audit.checkpoint_interval was accepted")
+	}
+}
+
+// TestWire_JobsAndSubscriptions: runs.cancel_timeout and runs.stall_check are on the queue
+// maintenance, runs.stall_check is periodic every agent.presence_timeout and runs once at the
+// start of a worker, and a registry without the interval is refused (M2-09).
+func TestWire_JobsAndSubscriptions(t *testing.T) {
+	t.Parallel()
+	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+		AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: 90 * time.Second}
+	reg, err := wire.NewJobRegistry(&m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"runs.cancel_timeout", "runs.stall_check"} {
+		if q, ok := reg.Queue(kind); !ok || q != jobs.QueueMaintenance {
+			t.Fatalf("%s: queue = %q, %v", kind, q, ok)
+		}
+	}
+	found := false
+	for _, p := range reg.Periodic() {
+		found = found || p.Args.Kind() == "runs.stall_check" && p.Interval == 90*time.Second && p.RunOnStart
+	}
+	if !found {
+		t.Fatalf("periodic jobs %+v lack runs.stall_check every 90s", reg.Periodic())
+	}
+	for _, p := range reg.Periodic() {
+		if p.Args.Kind() == "runs.cancel_timeout" {
+			t.Fatal("runs.cancel_timeout is scheduled per request, not periodic")
+		}
+	}
+	m.StallInterval = 0
+	if _, err := wire.NewJobRegistry(&m); err == nil {
+		t.Fatal("a registry without agent.presence_timeout was accepted")
 	}
 }

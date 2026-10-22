@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -93,9 +94,22 @@ type TransitionCmd struct {
 	// To is the new state; Reason the reason of failed and cancelled (09 5.2).
 	To     domain.State
 	Reason string
-	// SetBy is the setter of the reason: the server, or the adapter (only for failed until M2-09
-	// defines the rule for an adapter's cancelled).
+	// SetBy is the setter of the reason: the server, or the adapter (failed with the reason rules
+	// of 09 5.2, cancelled with a reason of a cancel request, M2-09 design note 6 c).
 	SetBy domain.Setter
+	// Store are the columns the same swap stores (M2-09); the zero value stores none.
+	Store TransitionStore
+}
+
+// TransitionStore are the columns a transition of M2-09 stores with the swap: the start columns,
+// the status line of a wait, the metrics and the summary of an end. Zero values keep the column.
+type TransitionStore struct {
+	// StartedJTI is the jti of the start token; it also clears renewed_from_jti.
+	StartedJTI ids.ID
+	// BillingModeUsed, Model, StatusLine and Summary are "" to keep.
+	BillingModeUsed, Model, StatusLine, Summary string
+	// BillingEvidence and Metrics are encoded JSON objects; nil keeps.
+	BillingEvidence, Metrics []byte
 }
 
 // Open writes a new run in queued in the caller's unit of work (brief note 5): the run row (ON
@@ -218,6 +232,9 @@ func (s *Service) Transition(ctx context.Context, cmd TransitionCmd) (Transition
 	at := s.now()
 	row, changed, err := s.d.Repo.TransitionRun(ctx, TransitionWrite{
 		ID: cmd.RunID, From: cmd.From, Version: cmd.Version, To: cmd.To, Reason: reason, At: at,
+		StartedJTI: cmd.Store.StartedJTI, BillingModeUsed: cmd.Store.BillingModeUsed, Model: cmd.Store.Model,
+		StatusLine: cmd.Store.StatusLine, Summary: cmd.Store.Summary, BillingEvidence: cmd.Store.BillingEvidence,
+		Metrics: cmd.Store.Metrics,
 	})
 	if err != nil {
 		return Transitioned{}, err
@@ -253,6 +270,9 @@ func (s *Service) reasonOf(cmd TransitionCmd) (reason, original string, err erro
 		return "", "", nil
 	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCompleted && cmd.Reason == "":
 		return "", "", nil
+	case cmd.SetBy == domain.SetterAdapter && cmd.To == domain.StateCancelled && slices.Contains(domain.CancelReasons(), cmd.Reason):
+		// The adapter confirms a cancel request with its reason (M2-09 design note 6 c).
+		return cmd.Reason, "", nil
 	}
 	return "", "", errs.New(errs.CodeInternalError, "runs: no reason rule for this setter and state")
 }
