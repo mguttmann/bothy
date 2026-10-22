@@ -137,89 +137,112 @@ func (f *Fake) serve() {
 		f.wg.Add(1)
 		go func() {
 			defer f.wg.Done()
-			s := f.handle(c, scr)
+			h := &handler{f: f, c: c, scr: scr}
+			h.handle()
 			_ = c.Close()
+			h.record()
 			f.mu.Lock()
-			f.active--
 			delete(f.conns, c)
-			f.sess = append(f.sess, s)
 			f.mu.Unlock()
 		}()
 	}
 }
 
-// handle reads one command and answers it by scr.
-func (f *Fake) handle(c net.Conn, scr Script) Session {
-	var s Session
-	cmd, err := readCommand(c)
-	s.Command = cmd
+// handler serves one connection. It records the session and ends the connection's count in
+// active before it writes a reply, so a client that has its reply already sees its session in
+// Sessions and never overlaps the next connection of its own slot in MaxActive. A connection
+// without a reply is recorded after it closes.
+type handler struct {
+	f        *Fake
+	c        net.Conn
+	scr      Script
+	s        Session
+	recorded bool
+}
+
+// record appends the session and decrements active, once.
+func (h *handler) record() {
+	if h.recorded {
+		return
+	}
+	h.recorded = true
+	h.f.mu.Lock()
+	h.f.active--
+	h.f.sess = append(h.f.sess, h.s)
+	h.f.mu.Unlock()
+}
+
+// handle reads one command and answers it by the script.
+func (h *handler) handle() {
+	cmd, err := readCommand(h.c)
+	h.s.Command = cmd
 	if err != nil {
-		return s
+		return
 	}
 	switch cmd {
 	case "zPING":
-		reply := scr.PingReply
+		reply := h.scr.PingReply
 		if reply == "" {
 			reply = "PONG"
 		}
-		f.answer(c, scr, []byte(reply+"\x00"))
+		h.answer([]byte(reply + "\x00"))
 	case "zINSTREAM":
-		if !f.stream(c, scr, &s) {
-			return s
+		if !h.stream() {
+			return
 		}
-		reply := scr.Reply
+		reply := h.scr.Reply
 		if reply == "" {
 			reply = "stream: OK"
 		}
-		f.answer(c, scr, []byte(reply+"\x00"))
+		h.answer([]byte(reply + "\x00"))
 	}
-	return s
 }
 
 // stream reads the chunks; false means the connection ended or the script closed early (the
 // reply is sent already then).
-func (f *Fake) stream(c net.Conn, scr Script, s *Session) bool {
+func (h *handler) stream() bool {
 	var lenBuf [4]byte
 	for {
-		if _, err := io.ReadFull(c, lenBuf[:]); err != nil {
+		if _, err := io.ReadFull(h.c, lenBuf[:]); err != nil {
 			return false
 		}
 		n := binary.BigEndian.Uint32(lenBuf[:])
 		if n == 0 {
-			s.Terminated = true
+			h.s.Terminated = true
 			return true
 		}
 		chunk := make([]byte, n)
-		if _, err := io.ReadFull(c, chunk); err != nil {
+		if _, err := io.ReadFull(h.c, chunk); err != nil {
 			return false
 		}
-		s.Chunks = append(s.Chunks, int(n))
-		s.Data = append(s.Data, chunk...)
-		if scr.CloseAfterBytes > 0 && int64(len(s.Data)) >= scr.CloseAfterBytes {
-			reply := scr.Reply
+		h.s.Chunks = append(h.s.Chunks, int(n))
+		h.s.Data = append(h.s.Data, chunk...)
+		if h.scr.CloseAfterBytes > 0 && int64(len(h.s.Data)) >= h.scr.CloseAfterBytes {
+			reply := h.scr.Reply
 			if reply == "" {
 				reply = "INSTREAM size limit exceeded. ERROR"
 			}
-			f.answer(c, scr, []byte(reply+"\x00"))
+			h.answer([]byte(reply + "\x00"))
 			return false
 		}
 	}
 }
 
-// answer sends reply (or scr.Raw) after scr.Delay; a stalling script waits until the client
-// closes.
-func (f *Fake) answer(c net.Conn, scr Script, reply []byte) {
-	if scr.Stall {
-		_, _ = io.Copy(io.Discard, c)
+// answer sends reply (or the script's Raw) after the script's Delay, recording the session
+// first; a stalling script waits until the client closes.
+func (h *handler) answer(reply []byte) {
+	if h.scr.Stall {
+		_, _ = io.Copy(io.Discard, h.c)
 		return
 	}
-	if scr.Delay > 0 {
-		time.Sleep(scr.Delay)
+	if h.scr.Delay > 0 {
+		time.Sleep(h.scr.Delay)
 	}
-	if scr.Raw != nil {
-		reply = scr.Raw
+	if h.scr.Raw != nil {
+		reply = h.scr.Raw
 	}
-	_, _ = c.Write(reply)
+	h.record()
+	_, _ = h.c.Write(reply)
 }
 
 // readCommand reads up to the NUL of a z command; at most 64 bytes.

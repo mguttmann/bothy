@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -42,7 +43,7 @@ const (
 	testStreamMax    = 256 << 10
 	testMaxScanSize  = 128 << 10
 	testMaxRecursion = 3
-	waitScan         = 2 * time.Minute
+	waitScan         = testkit.Patience
 )
 
 var shared struct {

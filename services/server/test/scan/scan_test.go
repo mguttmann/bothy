@@ -327,14 +327,22 @@ func TestScanClamdStoppedStaysPending(t *testing.T) {
 		jobs = append(jobs, j)
 	}
 	rows.Close()
+	// Round n+1 is scheduled by the run of round n at "now + delay", and River runs round n no
+	// earlier than its scheduled_at: so the gap of two scheduled_at values is at least the delay,
+	// and a round is due at most the delay after its insert. Neither bound depends on how slow
+	// the host is; clockSkew allows for the clock of the database container.
+	const clockSkew = 200 * time.Millisecond
 	want := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 4 * time.Second}
 	for i, d := range want {
 		j := jobs[i+1]
 		if j.round != int64(i+1) {
 			t.Fatalf("rounds %+v", jobs)
 		}
-		if got := j.scheduled.Sub(j.created); got < d-200*time.Millisecond || got > d+time.Second {
-			t.Errorf("round %d scheduled %v after its insert, want %v", j.round, got, d)
+		if gap := j.scheduled.Sub(jobs[i].scheduled); gap < d-clockSkew {
+			t.Errorf("round %d scheduled %v after round %d, want at least %v", j.round, gap, jobs[i].round, d)
+		}
+		if got := j.scheduled.Sub(j.created); got > d+clockSkew {
+			t.Errorf("round %d scheduled %v after its insert, want at most %v", j.round, got, d)
 		}
 	}
 	if r := readFile(t, db, u.FileID); r.UploadState != "pending" || r.ScanStatus != "pending" {

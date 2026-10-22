@@ -15,6 +15,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd"
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // newFake starts a scripted clamd for t.
@@ -175,7 +176,8 @@ func TestScanMaxConcurrent(t *testing.T) {
 		_, _ = c1.Scan(ctx, strings.NewReader("a"))
 	}()
 	<-started
-	time.Sleep(50 * time.Millisecond)
+	// The fake counts the connection once the first scan holds the only slot.
+	testkit.Until(t, "the first scan holds the slot", func() bool { return f.Active() == 1 })
 	ctx2, cancel2 := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel2()
 	if _, err := c1.Scan(ctx2, strings.NewReader("b")); !errors.Is(err, context.DeadlineExceeded) {
