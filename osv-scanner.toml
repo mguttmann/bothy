@@ -205,10 +205,10 @@ reason = "deps.dev knows no license for this pub package; its LICENSE file on pu
 
 [[PackageOverrides]]
 name = "equatable"
-version = "3.0.0"
+version = "2.1.0"
 ecosystem = "Pub"
 license.override = ["MIT"]
-reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of alchemist."
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of alchemist and patrol; patrol 4.10.0 needs ^2.1.0 (M6-04)."
 
 [[PackageOverrides]]
 name = "fake_async"
@@ -1193,3 +1193,31 @@ version = "10.1.0"
 ecosystem = "Pub"
 license.override = ["MIT"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file is MIT. Crash reports of apps/client (docs/spec/15-client-architecture.md 16, M4-31)."
+
+[[PackageOverrides]]
+name = "dispose_scope"
+version = "2.1.0"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of patrol_log, test only (M6-04)."
+
+[[PackageOverrides]]
+name = "patrol"
+version = "4.10.0"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Dev dependency of apps/console for the web flows of the administration, never in a release build (M6-04)."
+
+[[PackageOverrides]]
+name = "patrol_finders"
+version = "3.6.0"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive package of patrol, test only (M6-04)."
+
+[[PackageOverrides]]
+name = "patrol_log"
+version = "0.10.1"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Transitive package of patrol, test only (M6-04)."
