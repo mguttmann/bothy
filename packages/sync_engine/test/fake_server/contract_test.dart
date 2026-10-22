@@ -372,6 +372,55 @@ void main() {
     await access.viewAsUser(userId: w.sam.id);
     await access.revokeGrant(grantId: grant.id, reasonBody: why);
 
+    // Agents (M4-28): the card, the backend policy per agent and for all, the holder, and the
+    // agent tokens. Sam holds the personal agent first, so moving it to Alex, the only owner
+    // and so the only triggerer, keeps I1 (10 5.4).
+    final agentsApi = api.getAgentsApi();
+    final helper = world.addAgent(
+      handle: 'helper',
+      displayName: 'Helper',
+      billingMode: 'personal',
+      credentialHolderId: w.sam.id,
+    );
+    await agentsApi.getAgent(agentId: helper.id);
+    await agentsApi.setCredentialHolder(
+      agentId: helper.id,
+      ifMatch: '"${helper.version}"',
+      credentialHolderSet: CredentialHolderSet(
+        (b) => b
+          ..credentialHolderId = w.alex.id
+          ..reason = 'Alex pays',
+      ),
+    );
+    await agentsApi.setAgentBillingMode(
+      agentId: helper.id,
+      ifMatch: '"${helper.version}"',
+      billingModeSet: BillingModeSet(
+        (b) => b
+          ..billingMode = BillingMode.organization
+          ..reason = 'Team uses it',
+      ),
+    );
+    await agentsApi.setAllAgentsBillingMode(
+      billingModeSetAll: BillingModeSetAll(
+        (b) => b
+          ..billingMode = BillingMode.organization
+          ..reason = 'Company key',
+      ),
+    );
+    final tokensApi = api.getTokensApi();
+    final token = (await tokensApi.createToken(
+      principalId: helper.id,
+      apiTokenCreate: ApiTokenCreate(
+        (b) => b
+          ..name = 'Adapter production'
+          ..dpopJkt = 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs'
+          ..expiresAt = DateTime.utc(2027, 10, 10),
+      ),
+    )).data!;
+    await tokensApi.listTokens(principalId: helper.id);
+    await tokensApi.revokeToken(tokenId: token.token.id);
+
     // Audit log (M4-29): list, NDJSON export and chain check.
     h.server.audit.add(world, action: 'grant.create', actor: w.alex.id);
     final audit = api.getAuditApi();

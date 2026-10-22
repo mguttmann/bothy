@@ -70,7 +70,11 @@ void main() {
         adminLocationOf(['admin', 'hosts', 'h']),
         const AdminLocation(AdminSection.hosts, id: 'h'),
       );
-      expect(adminLocationOf(['admin', 'agents']), isNull);
+      expect(
+        adminLocationOf(['admin', 'agents', 'a']),
+        const AdminLocation(AdminSection.agents, id: 'a'),
+      );
+      expect(adminLocationOf(['admin', 'apps']), isNull);
       expect(adminLocationOf(['admin', 'devices', 'x']), isNull);
       expect(
         adminPathOf(const AdminLocation(AdminSection.groups, id: 'g')),
@@ -122,6 +126,9 @@ void main() {
     late AdminGroup group;
     late AdminGrant grant;
     late AdminHost host;
+    late AgentTokenCreated token;
+    final alex = fake.seed.alex.id;
+    final helper = world.addAgent(handle: 'helper', displayName: 'Helper');
     final general = AdminTarget(
       AdminTargetKind.channel,
       id: fake.seed.general,
@@ -232,6 +239,36 @@ void main() {
           admin.disablePerson(sam, reason: 'Left', purpose: 'disableUser'),
       'enableUser': () =>
           admin.enablePerson(sam, reason: 'Back', purpose: 'enableUser'),
+      // Agents (M4-28): agent.billing_mode.set, agent.billing_mode.set_all,
+      // agent.credential_holder.set and token.create have step-up, token.revoke has none. Alex
+      // is the only owner by now and the agent operates nothing, so Alex alone may trigger it
+      // and holding it keeps I1 (10 5.4).
+      'setAgentBillingMode': () async => admin.setMode(
+        await admin.agentRecord(helper.id),
+        AgentBillingMode.personal,
+        holderId: alex,
+        reason: 'Alex pays',
+        purpose: 'setAgentBillingMode',
+      ),
+      'setCredentialHolder': () async => admin.setHolder(
+        await admin.agentRecord(helper.id),
+        alex,
+        reason: 'Still Alex',
+        purpose: 'setCredentialHolder',
+      ),
+      'setAllAgentsBillingMode': () => admin.setAllModes(
+        AgentBillingMode.organization,
+        reason: 'Company key',
+        purpose: 'setAllAgentsBillingMode',
+      ),
+      'createToken': () async => token = await admin.createToken(
+        helper.id,
+        name: 'Adapter',
+        expiresAt: DateTime.utc(2027, 10, 1),
+        dpopJkt: 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs',
+        purpose: 'createToken',
+      ),
+      'revokeToken': () => admin.revokeToken(token.token.id),
     };
 
     final seen = <String>[];

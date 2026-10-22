@@ -6,11 +6,14 @@ library;
 
 import 'package:admin_ui/admin_ui.dart';
 import 'package:design_system/design_system.dart';
+import 'package:domain/domain.dart'
+    show AgentPresence, AgentRuntimeState, BillingMode, PrincipalId;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:l10n/l10n.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:sync_engine/sync_engine.dart' show EphemeralStore;
 
 import '../app/providers/session.dart';
 import '../settings/settings_providers.dart' show personTimeZoneProvider;
@@ -29,6 +32,41 @@ AdminLocation? adminLocationOf(List<String> segments) => AdminLocation.parse(
 
 /// The app path of [location], for example `/admin/groups/<id>`.
 String adminPathOf(AdminLocation location) => '/admin${location.path}';
+
+/// The live presence of [agentId] for the agent page of A5, from the engine's [store]
+/// (`agent.presence_changed`, 04 12 item 2; brief M4-28 Design note 1). A value the store does
+/// not have (an agent this device sees nowhere) is skipped, so the page keeps the presence of
+/// `getAgent`; an ID that is no UUID gives an empty stream.
+///
+/// Example: `agentPresenceOf(engine.ephemeral, agentId).listen(show)`.
+Stream<AgentLiveState> agentPresenceOf(EphemeralStore store, String agentId) {
+  final PrincipalId id;
+  try {
+    id = PrincipalId.parse(agentId);
+  } on FormatException {
+    return const Stream.empty();
+  }
+  return store
+      .watchPresence(id)
+      .where((p) => p != null)
+      .map((p) => agentLiveStateOf(p!));
+}
+
+/// The [AgentLiveState] of the engine's [presence].
+AgentLiveState agentLiveStateOf(AgentPresence presence) => AgentLiveState(
+  state: switch (presence.state) {
+    AgentRuntimeState.online => AgentLiveStateKind.online,
+    AgentRuntimeState.degraded => AgentLiveStateKind.degraded,
+    AgentRuntimeState.offline => AgentLiveStateKind.offline,
+    AgentRuntimeState.unknown => AgentLiveStateKind.unknown,
+  },
+  reportedMode: switch (presence.reportedBillingMode) {
+    BillingMode.personal => AgentBillingMode.personal,
+    BillingMode.organization => AgentBillingMode.organization,
+    BillingMode.unknown => AgentBillingMode.unknown,
+    null => null,
+  },
+);
 
 /// The REST source of the administration over the client of the signed-in session (DPoP,
 /// refresh and the step-up interceptor apply), or null before the login.
@@ -55,6 +93,7 @@ class AdminRoute extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repository = ref.watch(adminRepositoryProvider);
+    final engine = ref.watch(syncEngineProvider);
     final location = adminLocationOf(uri.pathSegments);
     final colors = context.dsColors;
     if (repository == null || location == null) {
@@ -76,6 +115,9 @@ class AdminRoute extends ConsumerWidget {
       timeZone: ref.watch(personTimeZoneProvider),
       onNavigate: (to) => context.go(adminPathOf(to)),
       onExit: () => context.go('/'),
+      agentPresence: engine == null
+          ? null
+          : (agentId) => agentPresenceOf(engine.ephemeral, agentId),
     );
   }
 }

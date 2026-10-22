@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:domain/domain.dart' show EventCatalog, FractionalIndex;
 
+import 'fake_agent.dart';
 import 'fake_host.dart';
 
 part 'world_thread_view.dart';
@@ -654,7 +655,7 @@ final class FakeWorld {
       'name': name,
       'topic': '',
       'sort_key': 'a${channels.length}',
-      'operator': {'mode': 'inherit'},
+      'operator': _inheritOperator(spaceId),
       'read_only': false,
       'version': 1,
       'settings_version': 1,
@@ -1907,5 +1908,276 @@ final class FakeWorld {
     p
       ..state = 'expired'
       ..expiresAt = stamp();
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Agents, operators and I1 (brief M4-28)
+
+  /// The agent rows by principal ID. An agent person added with [addPerson] alone has none
+  /// until [agentOf] creates it with the defaults (organization), so the worlds of earlier
+  /// tickets keep working.
+  final Map<String, FakeAgent> agents = {};
+
+  /// Adds an agent person (through [addPerson], kind `agent`) and its [FakeAgent] with the
+  /// given configured and reported values, as if its first heartbeat had just arrived; returns
+  /// the [FakeAgent].
+  ///
+  /// [credentialHolderId] is stored as given, so a test can build a world that already breaks
+  /// I1 (10 5.4) and repair it through the API.
+  FakeAgent addAgent({
+    required String handle,
+    required String displayName,
+    String billingMode = 'organization',
+    String? credentialHolderId,
+    String? reportedBillingMode,
+    List<String>? billingModesSupported = const ['organization', 'personal'],
+    String adapterKind = 'hermes',
+    String state = 'online',
+    String keyType = 'api_key',
+  }) {
+    final p = addPerson(
+      handle: handle,
+      displayName: displayName,
+      kind: 'agent',
+    );
+    final a = FakeAgent(
+      id: p.id,
+      billingMode: billingMode,
+      credentialHolderId: credentialHolderId,
+      reportedBillingMode: reportedBillingMode,
+      billingModesSupported: billingModesSupported == null
+          ? null
+          : List.of(billingModesSupported),
+      adapterKind: adapterKind,
+      state: state,
+      keyType: keyType,
+    )..lastHeartbeatAt = stamp();
+    a.mismatchAtHeartbeat =
+        reportedBillingMode != null && reportedBillingMode != billingMode;
+    agents[a.id] = a;
+    return a;
+  }
+
+  /// The [FakeAgent] of [agentId]: the stored one, or a new one with the defaults for an agent
+  /// person without a row; null for an unknown ID or a principal that is not an agent.
+  FakeAgent? agentOf(String agentId) {
+    final p = people[agentId];
+    if (p == null || p.kind != 'agent') return null;
+    return agents.putIfAbsent(agentId, () => FakeAgent(id: agentId));
+  }
+
+  /// The `operator` of a channel in [spaceId] that inherits: the default operator of the space
+  /// as `effective_agent_id`, absent without one (API `ChannelOperator`).
+  JsonMap _inheritOperator(String spaceId) => {
+    'mode': 'inherit',
+    'effective_agent_id': ?spaces[spaceId]?['default_operator_agent_id'],
+  };
+
+  /// Makes [agentId] the default operator of [spaceId] (`default_operator_agent_id`), or
+  /// removes it for null, and refreshes the `operator.effective_agent_id` of the space's
+  /// channels that inherit (03 `channels`, 10 5.2 point 1).
+  void setSpaceOperator(String spaceId, String? agentId) {
+    final space = spaces[spaceId]!;
+    if (agentId == null) {
+      space.remove('default_operator_agent_id');
+    } else {
+      space['default_operator_agent_id'] = agentId;
+    }
+    for (final c in channels.values) {
+      final op = c.json['operator'] as JsonMap?;
+      if (c.spaceId == spaceId && op?['mode'] == 'inherit') {
+        c.json['operator'] = _inheritOperator(spaceId);
+      }
+    }
+  }
+
+  /// Makes [agentId] the fixed operator of [channelId] (`mode: agent`), or lets the channel
+  /// inherit the default of its space again for null.
+  void setChannelOperator(String channelId, String? agentId) {
+    final c = channels[channelId]!;
+    c.json['operator'] = agentId == null
+        ? _inheritOperator(c.spaceId!)
+        : {'mode': 'agent', 'agent_id': agentId, 'effective_agent_id': agentId};
+  }
+
+  /// The fake's heartbeat of [agentId] (09 4.8): changes the reported values that are given
+  /// and stamps `last_heartbeat_at`.
+  ///
+  /// A null [reportedBillingMode] leaves the reported mode as it is; [clearReported] removes it
+  /// (an adapter that follows the configured mode per run, 10 8).
+  void agentHeartbeat(
+    String agentId, {
+    String? reportedBillingMode,
+    List<String>? billingModesSupported,
+    String? keyType,
+    String? state,
+    bool clearReported = false,
+  }) {
+    final a = agentOf(agentId)!;
+    if (clearReported) a.reportedBillingMode = null;
+    if (reportedBillingMode != null) {
+      a.reportedBillingMode = reportedBillingMode;
+    }
+    if (billingModesSupported != null) {
+      a.billingModesSupported = List.of(billingModesSupported);
+    }
+    if (keyType != null) a.keyType = keyType;
+    if (state != null) a.state = state;
+    a.mismatchAtHeartbeat =
+        a.reportedBillingMode != null && a.reportedBillingMode != a.billingMode;
+    a.lastHeartbeatAt = stamp();
+  }
+
+  /// The codes of `AgentRuntimeStatus.warnings` for [a] as the server computes them at each
+  /// heartbeat (10 8, 09 4.8), only while the runtime is `online` or `degraded`.
+  ///
+  /// The fake counts `billing.mismatch_alert_after` as one heartbeat: `billing_mode_mismatch`
+  /// shows once a heartbeat saw the reported mode differ from the configured one
+  /// ([FakeAgent.mismatchAtHeartbeat]); right after a switch only `billing_mode_matches` is
+  /// false, as on the server. There is no `tool_class_mismatch`, because the fake has
+  /// no reported tool class.
+  List<String> agentWarnings(FakeAgent a) {
+    if (a.state != 'online' && a.state != 'degraded') return const [];
+    final reported = a.reportedBillingMode;
+    final supported = a.billingModesSupported;
+    return [
+      if (a.mismatchAtHeartbeat &&
+          reported != null &&
+          reported != a.billingMode)
+        'billing_mode_mismatch',
+      if (reported == null &&
+          supported != null &&
+          !supported.contains(a.billingMode))
+        'billing_mode_unsupported',
+      if (a.keyType == 'unknown') 'billing_evidence_unknown',
+    ];
+  }
+
+  /// The API `Agent` of [a]: its person's handle, name and status, the configured policy
+  /// (`credential_holder_id` only with `personal`) and the presence (`AgentRuntimeStatus`) with
+  /// the reported values, `billing_evidence`, `billing_mode_matches` (only with a reported mode)
+  /// and the [agentWarnings].
+  JsonMap agentJson(FakeAgent a) {
+    final p = people[a.id]!;
+    final reported = a.reportedBillingMode;
+    return {
+      'id': a.id,
+      'handle': p.handle,
+      'display_name': p.displayName,
+      'status': switch (p.status) {
+        'active' => 'active',
+        'deleted' => 'deleted',
+        _ => 'disabled',
+      },
+      'adapter_kind': a.adapterKind,
+      'description': a.description,
+      'billing_mode': a.billingMode,
+      if (a.billingMode == 'personal')
+        'credential_holder_id': ?a.credentialHolderId,
+      'billing_mode_changed_at': ?a.billingModeChangedAt,
+      'tool_class': a.toolClass,
+      'presence': {
+        'state': a.state,
+        'reported_billing_mode': ?reported,
+        'last_heartbeat_at': ?a.lastHeartbeatAt,
+        if (a.billingModesSupported case final modes?)
+          'billing_modes_supported': List.of(modes),
+        if (reported != null) 'billing_mode_matches': reported == a.billingMode,
+        'billing_evidence': {
+          'provider': 'anthropic',
+          'key_type': a.keyType,
+          'method': ?a.evidenceMethod,
+        },
+        'warnings': agentWarnings(a),
+      },
+      'operator_config': <String, Object?>{},
+      'version': a.version,
+    };
+  }
+
+  /// The I1 trigger set of [agentId] (10 5.2 and 5.3, simplified): the active people who may
+  /// trigger it, in the order of [people].
+  ///
+  /// Targets are the channels whose `operator.effective_agent_id` is the agent and every
+  /// channel of a space whose default operator it is; their spaces count for space grants.
+  /// Triggerers are the active owners, the people with `trigger` in the access list of a target
+  /// channel, and the active members (membership not expired) of groups and the people that
+  /// hold a valid grant (not revoked, not expired) with `trigger` on a target channel, its
+  /// space or the instance. The fake has no thread operators (10 5.2 point 2).
+  List<String> agentTriggerers(String agentId) {
+    final targets = [
+      for (final c in channels.values)
+        if ((c.json['operator'] as JsonMap?)?['effective_agent_id'] ==
+                agentId ||
+            spaces[c.spaceId]?['default_operator_agent_id'] == agentId)
+          c,
+    ];
+    final targetIds = {for (final c in targets) c.id};
+    final targetSpaces = {
+      for (final c in targets) ?c.spaceId,
+      for (final s in spaces.values)
+        if (s['default_operator_agent_id'] == agentId) s['id']! as String,
+    };
+    final t = now();
+    bool valid(Object? expiresAt) =>
+        expiresAt == null || DateTime.parse(expiresAt as String).isAfter(t);
+    final found = <String>{
+      for (final p in people.values)
+        if (p.isOwner) p.id,
+      for (final c in targets)
+        for (final MapEntry(:key, :value) in c.access.entries)
+          if (value == 'trigger') key,
+    };
+    for (final g in grants.values) {
+      final target = g['target_id'];
+      final onTarget = switch (g['target_kind']) {
+        'instance' => true,
+        'space' => targetSpaces.contains(target),
+        'channel' => targetIds.contains(target),
+        _ => false,
+      };
+      if (g['revoked_at'] != null ||
+          !valid(g['expires_at']) ||
+          g['level'] != 'trigger' ||
+          !onTarget) {
+        continue;
+      }
+      final subject = g['subject_id']! as String;
+      if (g['subject_kind'] == 'user') found.add(subject);
+      if (g['subject_kind'] == 'group') {
+        for (final MapEntry(:key, :value)
+            in (groupMembers[subject] ?? {}).entries) {
+          if (valid(value['expires_at'])) found.add(key);
+        }
+      }
+    }
+    return [
+      for (final p in people.values)
+        if (found.contains(p.id) && p.kind == 'user' && p.status == 'active')
+          p.id,
+    ];
+  }
+
+  /// The I1 conflicts of the world (10 5.4): for every active agent on `personal` whose
+  /// trigger set ([agentTriggerers]) is not exactly its credential holder, the other
+  /// principals of the set, by agent ID in the order of [agents].
+  ///
+  /// As on the server a missing holder, or a holder who cannot trigger the agent, is a
+  /// conflict too, then with an empty list.
+  Map<String, List<String>> i1Conflicts() {
+    final out = <String, List<String>>{};
+    for (final a in agents.values) {
+      if (a.billingMode != 'personal' || people[a.id]?.status != 'active') {
+        continue;
+      }
+      final set = agentTriggerers(a.id);
+      final holder = a.credentialHolderId;
+      if (holder != null && set.length == 1 && set.single == holder) continue;
+      out[a.id] = [
+        for (final p in set)
+          if (p != holder) p,
+      ];
+    }
+    return out;
   }
 }

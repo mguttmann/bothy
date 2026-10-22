@@ -239,6 +239,7 @@ final class InvariantFinding {
     required this.code,
     required this.principalIds,
     this.agentId,
+    this.holderId,
     this.organizationReady,
   });
 
@@ -251,8 +252,31 @@ final class InvariantFinding {
   /// The agent of an I1 violation, or null.
   final String? agentId;
 
+  /// The credential holder of the agent of an I1 violation, or null.
+  final String? holderId;
+
   /// Whether the agent supports the organization mode, or null when not sent.
   final bool? organizationReady;
+}
+
+/// The guided way out of an I1 conflict (`ResolveI1`, 05 rule 1.6; 10 11 step 4): switch
+/// [agentIds] to organization in the same transaction as the change, with [reason].
+final class I1Resolution {
+  /// Creates the resolution.
+  const I1Resolution(this.agentIds, {required this.reason});
+
+  /// The agents to switch to organization first.
+  final List<String> agentIds;
+
+  /// The reason of the switch, in the audit entry of every switched agent.
+  final String reason;
+
+  /// The request body part `resolve_i1`.
+  ResolveI1 get wire => ResolveI1(
+    (b) => b
+      ..switchToOrganization.replace(agentIds)
+      ..reason = reason,
+  );
 }
 
 /// A hint of the preview (`GrantHint`).
@@ -558,10 +582,12 @@ abstract interface class AccessRepository {
   /// The dry run of [request] (`previewGrant`): nothing is stored, no step-up.
   Future<GrantPreviewResult> previewGrant(GrantRequest request);
 
-  /// Creates the grant (`createGrant`).
+  /// Creates the grant (`createGrant`); with [resolveI1] the server first switches the listed
+  /// agents to organization in the same transaction (10 11, BR-07: both changes or none).
   Future<AdminGrant> createGrant(
     GrantRequest request, {
     required String purpose,
+    I1Resolution? resolveI1,
   });
 
   /// The valid grants on [target] (`listGrants`, all pages).
@@ -667,6 +693,7 @@ final class ApiAccessRepository implements AccessRepository {
               code: v.code,
               principalIds: v.principalIds.toList(),
               agentId: v.agentId,
+              holderId: v.credentialHolderId,
               organizationReady: v.organizationReady,
             ),
         ],
@@ -701,10 +728,11 @@ final class ApiAccessRepository implements AccessRepository {
   Future<AdminGrant> createGrant(
     GrantRequest request, {
     required String purpose,
+    I1Resolution? resolveI1,
   }) => _call(
     () async => _grant(
       (await _access.createGrant(
-        grantCreate: _create(request),
+        grantCreate: _create(request, resolveI1: resolveI1),
         idempotencyKey: _newKey(),
         extra: _purpose(purpose),
       )).data!,
@@ -794,32 +822,34 @@ final class ApiAccessRepository implements AccessRepository {
         );
       });
 
-  static GrantCreate _create(GrantRequest r) => GrantCreate(
-    (b) => b
-      ..subjectKind = switch (r.subjectKind) {
-        AdminSubjectKind.user => GrantSubjectKind.user,
-        AdminSubjectKind.group => GrantSubjectKind.group,
-        AdminSubjectKind.agent => GrantSubjectKind.agent,
-        AdminSubjectKind.app => GrantSubjectKind.app,
-      }
-      ..subjectId = r.subjectId
-      ..targetKind = _wireTarget(r.target.kind)
-      ..targetId = r.target.id
-      // A host has no level: the member must be absent (07 2.12, `GrantCreate`).
-      ..level = r.target.kind == AdminTargetKind.host
-          ? null
-          : switch (r.level) {
-              AccessLevel.read || AccessLevel.none => Level.read,
-              AccessLevel.write => Level.write,
-              AccessLevel.trigger => Level.trigger,
-            }
-      ..capabilities.replace([
-        for (final c in AccessCapability.values)
-          if (r.capabilities.contains(c)) _wireCapability(c),
-      ])
-      ..expiresAt = r.expiresAt?.toUtc()
-      ..reason = r.reason,
-  );
+  static GrantCreate _create(GrantRequest r, {I1Resolution? resolveI1}) =>
+      GrantCreate(
+        (b) => b
+          ..resolveI1 = resolveI1?.wire.toBuilder()
+          ..subjectKind = switch (r.subjectKind) {
+            AdminSubjectKind.user => GrantSubjectKind.user,
+            AdminSubjectKind.group => GrantSubjectKind.group,
+            AdminSubjectKind.agent => GrantSubjectKind.agent,
+            AdminSubjectKind.app => GrantSubjectKind.app,
+          }
+          ..subjectId = r.subjectId
+          ..targetKind = _wireTarget(r.target.kind)
+          ..targetId = r.target.id
+          // A host has no level: the member must be absent (07 2.12, `GrantCreate`).
+          ..level = r.target.kind == AdminTargetKind.host
+              ? null
+              : switch (r.level) {
+                  AccessLevel.read || AccessLevel.none => Level.read,
+                  AccessLevel.write => Level.write,
+                  AccessLevel.trigger => Level.trigger,
+                }
+          ..capabilities.replace([
+            for (final c in AccessCapability.values)
+              if (r.capabilities.contains(c)) _wireCapability(c),
+          ])
+          ..expiresAt = r.expiresAt?.toUtc()
+          ..reason = r.reason,
+      );
 
   static TargetKind _wireTarget(AdminTargetKind kind) => switch (kind) {
     AdminTargetKind.instance => TargetKind.instance,
@@ -927,19 +957,51 @@ final class ApiAccessRepository implements AccessRepository {
     reason: s.reason,
   );
 
-  /// Runs [call] and turns its errors into [SelfActionFailed]; an error of the login layer
-  /// ([StepUpCancelled], a lost session) passes as it is.
-  static Future<T> _call<T>(Future<T> Function() call) async {
-    try {
-      return await call();
-    } on DioException catch (e) {
-      final cause = e.error;
-      if (cause is AuthException) throw cause;
-      final response = e.response;
-      throw SelfActionFailed(
-        ApiProblem.of(e) ??
-            (response == null ? null : ApiProblem.fromResponse(response)),
-      );
-    }
+  static Future<T> _call<T>(Future<T> Function() call) => adminCall(call);
+}
+
+/// Runs [call] and turns its errors into [SelfActionFailed]; an error of the login layer
+/// ([StepUpCancelled], a lost session) passes as it is. A `409 i1_violation` carries the
+/// entries of `Problem.conflicts` (10 5.4), which [ApiProblem] does not keep.
+Future<T> adminCall<T>(Future<T> Function() call) async {
+  try {
+    return await call();
+  } on DioException catch (e) {
+    final cause = e.error;
+    if (cause is AuthException) throw cause;
+    final response = e.response;
+    throw SelfActionFailed(
+      ApiProblem.of(e) ??
+          (response == null ? null : ApiProblem.fromResponse(response)),
+      conflicts: conflictsOf(response?.data),
+    );
   }
+}
+
+/// The entries of `conflicts` of the problem [body] (`InvariantViolation`), empty without.
+List<InvariantFinding> conflictsOf(Object? body) {
+  if (body is! Map) return const [];
+  final list = body['conflicts'];
+  if (list is! List) return const [];
+  return [
+    for (final c in list)
+      if (c is Map && c['code'] is String)
+        InvariantFinding(
+          code: c['code']! as String,
+          agentId: c['agent_id'] is String ? c['agent_id'] as String : null,
+          holderId: c['credential_holder_id'] is String
+              ? c['credential_holder_id'] as String
+              : null,
+          principalIds: [
+            for (final p
+                in (c['principal_ids'] is List
+                    ? c['principal_ids'] as List
+                    : const []))
+              if (p is String) p,
+          ],
+          organizationReady: c['organization_ready'] is bool
+              ? c['organization_ready'] as bool
+              : null,
+        ),
+  ];
 }

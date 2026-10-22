@@ -7,17 +7,21 @@
 /// level in the channels' access lists of the world, and revoking removes it. The preview
 /// answers the example request of 07 9.3 with the text of the specification, read at run time
 /// ([grantPreviewExample], D-W-94); other requests get a short English text. H1 (07 6) is
-/// derived from the access lists: an agent that sees a channel the subject does not see.
+/// derived from the access lists: an agent that sees a channel the subject does not see. Since
+/// M4-28 every grant runs through [FakeI1Guard] (10 5.4, 11): `resolve_i1`, the I1 check after
+/// the change, the audit rows; the preview reports a violation as `invariant_violations`.
 library;
 
 import 'dart:io';
 
 import '../action_catalog.dart';
+import '../audit_log.dart';
 import '../fake_host.dart';
 import '../rest_fake.dart';
 import '../schema_validator.dart' show embeddedPermissionsChapter;
 import '../world.dart';
 import 'admin_handlers.dart' show requireCatalogStepUp;
+import 'agent_handlers.dart';
 
 /// The example text of 07 9.3: the first fenced block between the `language-check` markers
 /// after the heading `### 9.3` of `docs/spec/07-permissions.md` of the repository that holds
@@ -55,9 +59,15 @@ const List<String> _levels = ['none', 'read', 'write', 'trigger'];
 String _max(String a, String b) =>
     _levels.indexOf(a) >= _levels.indexOf(b) ? a : b;
 
-/// Registers the grant and access handlers on [rest], with the step-up of [catalog].
-void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
+/// Registers the grant and access handlers on [rest], with the step-up of [catalog]; the
+/// audit rows of `createGrant` go to [audit].
+void registerAccessHandlers(
+  RestFake rest,
+  ActionCatalog catalog,
+  FakeAuditLog audit,
+) {
   final world = rest.world;
+  final guard = FakeI1Guard(world, audit);
 
   void owner(FakeRequest r) {
     if (!r.person.isOwner) {
@@ -111,20 +121,6 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
   JsonMap grantOf(FakeRequest r) =>
       world.grants[r.param('grant_id')] ??
       (throw const FakeProblem(404, 'not_found'));
-
-  JsonMap agentJson(FakePerson a) => {
-    'id': a.id,
-    'handle': a.handle,
-    'display_name': a.displayName,
-    'status': a.status == 'active' ? 'active' : 'disabled',
-    'adapter_kind': 'scripted',
-    'description': '',
-    'billing_mode': 'organization',
-    'tool_class': 'chat',
-    'presence': {'state': 'unknown'},
-    'operator_config': <String, Object?>{},
-    'version': 1,
-  };
 
   /// The entries of "Who has access?" for [channels] (one channel, or a space's channels).
   List<JsonMap> explain(List<FakeChannel> channels, {required bool space}) {
@@ -279,15 +275,50 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
     return FakeResponse(201, grant);
   }
 
+  /// Writes a grant of [body] on [channels] by [grantedBy]: the row, the levels of the
+  /// subject in the access lists and the permission version; returns the `Grant`.
+  JsonMap applyGrant(
+    JsonMap body,
+    List<FakeChannel> channels,
+    String grantedBy,
+  ) {
+    final subject = body['subject_id']! as String;
+    final level = body['level'] as String? ?? 'read';
+    final id = world.nextId();
+    final grant = <String, Object?>{
+      'id': id,
+      'subject_kind': body['subject_kind'],
+      'subject_id': subject,
+      'target_kind': body['target_kind'],
+      'target_id': ?body['target_id'],
+      'level': level,
+      'capabilities': body['capabilities'] ?? <Object?>[],
+      'expires_at': ?body['expires_at'],
+      'reason': body['reason'],
+      'granted_by': grantedBy,
+      'granted_at': world.stamp(),
+    };
+    world.grants[id] = grant;
+    if (world.people.containsKey(subject)) {
+      for (final c in channels) {
+        c.access[subject] = _max(c.access[subject] ?? 'none', level);
+      }
+    }
+    world.permissionVersion++;
+    return grant;
+  }
+
+  /// The details of the audit row `grant.create`.
+  JsonMap grantDetails(JsonMap grant) => {
+    'subject_kind': grant['subject_kind'],
+    'subject_id': grant['subject_id'],
+    'target_kind': grant['target_kind'],
+    'target_id': ?grant['target_id'],
+    'level': ?grant['level'],
+    'reason': grant['reason'],
+  };
+
   rest
-    ..handle('listAgents', (r) {
-      return FakeResponse(200, {
-        'items': [
-          for (final p in world.people.values)
-            if (p.kind == 'agent') agentJson(p),
-        ],
-      });
-    })
     ..handle('previewGrant', (r) {
       owner(r);
       final body = r.json;
@@ -307,8 +338,17 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
           targetPath(kind, target) == 'Marketing/Kampagnen' &&
           level == 'trigger' &&
           expires != null;
+      // 10 11 point 1: the grant as a dry run (with its `resolve_i1`), then rolled back.
+      final conflicts = guard.dryRun(
+        body,
+        () => applyGrant(body, channels, r.person.id),
+      );
+      final text = isExample
+          ? grantPreviewExample()
+          : '${person?.displayName ?? subject} gets the level "$level" on '
+                '${targetPath(kind, target)}.';
       return FakeResponse(200, {
-        'allowed': true,
+        'allowed': conflicts.isEmpty,
         'effects': [
           if (person != null)
             {
@@ -320,17 +360,14 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
               'capabilities_added': body['capabilities'] ?? <Object?>[],
             },
         ],
-        'invariant_violations': <Object?>[],
+        'invariant_violations': guard.previewViolations(conflicts),
         'hints': [
           if (level == 'trigger' && person != null)
             ...readHorizon(subject, channels),
           if (subjectKind == 'user' && expires == null)
             {'code': 'expiry_missing', 'principal_id': subject},
         ],
-        'text': isExample
-            ? grantPreviewExample()
-            : '${person?.displayName ?? subject} gets the level "$level" on '
-                  '${targetPath(kind, target)}.',
+        'text': [text, ...guard.previewSentences(conflicts)].join('\n'),
         'text_locale': isExample ? 'de' : 'en',
       });
     })
@@ -338,34 +375,30 @@ void registerAccessHandlers(RestFake rest, ActionCatalog catalog) {
       owner(r);
       stepUp(r);
       final body = r.json;
-      if (body['target_kind'] == 'host') return hostGrant(r, body);
-      final kind = body['target_kind']! as String;
-      final target = body['target_id'] as String?;
-      final channels = covered(kind, target);
-      final subject = body['subject_id']! as String;
-      final level = body['level'] as String? ?? 'read';
-      final id = world.nextId();
-      final grant = <String, Object?>{
-        'id': id,
-        'subject_kind': body['subject_kind'],
-        'subject_id': subject,
-        'target_kind': kind,
-        'target_id': ?target,
-        'level': level,
-        'capabilities': body['capabilities'] ?? <Object?>[],
-        'expires_at': ?body['expires_at'],
-        'reason': body['reason'],
-        'granted_by': r.person.id,
-        'granted_at': world.stamp(),
-      };
-      world.grants[id] = grant;
-      if (world.people.containsKey(subject)) {
-        for (final c in channels) {
-          c.access[subject] = _max(c.access[subject] ?? 'none', level);
-        }
-      }
-      world.permissionVersion++;
-      return FakeResponse(201, grant);
+      // The checks that write nothing come first (10 11: 404 before the agents of resolve_i1).
+      final host = body['target_kind'] == 'host';
+      final channels = host
+          ? const <FakeChannel>[]
+          : covered(
+              body['target_kind']! as String,
+              body['target_id'] as String?,
+            );
+      return guard.run(
+        r,
+        action: 'grant.create',
+        resourceKind: 'grant',
+        apply: () {
+          final response = host
+              ? hostGrant(r, body)
+              : FakeResponse(201, applyGrant(body, channels, r.person.id));
+          final grant = response.body! as JsonMap;
+          return (
+            response: response,
+            resourceId: grant['id']! as String,
+            details: grantDetails(grant),
+          );
+        },
+      );
     })
     ..handle('listGrants', (r) {
       owner(r);

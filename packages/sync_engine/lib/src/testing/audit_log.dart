@@ -40,9 +40,18 @@ final class FakeAuditLog {
   /// after it (M1-50).
   int? lastCheckpointSeq;
 
+  /// A correlation ID for the rows of one request, in the shape of `CorrelationId`: the ID the
+  /// next row would get on its own, so it never repeats the ID of an earlier row (10 11 point
+  /// 4: every audit row of one request carries the same `correlation_id`).
+  String get nextCorrelationId => _correlationId(rows.length + 1);
+
+  static String _correlationId(int seq) =>
+      '4bf92f35-77b3-4da6-a3ce-${seq.toRadixString(16).padLeft(12, '0')}';
+
   /// Appends a row and returns it; the hash links it to the row before.
   ///
-  /// [at] defaults to the world's clock; [details] defaults to an empty object.
+  /// [at] defaults to the world's clock; [details] defaults to an empty object;
+  /// [correlationId] (from [nextCorrelationId]) defaults to an ID of this row alone.
   JsonMap add(
     FakeWorld world, {
     required String action,
@@ -53,6 +62,7 @@ final class FakeAuditLog {
     String? resourceId,
     JsonMap details = const {},
     DateTime? at,
+    String? correlationId,
   }) {
     final prev = rows.isEmpty ? auditGenesisHash : rows.last['hash']! as String;
     final row = <String, Object?>{
@@ -66,8 +76,7 @@ final class FakeAuditLog {
       'resource_kind': ?resourceKind,
       'resource_id': ?resourceId,
       'details': details,
-      'correlation_id':
-          '4bf92f35-77b3-4da6-a3ce-${(rows.length + 1).toRadixString(16).padLeft(12, '0')}',
+      'correlation_id': correlationId ?? _correlationId(rows.length + 1),
       'prev_hash': prev,
     };
     row['hash'] = hashOf(row);
