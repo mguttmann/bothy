@@ -510,6 +510,27 @@ reasons):
   launchd `bothy-host` and `bothy-host.helper.<name>` in `/Library/LaunchDaemons`; Windows
   services `bothy-host` and `bothy-host-helper-<name>`. A refused start ends with exit code `78`,
   which the service manager does not restart.
+- M2-45 (D-M2-45-13, D-M2-45-15): the systemd unit of each PTY helper has `Delegate=yes`, so the
+  helper creates one cgroup per session in its own subtree ([24-terminal.md](24-terminal.md),
+  section 6.5). The folder of the local confirmation endpoint (24, 6.4) belongs to the service
+  user: on Linux `/run/bothy-host-confirm` from `RuntimeDirectory=bothy-host-confirm` of
+  `bothy-host.service` (mode `0755`), on macOS `/Library/Application Support/bothy-host/confirm`,
+  created by `install` (mode `0755`); on Windows the host service creates the pipe
+  `\\.\pipe\bothy-host-confirm` itself. The host service opens the endpoint only with
+  `host_service.require_local_confirm = true`.
+- Key of the profile `claude` (D-M2-45-11): the host service reads `claude_api_key` for each start
+  of the profile `claude` at `organization` and hands the value only to that start, so a
+  replaced file takes effect at the next start without a restart; a missing or empty file
+  refuses the start with `pty_failed`.
+- Local confirmation (D-M2-45-15; [24-terminal.md](24-terminal.md), section 6.4): with
+  `host_service.require_local_confirm = true` the operator creates for the person who sits at
+  the machine an autostart entry that starts `bothy-host confirm-agent` in that person's
+  desktop session: on macOS a LaunchAgent of that user, on Linux an XDG autostart file of that
+  user, on Windows a value under the `Run` key of that user. `install` creates none of them. The
+  person must not be the service user or a current or former session user, because the host
+  service refuses the agent of such a user. Without a running agent every opening and attach
+  ends with `local_confirm_denied`; on Linux the agent needs `/usr/bin/zenity` or
+  `/usr/bin/kdialog`, else it denies.
 - `bothy-host pair --server <url> --code <code> [--ca-file <pem>]` pairs with the identity of the
   service user: as an administrator it goes through the running service (on Windows the service
   must run) and restarts it afterwards; it prints the fingerprint in groups of four. As an

@@ -826,9 +826,9 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | duration | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old | active |
 | `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Validity of a terminal session token | active |
 | `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server | duration | `20s` | Deadline until both sides are connected in the relay and the handshake is complete | active |
-| `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server |  | `15m` | this long a detached session stays attachable | planned (M2) |
+| `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server | duration | `15m` | this long a detached session stays attachable | active |
 | `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | duration | `60s` | Reattach from the same device without a new step-up within this time after the detach | active |
-| `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server |  | `30m` | without input from the device for this long, the session ends | planned (M2) |
+| `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server | duration | `30m` | without input from the device for this long, the session ends | active |
 | `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server |  | `2m` | Extra time after which the server itself ends the session because of idleness | planned (M2) |
 | `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server |  | `12h` | Maximum duration of a session | planned (M2) |
 | `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server |  | `5` | open sessions per person | planned (M2) |

@@ -299,3 +299,15 @@ sections 3.4 and 9; the reasons are the rows `D-M2-47-<n>` of
   side), `app` (`LocalSignals`, staged signals), `adapters/wsrelay` (the handler), `internal/wire`
   (key and wiring), `test/terminal/multinode` (TM-T15 and the cross-node tests over two in-process
   nodes) and `test/edge` (the example edge with the real nginx image and the overlay).
+
+## Built in M2-45
+
+- `hello` of the control and the data connection (`adapters/wsrelay`, `helloFrame`) carries the
+  server values the host service applies to a session: `clock_leeway_ms` from `auth.clock_leeway`
+  (the tolerance on `exp` of the session token and its `jti` memory), `idle_timeout_ms` from
+  `terminal.idle_timeout` and `detach_grace_ms` from `terminal.detach_grace` (its timers); the
+  host service takes them from the `hello` of the data connection that carries the handshake
+  (M2-45 Design note 2a). `internal/wire` binds the three keys into `wsrelay.Config`; the two
+  terminal keys are registered here, and the server's own checks with them follow in M2-46. The
+  Fake-Host's script `EndAfterHandshake` plays the close order of the host service after message 2
+  (`session.ended`, data connection kept open), proven by `TestRelay_HostEndCloseOrder`.

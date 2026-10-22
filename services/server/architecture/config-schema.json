@@ -3725,6 +3725,18 @@
       "doc": "Longest template name in Unicode characters."
     },
     {
+      "name": "terminal.detach_grace",
+      "env": "BOTHY_TERMINAL__DETACH_GRACE",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "This long a detached session stays attachable; announced to the host service in hello."
+    },
+    {
       "name": "terminal.fingerprint_confirm_chars",
       "env": "BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS",
       "kind": "int",
@@ -3795,6 +3807,18 @@
       "max": "",
       "chapter": "24-terminal.md",
       "doc": "Missed heartbeats after which the server closes the control connection with 4009."
+    },
+    {
+      "name": "terminal.idle_timeout",
+      "env": "BOTHY_TERMINAL__IDLE_TIMEOUT",
+      "kind": "duration",
+      "default": "30m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Without input from the device for this long, the session ends; announced to the host service in hello."
     },
     {
       "name": "terminal.open_timeout",

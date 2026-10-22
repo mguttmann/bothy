@@ -17,7 +17,8 @@ import (
 )
 
 // TestConnect_LoginAndReady (M2-43): hello carries the versions, a 43-character challenge, the
-// heartbeat keys and the keys of purpose terminal; ready carries the declaration of H1 and state
+// heartbeat keys, the server values of M2-45 (auth.clock_leeway, terminal.idle_timeout,
+// terminal.detach_grace) and the keys of purpose terminal; ready carries the declaration of H1 and state
 // active, H2 gets confirming; reported_host_version and last_seen_at are stored; no audit entry.
 func TestConnect_LoginAndReady(t *testing.T) {
 	t.Parallel()
@@ -25,7 +26,8 @@ func TestConnect_LoginAndReady(t *testing.T) {
 	cl := c.dial()
 	h := cl.Hello()
 	if len(h.ProtocolVersions) != 1 || h.ProtocolVersions[0] != 1 || len(h.Challenge) != 43 ||
-		h.HeartbeatIntervalMs != hbInterval.Milliseconds() || h.HeartbeatMissLimit != hbMissLimit {
+		h.HeartbeatIntervalMs != hbInterval.Milliseconds() || h.HeartbeatMissLimit != hbMissLimit ||
+		h.ClockLeewayMs != clockLeeway.Milliseconds() || h.IdleTimeoutMs != idleTimeout.Milliseconds() || h.DetachGraceMs != detachGrace.Milliseconds() {
 		t.Fatalf("hello %+v", h)
 	}
 	if len(h.Jwks.Keys) != 1 || h.Jwks.Keys[0]["kid"] != "terminal-key-1" || h.Jwks.Keys[0]["kty"] != "OKP" {

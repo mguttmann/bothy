@@ -49,6 +49,13 @@ type Config struct {
 	HeartbeatInterval time.Duration
 	// HeartbeatMissLimit is terminal.host_heartbeat_miss_limit.
 	HeartbeatMissLimit int
+	// ClockLeeway is auth.clock_leeway (hello.clock_leeway_ms): the host service's tolerance on exp
+	// of a session token and its jti memory (M2-45 Design note 2a).
+	ClockLeeway time.Duration
+	// IdleTimeout is terminal.idle_timeout (hello.idle_timeout_ms), the host service's idle timer.
+	IdleTimeout time.Duration
+	// DetachGrace is terminal.detach_grace (hello.detach_grace_ms), the host service's detach timer.
+	DetachGrace time.Duration
 	// AuthTimeout is terminal.host_auth_timeout, the time between hello and identify.
 	AuthTimeout time.Duration
 	// DuplicateProbeTimeout is terminal.host_duplicate_probe_timeout.
@@ -84,12 +91,17 @@ type Handler struct {
 	d   Deps
 }
 
-// NewHandler returns the handler. Errors: a limit below 1 or a missing collaborator.
+// NewHandler returns the handler. Errors: a limit below 1, a negative auth.clock_leeway or a
+// missing collaborator.
 func NewHandler(cfg Config, d Deps) (*Handler, error) {
 	if cfg.HeartbeatInterval <= 0 || cfg.HeartbeatMissLimit < 1 || cfg.AuthTimeout <= 0 || cfg.DuplicateProbeTimeout <= 0 ||
-		cfg.MaxFrameBytes < 1 || cfg.MaxJSONDepth < 1 || cfg.OutboundQueueMax < 1 || cfg.WriteTimeout <= 0 {
-		return nil, errors.New("wsrelay: the terminal.host_* keys, sync.ws_max_frame_bytes, http.max_json_depth, " +
-			"sync.outbound_queue_max and gateway.write_timeout must be positive")
+		cfg.MaxFrameBytes < 1 || cfg.MaxJSONDepth < 1 || cfg.OutboundQueueMax < 1 || cfg.WriteTimeout <= 0 ||
+		cfg.IdleTimeout <= 0 || cfg.DetachGrace <= 0 {
+		return nil, errors.New("wsrelay: the terminal.host_* keys, terminal.idle_timeout, terminal.detach_grace, " +
+			"sync.ws_max_frame_bytes, http.max_json_depth, sync.outbound_queue_max and gateway.write_timeout must be positive")
+	}
+	if cfg.ClockLeeway < 0 {
+		return nil, errors.New("wsrelay: auth.clock_leeway must not be negative")
 	}
 	if d.UseCases == nil || d.Links == nil || d.Schemas == nil {
 		return nil, errors.New("wsrelay: NewHandler needs the use cases, the registry and the schemas")
@@ -255,7 +267,7 @@ func (c *conn) identify(ctx context.Context, data bool) (app.Login, app.Identify
 		return app.Login{}, app.Identify{}, false
 	}
 	k.lastJWKS = keySet(keys)
-	k.send(helloFrame(challenge, helloAt, h.cfg.HeartbeatInterval, h.cfg.HeartbeatMissLimit, keys))
+	k.send(helloFrame(challenge, helloAt, h.cfg, keys))
 	c.setTimer(h.cfg.AuthTimeout, func() {
 		if err := h.d.UseCases.AuthFailed(ctx); err != nil {
 			h.d.Log.LogAttrs(ctx, slog.LevelError, msgInternal, slog.String(logErrorType, errorInternal))

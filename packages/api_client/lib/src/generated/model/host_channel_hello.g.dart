@@ -18,6 +18,12 @@ class _$HostChannelHello extends HostChannelHello {
   @override
   final int heartbeatMissLimit;
   @override
+  final int clockLeewayMs;
+  @override
+  final int idleTimeoutMs;
+  @override
+  final int detachGraceMs;
+  @override
   final Jwks jwks;
 
   factory _$HostChannelHello([
@@ -30,6 +36,9 @@ class _$HostChannelHello extends HostChannelHello {
     required this.serverTime,
     required this.heartbeatIntervalMs,
     required this.heartbeatMissLimit,
+    required this.clockLeewayMs,
+    required this.idleTimeoutMs,
+    required this.detachGraceMs,
     required this.jwks,
   }) : super._();
   @override
@@ -49,6 +58,9 @@ class _$HostChannelHello extends HostChannelHello {
         serverTime == other.serverTime &&
         heartbeatIntervalMs == other.heartbeatIntervalMs &&
         heartbeatMissLimit == other.heartbeatMissLimit &&
+        clockLeewayMs == other.clockLeewayMs &&
+        idleTimeoutMs == other.idleTimeoutMs &&
+        detachGraceMs == other.detachGraceMs &&
         jwks == other.jwks;
   }
 
@@ -60,6 +72,9 @@ class _$HostChannelHello extends HostChannelHello {
     _$hash = $jc(_$hash, serverTime.hashCode);
     _$hash = $jc(_$hash, heartbeatIntervalMs.hashCode);
     _$hash = $jc(_$hash, heartbeatMissLimit.hashCode);
+    _$hash = $jc(_$hash, clockLeewayMs.hashCode);
+    _$hash = $jc(_$hash, idleTimeoutMs.hashCode);
+    _$hash = $jc(_$hash, detachGraceMs.hashCode);
     _$hash = $jc(_$hash, jwks.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -73,6 +88,9 @@ class _$HostChannelHello extends HostChannelHello {
           ..add('serverTime', serverTime)
           ..add('heartbeatIntervalMs', heartbeatIntervalMs)
           ..add('heartbeatMissLimit', heartbeatMissLimit)
+          ..add('clockLeewayMs', clockLeewayMs)
+          ..add('idleTimeoutMs', idleTimeoutMs)
+          ..add('detachGraceMs', detachGraceMs)
           ..add('jwks', jwks))
         .toString();
   }
@@ -106,6 +124,21 @@ class HostChannelHelloBuilder
   set heartbeatMissLimit(int? heartbeatMissLimit) =>
       _$this._heartbeatMissLimit = heartbeatMissLimit;
 
+  int? _clockLeewayMs;
+  int? get clockLeewayMs => _$this._clockLeewayMs;
+  set clockLeewayMs(int? clockLeewayMs) =>
+      _$this._clockLeewayMs = clockLeewayMs;
+
+  int? _idleTimeoutMs;
+  int? get idleTimeoutMs => _$this._idleTimeoutMs;
+  set idleTimeoutMs(int? idleTimeoutMs) =>
+      _$this._idleTimeoutMs = idleTimeoutMs;
+
+  int? _detachGraceMs;
+  int? get detachGraceMs => _$this._detachGraceMs;
+  set detachGraceMs(int? detachGraceMs) =>
+      _$this._detachGraceMs = detachGraceMs;
+
   JwksBuilder? _jwks;
   JwksBuilder get jwks => _$this._jwks ??= JwksBuilder();
   set jwks(JwksBuilder? jwks) => _$this._jwks = jwks;
@@ -122,6 +155,9 @@ class HostChannelHelloBuilder
       _serverTime = $v.serverTime;
       _heartbeatIntervalMs = $v.heartbeatIntervalMs;
       _heartbeatMissLimit = $v.heartbeatMissLimit;
+      _clockLeewayMs = $v.clockLeewayMs;
+      _idleTimeoutMs = $v.idleTimeoutMs;
+      _detachGraceMs = $v.detachGraceMs;
       _jwks = $v.jwks.toBuilder();
       _$v = null;
     }
@@ -167,6 +203,21 @@ class HostChannelHelloBuilder
               heartbeatMissLimit,
               r'HostChannelHello',
               'heartbeatMissLimit',
+            ),
+            clockLeewayMs: BuiltValueNullFieldError.checkNotNull(
+              clockLeewayMs,
+              r'HostChannelHello',
+              'clockLeewayMs',
+            ),
+            idleTimeoutMs: BuiltValueNullFieldError.checkNotNull(
+              idleTimeoutMs,
+              r'HostChannelHello',
+              'idleTimeoutMs',
+            ),
+            detachGraceMs: BuiltValueNullFieldError.checkNotNull(
+              detachGraceMs,
+              r'HostChannelHello',
+              'detachGraceMs',
             ),
             jwks: jwks.build(),
           );

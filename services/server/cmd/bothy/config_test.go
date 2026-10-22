@@ -495,12 +495,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"telemetry.traces.trust_remote_parent = false  # default\n" +
 		"template.max_per_scope = 100  # default\n" +
 		"template.name_max_chars = 100  # default\n" +
+		"terminal.detach_grace = 15m  # default\n" +
 		"terminal.fingerprint_confirm_chars = 8  # default\n" +
 		"terminal.fingerprint_max_attempts = 3  # default\n" +
 		"terminal.host_auth_timeout = 10s  # default\n" +
 		"terminal.host_duplicate_probe_timeout = 5s  # default\n" +
 		"terminal.host_heartbeat_interval = 20s  # default\n" +
 		"terminal.host_heartbeat_miss_limit = 3  # default\n" +
+		"terminal.idle_timeout = 30m  # default\n" +
 		"terminal.open_timeout = 20s  # default\n" +
 		"terminal.pairing_code_ttl = 15m  # default\n" +
 		"terminal.quick_reattach_window = 1m  # default\n" +

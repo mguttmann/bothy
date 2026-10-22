@@ -149,6 +149,19 @@ flowchart LR
        A name must equal a reported name exactly, also in upper and lower case, because the host
        service compares `osu` exactly with `host_service.session_users`; uniqueness per host, in
        contrast, ignores case (03, `host_session_users`; docs/DECISIONS.md D-M2-39-9).
+
+        Server values and declaration on the host (M2-45, D-M2-45-2, D-M2-45-3): the server
+        values the host service applies come with the `hello` of every data connection:
+        `clock_leeway_ms` (`auth.clock_leeway`), `idle_timeout_ms` (`terminal.idle_timeout`) and
+        `detach_grace_ms` (`terminal.detach_grace`). The host service uses those of the data
+        connection that carries a handshake: the leeway for the checks of `exp` and `jti` (5.3),
+        idle and detach for the timers of that session (6.2, 6.3); every attach refreshes them. A
+        `hello` with a negative leeway or without a positive idle or detach value closes that data
+        connection with `4002`. The declaration comes only from `ready` (D-M2-42-15); the server
+        sends `ready` again after a committed change of the declaration, the host service stores
+        it, evaluates HD6 again and sends `report`; a running session keeps its profile and
+        environment, and new openings and attaches use the new offer.
+
     6. **No shared locations** (Ruling T13): On the host there is no location that one
        session user can write and another can read or execute, if it carries code,
        settings or logins. For the locations that the host service knows, this means:
@@ -1116,6 +1129,40 @@ opening without a PTY ends with `open_failed` and that detail. A refusal reporte
 `session.ended` instead reaches the device with the same code (`StreamCodeForEnd`), so the device
 gets exactly one code either way.
 
+Check order on the host (M2-45, D-M2-45-5, D-M2-45-6): for every message 1 on a data connection
+the host service runs these steps; the first failure wins and nothing after it runs:
+
+| Step | Check | `close_detail` |
+|---|---|---|
+| 0 | `ReadMessage1` with the prologue (session ID of `session.open`, own host ID) and the static Noise key | `handshake_failed` |
+| 1 | compact JWS (exactly two dots, base64url without padding), header with `alg` exactly `EdDSA`, a `kid` and `typ`, no `crit`, `jku`, `x5u`, `x5c`, `zip` or `jwk`; the Ed25519 key with that `kid` from the `jwks` of the `hello` of this data connection verifies the signature; the claims of the table above with their JSON types, no `null` member, no trailing data | `token_invalid` |
+| 2 | `typ = terminal-session+jwt` | `token_invalid` |
+| 3 | `aud` = own host ID | `token_invalid` |
+| 4 | `sid` = session ID of the prologue | `token_invalid` |
+| 5 | now at most `exp` plus the leeway of `hello` (2.2 point 5) | `token_expired` |
+| 6 | `jti` not seen; it is remembered now until `exp` plus the leeway | `token_replayed` |
+| 7 | `cek` = hash of the `e` of message 1 | `token_invalid` |
+| 8 | `att = open` needs a session ID without a live PTY; `att = attach` needs a session ID with a live PTY whose `sub`, `osu` and `prf` equal the claims | `token_invalid` |
+| 9 | `prf` names a profile the host service offers now | `profile_unknown` |
+| 10 | `osu` in `host_service.session_users` | `session_user_unknown` |
+| 11 | `osu` unbound (it is bound to `sub` now) or bound to `sub` | `session_user_mismatch` |
+| 12 | `wdi` present exactly for a profile of kind `claude` with `att = open`, and an index into the list of `osu` after HD7 that the host service reported | `profile_unknown` |
+| 13 | `own = true` when this host detected that it is the server host (HD5 or the server of the control connection is this machine) | `server_host_owner_only` |
+
+Steps 8 and 12 add what the list above leaves open: which session an `attach` may name, and when
+`wdi` may be present; a mismatch can only come from a fault or a manipulation of the server
+(R-TM-16). `iss` and `iat` are not compared: the key from the JWKS of this server binds the
+issuer. Step 6 records the `jti` before the later steps run, so a replay of a token that failed
+later is still `token_replayed`. The `jti` memory lives only in memory: after a restart of the
+host service every earlier session is ended (`host_restarted`, 6.2), so only a server that sends
+`session.open` for an ended session could replay, which 5.1 excludes from the protection goal.
+Step 11 writes `bindings.json` under a lock before step 12, so two first openings of one session
+user by two people never both bind; the binding stays when a later step fails, because the
+server never gives a session user to another person (T12). An `attach` for a session whose end
+the host service already reported is no refusal: it closes that data connection with `1000` and
+reports nothing new. The host module verifies the token with its own smaller implementation of
+the profile of ADR 0067 (D-M2-45-5).
+
 JWKS refresh (M2-43, D-M2-43-11): `heartbeat_ack` carries `jwks` whenever the set of purpose
 `terminal` differs from the last set sent on the connection, and the host service replaces its
 set. A scheduled rotation publishes the `next` key `agent.jwks_max_age` before it signs, so a
@@ -1148,6 +1195,20 @@ number in two's complement. A frame is at most 65519 bytes long, the largest pla
 transport message. Directions as in the table; every error while reading a frame (empty, too
 long, unknown type, wrong direction, wrong content) ends the session like an unknown type
 (`4104`).
+
+Fault of the stream on the host (M2-45, D-M2-45-8): a first transport message other than
+`start`, a failed decryption, a frame that `frame.Decode` refuses, a second `start`, or any such
+fault later in the session ends the session on the host: the PTY ends with its tree, and the host
+service sends `session.ended` with `close_reason = open_failed` and
+`close_detail = handshake_failed`, also for a session that already ran. The server closes both
+sides through its end path, and the device gets `4104` (6.1, 10.3). Reason: 03 has no
+`close_reason` for a fault of the encrypted stream after the opening, and the server accepts no
+other reason from a host; `open_failed` with `handshake_failed` keeps the manipulation signal of
+`4104` without a change of the core contract. `start` sets the size of a new PTY or resizes the
+PTY of an attach; `data` goes to the PTY, `resize` resizes it, `close` ends the session with
+`client_closed`. When the process exits, the host service sends `exit` with the exit code
+(Unix: the exit status, or 128 plus the signal number after a signal; Windows: the exit code of
+the process), ends the tree and sends `session.ended` with `process_exited` and `exit_code`.
 
 ### 5.5 Key pinning on the device
 
@@ -1202,7 +1263,21 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
    without its counterpart follows the phase rule of section 9.
 7. After message 2 and the frame `start`, the host service starts the PTY; it reports
    `session.started` over the control connection; the server sets `state = 'active'`. M2-44: a
-   `session.started` without a paired device side makes the session `detached` at once.
+   `session.started` without a paired device side makes the session `detached` at once. M2-45
+   (D-M2-45-7, D-M2-45-12, D-M2-45-15): on the host the order is message 2 with the payload
+   `{"v":1,"host_version":"<version>","profile":"<prf>"}`, then the first transport message
+   `start`, awaited until `HostSessionOpen.expires_at` (only this wait), then the gate (HD6 and
+   HD11 of 7.4), then the local confirmation with `host_service.require_local_confirm` (6.4),
+   then the PTY in the helper of `osu`, then `session.started` once; an attach sends none.
+   Without `start` until `expires_at` no PTY starts, and the host service sends `session.ended`
+   with `open_failed` and `open_timeout`. Every failure after message 2 and before the PTY runs
+   sends `session.ended` with `open_failed` and its `close_detail`, and the host service keeps
+   the data connection open: the server ends the session and closes both sides (host side
+   `4100`), so the device gets the code of the end (`4104` for `handshake_failed`, else `4100`)
+   and not `4102`. Only when the server has not closed the data connection within the length of
+   the opening window (`HostSessionOpen.expires_at` minus the arrival of that `session.open`)
+   after the report does the host service close it with `1000`. The same holds for every
+   `session.ended` the host service sends while it holds the data connection.
 
 ### 6.2 Detach and reattach
 
@@ -1251,6 +1326,38 @@ Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (sou
   (M2-43, D-M2-43-8): a PTY the server no longer allows ends at the next login, fail closed for IDs
   the server does not know. Listed sessions in `opening`, `active` or `detached` stay; their end
   comes with `session.ended`.
+- Reactions of the host service (M2-45, D-M2-45-4): it opens at most one data connection for
+  each `session.open` (none for one it cannot use) and never one on its own. A `session.open` for a session ID without a live
+  PTY is an opening, one for a session ID with a live PTY an attach; a newer `session.open` for
+  the same session replaces the older data connection, which the host service closes with
+  `1000`. `session.close` and a close of the data connection by the server with `4100` end the
+  PTY with its tree at once (6.5), or abandon an opening without a PTY; the host service stops
+  the timers of the session, drops its scrollback, removes it from `live_sessions` and sends no
+  `session.ended`, because the server closed the session already. A `session.close` for a
+  session the host service does not know changes nothing. Every other close of the data
+  connection by the server (`1000`, `4002`, `4013`, `4014` or a code of the login) and its loss,
+  while the PTY lives, make the session detached on the host: idle keeps counting, the detach
+  timer of `terminal.detach_grace` starts, and the host service waits for the next
+  `session.open`; it never redials a data connection on its own. When the detach timer runs out
+  the session ends with `detach_expired`.
+- Replay on the host (M2-45, D-M2-45-14): the host service keeps per session a ring buffer of
+  `host_service.scrollback_bytes` with the newest PTY output, only in its memory, and keeps
+  filling it while no device is attached, so the program never blocks on a full PTY. After a
+  successful attach (checks of 5.3, `start`, local confirmation) it resizes the PTY to the size
+  of `start`, sends `replay_begin`, the buffer as it was when `start` arrived in `data` frames,
+  `replay_end`, then the output that arrived since `start` up to `host_service.scrollback_bytes`
+  (later output of that interval stays only in the ring buffer), then the live output. When the
+  buffer has wrapped, the replay starts after its first line feed, so no half line, half UTF-8
+  sequence or half escape sequence opens it; a wrapped buffer without a line feed replays
+  nothing. A refusal with `4101` leaves a live PTY of that session detached; every refusal with
+  `4104` of a `session.open` whose session has a live PTY (an attach or an open, also
+  `handshake_failed` before the token is read) ends that PTY with its tree without
+  `session.ended`. A faulty first frame or a denied local confirmation of an attach ends the
+  session with `open_failed`; an attach without `start` until `expires_at` closes its data
+  connection with `1000` and leaves the session detached.
+- Broken channel to a helper (M2-45, D-M2-45-16): when the local channel to a PTY helper breaks,
+  the helper ends its PTYs with their trees (D-W-90), and the host service ends their sessions
+  with `session.ended` `process_exited` without an exit code.
 
 ### 6.3 Limits
 
@@ -1270,6 +1377,12 @@ Reason: a tampered host service must not keep a session open indefinitely. The j
 ([02-architecture.md](02-architecture.md), section 12.3) checks the same limits in the database
 and catches sessions of a failed node.
 
+Idle on the host (M2-45, D-M2-45-2): the host service takes `terminal.idle_timeout` and
+`terminal.detach_grace` from `idle_timeout_ms` and `detach_grace_ms` of the `hello` of the data
+connection of the last handshake of a session (2.2 point 5). Idle is the time since the last
+input frame of the device (`data` or `resize`), also across a detach; when it reaches the value
+the session ends with `idle_timeout`.
+
 ### 6.4 Local confirmation
 
 With `host_service.require_local_confirm = true`, the host service asks on the host before the start
@@ -1277,6 +1390,49 @@ of every PTY (a notification of the operating system to the person logged in on 
 starts only after consent within `host_service.local_confirm_timeout`. The default is off.
 Reason: fallback against a malicious instance operator of the server (5.1), only useful if someone
 sits at the host.
+
+Built by M2-45 (D-M2-45-15):
+
+- **Agent.** The host service cannot show anything in the desktop session of another user, so
+  the person at the machine runs the confirmation agent `bothy-host confirm-agent` in their
+  desktop session, started at their login by an autostart entry the operator creates
+  ([16-operations.md](16-operations.md), section 4.4). It shows a dialog with "deny" as the default:
+  macOS `/usr/bin/osascript` with `display dialog` and `giving up after`; Linux
+  `/usr/bin/zenity --question --timeout`, else `/usr/bin/kdialog --warningyesno`; Windows
+  `MessageBoxW` with `MB_YESNO`, `MB_DEFBUTTON2` and `MB_SYSTEMMODAL`. Without a dialog program
+  it denies and logs `no_dialog_tool`. The text names open or attach, the profile and the
+  session user, nothing else.
+- **Endpoint.** The host service opens it only with `host_service.require_local_confirm = true`:
+  Linux `/run/bothy-host-confirm/confirm.sock` (folder from `RuntimeDirectory=bothy-host-confirm`
+  of the unit of the host service, owned by the service user), macOS
+  `/Library/Application Support/bothy-host/confirm/confirm.sock` (folder created by `install`,
+  owned by the service user), Windows the named pipe `\\.\pipe\bothy-host-confirm` with
+  `PIPE_REJECT_REMOTE_CLIENTS`. The socket has mode `0666`; the pipe gives interactive users
+  read and write access. It is never a TCP or UDP listener.
+- **Peer rule.** Access is decided by the user of the connected process, at the connection and
+  again before every request, not by the mode: it is neither the service user, nor in
+  `host_service.session_users`, nor a former session user in `bindings.json`, and it owns the
+  active console session (Linux: the user of the active session on `seat0` from `loginctl`;
+  macOS: the owner of `/dev/console`; Windows: the user of the active console session, and the
+  session of the peer's token is that session). Otherwise the connection is closed and logged
+  with `confirm_peer_refused`. Reason: a long-running process of a session user must never
+  approve a PTY, and the option means the person sitting at the machine.
+- **Protocol.** JSON lines; the service sends
+  `{"op":"confirm","id","kind":"open"|"attach","profile","session_user","timeout_ms"}` and
+  `{"op":"cancel","id"}`, the agent answers `{"op":"answer","id","allow"}`. A request goes to
+  every accepted agent; the first answer wins and the others get `cancel`.
+- **What is confirmed.** Before every PTY start (after `start` and the gate, 6.1 step 7) and
+  before every replay of an attach (after `start`), because an attach hands the scrollback and
+  the live stream to the attaching device, exactly what the option guards against a malicious
+  server. No accepted agent, no answer within `host_service.local_confirm_timeout` or a denial
+  give `open_failed` with `local_confirm_denied`; a denied attach ends the session.
+- **Deadline.** On a host whose last `report` says `require_local_confirm = true`, the server
+  deadline of an opening (grant time plus `terminal.open_timeout`) is met by the pairing of both
+  sides, not by `session.started`, because `host_service.local_confirm_timeout` may be longer
+  than `terminal.open_timeout` (6.1 step 6). The host service bounds the rest itself: `start`
+  until `HostSessionOpen.expires_at`, the consent within `host_service.local_confirm_timeout`,
+  and it ends a refused or unanswered opening with `session.ended` `open_failed`
+  (`open_timeout` or `local_confirm_denied`).
 
 ### 6.5 End of a session on the host
 
@@ -1287,6 +1443,47 @@ for whatever reason, it ends the whole tree: under Linux all processes of the cg
 Windows the Job Object, under macOS the process group and then every process of the
 session user whose parent chain leads back to the session. Reason: without this, a process started
 with `nohup`, `setsid` or `disown` would keep running after a revocation.
+
+Built by M2-45 (D-M2-45-13): every end, whatever its reason, kills the whole tree at once,
+without a grace period, because every end is either the person's `close` or an enforcement that
+8.3 wants immediately. The helper starts every PTY in its own POSIX session with a controlling
+terminal (`Setsid`, `Setctty`) or, on Windows, in a pseudo console (ConPTY).
+
+- **Linux.** Instead of a systemd scope of the session user, the unit of each PTY helper has
+  `Delegate=yes`: a session user without a login session has no user manager that could hold a
+  scope, and a delegated subtree of the helper's system unit gives the same cgroup per session.
+  systemd documents the option as "Turns on delegation of further resource control partitioning
+  to processes of the unit" and "Units where this is enabled may create and manage their own
+  private subhierarchy of control groups"
+  (https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html,
+  retrieved 2026-10-20 [verified]). At its start the helper moves itself into the leaf
+  `<its cgroup>/helper`, because cgroup v2 keeps processes out of inner nodes, and fails when it
+  may not create cgroups there. Each session gets the cgroup `<its cgroup>/s-<session id>`; the
+  child is cloned straight into it (`CLONE_INTO_CGROUP`), so no user code runs outside it, and a
+  kernel that refuses that makes the start fail (`pty_failed`). The end writes `cgroup.kill`,
+  falls back to `SIGKILL` of every PID in `cgroup.procs` until none is left, and removes the
+  cgroup. systemd also kills the whole subtree when the helper unit stops or restarts.
+- **macOS.** At the end the helper takes snapshots of the process table and kills every process
+  of its user whose POSIX session or process group is the session's or whose parent chain in the
+  snapshot leads to the session leader, until a snapshot finds none. Because launchd does not end
+  process groups created with `setsid` when the helper exits, the helper keeps a run file of its
+  live sessions (leader PID with its start time, process group, POSIX session; mode `0600`) in
+  the folder `<home>/.config/bothy-host/run` of its session user (mode `0700`); at its start it
+  ends every recorded tree by its POSIX session and process group, also when the leader is gone,
+  and skips only an entry whose leader PID now names another process (another start time).
+  Limit, honestly: a process that
+  left the session with `setsid` after its parent ended is not found; it runs in the person's own
+  session user like a long-running process (Limit below, T12).
+- **Windows.** The leader is created suspended with the pseudo console attribute, assigned to a
+  new Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and without
+  `JOB_OBJECT_LIMIT_BREAKAWAY_OK`, and only then resumed, so no process of the session runs
+  outside the job and `CREATE_BREAKAWAY_FROM_JOB` fails inside it. The end calls
+  `TerminateJobObject` and `ClosePseudoConsole`; the job handle belongs to the helper, so the tree
+  also ends when the helper dies.
+- **Exit code** of `exit` and `session.ended`: Unix the exit status, or 128 plus the signal number
+  after a signal; Windows the exit code of the process.
+- **Broken channel.** Every helper ends all its PTYs with their trees as soon as its channel to
+  the host service breaks, then waits for the next connection (D-W-90).
 
 Limit: long-running processes that a person sets up as a session user (crontab, systemd services of
 the user, LaunchAgent, scheduled task) are not ended by this; they run outside every
@@ -1510,10 +1707,89 @@ records this.
   it" (https://code.claude.com/docs/en/cli-reference [verified]); the token is a one-year
   OAuth token for environments without a browser that can only make model requests
   (https://code.claude.com/docs/en/authentication [verified]). Whether `/login` can use the
-  keychain under macOS for a user without a login session, the source does not say [assumed:
-  no; then the path through the token remains]. Whether the token is intended for an interactive
+  keychain under macOS for a user without a login session, the source does not say; when the
+  keychain refuses the write, the coding agent stores the login in the file (evidence in the
+  next point, M2-45). Whether the token is intended for an interactive
   session of the same person, the source does not say either; that is the owner question OQ-03
   (Ruling T10, narrowed in D-W-17).
+- OQ-03 check before the build (M2-45, D-M2-45-1), pages retrieved 2026-10-20:
+    - Path A, a token from `claude setup-token` in `CLAUDE_CODE_OAUTH_TOKEN`: "For CI pipelines,
+      scripts, or other environments where interactive browser login isn't available, generate a
+      one-year OAuth token with `claude setup-token`"; "It does not save the token anywhere; copy
+      it and set it as the `CLAUDE_CODE_OAUTH_TOKEN` environment variable wherever you want to
+      authenticate"; "This token authenticates with your Claude subscription and requires a Pro,
+      Max, Team, or Enterprise plan." (https://code.claude.com/docs/en/authentication
+      [verified]). "`claude setup-token` | Generate a long-lived OAuth token for CI and scripts.
+      Prints the token to the terminal without saving it. Requires a Claude subscription."
+      (https://code.claude.com/docs/en/cli-reference [verified]).
+    - Path B, `/login` with the login in a file of the home or in the keychain: "On Linux,
+      credentials are stored in `~/.claude/.credentials.json` with file mode `0600`."; "On
+      Windows, credentials are stored in `%USERPROFILE%\.claude\.credentials.json` and inherit
+      the access controls of your user profile directory"; "On macOS, credentials are stored in
+      the encrypted macOS Keychain. When the Keychain rejects the write, such as when it's locked
+      in an SSH session, Claude Code stores your login in `~/.claude/.credentials.json` with file
+      mode `0600` instead, the same storage it uses on Linux."; "If you've set the
+      `CLAUDE_CONFIG_DIR` environment variable, Claude Code keeps the `.credentials.json` file
+      under that directory instead, including the file the macOS fallback writes, and keys the
+      macOS Keychain entry to that directory too" (https://code.claude.com/docs/en/authentication
+      [verified]).
+    - Use by the subscriber: "OAuth authentication is intended exclusively for purchasers of
+      Claude Free, Pro, Max, Team, and Enterprise subscription plans and is designed to support
+      ordinary use of Claude Code and other native Anthropic applications."; "Nor does it prevent
+      an end user from signing in to the unmodified Claude Code binary with their own Claude
+      subscription, including where a platform hosts Claude Code as described under Can customers
+      offer Claude Code in their products? above."; "Advertised usage limits for Pro and Max plans
+      assume ordinary, individual usage of Claude Code and the Agent SDK."
+      (https://code.claude.com/docs/en/legal-and-compliance [verified]). No sentence of the three
+      pages restricts a token of `claude setup-token` or a `/login` to non-interactive use; the
+      authentication page recommends the token "for CI pipelines and scripts where browser login
+      isn't available" [verified 2026-10-20].
+    - Finding: path A and path B are documented, so the profile `claude` with `personal` is
+      built as described above. Whether the owner wants it stays the owner question OQ-03.
+- Start of `claude` with `personal` (M2-45, D-M2-45-9, D-M2-45-10): before every start the PTY
+  helper runs the login-shell probe of HD6 as the session user, bounded by
+  `host_service.auth_status_timeout`; the probe prints only whether `CLAUDE_CODE_OAUTH_TOKEN` is
+  set and the value of `CLAUDE_CONFIG_DIR`, never a token (Windows: from the `Environment` key of
+  the user's registry hive, where only the presence of the value `CLAUDE_CODE_OAUTH_TOKEN` is
+  read, and `%NAME%` references of the stored value are expanded from the user's environment
+  block). Unset means the default folder `<home>/.claude`. The helper resolves the value as the
+  session user; it must be absolute and lie in the home or below it after resolution. A value
+  outside, a link leading outside, a dangling link or a missing folder give `open_failed` with
+  `shared_location`; a timeout or a failed shell give `pty_failed`. The start command sets the
+  checked value again after the start files (Unix: `export CLAUDE_CONFIG_DIR=<quoted value>; exec
+  claude` or `unset CLAUDE_CONFIG_DIR; exec claude`, with the forms of `fish` and `csh` for those
+  shells; Windows: `powershell.exe -NoLogo -Command` with `$env:CLAUDE_CONFIG_DIR = '<value>'` or
+  `Remove-Item Env:\CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue`, then `& claude`); the
+  working directory is the one of `wdi`, and no key is set.
+- Start of `claude` with `organization` (M2-45, D-M2-45-11): the service user reads the key file
+  `claude_api_key` of `host_service.state_dir` for each such start and sends the value only in
+  that `pty.start` of the local channel; a missing or empty file gives `pty_failed`. The helper
+  puts it only into the environment of that child as `ANTHROPIC_API_KEY` and clears it from the
+  start request and the start environment after the start; it never reaches a log, a file or
+  another start. `CLAUDE_CONFIG_DIR` is
+  `<home>/.config/bothy-host/claude` (Windows `%USERPROFILE%\.config\bothy-host\claude`) and must
+  resolve to exactly that folder, else `shared_location`. The program is the resolved
+  `host_service.claude_bin` of the last check of the helper, and `PATH` is the search list of HD6
+  followed by the cleaned `PATH` of the profile without the folders of the search list. The
+  `pty.start` names the declaration and the path of the working directory that `wdi` names in the
+  list after HD7; the helper starts only when that path is in the working directories of its last
+  check and its identity equals the one it reported then, else `shared_location`. On Windows the
+  environment block of the session user contains every user and system variable, so the helper
+  removes `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_PROFILE`,
+  `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX` and `CLAUDE_CODE_USE_FOUNDRY` from it; on
+  Unix they are never on the allow list (11.1).
+- Gate in operation (M2-45, D-M2-45-12): before every PTY start (after `start`, before the local
+  confirmation) the host service runs one `Light` run that asks only the helper of `osu` (HD6 and
+  HD11 without the entry scan) together with its own checks, including HD11 for the places for
+  all; the other helpers keep their last answer, whose age the periodic `Light` run of every
+  helper each `host_service.credential_check_interval` bounds. Consequences: HD10 failed or a
+  failed peer check of a session channel give `helper_untrusted` (no new session, all running
+  sessions end with `host_policy_violation`); HD6 failed gives `subscription_login_detected`
+  (all end); HD11 failed at a place for all gives `shared_location` (all end); HD11 failed for
+  one session user gives `shared_location` for that session user only; any other finding that
+  refuses a start refuses new sessions with `pty_failed` and ends no running session (the
+  `doctor` run of the administrator ends the service for those, M2-42). Every change of the
+  result sends `report`.
 - Fail closed and unknown declaration (D-M2-42-9): a value of `authMethod` outside the six of
   the list, an output that is not JSON, a timeout after `host_service.auth_status_timeout` or an
   exit code other than `0` and `1` gives `auth_status_unknown`, which counts like a finding. Before
@@ -1751,6 +2027,12 @@ and the backups read everything in the log in plain text.
 | `open_failed` | handshake, token, timeout on opening or rejection by the host service; code in `close_detail` |
 | `host_policy_violation` | check of the host service failed during operation (HD6, HD10, HD11; 2.2, 7.4); code in `close_detail` |
 
+What the host service sends (M2-45, D-M2-45-8, D-M2-45-16): only `client_closed`,
+`process_exited`, `idle_timeout`, `detach_expired`, `open_failed` and `host_policy_violation`.
+A fault of the encrypted stream after the opening, also in a running session, is `open_failed`
+with `handshake_failed` (5.4); a session whose helper channel broke ends with `process_exited`
+without an exit code.
+
 `close_detail` takes only codes from a closed list: `token_invalid`, `token_expired`,
 `token_replayed`, `handshake_failed`, `profile_unknown`, `session_user_unknown`, `session_user_mismatch`,
 `server_host_owner_only`, `local_confirm_denied`, `subscription_login_detected`, `helper_untrusted`,
@@ -1789,6 +2071,26 @@ service. The working directory of the profile `claude` is in the request as an i
 user in `hosts.reported_session_users`, which carries only display names; the token carries it as
 `wdi`, and the host service resolves it in exactly the list of `osu` that it reported, that is,
 according to HD7 (2.2 item 6, 5.3, Ruling T13).
+
+Start specifications on the host (M2-45, D-M2-45-9, D-M2-45-10): every environment is built
+from scratch, never by removing from an inherited one, and `TERM` is `xterm-256color` for every
+profile, because the renderer of the clients is `xterm` (12).
+
+- Unix allow list: `HOME`, `USER`, `LOGNAME` and `SHELL` of the session user, `PATH` cleaned
+  from the helper's own environment (only absolute, existing folders that are not writable by
+  group or others, judged after resolution as the session user, without duplicates), and `LANG`,
+  `LC_*` and `TMPDIR` from the helper's environment when present, then `TERM`.
+- Windows: the environment block of the helper's token without inheritance (the user and system
+  variables, the equivalent of a login) plus `TERM`.
+- `shell`: the login shell of the session user, working directory the home. Unix: the shell of
+  the user database, started with `argv[0]` set to `-` plus the base name of the shell (the
+  convention of login(1)); a shell that is not an absolute path listed in `/etc/shells` gives
+  `pty_failed`. Windows: `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo`.
+- `command`: the resolved path of `program` with `args`, working directory the home.
+- `claude`: 7.4 ("Start of `claude` with `organization`" and "with `personal`"); the profile is
+  offered with `organization` only with a usable `host_service.claude_bin`, with `personal` as
+  long as OQ-03 found a documented login path, never with `none` or an unknown declaration, and
+  only when at least one session user has a working directory after HD7.
 
 ### 11.2 Rendering
 
@@ -1872,6 +2174,16 @@ Close codes of the terminal channels (source of the names and client reactions i
 | `4112` | `host_duplicate` | control and data connection | second live control connection with the same keys (3.4); host disabled, do not reconnect |
 | `4113` | `host_auth_failed` | control and data connection | signature over the challenge from `hello` invalid or too late (`terminal.host_auth_timeout`); check clock and keys, reconnect with backoff |
 | `4114` | `host_version_unsupported` | control and data connection | version below the minimum version ([18-release.md](18-release.md)); update the host service, do not reconnect |
+
+Reactions of the host service on a data connection (M2-45, D-M2-45-4, D-M2-45-7): the server
+closes it with `4100` when the session ended; the host service ends the PTY with its tree and
+sends no `session.ended`. Every other close by the server (`1000`, `4002`, `4013`, `4014`, a code
+of the login) and a lost connection leave a live PTY detached until the next `session.open` or
+`terminal.detach_grace` (6.2); the host service never redials. The host service itself closes a
+data connection with `4101` or `4104` and the `close_detail` as close reason when it refuses a
+handshake (5.3), with `1000` when a newer `session.open` replaces it or when the server has not
+closed it within the opening window after a `session.ended` (6.1 step 7), and with `4002` when its
+`hello` lacks a usable server value (2.2 point 5).
 
 ## 14. Tests
 

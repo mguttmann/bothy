@@ -16,6 +16,28 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// RefreshTokenWithBody Rotate the refresh token
+//
+// The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
+// the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
+// with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
+// server issues a new access token and returns the same refresh token, without rotation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/token/refresh (the `RefreshToken` operationId).
+func (c *Client) RefreshTokenWithBody(ctx context.Context, params *RefreshTokenParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRefreshTokenRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // RefreshToken Rotate the refresh token
 //
 // The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes

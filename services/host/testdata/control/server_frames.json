@@ -1,5 +1,5 @@
 [
-  {"op":"hello","d":{"challenge":"SGVsbG8gZnJvbSB0aGUgcmVjb3JkaW5nIG9mIE0yLTQzIQ","heartbeat_interval_ms":20000,"heartbeat_miss_limit":3,"jwks":{"keys":[{"alg":"EdDSA","crv":"Ed25519","kid":"terminal-key-1","kty":"OKP","use":"sig","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]},"protocol_versions":[1],"server_time":"2026-10-14T09:00:00Z"}},
+  {"op":"hello","d":{"challenge":"SGVsbG8gZnJvbSB0aGUgcmVjb3JkaW5nIG9mIE0yLTQzIQ","clock_leeway_ms":30000,"detach_grace_ms":900000,"heartbeat_interval_ms":20000,"heartbeat_miss_limit":3,"idle_timeout_ms":1800000,"jwks":{"keys":[{"alg":"EdDSA","crv":"Ed25519","kid":"terminal-key-1","kty":"OKP","use":"sig","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]},"protocol_versions":[1],"server_time":"2026-10-14T09:00:00Z"}},
   {"op":"ready","d":{"host_id":"0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f","llm_credentials":"organization","state":"active"}},
   {"op":"heartbeat_ack","d":{"server_time":"2026-10-14T09:00:00Z"}},
   {"op":"heartbeat_ack","d":{"jwks":{"keys":[{"alg":"EdDSA","crv":"Ed25519","kid":"terminal-key-1","kty":"OKP","use":"sig","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]},"server_time":"2026-10-14T09:00:00Z"}},

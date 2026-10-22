@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"strings"
 
 	"github.com/OWNER/bothy/services/host/internal/config"
@@ -37,7 +38,15 @@ type Ops interface {
 func Apply(ctx context.Context, ops Ops, steps []Step) error {
 	for _, s := range steps {
 		if err := apply(ctx, ops, s); err != nil {
-			return fmt.Errorf("install: %s %s%s: %w", s.Kind, s.Path, s.Name, err)
+			what := s.Path + s.Name
+			if what == "" && len(s.Argv) > 0 {
+				// A run step names its program and its first argument, never a value.
+				what = filepath.Base(s.Argv[0])
+				if len(s.Argv) > 1 {
+					what += " " + s.Argv[1]
+				}
+			}
+			return fmt.Errorf("install: %s %s: %w", s.Kind, what, err)
 		}
 	}
 	return nil

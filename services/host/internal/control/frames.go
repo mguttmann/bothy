@@ -29,13 +29,19 @@ type JWKS struct {
 	Keys []map[string]any `json:"keys"`
 }
 
-// Hello is the first frame of the server (schema HostChannelHello).
+// Hello is the first frame of the server (schema HostChannelHello). ClockLeewayMs, IdleTimeoutMs
+// and DetachGraceMs are the server's auth.clock_leeway, terminal.idle_timeout and
+// terminal.detach_grace; the hello of a data connection sets them for the session of that
+// connection (M2-45 Design note 2a).
 type Hello struct {
 	ProtocolVersions    []int  `json:"protocol_versions"`
 	Challenge           string `json:"challenge"`
 	ServerTime          string `json:"server_time"`
 	HeartbeatIntervalMs int64  `json:"heartbeat_interval_ms"`
 	HeartbeatMissLimit  int    `json:"heartbeat_miss_limit"`
+	ClockLeewayMs       int64  `json:"clock_leeway_ms"`
+	IdleTimeoutMs       int64  `json:"idle_timeout_ms"`
+	DetachGraceMs       int64  `json:"detach_grace_ms"`
 	JWKS                JWKS   `json:"jwks"`
 }
 
@@ -104,7 +110,8 @@ type SessionEnded struct {
 
 // required are the members each server op must carry (asyncapi messages and their schemas).
 var required = map[string][]string{
-	opHello:        {"protocol_versions", "challenge", "server_time", "heartbeat_interval_ms", "heartbeat_miss_limit", "jwks"},
+	opHello: {"protocol_versions", "challenge", "server_time", "heartbeat_interval_ms", "heartbeat_miss_limit",
+		"clock_leeway_ms", "idle_timeout_ms", "detach_grace_ms", "jwks"},
 	opReady:        {"host_id", "state", "llm_credentials"},
 	opHeartbeatAck: {},
 	opSessionOpen:  {"session_id", "data_path", "profile", "expires_at"},

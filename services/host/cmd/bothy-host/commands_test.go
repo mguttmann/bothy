@@ -91,7 +91,7 @@ func TestCommandsRegistered(t *testing.T) {
 		names = append(names, c.name)
 	}
 	slices.Sort(names)
-	if strings.Join(names, " ") != "doctor install pair pty-helper restart run session-user" {
+	if strings.Join(names, " ") != "confirm-agent doctor install pair pty-helper restart run session-user" {
 		t.Errorf("commands %v", names)
 	}
 	_, out, _ := runCmd("--help")
@@ -335,6 +335,7 @@ func TestRunCommand(t *testing.T) {
 
 func TestPtyHelperCommand(t *testing.T) {
 	newFake(t)
+	keepStdin(t)
 	if code, _, stderr := runCmd("pty-helper", "--session-user", "bothy-s-alex"); code != 2 || !strings.Contains(stderr, "must run as its session user") {
 		t.Errorf("%d %q", code, stderr)
 	}

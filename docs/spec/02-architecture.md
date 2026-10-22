@@ -418,11 +418,13 @@ services/server/
   .go-arch-lint.yml           generated from architecture/modules.yaml
 services/host/                host service bothy-host (own Go module, own version; 24-terminal.md)
   cmd/bothy-host/             main: subcommands install, pair, doctor, run, restart, session-user,
-                              pty-helper (24 section 2.2, 16 section 4.4; M2-42)
+                              pty-helper (24 section 2.2, 16 section 4.4; M2-42), confirm-agent (M2-45)
   internal/                   noise, frame, fingerprint (M2-38); buildinfo, clock (+ clocktest), config, state,
                               hostos (+ hostostest: the fake operating system), doctor (HD1 to HD11), localchan
                               (local channel, admin endpoint), helper (pty-helper), install (plans, units/),
-                              startup (run, the Control port), pairing (M2-42); control, pty, profiles follow
+                              startup (run, the Control port), pairing (M2-42); control (+ controltest, M2-43);
+                              session (+ sessiontest: fake server and Go test device), pty, profiles, confirm
+                              (M2-45)
   test/platform/              platform suite (build tag platform), only on disposable machines (M2-42)
   testdata/fakeclaude/        stand-in for claude auth status in the tests of HD6 (M2-42)
   testdata/noise/             test vectors, Go and Dart recordings, fingerprint vectors (24, 5.2, 14)
@@ -457,7 +459,12 @@ by kind:
   `bothy-host` and `bothy-host.helper.<name>`; Windows services `bothy-host` and
   `bothy-host-helper-<name>` and the virtual account `NT SERVICE\bothy-host`; channel endpoints
   `/run/bothy-host/`, `/Library/Application Support/bothy-host/run/` and the pipes
-  `bothy-host-admin` and `bothy-host-helper-<name>`.
+  `bothy-host-admin` and `bothy-host-helper-<name>`. Since M2-45: the confirmation endpoints
+  `/run/bothy-host-confirm/confirm.sock`,
+  `/Library/Application Support/bothy-host/confirm/confirm.sock` and the pipe
+  `bothy-host-confirm`; the folder `.config/bothy-host` in the home of a session user (`claude`
+  with the configuration of the coding agent at `organization`, on macOS `run` with the run file
+  of the live sessions).
 - Packages of the apps: Dart packages with the prefix `bothy_` (`bothy_viz`, `bothy_noise`).
 - SDKs: Python distribution `bothy-sdk`, import package `bothy_sdk`, npm package `bothy-sdk` (not
   published until OQ-17 is decided).

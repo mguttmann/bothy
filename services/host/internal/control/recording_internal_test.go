@@ -97,7 +97,9 @@ func TestHostFramesRecordingCurrent(t *testing.T) {
 }
 
 // TestServerFramesDecodeStrictly: every frame the server recorded decodes strictly into the
-// hand-written types.
+// hand-written types; hello carries the server values of M2-45 (auth.clock_leeway,
+// terminal.idle_timeout, terminal.detach_grace at the defaults the server recorded), and a hello
+// without one of them is malformed.
 func TestServerFramesDecodeStrictly(t *testing.T) {
 	t.Parallel()
 	b, err := os.ReadFile(serverFramesFile) //nolint:gosec // G304: a fixed path of the repository's test data
@@ -110,11 +112,25 @@ func TestServerFramesDecodeStrictly(t *testing.T) {
 	}
 	ops := map[string]bool{}
 	for _, f := range frames {
-		op, _, err := decodeServerFrame(f)
+		op, body, err := decodeServerFrame(f)
 		if err != nil {
 			t.Errorf("%s: %v", f, err)
 		}
 		ops[op] = true
+		if h, ok := body.(*Hello); ok && (h.ClockLeewayMs != 30000 || h.IdleTimeoutMs != 1800000 || h.DetachGraceMs != 900000) {
+			t.Errorf("hello values %+v", h)
+		}
+	}
+	for _, member := range []string{"clock_leeway_ms", "idle_timeout_ms", "detach_grace_ms"} {
+		var hello map[string]any
+		if err := json.Unmarshal(frames[0], &hello); err != nil {
+			t.Fatal(err)
+		}
+		delete(hello["d"].(map[string]any), member)
+		b, _ := json.Marshal(hello)
+		if _, _, err := decodeServerFrame(b); err == nil {
+			t.Errorf("hello without %s decoded", member)
+		}
 	}
 	for op := range required {
 		if !ops[op] {
