@@ -168,15 +168,23 @@ final class DownloadService {
     final sink = partial.openWrite();
     final digest = _DigestSink();
     final hasher = sha256.startChunkedConversion(digest);
+    var failed = false;
     try {
       await for (final chunk in body.stream) {
         hasher.add(chunk);
         sink.add(chunk);
       }
       hasher.close();
+    } on Object {
+      failed = true;
+    }
+    // The sink is closed exactly once; a failed close (a full disk) fails the download too.
+    try {
       await sink.close();
     } on Object {
-      await sink.close();
+      failed = true;
+    }
+    if (failed) {
       if (partial.existsSync()) await partial.delete();
       return const DownloadFailed('network');
     }

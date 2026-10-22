@@ -155,6 +155,14 @@ void main() {
       final id = await enqueueUpload(f, 'k1');
       await Process.run('chmod', ['000', f.path]);
       addTearDown(() => Process.run('chmod', ['644', f.path]));
+      try {
+        await f.openRead().first;
+        // A privileged process still reads a mode-000 file: nothing to check here.
+        markTestSkipped('this process can read a file with mode 000');
+        return;
+      } on FileSystemException {
+        // Unreadable, as the test needs.
+      }
       await h.outbox.start();
       await eventually(
         'failed',
@@ -163,6 +171,7 @@ void main() {
       );
       expect((await h.db.outboxDao.byId(id))!.lastErrorCode, 'file_unreadable');
     },
+    skip: Platform.isWindows ? 'chmod does not exist on Windows' : false,
   );
 
   test('part_conflict fails the entry with its reason', () async {

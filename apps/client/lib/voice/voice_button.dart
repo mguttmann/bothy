@@ -129,6 +129,12 @@ final class VoiceController extends ChangeNotifier {
       _set(VoicePhase.failed);
       return;
     }
+    if (_disposed) {
+      // Disposed while the recorder started: drop the recording; [dispose] disposes the
+      // recorder after this start.
+      await recorder.cancel();
+      return;
+    }
     _set(VoicePhase.recording);
     final started = DateTime.now();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -204,7 +210,18 @@ final class VoiceController extends ChangeNotifier {
     _disposed = true;
     _ticker?.cancel();
     _stopper?.cancel();
-    unawaited(_recorder?.dispose());
+    final recorder = _recorder;
+    final starting = _starting;
+    if (recorder != null) {
+      // A pending start finishes (and cancels its recording) before the recorder goes.
+      unawaited(
+        starting == null
+            ? recorder.dispose()
+            : starting
+                  .then<void>((_) {}, onError: (Object _) {})
+                  .whenComplete(recorder.dispose),
+      );
+    }
     super.dispose();
   }
 }

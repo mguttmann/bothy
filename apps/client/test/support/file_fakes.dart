@@ -87,6 +87,9 @@ class FakeRecorder implements VoiceRecorder {
   /// The bit rate of the last start.
   int? bitRate;
 
+  /// When set, [start] waits for it, so a test can act while a start is pending.
+  Completer<void>? startGate;
+
   String? _path;
   DateTime? _started;
   final StreamController<double> _levels = StreamController.broadcast();
@@ -100,6 +103,7 @@ class FakeRecorder implements VoiceRecorder {
   @override
   Future<void> start({required String path, required int bitRate}) async {
     calls.add('start');
+    await startGate?.future;
     this.bitRate = bitRate;
     _path = path;
     _started = DateTime.now();

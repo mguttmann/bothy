@@ -104,6 +104,40 @@ void main() {
       voice.dispose();
     });
 
+    testWidgets('a dispose during a pending start leaves no recording', (
+      tester,
+    ) async {
+      final recorder = FakeRecorder();
+      final voice = VoiceController(
+        recorder: () => recorder,
+        bitRate: 64000,
+        limit: const Duration(seconds: 3),
+        scratch: () async => scratch,
+        onSend: (_) async {},
+      );
+      await tester.runAsync(() async {
+        // Created in the real zone, so its completion is not held by the fake clock.
+        recorder.startGate = Completer<void>();
+        final started = voice.start();
+        while (!recorder.calls.contains('start')) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        voice.dispose();
+        recorder.startGate!.complete();
+        await started;
+        while (!recorder.calls.contains('dispose')) {
+          await Future<void>.delayed(Duration.zero);
+        }
+      });
+      expect(voice.phase, isNot(VoicePhase.recording));
+      // The started recording is cancelled before the recorder is disposed, never after.
+      expect(recorder.calls.sublist(recorder.calls.indexOf('start')), [
+        'start',
+        'cancel',
+        'dispose',
+      ]);
+    });
+
     testWidgets('a failed send keeps the recording for another try', (
       tester,
     ) async {
