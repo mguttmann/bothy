@@ -17,6 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/app"
 )
@@ -75,10 +76,13 @@ func (r *relay) list() []asked {
 	return append([]asked{}, r.calls...)
 }
 
-// timers is the manual timer of the wait: every started timer is a channel the test fires.
+// timers is the manual timer of the wait: every started timer is a channel the test fires. The
+// use case starts the timer after the relay returned, so a test that looks at the timer waits for
+// its start on starts first.
 type timers struct {
 	mu      sync.Mutex
 	started []time.Duration
+	starts  chan time.Duration
 	fire    chan time.Time
 	stopped int
 }
@@ -87,6 +91,10 @@ func (m *timers) after(d time.Duration) (<-chan time.Time, func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.started = append(m.started, d)
+	select {
+	case m.starts <- d:
+	default:
+	}
 	return m.fire, func() {
 		m.mu.Lock()
 		m.stopped++
@@ -121,7 +129,7 @@ func newACWorld(t *testing.T) *acWorld {
 	if err := w.svc.BindTokens(inv.svc); err != nil {
 		t.Fatal(err)
 	}
-	aw := &acWorld{world: w, relay: &relay{sent: true}, timers: &timers{fire: make(chan time.Time, 1)}, forum: ids.New(), trackID: ids.New(),
+	aw := &acWorld{world: w, relay: &relay{sent: true}, timers: &timers{fire: make(chan time.Time, 1), starts: make(chan time.Duration, 16)}, forum: ids.New(), trackID: ids.New(),
 		inv: inv}
 	aw.cmd = agents.Command{ID: ids.New(), OwnerPrincipalID: w.lotse, OwnerKind: "agent", Name: "ticket", ScopeKind: "instance",
 		Options: []agents.CommandOption{
@@ -180,31 +188,26 @@ func (w *acWorld) start(ctx context.Context, q runs.AutocompleteQuery) (<-chan r
 		return out, a
 	case r := <-out:
 		w.t.Fatalf("Autocomplete returned before asking: %+v %v", r.res, r.err)
-	case <-time.After(10 * time.Second):
+	case <-time.After(testkit.Patience):
 		w.t.Fatal("the relay was never asked")
 	}
 	return nil, asked{}
 }
 
-// wait returns the result of out.
+// wait returns the result of out, at most testkit.Patience.
 func (w *acWorld) wait(out <-chan result) result {
 	w.t.Helper()
-	select {
-	case r := <-out:
-		return r
-	case <-time.After(10 * time.Second):
-		w.t.Fatal("Autocomplete did not return")
-	}
-	return result{}
+	return testkit.Receive(w.t, "the result of Autocomplete", out)
 }
 
-// notYet fails when out already has a result.
+// notYet fails when out already has a result. It does not wait: the manual timer has not fired,
+// so a correct wait cannot have ended, and a quiet window would prove nothing more.
 func (w *acWorld) notYet(out <-chan result) {
 	w.t.Helper()
 	select {
 	case r := <-out:
 		w.t.Fatalf("Autocomplete returned early: %+v %v", r.res, r.err)
-	case <-time.After(50 * time.Millisecond):
+	default:
 	}
 }
 
@@ -213,6 +216,9 @@ func (w *acWorld) notYet(out <-chan result) {
 func TestAutocomplete_AG23_EmptyAfterTimeout(t *testing.T) {
 	w := newACWorld(t)
 	out, a := w.start(alexCtx(w), w.query())
+	if d := testkit.Receive(t, "the start of the timer", w.timers.starts); d != acTimeout {
+		t.Fatalf("timer of %s, want command.autocomplete_timeout", d)
+	}
 	w.notYet(out)
 	if st := w.timers.list(); len(st) != 1 || st[0] != acTimeout {
 		t.Fatalf("timers %v, want one of command.autocomplete_timeout", st)

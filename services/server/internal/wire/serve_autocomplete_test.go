@@ -22,12 +22,23 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/runs/adapters/runstest"
 )
 
-// acWait is command.autocomplete_timeout of the autocomplete world: long enough for an answer
-// over the gateway, short enough for the suite, never the default.
-const acWait = 1500 * time.Millisecond
+// acWait is command.autocomplete_timeout of the autocomplete world: longer than testkit.Patience,
+// so a request that waits for the timeout fails the test instead of passing late. Every answer
+// that must come "at once" therefore comes within the patience of the suite, on any machine, and
+// no test bounds a time itself.
+const acWait = testkit.Patience + time.Minute
+
+// acRequestTimeout is http.request_timeout of the autocomplete worlds, above every acWait
+// (cross-check autocomplete_below_request_timeout).
+const acRequestTimeout = acWait + time.Minute
+
+// acShortWait is command.autocomplete_timeout of the world of AG-23, the only test that waits for
+// the timeout: short, because the test waits for it, and never the default.
+const acShortWait = 1500 * time.Millisecond
 
 // acWorld is the command world of M2-16 with the commands of the autocomplete tests (brief M2-17
 // "Tests"): Lotse /ticket in the space Support (option ticket with autocomplete, priority with
@@ -43,10 +54,17 @@ type acWorld struct {
 	forumThread          string
 }
 
-// newACWorld starts the autocomplete world.
+// newACWorld starts the autocomplete world with command.autocomplete_timeout acWait.
 func newACWorld(t *testing.T, extra ...string) *acWorld {
 	t.Helper()
-	env := []string{"BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT=" + strconv.FormatInt(acWait.Milliseconds(), 10) + "ms",
+	return newACWorldWait(t, acWait, extra...)
+}
+
+// newACWorldWait starts the autocomplete world with command.autocomplete_timeout wait.
+func newACWorldWait(t *testing.T, wait time.Duration, extra ...string) *acWorld {
+	t.Helper()
+	env := []string{"BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT=" + strconv.FormatInt(wait.Milliseconds(), 10) + "ms",
+		"BOTHY_HTTP__REQUEST_TIMEOUT=" + strconv.FormatInt(acRequestTimeout.Milliseconds(), 10) + "ms",
 		"BOTHY_SYNC__EVENT_PAYLOAD_MAX_BYTES=" + strconv.Itoa(cmdPayloadMax), "BOTHY_RATELIMIT__RL__READ__BURST=1000",
 		"BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST=1000"}
 	// The suite must not depend on its own speed; the rate-limit test sets the two classes low.
@@ -115,6 +133,19 @@ func (w *acWorld) forumPost() string {
 	return out.Thread.ID
 }
 
+// unconnected creates an agent that never opened a gateway connection, operating a new text
+// channel of Support, with the command /lookup (option ticket with autocomplete) scoped to that
+// channel. Sam may trigger there through his grant on the space. Tests that need "no live
+// connection" use it: a connection closed by an earlier test may still be attached for a moment,
+// and nothing outside the process tells when it is gone.
+func (w *acWorld) unconnected() (consumerAgent, channel, string) {
+	w.t.Helper()
+	a, ch := w.fresh("lookup")
+	id := w.mustRegister(a, def("lookup", "scope_kind", "channel", "scope_id", ch.id, "options", []any{
+		map[string]any{"name": "ticket", "description": "Ticket number", "type": "string", "required": false, "autocomplete": true}})).ID
+	return a, ch, id
+}
+
 // acReply is the answer of one autocompleteCommand.
 type acReply struct {
 	code int
@@ -144,7 +175,7 @@ func (w *acWorld) rawRequest(p *gwPerson, a *consumerAgent, path string, body an
 		b, _ := json.Marshal(body)
 		rd = bytes.NewReader(b)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, method, w.base+path, rd)
 	if err != nil {
@@ -214,19 +245,14 @@ func (w *acWorld) answerAs(p gwPerson, request string, choices []any) acReply {
 	return r
 }
 
-// got waits for the answer of out.
+// got waits for the answer of out, at most testkit.Patience.
 func (w *acWorld) got(out <-chan acReply) acReply {
 	w.t.Helper()
-	select {
-	case r := <-out:
-		if r.err != nil {
-			w.t.Fatal(r.err)
-		}
-		return r
-	case <-time.After(30 * time.Second):
-		w.t.Fatal("autocompleteCommand did not answer")
+	r := testkit.Receive(w.t, "the answer of autocompleteCommand", out)
+	if r.err != nil {
+		w.t.Fatal(r.err)
 	}
-	return acReply{}
+	return r
 }
 
 // acFrame is a dispatch of command.autocomplete_requested as the tests read it.
@@ -270,10 +296,11 @@ type opError struct {
 }
 
 // nextAC reads frames of c until a dispatch of command.autocomplete_requested or an error frame
-// arrives or d passed; durable dispatches are acknowledged on the way. ok is false when none came.
-func (w *acWorld) nextAC(c *wstest.Client, d time.Duration) (acFrame, *opError, bool) {
+// arrives, at most testkit.Patience; durable dispatches are acknowledged on the way. ok is false
+// when none came.
+func (w *acWorld) nextAC(c *wstest.Client) (acFrame, *opError, bool) {
 	w.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), d)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	for {
 		op, raw, err := c.Next(ctx)
@@ -311,18 +338,59 @@ func (w *acWorld) nextAC(c *wstest.Client, d time.Duration) (acFrame, *opError, 
 // mustAC requires a dispatch of command.autocomplete_requested on c.
 func (w *acWorld) mustAC(c *wstest.Client) acFrame {
 	w.t.Helper()
-	f, e, ok := w.nextAC(c, 15*time.Second)
+	f, e, ok := w.nextAC(c)
 	if !ok || e != nil {
 		w.t.Fatalf("no command.autocomplete_requested (error %+v)", e)
 	}
 	return f
 }
 
-// noAC requires that c gets no command.autocomplete_requested and no error frame within d.
-func (w *acWorld) noAC(c *wstest.Client, d time.Duration) {
+// noAC requires that the agent connection c got no command.autocomplete_requested and no error
+// frame so far. It is proven by order, without a quiet window: c sends command.autocomplete_result
+// for an unknown request with a fresh ref, and its error not_found (answered before any rights
+// check, D-M2-17-8) must be the next of these frames. The connection's outgoing queue is first in,
+// first out, and the gateway handles the frames of one connection in order, so a frame queued by
+// an earlier request or op would arrive before the marker.
+func (w *acWorld) noAC(c *wstest.Client) {
 	w.t.Helper()
-	if f, e, ok := w.nextAC(c, d); ok {
-		w.t.Fatalf("unexpected frame %s %+v", f.raw, e)
+	ref := "marker-" + ids.New().String()
+	sendResult(w.t, c, ids.New().String(), []any{}, ref)
+	f, e, ok := w.nextAC(c)
+	if !ok || e == nil || e.Ref != ref || e.Code != "not_found" {
+		w.t.Fatalf("frame before the marker: %s %+v", f.raw, e)
+	}
+}
+
+// noACPerson is noAC for the connection of a person, which answers no autocomplete: the marker is
+// typing.start on an unknown thread, answered with error not_found.
+func (w *acWorld) noACPerson(c *wstest.Client) {
+	w.t.Helper()
+	if err := c.Send("typing.start", map[string]any{"thread_id": ids.New().String()}); err != nil {
+		w.t.Fatal(err)
+	}
+	// A person acknowledges nothing (ack is an agent op), so the frames are read here.
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
+	defer cancel()
+	for {
+		op, raw, err := c.Next(ctx)
+		if err != nil {
+			w.t.Fatalf("no marker: %v", err)
+		}
+		switch op {
+		case "error":
+			var e opError
+			_ = json.Unmarshal(raw, &e)
+			if e.Op != "typing.start" || e.Code != "not_found" {
+				w.t.Fatalf("error frame before the marker: %+v", e)
+			}
+			return
+		case "dispatch":
+			var f acFrame
+			_ = json.Unmarshal(raw, &f)
+			if f.Type == "command.autocomplete_requested" {
+				w.t.Fatalf("a person got %s", raw)
+			}
+		}
 	}
 }
 
@@ -337,7 +405,7 @@ func (w *acWorld) connectAs(t *testing.T, a consumerAgent, consumer string) *wst
 // catchUp reads c until catchup.complete and acknowledges every dispatch on the way.
 func (w *acWorld) catchUp(t *testing.T, c *wstest.Client) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	for {
 		op, raw, err := c.Next(ctx)
@@ -357,6 +425,16 @@ func (w *acWorld) catchUp(t *testing.T, c *wstest.Client) {
 			}
 		}
 	}
+}
+
+// writerOn creates a person with write, not trigger, on ch: autocomplete there is denied with
+// level_insufficient and audited.
+func (w *acWorld) writerOn(ch channel) gwPerson {
+	w.t.Helper()
+	p := w.newPerson("robin", identity.DeviceStateActive)
+	w.must(w.owner, http.MethodPost, "/api/v1/grants", map[string]any{"subject_kind": "user", "subject_id": p.user.String(),
+		"target_kind": "channel", "target_id": ch.id, "level": "write", "reason": "test"})
+	return p
 }
 
 // sendResult sends command.autocomplete_result on c.
@@ -433,7 +511,7 @@ func TestCommandAutocomplete(t *testing.T) {
 		if ch := r.choices(); len(ch) != 2 || ch[0]["name"] != "Ticket 47" || ch[1]["value"] != "470" {
 			t.Fatalf("choices %s", r.body)
 		}
-		w.noAC(c, 300*time.Millisecond)
+		w.noAC(c)
 		noViolations(t, c)
 	})
 
@@ -455,65 +533,26 @@ func TestCommandAutocomplete(t *testing.T) {
 		noViolations(t, c)
 	})
 
-	t.Run("TestAutocomplete_AG23_NoAnswerEmptyAfterTimeout", func(t *testing.T) {
-		c := w.connectAs(t, w.lotse, "")
-		defer c.Close()
-		out := w.ask(w.sam, w.allgemein.id, w.ticket, q47)
-		f := w.mustAC(c)
-		r := w.got(out)
-		wantEmpty(t, r)
-		if r.took < acWait || r.took > acWait+5*time.Second {
-			t.Fatalf("empty list after %s, want command.autocomplete_timeout (%s) plus slack", r.took, acWait)
-		}
-		// The request is remembered until expires_at plus command.autocomplete_timeout: a late answer
-		// within that window gets 410; after it the request is forgotten and the answer gets 404
-		// (D-M2-17-7). A slow machine may push the answer past the window, so the expected code
-		// follows the time of the answer.
-		expires, err := time.Parse(time.RFC3339Nano, f.Payload.ExpiresAt)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// lateOK reports whether code fits an answer sent at sent: 410 while the window is open,
-		// 404 once it closed before the server handled the answer.
-		lateOK := func(sent time.Time, gone, notFound bool) bool {
-			end := expires.Add(acWait)
-			return gone && sent.Before(end) || notFound && !time.Now().Before(end)
-		}
-		start := time.Now()
-		a := w.answer(w.lotse, f.Payload.RequestID, []any{})
-		if !lateOK(start, a.code == http.StatusGone, a.code == http.StatusNotFound) {
-			t.Fatalf("late answer = %d %s", a.code, a.body)
-		}
-		start = time.Now()
-		sendResult(t, c, f.Payload.RequestID, []any{}, "late-1")
-		_, e, ok := w.nextAC(c, 5*time.Second)
-		if !ok || e == nil || e.Op != "command.autocomplete_result" || e.Ref != "late-1" || !lateOK(start, e.Code == "gone", e.Code == "not_found") {
-			t.Fatalf("op after the end: %+v", e)
-		}
-		// The connection stays: a new request still reaches it.
-		out = w.ask(w.sam, w.allgemein.id, w.ticket, q47)
-		f = w.mustAC(c)
-		sendResult(t, c, f.Payload.RequestID, []any{choice("A", "a")}, "")
-		if r := w.got(out); len(r.choices()) != 1 {
-			t.Fatalf("after the error frame: %d %s", r.code, r.body)
-		}
-		noViolations(t, c)
-	})
-
 	t.Run("TestAutocomplete_NoLiveConnectionEmptyAtOnce", func(t *testing.T) {
-		r := w.askNow(w.sam, w.allgemein.id, w.ticket, q47)
+		// acWait is longer than testkit.Patience: an answer within the patience did not wait.
+		a, ch, cmd := w.unconnected()
+		r := w.askNow(w.sam, ch.id, cmd, q47)
 		wantEmpty(t, r)
 		if r.took >= acWait {
 			t.Fatalf("without a connection the answer took %s", r.took)
 		}
 		// Connected but still catching up: a backlog above agent.max_inflight_events that the
-		// client does not acknowledge keeps the consumer window before catchup.complete.
+		// client does not acknowledge keeps the consumer window before catchup.complete. A first
+		// connection creates the cursor of consumer default; the second takes the consumer over
+		// (fencing), so the first is no longer streaming even while it is still attached.
+		first := w.connectAs(t, a, "")
+		first.Close()
 		for range 3 * consumerInflight {
-			w.post(w.allgemein.thread, "filler")
+			w.post(ch.thread, "filler")
 		}
-		c, _ := w.ready(t, w.agentParams(w.lotse, ""))
+		c, _ := w.ready(t, w.agentParams(a, ""))
 		defer c.Close()
-		r = w.askNow(w.sam, w.allgemein.id, w.ticket, q47)
+		r = w.askNow(w.sam, ch.id, cmd, q47)
 		wantEmpty(t, r)
 		if r.took >= acWait {
 			t.Fatalf("while catching up the answer took %s", r.took)
@@ -535,19 +574,22 @@ func TestCommandAutocomplete(t *testing.T) {
 		f := w.mustAC(dflt)
 		sendResult(t, dflt, f.Payload.RequestID, []any{}, "")
 		w.got(out)
-		for _, c := range []*wstest.Client{audit, samC, ownerC} {
-			w.noAC(c, 500*time.Millisecond)
-		}
-		dflt.Close()
-		// Without default only the newer of two other consumers gets it.
-		newer := w.connectAs(t, w.lotse, "newer")
+		w.noAC(audit)
+		w.noACPerson(samC)
+		w.noACPerson(ownerC)
+		// Without default only the newer of two other consumers gets it. An agent that never had a
+		// default connection, so no closed connection can still be attached.
+		a, ch, cmd := w.unconnected()
+		older := w.connectAs(t, a, "older")
+		defer older.Close()
+		newer := w.connectAs(t, a, "newer")
 		defer newer.Close()
-		out = w.ask(w.sam, w.allgemein.id, w.ticket, q47)
+		out = w.ask(w.sam, ch.id, cmd, q47)
 		f = w.mustAC(newer)
 		sendResult(t, newer, f.Payload.RequestID, []any{}, "")
 		w.got(out)
-		w.noAC(audit, 500*time.Millisecond)
-		noViolations(t, newer, audit)
+		w.noAC(older)
+		noViolations(t, newer, older, audit)
 	})
 
 	t.Run("TestAutocomplete_I2_PersonalAgent", func(t *testing.T) {
@@ -570,7 +612,7 @@ func TestCommandAutocomplete(t *testing.T) {
 		defer w.sql(`UPDATE agents SET billing_mode = 'organization', credential_holder_id = NULL WHERE principal_id = $1`, w.lotse.id.String())
 		r := w.askNow(w.sam, w.allgemein.id, w.ticket, q47)
 		wantProblem(t, r.code, r.body, http.StatusForbidden, "agent_invocation_denied", "billing_mode_personal_not_holder", "", "")
-		w.noAC(lc, 500*time.Millisecond)
+		w.noAC(lc)
 		w.denials(t, `action = 'command.autocomplete' AND deny_reason = 'billing_mode_personal_not_holder' AND actor_principal_id = $1`,
 			w.sam.user.String())
 	})
@@ -601,7 +643,7 @@ func TestCommandAutocomplete(t *testing.T) {
 		defer c.Close()
 		r := w.askNow(w.sam, w.werkzeuge.id, w.deploy, map[string]any{"option": "target", "value": "pr"})
 		wantProblem(t, r.code, r.body, http.StatusForbidden, "agent_invocation_denied", "tool_class_owner_only", "", "")
-		w.noAC(c, 500*time.Millisecond)
+		w.noAC(c)
 		out := w.ask(w.owner, w.werkzeuge.id, w.deploy, map[string]any{"option": "target", "value": "pr"})
 		f := w.mustAC(c)
 		cl, err := w.verifier(w.runner).Check(context.Background(), f.InvocationToken, runstest.ReferenceExpectation{
@@ -621,7 +663,7 @@ func TestCommandAutocomplete(t *testing.T) {
 		if r.took >= acWait {
 			t.Fatalf("the forum answer took %s", r.took)
 		}
-		w.noAC(c, 500*time.Millisecond)
+		w.noAC(c)
 		unknown := w.askNow(w.outsider, ids.New().String(), w.deploy, map[string]any{"option": "target", "value": "pr"})
 		denied := w.askNow(w.outsider, w.forum, w.deploy, map[string]any{"option": "target", "value": "pr"})
 		if denied.code != http.StatusNotFound || !sameProblem(denied.body, unknown.body) {
@@ -662,7 +704,8 @@ func TestCommandAutocomplete(t *testing.T) {
 				a, b = append(a, dx), append(b, dy)
 			}
 		}
-		if d := median(a) - median(b); d > notFoundTimingTolerance || d < -notFoundTimingTolerance {
+		// Under the race detector the bound grows (testkit.TimingBound, PL/21), as in the leak test AZ-P4.
+		if d, tol := (median(a) - median(b)).Abs(), testkit.TimingBound(notFoundTimingTolerance); d > tol {
 			t.Fatalf("median times differ by %s", d)
 		}
 		r := w.askNow(w.robin, w.eskalation.id, w.ticket, q47)
@@ -745,7 +788,7 @@ func TestCommandAutocomplete(t *testing.T) {
 		wantProblem(t, a.code, a.body, http.StatusBadRequest, "validation_failed", "", "/choices/0/name", "control_character")
 		// The op variants answer error frames with the same codes and keep the connection.
 		sendResult(t, c, req, []any{choice("bad\u0007name", "x")}, "r1")
-		if _, e, ok := w.nextAC(c, 5*time.Second); !ok || e == nil || e.Code != "validation_failed" || e.Ref != "r1" ||
+		if _, e, ok := w.nextAC(c); !ok || e == nil || e.Code != "validation_failed" || e.Ref != "r1" ||
 			e.Detail != "/choices/0/name control_character" {
 			t.Fatalf("op error %+v", e)
 		}
@@ -756,7 +799,7 @@ func TestCommandAutocomplete(t *testing.T) {
 			t.Fatalf("a second answer = %d %s", a.code, a.body)
 		}
 		sendResult(t, c, req, []any{choice("Third", "3")}, "r2")
-		w.noAC(c, 500*time.Millisecond)
+		w.noAC(c)
 		r := w.got(out)
 		if ch := r.choices(); len(ch) != 1 || ch[0]["value"] != "1" {
 			t.Fatalf("Sam got %s", r.body)
@@ -785,12 +828,15 @@ func TestCommandAutocomplete(t *testing.T) {
 		if rest.code != http.StatusNoContent || len(ch) != 1 || (ch[0]["value"] != "op" && ch[0]["value"] != "rest") {
 			t.Fatalf("REST %d %s, Sam %s", rest.code, rest.body, r.body)
 		}
-		w.noAC(c, 500*time.Millisecond)
+		w.noAC(c)
 	})
 
 	t.Run("TestAutocomplete_NothingStored", func(t *testing.T) {
 		secret := "ACSECRET" + ids.New().String()[24:]
 		choiceSecret := "ACCHOICE" + ids.New().String()[24:]
+		// marker's denial is written last; once it is there, the entries of the requests before it
+		// would be too (instead of a quiet window).
+		marker := w.writerOn(w.eskalation)
 		before := map[string]int{
 			"runs": w.count(`SELECT count(*) FROM runs`), "steps": w.count(`SELECT count(*) FROM run_steps`),
 			"events": w.count(`SELECT count(*) FROM event_log`),
@@ -805,9 +851,13 @@ func TestCommandAutocomplete(t *testing.T) {
 		w.got(out)
 		out = w.ask(w.sam, w.allgemein.id, w.ticket, body)
 		f2 := w.mustAC(c)
+		if a := w.answer(w.lotse, f2.Payload.RequestID, []any{}); a.code != http.StatusNoContent {
+			t.Fatalf("answerAutocomplete = %d %s", a.code, a.body)
+		}
 		wantEmpty(t, w.got(out))
 		_ = w.askNow(w.robin, w.eskalation.id, w.ticket, body)
-		time.Sleep(1500 * time.Millisecond)
+		_ = w.askNow(marker, w.eskalation.id, w.ticket, body)
+		w.denials(t, `action = 'command.autocomplete' AND actor_principal_id = $1`, marker.user.String())
 		after := map[string]int{
 			"runs": w.count(`SELECT count(*) FROM runs`), "steps": w.count(`SELECT count(*) FROM run_steps`),
 			"events": w.count(`SELECT count(*) FROM event_log`),
@@ -831,7 +881,8 @@ func TestCommandAutocomplete(t *testing.T) {
 
 	t.Run("TestAutocomplete_Registered", func(t *testing.T) {
 		// Without Idempotency-Key both operations pass the chain (x-idempotency-exempt).
-		r := w.askNow(w.sam, w.allgemein.id, w.ticket, q47)
+		_, ch, cmd := w.unconnected()
+		r := w.askNow(w.sam, ch.id, cmd, q47)
 		wantEmpty(t, r)
 		if a := w.answer(w.lotse, ids.New().String(), []any{}); a.code != http.StatusNotFound {
 			t.Fatalf("answer without Idempotency-Key = %d %s", a.code, a.body)
@@ -839,6 +890,7 @@ func TestCommandAutocomplete(t *testing.T) {
 	})
 
 	t.Run("TestAutocomplete_DenialsAudited", func(t *testing.T) {
+		writer := w.writerOn(w.eskalation)
 		before := w.count(`SELECT count(*) FROM audit_events WHERE action LIKE 'command.autocomplete%'`)
 		c := w.connectAs(t, w.lotse, "")
 		defer c.Close()
@@ -846,17 +898,68 @@ func TestCommandAutocomplete(t *testing.T) {
 		f := w.mustAC(c)
 		sendResult(t, c, f.Payload.RequestID, []any{}, "")
 		w.got(out)
-		time.Sleep(1500 * time.Millisecond)
-		if n := w.count(`SELECT count(*) FROM audit_events WHERE action LIKE 'command.autocomplete%'`); n != before {
-			t.Fatalf("an allowed request or the relay wrote %d audit entries", n-before)
-		}
-		writer := w.newPerson("robin", identity.DeviceStateActive)
-		w.must(w.owner, http.MethodPost, "/api/v1/grants", map[string]any{"subject_kind": "user", "subject_id": writer.user.String(),
-			"target_kind": "channel", "target_id": w.eskalation.id, "level": "write", "reason": "test"})
+		// The denial is written after the allowed request and its answer; once it is there, an entry
+		// of the allowed request would be too (instead of a quiet window).
 		r := w.askNow(writer, w.eskalation.id, w.ticket, q47)
 		wantProblem(t, r.code, r.body, http.StatusForbidden, "agent_invocation_denied", "level_insufficient", "", "")
 		w.denials(t, `action = 'command.autocomplete' AND deny_reason = 'level_insufficient' AND actor_principal_id = $1`, writer.user.String())
+		if n := w.count(`SELECT count(*) FROM audit_events WHERE action LIKE 'command.autocomplete%'`); n != before+1 {
+			t.Fatalf("an allowed request or the relay wrote %d audit entries", n-before-1)
+		}
 	})
+}
+
+// TestCommandAutocompleteTimeout is AG-23 against a started api process with a short
+// command.autocomplete_timeout: nobody answers, the person gets an empty list not before the
+// timeout, a late answer over REST and over the op learns that it came too late, and the
+// connection stays.
+func TestCommandAutocompleteTimeout(t *testing.T) {
+	t.Parallel()
+	w := newACWorldWait(t, acShortWait)
+	q47 := map[string]any{"option": "ticket", "value": "47"}
+	c := w.connectAs(t, w.lotse, "")
+	defer c.Close()
+	out := w.ask(w.sam, w.allgemein.id, w.ticket, q47)
+	f := w.mustAC(c)
+	r := w.got(out)
+	wantEmpty(t, r)
+	// Not earlier than the timeout; how much later depends on the machine and is not bounded.
+	if r.took < acShortWait {
+		t.Fatalf("empty list after %s, before command.autocomplete_timeout (%s)", r.took, acShortWait)
+	}
+	// The request is remembered until expires_at plus command.autocomplete_timeout: a late answer
+	// within that window gets 410; after it the request is forgotten and the answer gets 404
+	// (D-M2-17-7). A slow machine may push the answer past the window, so the expected code
+	// follows the time of the answer.
+	expires, err := time.Parse(time.RFC3339Nano, f.Payload.ExpiresAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// lateOK reports whether code fits an answer sent at sent: 410 while the window is open,
+	// 404 once it closed before the server handled the answer.
+	lateOK := func(sent time.Time, gone, notFound bool) bool {
+		end := expires.Add(acShortWait)
+		return gone && sent.Before(end) || notFound && !time.Now().Before(end)
+	}
+	start := time.Now()
+	a := w.answer(w.lotse, f.Payload.RequestID, []any{})
+	if !lateOK(start, a.code == http.StatusGone, a.code == http.StatusNotFound) {
+		t.Fatalf("late answer = %d %s", a.code, a.body)
+	}
+	start = time.Now()
+	sendResult(t, c, f.Payload.RequestID, []any{}, "late-1")
+	_, e, ok := w.nextAC(c)
+	if !ok || e == nil || e.Op != "command.autocomplete_result" || e.Ref != "late-1" || !lateOK(start, e.Code == "gone", e.Code == "not_found") {
+		t.Fatalf("op after the end: %+v", e)
+	}
+	// The connection stays: a new request still reaches it.
+	out = w.ask(w.sam, w.allgemein.id, w.ticket, q47)
+	f = w.mustAC(c)
+	sendResult(t, c, f.Payload.RequestID, []any{choice("A", "a")}, "")
+	if r := w.got(out); len(r.choices()) != 1 {
+		t.Fatalf("after the error frame: %d %s", r.code, r.body)
+	}
+	noViolations(t, c)
 }
 
 // notFoundTimingTolerance is the documented default of authz.not_found_timing_tolerance (07
@@ -893,7 +996,7 @@ func TestCommandAutocompleteRateLimits(t *testing.T) {
 	c := w.connectAs(t, w.lotse, "")
 	defer c.Close()
 	sendResult(t, c, ids.New().String(), []any{}, "rl")
-	if _, e, ok := w.nextAC(c, 5*time.Second); !ok || e == nil || e.Code != "rate_limited" || e.Ref != "rl" {
+	if _, e, ok := w.nextAC(c); !ok || e == nil || e.Code != "rate_limited" || e.Ref != "rl" {
 		t.Fatalf("rl.agent_runtime on the op: %+v", e)
 	}
 }
