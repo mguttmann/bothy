@@ -153,21 +153,11 @@ func (w *world) wantSwitchedFirst(r *httpservertest.Response, action, ownEvent s
 // specification of this branch or the English one of main).
 func guidedActions(t *testing.T) []string {
 	t.Helper()
-	var text []byte
-	for _, name := range []string{"05-aktionen.md", "05-actions.md"} {
-		b, err := os.ReadFile(filepath.Clean(filepath.Join("..", "..", "..", "..", "docs", "spec", name)))
-		if err == nil {
-			text = b
-			break
-		}
+	text, err := os.ReadFile(filepath.Clean(filepath.Join("..", "..", "..", "..", "docs", "spec", "05-actions.md")))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if text == nil {
-		t.Fatal("05 not found")
-	}
-	start := bytes.Index(text, []byte("Geführter Ablauf:"))
-	if start < 0 {
-		start = bytes.Index(text, []byte("Guided flow:"))
-	}
+	start := bytes.Index(text, []byte("Guided flow:"))
 	end := bytes.Index(text[max(start, 0):], []byte("resolve_i1"))
 	if start < 0 || end < 0 {
 		t.Fatal("05 rule 1.6 has no bullet on the guided flow")

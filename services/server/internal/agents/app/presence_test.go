@@ -24,6 +24,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // The short windows of the tracker tests; no test depends on a default.
@@ -694,11 +695,7 @@ func TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase(t *testing.T) {
 						`{"state":"online","reported_billing_mode":"personal","project_readiness":[{"channel_id":"`+ids.New().String()+`","ready":true}]}`))
 					beat <- err
 				}()
-				select {
-				case <-g.entered:
-				case <-time.After(5 * time.Second):
-					t.Fatalf("the heartbeat never reached %s", point)
-				}
+				testkit.Receive(t, "the heartbeat reaching "+point, g.entered)
 				if c.changes {
 					w.store.setTarget(w.agent.ID, domain.Target{BillingMode: domain.Personal, ToolClass: domain.ToolChat})
 				}
@@ -708,18 +705,13 @@ func TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase(t *testing.T) {
 				waited := false
 				select {
 				case err = <-done:
-				case <-time.After(2 * time.Second):
+				case <-time.After(testkit.Patience): // the cycle waits until the release, never ends alone
 					t.Errorf("%s waits for a heartbeat parked in %s", c.name, point)
 					waited = true
 				}
 				close(g.release)
-				select {
-				case err := <-beat:
-					if err != nil {
-						t.Fatalf("heartbeat after the release: %v", err)
-					}
-				case <-time.After(5 * time.Second):
-					t.Fatal("the heartbeat did not end after the release")
+				if err := testkit.Receive(t, "the end of the heartbeat after the release", beat); err != nil {
+					t.Fatalf("heartbeat after the release: %v", err)
 				}
 				if waited {
 					err = <-done
