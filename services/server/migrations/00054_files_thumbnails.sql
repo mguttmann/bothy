@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Thumbnails of a file (M3-05): file_thumbnails exactly as docs/spec/03-datenmodell.md section 4.7
+-- Thumbnails of a file (M3-05): file_thumbnails exactly as docs/spec/03-data-model.md section 4.7
 -- states it. The download of a thumbnail (downloadThumbnail) reads it by (file_id, variant); the
 -- image job of M3-06 writes it. The table is new and empty, so its keys and checks are created with
 -- it. Only the module files reads and writes it. Retention class: content (03).

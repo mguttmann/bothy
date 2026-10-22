@@ -41,7 +41,7 @@ type GetFileForDeliveryRow struct {
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// The read path of downloads, tickets and transcripts (M3-05, docs/spec/12-dateien.md 9). Every
+// The read path of downloads, tickets and transcripts (M3-05, docs/spec/12-files.md 9). Every
 // read is keyed by the file id (07 7.4 rule 1); nothing here writes.
 // One file with what a delivery needs: the object, the digest, the type, the name, the facts of
 // file.read, the states and the transcript. A deleted file is read too, so the use case answers it

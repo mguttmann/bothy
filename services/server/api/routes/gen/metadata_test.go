@@ -321,7 +321,7 @@ func TestLoadInputs_RejectsSecurityOverrideOfEnabledOperation(t *testing.T) {
 // TestLoadInputs_AcceptsFileTicketBesideRootSecurity: downloadFile and downloadThumbnail accept
 // the root security or a fetch ticket in the query (security scheme fileTicket, 12 9.2, ADR 0048).
 // The route table records them as root security: the chain authenticates the header as for every
-// route and an anonymous request reaches the handler, which checks the ticket (docs/DECISIONS.md
+// route and an anonymous request reaches the handler, which checks the ticket (docs/decisions.d/M3-05.md
 // D-M3-05-14). Any other extra requirement stays an override.
 func TestLoadInputs_AcceptsFileTicketBesideRootSecurity(t *testing.T) {
 	schemes := "  securitySchemes:\n    fileTicket:\n      type: apiKey\n      in: query\n      name: ticket\n" +

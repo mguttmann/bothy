@@ -1078,7 +1078,7 @@
       "enum": [],
       "min": "1s",
       "max": "",
-      "chapter": "04-sync-protokoll.md",
+      "chapter": "04-sync-protocol.md",
       "doc": "Age after which clients drop unused cache entries; the max-age of an authenticated file download."
     },
     {
@@ -1579,7 +1579,7 @@
       "enum": [],
       "min": "1s",
       "max": "1h",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Retry-After of the 409 file_not_ready responses, in whole seconds."
     },
     {
@@ -1840,7 +1840,7 @@
       "enum": [],
       "min": "",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Secret reference of the HMAC key of the download tickets; 32 bytes as hex. Roles api and all do not start without it."
     },
     {
@@ -1852,7 +1852,7 @@
       "enum": [],
       "min": "1s",
       "max": "",
-      "chapter": "12-dateien.md",
+      "chapter": "12-files.md",
       "doc": "Validity of a download ticket (createFileTicket)."
     },
     {

@@ -32,7 +32,7 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   context and the write deadline) holds for a multipart or octet-stream request body and, since
   M1-50, for `Operation.Download`, a success that streams a body that is not JSON (the export of
   the audit log; since M3-05 also `downloadFile` and `downloadThumbnail`, which therefore run
-  under `http.transfer_timeout`, not `http.request_timeout`, docs/DECISIONS.md D-M3-05-14). The
+  under `http.transfer_timeout`, not `http.request_timeout`, docs/decisions.d/M3-05.md D-M3-05-14). The
   `Cache-Control: no-store` that `StageRoute` sets before the handler is overridden by the file
   handler on `200` and `206` (`private, max-age=<client.cache_max_age>, immutable`, or
   `private, no-store` with a download ticket); its problem responses keep the API headers.

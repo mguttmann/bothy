@@ -424,10 +424,10 @@ func requirementKeys(reqs openapi3.SecurityRequirements) map[string]bool {
 }
 
 // fileTicketScheme is the security scheme of the fetch tickets of downloadFile and
-// downloadThumbnail (docs/spec/12-dateien.md 9.2, ADR 0048): an alternative to the header
+// downloadThumbnail (docs/spec/12-files.md 9.2, ADR 0048): an alternative to the header
 // credentials that the file handler checks itself, after the chain let the anonymous request
 // through. An operation that lists it beside some of the root requirements is no override; the
-// route table records it as root security (docs/DECISIONS.md D-M3-05-14).
+// route table records it as root security (docs/decisions.d/M3-05.md D-M3-05-14).
 const fileTicketScheme = "fileTicket"
 
 // withoutFileTicket returns reqs without the requirement that names only fileTicketScheme and

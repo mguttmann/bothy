@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// VariantOriginal names the original of a file as a download variant (docs/spec/12-dateien.md
+// VariantOriginal names the original of a file as a download variant (docs/spec/12-files.md
 // "9.2", the variant of a ticket). It has no key of its own: VariantKey refuses it, and the
 // original lives under OriginalKey.
 const VariantOriginal Variant = "original"
