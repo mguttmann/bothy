@@ -475,7 +475,7 @@ func cfDocColumns(t *testing.T, path, table string) []string {
 	defer func() { _ = f.Close() }()
 	types := map[string]string{"uuid": "uuid", "text": "text", "integer": "integer", "bigint": "bigint",
 		"timestamptz": "timestamp with time zone", "boolean": "boolean", "jsonb": "jsonb", "bytea": "bytea"}
-	nullable := map[string]string{"nein": "no", "ja": "yes"}
+	nullable := map[string]string{"no": "no", "yes": "yes"}
 	var out []string
 	in, table2 := false, false
 	sc := bufio.NewScanner(f)
@@ -488,7 +488,7 @@ func cfDocColumns(t *testing.T, path, table string) []string {
 			continue
 		case !in:
 			continue
-		case strings.HasPrefix(line, "| Feld "):
+		case strings.HasPrefix(line, "| Field "):
 			table2 = true
 			continue
 		case !table2 || strings.HasPrefix(line, "|---"):
@@ -519,11 +519,11 @@ func cfDocColumns(t *testing.T, path, table string) []string {
 
 // TestTerminalSessionsHoldOnlyMetadata proves requirement 24 and Design note 14 of brief M2-46
 // (R-DM-36, 24 section 10.4): the columns of terminal_sessions in the migrated database (name,
-// type and nullability, in order) equal the list of docs/spec/03-datenmodell.md section 4.14, so no
+// type and nullability, in order) equal the list of docs/spec/03-data-model.md section 4.14, so no
 // column can hold terminal content.
 func TestTerminalSessionsHoldOnlyMetadata(t *testing.T) {
 	t.Parallel()
-	want := cfDocColumns(t, filepath.Join(cfRepoRoot(t), "docs", "spec", "03-datenmodell.md"), "terminal_sessions")
+	want := cfDocColumns(t, filepath.Join(cfRepoRoot(t), "docs", "spec", "03-data-model.md"), "terminal_sessions")
 	if len(want) == 0 {
 		t.Fatal("no columns of terminal_sessions in 03")
 	}
