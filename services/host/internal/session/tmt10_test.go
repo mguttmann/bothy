@@ -18,12 +18,13 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/control"
 	"github.com/OWNER/bothy/services/host/internal/control/controltest"
 	"github.com/OWNER/bothy/services/host/internal/frame"
+	"github.com/OWNER/bothy/services/host/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 )
 
 // treeEndDeadline bounds the wait for the end of the PTY and its background processes after a
 // close; the helper ends the tree at once (24 6.5), the bound only absorbs a slow build machine.
-const treeEndDeadline = 10 * time.Second
+const treeEndDeadline = testkit.Patience
 
 // quietWindow is how long the test listens for a session.ended after a close by the server.
 const quietWindow = 300 * time.Millisecond

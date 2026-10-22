@@ -188,7 +188,7 @@ func TestRelayLimits_ProgressWrittenAtMostOncePerGrace(t *testing.T) {
 		timers.Advance(time.Second)
 	}
 	// 20 seconds of input with a grace of 10 seconds: at most three writes (the first at once).
-	time.Sleep(50 * time.Millisecond) // the writes run in their own goroutines
+	r.writes.Wait() // the writes run in their own goroutines
 	if n := counters(); n < 1 || n > 3 {
 		t.Fatalf("%d progress writes in two grace windows", n)
 	}
@@ -302,11 +302,12 @@ func TestRelayLimits_EndsOnce(t *testing.T) {
 	r.ObserveLogEvent(t.Context(), eventSessionChg, id, []byte(payload))
 	// A reached deadline runs its timer at once in its own goroutine (fakehost.ClockTimers).
 	for range 50 {
+		timers.Settle()
 		timers.Advance(time.Second)
+		timers.Settle()
 		if e := uc.ends(); !slices.Equal(e, []string{"end:idle_timeout"}) {
 			t.Fatalf("ends %v after a late active row, want one idle_timeout", e)
 		}
-		time.Sleep(2 * time.Millisecond)
 	}
 }
 
@@ -338,7 +339,7 @@ func TestRelayLimits_InputAfterOutputOnlyWriteIsStored(t *testing.T) {
 	typed := timers.Clock.Now()
 	r.forward(dev, []byte("k"))
 	// Then silence: nothing else would carry the input to the store.
-	time.Sleep(50 * time.Millisecond) // the writes run in their own goroutines
+	r.writes.Wait() // the writes run in their own goroutines
 	uc.mu.Lock()
 	defer uc.mu.Unlock()
 	var stored time.Time
@@ -373,11 +374,11 @@ func TestRelayLimits_FailedWriteRetriesOncePerGrace(t *testing.T) {
 	r.forward(dev, []byte("k"))
 	// 200 host frames within 2 seconds, far less than one grace.
 	for range 200 {
-		time.Sleep(time.Millisecond) // let a failed write give its counts back
+		r.writes.Wait() // let a failed write give its counts back
 		r.forward(hst, []byte("out"))
 		timers.Advance(10 * time.Millisecond)
 	}
-	time.Sleep(50 * time.Millisecond)
+	r.writes.Wait()
 	uc.mu.Lock()
 	n := len(uc.written)
 	uc.mu.Unlock()

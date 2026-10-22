@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
@@ -122,8 +123,8 @@ func progressRun(t *testing.T, seed uint64) error {
 	return nil
 }
 
-// settled waits until no progress write is in flight; false when that takes longer than a few
-// seconds of real time, which only a write that keeps starting the next one does.
+// settled waits until no progress write is in flight; false when that takes longer than
+// testkit.Patience, which only a write that keeps starting the next one does.
 func settled(r *Relay) bool {
 	done := make(chan struct{})
 	go func() {
@@ -133,7 +134,7 @@ func settled(r *Relay) bool {
 	select {
 	case <-done:
 		return true
-	case <-time.After(5 * time.Second):
+	case <-time.After(testkit.Patience):
 		return false
 	}
 }

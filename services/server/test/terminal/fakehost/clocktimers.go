@@ -25,6 +25,8 @@ type ClockTimers struct {
 	mu     gosync.Mutex
 	list   []*clockTimer
 	frozen bool
+	// running counts the timers that run in their own goroutine (Settle waits for them).
+	running gosync.WaitGroup
 }
 
 // clockTimer is one scheduled function.
@@ -45,12 +47,16 @@ func (t *ClockTimers) AfterFunc(d time.Duration, f func()) func() bool {
 	now := d <= 0 && !t.frozen
 	if now {
 		tm.fired = true
+		t.running.Add(1)
 	} else {
 		t.list = append(t.list, tm)
 	}
 	t.mu.Unlock()
 	if now {
-		go f()
+		go func() {
+			defer t.running.Done()
+			f()
+		}()
 	}
 	return func() bool {
 		t.mu.Lock()
@@ -121,6 +127,10 @@ func (t *ClockTimers) next() *clockTimer {
 	tm.fired = true
 	return tm
 }
+
+// Settle waits until every timer that runs in its own goroutine (a duration that is not positive)
+// has returned, so a test checks their effects without sleeping.
+func (t *ClockTimers) Settle() { t.running.Wait() }
 
 // Pending returns the number of timers not yet fired or stopped.
 func (t *ClockTimers) Pending() int {

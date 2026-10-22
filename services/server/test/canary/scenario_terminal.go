@@ -9,15 +9,15 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 	"github.com/OWNER/bothy/services/server/test/terminal/fakehost"
 )
 
 // terminalWait bounds each wait of the terminal step with Noise (a test constant).
-const terminalWait = 30 * time.Second
+const terminalWait = testkit.Patience
 
 // TerminalIO is what the terminal step with Noise saw (M2-46 Design note 13): the positive controls
 // of TestSEC_T10_TerminalInputOutput and the number of relay messages it added to the sinks.

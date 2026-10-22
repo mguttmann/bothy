@@ -22,6 +22,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/hosttest"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
 	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
@@ -31,7 +32,7 @@ import (
 )
 
 // waitLong bounds every wait of a test (a test constant, not a product limit).
-const waitLong = 30 * time.Second
+const waitLong = testkit.Patience
 
 // The windows of the test configuration (test values, not the product defaults of 24 section 17).
 const (
