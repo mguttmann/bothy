@@ -8,7 +8,6 @@ library;
 import 'package:api_client/api_client.dart' show ApiProblem;
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:l10n/l10n.dart';
 
 import '../common/admin_action.dart';
@@ -18,6 +17,7 @@ import '../data/admin_repository.dart';
 import '../data/agents_repository.dart';
 import '../grants/grant_labels.dart' show lastDayLabel;
 import '../groups/member_editor.dart' show parseDay;
+import '../secrets/once_only_secret.dart';
 import '../self/device_tile.dart' show activityText;
 import '../self/self_feedback.dart';
 
@@ -373,15 +373,11 @@ class _CreateTokenDialogState extends State<_CreateTokenDialog> {
   }
 }
 
-/// The secret of a new token, shown once: in the mono font, selectable and copyable, with the
-/// note that it is shown only once (08 12; pattern of the enrollment code, M4-26 Design note
-/// 4).
-///
-/// The dialog holds the only copy of [secret]: the caller passes it in and keeps no reference,
-/// so closing the dialog discards it; the list shows only the prefix afterwards.
+/// The dialog that shows the secret of a new token once: the shared [OnceOnlySecret] with the
+/// texts of a token and the keys `token.*` (08 12; brief M6-08 Design note 4).
 ///
 /// Example: `TokenSecretView.show(context, name: 'Deploy', secret: created.secret)`.
-class TokenSecretView extends StatefulWidget {
+class TokenSecretView extends StatelessWidget {
   /// Creates the view of [secret] for the token [name].
   const TokenSecretView({super.key, required this.name, required this.secret});
 
@@ -404,74 +400,14 @@ class TokenSecretView extends StatefulWidget {
   );
 
   @override
-  State<TokenSecretView> createState() => _TokenSecretViewState();
-}
-
-class _TokenSecretViewState extends State<TokenSecretView> {
-  bool _copied = false;
-
-  Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: widget.secret));
-    if (mounted) setState(() => _copied = true);
-  }
-
-  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final colors = context.dsColors;
-    return AlertDialog(
-      key: const ValueKey('token.secretDialog'),
-      backgroundColor: colors.surfaceRaised,
-      title: Text(
-        l.adminTokenSecretTitle(widget.name),
-        style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DsBanner(tone: DsTone.warning, text: l.adminTokenSecretOnce),
-              const SizedBox(height: DsSpace.s16),
-              Text(
-                l.adminTokenSecretLabel,
-                style: dsTextStyle(DsType.bodyStrong)
-                    .copyWith(color: colors.textPrimary),
-              ),
-              const SizedBox(height: DsSpace.s4),
-              Semantics(
-                label: l.adminTokenSecretLabel,
-                // SelectableText, not SelectionArea: in the web console a SelectionArea makes the
-                // engine insert a style element without the nonce, which the CSP blocks (brief
-                // M6-04, D-M6-04-6).
-                child: SelectableText(
-                  widget.secret,
-                  key: const ValueKey('token.secret'),
-                  style: dsTextStyle(DsType.code)
-                      .copyWith(color: colors.textPrimary),
-                ),
-              ),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton(
-                  key: const ValueKey('token.copy'),
-                  onPressed: _copy,
-                  child: Text(_copied ? l.onboardingCopied : l.onboardingCopy),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        FilledButton(
-          key: const ValueKey('token.secretClose'),
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.adminCodeClose),
-        ),
-      ],
+    return OnceOnlySecret(
+      title: l.adminTokenSecretTitle(name),
+      label: l.adminTokenSecretLabel,
+      notice: l.adminTokenSecretOnce,
+      secret: secret,
+      keyPrefix: 'token',
     );
   }
 }

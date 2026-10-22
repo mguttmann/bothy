@@ -49,6 +49,13 @@
 /// view of "View as person": the [ViewAsBanner] with the time left and "End view", the
 /// [ViewAsStructure] (structure and access only, never content; ADR 0028) and
 /// [notVisibleSpaces].
+///
+/// M6-08 adds the apps and webhooks of 01 5.2 and 11 4 to 8: the [AppsList] with the install
+/// flow from a manifest file ([ManifestPicker], [ManifestUpload]) and its consent, the
+/// [AppPage] with the update diff, suspend, resume and uninstall and the outgoing
+/// [AppSubscriptionsSection] with its deliveries, the [IncomingWebhooksView] per channel with
+/// the composed "incoming app", the shared [OnceOnlySecret] for every secret shown once, and
+/// the data source [AppsRepository] ([ApiAppsRepository]), which [AdminRepository] includes.
 library;
 
 export 'src/access/source_chain.dart';
@@ -65,6 +72,10 @@ export 'src/agents/holder_dialog.dart';
 export 'src/agents/i1_explanation.dart';
 export 'src/agents/switch_all_dialog.dart';
 export 'src/agents/switch_mode_dialog.dart';
+export 'src/apps/app_page.dart';
+export 'src/apps/apps_list.dart';
+export 'src/apps/manifest_picker.dart';
+export 'src/apps/subscriptions_section.dart';
 export 'src/audit/audit_entry_detail.dart';
 export 'src/audit/audit_export.dart';
 export 'src/audit/audit_filters.dart';
@@ -103,12 +114,14 @@ export 'src/hosts/llm_login_section.dart';
 export 'src/hosts/pairing_wizard.dart';
 export 'src/hosts/server_host_section.dart';
 export 'src/hosts/session_users_section.dart';
+export 'src/incoming_webhooks/incoming_webhooks_view.dart';
 export 'src/people/create_person_dialog.dart';
 export 'src/people/credentials_section.dart';
 export 'src/people/enrollment_code_view.dart';
 export 'src/people/owners_section.dart';
 export 'src/people/people_list.dart';
 export 'src/people/person_detail.dart';
+export 'src/secrets/once_only_secret.dart';
 export 'src/self/add_device_dialog.dart';
 export 'src/self/confirm_device_dialog.dart';
 export 'src/self/device_tile.dart';

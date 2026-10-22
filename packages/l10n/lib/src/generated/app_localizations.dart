@@ -7908,6 +7908,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Video {name}'**
   String fileVideoTitle(String name);
+
+  /// Entry of the administration navigation: the installed apps (01 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Apps'**
+  String get adminNavApps;
+
+  /// Entry of the administration navigation: the incoming webhooks per channel (11 section 8).
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming webhooks'**
+  String get adminNavIncomingWebhooks;
 }
 
 class _AppLocalizationsDelegate

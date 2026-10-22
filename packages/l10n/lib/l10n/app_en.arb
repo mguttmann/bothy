@@ -7459,5 +7459,13 @@
         "example": "clip.mp4"
       }
     }
+  },
+  "adminNavApps": "Apps",
+  "@adminNavApps": {
+    "description": "Entry of the administration navigation: the installed apps (01 section 5.2)."
+  },
+  "adminNavIncomingWebhooks": "Incoming webhooks",
+  "@adminNavIncomingWebhooks": {
+    "description": "Entry of the administration navigation: the incoming webhooks per channel (11 section 8)."
   }
 }

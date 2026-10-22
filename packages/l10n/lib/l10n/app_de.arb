@@ -1300,5 +1300,7 @@
   "transcriptUnavailable": "Transkription ist hier nicht verfügbar",
   "sessionFiles": "Dateien ({count})",
   "sessionFilesEmpty": "Keine Dateien",
-  "fileVideoTitle": "Video {name}"
+  "fileVideoTitle": "Video {name}",
+  "adminNavApps": "Apps",
+  "adminNavIncomingWebhooks": "Eingehende Webhooks"
 }

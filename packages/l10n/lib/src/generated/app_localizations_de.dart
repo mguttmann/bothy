@@ -4927,4 +4927,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String fileVideoTitle(String name) {
     return 'Video $name';
   }
+
+  @override
+  String get adminNavApps => 'Apps';
+
+  @override
+  String get adminNavIncomingWebhooks => 'Eingehende Webhooks';
 }
