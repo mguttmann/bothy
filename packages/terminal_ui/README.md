@@ -66,7 +66,9 @@ app implements them its own way:
 8. Close codes (`closeReactionFor`): `4100` ends the tab with the `close_reason`, a revocation
    blocks it; `4101`, `4102`, `4103` and a lost connection detach it with their cause; `4104`
    and every Noise or frame error block it as tampering, without a retry. A closed session in
-   `terminal_session.changed` reacts like `4100`.
+   `terminal_session.changed` reacts like `4100`. Local work is no tampering: a failed
+   `identify` (no access token or DPoP proof) detaches the tab with `authenticationFailed`, and
+   a pin that cannot be stored leaves the session connected (D-M4-35-21).
 
 ## Blocks
 
@@ -76,9 +78,10 @@ app implements them its own way:
   (final `t`), status and other reports (`n` other than CPR `6 n`), device attributes other
   than DA1 and DA2, `$` requests, DECREQTPARM and XTVERSION; so the answers that reach the host
   are exactly CPR and DA1/DA2. DCS, SOS, PM and APC are dropped with their content. Every OSC
-  is dropped (OSC 52 clipboard, titles, colour queries) except OSC 8. CSI sequences known to
-  make xterm 4.0.0 throw or hang are dropped too (parameters above 9999, SGR 38/48 without
-  sub-parameters or with an index above 255, large REP counts, `CSI 0 X`). Sequences may be
+  is dropped (OSC 52 clipboard, titles, color queries) except OSC 8. CSI sequences known to
+  make xterm 4.0.0 throw or hang are dropped too (parameters above
+  `EscapeFilter.maxParameterValue`, SGR 38/48 without sub-parameters or with an index above 255,
+  REP counts above `EscapeFilter.maxRepeatCount`, `CSI 0 X`). Sequences may be
   split at any byte across frames; memory per sequence is bounded. The full allow list is the
   doc comment of `EscapeFilter`.
 - **OSC 8 links**: rewritten into inert text plus a record (`TerminalLink`). A click shows the

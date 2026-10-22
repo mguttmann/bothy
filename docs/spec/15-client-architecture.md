@@ -942,10 +942,11 @@ Ports of `terminal_ui`, implemented per app:
   content; CSI passes except window operations and reports (final `t`), status reports other
   than CPR (`CSI 6 n`), device attributes other than DA1 and DA2, `$` requests, DECREQTPARM and
   XTVERSION, so the only answers that reach the host are CPR and DA1/DA2; every OSC (OSC 52,
-  titles, colour queries) is dropped except OSC 8, which becomes inert text plus a link record
+  titles, color queries) is dropped except OSC 8, which becomes inert text plus a link record
   that opens only after a click on a confirmation showing the target, and only for `https` and
   `http`; CSI sequences that make xterm 4.0.0 throw or hang are dropped too (parameters above
-  9999, SGR 38/48 without sub-parameters or with an index above 255, large REP counts,
+  `EscapeFilter.maxParameterValue`, SGR 38/48 without sub-parameters or with an index above 255,
+  REP counts above `EscapeFilter.maxRepeatCount`,
   `CSI 0 X`). A sequence may be split at any byte across frames; memory per sequence is
   bounded; the filter logs nothing. The full list is the doc comment of `EscapeFilter`.
   Second layer: the screen of the view (`TerminalScreen`) leaves `onTitleChange`,
@@ -953,7 +954,7 @@ Ports of `terminal_ui`, implemented per app:
   output cannot end the session as tampering.
 - As built (M4-35): `buildTerminalTheme` generates the xterm `TerminalTheme` from `DsColors`
   (`color.terminal.*` of docs/design/components.md 12), so the screen follows light and dark
-  mode without a colour of its own. xterm paints the cursor and the selection over the text,
+  mode without a color of its own. xterm paints the cursor and the selection over the text,
   has no field for `color.terminal.cursor-text` and paints the underline and bar cursors in the
   wrong row, so its cursor and selection are transparent and the view paints both itself
   (`TerminalMarksPainter`): the cursor cell opaque in `color.terminal.cursor` with its character

@@ -467,6 +467,8 @@ final class TerminalController extends ChangeNotifier {
     NkInitiator? initiator;
     var stage = _Stage.hello;
     BlockCause? failure;
+    // Local work that failed (no tampering): the tab detaches and offers "Reattach".
+    DetachCause? lost;
     try {
       await for (final message in channel.messages) {
         if (!_owns(generation)) break;
@@ -487,10 +489,20 @@ final class TerminalController extends ChangeNotifier {
               failure = BlockCause.protocolError;
               break;
             }
-            final identify = await _owned(
-              generation,
-              () => _transport.identify(hello),
-            );
+            final Map<String, Object?> identify;
+            try {
+              identify = await _owned(
+                generation,
+                () => _transport.identify(hello),
+              );
+            } on _Superseded {
+              rethrow;
+            } on Object {
+              // The access token or the DPoP proof could not be made (a failed refresh, the
+              // network): the stream's login failed, which is no tampering (D-M4-35-21).
+              lost = DetachCause.authenticationFailed;
+              break;
+            }
             channel.sendText(jsonEncode({'op': 'identify', 'd': identify}));
             final key = _ephemeral;
             if (key == null) {
@@ -554,18 +566,25 @@ final class TerminalController extends ChangeNotifier {
               ),
             );
             if (checked.writePin) {
-              await _owned(
-                generation,
-                () => _pins.write(
-                  HostKeyPin(
-                    hostId: host.id,
-                    noisePublicKey: grant.noisePublicKey,
-                    keyGeneration: grant.keyGeneration,
-                    fingerprint: grant.keyFingerprint,
-                    firstSeen: _clock.now(),
+              try {
+                await _owned(
+                  generation,
+                  () => _pins.write(
+                    HostKeyPin(
+                      hostId: host.id,
+                      noisePublicKey: grant.noisePublicKey,
+                      keyGeneration: grant.keyGeneration,
+                      fingerprint: grant.keyFingerprint,
+                      firstSeen: _clock.now(),
+                    ),
                   ),
-                ),
-              );
+                );
+              } on _Superseded {
+                rethrow;
+              } on Object {
+                // The local store failed: the session is checked and stays; without a stored
+                // pin the next opening is a first contact again (D-M4-35-21).
+              }
             }
           case _Stage.frames:
             if (message is! Uint8List) {
@@ -577,7 +596,7 @@ final class TerminalController extends ChangeNotifier {
               await _owned(generation, () => _pump!.receive(message)),
             );
         }
-        if (failure != null) break;
+        if (failure != null || lost != null) break;
       }
     } on Object {
       // A Noise or frame error is tampering (24 5.3, 5.4): hard warning, no retry. The error
@@ -597,6 +616,17 @@ final class TerminalController extends ChangeNotifier {
         _state.copyWith(
           phase: TerminalPhase.blocked,
           blockCause: failure,
+          replaying: false,
+        ),
+      );
+    }
+    if (lost != null) {
+      await channel.close();
+      return _set(
+        generation,
+        _state.copyWith(
+          phase: TerminalPhase.detached,
+          detachCause: lost,
           replaying: false,
         ),
       );

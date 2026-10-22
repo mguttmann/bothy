@@ -1827,7 +1827,7 @@ One Flutter widget for all clients. Renderer: package `xterm` by TerminalStudio,
   lists no vulnerability; the GitHub advisory database
   (https://github.com/advisories?query=ecosystem%3Apub+xterm) has no entry; the issues hold no
   security report for OSC 52, OSC 8, hyperlinks, the clipboard or titles.
-- Behaviour and bugs of 4.0.0, read in its source:
+- Behavior and bugs of 4.0.0, read in its source:
   [15-client-architecture.md](15-client-architecture.md), section 23.4.
 
 The package is taken as is; the blocks of 11.2 live in `terminal_ui` in front of the renderer and

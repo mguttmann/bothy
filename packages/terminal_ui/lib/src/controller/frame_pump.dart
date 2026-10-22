@@ -58,14 +58,19 @@ final class FramePump {
   }
 
   /// Sends [bytes] of input as `data` frames, split at [maxDataFrameBytes]; nothing for an
-  /// empty input (an empty `data` frame is not allowed, 24 5.4).
-  Future<void> sendInput(List<int> bytes) async {
+  /// empty input (an empty `data` frame is not allowed, 24 5.4). Every chunk is queued at once,
+  /// so input sent while the chunks are on their way follows the whole input.
+  Future<void> sendInput(List<int> bytes) {
+    var last = _tail;
     for (var start = 0; start < bytes.length; start += maxDataFrameBytes) {
       final end = start + maxDataFrameBytes < bytes.length
           ? start + maxDataFrameBytes
           : bytes.length;
-      await sendFrame(DataFrame(Uint8List.fromList(bytes.sublist(start, end))));
+      last = sendFrame(
+        DataFrame(Uint8List.fromList(bytes.sublist(start, end))),
+      );
     }
+    return last;
   }
 
   /// Records a new size; the last size within one frame tick is sent as one `resize`.

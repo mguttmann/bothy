@@ -54,8 +54,13 @@ final class FakePins implements HostKeyPinStore {
   @override
   Future<HostKeyPin?> read(String hostId) async => pins[hostId];
 
+  /// When set, [write] throws it (the local store failed).
+  Object? writeError;
+
   @override
   Future<void> write(HostKeyPin pin) async {
+    final error = writeError;
+    if (error != null) throw error;
     writes.add(pin);
     pins[pin.hostId] = pin;
   }

@@ -308,9 +308,16 @@ final class FakeTerminalTransport implements TerminalTransport {
     return host._connect(streamPath);
   }
 
+  /// When set, [identify] throws it (a failed token refresh or a network error).
+  Object? identifyError;
+
   @override
-  Future<Map<String, Object?>> identify(Map<String, Object?> hello) async => {
-    'protocol_version': 1,
-    'device_id': '0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e01',
-  };
+  Future<Map<String, Object?>> identify(Map<String, Object?> hello) async {
+    final error = identifyError;
+    if (error != null) throw error;
+    return {
+      'protocol_version': 1,
+      'device_id': '0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e01',
+    };
+  }
 }
