@@ -35,7 +35,7 @@ const instrumentationName = "github.com/OWNER/bothy/services/server/internal/fil
 // SpanName is the CLIENT span of one scan pass (signals.md 5.2).
 const SpanName = "file.scan"
 
-// Scan are the arguments of files.scan: only the file id and the retry round (02 "Einsatz").
+// Scan are the arguments of files.scan: only the file id and the retry round (02 12.1 "Usage").
 type Scan struct {
 	// FileID is the file to scan.
 	FileID ids.ID `json:"file_id"`

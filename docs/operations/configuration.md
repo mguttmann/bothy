@@ -1007,7 +1007,7 @@ These variables are not server configuration; Compose derives values of the serv
 | `BOTHY_STORAGE_DRIVER` | `fs` | sets `file.storage.driver`: fs or s3 (chapter 12) |
 | `BOTHY_S3_ENDPOINT` | `http://seaweedfs:8333` | sets `file.s3.endpoint` with driver s3 |
 | `BOTHY_S3_BUCKET` | `bothy-files` | sets `file.s3.bucket` with driver s3 |
-| `BOTHY_CLAMD_ADDRESS` | `tcp://clamav:3310` | sets `file.scan.clamd_address` (chapter 12) |
+| `BOTHY_CLAMD_ADDRESS` | `unix:///run/clamav/clamd.sock` | sets `file.scan.clamd_address` (chapter 12); the socket lies in the volume `clamav-socket` |
 | `BOTHY_PG_SHM_SIZE` | `256m` | shared memory of the database container |
 | `BOTHY_PG_ARCHIVE_TIMEOUT` | `60s` | sets `archive_timeout` in PostgreSQL; equal to `backup.pg.archive_timeout` |
 | `BOTHY_BACKUP_OFFSITE_TARGET` | empty | sets `backup.offsite.target` (`s3:https://<host>[:<port>]/<bucket>[/<prefix>]`) and `BOTHY_PGBACKREST_REPO2` of `postgres` |
