@@ -79,7 +79,7 @@ minimum the process keeps running for every role, the readiness check
 
 ### Restore finalize and the start lock (M7-04)
 
-Migration `00051_instance_restore_identity.sql` adds `pg_system_identifier` (decimal text of
+Migration `00054_instance_restore_identity.sql` adds `pg_system_identifier` (decimal text of
 `pg_control_system().system_identifier`) and `pg_timeline_id` (`pg_control_checkpoint().timeline_id`)
 to the instance row (R-DM-50). `RecordMigration` fills both while they are empty and never changes a
 stored identity or `sync_epoch`. `State.CheckIdentity` compares the stored identity with the current
