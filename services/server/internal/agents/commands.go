@@ -8,7 +8,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Commands is the register of slash commands (docs/spec/09-agenten.md section 10, 03 commands;
+// Commands is the register of slash commands (docs/spec/09-agents.md section 10, 03 commands;
 // M2-16). The caller is the principal of ctx (kernel/actor). Every change authorizes
 // command.register or command.remove and writes one audit entry and one command.changed in its
 // unit of work; the reads authorize command.read. Errors are kernel/errs errors; an unknown, a

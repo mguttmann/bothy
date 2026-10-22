@@ -16,7 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 )
 
-// The slash commands of the register (docs/spec/09-agenten.md section 10, 03 commands; brief
+// The slash commands of the register (docs/spec/09-agents.md section 10, 03 commands; brief
 // M2-16 design notes 3 and 9). The rules are pure: they read no stored state, so the use cases run
 // them before authorize without revealing anything (design note 4 a).
 

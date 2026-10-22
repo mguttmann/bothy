@@ -206,7 +206,7 @@ type InvokeFacts struct {
 }
 
 // CommandFacts describes a slash command for command.read, command.register and command.invoke
-// (docs/spec/09-agenten.md section 10, M2-16). Zero values mean "not applicable".
+// (docs/spec/09-agents.md section 10, M2-16). Zero values mean "not applicable".
 //
 // Example (one item of listChannelCommands):
 //

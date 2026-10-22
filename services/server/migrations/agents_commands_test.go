@@ -16,7 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
-// TestMigration_Commands holds commands against docs/spec/03-datenmodell.md section 4.4 column by
+// TestMigration_Commands holds commands against docs/spec/03-data-model.md section 4.4 column by
 // column, with every check, key and index, and the validated foreign key of
 // runs.triggering_command_id (00054, 00055). As bothy_app it then shows the rules: the unique
 // partial index is NULLS NOT DISTINCT (two live instance commands of one owner and name fail),

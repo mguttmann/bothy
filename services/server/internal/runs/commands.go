@@ -8,7 +8,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// CommandExec executes slash commands (docs/spec/09-agenten.md section 10.4, M2-16). The caller is
+// CommandExec executes slash commands (docs/spec/09-agents.md section 10.4, M2-16). The caller is
 // the principal of ctx (kernel/actor). A control command goes to its owner at once as the personal
 // event command.invoked, also during a run, and never creates a run, a follow-up or a model turn; a
 // model command opens a run queued with trigger_kind command like a triggering message and is

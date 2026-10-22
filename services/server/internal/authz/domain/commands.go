@@ -8,7 +8,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// The rules of slash commands (docs/spec/09-agenten.md section 10, brief M2-16 design note 8):
+// The rules of slash commands (docs/spec/09-agents.md section 10, brief M2-16 design note 8):
 // the visibility of the resource kind command, the target guard of command.register and the
 // requirement and guard of command.invoke. The application layer gathers CommandFacts.
 

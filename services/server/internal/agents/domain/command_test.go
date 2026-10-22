@@ -37,7 +37,7 @@ func repoRoot(t *testing.T) string {
 // TestReservedNamesMatchChapter09 reads the first column of the table in 09 section 10.1 and
 // compares it with the reserved names, so a new built-in fails until the list follows.
 func TestReservedNamesMatchChapter09(t *testing.T) {
-	f, err := os.Open(filepath.Join(repoRoot(t), "docs", "spec", "09-agenten.md"))
+	f, err := os.Open(filepath.Join(repoRoot(t), "docs", "spec", "09-agents.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -93,7 +93,7 @@ type CommandDeps struct {
 	Channels chat.TriggerFacts
 }
 
-// CommandService implements agents.Commands (docs/spec/09-agenten.md section 10.2 and 10.3,
+// CommandService implements agents.Commands (docs/spec/09-agents.md section 10.2 and 10.3,
 // M2-16). It is safe for concurrent use.
 type CommandService struct {
 	cfg CommandConfig

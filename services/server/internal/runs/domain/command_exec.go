@@ -13,7 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 )
 
-// The execution of slash commands (docs/spec/09-agenten.md section 10.4, brief M2-16 design notes
+// The execution of slash commands (docs/spec/09-agents.md section 10.4, brief M2-16 design notes
 // 10 to 13): the option values of an invocation and the payloads of command.invoked and of the
 // command variant of agent.invocation. Pure; the definition comes from the agents port.
 

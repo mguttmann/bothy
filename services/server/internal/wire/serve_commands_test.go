@@ -27,6 +27,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/runs/adapters/runstest"
 )
 
@@ -120,7 +121,7 @@ func (w *cmdWorld) do(s send) (int, []byte, http.Header) {
 		b, _ := json.Marshal(s.body)
 		rd = bytes.NewReader(b)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, s.method, w.base+s.path, rd)
 	if err != nil {
@@ -308,11 +309,12 @@ type dispatchFrame struct {
 	Payload         json.RawMessage `json:"payload"`
 }
 
-// nextOf reads frames of c until a dispatch of typ arrives or d passed, acknowledging every other
-// dispatch; ok is false when none came.
-func (w *cmdWorld) nextOf(c *wstest.Client, typ string, d time.Duration) (dispatchFrame, bool) {
+// nextOf reads frames of c until a dispatch of typ arrives, acknowledging every other dispatch;
+// ok is false when none came within testkit.Patience. A refused delivery is proven by order: a
+// later event of the same type must be the next one (no quiet window).
+func (w *cmdWorld) nextOf(c *wstest.Client, typ string) (dispatchFrame, bool) {
 	w.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), d)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	for {
 		op, raw, err := c.Next(ctx)
@@ -837,7 +839,7 @@ func TestSlashCommands(t *testing.T) {
 			p.MessageID != "" || len(p.Options) != 2 || p.Options[0].Name != "ticket" || p.Options[1].Name != "priority" {
 			t.Fatalf("payload %s", payload)
 		}
-		f, ok := w.nextOf(c, "agent.invocation", 15*time.Second)
+		f, ok := w.nextOf(c, "agent.invocation")
 		if !ok || f.InvocationToken == "" {
 			t.Fatal("no agent.invocation")
 		}
@@ -964,7 +966,7 @@ func TestSlashCommands(t *testing.T) {
 				!p.Control || p.RunID != wantRun || inv.RunID != "" {
 				t.Fatalf("command.invoked %s %s %s %s %v", payload, audience, receive, kind, version)
 			}
-			f, ok := w.nextOf(c, "command.invoked", 15*time.Second)
+			f, ok := w.nextOf(c, "command.invoked")
 			if !ok || f.InvocationToken == "" {
 				t.Fatal("no command.invoked to the owner")
 			}
@@ -986,7 +988,7 @@ func TestSlashCommands(t *testing.T) {
 		}
 		r := w.mention(w.sam, th, a)
 		// The delivery of the run's own invocation records its jti first.
-		if f, ok := w.nextOf(c, "agent.invocation", 15*time.Second); !ok {
+		if f, ok := w.nextOf(c, "agent.invocation"); !ok {
 			t.Fatal("no invocation of the mention")
 		} else {
 			sendAck(t, c, f.Seq)
@@ -1170,10 +1172,21 @@ func TestSlashCommands(t *testing.T) {
 		mi := w.mustInvoke(p, ch, model.ID, map[string]any{"thread_id": w.thread(ch), "options": opts("ticket", "T-9")})
 		w.must(w.owner, http.MethodPost, "/api/v1/grants/"+g+"/revoke", map[string]any{"reason": "left the team"})
 		c, _ := w.ready(t, w.agentParams(a, ""))
-		if f, ok := w.nextOf(c, "command.invoked", 5*time.Second); ok {
-			t.Fatalf("a revoked control command was delivered: %+v", f)
+		// Proof by order: a later control command of Sam, who keeps the right, is the next
+		// command.invoked; the revoked one before it was not delivered.
+		later := w.mustInvoke(w.sam, ch, ctl.ID, map[string]any{"thread_id": w.thread(ch)})
+		f, ok := w.nextOf(c, "command.invoked")
+		if !ok {
+			t.Fatal("no command.invoked after the revocation")
 		}
-		eventually(t, 10*time.Second, "the failed command run", func() bool {
+		var got struct {
+			InvocationID string `json:"invocation_id"`
+		}
+		_ = json.Unmarshal(f.Payload, &got)
+		if got.InvocationID != later.InvocationID {
+			t.Fatalf("a revoked control command was delivered: %s, want %s", f.Payload, later.InvocationID)
+		}
+		testkit.Until(t, "the failed command run", func() bool {
 			return w.count(`SELECT count(*) FROM runs WHERE id = $1 AND state = 'failed' AND state_reason = 'access_revoked'`, mi.RunID) == 1
 		})
 		if n := w.count(`SELECT count(*) FROM audit_events WHERE action = 'agent.invoke' AND decision = 'deny' AND actor_principal_id = $1
@@ -1250,13 +1263,12 @@ func TestSlashCommands(t *testing.T) {
 	})
 }
 
-// denials waits until exactly one deny entry matches cond (the authz layer writes denials outside
+// denials waits until a deny entry matches cond and then requires exactly one (the authz layer writes denials outside
 // the business transaction, aggregated per audit.deny_aggregate_window).
 func (w *cmdWorld) denials(t *testing.T, cond string, args ...any) {
 	t.Helper()
 	q := `SELECT count(*) FROM audit_events WHERE decision = 'deny' AND ` + cond
-	eventually(t, 10*time.Second, "the deny entry", func() bool { return w.count(q, args...) >= 1 })
-	time.Sleep(1500 * time.Millisecond)
+	testkit.Until(t, "the deny entry", func() bool { return w.count(q, args...) >= 1 })
 	if n := w.count(q, args...); n != 1 {
 		t.Fatalf("%d deny entries for %s", n, cond)
 	}
@@ -1347,3 +1359,24 @@ var (
 	_ = sync.Mutex{}
 	_ = runstest.ReferenceExpectation{}
 )
+
+// apiToken stores an API token of kind for principal with the scopes, bound to key when not nil.
+func (w *cmdWorld) apiToken(kind apitoken.Kind, principal ids.ID, key *identitytest.Key, expires time.Time, scopes ...string) string {
+	w.t.Helper()
+	tok, err := apitoken.Generate(nil, kind)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	pp, _ := apitoken.Parse(tok)
+	var jkt any
+	if key != nil {
+		jkt = key.Thumbprint
+	}
+	if scopes == nil {
+		scopes = []string{}
+	}
+	w.sql(`INSERT INTO api_tokens (id, principal_id, name, token_prefix, token_hash, scopes, dpop_jkt, expires_at, created_by)
+		VALUES ($1, $2, 'x', $3, $4, $5, $6, $7, $2)`, ids.New().String(), principal.String(), pp.Prefix(), apitoken.Hash(w.pepper, tok), scopes, jkt, expires)
+	w.remember(tok)
+	return tok
+}

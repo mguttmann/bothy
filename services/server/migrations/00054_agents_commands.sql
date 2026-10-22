@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Slash commands of the agents module (M2-16): commands exactly as docs/spec/03-datenmodell.md
+-- Slash commands of the agents module (M2-16): commands exactly as docs/spec/03-data-model.md
 -- section 4.4 states it, every column with its type, default and nullability, the checks, the
 -- foreign keys with their ON DELETE, the unique partial index and the two indexes. Agents and apps
 -- register their commands here (09 section 10.2); a removal sets removed_at and keeps the row,
