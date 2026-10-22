@@ -15,10 +15,11 @@ import (
 
 // seedFake is the server side of the seed: it redeems the code and plays setMyLocalCredential.
 type seedFake struct {
-	secret  []byte
-	calls   []rest.LocalCredentialSet
-	token   string
-	enabled bool
+	secret    []byte
+	firstStep int64
+	calls     []rest.LocalCredentialSet
+	token     string
+	enabled   bool
 }
 
 func (f *seedFake) SetCredentials(_ Key, token string) { f.token = token }
@@ -37,8 +38,14 @@ func (f *seedFake) SetMyLocalCredential(_ context.Context, body rest.LocalCreden
 		uri := "otpauth://totp/Team%20Chat:alex?secret=" + base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(f.secret)
 		return rest.LocalCredentialResult{PasswordSet: true, TotpSecretUri: &uri}, nil
 	}
-	if body.TotpCode != nil && *body.TotpCode == TOTPCode(f.secret, TOTPStep(time.Now())) {
-		f.enabled = true
+	// Any step from the start of the test to now: the seed reads the clock itself, and a slow
+	// machine may cross a step boundary between its reading and this one.
+	if body.TotpCode != nil {
+		for step := f.firstStep; step <= TOTPStep(time.Now()); step++ {
+			if *body.TotpCode == TOTPCode(f.secret, step) {
+				f.enabled = true
+			}
+		}
 	}
 	return rest.LocalCredentialResult{PasswordSet: true, TotpEnabled: f.enabled}, nil
 }
@@ -47,7 +54,7 @@ func (f *seedFake) SetMyLocalCredential(_ context.Context, body rest.LocalCreden
 // code of the current step and returns the login of the console test (brief M6-03 Design note 7).
 func TestSeed(t *testing.T) {
 	t.Parallel()
-	f := &seedFake{secret: []byte("0123456789abcdefghij")}
+	f := &seedFake{secret: []byte("0123456789abcdefghij"), firstStep: TOTPStep(time.Now())}
 	login, err := Seed(t.Context(), f, []byte("en_0000-1111-2222-3333-4444-5555-6666-7777\n"))
 	if err != nil {
 		t.Fatal(err)

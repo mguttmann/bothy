@@ -338,7 +338,7 @@ Format of the checkpoints (03, `audit_checkpoints`):
 | SEC-T02 | Lint: no `InsecureSkipVerify`, no `http.DefaultClient`, no raw SQL | SEC-TLS-4, SEC-NET-1, SEC-IN-5 |
 | SEC-T03 | Headers of every response kind against an expected list (API, console, file, error) | SEC-HDR-1 to 4 |
 | SEC-T04 | CORS: no `Access-Control-Allow-*` except at the public endpoints; WebSocket with a foreign `Origin` rejected | SEC-CORS-1 to 4 |
-| SEC-T05 | Console in a headless browser with an enforced CSP: zero violations, no fetch from a foreign origin, WebSocket works. `make console-e2e` (`tools/console-e2e`, M6-03): Chromium with the full flow (password and passkey step-up, negative test with a report), Firefox and WebKit as smoke test; CI job `console-e2e` on every change of `apps` or `server` | Section 5 |
+| SEC-T05 | Console in a headless browser with an enforced CSP: zero violations, no fetch from a foreign origin, WebSocket works. `make console-e2e` (`tools/console-e2e`, M6-03): Chromium with the full flow (password and passkey step-up, negative test with a report), Firefox and WebKit as smoke test; CI job `console-e2e` when the build context of the server image or the Compose stack of the test changes (docs/quality/gates.md, "Jobs a change needs") | Section 5 |
 | SEC-T06 | Schema fuzzing of all routes: no `5xx` except expected ones, no acceptance of unknown fields, duplicate JSON keys rejected | SEC-IN-1, SEC-IN-2 |
 | SEC-T07 | Bidi and control characters in display names rejected | SEC-IN-4 |
 | SEC-T08 | Uploads: wrong type declaration, SVG with a script, decompression bomb, size over the limit, scanner not ready, infected test file (EICAR) | SEC-UP-1 to 7 |

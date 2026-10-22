@@ -264,7 +264,7 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["services/server/Dockerfile"], TESTS_SERVER | CONSOLE),
         (["infra/compose/test/compose.console-e2e.yaml"], CONSOLE),
         (["tools/console-e2e/console_e2e.py"], EVERY_JOB),
-        # Server code outside it does not.
+        # Server code outside the build context of bothy-postgres does not run its image jobs.
         (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE),
         (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE),
         (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER),
