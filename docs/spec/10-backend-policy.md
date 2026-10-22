@@ -454,10 +454,13 @@ sequenceDiagram
 ```
 
 Server rules of point 4 (M2-21, docs/decisions.d/M2-21.md D-M2-21-2 to D-M2-21-6): the server
-first validates the whole body (the reason of `resolve_i1` is not blank, passes SEC-IN-4 and has
-at most `audit.reason_max_chars` characters), then runs the outer action's `authorize` and its
-checks that write nothing (`404`, `403`, `401 step_up_required`, `409 conflict`, `428`, `412`), so
-a caller without read access to the outer target learns nothing about the listed agents. An
+validates the whole body (the reason of `resolve_i1` is not blank, passes SEC-IN-4 and has at
+most `audit.reason_max_chars` characters) where the use case validates its body: `createGrant` and
+`addGroupMember` before the outer action's `authorize`, `addOwner` and the operator actions after
+it, together with their own reason. The outer `authorize` and its checks that write nothing
+(`404`, `403`, `401 step_up_required`, `409 conflict`, `428`, `412`) always run before any listed
+agent is looked at, so a caller without read access to the outer target learns nothing about the
+listed agents. An
 operator change without effect switches nothing. Then, inside the transaction of the outer action
 and before its first write, it authorizes `agent.billing_mode.set` for every listed agent in
 ascending id: an unknown id, a principal that is not an agent and an agent the caller cannot read
