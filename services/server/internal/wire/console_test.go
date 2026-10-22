@@ -14,18 +14,20 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
 // repoRoot is the repository root relative to this package directory.
 const repoRoot = "../../../.."
 
-// consoleBuildDir writes index.html and the version.json of the console build step
-// (apps/console/tool/version_json.sh, the same script services/server/Dockerfile runs) into a
-// temporary directory.
+// consoleBuildDir writes index.html (with the nonce placeholder the server requires since M6-03)
+// and the version.json of the console build step (apps/console/tool/version_json.sh, the same
+// script services/server/Dockerfile runs) into a temporary directory.
 func consoleBuildDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<!DOCTYPE html>"), 0o600); err != nil {
+	index := `<!DOCTYPE html><script src="/console/flutter_bootstrap.js" async nonce="` + httpserver.NoncePlaceholder + `"></script>`
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(index), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	// The arguments are fixed paths of this repository and a temporary directory of the test.

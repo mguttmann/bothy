@@ -849,6 +849,10 @@ func (stubServer) StepUpWithPassword(context.Context, rest.StepUpWithPasswordReq
 	return nil, nil
 }
 
+func (stubServer) SubmitCspReport(context.Context, rest.SubmitCspReportRequestObject) (rest.SubmitCspReportResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) BeginStepUpOidcReauth(context.Context, rest.BeginStepUpOidcReauthRequestObject) (rest.BeginStepUpOidcReauthResponseObject, error) {
 	return nil, nil
 }
@@ -1170,6 +1174,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getTerminalSession":    {"GET /api/v1/terminal/sessions/{session_id}", "terminal.read_own", "rl.read"},
 		"attachTerminalSession": {"POST /api/v1/terminal/sessions/{session_id}/attach", "terminal.attach", "rl.terminal"},
 		"closeTerminalSession":  {"POST /api/v1/terminal/sessions/{session_id}/close", "terminal.close", "rl.write"},
+		// M6-03
+		"submitCspReport": {"POST /api/v1/csp-reports", "console.csp_report", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

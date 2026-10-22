@@ -641,6 +641,36 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # As in ci.yml: the console under its CSP (SEC-T05, M6-03).
+  console-e2e:
+    name: console-e2e
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' console-e2e ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: make image (host platform)
+        run: make image IMAGE_PLATFORMS="linux/$(dpkg --print-architecture)"
+      - name: make console-e2e
+        env:
+          E2E_ARTIFACTS: ${{ runner.temp }}/console-e2e-results
+        run: make console-e2e
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: console-e2e-results
+          path: ${{ runner.temp }}/console-e2e-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   # As in ci.yml: platform tests of the apps on macOS, Windows and Android emulators.
   apps-macos:
     name: apps (macOS)
@@ -763,7 +793,7 @@ jobs:
   # missing plan fails it.
   build-verify-ok:
     name: build-verify-ok
-    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, apps-macos, apps-windows, apps-android-26, apps-android-36]
+    needs: [plan, static, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, docs, security, denylist, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-windows, apps-android-26, apps-android-36]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

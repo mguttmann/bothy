@@ -251,7 +251,7 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
 		"bothy.authz.errors", "bothy.backup.duration", "bothy.backup.last_success.timestamp", "bothy.backup.size",
-		"bothy.backup.wal.last_archived.timestamp", "bothy.db.event_seq.lock_wait", "bothy.db.pool.connections", "bothy.delivery.duration",
+		"bothy.backup.wal.last_archived.timestamp", "bothy.console.csp_violations", "bothy.db.event_seq.lock_wait", "bothy.db.pool.connections", "bothy.delivery.duration",
 		"bothy.egress.blocked", "bothy.event.appended", "bothy.event.consumer.lag", "bothy.event.consumer.pending_age",
 		"bothy.event.fanout.lag", "bothy.file.scan", "bothy.file.scan.duration", "bothy.file.scan.queue", "bothy.file.upload.size", "bothy.gateway.catchup.duration", "bothy.gateway.close", "bothy.gateway.connect.duration",
 		"bothy.gateway.connections.active", "bothy.gateway.outbound.dropped", "bothy.gateway.resync", "bothy.job.duration",

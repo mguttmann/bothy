@@ -167,6 +167,7 @@ export 'package:api_client/src/generated/model/cost_report.dart';
 export 'package:api_client/src/generated/model/cost_series.dart';
 export 'package:api_client/src/generated/model/credential_holder_set.dart';
 export 'package:api_client/src/generated/model/credential_overview.dart';
+export 'package:api_client/src/generated/model/csp_report_legacy.dart';
 export 'package:api_client/src/generated/model/device.dart';
 export 'package:api_client/src/generated/model/device_approve.dart';
 export 'package:api_client/src/generated/model/device_key_registration.dart';

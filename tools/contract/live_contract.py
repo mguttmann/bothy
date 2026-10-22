@@ -78,6 +78,9 @@ MAX_EXAMPLES = int(os.environ.get("CONTRACT_MAX_EXAMPLES", "100"))
 SEED = int(os.environ["CONTRACT_SEED"])
 CODES = problem_codes(SPEC)
 KEY_DIR = Path(tempfile.mkdtemp(prefix="bothy-contract-keys-"))
+# submitCspReport takes the legacy CSP report type besides application/reports+json (M6-03,
+# 06 "Media types"); both are JSON, so Schemathesis serializes them like application/json.
+schemathesis.serializer.alias("application/csp-report", "application/json")
 # A channel the plain user may upload to (Support/Allgemein of the matrix world, M3-03); the
 # upload operations of a positive case run against a fresh session there.
 UPLOAD_CHANNEL = os.environ.get("BOTHY_CONTRACT_UPLOAD_CHANNEL", "")

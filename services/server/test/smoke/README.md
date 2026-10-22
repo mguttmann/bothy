@@ -15,14 +15,18 @@ product has no JOSE library) and checks the server only through the public liste
 
 ## Command
 
-`cmd/bothy-smoke` with the subcommands `precheck`, `run` and `scan` (flags `--base-url`,
+`cmd/bothy-smoke` with the subcommands `precheck`, `run`, `scan` and `seed` (flags `--base-url`,
 `--public-url`, `--out`, `--in`); the image target `smoke` of `services/server/Dockerfile` builds
 it. The environment gives `SMOKE_PUBLIC_URL` and `SMOKE_CANARY`. Steps log `ok <step>` on stderr,
-never a value. Exit codes: 0 pass, 1 a check failed, 2 usage.
+never a value. Exit codes: 0 pass, 1 a check failed, 2 usage. `seed` prepares the console E2E test
+of M6-03 instead of the scenario: it reads `setup.out`, gives the owner a random password with a
+confirmed TOTP and writes `console-login.json` (mode 0600, never printed).
 
 ## Files
 
 - `dpop.go`: `Key` (`PublicJWK`, `Thumbprint` per RFC 7638), `NewProof`, `StepUpSignature`.
+- `seed.go`: `Seed`, `SeedREST`, `ConsoleLogin`, `TOTPStep`, `TOTPCode` (RFC 6238 with
+  HMAC-SHA-1) and `HTTPClient.SetMyLocalCredential` (M6-03).
 - `htu.go`: `GatewayHTU`, `RESTHTU` (the rule of the server, M1-33).
 - `rest.go`: `REST`, `HTTPClient` (nonce tracking, one retry on `use_dpop_nonce`,
   `Idempotency-Key`), `StatusError`.

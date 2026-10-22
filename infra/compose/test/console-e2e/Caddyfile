@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# TLS sidecar of the console E2E test (brief M6-03 Design note 7). TEST ONLY. It shares the network
+# namespace of api, terminates TLS on :8443 with the certificate of the test CA that
+# tools/console-e2e generates per run (names localhost and api) and forwards to 127.0.0.1:8080, so
+# the server sees a loopback peer (SEC-TLS-1) and server.trusted_proxies stays at its loopback
+# default. It changes no header of the server and no body.
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		protocols h1 h2
+	}
+	log {
+		output stderr
+		level WARN
+	}
+}
+
+https://:8443 {
+	tls /certs/leaf.pem /certs/leaf.key
+	reverse_proxy 127.0.0.1:8080
+}

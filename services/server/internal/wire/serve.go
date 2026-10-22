@@ -755,6 +755,9 @@ func (s *server) startSettings(context.Context) error {
 	if err != nil {
 		return err
 	}
+	if st.CSPReports, err = NewCSPReports(az, s.logger(), nil, int(s.values.Int(KeyCSPReportMaxRecords))); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	s.settings = st
 	s.mu.Unlock()
@@ -1146,8 +1149,8 @@ func (s *server) handlers() Handlers {
 	if h.Log == nil && s.audit != nil {
 		h.Log = s.audit.Handlers()
 	}
-	if h.Admin == nil && s.settings != nil {
-		h.Admin = s.settings.Handlers
+	if s.settings != nil {
+		s.settings.fillHandlers(&h)
 	}
 	if h.Access == nil && s.authzAdmin != nil {
 		h.Access = s.authzAdmin.Handlers

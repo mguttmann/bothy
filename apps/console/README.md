@@ -10,6 +10,16 @@ Status (M6-02): the shell with the navigation of
 fills it), the login E2 and E7 of 01 5.6 in the console form, the step-up directly after the
 login, and the version check. Rulings: `D-M6-02-0` to `D-M6-02-9` in `docs/DECISIONS.md`.
 
+Since M6-03 the console runs under the Content Security Policy of
+[19-security.md](../../docs/spec/19-security.md) 5, which the server sets with a nonce per
+response. `web/index.html` has no `<base>` element (`base-uri 'none'`) and carries the placeholder
+`__BOTHY_CSP_NONCE__` in the nonce attribute of the bootstrap script tag, which the server
+replaces; `web/flutter_bootstrap.js` derives the entry point, the assets, CanvasKit and the
+fallback fonts from its own URL (all on the own origin) and hands the nonce to the loader;
+`ConsolePlatformLocation` (`lib/run.dart`) gives the path URL strategy its base `/console/`.
+`make console-e2e` (`tools/console-e2e`) proves the console under the policy in Chromium, Firefox
+and WebKit (SEC-T05). Rulings: `D-M6-03-0` to `D-M6-03-8` in `docs/decisions.d/M6-03.md`.
+
 ## Layout
 
 | Path | Content |
@@ -22,7 +32,7 @@ login, and the version check. Rulings: `D-M6-02-0` to `D-M6-02-9` in `docs/DECIS
 | `lib/platform/` | the browser ports (`sessionStorage`, location, `navigator.credentials`); `browser_web.dart` in the web build, an inert stub elsewhere |
 | `lib/shell/` | the navigation, the placeholder pages and the thread link |
 | `lib/version/` | the check of `version.json` against `Discovery.spec_version` |
-| `web/` | `index.html` and the loader configuration `flutter_bootstrap.js` (no service worker) |
+| `web/` | `index.html` (no `<base>`, the nonce placeholder) and the loader configuration `flutter_bootstrap.js` (no service worker, every URL from its own, the nonce) |
 | `tool/version_json.sh` | writes `build/web/version.json` after the build |
 
 Screens: [01-product.md](../../docs/spec/01-product.md), sections 5.2 and 5.5. The screens

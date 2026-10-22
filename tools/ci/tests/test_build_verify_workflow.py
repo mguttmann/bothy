@@ -25,6 +25,7 @@ ANDROID_IF = "hashFiles('packages/*/android/gradlew') != ''"
 PLATFORM_JOBS = (
     "postgres-image-amd64",
     "postgres-image-arm64",
+    "console-e2e",
     "apps-macos",
     "apps-windows",
     "apps-android-26",

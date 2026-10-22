@@ -124,7 +124,7 @@ TOOL_COMPONENTS: dict[str, tuple[str, ...]] = {
 }
 # Tool folders every gate and job depends on: the pinned binaries, the CI helpers with this map,
 # the hooks (commitlint and the pre-push plan) and the Node tools with their lock file.
-SHARED_TOOL_FOLDERS = ("bin", "ci", "hooks", "node")
+SHARED_TOOL_FOLDERS = ("bin", "ci", "console-e2e", "hooks", "node")
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
 NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
@@ -150,11 +150,42 @@ DESKTOP_JOBS = ("apps-macos", "apps-windows")
 # The emulator jobs run only while the repository is public (docs/DECISIONS.md D-M5-01-5).
 ANDROID_JOBS = ("apps-android-26", "apps-android-36")
 POSTGRES_IMAGE_JOBS = ("postgres-image-amd64", "postgres-image-arm64")
+# SEC-T05 (M6-03): the console of the server image under its CSP in headless browsers. The image
+# builds the server and the console: the job runs when the build context of
+# services/server/Dockerfile.dockerignore or the Compose stack of the test changes, and for the
+# component server or apps without a diff.
+CONSOLE_E2E_JOBS = ("console-e2e",)
+CONSOLE_E2E_PREFIXES = (
+    "services/server/api/",
+    "services/server/cmd/",
+    "services/server/internal/",
+    "services/server/migrations/",
+    "services/server/test/smoke/",
+    "apps/console/",
+    "packages/",
+    "infra/compose/test/console-e2e/",
+)
+CONSOLE_E2E_FILES = (
+    "services/server/go.mod",
+    "services/server/go.sum",
+    "services/server/VERSION",
+    "services/server/Dockerfile",
+    "services/server/Dockerfile.dockerignore",
+    "pubspec.yaml",
+    "pubspec.lock",
+    "analysis_options.yaml",
+    "infra/compose/compose.yaml",
+    "infra/compose/test/compose.smoke.yaml",
+    "infra/compose/test/compose.console-e2e.yaml",
+    "infra/compose/test/smoke.env",
+    "infra/compose/test/console-e2e.env",
+)
 CONDITIONAL_JOBS: tuple[str, ...] = (
     *COMPONENT_TEST_JOBS,
     *DESKTOP_JOBS,
     *ANDROID_JOBS,
     *POSTGRES_IMAGE_JOBS,
+    *CONSOLE_E2E_JOBS,
 )
 # What the platform tests (tools/ci/apps_platform.py) build and run: the members of the Dart
 # workspace with their native code, and its root manifest (Flutter pin) and lock file. The other
@@ -287,6 +318,7 @@ def ci_plan(
         postgres = any(
             f.startswith(POSTGRES_IMAGE_PREFIXES) or f in POSTGRES_IMAGE_FILES for f in files
         )
+        console = any(f.startswith(CONSOLE_E2E_PREFIXES) or f in CONSOLE_E2E_FILES for f in files)
     else:
         names = list(selected or [])
         unknown = [n for n in names if n != "all" and n not in GATE_COMPONENTS]
@@ -295,6 +327,7 @@ def ci_plan(
         full = "all" in names
         platform = "apps" in names
         postgres = "server" in names
+        console = bool({"apps", "server"} & set(names))
     jobs: set[str] = set(CONDITIONAL_JOBS) if full else set()
     if not full:
         jobs.update(job for job, owners in COMPONENT_TEST_JOBS.items() if set(owners) & set(names))
@@ -302,6 +335,8 @@ def ci_plan(
             jobs.update((*DESKTOP_JOBS, *ANDROID_JOBS))
         if postgres:
             jobs.update(POSTGRES_IMAGE_JOBS)
+        if console:
+            jobs.update(CONSOLE_E2E_JOBS)
     if not public:
         jobs.difference_update(ANDROID_JOBS)
     return CIPlan(components=names, jobs=sorted(jobs & set(CONDITIONAL_JOBS)))

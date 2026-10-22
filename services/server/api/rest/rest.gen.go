@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/oapi-codegen/runtime"
 )
@@ -239,6 +240,9 @@ type ServerInterface interface {
 	// EndViewAs End the stored view as person
 	// (DELETE /console/session/view-as)
 	EndViewAs(w http.ResponseWriter, r *http.Request, params EndViewAsParams)
+	// SubmitCspReport Accept a CSP violation report of the web console
+	// (POST /csp-reports)
+	SubmitCspReport(w http.ResponseWriter, r *http.Request)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath)
@@ -3692,6 +3696,20 @@ func (siw *ServerInterfaceWrapper) EndViewAs(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EndViewAs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitCspReport operation middleware
+func (siw *ServerInterfaceWrapper) SubmitCspReport(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitCspReport(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9329,6 +9347,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/oidc/complete", wrapper.CompleteStepUpOidcReauth)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/console/session", wrapper.GetConsoleSession)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/console/session/view-as", wrapper.EndViewAs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/csp-reports", wrapper.SubmitCspReport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me/profile", wrapper.UpdateMyProfile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/credentials", wrapper.GetMyCredentials)
@@ -9912,6 +9931,9 @@ type StrictServerInterface interface {
 	// EndViewAs End the stored view as person
 	// (DELETE /console/session/view-as)
 	EndViewAs(ctx context.Context, request EndViewAsRequestObject) (EndViewAsResponseObject, error)
+	// SubmitCspReport Accept a CSP violation report of the web console
+	// (POST /csp-reports)
+	SubmitCspReport(ctx context.Context, request SubmitCspReportRequestObject) (SubmitCspReportResponseObject, error)
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
@@ -12641,6 +12663,44 @@ func (sh *strictHandler) EndViewAs(w http.ResponseWriter, r *http.Request, param
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EndViewAsResponseObject); ok {
 		if err := validResponse.VisitEndViewAsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitCspReport operation middleware
+func (sh *strictHandler) SubmitCspReport(w http.ResponseWriter, r *http.Request) {
+	var request SubmitCspReportRequestObject
+
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/csp-report") {
+		request.Body = r.Body
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/reports+json") {
+
+		var body SubmitCspReportApplicationReportsPlusJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.ApplicationReportsPlusJSONBody = &body
+
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitCspReport(ctx, request.(SubmitCspReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitCspReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitCspReportResponseObject); ok {
+		if err := validResponse.VisitSubmitCspReportResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

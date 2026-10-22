@@ -1042,6 +1042,45 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # SEC-T05 (brief M6-03, docs/decisions.d/M6-03.md D-M6-03-7): the web console under its CSP in
+  # Chromium, Firefox and WebKit against the Compose smoke stack with the server image of this
+  # change. Only when the build context of the image or the Compose stack of the test changes
+  # (tools/ci/components.py CONSOLE_E2E_PREFIXES) or a shared input; ci-ok accepts a skip only
+  # when the plan left the job out. The image builds the console and the server itself (pinned
+  # Flutter and Go of its Dockerfile); the browsers come from the Playwright image of
+  # tools/uv.lock, pinned by digest in the overlay. The result files of the browsers are uploaded
+  # only on a failure; they hold no secret.
+  console-e2e:
+    name: console-e2e
+    needs: plan
+    if: contains(format(' {0} ', needs.plan.outputs.jobs), ' console-e2e ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: make image (host platform)
+        run: make image IMAGE_PLATFORMS="linux/$(dpkg --print-architecture)"
+      - name: make console-e2e
+        env:
+          E2E_ARTIFACTS: ${{ runner.temp }}/console-e2e-results
+        run: make console-e2e
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: console-e2e-results
+          path: ${{ runner.temp }}/console-e2e-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   # Platform tests of the apps (make apps-platform, docs/DECISIONS.md D-M4-01-7): native code
   # and desktop integration tests need macOS and Windows (ADR 0039), Android code an emulator
   # (apps-android-*, D-M5-01-5), the pure gates run on Linux. Only when the change touches a
@@ -1186,7 +1225,7 @@ jobs:
     # skipped or cancelled job. tools/ci/ci_ok.py checks the results against the plan: a needed
     # job must succeed, a job that ran must pass, a missing plan fails. It then completes the
     # pending check run that the plan job created (docs/quality/push-discipline.md).
-    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, apps-macos, apps-windows, apps-android-26, apps-android-36]
+    needs: [plan, gates, gates-docs, gates-security, test-tools, test-server, test-server-coverage, test-server-contract, test-apps, test-sdk-plugins, denylist, denylist-fork, sonar, postgres-image-amd64, postgres-image-arm64, console-e2e, apps-macos, apps-windows, apps-android-26, apps-android-36]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

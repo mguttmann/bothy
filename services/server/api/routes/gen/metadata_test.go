@@ -123,6 +123,9 @@ func TestLoadInputs_FailsClosedOnUnsupportedForms(t *testing.T) {
 		{"two media types", "              $ref: '#/components/schemas/ThingCreate'\n",
 			"              $ref: '#/components/schemas/ThingCreate'\n          multipart/form-data:\n            schema:\n              $ref: '#/components/schemas/ThingCreate'\n",
 			[]string{"createThing", "one media type"}},
+		{"one CSP report media type alone", "          application/json:\n            schema:\n              $ref: '#/components/schemas/ThingCreate'\n",
+			"          application/csp-report:\n            schema:\n              $ref: '#/components/schemas/ThingCreate'\n",
+			[]string{"createThing", "application/csp-report"}},
 		{"unknown media type", "          application/json:\n            schema:\n              $ref: '#/components/schemas/ThingCreate'\n",
 			"          text/plain:\n            schema:\n              type: string\n",
 			[]string{"createThing", "text/plain"}},
@@ -261,6 +264,11 @@ func TestOperationMetadata_FollowsWhatOapiCodegenSees(t *testing.T) {
 			"          description: The thing.\n          content:\n            application/json:",
 			"          description: The thing.\n          content:\n            application/octet-stream:",
 		}, "getThing", func(o opMeta) bool { return o.Download }},
+		{"the pair of CSP report media types is the report kind", []string{
+			"      - $ref: '#/components/parameters/IdempotencyKey'\n", "",
+			"          application/json:\n            schema:\n              $ref: '#/components/schemas/ThingCreate'\n",
+			"          application/reports+json:\n            schema:\n              $ref: '#/components/schemas/ThingCreate'\n          application/csp-report:\n            schema:\n              $ref: '#/components/schemas/ThingCreate'\n",
+		}, "createThing", func(o opMeta) bool { return o.RequestBody == bodyReport }},
 		{"a +json success is no download", []string{
 			"          description: The thing.\n          content:\n            application/json:",
 			"          description: The thing.\n          content:\n            application/jwk-set+json:",
