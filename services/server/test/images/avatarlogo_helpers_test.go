@@ -138,8 +138,8 @@ func problemOf(t *testing.T, r harness.Response) problem {
 }
 
 // sameAnswer fails the test unless a and b have the same status, the same body apart from the
-// correlation id and the same headers apart from Correlation-Id, Date and the counters of the rate
-// limit (AZ-P4: an unknown and an invisible resource answer alike).
+// correlation id and the same headers apart from the per-request values of comparedHeaders (AZ-P4:
+// an unknown and an invisible resource answer alike).
 func sameAnswer(t *testing.T, what string, a, b harness.Response) {
 	t.Helper()
 	if a.Status != b.Status {
@@ -148,21 +148,27 @@ func sameAnswer(t *testing.T, what string, a, b harness.Response) {
 	if !bytes.Equal(withoutCorrelation(t, a.Body), withoutCorrelation(t, b.Body)) {
 		t.Errorf("%s: bodies differ:\n%s\n%s", what, a.Body, b.Body)
 	}
-	skip := map[string]bool{"Correlation-Id": true, "Date": true, "Ratelimit": true, "Ratelimit-Policy": true}
-	ha, hb := map[string][]string{}, map[string][]string{}
-	for k, v := range a.Header {
-		if !skip[k] {
-			ha[k] = v
-		}
-	}
-	for k, v := range b.Header {
-		if !skip[k] {
-			hb[k] = v
-		}
-	}
-	if !maps.EqualFunc(ha, hb, slices.Equal) {
+	if ha, hb := comparedHeaders(a.Header), comparedHeaders(b.Header); !maps.EqualFunc(ha, hb, slices.Equal) {
 		t.Errorf("%s: headers differ:\n%v\n%v", what, ha, hb)
 	}
+}
+
+// perRequestHeaders differ from one request to the next whatever the resource is: the correlation
+// id, the date, the counters of the rate limit and the DPoP nonce, which the server sends whenever
+// its nonce rotated, so two requests close together see it only when a rotation falls between them.
+var perRequestHeaders = map[string]bool{
+	"Correlation-Id": true, "Date": true, "Ratelimit": true, "Ratelimit-Policy": true, "Dpop-Nonce": true,
+}
+
+// comparedHeaders returns h without the perRequestHeaders.
+func comparedHeaders(h http.Header) map[string][]string {
+	out := map[string][]string{}
+	for k, v := range h {
+		if !perRequestHeaders[k] {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // withoutCorrelation returns body with every member naming the correlation id removed.
