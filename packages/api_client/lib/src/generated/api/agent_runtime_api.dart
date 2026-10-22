@@ -152,7 +152,7 @@ class AgentRuntimeApi {
   }
 
   /// Answer an autocomplete request
-  ///
+  /// The owner of the command answers an open request of &#x60;command.autocomplete_requested&#x60;; the first valid answer goes back to the person. &#x60;404&#x60; for an unknown or forgotten request, &#x60;410 gone&#x60; after the wait ended, &#x60;204&#x60; without effect for an answer after the first one. &#x60;400 validation_failed&#x60; for more than &#x60;command.autocomplete_max_choices&#x60; choices (&#x60;too_many_items&#x60;), an empty name or value (&#x60;too_short&#x60;) or a name or value that is no display text (&#x60;invalid_utf8&#x60;, &#x60;control_character&#x60;, &#x60;bidi_control&#x60;); the request stays open.
   ///
   /// Parameters:
   /// * [requestId]

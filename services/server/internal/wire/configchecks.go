@@ -67,6 +67,7 @@ var configChecks = []configCheck{
 	{name: "backup_offsite_target", keys: []string{keyBackupOffsiteTarget}, fn: backupOffsiteTarget},
 	{name: "webhook_in_formats", keys: []string{keyWebhookInFormatsEnabled}, fn: webhookInFormats},
 	{name: "heartbeat_persist_below_orphan_timeout", keys: []string{keyHeartbeatPersistInterval, keyOrphanTimeout}, fn: heartbeatPersistBelowOrphanTimeout},
+	{name: "autocomplete_below_request_timeout", keys: []string{keyAutocompleteTimeout, keyHTTPRequestTimeout}, fn: autocompleteBelowRequestTimeout},
 }
 
 // keyHeartbeatPersistInterval is agent.heartbeat_persist_interval, how often the heartbeat is
@@ -80,6 +81,19 @@ const keyHeartbeatPersistInterval = "agent.heartbeat_persist_interval"
 func heartbeatPersistBelowOrphanTimeout(v *config.Values) error {
 	if v.Duration(keyHeartbeatPersistInterval) >= v.Duration(keyOrphanTimeout) {
 		return errors.New(keyHeartbeatPersistInterval + " must be below " + keyOrphanTimeout)
+	}
+	return nil
+}
+
+// keyHTTPRequestTimeout is http.request_timeout, the deadline of a REST request (02 section 14.2).
+const keyHTTPRequestTimeout = "http.request_timeout"
+
+// autocompleteBelowRequestTimeout requires command.autocomplete_timeout to be lower than
+// http.request_timeout (M2-17, docs/DECISIONS.md D-M2-17): otherwise the request context ends
+// before the empty answer of AG-23. The error names both keys.
+func autocompleteBelowRequestTimeout(v *config.Values) error {
+	if v.Duration(keyAutocompleteTimeout) >= v.Duration(keyHTTPRequestTimeout) {
+		return errors.New(keyAutocompleteTimeout + " must be lower than " + keyHTTPRequestTimeout)
 	}
 	return nil
 }

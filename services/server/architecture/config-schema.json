@@ -1212,9 +1212,21 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "25",
       "chapter": "09-agents.md",
       "doc": "Most suggestions of one autocomplete answer and most static choices of one command option."
+    },
+    {
+      "name": "command.autocomplete_timeout",
+      "env": "BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT",
+      "kind": "duration",
+      "default": "2500ms",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "09-agents.md",
+      "doc": "Longest wait of autocompleteCommand for the suggestions of the command owner; below http.request_timeout."
     },
     {
       "name": "command.description_max_chars",

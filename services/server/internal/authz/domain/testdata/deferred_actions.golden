@@ -2,7 +2,6 @@
 # builds one of them replaces its entry and removes it here.
 agent_session.bind
 agent_session.reset
-command.autocomplete
 file.transcript.submit
 import.apply
 interaction.create

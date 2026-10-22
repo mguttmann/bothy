@@ -26,7 +26,7 @@ class CommandsApi {
   const CommandsApi(this._dio, this._serializers);
 
   /// Get suggestions for an option
-  /// Forwards the query to the command owner and waits up to &#x60;command.autocomplete_timeout&#x60;; returns no choices when the owner does not answer in time.
+  /// Forwards the query to the command owner and waits up to &#x60;command.autocomplete_timeout&#x60;; returns no choices when the owner does not answer in time. Returns an empty list at once when the owner has no live gateway connection, and for an agent command in a forum channel without &#x60;thread_id&#x60; after the check (R-AZ-26). Checked like &#x60;agent.invoke&#x60; without a run: a refusal is &#x60;403 agent_invocation_denied&#x60; with &#x60;reason&#x60; (for example &#x60;level_insufficient&#x60;, &#x60;agent_not_reachable&#x60;, &#x60;billing_mode_personal_not_holder&#x60;, &#x60;tool_class_owner_only&#x60;, &#x60;project_not_ready&#x60;), a read-only or archived channel &#x60;403 channel_read_only&#x60;. An unknown, removed or not covered command, an app command (until its execution is built), an unknown channel or a thread of another channel is &#x60;404&#x60;. The query names an option with &#x60;autocomplete&#x60; (&#x60;400 validation_failed&#x60; with &#x60;unknown_option&#x60;, &#x60;autocomplete_not_enabled&#x60; or &#x60;duplicate&#x60;; &#x60;too_long&#x60; when the request does not fit &#x60;sync.event_payload_max_bytes&#x60;).
   ///
   /// Parameters:
   /// * [channelId]

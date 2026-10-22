@@ -14073,7 +14073,17 @@ paths:
       tags: [Commands]
       description: |-
         Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-        no choices when the owner does not answer in time.
+        no choices when the owner does not answer in time. Returns an empty list at once when the owner
+        has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+        after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+        `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+        `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+        `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+        removed or not covered command, an app command (until its execution is built), an unknown channel
+        or a thread of another channel is `404`.
+        The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+        `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+        `sync.event_payload_max_bytes`).
       x-authz-action: command.autocomplete
       x-rate-limit-class: rl.trigger
       x-idempotency-exempt: read_only
@@ -14191,6 +14201,13 @@ paths:
       operationId: answerAutocomplete
       summary: Answer an autocomplete request
       tags: [Agent runtime]
+      description: |-
+        The owner of the command answers an open request of `command.autocomplete_requested`; the
+        first valid answer goes back to the person. `404` for an unknown or forgotten request,
+        `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+        `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+        (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+        text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
       x-authz-action: command.autocomplete.respond
       x-rate-limit-class: rl.agent_runtime
       x-idempotency-exempt: agent_runtime
@@ -26328,6 +26345,8 @@ components:
       properties:
         choices:
           type: array
+          maxItems: 25
+          description: At most `command.autocomplete_max_choices`.
           items:
             $ref: '#/components/schemas/CommandChoice'
     AutocompleteAnswer:
@@ -26337,6 +26356,8 @@ components:
       properties:
         choices:
           type: array
+          maxItems: 25
+          description: At most `command.autocomplete_max_choices`.
           items:
             $ref: '#/components/schemas/CommandChoice'
     AppManifest:

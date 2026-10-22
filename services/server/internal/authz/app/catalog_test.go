@@ -369,12 +369,12 @@ func TestAZP1_RouteMessagesAndIdentity(t *testing.T) {
 // deferred action fails the start (07 section 4.2, D3).
 func TestVerifyRegistrations_DeferredActions(t *testing.T) {
 	cat, _ := newCatalog()
-	route := authorize.RouteBinding{OperationID: "autocompleteCommand", Method: "POST",
-		Pattern: "/api/v1/channels/{channel_id}/commands/{command_id}/autocomplete", Action: "command.autocomplete", RateLimitClass: "rl.trigger"}
+	route := authorize.RouteBinding{OperationID: "startRun", Method: "POST",
+		Pattern: "/api/v1/runs/{run_id}/start", Action: "run.start", RateLimitClass: "rl.agent_runtime"}
 	err := cat.VerifyRegistrations([]authorize.RouteBinding{route}, nil)
 	var re *app.RegistrationError
 	if !errors.As(err, &re) || len(re.Violations) != 1 || re.Violations[0].Kind != app.ViolationDeferredAction ||
-		re.Violations[0].Action != "command.autocomplete" {
+		re.Violations[0].Action != "run.start" {
 		t.Fatalf("route: %v", err)
 	}
 	// Since M2-43 no channel op names a deferred action (host.connect is HostSelf), and since M3-03

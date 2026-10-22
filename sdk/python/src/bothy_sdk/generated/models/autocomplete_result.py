@@ -17,7 +17,7 @@ T = TypeVar("T", bound="AutocompleteResult")
 class AutocompleteResult:
     """
     Attributes:
-        choices (list[CommandChoice]):
+        choices (list[CommandChoice]): At most `command.autocomplete_max_choices`.
     """
 
     choices: list[CommandChoice]

@@ -10,14 +10,18 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// Register declares the durable events runs appends (M1-25, docs/spec/05-actions.md section 6):
-// run.state_changed (M2-05), agent.invocation (M2-08), command.invoked (M2-16) and
-// run.cancel_requested (M2-09). internal/wire lists it in moduleRegistrations.
+// Register declares the events runs emits and the ops it owns (M1-25, docs/spec/05-actions.md
+// sections 6 and 7): the durable run.state_changed (M2-05), agent.invocation (M2-08),
+// command.invoked (M2-16) and run.cancel_requested (M2-09), the ephemeral
+// command.autocomplete_requested and the gateway op command.autocomplete_result (M2-17), whose
+// handler the gateway runs on CommandExec. internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunStateChanged)
 	r.Event("runs", authorize.EventAgentInvocation)
 	r.Event("runs", authorize.EventCommandInvoked)
 	r.Event("runs", authorize.EventRunCancelRequested)
+	r.Event("runs", authorize.EventCommandAutocompleteRequested)
+	r.Op("runs", authorize.OpCommandAutocompleteResult)
 }
 
 // Money is an amount with its currency (schema Money): AmountMicros in millionths of the unit,

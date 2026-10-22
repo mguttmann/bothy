@@ -118,6 +118,9 @@ type Deps struct {
 	// Presence takes the member agent of heartbeat (agents, M2-20); nil leaves the member without
 	// effect (tests of the connection).
 	Presence agents.Presence
+	// Autocomplete takes the answers of command.autocomplete_result (runs.CommandExec, M2-17); nil
+	// registers no handler of the op.
+	Autocomplete AutocompleteAnswerer
 	// Clock is the time of deadlines and frames; nil means clock.System().
 	Clock clock.Clock
 	// Log receives the errors of ops; nil means slog.Default(). It never receives tokens,
@@ -169,6 +172,9 @@ func New(cfg Config, d Deps) (*Gateway, error) {
 		opFocus: g.focus, opTypingStart: g.typingStart, opTypingStop: g.typingStop}
 	if d.Consumers != nil {
 		g.handlers["ack"] = g.ack
+	}
+	if d.Autocomplete != nil {
+		g.handlers[opAutocompleteResult] = g.autocompleteResult
 	}
 	return g, nil
 }
