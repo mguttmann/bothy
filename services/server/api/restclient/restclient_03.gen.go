@@ -15114,6 +15114,7 @@ type GetTranscriptResponse404Headers struct {
 // GetTranscriptResponse409Headers the declared response headers of an HTTP 409 response for GetTranscript
 type GetTranscriptResponse409Headers struct {
 	CorrelationId *CorrelationId
+	RetryAfter    *int
 }
 
 // GetTranscriptResponse429Headers the declared response headers of an HTTP 429 response for GetTranscript
@@ -15143,7 +15144,7 @@ type GetTranscriptResponse struct {
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
+	ApplicationproblemJSON409 *FileConflict
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
 	ApplicationproblemJSON429 *TooManyRequests
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
@@ -15192,7 +15193,7 @@ func (r GetTranscriptResponse) GetApplicationproblemJSON404() *NotFound {
 }
 
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r GetTranscriptResponse) GetApplicationproblemJSON409() *Conflict {
+func (r GetTranscriptResponse) GetApplicationproblemJSON409() *FileConflict {
 	return r.ApplicationproblemJSON409
 }
 
