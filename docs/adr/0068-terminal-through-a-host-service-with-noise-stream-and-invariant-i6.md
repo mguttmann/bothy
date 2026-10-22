@@ -213,6 +213,10 @@ threat model T-TM-13).
   folder chain, duplicate working directory, readable `CLAUDE_CONFIG_DIR`, entry of another user,
   writable program or program of another user, index of another user, chain file of another user).
 * Standstill through HD6 and its end, also with a hit at start: TM-T21.
+* Two api nodes with and without hash routing (TM-T15). Since M2-47 TM-T15 holds
+  `TestTMT15_TwoNodesWithHashRouting`, `TestTMT15_WithoutHashRouting` and
+  `TestTMT15_WithoutHashRouting_Attach` in `services/server/test/terminal/multinode`, at the server
+  level with the fake host of M2-44; M2-48 runs it again end to end with the real host service.
 * Red team terminal at the end of M2, M4, M5, M6 (threat model, section 6.7).
 
 ## Pros and Cons of the Options

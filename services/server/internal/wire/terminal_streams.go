@@ -99,6 +99,8 @@ type TerminalStreamsDeps struct {
 	Clock clock.Clock
 	// Log receives the relay records and failures without content; nil means slog.Default().
 	Log *slog.Logger
+	// Multi is cluster.mode multi (M2-47, wsrelay.RelayConfig.Multi).
+	Multi bool
 }
 
 // TerminalStreams are the relay of this process with its two handlers.
@@ -130,7 +132,7 @@ func NewTerminalStreams(cfg TerminalStreamsConfig, t *Terminal, hc *HostControl,
 		}
 		m = om
 	}
-	relay, err := wsrelay.NewRelay(wsrelay.RelayConfig{BufferMaxBytes: cfg.BufferMaxBytes, OpenTimeout: cfg.OpenTimeout}, t.Service, hc.Links,
+	relay, err := wsrelay.NewRelay(wsrelay.RelayConfig{BufferMaxBytes: cfg.BufferMaxBytes, OpenTimeout: cfg.OpenTimeout, Multi: d.Multi}, t.Service, hc.Links,
 		d.Timers, d.Clock, d.Log)
 	if err != nil {
 		return nil, err

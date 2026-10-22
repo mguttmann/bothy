@@ -115,6 +115,24 @@ type Options struct {
 	// TerminalBeforeOpenCommit runs inside the unit of work of every terminal opening before its
 	// commit (wire.Deps.TerminalBeforeOpenCommit, M2-44); nil runs nothing.
 	TerminalBeforeOpenCommit func()
+	// PublicURL, when set, is server.public_url instead of the origin of the own public listener:
+	// several api nodes behind one edge share it (M2-47). The node still listens on its own port
+	// of 127.0.0.1, which Server.ListenURL names.
+	PublicURL string
+	// Role is the role of the process (wire.RoleAll when empty); a worker has no public listener.
+	Role wire.Role
+	// TerminalSignals and TerminalListenerGate are the test seams of the terminal across nodes
+	// (wire.Deps.TerminalSignals and wire.Deps.TerminalListenerGate, M2-47).
+	TerminalSignals      func(terminalapp.Signals) terminalapp.Signals
+	TerminalListenerGate func(ctx context.Context) error
+	// TerminalMetrics replaces the instruments of the relay (wire.Deps.TerminalMetrics, M2-47).
+	TerminalMetrics terminalapp.Metrics
+	// TerminalModule receives the use cases of the terminal module (wire.Deps.TerminalModule,
+	// M2-47).
+	TerminalModule func(*terminalapp.Service)
+	// OnListen, when set, receives the origin of the own public listener before the server starts
+	// (an edge in front of several nodes routes to it, M2-47).
+	OnListen func(listenURL string)
 }
 
 // Server is a running harness server.
@@ -124,6 +142,9 @@ type Server struct {
 	PublicURL, APIBase, GatewayURL string
 	// InternalURL is the origin of the internal listener (/healthz, /readyz).
 	InternalURL string
+	// ListenURL is the origin of the own public listener; it equals PublicURL unless
+	// Options.PublicURL put the node behind an edge (M2-47).
+	ListenURL string
 	// SecretsDir is secrets.dir of the server.
 	SecretsDir string
 	// SigningKeyDir is secrets.signing_key_dir of the server, the store of its private signing
@@ -193,10 +214,16 @@ func Start(tb testing.TB, opts Options) *Server {
 	if err := os.Mkdir(files, 0o700); err != nil {
 		tb.Fatal(err)
 	}
-	var lastErr error
 	code := ""
+	return startRetrying(tb, db, opts, clk, secretsDir, keys, files, &code)
+}
+
+// startRetrying starts one server process, again when its reserved public port was taken.
+func startRetrying(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsDir, keys, files string, code *string) *Server {
+	tb.Helper()
+	var lastErr error
 	for range portAttempts {
-		s, err := start(tb, db, opts, clk, secretsDir, keys, files, &code)
+		s, err := start(tb, db, opts, clk, secretsDir, keys, files, code)
 		if err == nil {
 			return s
 		}
@@ -207,6 +234,18 @@ func Start(tb testing.TB, opts Options) *Server {
 	}
 	tb.Fatalf("harness: %v", lastErr)
 	return nil
+}
+
+// StartNode starts another process of the installation of first (M2-47): the same database,
+// secrets, signing key store and file root, with opts for its own configuration, role and test
+// seams. It enrolls no owner: Owner is the owner of first, whose clients reach the node through
+// the shared Options.PublicURL. It stops in tb.Cleanup.
+func StartNode(tb testing.TB, first *Server, opts Options) *Server {
+	tb.Helper()
+	code := "-"
+	s := startRetrying(tb, first.db, opts, first.clk, first.SecretsDir, first.SigningKeyDir, first.FilesRoot, &code)
+	s.Owner = first.Owner
+	return s
 }
 
 // errPortTaken reports that the reserved public port was taken before the server bound it.
@@ -223,8 +262,15 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	if host == "" {
 		host = "127.0.0.1"
 	}
-	public := "http://" + host + ":" + strconv.Itoa(port)
+	listen := "http://" + host + ":" + strconv.Itoa(port)
+	public := listen
+	if opts.PublicURL != "" {
+		public = opts.PublicURL
+	}
 	env := environment(db, opts, public, secretsDir, keys, files, port)
+	if opts.OnListen != nil {
+		opts.OnListen(listen)
+	}
 	schema, err := wire.ConfigSchema()
 	if err != nil {
 		return nil, err
@@ -247,11 +293,17 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	deps := wire.Deps{
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
 		TerminalTimers: opts.TerminalTimers, TerminalBeforeOpenCommit: opts.TerminalBeforeOpenCommit,
+		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
+		TerminalModule: opts.TerminalModule,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()
 	}
-	runner, err := wire.Serve(context.Background(), values, wire.RoleAll, deps)
+	role := opts.Role
+	if role == "" {
+		role = wire.RoleAll
+	}
+	runner, err := wire.Serve(context.Background(), values, role, deps)
 	if err != nil {
 		return nil, err
 	}
@@ -265,10 +317,18 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		}
 		return nil, err
 	}
+	gateway := "ws://" + host + ":" + strconv.Itoa(port) + apiPrefix + "/gateway"
+	if opts.PublicURL != "" {
+		gateway = "ws" + strings.TrimPrefix(public, "http") + apiPrefix + "/gateway"
+	}
 	s := &Server{
-		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: "ws://" + host + ":" + strconv.Itoa(port) + apiPrefix + "/gateway",
+		PublicURL: public, APIBase: public + apiPrefix, GatewayURL: gateway, ListenURL: listen,
 		InternalURL: internal, SecretsDir: secretsDir, SigningKeyDir: keys, FilesRoot: files, proofs: opts.ProofObserver, tokens: opts.TokenObserver, db: db, tb: tb, clk: clk, values: values, env: env,
 		http: &http.Client{Timeout: 60 * time.Second},
+	}
+	if *code == "-" {
+		// Another node of an installation (StartNode): the owner exists.
+		return s, nil
 	}
 	owner, err := s.redeem(tb.Context(), *code, "Owner device")
 	if err != nil {
