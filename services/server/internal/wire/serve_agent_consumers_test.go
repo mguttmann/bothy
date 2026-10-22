@@ -230,6 +230,19 @@ func quiet(t *testing.T, c *wstest.Client, d time.Duration) []frame {
 	}
 }
 
+// fresh returns the frames of fs whose seq is not in seen and adds their seqs to seen, so a
+// redelivery of an already dispatched event does not count as a new dispatch.
+func fresh(fs []frame, seen map[int64]bool) []frame {
+	var out []frame
+	for _, f := range fs {
+		if !seen[f.seq] {
+			seen[f.seq] = true
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // dispatches returns the dispatch frames of fs.
 func dispatches(fs []frame) []frame {
 	var out []frame
@@ -336,15 +349,17 @@ func TestAgentConsumers(t *testing.T) {
 		for i := range consumerInflight + 2 {
 			cms = append(cms, w.post(ch.thread, "m"+strconv.Itoa(i)))
 		}
-		fs := dispatches(readUntil(t, c, message(cms[consumerInflight-1])))
-		// The quiet windows together stay below agent.ack_timeout, so no redelivery interferes.
-		more := dispatches(quiet(t, c, consumerAckTimeout/4))
+		// A slow host can pass agent.ack_timeout inside the windows below, and the gateway then
+		// redelivers unacknowledged events; only a dispatch of a seq not seen before counts.
+		seen := map[int64]bool{}
+		fs := fresh(dispatches(readUntil(t, c, message(cms[consumerInflight-1]))), seen)
+		more := fresh(dispatches(quiet(t, c, consumerAckTimeout/4)), seen)
 		if len(fs) != consumerInflight || len(more) != 0 {
 			t.Fatalf("%d dispatches, then %d more while nothing was acknowledged", len(fs), len(more))
 		}
 		sendAck(t, c, fs[0].seq)
-		next := dispatches(readUntil(t, c, message(cms[consumerInflight])))
-		if extra := dispatches(quiet(t, c, consumerAckTimeout/8)); len(next) != 1 || len(extra) != 0 {
+		next := fresh(dispatches(readUntil(t, c, message(cms[consumerInflight]))), seen)
+		if extra := fresh(dispatches(quiet(t, c, consumerAckTimeout/8)), seen); len(next) != 1 || len(extra) != 0 {
 			t.Fatalf("one acknowledgement released %d and then %d", len(next), len(extra))
 		}
 		w.poll(w.base, a, "rest-inflight", "")
