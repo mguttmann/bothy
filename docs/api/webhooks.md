@@ -294,26 +294,26 @@ in this list; the check `api-catalogue-sync` (M1-03, subcheck `webhook-events`) 
    `errors[].code` `format_mixed`. Every other body is `native`. A format not listed in
    `webhook_in.formats_enabled` gives `400 validation_failed` with an empty pointer and
    `format_disabled`. Unknown members give `400 validation_failed` with `unknown_member`.
-   - `native`: Markdown in `content_md` (required, at least one non-white-space character, at
-     most `message.max_content_bytes` UTF-8 bytes, else `413 payload_too_large`), stored byte
-     for byte; optional `title` (new thread, point 7), `thread_id` (existing thread, point 7) and
-     `client_msg_id` (a UUIDv7, else `not_uuid_v7`; when absent the server creates one, so only a
-     sender's own `client_msg_id` makes retries idempotent).
-   - `alertmanager`: the unchanged webhook payload of Prometheus Alertmanager (`version` `4`,
-     `status` and each `alerts[].status` `firing` or `resolved`, at least one alert, each alert
-     with `status` and `labels`, every label and annotation value a string). One notification
-     gives one message: a header line with `FIRING` or `RESOLVED`, the alert name (`alertname`
-     of `commonLabels`, else of `groupLabels`, else `Alerts`) and the number of alerts; one list
-     item per alert with its status, name, severity (label `severity`) and summary (annotation
-     `summary`, else `description`, else the remaining labels as `name=value`), with
-     `Runbook:` from the annotation `runbook_url` and `Source:` from `generatorURL`; an item
-     `- and <k> more alerts` for `truncatedAlerts` and alerts dropped to fit; and a last line
-     `Alertmanager:` with `externalURL`. Payload values are escaped so they add no formatting,
-     links or images; a URL appears only as an absolute `http` or `https` autolink and is never
-     fetched by the server. The message never exceeds `message.max_content_bytes`. Each
-     notification gets a new client message ID, so retries of Alertmanager are not
-     deduplicated. The layout is fixed in [DECISIONS.md](../DECISIONS.md) (D-M2-27) and by the
-     golden files of `services/server/internal/apps/domain/incoming/testdata`.
+    - `native`: Markdown in `content_md` (required, at least one non-white-space character, at
+      most `message.max_content_bytes` UTF-8 bytes, else `413 payload_too_large`), stored byte
+      for byte; optional `title` (new thread, point 7), `thread_id` (existing thread, point 7) and
+      `client_msg_id` (a UUIDv7, else `not_uuid_v7`; when absent the server creates one, so only a
+      sender's own `client_msg_id` makes retries idempotent).
+    - `alertmanager`: the unchanged webhook payload of Prometheus Alertmanager (`version` `4`,
+      `status` and each `alerts[].status` `firing` or `resolved`, at least one alert, each alert
+      with `status` and `labels`, every label and annotation value a string). One notification
+      gives one message: a header line with `FIRING` or `RESOLVED`, the alert name (`alertname`
+      of `commonLabels`, else of `groupLabels`, else `Alerts`) and the number of alerts; one list
+      item per alert with its status, name, severity (label `severity`) and summary (annotation
+      `summary`, else `description`, else the remaining labels as `name=value`), with
+      `Runbook:` from the annotation `runbook_url` and `Source:` from `generatorURL`; an item
+      `- and <k> more alerts` for `truncatedAlerts` and alerts dropped to fit; and a last line
+      `Alertmanager:` with `externalURL`. Payload values are escaped so they add no formatting,
+      links or images; a URL appears only as an absolute `http` or `https` autolink and is never
+      fetched by the server. The message never exceeds `message.max_content_bytes`. Each
+      notification gets a new client message ID, so retries of Alertmanager are not
+      deduplicated. The layout is fixed in [DECISIONS.md](../DECISIONS.md) (D-M2-27) and by the
+      golden files of `services/server/internal/apps/domain/incoming/testdata`.
 7. Target thread (11 8.3), in this order: (1) the fixed thread of the webhook while it belongs
    to the webhook's channel, and `thread_id` and `title` of the body are ignored; a fixed thread
    moved to another channel gives `404`. (2) `thread_id` of a `native` body when that thread

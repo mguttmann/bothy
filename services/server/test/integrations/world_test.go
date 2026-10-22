@@ -17,9 +17,9 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -61,7 +61,7 @@ func newHW(t *testing.T, o options) *hw {
 		o.opts(&ho)
 	}
 	s := harness.Start(t, ho)
-	h := &hw{t: t, s: s, w: harness.BuildMatrixWorld(t, s), ctx: t.Context(), http: &http.Client{Timeout: time.Minute}}
+	h := &hw{t: t, s: s, w: harness.BuildMatrixWorld(t, s), ctx: t.Context(), http: &http.Client{Timeout: testkit.Patience}}
 	h.eskalation = h.w.Channels["Support/Eskalation"]
 	var ch struct {
 		Channel struct {
