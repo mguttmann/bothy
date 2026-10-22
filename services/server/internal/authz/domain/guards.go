@@ -85,6 +85,8 @@ func guards(in *Input) (Decision, error) {
 		return commandRegisterGuard(in)
 	case actionCommandInvoke:
 		return commandInvokeGuard(in)
+	case actionCommandAutocomplete:
+		return commandAutocompleteGuard(in)
 	case actionAgentInvoke:
 		if in.Invoke == nil {
 			return Decision{}, internalError("agent.invoke without its trigger")

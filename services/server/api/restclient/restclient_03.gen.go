@@ -808,7 +808,17 @@ type ClientWithResponsesInterface interface {
 	// AutocompleteCommandWithBodyWithResponse Get suggestions for an option
 	//
 	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-	// no choices when the owner does not answer in time.
+	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+	// removed or not covered command, an app command (until its execution is built), an unknown channel
+	// or a thread of another channel is `404`.
+	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+	// `sync.event_payload_max_bytes`).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -818,7 +828,17 @@ type ClientWithResponsesInterface interface {
 	// AutocompleteCommandWithResponse Get suggestions for an option
 	//
 	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-	// no choices when the owner does not answer in time.
+	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+	// removed or not covered command, an app command (until its execution is built), an unknown channel
+	// or a thread of another channel is `404`.
+	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+	// `sync.event_payload_max_bytes`).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1112,12 +1132,26 @@ type ClientWithResponsesInterface interface {
 
 	// AnswerAutocompleteWithBodyWithResponse Answer an autocomplete request
 	//
+	// The owner of the command answers an open request of `command.autocomplete_requested`; the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+	// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+	// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+	// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+	// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
 	AnswerAutocompleteWithBodyWithResponse(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AnswerAutocompleteResponse, error)
 
 	// AnswerAutocompleteWithResponse Answer an autocomplete request
+	//
+	// The owner of the command answers an open request of `command.autocomplete_requested`; the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+	// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+	// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+	// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+	// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22806,88 +22840,4 @@ func (r ListHostsResponse) GetJSON200() *HostPage {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r ListHostsResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r ListHostsResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r ListHostsResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r ListHostsResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r ListHostsResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r ListHostsResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ListHostsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListHostsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ListHostsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// CreateHostResponse201Headers the declared response headers of an HTTP 201 response for CreateHost
-type CreateHostResponse201Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// CreateHostResponse400Headers the declared response headers of an HTTP 400 response for CreateHost
-type CreateHostResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateHostResponse401Headers the declared response headers of an HTTP 401 response for CreateHost
-type CreateHostResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// CreateHostResponse403Headers the declared response headers of an HTTP 403 response for CreateHost
-type CreateHostResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateHostResponse409Headers the declared response headers of an HTTP 409 response for CreateHost
-type CreateHostResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// CreateHostResponse422Headers the declared response headers of an HTTP 422 response for CreateHost
-type CreateHostResponse422Headers struct {
-	CorrelationId *CorrelationId
 }

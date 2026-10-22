@@ -13,6 +13,64 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// SendHeartbeatWithResponse Report state and actual billing mode
+//
+// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
+//
+// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
+func (c *ClientWithResponses) SendHeartbeatWithResponse(ctx context.Context, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error) {
+	rsp, err := c.SendHeartbeat(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendHeartbeatResponse(rsp)
+}
+
+// GetAgentTriggerersWithResponse List who may trigger this agent
+//
+// Principals with effective `trigger` on a channel the agent operates, with `permission_version`. The adapter keeps it as allow list and reloads on `access.changed` (09, 15).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
+func (c *ClientWithResponses) GetAgentTriggerersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentTriggerersResponse, error) {
+	rsp, err := c.GetAgentTriggerers(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentTriggerersResponse(rsp)
+}
+
+// GetAgentWithResponse Read an agent with reported state
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /agents/{agent_id} (the `GetAgent` operationId).
+func (c *ClientWithResponses) GetAgentWithResponse(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*GetAgentResponse, error) {
+	rsp, err := c.GetAgent(ctx, agentId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentResponse(rsp)
+}
+
+// UpdateAgentWithBodyWithResponse Change an agent
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
+func (c *ClientWithResponses) UpdateAgentWithBodyWithResponse(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentResponse, error) {
+	rsp, err := c.UpdateAgentWithBody(ctx, agentId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAgentResponse(rsp)
+}
+
 // UpdateAgentWithResponse Change an agent
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -1190,7 +1248,17 @@ func (c *ClientWithResponses) ListChannelCommandsWithResponse(ctx context.Contex
 // AutocompleteCommandWithBodyWithResponse Get suggestions for an option
 //
 // Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time.
+// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+// removed or not covered command, an app command (until its execution is built), an unknown channel
+// or a thread of another channel is `404`.
+// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+// `sync.event_payload_max_bytes`).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -1206,7 +1274,17 @@ func (c *ClientWithResponses) AutocompleteCommandWithBodyWithResponse(ctx contex
 // AutocompleteCommandWithResponse Get suggestions for an option
 //
 // Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-// no choices when the owner does not answer in time.
+// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+// removed or not covered command, an app command (until its execution is built), an unknown channel
+// or a thread of another channel is `404`.
+// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+// `sync.event_payload_max_bytes`).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -1728,6 +1806,13 @@ func (c *ClientWithResponses) SubmitClientMetricsWithResponse(ctx context.Contex
 
 // AnswerAutocompleteWithBodyWithResponse Answer an autocomplete request
 //
+// The owner of the command answers an open request of `command.autocomplete_requested`; the
+// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
@@ -1740,6 +1825,13 @@ func (c *ClientWithResponses) AnswerAutocompleteWithBodyWithResponse(ctx context
 }
 
 // AnswerAutocompleteWithResponse Answer an autocomplete request
+//
+// The owner of the command answers an open request of `command.autocomplete_requested`; the
+// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

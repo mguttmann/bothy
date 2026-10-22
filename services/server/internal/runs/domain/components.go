@@ -58,7 +58,8 @@ const CapabilityApproveActions = "approve_actions"
 const (
 	// FieldRequired: a required member is missing or empty.
 	FieldRequired = "required"
-	// FieldTooLong: custom_id has more code points than component.custom_id_max_chars.
+	// FieldTooLong: custom_id has more code points than component.custom_id_max_chars, or a
+	// request whose payload does not fit sync.event_payload_max_bytes (M2-17).
 	FieldTooLong = "too_long"
 	// FieldLimitReached: more components than component.max_per_message or more fields than
 	// component.form_max_fields.

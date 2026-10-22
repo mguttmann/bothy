@@ -3694,7 +3694,17 @@ export interface paths {
         /**
          * Get suggestions for an option
          * @description Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-         *     no choices when the owner does not answer in time.
+         *     no choices when the owner does not answer in time. Returns an empty list at once when the owner
+         *     has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+         *     after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+         *     `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+         *     `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+         *     `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+         *     removed or not covered command, an app command (until its execution is built), an unknown channel
+         *     or a thread of another channel is `404`.
+         *     The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+         *     `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+         *     `sync.event_payload_max_bytes`).
          */
         post: operations["autocompleteCommand"];
         delete?: never;
@@ -3729,7 +3739,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Answer an autocomplete request */
+        /**
+         * Answer an autocomplete request
+         * @description The owner of the command answers an open request of `command.autocomplete_requested`; the
+         *     first valid answer goes back to the person. `404` for an unknown or forgotten request,
+         *     `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+         *     `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+         *     (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+         *     text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+         */
         post: operations["answerAutocomplete"];
         delete?: never;
         options?: never;
@@ -8130,9 +8148,11 @@ export interface components {
             options?: components["schemas"]["CommandOptionValue"][];
         };
         AutocompleteResult: {
+            /** @description At most `command.autocomplete_max_choices`. */
             choices: components["schemas"]["CommandChoice"][];
         };
         AutocompleteAnswer: {
+            /** @description At most `command.autocomplete_max_choices`. */
             choices: components["schemas"]["CommandChoice"][];
         };
         /** @description Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of their receive action and `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a host, commands without reserved names and at most `command.max_per_principal`, and at most `app.manifest_max_bytes`. */

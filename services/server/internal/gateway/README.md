@@ -2,8 +2,9 @@
 
 Status: connection and session built (M1-64); delivery of durable events, catch-up over the
 WebSocket, revocation of open connections and the shutdown close built (M1-65); focus, typing and
-the ephemeral publisher built (M1-66); frame conformance, gate G9, built (M1-67); agent consumers with
-the op `ack` built (M2-07).
+the ephemeral publisher built (M1-66); agent consumers with the op `ack` built (M2-07); the relay of
+autocomplete requests and the op `command.autocomplete_result` built (M2-17); frame
+conformance, gate G9, built (M1-67).
 Normative are [docs/spec/04-sync-protocol.md](../../../../docs/spec/04-sync-protocol.md) section 6
 and [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); on any difference the
 chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64, M1-65, M1-66 and M1-67.
@@ -241,9 +242,28 @@ adapter.
 
 Enabled (section `gateway_ops` of `api/operations.yaml`): `identify`, `resume`, `heartbeat`,
 `reauth` with the action `gateway.connect`; `focus` with `gateway.focus`; `typing.start` and
-`typing.stop` with `typing.start`; `ack` with `agent.events.consume` (module `agents` registers it,
-the handler is `app/ack.go`, M2-07). Every other client op of the channel is unknown (`4001`) until
-its ticket enables it.
+`typing.stop` with `typing.start`; `ack` with `agent.events.consume` (module `agents` registers
+it, the handler is `app/ack.go`, M2-07); `command.autocomplete_result` with
+`command.autocomplete.respond` (module `runs` registers it, the handler is `app/autocomplete.go`,
+M2-17). Every other client op of the channel is unknown (`4001`) until its ticket enables it.
+
+## Autocomplete relay (M2-17)
+
+`adapters/autocompleterelay` implements the source port `runs.AutocompleteRelay` on the hub
+(`Hub.AskAutocomplete`) and adds `correlation_id` and, for a recorded request, `trace_context`
+through the correlator of the event log. The hub chooses exactly one connection of the command's
+owner in this process (`domain.PickAutocompleteConnection`): the live connection of consumer
+`default`, else the most recently attached live one (`member.attached`); a connection still
+catching up is never chosen, and people and other principals never get the frame. It admits the
+connection with `agent.events.consume` on the owner in delivery mode (no audit) and queues the
+`dispatch` without blocking, with the delivery field `invocation_token` and without `seq` and
+`permission_version`; a full queue drops the frame (never `4014`) and `Ask` reports not sent.
+
+The op `command.autocomplete_result` (`app/autocomplete.go`, `Deps.Autocomplete`) counts
+`rl.agent_runtime` for the principal first, then calls `runs.CommandExec.AnswerAutocomplete`. A
+success sends no frame; a failure answers `error {op, code, detail, ref}` and keeps the connection
+(`detail` names pointer and code of the first field error, never a value); a credential revoked
+since identify closes with `4012`. The dispatcher's proof applies only to successful ops.
 
 ## Close codes owned
 

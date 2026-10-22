@@ -12,6 +12,7 @@ import (
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/autocompleterelay"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -26,6 +27,7 @@ import (
 	runsmetrics "github.com/OWNER/bothy/services/server/internal/runs/adapters/otelmetrics"
 	runspg "github.com/OWNER/bothy/services/server/internal/runs/adapters/postgres"
 	runsapp "github.com/OWNER/bothy/services/server/internal/runs/app"
+	synctelemetry "github.com/OWNER/bothy/services/server/internal/sync/adapters/telemetry"
 )
 
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
@@ -274,4 +276,30 @@ func (r *Runs) BindInvocationTokens(cfg runsapp.InvocationTokenConfig, keys runs
 	}
 	r.Invocations = it
 	return nil
+}
+
+// AutocompleteConfigFrom binds the keys of autocompletion (command.autocomplete_timeout,
+// command.autocomplete_max_choices; M2-17). The error names the key whose binding failed, never a
+// value.
+func AutocompleteConfigFrom(v *config.Values) (runsapp.AutocompleteConfig, error) {
+	var c runsapp.AutocompleteConfig
+	if err := config.Bind(v, &c); err != nil {
+		return runsapp.AutocompleteConfig{}, err
+	}
+	return c, nil
+}
+
+// bindAutocomplete binds the relay of autocompletion (gateway/adapters/autocompleterelay over the
+// hub of gw, with the correlator of the event log) and its keys into the runs use cases (M2-17).
+// Without runs or without a hub (a gateway over a given delivery in tests of the connection) it
+// binds nothing, and autocompleteCommand answers with an internal error.
+func bindAutocomplete(v *config.Values, rn *Runs, gw *Gateway) error {
+	if rn == nil || gw == nil || gw.Hub == nil {
+		return nil
+	}
+	cfg, err := AutocompleteConfigFrom(v)
+	if err != nil {
+		return err
+	}
+	return rn.Service.BindAutocomplete(cfg, runsapp.AutocompleteDeps{Relay: autocompleterelay.New(gw.Hub, synctelemetry.Correlator{})})
 }

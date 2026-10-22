@@ -125,6 +125,9 @@ type GatewayDeps struct {
 	Invocations runs.Delivery
 	// Presence takes the member agent of the op heartbeat (M2-20); nil leaves it without effect.
 	Presence agents.Presence
+	// Autocomplete is runs.CommandExec, which takes the answers of the op
+	// command.autocomplete_result (M2-17); required while the op is enabled.
+	Autocomplete gatewayapp.AutocompleteAnswerer
 	// Clock nil means clock.System(); Log nil means slog.Default().
 	Clock clock.Clock
 	Log   *slog.Logger
@@ -163,11 +166,12 @@ const (
 // GatewayOpClasses returns the rate-limit class of each enabled client op, for the contract tests
 // (TestGatewayOpRateClasses, the register test of G9): identify and resume consume
 // rl.gateway_connect in the handshake; heartbeat and reauth belong to that class but consume
-// nothing from it (05 section 3); focus and typing are counted by the gateway itself, ack by the
-// agent limiter (M2-07, INT-W42/4).
+// nothing from it (05 section 3); focus and typing are counted by the gateway itself, ack and
+// command.autocomplete_result by the agent limiter (M2-07, INT-W42/4, M2-17).
 func GatewayOpClasses() map[string]string {
 	return map[string]string{"identify": gatewayClass, "resume": gatewayClass, "heartbeat": gatewayClass, "reauth": gatewayClass,
-		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass, "ack": agentRuntimeClass}
+		"focus": focusClass, "typing.start": typingClass, "typing.stop": typingClass, "ack": agentRuntimeClass,
+		"command.autocomplete_result": agentRuntimeClass}
 }
 
 // NewGateway builds the gateway over d with cfg and registers exactly the ops of
@@ -214,7 +218,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 		Snapshot: d.Reads.Snapshot, CatchUp: d.Reads.CatchUp, Epoch: epochSource{d.Instance}, Delivery: d.Delivery,
 		Decoder: gatewayws.NewDecoder(schemas, check), Alarm: proofAlarm{alarm}, Clock: d.Clock, Log: orDiscard(d.Log),
 		Threads: d.Threads, OpLimiter: opLimiter{l: d.Limiter}, Publisher: publisher, Metrics: d.Metrics,
-		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence,
+		Consumers: engine, AgentLimiter: agentLimiter{l: d.Limiter}, Presence: d.Presence, Autocomplete: d.Autocomplete,
 	})
 	if err != nil {
 		return nil, err

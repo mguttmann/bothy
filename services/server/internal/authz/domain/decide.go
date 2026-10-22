@@ -588,6 +588,9 @@ func init() {
 			return v.commandLevel()
 		},
 		opToken: func(v evaluator, e Expr) (bool, Reason, error) { return v.tokenAtom(e) },
+		opAutocompleteLevel: func(v evaluator, _ Expr) (bool, Reason, error) {
+			return v.autocompleteLevel()
+		},
 	}
 }
 

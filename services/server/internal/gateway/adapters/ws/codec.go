@@ -13,6 +13,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
 
@@ -128,6 +129,8 @@ func (d *Decoder) Decode(op string, raw json.RawMessage) (any, error) {
 		return app.Reauth{AccessToken: f.AccessToken, DPoP: f.Dpop}, nil
 	case "focus":
 		return decodeFocus(raw)
+	case "command.autocomplete_result":
+		return decodeAutocompleteResult(raw)
 	case "typing.start", "typing.stop":
 		var f rest.GatewayTyping
 		if err := strictUnmarshal(raw, &f); err != nil {
@@ -162,6 +165,20 @@ func decodeAck(raw json.RawMessage) (app.Ack, error) {
 		return app.Ack{}, err
 	}
 	return app.Ack{Seq: f.Seq}, nil
+}
+
+// decodeAutocompleteResult decodes the body of command.autocomplete_result strictly into its frame
+// (M2-17).
+func decodeAutocompleteResult(raw json.RawMessage) (app.AutocompleteResult, error) {
+	var f rest.GatewayAutocompleteResult
+	if err := strictUnmarshal(raw, &f); err != nil {
+		return app.AutocompleteResult{}, err
+	}
+	out := app.AutocompleteResult{RequestID: ids.ID(f.RequestId), Ref: deref(f.Ref), Choices: make([]runs.Choice, 0, len(f.Choices))}
+	for _, c := range f.Choices {
+		out.Choices = append(out.Choices, runs.Choice{Name: c.Name, Value: c.Value})
+	}
+	return out, nil
 }
 
 // decodeFocus decodes the body of focus strictly into its frame.

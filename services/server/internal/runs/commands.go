@@ -26,6 +26,22 @@ type CommandExec interface {
 	// or archived channel, 404 for an unknown, invisible, not covered or shadowed command, an
 	// unknown thread or a thread of another channel.
 	Invoke(ctx context.Context, cmd InvokeCommand) (CommandInvocation, error)
+	// Autocomplete asks the owner of a command for suggestions for one option and waits at most
+	// command.autocomplete_timeout (09 section 10.5, M2-17). It never starts a run, writes nothing
+	// and appends no durable event. It answers an empty list at once when the owner has no live
+	// gateway connection in this process and in a forum channel without thread_id after the check
+	// (R-AZ-26); an app command is 404 until M2-25 (D-M2-16-20). Errors: 400 validation_failed for an option
+	// without autocomplete or a payload that does not fit sync.event_payload_max_bytes, 403
+	// agent_invocation_denied with the reason of the refusal, 403 channel_read_only in a read-only
+	// or archived channel, 404 for an unknown, invisible or not covered command, an unknown thread
+	// or a thread of another channel.
+	Autocomplete(ctx context.Context, q AutocompleteQuery) (AutocompleteResult, error)
+	// AnswerAutocomplete accepts the owner's suggestions for an open request (answerAutocomplete
+	// and the gateway op command.autocomplete_result). The first valid answer counts. Errors: 404
+	// for an unknown or forgotten request, 403 for a principal that is not the owner, 400
+	// validation_failed for too many or invalid choices (the request stays open), 410 gone after
+	// the wait ended; a repeated answer after the first one is nil without effect.
+	AnswerAutocomplete(ctx context.Context, a AutocompleteAnswer) error
 }
 
 // InvokeCommand is the input of CommandExec.Invoke (schema CommandInvoke and the path).

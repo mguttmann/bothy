@@ -1276,6 +1276,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"removeCommand":       {"DELETE /api/v1/commands/{command_id}", "command.remove", "rl.admin"},
 		"listChannelCommands": {"GET /api/v1/channels/{channel_id}/commands", "command.read", "rl.read"},
 		"invokeCommand":       {"POST /api/v1/channels/{channel_id}/commands/{command_id}/invoke", "command.invoke", "rl.trigger"},
+		// M2-17
+		"autocompleteCommand": {"POST /api/v1/channels/{channel_id}/commands/{command_id}/autocomplete", "command.autocomplete", "rl.trigger"},
+		"answerAutocomplete": {"POST /api/v1/command-autocompletions/{request_id}/answer", "command.autocomplete.respond",
+			"rl.agent_runtime"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
@@ -1388,5 +1392,13 @@ func (stubServer) ListChannelCommands(context.Context, rest.ListChannelCommandsR
 }
 
 func (stubServer) InvokeCommand(context.Context, rest.InvokeCommandRequestObject) (rest.InvokeCommandResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AutocompleteCommand(context.Context, rest.AutocompleteCommandRequestObject) (rest.AutocompleteCommandResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) AnswerAutocomplete(context.Context, rest.AnswerAutocompleteRequestObject) (rest.AnswerAutocompleteResponseObject, error) {
 	return nil, nil
 }

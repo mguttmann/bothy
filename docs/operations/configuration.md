@@ -423,7 +423,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server | duration | `48h` | the maximum age a run that has not started may reach | active |
 | `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server | duration | `15m` | without a heartbeat during an active run: `stale` | active |
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | after that the card shows "not acknowledged" | planned (M2) |
-| `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server |  | `2500ms` | wait time for suggestions | planned (M2) |
+| `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server | duration | `2500ms` | wait time for suggestions | active |
 | `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server | int | `25` | suggestions per answer | active |
 | `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | int | `100` | commands per agent or app | active |
 | `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | int | `100` | length of a description | active |

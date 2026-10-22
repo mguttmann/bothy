@@ -189,6 +189,7 @@ func TestRealInputs_GatewayOps(t *testing.T) {
 	}
 	want := []gatewayOp{
 		{Op: "ack", Action: "agent.events.consume", Schema: "GatewayAck"},
+		{Op: "command.autocomplete_result", Action: "command.autocomplete.respond", Schema: "GatewayAutocompleteResult"},
 		{Op: "focus", Action: "gateway.focus", Schema: "GatewayFocus"},
 		{Op: "heartbeat", Action: "gateway.connect", Schema: "GatewayHeartbeat"},
 		{Op: "identify", Action: "gateway.connect", Schema: "GatewayIdentify"},

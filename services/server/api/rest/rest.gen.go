@@ -186,6 +186,9 @@ type ServerInterface interface {
 	// ListChannelCommands List commands usable in a channel
 	// (GET /channels/{channel_id}/commands)
 	ListChannelCommands(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// AutocompleteCommand Get suggestions for an option
+	// (POST /channels/{channel_id}/commands/{command_id}/autocomplete)
+	AutocompleteCommand(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, commandId CommandIdPath)
 	// InvokeCommand Run a command
 	// (POST /channels/{channel_id}/commands/{command_id}/invoke)
 	InvokeCommand(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, commandId CommandIdPath, params InvokeCommandParams)
@@ -246,6 +249,9 @@ type ServerInterface interface {
 	// SubmitClientMetrics Submit anonymous client measurements
 	// (POST /client-metrics)
 	SubmitClientMetrics(w http.ResponseWriter, r *http.Request)
+	// AnswerAutocomplete Answer an autocomplete request
+	// (POST /command-autocompletions/{request_id}/answer)
+	AnswerAutocomplete(w http.ResponseWriter, r *http.Request, requestId RequestIdPath)
 	// RegisterCommand Register a command
 	// (POST /commands)
 	RegisterCommand(w http.ResponseWriter, r *http.Request, params RegisterCommandParams)
@@ -3003,6 +3009,41 @@ func (siw *ServerInterfaceWrapper) ListChannelCommands(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// AutocompleteCommand operation middleware
+func (siw *ServerInterfaceWrapper) AutocompleteCommand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "command_id" -------------
+	var commandId CommandIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "command_id", r.PathValue("command_id"), &commandId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "command_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AutocompleteCommand(w, r, channelId, commandId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // InvokeCommand operation middleware
 func (siw *ServerInterfaceWrapper) InvokeCommand(w http.ResponseWriter, r *http.Request) {
 
@@ -3874,6 +3915,32 @@ func (siw *ServerInterfaceWrapper) SubmitClientMetrics(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SubmitClientMetrics(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AnswerAutocomplete operation middleware
+func (siw *ServerInterfaceWrapper) AnswerAutocomplete(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "request_id" -------------
+	var requestId RequestIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "request_id", r.PathValue("request_id"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "request_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AnswerAutocomplete(w, r, requestId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10553,7 +10620,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/commands/{command_id}", wrapper.RemoveCommand)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/commands/{command_id}", wrapper.GetCommand)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/commands/{command_id}", wrapper.UpdateCommand)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/commands/{command_id}/autocomplete", wrapper.AutocompleteCommand)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/commands/{command_id}/invoke", wrapper.InvokeCommand)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/command-autocompletions/{request_id}/answer", wrapper.AnswerAutocomplete)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/apps", wrapper.ListApps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/apps", wrapper.InstallApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/app-manifests/validate", wrapper.ValidateManifest)
@@ -10933,6 +11002,9 @@ type StrictServerInterface interface {
 	// ListChannelCommands List commands usable in a channel
 	// (GET /channels/{channel_id}/commands)
 	ListChannelCommands(ctx context.Context, request ListChannelCommandsRequestObject) (ListChannelCommandsResponseObject, error)
+	// AutocompleteCommand Get suggestions for an option
+	// (POST /channels/{channel_id}/commands/{command_id}/autocomplete)
+	AutocompleteCommand(ctx context.Context, request AutocompleteCommandRequestObject) (AutocompleteCommandResponseObject, error)
 	// InvokeCommand Run a command
 	// (POST /channels/{channel_id}/commands/{command_id}/invoke)
 	InvokeCommand(ctx context.Context, request InvokeCommandRequestObject) (InvokeCommandResponseObject, error)
@@ -10993,6 +11065,9 @@ type StrictServerInterface interface {
 	// SubmitClientMetrics Submit anonymous client measurements
 	// (POST /client-metrics)
 	SubmitClientMetrics(ctx context.Context, request SubmitClientMetricsRequestObject) (SubmitClientMetricsResponseObject, error)
+	// AnswerAutocomplete Answer an autocomplete request
+	// (POST /command-autocompletions/{request_id}/answer)
+	AnswerAutocomplete(ctx context.Context, request AnswerAutocompleteRequestObject) (AnswerAutocompleteResponseObject, error)
 	// RegisterCommand Register a command
 	// (POST /commands)
 	RegisterCommand(ctx context.Context, request RegisterCommandRequestObject) (RegisterCommandResponseObject, error)
@@ -13244,6 +13319,40 @@ func (sh *strictHandler) ListChannelCommands(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// AutocompleteCommand operation middleware
+func (sh *strictHandler) AutocompleteCommand(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, commandId CommandIdPath) {
+	var request AutocompleteCommandRequestObject
+
+	request.ChannelId = channelId
+	request.CommandId = commandId
+
+	var body AutocompleteCommandJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AutocompleteCommand(ctx, request.(AutocompleteCommandRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AutocompleteCommand")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AutocompleteCommandResponseObject); ok {
+		if err := validResponse.VisitAutocompleteCommandResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // InvokeCommand operation middleware
 func (sh *strictHandler) InvokeCommand(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, commandId CommandIdPath, params InvokeCommandParams) {
 	var request InvokeCommandRequestObject
@@ -13862,6 +13971,39 @@ func (sh *strictHandler) SubmitClientMetrics(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SubmitClientMetricsResponseObject); ok {
 		if err := validResponse.VisitSubmitClientMetricsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AnswerAutocomplete operation middleware
+func (sh *strictHandler) AnswerAutocomplete(w http.ResponseWriter, r *http.Request, requestId RequestIdPath) {
+	var request AnswerAutocompleteRequestObject
+
+	request.RequestId = requestId
+
+	var body AnswerAutocompleteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AnswerAutocomplete(ctx, request.(AnswerAutocompleteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AnswerAutocomplete")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AnswerAutocompleteResponseObject); ok {
+		if err := validResponse.VisitAnswerAutocompleteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

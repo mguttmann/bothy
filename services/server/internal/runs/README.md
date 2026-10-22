@@ -88,7 +88,7 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 
 ## Port (root package `internal/runs`)
 
-- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). M2-09: start, resume, renewal, wait, finish and cancel in `Runs`. M2-15: `Interactions` (`interactions.go`: `Create` for `createInteraction`, `Respond` for `respondToInteraction`, `UpdateComponent` for `updateComponent`; the principal comes from the context). M2-16: `CommandExec`. Planned: patch (M2-10).
+- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). M2-09: start, resume, renewal, wait, finish and cancel in `Runs`. M2-15: `Interactions` (`interactions.go`: `Create` for `createInteraction`, `Respond` for `respondToInteraction`, `UpdateComponent` for `updateComponent`; the principal comes from the context). M2-16: `CommandExec` (`Autocomplete` and `AnswerAutocomplete` M2-17). Source port (M2-17): `AutocompleteRelay`. Planned: patch (M2-10).
 - Emits durable events (M2-08): `agent.invocation` (audience the agent, receive action `agent.events.consume`, resource the run without version, no token). M2-15: `interaction.created` (audience the card's agent, receive action `agent.events.consume`, resource the interaction without version, payload `InteractionCreatedPayload` with the values and without `response`).
 - Emits in-tx events: none.
 - Subscribes (M2-05): `messaging.MessagePosted` (the acceptance, `app.Acceptor`, registered after the subscriber of sync). M2-09: kernel `authorize.AccessChanged` and `agents.AgentDisabled`. M2-15: `messaging.MessageDeleted` (`Acceptor.OnMessageDeleted`, registered after them). Planned: `files.FileFinalized`, `chat.ChannelReadOnlySet`.
@@ -186,6 +186,52 @@ The port `runs.Runs` gains `Start`, `Resume`, `RenewToken`, `AwaitInput`, `Finis
 **Job `runs.component_expiry`** (`adapters/jobs/component_expiry.go`, queue `maintenance`, args `ComponentExpiry{MessageID}` only, registered in every role, run by `worker` and `all`): scheduled per card at its earliest `expires_at`, never periodic. `ExpireComponents` locks the card (missing or deleted: done), locks its active components with `expires_at` at or before now in ascending id, sets them `expired` with `version + 1`, calls `ComponentsChanged` once if any changed and schedules itself for the next `expires_at`. Repeated execution is harmless; correctness never depends on the job, because `authorize` treats a passed `expires_at` as expired.
 
 **Visibility.** `message_components` and `interactions` have no `channel_id`: every query names the components of messages that `authorize` checked, that `messaging` loaded for an event of the same transaction, or that a job or the end of a run names (07 7.4 rule 1, `tools/lint/sql_visibility.yaml`). Form values live only in `interactions`; they leave the server only in the answers of `createInteraction`, in `interaction.created` and in the answer of `respondToInteraction` to the card's agent (SEC-T10).
+
+## Autocompletion (M2-17)
+
+`CommandExec.Autocomplete` and `CommandExec.AnswerAutocomplete` (`autocomplete.go`,
+`app/autocomplete.go`, `domain/autocomplete.go`, handlers `adapters/httpapi/autocomplete.go`) serve
+`autocompleteCommand` and `answerAutocomplete`; the gateway op `command.autocomplete_result` calls
+`AnswerAutocomplete` too. Neither holds a transaction, writes a row or appends a durable event, and
+neither creates a run or a cost entry (R-AG-14).
+
+- `Autocomplete`: `agents.Commands.Resolve` (404 for an unknown, removed, not covered or shadowed
+  command), the thread of the request (404 when unknown or of another channel, before `authorize`),
+  the channel facts, the target thread (`domain.AutocompleteTarget`: the given thread, else the main
+  thread of a text channel, else none in a forum, R-AZ-26), then `command.autocomplete` in request
+  mode at the permission version read once (`instance.Versions`) and the query rules
+  (`domain.ValidateAutocompleteQuery`). An agent owner without a target thread gets an empty list
+  at once. An app command is `404` until M2-25, because `Resolve` hides it (D-M2-16-20); the
+  use case would answer an empty list for an app owner and the requirement already decides it. Otherwise the payload of `command.autocomplete_requested`
+  (`400 validation_failed` with the field code `too_long` and an empty pointer above
+  `sync.event_payload_max_bytes`), a fresh token with
+  `trigger_kind = autocomplete`, no `run_id`, the command and the target thread
+  (`domain.AutocompleteGrant`, target billing mode and tool class of the agent), the request in the
+  registry, and the source port `AutocompleteRelay` (implemented by
+  `gateway/adapters/autocompleterelay`). Not sent: an empty list at once. Sent: the first accepted
+  answer, or an empty list after `command.autocomplete_timeout`; the end of the request context
+  expires the request.
+- `AnswerAutocomplete`: an unknown or forgotten request is `404` without `authorize`; then
+  `command.autocomplete.respond` on the command at the place of the request with the owner as
+  `OwnerID`, the answer rules (`domain.ValidateAutocompleteAnswer`, at most
+  `command.autocomplete_max_choices`; the request stays open after a `400`), `410` for an expired
+  request, `204` without effect for an answered one, otherwise the compare-and-swap
+  `open -> answered` that wakes the waiter.
+- The registry of open requests is a mutex-guarded map in the memory of the process
+  (`autocompleteBox`); every transition is a compare-and-swap of `domain.AutocompleteRequest`.
+  Answered and expired requests stay until `expires_at` plus `command.autocomplete_timeout` and are
+  swept by every call (no goroutine). A restart forgets every request (at most once, 04 section 9).
+  With `cluster.mode = multi`, before M7-17 distributes requests and answers, only owner
+  connections and REST answers on the same api node are reached; elsewhere the person gets an empty
+  list and the answer `404` (OQ-07, RK-37).
+- Residual risk (T-AI-02, 07 SR9): an adapter that reads the API with its own rights while it
+  computes suggestions could return names from channels the person cannot read; the server cannot
+  filter free-form choices. SR9 binds requests only within a run; M2-14 decides about autocomplete
+  tokens as `acting_for`.
+- Keys: `command.autocomplete_timeout`, `command.autocomplete_max_choices` (bound with the relay in
+  `internal/wire`, `BindAutocomplete`), `sync.event_payload_max_bytes`, `agent.invocation_token_ttl`.
+- Registrations: `runs.Register` declares the ephemeral `command.autocomplete_requested` and the op
+  `command.autocomplete_result`, whose handler the gateway runs on `CommandExec`.
 
 ## Invocation tokens (M2-06)
 

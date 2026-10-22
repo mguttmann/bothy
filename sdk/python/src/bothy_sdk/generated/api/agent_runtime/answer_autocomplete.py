@@ -94,6 +94,13 @@ def sync_detailed(
 ) -> Response[Any | Problem]:
     """Answer an autocomplete request
 
+     The owner of the command answers an open request of `command.autocomplete_requested`; the
+    first valid answer goes back to the person. `404` for an unknown or forgotten request,
+    `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+    `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+    (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+    text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AutocompleteAnswer):
@@ -126,6 +133,13 @@ def sync(
 ) -> Any | Problem | None:
     """Answer an autocomplete request
 
+     The owner of the command answers an open request of `command.autocomplete_requested`; the
+    first valid answer goes back to the person. `404` for an unknown or forgotten request,
+    `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+    `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+    (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+    text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AutocompleteAnswer):
@@ -152,6 +166,13 @@ async def asyncio_detailed(
     body: AutocompleteAnswer,
 ) -> Response[Any | Problem]:
     """Answer an autocomplete request
+
+     The owner of the command answers an open request of `command.autocomplete_requested`; the
+    first valid answer goes back to the person. `404` for an unknown or forgotten request,
+    `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+    `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+    (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+    text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
 
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -182,6 +203,13 @@ async def asyncio(
     body: AutocompleteAnswer,
 ) -> Any | Problem | None:
     """Answer an autocomplete request
+
+     The owner of the command answers an open request of `command.autocomplete_requested`; the
+    first valid answer goes back to the person. `404` for an unknown or forgotten request,
+    `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+    `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+    (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+    text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
 
     Args:
         request_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

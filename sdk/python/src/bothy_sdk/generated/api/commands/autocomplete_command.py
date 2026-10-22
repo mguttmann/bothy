@@ -95,7 +95,17 @@ def sync_detailed(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time.
+    no choices when the owner does not answer in time. Returns an empty list at once when the owner
+    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+    `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+    removed or not covered command, an app command (until its execution is built), an unknown channel
+    or a thread of another channel is `404`.
+    The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+    `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+    `sync.event_payload_max_bytes`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -133,7 +143,17 @@ def sync(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time.
+    no choices when the owner does not answer in time. Returns an empty list at once when the owner
+    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+    `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+    removed or not covered command, an app command (until its execution is built), an unknown channel
+    or a thread of another channel is `404`.
+    The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+    `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+    `sync.event_payload_max_bytes`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -166,7 +186,17 @@ async def asyncio_detailed(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time.
+    no choices when the owner does not answer in time. Returns an empty list at once when the owner
+    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+    `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+    removed or not covered command, an app command (until its execution is built), an unknown channel
+    or a thread of another channel is `404`.
+    The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+    `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+    `sync.event_payload_max_bytes`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -202,7 +232,17 @@ async def asyncio(
     """Get suggestions for an option
 
      Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-    no choices when the owner does not answer in time.
+    no choices when the owner does not answer in time. Returns an empty list at once when the owner
+    has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+    after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+    `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+    `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+    `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+    removed or not covered command, an app command (until its execution is built), an unknown channel
+    or a thread of another channel is `404`.
+    The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+    `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+    `sync.event_payload_max_bytes`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

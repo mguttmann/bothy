@@ -60,7 +60,12 @@ func checkCommandFacts(ctx context.Context, act authorize.Action, r authorize.Re
 	if r.Command != nil || authorize.IsFilter(ctx) && r.Event != nil {
 		return nil
 	}
-	if r.Kind == authorize.ResourceCommand || act == authorize.ActionCommandInvoke {
+	if act == authorize.ActionCommandAutocompleteRespond && r.Kind == authorize.ResourceCommand && !r.ChannelID.IsZero() {
+		// The answer of an autocomplete request (M2-17 design note 3) is decided on the place of
+		// the request, which the resource names as its path; the owner is OwnerID.
+		return nil
+	}
+	if r.Kind == authorize.ResourceCommand || act == authorize.ActionCommandInvoke || act == authorize.ActionCommandAutocomplete {
 		return internal("command resource without its facts in request mode")
 	}
 	return nil

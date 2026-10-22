@@ -41,12 +41,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      Future<void> tap(String key) async {
-        await app.waitFor(find.byKey(ValueKey(key)));
-        await tester.ensureVisible(find.byKey(ValueKey(key)).first);
-        await tester.tap(find.byKey(ValueKey(key)).first);
-        await tester.pumpAndSettle();
-      }
+      final tap = app.tap;
 
       /// Forgets the confirmation, runs [ui] up to the submitting tap and checks the dialog.
       Future<void> check(String op, Future<void> Function() ui) async {

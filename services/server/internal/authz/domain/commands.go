@@ -27,6 +27,8 @@ const (
 	actionCommandRead     = "command.read"
 	actionCommandRegister = "command.register"
 	actionCommandInvoke   = "command.invoke"
+	// actionCommandAutocomplete is decided on the channel with the command facts (M2-17).
+	actionCommandAutocomplete = "command.autocomplete"
 )
 
 // CommandFacts are the facts of a command resource and of command.invoke, gathered by the
@@ -211,4 +213,47 @@ func commandInvokeGuard(in *Input) (Decision, error) {
 		return deny(OutcomeForbidden, ReasonRunActive), nil
 	}
 	return Allow, nil
+}
+
+// AutocompleteLevel is the requirement of command.autocomplete (05 section 4.10 "trigger and
+// agent.invoke without a run (for app commands required_level)", brief M2-17 design note 3): an
+// agent owner needs Level(trigger), whose guard then applies the agent.invoke rules without a run;
+// an app owner needs Level(required_level) only (R-AZ-18). Missing command facts or an unknown
+// owner kind are internal errors.
+var AutocompleteLevel = Expr{op: opAutocompleteLevel}
+
+// autocompleteLevel evaluates AutocompleteLevel.
+func (v evaluator) autocompleteLevel() (bool, Reason, error) {
+	c := v.in.Command
+	if c == nil {
+		return false, "", internalError("command.autocomplete without its command")
+	}
+	switch c.OwnerKind {
+	case commandOwnerAgent:
+		return v.level(LevelTrigger), ReasonLevelInsufficient, nil
+	case commandOwnerApp:
+		return v.commandLevel()
+	}
+	return false, "", internalError("command.autocomplete of an owner that is neither agent nor app")
+}
+
+// commandAutocompleteGuard is the guard of command.autocomplete (brief M2-17 design note 3): for
+// an agent owner the agent.invoke guard on the target thread (points 1 to 6; the active-run rule
+// never applies, because the descriptor carries no active run), for an app owner nothing more.
+// Missing command facts or an agent owner without invoke facts are internal errors.
+func commandAutocompleteGuard(in *Input) (Decision, error) {
+	c := in.Command
+	if c == nil {
+		return Decision{}, internalError("command.autocomplete without its command")
+	}
+	switch c.OwnerKind {
+	case commandOwnerAgent:
+		if in.Invoke == nil {
+			return Decision{}, internalError("command.autocomplete of an agent command without its trigger")
+		}
+		return invokeGuard(in, in.Invoke)
+	case commandOwnerApp:
+		return Allow, nil
+	}
+	return Decision{}, internalError("command.autocomplete of an owner that is neither agent nor app")
 }

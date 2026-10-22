@@ -9,6 +9,90 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListHostsResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListHostsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ListHostsResponse) GetApplicationproblemJSON429() *TooManyRequests {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListHostsResponse) GetApplicationproblemJSONDefault() *Error {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListHostsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListHostsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListHostsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListHostsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateHostResponse201Headers the declared response headers of an HTTP 201 response for CreateHost
+type CreateHostResponse201Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// CreateHostResponse400Headers the declared response headers of an HTTP 400 response for CreateHost
+type CreateHostResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CreateHostResponse401Headers the declared response headers of an HTTP 401 response for CreateHost
+type CreateHostResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// CreateHostResponse403Headers the declared response headers of an HTTP 403 response for CreateHost
+type CreateHostResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CreateHostResponse409Headers the declared response headers of an HTTP 409 response for CreateHost
+type CreateHostResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// CreateHostResponse422Headers the declared response headers of an HTTP 422 response for CreateHost
+type CreateHostResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // CreateHostResponse429Headers the declared response headers of an HTTP 429 response for CreateHost
 type CreateHostResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -25903,62 +25987,4 @@ func (c *ClientWithResponses) SendHeartbeatWithBodyWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParseSendHeartbeatResponse(rsp)
-}
-
-// SendHeartbeatWithResponse Report state and actual billing mode
-//
-// The adapter reports the whole state of its runtime (`agent_heartbeat.v1`, 09 section 4.8); the member `agent` of the gateway op `heartbeat` has the same effect. Only an agent may call it (`agent-self`); the body carries no agent id. The last heartbeat wins: an absent optional member means "not reported", except `project_readiness`, which is applied only when present and changed since the last list this server process applied (`ApplyProjectReadiness` of M2-03, in its own transaction).
-//
-// The server validates every member and the closed keys of `details` itself, also the patterns of names, versions and codes; a violation answers `400 validation_failed` with every field error, `rate_limit` answers `errors[].code` `not_enabled` until it is built. A change of `reported_billing_mode` or `reported_tool_class`, also from or to "not reported", is stored at once and audited with action `agent.heartbeat`; the other fields are stored at most once per `agent.heartbeat_persist_interval`. The presence becomes `offline` once `agent.presence_timeout` passes without a heartbeat. The server compares the reported with the configured mode at each heartbeat and returns the warnings of `AgentRuntimeStatus.warnings`; the reported mode is evidence for display, warning, audit and alarm and never a permission (BR-05). `interval_ms` is `sync.heartbeat_interval`.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /agents/me/heartbeat (the `SendHeartbeat` operationId).
-func (c *ClientWithResponses) SendHeartbeatWithResponse(ctx context.Context, body SendHeartbeatJSONRequestBody, reqEditors ...RequestEditorFn) (*SendHeartbeatResponse, error) {
-	rsp, err := c.SendHeartbeat(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSendHeartbeatResponse(rsp)
-}
-
-// GetAgentTriggerersWithResponse List who may trigger this agent
-//
-// Principals with effective `trigger` on a channel the agent operates, with `permission_version`. The adapter keeps it as allow list and reloads on `access.changed` (09, 15).
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /agents/me/triggerers (the `GetAgentTriggerers` operationId).
-func (c *ClientWithResponses) GetAgentTriggerersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentTriggerersResponse, error) {
-	rsp, err := c.GetAgentTriggerers(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetAgentTriggerersResponse(rsp)
-}
-
-// GetAgentWithResponse Read an agent with reported state
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /agents/{agent_id} (the `GetAgent` operationId).
-func (c *ClientWithResponses) GetAgentWithResponse(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*GetAgentResponse, error) {
-	rsp, err := c.GetAgent(ctx, agentId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetAgentResponse(rsp)
-}
-
-// UpdateAgentWithBodyWithResponse Change an agent
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PATCH /agents/{agent_id} (the `UpdateAgent` operationId).
-func (c *ClientWithResponses) UpdateAgentWithBodyWithResponse(ctx context.Context, agentId AgentIdPath, params *UpdateAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentResponse, error) {
-	rsp, err := c.UpdateAgentWithBody(ctx, agentId, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseUpdateAgentResponse(rsp)
 }

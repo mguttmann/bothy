@@ -6833,6 +6833,7 @@ type AuthProviderInfo struct {
 
 // AutocompleteAnswer defines model for AutocompleteAnswer.
 type AutocompleteAnswer struct {
+	// Choices At most `command.autocomplete_max_choices`.
 	Choices []CommandChoice `json:"choices"`
 }
 
@@ -6853,6 +6854,7 @@ type AutocompleteQuery struct {
 
 // AutocompleteResult defines model for AutocompleteResult.
 type AutocompleteResult struct {
+	// Choices At most `command.autocomplete_max_choices`.
 	Choices []CommandChoice `json:"choices"`
 }
 
@@ -21271,7 +21273,17 @@ type ClientInterface interface {
 	// AutocompleteCommandWithBody Get suggestions for an option
 	//
 	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-	// no choices when the owner does not answer in time.
+	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+	// removed or not covered command, an app command (until its execution is built), an unknown channel
+	// or a thread of another channel is `404`.
+	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+	// `sync.event_payload_max_bytes`).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -21281,7 +21293,17 @@ type ClientInterface interface {
 	// AutocompleteCommand Get suggestions for an option
 	//
 	// Forwards the query to the command owner and waits up to `command.autocomplete_timeout`; returns
-	// no choices when the owner does not answer in time.
+	// no choices when the owner does not answer in time. Returns an empty list at once when the owner
+	// has no live gateway connection, and for an agent command in a forum channel without `thread_id`
+	// after the check (R-AZ-26). Checked like `agent.invoke` without a run: a refusal is
+	// `403 agent_invocation_denied` with `reason` (for example `level_insufficient`,
+	// `agent_not_reachable`, `billing_mode_personal_not_holder`, `tool_class_owner_only`,
+	// `project_not_ready`), a read-only or archived channel `403 channel_read_only`. An unknown,
+	// removed or not covered command, an app command (until its execution is built), an unknown channel
+	// or a thread of another channel is `404`.
+	// The query names an option with `autocomplete` (`400 validation_failed` with `unknown_option`,
+	// `autocomplete_not_enabled` or `duplicate`; `too_long` when the request does not fit
+	// `sync.event_payload_max_bytes`).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -21557,12 +21579,26 @@ type ClientInterface interface {
 
 	// AnswerAutocompleteWithBody Answer an autocomplete request
 	//
+	// The owner of the command answers an open request of `command.autocomplete_requested`; the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+	// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+	// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+	// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+	// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /command-autocompletions/{request_id}/answer (the `AnswerAutocomplete` operationId).
 	AnswerAutocompleteWithBody(ctx context.Context, requestId RequestIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AnswerAutocomplete Answer an autocomplete request
+	//
+	// The owner of the command answers an open request of `command.autocomplete_requested`; the
+	// first valid answer goes back to the person. `404` for an unknown or forgotten request,
+	// `410 gone` after the wait ended, `204` without effect for an answer after the first one.
+	// `400 validation_failed` for more than `command.autocomplete_max_choices` choices
+	// (`too_many_items`), an empty name or value (`too_short`) or a name or value that is no display
+	// text (`invalid_utf8`, `control_character`, `bidi_control`); the request stays open.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25406,59 +25442,6 @@ func (c *Client) BeginStepUpOidcReauthWithBody(ctx context.Context, params *Begi
 // Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
 func (c *Client) BeginStepUpOidcReauth(ctx context.Context, params *BeginStepUpOidcReauthParams, body BeginStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBeginStepUpOidcReauthRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteStepUpOidcReauthWithBody Finish a console step-up with OIDC
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
-func (c *Client) CompleteStepUpOidcReauthWithBody(ctx context.Context, params *CompleteStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteStepUpOidcReauthRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteStepUpOidcReauth Finish a console step-up with OIDC
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
-func (c *Client) CompleteStepUpOidcReauth(ctx context.Context, params *CompleteStepUpOidcReauthParams, body CompleteStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteStepUpOidcReauthRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CompleteStepUpWithPasskeyWithBody Confirm step-up with a passkey
-//
-// Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /auth/step-up/passkey (the `CompleteStepUpWithPasskey` operationId).
-func (c *Client) CompleteStepUpWithPasskeyWithBody(ctx context.Context, params *CompleteStepUpWithPasskeyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCompleteStepUpWithPasskeyRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

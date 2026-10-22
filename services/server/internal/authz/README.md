@@ -367,6 +367,24 @@ filter-mode receive check of `command.changed` takes the path from the event sco
   its guard refuses a model command with `ActiveRun` (`run_active`) and fails closed for an app
   owner until M2-25. The read-only and archive steps apply as for every write.
 
+### Autocompletion (M2-17)
+
+- `command.autocomplete` is no longer deferred. Its requirement `AutocompleteLevel`
+  (`domain/commands.go`) reads the command facts: an agent owner needs `Level(trigger)`, and the
+  guard `commandAutocompleteGuard` then applies the `agent.invoke` guard (`invokeGuard`, points 1
+  to 6) to `Resource.Invoke`; the active-run point never applies, because the descriptor carries no
+  active run. An app owner needs `Level(required_level)` only, without the invoke guard and I2
+  (R-AZ-18). The descriptor is the channel with the target thread as hint; `gather` reads the invoke
+  facts for this action as for `agent.invoke`. Without the command facts, or for an agent owner
+  without invoke facts, the decision is an internal error. The read-only and archive steps apply
+  as for every `trigger` action, owners included.
+- `command.autocomplete.respond` keeps `Any(AgentSelf, AppSelf)`. Its resource is the command with
+  the place of the request as `ChannelID` and `ThreadID` and the owner as `OwnerID`; such a
+  resource needs no command facts in request mode (`checkCommandFacts`). The visibility of kind
+  `command` then decides on that place: the owner passes, another agent that reads the place gets
+  `not_self`, one that does not `not_found`, a person `subject_kind_not_allowed`; an app needs
+  `commands:write`.
+
 ### Files (M3-03)
 
 `file.read` is no longer deferred: its requirement is read on the path. Kind `file` has its own

@@ -40,3 +40,14 @@ The Semgrep rule `bothy-go-test-wall-clock-wait` (`.semgrep/`) refuses literal s
 as the bound of a wait in a `_test.go` file. A bounded give-up or a latency bound under test
 carries `// nosemgrep: bothy-go-test-wall-clock-wait -- <reason>`. The rule does not see a wait
 bounded by a constant of the test or by `time.Sleep`.
+
+## Timing comparisons
+
+`testkit.TimingSame(tolerance, a, b)` compares two operations that must not be told apart by
+their time (AZ-P4: an invisible and an unknown ID). Per round it runs warm-up pairs, then counted
+pairs in alternating order, and compares the shortest counted duration of each side within
+`TimingBound(tolerance)`; it tries up to `TimingRounds` rounds and fails only when every round
+differs. Load and the scheduler only add delay, so a busy machine slows a round but cannot fail
+the comparison, while a real difference lengthens the shortest run in every round.
+`TimingBound` alone widens a bound under the race detector; a new timing comparison uses
+`TimingSame` instead of comparing medians once.

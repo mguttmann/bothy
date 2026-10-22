@@ -208,6 +208,9 @@ type Service struct {
 	tokens atomic.Pointer[tokenBox]
 	// commands is the command register of agents (M2-16), bound in the chat step (BindCommands).
 	commands atomic.Pointer[commandBox]
+	// autocomplete is the relay and the registry of open autocomplete requests (M2-17), bound
+	// with the gateway (BindAutocomplete).
+	autocomplete autocompleteState
 }
 
 // Compile-time check: Service is the incoming port.

@@ -1199,7 +1199,44 @@ For options with `autocomplete = true` the server asks the owner of the command:
    costs.
 
 Apps answer autocomplete through their interaction address
-([11-extensions.md](11-extensions.md) section 3).
+([11-extensions.md](11-extensions.md) section 9).
+
+API-visible rules of the server (M2-17; docs/decisions.d/M2-17.md, D-M2-17-1 to D-M2-17-12):
+
+- The command must be usable at the place: an unknown or removed command, a command whose scope
+  does not cover the channel, an unknown channel and a `thread_id` of another channel all answer
+  `404 not_found`, identical to an unknown ID; so does an app command until its execution through
+  the interaction address is built (M2-25, D-M2-16-20). Then `command.autocomplete` is decided on the channel
+  in request mode, with the target thread as path: the thread of the request, without one the
+  main thread of a text channel (R-AZ-26). For an agent command the person needs `trigger` and the
+  `agent.invoke` rules without a run, where the command addresses its owner like a mention; for an
+  app command `required_level`. Denials answer `403 agent_invocation_denied` with `reason`, a
+  read-only or archived channel `403 channel_read_only`, and are audited.
+- The query names an option of the command with `autocomplete = true`; `errors[].code` is
+  `unknown_option` (pointer `/option` or `/options/<i>/name`), `autocomplete_not_enabled`
+  (`/option`) or `duplicate` (an option given twice, or the option again in `options`). The values
+  are passed on unchecked, because the person is still typing. A request whose payload does not
+  fit `sync.event_payload_max_bytes` answers `400 validation_failed` with `too_long` and an empty
+  pointer.
+- The server answers an empty list at once, without asking anybody and without a token: for an
+  agent command in a forum channel without `thread_id` (R-AZ-26), and when the owner has no live
+  gateway connection in this process. Otherwise exactly one live connection gets the event: the one of consumer `default`,
+  else the most recently attached one; people and other principals never get it.
+- The first valid answer counts; the person gets it at once. `answerAutocomplete` and the op answer
+  `404` for an unknown or forgotten request (before any rights check), `403` for a principal that
+  is not the owner (`not_self`, `subject_kind_not_allowed`), `400 validation_failed` for more than
+  `command.autocomplete_max_choices` choices (`too_many_items`), an empty name or value
+  (`too_short`) or a name or value that is no display text (`invalid_utf8`, `control_character`,
+  `bidi_control`; SEC-IN-4), `410 gone` after the wait ended, and `204` without effect for a later
+  answer. After a `400` the request stays open. The op answers failures with an `error` frame
+  (`detail` names pointer and code of the first field error, never a value) and keeps the
+  connection.
+- Open requests live only in the memory of the api process that took the request; answered and
+  expired ones are remembered until `expires_at` plus `command.autocomplete_timeout`. A restart
+  forgets them. With `cluster.mode = multi` only owner connections and REST answers on the same api
+  node are reached until the distribution of 02 section 11.6 is built.
+- `command.autocomplete_timeout` must be lower than `http.request_timeout`; the start refuses
+  otherwise. `command.autocomplete_max_choices` is at most the `maxItems` of the answer schemas.
 
 ## 11. Components
 
