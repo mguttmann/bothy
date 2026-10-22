@@ -124,6 +124,9 @@ def _operations() -> dict[str, dict[str, Any]]:
                 ),
                 "params": params,
                 "json_example": example,
+                # The token check of an incoming webhook runs before the body is read (11 8.4):
+                # without a valid webhook token every call answers the uniform 404.
+                "token_gated": op.get("x-authz-action") == "webhook_in.post",
             }
     return out
 
@@ -245,7 +248,9 @@ def _alternate_url(case: Any) -> str | None:
 
 
 def _check_not_found(case: Any, response: Any, state: PassAuth) -> None:
-    if response.status_code != 404:
+    # R-AZ-01 compares the 404 of one ID with that of fresh IDs; a malformed path parameter is no
+    # ID, and its own path in instance would differ from theirs.
+    if response.status_code != 404 or _negative(case, ParameterLocation.PATH):
         return
     url = _alternate_url(case)
     if url is None:
@@ -487,12 +492,33 @@ def _sec_call(op_id: str, body: bytes) -> tuple[Answer, str]:
     return Answer(resp.status, resp.headers, resp.body), curl
 
 
+def _token_gated_not_found(op_id: str, answer: Answer, curl: str) -> bool:
+    """For an operation behind the webhook token check, require its uniform 404 and return True.
+
+    The pass holds no webhook token, so the token check answers before the body is read (11 8.4);
+    the body rules of these operations are tested in services/server/test/integrations.
+    """
+    if not OPERATIONS[op_id]["token_gated"]:
+        return False
+    if answer.status != 404 or problem_code(answer.body) != "not_found":
+        raise ContractError(
+            failure_report(
+                f"{op_id}: without a webhook token answered {answer.status} {answer.body!r}",
+                curl,
+                SEED,
+            )
+        )
+    return True
+
+
 @pytest.mark.parametrize("op_id", _json_operations())
 def test_sec_t06_unknown_field_rejected(op_id: str) -> None:
     """A valid body plus x_unknown_field gives 400 validation_failed (19 SEC-IN-1, PLAN W7)."""
     body = dict(OPERATIONS[op_id]["json_example"])
     body["x_unknown_field"] = True
     answer, curl = _sec_call(op_id, json.dumps(body).encode())
+    if _token_gated_not_found(op_id, answer, curl):
+        return
     errors = json.loads(answer.body).get("errors", []) if answer.status == 400 else []
     pointers = {e.get("pointer") for e in errors if isinstance(e, Mapping)}
     if (
@@ -516,6 +542,8 @@ def test_sec_t06_duplicate_json_keys_rejected(op_id: str) -> None:
         f"{json.dumps(k)}:{json.dumps(v)}" for k, v in example.items() if k != name
     ]
     answer, curl = _sec_call(op_id, ("{" + ",".join(members) + "}").encode())
+    if _token_gated_not_found(op_id, answer, curl):
+        return
     if answer.status != 400 or problem_code(answer.body) != "malformed_request":
         raise ContractError(
             failure_report(

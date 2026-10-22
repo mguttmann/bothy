@@ -385,7 +385,7 @@ func TestPostIncomingWebhook_RevokeRace(t *testing.T) {
 // TestPostIncomingWebhook_TokenOnlyAsPattern (06 5 point 1, SEC-LOG-2, SEC-LOG-3): with a token
 // built at runtime, the exported access log records and spans hold the route pattern
 // /api/v1/hooks/{webhook_id}/{token} and never the token; a 404, a 400 and a 413 carry instance
-// /api/v1/hooks/<id>/{token}; the Bearer variant logs no Authorization; audit details and event
+// /api/v1/hooks/<id>/%7Btoken%7D (percent-encoded, a uri-reference); the Bearer variant logs no Authorization; audit details and event
 // payloads hold no token. It installs the global telemetry providers and so does not run in
 // parallel.
 func TestPostIncomingWebhook_TokenOnlyAsPattern(t *testing.T) {
@@ -405,7 +405,7 @@ func TestPostIncomingWebhook_TokenOnlyAsPattern(t *testing.T) {
 		{k, native(strings.Repeat("x", 4096)), http.StatusRequestEntityTooLarge},
 	} {
 		r := h.postPath(c.k, c.body)
-		if _, _, _, _, inst := r.problem(); r.status != c.want || inst != "/api/v1/hooks/"+k.id+"/{token}" {
+		if _, _, _, _, inst := r.problem(); r.status != c.want || inst != "/api/v1/hooks/"+k.id+"/%7Btoken%7D" {
 			t.Fatalf("%d %s, want %d with the pattern in instance", r.status, r.body, c.want)
 		}
 	}

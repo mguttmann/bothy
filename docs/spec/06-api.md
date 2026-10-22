@@ -217,7 +217,7 @@ actions (R-AZ-03).
    `status`, `code`, `correlation_id`, optionally `detail` and `instance`. `instance` is the path
    of the request without query; path parameters that carry a secret (today only `{token}` of
    `postIncomingWebhook`) appear as placeholders, as in logs ([19-security.md](19-security.md),
-   SEC-LOG-3).
+   SEC-LOG-3), percent-encoded (`%7Btoken%7D`) because `instance` is a URI reference.
 2. `type` is a relative URI with the full path `/api/v1/problems/{code}`. RFC 9457 recommends
    absolute URIs "when possible" and allows relative ones with a full path [verified, Q2]. A
    self-hosted software has no common host; every instance serves the description

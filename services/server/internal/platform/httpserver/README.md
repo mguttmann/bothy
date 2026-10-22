@@ -191,7 +191,7 @@ the proof applies to every success of a route.
   the log.
 - `503 unavailable` and `maintenance` always carry `Retry-After` (`http.unavailable_retry_after`).
 - Error headers of `errs.Error.WithHeader` (`WWW-Authenticate`, `DPoP-Nonce`, `Allow`) are applied.
-- `instance` is the escaped path with `{token}` segments kept as `{token}`; unmatched requests have
+- `instance` is the escaped path with `{token}` segments written as `%7Btoken%7D` (a URI reference has no braces); unmatched requests have
   none. Internal causes and wrapped texts never reach the body.
 - Response writer: success without a check of the route's action is replaced by `500` and counts in
   `bothy.authz.errors`; JSON bodies lose null members (logged), null elements and integers beyond
