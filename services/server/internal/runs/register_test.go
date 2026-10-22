@@ -10,15 +10,15 @@ import (
 )
 
 // TestRegister_Events: runs declares run.state_changed (M2-05), agent.invocation (M2-08) and
-// command.invoked (M2-16).
+// command.invoked (M2-16) and run.cancel_requested (M2-09).
 func TestRegister_Events(t *testing.T) {
 	t.Parallel()
 	r := authorize.NewRegistry()
 	runs.Register(r)
 	ev := r.Events()
-	if len(ev) != 3 || ev[0].Module != "runs" || ev[0].Type != authorize.EventAgentInvocation ||
+	if len(ev) != 4 || ev[0].Module != "runs" || ev[0].Type != authorize.EventAgentInvocation ||
 		ev[1].Module != "runs" || ev[1].Type != authorize.EventCommandInvoked ||
-		ev[2].Module != "runs" || ev[2].Type != authorize.EventRunStateChanged {
+		ev[2].Type != authorize.EventRunCancelRequested || ev[3].Type != authorize.EventRunStateChanged {
 		t.Fatalf("events %+v", ev)
 	}
 }

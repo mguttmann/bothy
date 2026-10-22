@@ -180,6 +180,29 @@ func (a *Authorizer) resolveGrant(ctx context.Context, id ids.ID, revoked bool) 
 	return res, true, nil
 }
 
+// tokenAndInvokeFacts adds the facts of token.create (the holder), of a requirement on the
+// invocation token (run.start, run.token.renew) and of agent.invoke to in.
+func (a *Authorizer) tokenAndInvokeFacts(ctx context.Context, s *actingPrincipal, spec domain.ActionSpec, req domain.Expr,
+	r authorize.Resource, res resolved, t time.Time, in *domain.Input) error {
+	if spec.ID == string(authorize.ActionTokenCreate) {
+		pf, found, err := a.principal.Principal(ctx, r.ID)
+		if err != nil {
+			return sourceError("principal source", err)
+		}
+		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
+	}
+	if req.Contains(domain.Token()) && r.Token != nil {
+		in.Invocation = invocationFacts(r.Token)
+	}
+	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
+		var err error
+		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // gather builds the fact bundle of domain.Decide for one call: the effective rights on the path
 // with the "view as" and acting-for intersections and the facts the action and the resource kind
 // need (brief M1-28: decide.go stays pure).
@@ -214,23 +237,14 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	if err := a.grantFacts(spec.ID, r, res, &in); err != nil {
 		return domain.Input{}, err
 	}
-	var err error
-	if spec.ID == string(authorize.ActionTokenCreate) {
-		pf, found, err := a.principal.Principal(ctx, r.ID)
-		if err != nil {
-			return domain.Input{}, sourceError("principal source", err)
-		}
-		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
+	if err := a.tokenAndInvokeFacts(ctx, s, spec, req, r, res, t, &in); err != nil {
+		return domain.Input{}, err
 	}
+	var err error
 	if in.Command, err = a.commandFacts(ctx, s, spec, r, res, t); err != nil {
 		return domain.Input{}, err
 	}
 	baseIn.Command = in.Command
-	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
-		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
-			return domain.Input{}, err
-		}
-	}
 	if in.Principal.ActingFor {
 		if in.BaseVisible, _, err = domain.Visible(baseIn); err != nil {
 			return domain.Input{}, err
@@ -495,6 +509,20 @@ func memoized[T any](ctx context.Context, key any, read func() (T, bool, error))
 
 // purposeAttachment is files.purpose of a file uploaded into a channel (M3-03).
 const purposeAttachment = "attachment"
+
+// invocationFacts converts the token facts of run.start and run.token.renew (M2-09).
+func invocationFacts(f *authorize.TokenFacts) *domain.InvocationFacts {
+	return &domain.InvocationFacts{Verdict: invocationVerdicts[f.Verdict], BillingModeUsed: f.BillingModeUsed,
+		BillingModeExpected: f.BillingModeExpected, BillingKeyType: f.BillingKeyType, BillingProvider: f.BillingProvider,
+		BillingMethod: f.BillingMethod, ToolClassUsed: f.ToolClassUsed, ToolClassClaim: f.ToolClassClaim}
+}
+
+// invocationVerdicts converts the verdicts of kernel/authorize; a value outside the map becomes
+// the zero verdict, which Decide refuses as an internal error.
+var invocationVerdicts = map[authorize.TokenVerdict]domain.InvocationVerdict{
+	authorize.TokenValid: domain.InvocationValid, authorize.TokenExpired: domain.InvocationExpired,
+	authorize.TokenSuperseded: domain.InvocationSuperseded, authorize.TokenInvalid: domain.InvocationInvalid,
+}
 
 // fileFacts converts the file facts of a resource; nil stays nil.
 func fileFacts(f *authorize.FileFacts) *domain.FileFacts {

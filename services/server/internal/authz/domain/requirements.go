@@ -48,6 +48,7 @@ const (
 	opDelivery
 	opHostSelf
 	opCommandLevel
+	opToken
 )
 
 // Fact names a fact of the resource descriptor that a conditional capability depends on.
@@ -69,6 +70,8 @@ type Expr struct {
 	args      []Expr
 	byKind    map[string]Expr
 	milestone string
+	// verdicts are the allowed token verdicts of Token.
+	verdicts []InvocationVerdict
 }
 
 // The atoms of the brief M1-28, "Requirement table". Each is true as described; the reason when
@@ -215,6 +218,9 @@ func (e Expr) String() string {
 	}
 	if e.op == opDeferred {
 		return "Deferred(" + e.milestone + ")"
+	}
+	if e.op == opToken {
+		return tokenString(e)
 	}
 	if e.op == opAll || e.op == opAny {
 		parts := make([]string, len(e.args))

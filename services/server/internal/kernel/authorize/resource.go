@@ -48,6 +48,10 @@ type Resource struct {
 	// an internal error; nil only in filter mode for the receive check of command.changed, whose
 	// path is the event scope (ResourceFromEvent).
 	Command *CommandFacts
+	// Token is the verdict of the invocation token of run.start and run.token.renew, computed by
+	// runs (M2-09), with the mode facts of run.start; required for those two actions, where a
+	// missing value is an internal error, ignored otherwise.
+	Token *TokenFacts
 	// PreviewOf is the action that access.preview previews.
 	PreviewOf Action
 	// HostID is the path hint of a terminal_session: its host (terminal_sessions.host_id, M2-40).

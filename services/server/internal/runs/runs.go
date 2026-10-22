@@ -11,12 +11,13 @@ import (
 )
 
 // Register declares the durable events runs appends (M1-25, docs/spec/05-actions.md section 6):
-// run.state_changed (M2-05), agent.invocation (M2-08) and command.invoked (M2-16). internal/wire
-// lists it in moduleRegistrations.
+// run.state_changed (M2-05), agent.invocation (M2-08), command.invoked (M2-16) and
+// run.cancel_requested (M2-09). internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunStateChanged)
 	r.Event("runs", authorize.EventAgentInvocation)
 	r.Event("runs", authorize.EventCommandInvoked)
+	r.Event("runs", authorize.EventRunCancelRequested)
 }
 
 // Money is an amount with its currency (schema Money): AmountMicros in millionths of the unit,
@@ -127,11 +128,76 @@ type ActiveRunsQuery struct {
 	Limit   int
 }
 
+// BillingEvidence is billing_evidence.v1 as an adapter reports it at the start (schema
+// BillingEvidence): codes only, never a key value or prefix.
+type BillingEvidence struct {
+	Provider, KeyType, Method string
+}
+
+// StartRun is the input of Runs.Start (startRun) and Runs.Resume (resumeRun), schema RunStart.
+type StartRun struct {
+	RunID ids.ID
+	// Token is the compact invocation token; it is never logged, stored or echoed.
+	Token string
+	// BillingModeUsed and ToolClassUsed are the mode and the tool class the runtime uses; Model
+	// the model ("" for none).
+	BillingModeUsed, ToolClassUsed, Model string
+	// BillingEvidence is nil when absent.
+	BillingEvidence *BillingEvidence
+	// ExternalSessionRef is nil when absent; a present one is not enabled before M2-12.
+	ExternalSessionRef *string
+}
+
+// StartResult is the result of a start: the run and whether the answer is the replay of a start
+// with the same token (header Idempotent-Replay).
+type StartResult struct {
+	Run    Run
+	Replay bool
+}
+
+// RenewToken is the input of Runs.RenewToken (renewInvocationToken), schema InvocationTokenRenew.
+type RenewToken struct {
+	RunID ids.ID
+	// Token is the presented token, also an expired one.
+	Token string
+}
+
+// TokenGrant is the answer of a renewal, schema InvocationTokenGrant. Token is the compact JWS;
+// it is a response field only and never stored or logged.
+type TokenGrant struct {
+	Token     string
+	ExpiresAt time.Time
+}
+
+// AwaitInput is the input of Runs.AwaitInput (awaitRunInput), schema RunAwaitInput.
+type AwaitInput struct {
+	RunID      ids.ID
+	StatusLine string
+}
+
+// FinishRun is the input of Runs.Finish (finishRun), schema RunFinish.
+type FinishRun struct {
+	RunID ids.ID
+	// State is completed, failed or cancelled; Reason the reason of failed and cancelled.
+	State, Reason, Summary string
+	// Metrics is the object run_metrics.v1; nil when absent.
+	Metrics map[string]any
+	// CostsPresent reports a member costs, which is not enabled before M2-22.
+	CostsPresent bool
+}
+
+// CancelRun is the input of Runs.Cancel (cancelRun), schema RunCancel.
+type CancelRun struct {
+	RunID ids.ID
+	// Reason is the optional text of the person; it is checked and stored nowhere (D-M2-09-11).
+	Reason string
+}
+
 // Runs is the read side of the runs module for handlers and other modules (M2-05). The caller is
 // the principal of ctx (kernel/actor). Errors are kernel/errs errors; an unknown and an invisible
 // run or thread give the same 404 not_found (02 section 9.2), and a foreign cursor 400
-// cursor_invalid. State changes go through runs/app (Open, Transition), never through this port:
-// no other module changes run states.
+// cursor_invalid. Apart from the adapter operations and cancelRun of M2-09, which the REST handlers
+// call, state changes go through runs/app (Open, Transition): no other module changes run states.
 type Runs interface {
 	// Get returns the run document for the actor in ctx (getRun, run.read); an unknown or invisible
 	// run gives the same not_found error.
@@ -150,4 +216,32 @@ type Runs interface {
 	// ActiveForActor lists all active runs the actor may read, for the snapshot (04 section 6.3
 	// step 4); the snapshot checked sync.snapshot.read, so run.overview.read is not checked here.
 	ActiveForActor(ctx context.Context) ([]RunSummary, error)
+	// Start moves a delivered run queued -> running with its current invocation token (startRun,
+	// run.start, M2-09). Errors: 404 for an unknown or invisible run, 403 forbidden, 403
+	// invocation_token_invalid with reason expired, superseded or invalid, 409 already_started,
+	// invalid_state_transition, billing_mode_mismatch or tool_class_mismatch (the last two fail
+	// the run), 400 validation_failed.
+	//
+	// Example:
+	//
+	//	res, err := rs.Start(ctx, runs.StartRun{RunID: id, Token: tok, BillingModeUsed: "organization", ToolClassUsed: "scoped"})
+	Start(ctx context.Context, cmd StartRun) (StartResult, error)
+	// Resume moves a waiting run waiting_input -> running with the token of the answer
+	// (resumeRun, run.start); errors as Start.
+	Resume(ctx context.Context, cmd StartRun) (StartResult, error)
+	// RenewToken issues a fresh token for an own run in queued or waiting_input (09 4.5.1,
+	// run.token.renew). Errors: as Start for the token, 409 already_started, 403
+	// agent_invocation_denied when the checks before a delivery refuse (the run fails).
+	RenewToken(ctx context.Context, cmd RenewToken) (TokenGrant, error)
+	// AwaitInput moves running -> waiting_input (awaitRunInput, run.finish); waiting_input again
+	// answers without change. Errors: 409 invalid_state_transition from another state.
+	AwaitInput(ctx context.Context, cmd AwaitInput) (Run, error)
+	// Finish ends a run with completed, failed or cancelled (finishRun, run.finish); the same end
+	// state again answers without change. Errors: 400 validation_failed, 409
+	// invalid_state_transition.
+	Finish(ctx context.Context, cmd FinishRun) (Run, error)
+	// Cancel stops a run for a person (cancelRun, run.cancel): a queued run ends at once, an active
+	// one gets run.cancel_requested and the job runs.cancel_timeout. Errors: 404, 403, 400
+	// validation_failed for the reason, 409 invalid_state_transition for completed or failed.
+	Cancel(ctx context.Context, cmd CancelRun) (RunSummary, error)
 }

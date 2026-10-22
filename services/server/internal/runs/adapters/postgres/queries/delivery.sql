@@ -9,13 +9,14 @@
 SELECT * FROM runs WHERE id = sqlc.arg(id) FOR UPDATE;
 
 -- name: RecordDelivery :one
--- An allowed delivery: invocation_jti is replaced and renewed_from_jti cleared when record is
--- true (a delivery that may start the run), billing_mode_expected is the configured mode now. The
+-- An allowed delivery: invocation_jti is replaced and renewed_from_jti set to renewed_from (NULL
+-- for a delivery, the replaced jti for a renewal of M2-09) when record is true (a token that may
+-- start the run), billing_mode_expected is the configured mode now. The
 -- caller holds the row lock and calls this only when one of the columns changes, so version rises
 -- by exactly one per change (03 runs.version).
 UPDATE runs
 SET invocation_jti = CASE WHEN sqlc.arg(record)::boolean THEN sqlc.arg(jti)::uuid ELSE invocation_jti END,
-    renewed_from_jti = CASE WHEN sqlc.arg(record)::boolean THEN NULL ELSE renewed_from_jti END,
+    renewed_from_jti = CASE WHEN sqlc.arg(record)::boolean THEN sqlc.narg(renewed_from)::uuid ELSE renewed_from_jti END,
     billing_mode_expected = sqlc.arg(billing_mode_expected)::text,
     version = version + 1
 WHERE id = sqlc.arg(id)

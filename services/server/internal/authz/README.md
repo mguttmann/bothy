@@ -258,9 +258,34 @@ allowed, with `read` only `forbidden level_insufficient`, without a grant `not_f
 every refusal into the `404` of an unknown webhook. Test: `app/webhookin_test.go`
 (`TestWebhookInPostRequirement`).
 
+### Invocation token of `run.start` and `run.token.renew` (M2-09)
+
+Both are no longer deferred. `runs` verifies the invocation token and passes its verdict in
+`Resource.Token` (`authorize.TokenFacts`); authz decides on it (05 rule 1.1). The requirements are
+`run.start`: `All(AgentSelf, Token(valid))` ("agent-self and token valid") and `run.token.renew`:
+`All(AgentSelf, Token(valid, expired))` ("agent-self and token current"). The resource is the run
+(`Kind` run, `ThreadID` of the run, `OwnerID` the run's agent), so visibility (`not_found`) and
+`AgentSelf` (`not_self`, `subject_kind_not_allowed`) decide first. A verdict outside the allowed
+set is `forbidden invocation_token_invalid` with `Decision.Detail` the verdict (`expired`,
+`superseded`, `invalid`); `Decision.Err()` answers `403 invocation_token_invalid` with that verdict
+as `reason`, while the audit reason stays `invocation_token_invalid`. A missing `Resource.Token`
+or the zero verdict is an internal error on every path.
+
+The guard of `run.start` (07 section 4.2 step 9) runs only when `BillingModeUsed` is set:
+`BillingKeyType = unknown` or a reported mode other than `BillingModeExpected` is
+`invariant_violation billing_mode_mismatch`; then a `ToolClassUsed` above `ToolClassClaim`
+(`chat` < `scoped` < `host`, an unknown class counts as `host`) is `invariant_violation
+tool_class_mismatch`. A token that is not valid never reaches the guard.
+
+The deny entry carries codes as details, never a token or `jti`: `token_verdict` for
+`invocation_token_invalid`; `billing_mode_expected`, `billing_mode_used` and, when present,
+`billing_evidence_provider`, `billing_evidence_key_type`, `billing_evidence_method` for
+`billing_mode_mismatch`; `tool_class` (the claim) and `tool_class_used` for `tool_class_mismatch`.
+A value that is not a code is left out, so the denial is still written.
+
 ### How a module builds a `Resource`
 
-Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
+Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the path hint (`ThreadID` for things in a thread, `ChannelID` for a channel or an unattached file, `SpaceID` for a space), `OwnerID` (author, creator, holder or the principal itself) and the facts of the action (`File` for a file, `HasAttachments` for `message.create`, `RestrictedTags`, `TargetChannelID` for `thread.move`, `Grant` for `grant.create`, `Invoke` for `agent.invoke`, `Token` for `run.start` and `run.token.renew`, `PreviewOf` for `access.preview`, `DeliveryOf` and `Audience` for `webhook_out.deliver`). Pass the `actor.Actor` of the request as the principal; it implements `authorize.Principal`. Treat an error like a denial and return it. Per-element checks of lists, searches and deliveries run with `authorize.Filter(ctx)`.
 
 ### Slash commands (M2-16)
 

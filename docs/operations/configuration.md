@@ -288,7 +288,7 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | int | `100` | unacknowledged events per consumer | active |
 | `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server |  | `500ms` | adapter throttle for `run.update` | planned (M2) |
 | `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server | duration | `90s` | without a heartbeat, the agent counts as `offline` | active |
-| `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server |  | `30s` | time for the adapter to report a cancellation | planned (M2) |
+| `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server | duration | `30s` | time for the adapter to report a cancellation | active |
 
 ### 05 Authorization action catalogue
 
@@ -421,7 +421,7 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | duration | `1h` | cache duration of the JWKS; lead time of a `next` key | active |
 | `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | duration | `30d` | scheduled change of the token key | active |
 | `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server | duration | `48h` | the maximum age a run that has not started may reach | active |
-| `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server |  | `15m` | without a heartbeat during an active run: `stale` | planned (M2) |
+| `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server | duration | `15m` | without a heartbeat during an active run: `stale` | active |
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | after that the card shows "not acknowledged" | planned (M2) |
 | `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server |  | `2500ms` | wait time for suggestions | planned (M2) |
 | `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server | int | `25` | suggestions per answer | active |

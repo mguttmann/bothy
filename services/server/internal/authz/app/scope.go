@@ -34,7 +34,7 @@ func (a *Authorizer) Scope(ctx context.Context, p authorize.Principal, act autho
 	sc, d, err := a.scope(ctx, p, act)
 	allowed := err == nil && d.Outcome == domain.OutcomeAllow
 	authorize.RecordCheck(ctx, authorize.Check{Action: string(act), Kind: authorize.CheckScope, Allowed: allowed})
-	a.audit(ctx, act, "", ids.ID{}, outcome(d), err)
+	a.audit(ctx, act, "", ids.ID{}, nil, outcome(d), err)
 	if err == nil && !allowed {
 		return authorize.Scope{}, outcome(d).Err()
 	}

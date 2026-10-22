@@ -66,6 +66,22 @@ var configChecks = []configCheck{
 	{name: "backup_schedules", keys: backupScheduleKeys, fn: backupSchedules},
 	{name: "backup_offsite_target", keys: []string{keyBackupOffsiteTarget}, fn: backupOffsiteTarget},
 	{name: "webhook_in_formats", keys: []string{keyWebhookInFormatsEnabled}, fn: webhookInFormats},
+	{name: "heartbeat_persist_below_orphan_timeout", keys: []string{keyHeartbeatPersistInterval, keyOrphanTimeout}, fn: heartbeatPersistBelowOrphanTimeout},
+}
+
+// keyHeartbeatPersistInterval is agent.heartbeat_persist_interval, how often the heartbeat is
+// stored.
+const keyHeartbeatPersistInterval = "agent.heartbeat_persist_interval"
+
+// heartbeatPersistBelowOrphanTimeout requires agent.heartbeat_persist_interval to be below
+// run.orphan_timeout (M2-09, ruling D-M2-09-21): the job runs.stall_check reads only the stored
+// heartbeat, which lags by up to the persist interval, so a live adapter would otherwise look
+// stale. The error names both keys.
+func heartbeatPersistBelowOrphanTimeout(v *config.Values) error {
+	if v.Duration(keyHeartbeatPersistInterval) >= v.Duration(keyOrphanTimeout) {
+		return errors.New(keyHeartbeatPersistInterval + " must be below " + keyOrphanTimeout)
+	}
+	return nil
 }
 
 // webhookInFormats requires every entry of webhook_in.formats_enabled to be native or

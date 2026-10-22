@@ -19,6 +19,9 @@ const RunCancelRequestedPayloadReasonEnum
 _$runCancelRequestedPayloadReasonEnum_userDisabled =
     const RunCancelRequestedPayloadReasonEnum._('userDisabled');
 const RunCancelRequestedPayloadReasonEnum
+_$runCancelRequestedPayloadReasonEnum_channelReadOnly =
+    const RunCancelRequestedPayloadReasonEnum._('channelReadOnly');
+const RunCancelRequestedPayloadReasonEnum
 _$runCancelRequestedPayloadReasonEnum_unknownDefaultOpenApi =
     const RunCancelRequestedPayloadReasonEnum._('unknownDefaultOpenApi');
 
@@ -33,6 +36,8 @@ _$runCancelRequestedPayloadReasonEnumValueOf(String name) {
       return _$runCancelRequestedPayloadReasonEnum_agentDisabled;
     case 'userDisabled':
       return _$runCancelRequestedPayloadReasonEnum_userDisabled;
+    case 'channelReadOnly':
+      return _$runCancelRequestedPayloadReasonEnum_channelReadOnly;
     case 'unknownDefaultOpenApi':
       return _$runCancelRequestedPayloadReasonEnum_unknownDefaultOpenApi;
     default:
@@ -48,6 +53,7 @@ _$runCancelRequestedPayloadReasonEnumValues =
         _$runCancelRequestedPayloadReasonEnum_accessRevoked,
         _$runCancelRequestedPayloadReasonEnum_agentDisabled,
         _$runCancelRequestedPayloadReasonEnum_userDisabled,
+        _$runCancelRequestedPayloadReasonEnum_channelReadOnly,
         _$runCancelRequestedPayloadReasonEnum_unknownDefaultOpenApi,
       ],
     );
@@ -63,6 +69,7 @@ class _$RunCancelRequestedPayloadReasonEnumSerializer
     'accessRevoked': 'access_revoked',
     'agentDisabled': 'agent_disabled',
     'userDisabled': 'user_disabled',
+    'channelReadOnly': 'channel_read_only',
     'unknownDefaultOpenApi': 'unknown_default_open_api',
   };
   static const Map<Object, String> _fromWire = const <Object, String>{
@@ -70,6 +77,7 @@ class _$RunCancelRequestedPayloadReasonEnumSerializer
     'access_revoked': 'accessRevoked',
     'agent_disabled': 'agentDisabled',
     'user_disabled': 'userDisabled',
+    'channel_read_only': 'channelReadOnly',
     'unknown_default_open_api': 'unknownDefaultOpenApi',
   };
 

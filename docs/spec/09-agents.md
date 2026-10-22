@@ -858,6 +858,18 @@ notification; "Answer ready" depends on the end of the run ([13-push-notificatio
 | Adapter gone | no heartbeat since `run.orphan_timeout` for a run in `running` or `waiting_input` | `failed`, reason `stale` |
 | Agent offline at invocation | run stays `queued`, box shows "Agent offline, waiting" | after `run.queued_max_age`: `failed`, reason `agent_unavailable` |
 
+The periodic job `runs.stall_check` (every `agent.presence_timeout`, 02 section 12.3) evaluates the
+rows `interrupted` and `stale` on the last persisted heartbeat of the agent (`agents.last_heartbeat_at`
+and `agents.reported_details.active_runs`, stored at most every `agent.heartbeat_persist_interval`):
+a run in `running` or `waiting_input` is `interrupted` when that heartbeat does not list it in
+`active_runs` and lies more than `agent.presence_timeout` after `runs.started_at`; it is `stale`
+when the agent has no heartbeat or its last one is older than `run.orphan_timeout` and
+`runs.started_at` is older than `run.orphan_timeout`. A heartbeat without the member `active_runs`
+gives no `interrupted`. Only the persisted heartbeat is visible to the worker, so the comparison
+"on every heartbeat" of 4.8 happens on the stored one (D-M2-09-20); `agent.heartbeat_persist_interval`
+must be below `run.orphan_timeout` (start check, D-M2-09-21). The row "no progress" is not built yet
+(the core contract keeps no time of the last `run.update`).
+
 After `interrupted` and `stale` there is no automatic retry. The box shows "Run
 interrupted" and a button "Send again", which puts a new message with the text of the
 triggering message into the outbox. Reason: the runtime may already have caused side effects
@@ -943,8 +955,15 @@ Ways: button "Stop" in the box, built-in command `/stop`, revocation of permissi
 disabling of the agent or of the triggering person.
 
 1. `run.cancel` checks `trigger` and (triggering person of the run or `manage`) (R-AZ-07).
-2. Run in `queued` without delivery: immediately `cancelled`. Otherwise the server writes
-   `run.cancel_requested` to the agent.
+2. A run in `queued` ends `cancelled` with `user_cancelled` at once, and the server writes
+   `run.cancel_requested` to the agent as well, because the core contract keeps no delivery marker
+   on a run: an adapter that never got the invocation ignores the request, one that holds it drops
+   it, and its later `startRun` gets 409 `already_started` (D-M2-09-12). For a run in `running` or
+   `waiting_input` the server writes `run.cancel_requested` to the agent and schedules the job
+   `runs.cancel_timeout` at now plus `agent.cancel_grace`; the state stays until the adapter
+   reports `cancelled` or the job ends the run. A loss of `trigger` by the starter (04 section 8.3)
+   takes the same path with `access_revoked`, `user_disabled` or `channel_read_only`, also for a
+   `queued` run; a disabled agent's runs end `cancelled` with `agent_disabled` at once (2.1).
 3. The adapter ends the turn (Hermes: `/stop` via `handle_message`, after which Hermes reports
    `on_processing_complete` with `CANCELLED` and calls the model no further; Runner: SIGINT,
    18.6) and reports `run.finish` with `cancelled`.

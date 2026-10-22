@@ -29,4 +29,24 @@ func (sc *Scenario) runs() {
 	if len(foreign) > 0 {
 		sc.get(alex, "/runs/"+jsonText(foreign[0]["id"]), http.StatusNotFound)
 	}
+	sc.runLifecycle(run)
+}
+
+// runLifecycle drives the six lifecycle operations of M2-09 on the queued run of Lotse without
+// changing it: start, resume and renew present a forged invocation token (a secret canary, which
+// no output may carry) and are refused, waiting for input and finishing are no transitions of a
+// queued run, and Alex, who did not trigger the run, may not cancel it.
+func (sc *Scenario) runLifecycle(run string) {
+	sc.T.Helper()
+	lotse, alex := sc.W.Agents["Lotse"], sc.W.People["Alex"]
+	forged := sc.Reg.New(ClassSecret, "", "forged invocation token")
+	start := map[string]any{"invocation_token": forged, "billing_mode_used": "organization", "tool_class_used": "chat"}
+	refused := []int{http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict}
+	sc.post(lotse, "/runs/"+run+"/start", start, refused...)
+	sc.post(lotse, "/runs/"+run+"/resume", start, refused...)
+	sc.post(lotse, "/runs/"+run+"/invocation-token", map[string]any{"invocation_token": forged}, refused...)
+	sc.post(lotse, "/runs/"+run+"/await-input", map[string]any{"status_line": "waiting"}, http.StatusConflict)
+	sc.post(lotse, "/runs/"+run+"/finish", map[string]any{"state": "completed"}, http.StatusConflict)
+	sc.call(alex, req{method: http.MethodPost, path: "/runs/" + run + "/cancel", body: map[string]any{},
+		header: header("Idempotency-Key", newID())}, http.StatusForbidden, http.StatusNotFound)
 }

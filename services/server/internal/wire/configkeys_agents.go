@@ -6,7 +6,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // agentsConfigKeys returns the keys of the agent consumers from docs/spec/04-sync-protocol.md
 // "Configuration values of this chapter" (M2-07): the ack timeout, the save interval of acked_seq
-// and the inflight bound per consumer; and the keys of the presence of agents (M2-20).
+// and the inflight bound per consumer; the keys of the presence of agents (M2-20); and the grace of
+// a cancel request (M2-09).
 func agentsConfigKeys() []config.Key {
 	return []config.Key{
 		{Name: "agent.ack_timeout", Kind: config.KindDuration, Default: thirtySeconds, Min: minDeadline, Chapter: chapter04,
@@ -22,6 +23,9 @@ func agentsConfigKeys() []config.Key {
 			Doc: "Heartbeat fields are stored at most this often."},
 		{Name: "billing.mismatch_alert_after", Kind: config.KindDuration, Default: "5m", Min: minDeadline, Chapter: chapter10,
 			Doc: "How long the reported mode may differ from the configured one before the warning and the alarm."},
+		// M2-09: a cancel request the adapter does not confirm in time ends the run (09 8).
+		{Name: "agent.cancel_grace", Kind: config.KindDuration, Default: thirtySeconds, Min: minDeadline, Chapter: chapter04,
+			Doc: "Time for the adapter to report a cancellation; then the server cancels the run with cancel_timeout."},
 	}
 }
 
