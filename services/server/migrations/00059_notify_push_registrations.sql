@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Push targets of devices (M3-19): push_registrations exactly as docs/spec/03-datenmodell.md
+-- Push targets of devices (M3-19): push_registrations exactly as docs/spec/03-data-model.md
 -- section 4.10 states it, without deviation. A push carries no content (ADR 0031): the row holds
 -- the provider token of one device of one session and the delivery state the job
 -- notify.push_send writes (last_success_at, failure_count, disabled_at, disabled_reason). The

@@ -17,7 +17,7 @@ import (
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
-// TestMigrationPushRegistrations holds push_registrations against docs/spec/03-datenmodell.md
+// TestMigrationPushRegistrations holds push_registrations against docs/spec/03-data-model.md
 // section 4.10 column by column, with every key, check and index (M3-19 design note 2): the
 // three foreign keys cascade, (provider, token) is unique, preview_token_hash is a unique partial
 // index, a second up changes nothing, and deleting a device or a session removes its rows.

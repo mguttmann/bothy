@@ -100,7 +100,7 @@ D-M3-17-1 to D-M3-17-8 in [docs/DECISIONS.md](../../../../docs/DECISIONS.md), se
 
 ### Table `push_registrations`
 
-Migration `00057_notify_push_registrations.sql` creates the table exactly as 03 (provider, token, environment, app ID, preview token hash, delivery columns, the check that `disabled_at` and `disabled_reason` are set together, cascades from `users`, `devices` and `auth_sessions`, unique `(provider, token)`, the partial unique index on `preview_token_hash` and the indexes `(user_id) WHERE disabled_at IS NULL` and `(auth_session_id)`), retention class `security`. This ticket writes no rows except the delivery columns of a send; `registerPush` and `unregisterPush` come with M3-22. The token and `preview_token_hash` never leave the adapters of `notify`.
+Migration `00059_notify_push_registrations.sql` creates the table exactly as 03 (provider, token, environment, app ID, preview token hash, delivery columns, the check that `disabled_at` and `disabled_reason` are set together, cascades from `users`, `devices` and `auth_sessions`, unique `(provider, token)`, the partial unique index on `preview_token_hash` and the indexes `(user_id) WHERE disabled_at IS NULL` and `(auth_session_id)`), retention class `security`. This ticket writes no rows except the delivery columns of a send; `registerPush` and `unregisterPush` come with M3-22. The token and `preview_token_hash` never leave the adapters of `notify`.
 
 ### Ports
 

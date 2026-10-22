@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package jobs is the job adapter of the notify module (docs/spec/02-architektur.md "Job-Katalog",
+// Package jobs is the job adapter of the notify module (docs/spec/02-architecture.md "Job catalogue",
 // brief M3-19 design notes 9, 11 and 16): the arguments and handlers of notify.push_send,
 // notify.coalesce_window, notify.coalesce_flush, notify.badge_sync and notify.badge_sync_hold on
 // the queue delivery, the Scheduler of notify/app over platform/jobs, and the span push.send
