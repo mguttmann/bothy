@@ -506,7 +506,8 @@ func TestSessionCloseDuringOpening(t *testing.T) {
 
 // fakeClaudeScript stands in for host_service.claude_bin: auth status reports no login; any other
 // start prints its working directory, the names of its environment, its CLAUDE_CONFIG_DIR and the
-// length of ANTHROPIC_API_KEY (never the key), then waits for input.
+// length of ANTHROPIC_API_KEY (never the key), then waits for input; after its answer it waits
+// again, so the session ends by the close of the device and not by its exit.
 const fakeClaudeScript = `#!/bin/sh
 if [ "$1" = auth ]; then echo '{"loggedIn":false,"authMethod":"none"}'; exit 1; fi
 echo "cwd=$(pwd)"
@@ -517,6 +518,7 @@ echo "lc=$LC_CANARY"
 echo "DO""NE"
 read line
 echo "got=$line"
+read rest
 `
 
 // TestClaudeOrganizationAndNoContent starts the profile claude with organization in the working

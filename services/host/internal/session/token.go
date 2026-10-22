@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 )
 
@@ -90,8 +91,8 @@ func objectOf(b []byte) (map[string]json.RawMessage, error) {
 	if err := dec.Decode(&m); err != nil || m == nil {
 		return nil, ErrToken
 	}
-	if _, err := dec.Token(); err == nil {
-		return nil, ErrToken // trailing data
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, ErrToken // trailing data, also data that is no JSON
 	}
 	for _, v := range m {
 		if bytes.Equal(bytes.TrimSpace(v), []byte("null")) {

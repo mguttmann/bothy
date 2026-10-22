@@ -335,6 +335,7 @@ func TestRunCommand(t *testing.T) {
 
 func TestPtyHelperCommand(t *testing.T) {
 	newFake(t)
+	keepStdin(t)
 	if code, _, stderr := runCmd("pty-helper", "--session-user", "bothy-s-alex"); code != 2 || !strings.Contains(stderr, "must run as its session user") {
 		t.Errorf("%d %q", code, stderr)
 	}
