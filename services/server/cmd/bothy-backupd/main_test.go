@@ -320,14 +320,18 @@ func TestHealthcheckSilentServer(t *testing.T) {
 	}
 }
 
-// TestRunServesUntilTheServerFails: the default command of run starts serve with its own
-// signal channel; without a pgBackRest binary it fails.
-func TestRunServesUntilTheServerFails(t *testing.T) {
+// TestRunServeLoadsTheConfigurationFirst: the default command of run loads the server
+// configuration before it starts serve (M7-02); without the required keys it is a usage error
+// that names the key, and no pgBackRest child starts.
+func TestRunServeLoadsTheConfigurationFirst(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	args := []string{"--pgbackrest", filepath.Join(t.TempDir(), "missing"), "--retry", "1ms"}
-	if code := run(context.Background(), args, nil, &stdout, &stderr); code != exitFailure {
-		t.Errorf("run without a pgbackrest binary = %d, want %d; stderr %s", code, exitFailure, stderr.String())
+	if code := run(context.Background(), args, nil, &stdout, &stderr); code != exitUsage {
+		t.Errorf("run without a configuration = %d, want %d; stderr %s", code, exitUsage, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "server.public_url") {
+		t.Errorf("stderr does not name the missing key: %s", stderr.String())
 	}
 }
 

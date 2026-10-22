@@ -38,6 +38,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -786,9 +787,15 @@ func (c *cluster) clone(ctx context.Context, name, template string) (err error) 
 			_ = c.dropDatabase(dctx, name)
 		}
 	}()
+	// Every role but the owner may connect, as pg.BootstrapDatabase grants it.
+	var connect []string
+	for _, r := range pg.Roles() {
+		if r != pg.RoleOwner {
+			connect = append(connect, pgx.Identifier{string(r)}.Sanitize())
+		}
+	}
 	grants := "REVOKE ALL ON DATABASE " + db + " FROM PUBLIC; GRANT CONNECT ON DATABASE " + db + " TO " +
-		pgx.Identifier{string(pg.RoleApp)}.Sanitize() + ", " + pgx.Identifier{string(pg.RoleMaint)}.Sanitize() + ", " +
-		pgx.Identifier{string(pg.RoleMonitor)}.Sanitize()
+		strings.Join(connect, ", ")
 	if _, err := c.admin.PGX().Exec(ctx, grants, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return fmt.Errorf("pgtest: grants of %s: %w", name, err)
 	}

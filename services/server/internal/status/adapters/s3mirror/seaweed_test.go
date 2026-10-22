@@ -11,7 +11,6 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -20,6 +19,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	tclog "github.com/testcontainers/testcontainers-go/log"
 	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // seaweedImage is the SeaweedFS image of the files driver tests
@@ -35,9 +36,10 @@ const (
 	testRegion        = "us-east-1"
 )
 
+// Every wait for the runtime and the container is bounded by testkit.Patience only.
 const (
-	seaweedStartTimeout = 3 * time.Minute
-	seaweedRuntimeWait  = 30 * time.Second
+	seaweedStartTimeout = testkit.Patience
+	seaweedRuntimeWait  = testkit.Patience
 )
 
 // TestMain checks for a container runtime and stops the SeaweedFS container after the tests;
@@ -177,20 +179,15 @@ func adminClient(endpoint, access, secret string) *awss3.Client {
 }
 
 // newBucket creates a bucket with a random name. The filer may still be starting when the first
-// test runs, so creation is tried a few times, as in the files driver tests.
+// test runs, so creation is tried until it succeeds, bounded by testkit.Patience.
 func (s *seaweedServer) newBucket(t *testing.T) string {
 	t.Helper()
 	name := "bothy-" + randomHex(t, 8)
-	var err error
-	for range 30 {
-		_, err = s.admin.CreateBucket(t.Context(), &awss3.CreateBucketInput{Bucket: aws.String(name)})
-		if err == nil {
-			return name
-		}
-		time.Sleep(time.Second)
-	}
-	t.Fatalf("CreateBucket: %v", err)
-	return ""
+	testkit.Until(t, "the creation of bucket "+name, func() bool {
+		_, err := s.admin.CreateBucket(t.Context(), &awss3.CreateBucketInput{Bucket: aws.String(name)})
+		return err == nil
+	})
+	return name
 }
 
 func randomHex(t *testing.T, n int) string {

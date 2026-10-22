@@ -645,6 +645,18 @@ type Principal struct {
 	DeletedAt    pgtype.Timestamptz
 }
 
+type ProjectBinding struct {
+	ChannelID     pgtype.UUID
+	WorkspaceRef  string
+	RepositoryUrl pgtype.Text
+	DefaultBranch pgtype.Text
+	RunnerConfig  []byte
+	Ready         bool
+	CreatedBy     pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+	Version       int64
+}
+
 type QuietHour struct {
 	ID         pgtype.UUID
 	UserID     pgtype.UUID

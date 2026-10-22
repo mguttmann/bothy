@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/executor"
 	"github.com/OWNER/bothy/services/server/internal/status/app"
 )
@@ -36,7 +37,7 @@ esac`)
 		_, err := e.ResticBackup(context.Background(), app.ResticBackup{Paths: []string{"/srv/files"}, Tags: []string{"objects"}})
 		backupDone <- err
 	}()
-	waitFor(t, func() bool { return strings.Contains(read(order), "begin-backup") })
+	testkit.Until(t, "the start of the backup", func() bool { return strings.Contains(read(order), "begin-backup") })
 	forgetDone := make(chan error, 1)
 	go func() {
 		forgetDone <- e.ResticForget(context.Background(), app.ResticForget{Tag: "logical", KeepWithin: time.Hour})
@@ -64,16 +65,4 @@ func read(path string) string {
 		return ""
 	}
 	return string(b)
-}
-
-// waitFor polls cond until it holds, failing after ten seconds.
-func waitFor(t *testing.T, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatal("condition not reached")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
 }
