@@ -13,6 +13,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
+// configFlagUsage is the usage text of the flag --config of every command.
+const configFlagUsage = "configuration file"
+
 // backupCommand runs "bothy-backupd backup <kind> [--config FILE]": one run of kind now, for the
 // runbook and the tests (brief M7-02 design note 1). It returns 0 when the run succeeded, 1 when
 // it failed or the slot of the kind runs already, 2 for a usage or configuration error. The run
@@ -21,7 +24,7 @@ import (
 func backupCommand(ctx context.Context, args, env []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("bothy-backupd backup", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	file := fs.String("config", "", "configuration file")
+	file := fs.String("config", "", configFlagUsage)
 	kind, rest := "", args
 	if len(rest) > 0 && rest[0] != "" && rest[0][0] != '-' {
 		kind, rest = rest[0], rest[1:]
@@ -68,7 +71,7 @@ func expireCommand(ctx context.Context, args, env []string, stderr io.Writer) in
 	fs.SetOutput(io.Discard)
 	offsite := fs.Bool("offsite", false, "expire the off-site target")
 	dir := fs.String("credentials", "", "directory of the owner's off-site key")
-	file := fs.String("config", "", "configuration file")
+	file := fs.String("config", "", configFlagUsage)
 	if err := fs.Parse(args); err != nil {
 		return usageError(stderr, "expire: "+err.Error())
 	}
@@ -101,7 +104,7 @@ func expireCommand(ctx context.Context, args, env []string, stderr io.Writer) in
 func restoreTestCommand(ctx context.Context, args, env []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("bothy-backupd restore-test", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	file := fs.String("config", "", "configuration file")
+	file := fs.String("config", "", configFlagUsage)
 	if err := fs.Parse(args); err != nil {
 		return usageError(stderr, "restore-test: "+err.Error())
 	}

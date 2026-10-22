@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/OWNER/bothy/services/server/internal/audit"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/status/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/status/app"
@@ -171,4 +172,42 @@ func TestScratchDBFilesAndAudit(t *testing.T) {
 		t.Errorf("%d checkpoints, want none", n)
 	}
 	var _ app.ScratchDB = copyDB
+}
+
+// TestScratchDBAuditCheckpointsAndKeys: the audit chain of the copy carries the public keys of
+// purpose audit_checkpoint only and every row of audit_checkpoints in seq order with its stored
+// hash and signature; a hash of another size reads as zero, which the walk reports.
+func TestScratchDBAuditCheckpointsAndKeys(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	super := db.SuperConn(t)
+	seed(t, super)
+	mustExec(t, super, `INSERT INTO server_signing_keys (kid, purpose, alg, public_jwk, private_key_ref, state) VALUES
+		('cp-1', 'audit_checkpoint', 'EdDSA', '{"kty":"OKP","crv":"Ed25519","x":"EXAMPLE"}', 'file:EXAMPLE', 'active'),
+		('at-1', 'access_token', 'EdDSA', '{"kty":"OKP","crv":"Ed25519","x":"EXAMPLE"}', 'file:EXAMPLE', 'active')`)
+	mustExec(t, super, `INSERT INTO audit_checkpoints (seq, hash, signature, kid) VALUES
+		(2, sha256('two'), 'sig-two', 'cp-1'), (1, sha256('one'), 'sig-one', 'cp-1'), (3, '\x00', 'sig-three', 'cp-1')`)
+	in, err := postgres.NewScratchDB(db.OpenPool(t, db.SuperConfig())).AuditChain(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(in.Keys) != 1 || in.Keys[0].KID != "cp-1" || in.Keys[0].Purpose != audit.PurposeAuditCheckpoint || in.Keys[0].Alg != "EdDSA" {
+		t.Errorf("keys %+v, want only cp-1 of purpose audit_checkpoint", in.Keys)
+	}
+	var seqs []int64
+	var sigs []string
+	var zero [audit.HashSize]byte
+	for c, err := range in.Checkpoints {
+		if err != nil {
+			t.Fatal(err)
+		}
+		seqs, sigs = append(seqs, c.Seq), append(sigs, string(c.Signature))
+		if (c.Seq == 3) != (c.Hash == zero) {
+			t.Errorf("checkpoint %d hash %x", c.Seq, c.Hash)
+		}
+	}
+	if !slices.Equal(seqs, []int64{1, 2, 3}) || !slices.Equal(sigs, []string{"sig-one", "sig-two", "sig-three"}) {
+		t.Errorf("checkpoints %v %v, want 1 2 3 in order", seqs, sigs)
+	}
 }

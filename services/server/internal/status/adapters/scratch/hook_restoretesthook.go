@@ -18,11 +18,12 @@ import (
 // restoretesthook, which no release build sets: services/server/test/postgresimage builds its own
 // bothy-backupd with it. The variable RESTORE_TEST_HOOK names one manipulation of the copy before
 // the checks; it has no BOTHY_ prefix, so the configuration never sees it. Every run also writes
-// /proc/net/tcp and /proc/net/tcp6 while the copy runs to probeFile, outside the scratch
-// directory, for the check that the copy has no TCP listener.
+// /proc/net/tcp and /proc/net/tcp6 while the copy runs to probeFile next to the scratch
+// directory (in the volume of bothy-backupd, mode 0700, never a publicly writable directory),
+// for the check that the copy has no TCP listener.
 const (
 	hookVariable = "RESTORE_TEST_HOOK"
-	probeFile    = "/tmp/restore-test-tcp"
+	probeFile    = "restore-test-tcp"
 	// The manipulations.
 	hookEventGap   = "event_log_gap"
 	hookAuditHash  = "audit_hash"
@@ -38,7 +39,7 @@ func hook() string {
 // one event_log row in the middle of its partition deleted, or the stored hash of one
 // audit_events row in the middle of the chain changed (with the protection trigger off, as an
 // attacker with the superuser would).
-func afterStart(ctx context.Context, _ string, pool *pg.Pool) error {
+func afterStart(ctx context.Context, dir string, pool *pg.Pool) error {
 	var probe []byte
 	for _, f := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
 		b, err := os.ReadFile(f) // #nosec G304 -- fixed kernel files
@@ -47,7 +48,7 @@ func afterStart(ctx context.Context, _ string, pool *pg.Pool) error {
 		}
 		probe = append(probe, b...)
 	}
-	if err := os.WriteFile(probeFile, probe, 0o600); err != nil { // #nosec G703 -- a fixed path of the test build
+	if err := os.WriteFile(filepath.Join(filepath.Dir(dir), probeFile), probe, 0o600); err != nil { // #nosec G703 -- a fixed name next to the scratch directory of the test build
 		return err
 	}
 	switch hook() {

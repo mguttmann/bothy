@@ -26,6 +26,7 @@ type fakeTools struct {
 	// objects maps a restored path below the target (as stored, absolute) to its content.
 	objects    map[string]string
 	restoreErr error
+	verifyErr  error
 	noData     bool
 }
 
@@ -43,7 +44,7 @@ func (f *fakeTools) PgBackRestRestore(_ context.Context, label, pgPath string) e
 	return os.WriteFile(filepath.Join(pgPath, "PG_VERSION"), []byte("18\n"), 0o600)
 }
 
-func (f *fakeTools) PgBackRestVerify(context.Context) error { return nil }
+func (f *fakeTools) PgBackRestVerify(context.Context) error { return f.verifyErr }
 
 func (f *fakeTools) ResticRestore(_ context.Context, tag, path string, includes []string, target string) error {
 	if tag != "objects" || path != "/var/lib/bothy/files" {
@@ -203,4 +204,50 @@ func TestScratchFailures(t *testing.T) {
 func hasCode(err error, code string) bool {
 	var ee *app.ExecError
 	return errors.As(err, &ee) && ee.Code == code
+}
+
+// TestScratchStartAndConfigErrors: Verify runs pgbackrest verify through the tools; a server
+// binary that is not found and a pool that cannot be opened are scratch_start_failed; a second
+// start while a server of the first one is still recorded is scratch_in_use until Clear; New
+// names a missing Tools or Open.
+func TestScratchStartAndConfigErrors(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	verifyErr := &app.ExecError{Code: "pgbackrest_exit_104"}
+	s, _ := newScratch(t, &fakeTools{verifyErr: verifyErr}, func(c *scratch.Config) {
+		c.Postgres = filepath.Join(t.TempDir(), "no-postgres")
+	})
+	if err := s.Verify(ctx); !errors.Is(err, verifyErr) {
+		t.Errorf("Verify = %v, want the error of the tool", err)
+	}
+	if _, err := s.Start(ctx); !hasCode(err, "scratch_start_failed") {
+		t.Errorf("start without a server binary: %v", err)
+	}
+
+	bin := filepath.Join(t.TempDir(), "postgres")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\nexec sleep 3600\n"), 0o700); err != nil { // #nosec G306 -- an executable test fixture
+		t.Fatal(err)
+	}
+	busy, dir := newScratch(t, &fakeTools{}, func(c *scratch.Config) { c.Postgres = bin })
+	t.Cleanup(func() { _ = busy.Clear(ctx) })
+	if _, err := busy.Start(ctx); !hasCode(err, "scratch_start_failed") {
+		t.Errorf("start with a pool that cannot be opened: %v", err)
+	}
+	if _, err := busy.Start(ctx); !hasCode(err, "scratch_in_use") {
+		t.Errorf("second start: %v, want scratch_in_use", err)
+	}
+	if err := busy.Clear(ctx); err != nil {
+		t.Fatalf("Clear: %v", err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("%d entries after Clear", len(entries))
+	}
+
+	open := func(context.Context, string) (*pg.Pool, error) { return nil, nil }
+	if _, err := scratch.New(scratch.Config{Dir: dir, Open: open}); err == nil || !strings.Contains(err.Error(), "Tools") {
+		t.Errorf("New without Tools: %v", err)
+	}
+	if _, err := scratch.New(scratch.Config{Dir: dir, Tools: &fakeTools{}}); err == nil || !strings.Contains(err.Error(), "Open") {
+		t.Errorf("New without Open: %v", err)
+	}
 }

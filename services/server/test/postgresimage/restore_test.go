@@ -293,7 +293,7 @@ func TestRestoreTest(t *testing.T) {
 				t.Errorf("file sample checked %d objects, want all %d", c.Items, restoreObjects)
 			}
 		}
-		probe := mustDocker(t, "exec", backup, "cat", "/tmp/restore-test-tcp")
+		probe := mustDocker(t, "exec", backup, "cat", "/var/lib/bothy-backup/restore-test-tcp")
 		if ports := listeningPorts(probe); !slices.Equal(ports, []string{tlsPortHex}) {
 			t.Errorf("listening TCP ports while the copy ran %v, want only the pgBackRest TLS server %s:\n%s", ports, tlsPortHex, probe)
 		}

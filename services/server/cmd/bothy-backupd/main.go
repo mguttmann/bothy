@@ -157,7 +157,7 @@ func parseServe(args []string, stdout, stderr io.Writer) (serveOptions, int) {
 	fs.StringVar(&o.pgbackrest, "pgbackrest", "pgbackrest", "pgBackRest binary")
 	fs.StringVar(&o.stanza, "stanza", defaultStanza, "stanza")
 	fs.DurationVar(&o.retry, "retry", defaultRetry, "wait between attempts")
-	fs.StringVar(&o.config, "config", "", "configuration file")
+	fs.StringVar(&o.config, "config", "", configFlagUsage)
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			_, _ = io.WriteString(stdout, usage)
