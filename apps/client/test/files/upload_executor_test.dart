@@ -328,6 +328,42 @@ void main() {
       );
     });
 
+    test('Upload again gives a failed attachment a new entry', () async {
+      h.server.faults.onRequest(
+        'uploadPart',
+        status: 409,
+        code: 'conflict',
+        reason: 'part_conflict',
+      );
+      expect(await attach.add([await picked('a.bin', 4)]), isTrue);
+      final first = attach.attachments.single;
+      await h.outbox.start();
+      await eventually(
+        'failed',
+        () async =>
+            (await h.db.outboxDao.byId(first.entryId))?.state ==
+            OutboxState.failed,
+      );
+      await attach.retry(first.key);
+      final again = attach.attachments.single;
+      expect(again.key, first.key);
+      expect(again.entryId, isNot(first.entryId));
+      expect(await h.db.outboxDao.byId(first.entryId), isNull);
+      await attach.retry('unknown');
+      expect(attach.attachments.single.entryId, again.entryId);
+    });
+
+    test('dragging over the composer notifies once per change', () {
+      var calls = 0;
+      attach.addListener(() => calls++);
+      attach.setDragging(true);
+      attach.setDragging(true);
+      expect(attach.dragging, isTrue);
+      attach.setDragging(false);
+      expect(attach.dragging, isFalse);
+      expect(calls, 2);
+    });
+
     test('a removed attachment leaves no copy behind', () async {
       expect(await attach.add([await picked('a.bin', 5)]), isTrue);
       final key = attach.attachments.single.key;

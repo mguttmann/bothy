@@ -109,6 +109,38 @@ void main() {
     await host.dispose(tester);
   });
 
+  testWidgets('Open shows the reason when the download or the system refuses', (
+    tester,
+  ) async {
+    final report = fileOf(1, name: 'report.pdf');
+    final program = fileOf(
+      2,
+      name: 'setup.exe',
+      mime: 'application/octet-stream',
+    );
+    final (host, services) = await open(tester, files: [report, program]);
+    services.adapter.on(
+      '/files/${report.id.value}/content',
+      ScriptedAnswer.problem(409, 'file_blocked'),
+    );
+    await pump(tester, host, services);
+    Finder notice(FileId id) => find.byKey(ValueKey('file.${id.value}.notice'));
+
+    await tester.tap(find.byKey(ValueKey('file.${report.id.value}.open')));
+    await settleUntil(tester, host, notice(report.id));
+    expect(inTile(report.id, find.text(en.fileStateBlocked)), findsWidgets);
+
+    await tester.tap(find.byKey(ValueKey('file.${program.id.value}.open')));
+    await settleUntil(tester, host, notice(program.id));
+    expect(notice(program.id), findsOneWidget);
+    // A program is refused before any request (D-M4-22-14).
+    expect(
+      services.adapter.requested,
+      isNot(contains('/files/${program.id.value}/content')),
+    );
+    await host.dispose(tester);
+  });
+
   testWidgets(
     'upload entries show waiting, uploading, failed with Upload again '
     'and canceled',

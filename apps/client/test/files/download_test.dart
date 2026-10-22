@@ -137,6 +137,34 @@ void main() {
   });
 
   test(
+    'Open hands the checked bytes to the system, a refusal is open_failed',
+    () async {
+      final id = ready();
+      final meta = FileMeta(
+        id: id,
+        sizeBytes: bytes.length,
+        mimeType: 'text/plain',
+        originalName: 'report.txt',
+        uploadedBy: PrincipalId.parse(h.seed.alex.id),
+        purpose: FilePurpose.attachment,
+        uploadState: UploadState.complete,
+        scanStatus: ScanStatus.clean,
+        transcriptStatus: TranscriptStatus.none,
+        thumbnails: const [],
+        createdAt: DateTime.utc(2026, 10, 17),
+      );
+      final opener = FakeOpener();
+      final opened = await downloads.open(meta, opener);
+      expect(opened, isA<Downloaded>());
+      expect(opener.opened, [(opened as Downloaded).file.path]);
+      expect(
+        await downloads.open(meta, FakeOpener(answer: false)),
+        isA<DownloadFailed>().having((r) => r.code, 'code', 'open_failed'),
+      );
+    },
+  );
+
+  test(
     'Open refuses programs and scripts and never hands them to the system',
     () async {
       final id = ready();

@@ -53,13 +53,19 @@ class FakePaste implements PasteSource {
 
 /// An opener that records the paths.
 class FakeOpener implements FileOpener {
+  /// Creates the opener; [answer] is what the system says.
+  FakeOpener({this.answer = true});
+
+  /// What [open] answers.
+  final bool answer;
+
   /// The opened paths.
   final List<String> opened = [];
 
   @override
   Future<bool> open(String path) async {
     opened.add(path);
-    return true;
+    return answer;
   }
 }
 
