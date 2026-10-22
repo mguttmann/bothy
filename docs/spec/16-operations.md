@@ -1062,6 +1062,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `secrets.dir` | Server | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails |
 | `secrets.cache_ttl` | Server | `5m` | how long a read secret stays valid; at least `1s` |
 | `secrets.signing_key_dir` | Server | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) |
+| `console.assets_dir` | Server | empty | directory of the built web console (`flutter build web` of `apps/console`) that the api process serves under `/console/` ([02-architecture.md](02-architecture.md), 3.1); empty: no console, `404` under `/console/`; the image sets `/usr/share/bothy/console`; a set directory without `index.html` ends the start |
 | `server.tls_cert_ref` | Server | empty | reference to the certificate chain (PEM, leaf first); empty: the server does not terminate TLS (SEC-TLS-2) |
 | `server.tls_key_ref` | Server | empty | reference to the private key (PEM); only together with `server.tls_cert_ref` |
 | `database.host` | Server | `localhost` | host of the database |

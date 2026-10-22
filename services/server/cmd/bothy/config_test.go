@@ -246,6 +246,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"client.recommended_version.windows =   # default\n" +
 		"command.description_max_chars = 100  # default\n" +
 		"command.max_per_principal = 100  # default\n" +
+		"console.assets_dir =   # default\n" +
 		"consumer.batch_size = 500  # default\n" +
 		"consumer.pending_alert_after = 15m  # default\n" +
 		"consumer.poll_interval = 1s  # default\n" +
