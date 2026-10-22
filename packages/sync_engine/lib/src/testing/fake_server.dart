@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'action_catalog.dart';
 import 'audit_log.dart';
@@ -17,6 +18,7 @@ import 'rest/admin_handlers.dart';
 import 'rest/agent_handlers.dart';
 import 'rest/audit_handlers.dart';
 import 'rest/auth_handlers.dart';
+import 'rest/file_handlers.dart';
 import 'rest/host_handlers.dart';
 import 'rest/message_handlers.dart';
 import 'rest/personal_handlers.dart';
@@ -156,6 +158,7 @@ final class FakeServer {
     registerPersonalHandlers(rest);
     registerRunHandlers(rest);
     registerSelfHandlers(rest);
+    registerFileHandlers(rest);
     final actions = ActionCatalog.load();
     final audit = FakeAuditLog();
     registerAdminHandlers(rest, actions, audit);
@@ -232,6 +235,10 @@ final class FakeServer {
         gateway.accept(await WebSocketTransformer.upgrade(request));
         return;
       }
+      if (request.uri.path.startsWith('/objectstore/')) {
+        await _objectStore(request);
+        return;
+      }
       await rest.serve(request, baseUri);
     } on Object {
       // A dropped response or a client that went away; the record is in [requests].
@@ -241,6 +248,40 @@ final class FakeServer {
         // The socket is gone already.
       }
     }
+  }
+
+  /// Every part PUT to the object store of a `presigned` session (12 3.3), in order.
+  final List<String> objectStorePuts = [];
+
+  /// The object store of a `presigned` session (12 3.3): `PUT /objectstore/<file_id>/<n>`
+  /// stores the part without `Authorization` and answers its `ETag`; a request that carries
+  /// `Authorization` is refused, because the client must never send its token there.
+  Future<void> _objectStore(HttpRequest request) async {
+    final segments = request.uri.pathSegments;
+    final received = BytesBuilder(copy: false);
+    await request.forEach(received.add);
+    final res = request.response;
+    if (request.method != 'PUT' ||
+        segments.length != 3 ||
+        request.headers.value('authorization') != null) {
+      res.statusCode = 403;
+      await res.close();
+      return;
+    }
+    objectStorePuts.add(request.uri.path);
+    try {
+      final etag = world.putPresignedPart(
+        segments[1],
+        int.parse(segments[2]),
+        received.takeBytes(),
+      );
+      res
+        ..statusCode = 200
+        ..headers.set('ETag', etag);
+    } on FakeProblem catch (p) {
+      res.statusCode = p.status;
+    }
+    await res.close();
   }
 
   /// Stops the agents, closes every socket and the listener.

@@ -30,7 +30,9 @@ Allowed members (docs/spec/15-client-architecture.md, 3.1; `tools/arch-check/rul
 reach; `make arch` checks the manifest and every import. Outside the workspace: `flutter_riverpod`
 and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flutter_secure_storage`,
 `url_launcher`, `path_provider`, `timezone` (IANA time zones of the profile), `dio`,
-`sentry_flutter` (crash reports, M4-31) and `crypto` (the hashed instance tag of a crash report). The network status needs no plugin
+`sentry_flutter` (crash reports, M4-31), `crypto` (the hashed instance tag of a crash report, the
+SHA-256 of uploads and downloads), and for files and voice (M4-22, docs/DECISIONS.md D-M4-22-4)
+`record`, `audioplayers`, `video_player`, `file_selector`, `desktop_drop` and `pasteboard`. The network status needs no plugin
 (docs/DECISIONS.md D-M4-18-8).
 
 ## Layout
@@ -48,7 +50,9 @@ and `riverpod_annotation` (state, with `riverpod_generator`), `go_router`, `flut
 | `lib/forum/` | the post list of a forum (M4-19): head with filters, rows, Done section, "New post" dialog, paging |
 | `lib/thread/` | the history column (M4-20): header, message list with paging, gaps and jumps, message tiles and actions, outbox rows, dialogs (versions, conflict, delete, reactions, title, move), the D2 layout |
 | `lib/composer/` | the composer (M4-20): send path, draft sync, mention suggestions, templates |
-| `lib/session_column/` | the frame of the session column with the section "Pinned" (M4-20) |
+| `lib/session_column/` | the frame of the session column with the sections "Pinned" (M4-20) and "Files" (M4-22) |
+| `lib/files/` | files (M4-22): the upload executor and the attaching of its files, the part plan and hashing, the composer's attachments (button, drag and drop, paste), attachment tiles and their states, image previews, downloads with `Repr-Digest`, the file cache, ticket players, the file ports and providers |
+| `lib/voice/` | voice messages (M4-22): the recorder port over `record`, the recording bar, the player with speeds and the transcript |
 | `lib/sync/` | the app's outbox executors: `putMySidebarSpace` (`sidebar_ops.dart`), `createThread` (`thread_ops.dart`), the thread view's writes (`message_ops_app.dart`) |
 | `lib/onboarding/` | E1 to E7, the controller of the flow, codes and remaining times |
 | `lib/admin/` | the route of the administration: `AdminRoute`, `adminRepositoryProvider`, the mapping of `AdminLocation` to `/admin/...` |
@@ -141,7 +145,28 @@ message actions (hover bar, right click, menu key or Shift+F10) and the header b
 by the level and capabilities the server reported for the channel, never by grants; every write
 goes through the outbox (docs/DECISIONS.md D-M4-20-1 to D-M4-20-8). Rendering loads and runs
 nothing from a message (SEC-T13). The session column (`lib/session_column/`) has its frame with
-the pinned messages; the agent session and the files follow (M4-21, M4-22).
+the pinned messages and the files of the thread; the agent session follows (M4-21).
+
+## Files and voice messages
+
+Attaching by the attachment button, drag and drop or paste checks the size against
+`file_max_upload_bytes` and the count against `message_max_attachments` and then writes one
+`upload` entry per file into the outbox, before the message (`lib/files/attach_controller.dart`).
+The executor (`upload_executor.dart`) creates the session with the entry ID as
+`Idempotency-Key`, sends the parts `getUpload` has not confirmed, at most two at a time and each
+with `Content-Digest`, and completes the session; the message then attaches the files
+(12 3.4, D-M4-22-1). The SHA-256 is computed in a background isolate while the file streams.
+Attachments show the states of 12 2 (`attachment_mapping.dart`, `attachment_tile.dart`); images
+show thumbnails from `downloadThumbnail` only, never from a URL in the content (SEC-OUT-2), and
+`![alt](attachment:<file_id>)` in the content shows the thumbnail of the message's own file.
+Downloads (`download_service.dart`) stream into the file cache (`file_cache.dart`,
+`<instance folder>/files`) and keep only bytes that match `Repr-Digest`; audio and video play
+through file tickets (`ticket_player.dart`). Voice messages (`lib/voice/`) record AAC-LC mono in
+`.m4a` at `client.voice.bitrate` up to `voice_max_duration_ms`, play at 1, 1.5 and 2 and show the
+transcript when `file.updated` reports it. Every outside dependency is a port in
+`lib/files/file_ports.dart` (`AppPorts.files`), so the tests use a fake recorder, fake players
+and no dialogs. On macOS the runner declares `NSMicrophoneUsageDescription`, the audio input
+entitlement and access to files the person picks; Windows needs nothing beyond the packages.
 
 ## Client metrics and crash reports
 

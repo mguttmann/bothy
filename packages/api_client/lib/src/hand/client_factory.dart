@@ -10,7 +10,8 @@ import 'package:dio/dio.dart';
 ///
 /// One `Dio` with `baseUrl` = [baseUrl] plus `/api/v1` (06 R-API-01), JSON responses and the
 /// interceptors in this fixed order: [HeadersInterceptor] (`traceparent` from [traceContext],
-/// `Idempotency-Key` from the request option [idempotencyKeyExtra]), then [authInterceptors]
+/// `Idempotency-Key` from the request option [idempotencyKeyExtra]), then
+/// [BinaryProblemInterceptor] (the problem body of a download as JSON), then [authInterceptors]
 /// (the slot for DPoP, nonce, refresh and step-up of M4-09), then [ProblemInterceptor], then
 /// [ReadRetryInterceptor] with [readRetry]. Errors reach the caller as a `DioException`; a
 /// response error carries an [ApiProblem] (`ApiProblem.of`). The generated auth interceptors
@@ -58,6 +59,9 @@ ApiClient createApiClient({
   if (adapter != null) dio.httpClientAdapter = adapter;
   dio.interceptors.addAll([
     HeadersInterceptor(traceContext: traceContext),
+    // Errors pass the interceptors in this order too: the problem of a download must be a
+    // JSON object before `auth` reads it (M4-22).
+    BinaryProblemInterceptor(),
     ...authInterceptors,
     ProblemInterceptor(),
     ReadRetryInterceptor(dio: dio, policy: readRetry),

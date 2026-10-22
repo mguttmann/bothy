@@ -15,6 +15,10 @@ import 'package:flutter/services.dart';
 import 'package:l10n/l10n.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../files/attachment_mapping.dart';
+import '../files/attachment_tile.dart';
+import '../files/upload_executor.dart';
+
 /// The delivery of [view] in the message component.
 DsDelivery deliveryOf(OutboxEntryView view) => switch (view.stateLabel) {
   OutboxStateLabel.failed => DsDelivery.failed,
@@ -27,7 +31,7 @@ DsDelivery deliveryOf(OutboxEntryView view) => switch (view.stateLabel) {
 String? failureTextOf(AppLocalizations l, OutboxEntryView view) {
   final code = view.failureCode ?? view.blockedByCode;
   if (code == null) return null;
-  return problemText(
+  return uploadFailureText(
     l,
     code,
     reason: view.failureReason ?? view.blockedByReason,
@@ -47,10 +51,22 @@ class PendingRow extends StatelessWidget {
     required this.onEdit,
     required this.onDiscard,
     required this.onOpenLink,
+    this.uploads = const {},
+    this.progress,
+    this.onRetryUpload,
   });
 
   /// The entry.
   final OutboxEntryView view;
+
+  /// The upload entries of the thread by attachment key (M4-22).
+  final Map<String, OutboxEntryView> uploads;
+
+  /// The progress of the uploads, or null.
+  final UploadProgress? progress;
+
+  /// "Upload again" of a failed upload entry, with its ID.
+  final ValueChanged<String>? onRetryUpload;
 
   /// The reader's name.
   final String authorName;
@@ -73,10 +89,64 @@ class PendingRow extends StatelessWidget {
   /// Opens a link of the content.
   final void Function(Uri) onOpenLink;
 
+  /// The files of the waiting message: one chip per attachment with the state of its upload
+  /// entry; a confirmed upload is being checked by the server (12 2).
+  Widget? _files(AppLocalizations l) {
+    final preview = view.payload['attachment_preview'];
+    if (preview is! List || preview.isEmpty) return null;
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: DsSize.avatarMd + DsSpace.s12 + DsSpace.s8,
+        top: DsSpace.s4,
+      ),
+      child: Wrap(
+        spacing: DsSpace.s6,
+        runSpacing: DsSpace.s6,
+        children: [
+          for (final item in preview.cast<Map<String, Object?>>())
+            _chip(l, item),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(AppLocalizations l, Map<String, Object?> item) {
+    final key = item['key']! as String;
+    final upload = uploads[key];
+    final state = upload == null
+        ? AttachmentState.checking
+        : stateOfUpload(upload);
+    final code = upload?.failureCode;
+    return UploadChip(
+      attachmentKey: key,
+      name: item['name'] as String? ?? '',
+      sizeBytes: item['size_bytes'] as int? ?? 0,
+      state: state,
+      percent: ((progress?.fractionOf(key) ?? 0) * 100).round(),
+      reason: code == null
+          ? null
+          : uploadFailureText(l, code, reason: upload?.failureReason),
+      onRetry: upload == null || onRetryUpload == null
+          ? null
+          : () => onRetryUpload!(upload.id),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final delivery = deliveryOf(view);
+    final files = _files(l);
+    final message = _message(l, delivery);
+    if (files == null) return message;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [message, files],
+    );
+  }
+
+  Widget _message(AppLocalizations l, DsDelivery delivery) {
     return DsMessage(
       DsMessageData(
         id: view.id,

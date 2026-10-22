@@ -4,10 +4,15 @@
 <!-- network.client: REST and gateway. network.server: the loopback listener of the OIDC
      redirect on 127.0.0.1 with a free port (docs/spec/15-client-architecture.md 8, RFC 8252).
      keychain-access-groups: the Data Protection keychain of flutter_secure_storage and the
-     device keys (15 9). -->
+     device keys (15 9). device.audio-input: voice messages (15 13); files.user-selected:
+     the open and save dialogs of the attachments (brief M4-22). -->
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>

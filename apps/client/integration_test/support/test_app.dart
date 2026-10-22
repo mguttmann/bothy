@@ -7,6 +7,7 @@
 
 import 'package:client/app/app.dart';
 import 'package:client/app/providers/ports.dart';
+import 'package:client/files/file_ports.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,11 +38,12 @@ class TestApp {
   static Future<TestApp> start(
     WidgetTester tester, {
     Map<String, String> config = fastConfig,
+    FilePorts? files,
   }) async {
     tester.view
       ..physicalSize = const Size(1440, 1000)
       ..devicePixelRatio = 1;
-    final fake = await FakeInstance.start(config: config);
+    final fake = await FakeInstance.start(config: config, files: files);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [appPortsProvider.overrideWithValue(fake.ports)],

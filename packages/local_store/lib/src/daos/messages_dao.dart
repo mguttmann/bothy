@@ -7,6 +7,7 @@ library;
 import 'package:domain/domain.dart';
 import 'package:drift/drift.dart';
 
+import '../cascade.dart';
 import '../database.dart';
 import '../mappers/files.dart';
 import '../mappers/threads_messages.dart';
@@ -250,6 +251,22 @@ final class MessagesDao {
     MessageId messageId, {
     required DateTime deletedAt,
     required ResourceVersion version,
+  }) async =>
+      await tombstoneWithFiles(
+        messageId,
+        deletedAt: deletedAt,
+        version: version,
+      ) !=
+      null;
+
+  /// [tombstone] that also deletes the metadata and file cache rows of the message's files
+  /// that no other message attaches (20 4.7: client caches go with `message.deleted`); returns
+  /// the paths of the deleted cache rows, whose bytes the caller deletes after the commit, or
+  /// null when the tombstone did not apply.
+  Future<List<String>?> tombstoneWithFiles(
+    MessageId messageId, {
+    required DateTime deletedAt,
+    required ResourceVersion version,
   }) => _db.transaction(() async {
     final changed =
         await (_db.update(_db.messages)..where(
@@ -267,8 +284,11 @@ final class MessagesDao {
                 version: Value(version.value),
               ),
             );
-    if (changed == 0) return false;
+    if (changed == 0) return null;
     final id = messageId.value;
+    final attached = [
+      for (final a in await attachmentsOf(messageId)) a.fileId.value,
+    ];
     await (_db.delete(
       _db.reactionsSummary,
     )..where((t) => t.messageId.equals(id))).go();
@@ -287,7 +307,7 @@ final class MessagesDao {
       updates: {_db.searchIndex},
       updateKind: UpdateKind.delete,
     );
-    return true;
+    return deleteOrphanFiles(_db, attached);
   });
 
   /// Stores a mention of the person themselves (15 6.1 `my_mentions`).
@@ -344,6 +364,54 @@ final class MessagesDao {
       _db.files,
     )..where((t) => t.id.equals(id.value))).getSingleOrNull();
     return row == null ? null : fileFromRow(row);
+  }
+
+  /// The metadata of file [id] on every change (`file.updated`, 12 2), null while unknown.
+  Stream<FileMeta?> watchFile(FileId id) => (_db.select(
+    _db.files,
+  )..where((t) => t.id.equals(id.value))).map(fileFromRow).watchSingleOrNull();
+
+  /// The files attached to [messageId] in their order, on every change of the attachments or
+  /// of a file's metadata; an attachment whose file row is missing is left out.
+  Stream<List<FileMeta>> watchAttachedFiles(MessageId messageId) {
+    final a = _db.messageAttachments;
+    final f = _db.files;
+    final query = _db.select(a).join([innerJoin(f, f.id.equalsExp(a.fileId))])
+      ..where(a.messageId.equals(messageId.value))
+      ..orderBy([OrderingTerm(expression: a.position)]);
+    return query.watch().map(
+      (rows) => [for (final r in rows) fileFromRow(r.readTable(f))],
+    );
+  }
+
+  /// The files attached to the messages of [threadId], the newest message first and in their
+  /// order within a message, on every change (the section "Files" of the session column,
+  /// 01 5.1 D1).
+  Stream<List<AttachedFile>> watchThreadFiles(ThreadId threadId) {
+    final a = _db.messageAttachments;
+    final f = _db.files;
+    final m = _db.messages;
+    final query =
+        _db.select(a).join([
+            innerJoin(f, f.id.equalsExp(a.fileId)),
+            innerJoin(m, m.id.equalsExp(a.messageId)),
+          ])
+          ..where(a.threadId.equals(threadId.value))
+          ..orderBy([
+            OrderingTerm(expression: m.threadSeq, mode: OrderingMode.desc),
+            OrderingTerm(expression: a.position),
+          ]);
+    return query.watch().map(
+      (rows) => [
+        for (final r in rows)
+          AttachedFile(
+            messageId: MessageId.parse(r.readTable(a).messageId),
+            threadSeq: ThreadSeq(r.readTable(m).threadSeq),
+            position: r.readTable(a).position,
+            file: fileFromRow(r.readTable(f)),
+          ),
+      ],
+    );
   }
 
   /// Replaces the attachments of [messageId] with [attachments] in one transaction.

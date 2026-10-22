@@ -4724,4 +4724,207 @@ class AppLocalizationsDe extends AppLocalizations {
   String terminalLinkHost(String name) {
     return 'Rechner: $name';
   }
+
+  @override
+  String fileStateUploading(int percent) {
+    return 'Wird hochgeladen, $percent %';
+  }
+
+  @override
+  String get fileStateWaiting => 'Wartet auf das Hochladen';
+
+  @override
+  String get fileStateChecking => 'Wird geprüft';
+
+  @override
+  String get fileStateUploadFailed => 'Hochladen fehlgeschlagen';
+
+  @override
+  String get fileStateBlocked => 'Blockiert';
+
+  @override
+  String get fileStateCanceled => 'Hochladen abgebrochen';
+
+  @override
+  String get fileDeleted => 'Datei gelöscht';
+
+  @override
+  String fileSizeBytes(String size) {
+    return '$size B';
+  }
+
+  @override
+  String fileSizeKilobytes(String size) {
+    return '$size KB';
+  }
+
+  @override
+  String fileSizeMegabytes(String size) {
+    return '$size MB';
+  }
+
+  @override
+  String fileSizeGigabytes(String size) {
+    return '$size GB';
+  }
+
+  @override
+  String fileTileLabel(String name, String size, String state) {
+    return '$name, $size, $state';
+  }
+
+  @override
+  String get fileOpen => 'Öffnen';
+
+  @override
+  String get fileSaveAs => 'Speichern unter';
+
+  @override
+  String fileSaved(String name) {
+    return '$name gespeichert';
+  }
+
+  @override
+  String fileDownloadFailed(String reason) {
+    return 'Herunterladen fehlgeschlagen: $reason';
+  }
+
+  @override
+  String get fileDownloadDamaged =>
+      'Der Download war beschädigt und wurde gelöscht. Versuche es erneut.';
+
+  @override
+  String fileImageOpen(String name) {
+    return 'Bild $name öffnen';
+  }
+
+  @override
+  String get fileImageClose => 'Schließen';
+
+  @override
+  String get fileImageLoading => 'Bild wird geladen';
+
+  @override
+  String fileMediaPlay(String name) {
+    return '$name abspielen';
+  }
+
+  @override
+  String get fileMediaPause => 'Anhalten';
+
+  @override
+  String get fileMediaFailed => 'Abspielen fehlgeschlagen';
+
+  @override
+  String get fileUploadAgain => 'Erneut hochladen';
+
+  @override
+  String fileRemove(String name) {
+    return '$name entfernen';
+  }
+
+  @override
+  String get fileFailPartConflict =>
+      'Ein Teil wurde zweimal mit anderem Inhalt gesendet';
+
+  @override
+  String get fileFailSessionEnded => 'Die Upload-Sitzung ist beendet';
+
+  @override
+  String get fileFailQuota => 'Das Speicherkontingent ist aufgebraucht';
+
+  @override
+  String get fileFailNotAttachable => 'Diese Datei kann nicht angehängt werden';
+
+  @override
+  String get fileFailUnreadable => 'Die Datei kann nicht mehr gelesen werden';
+
+  @override
+  String composerFileTooLarge(String name, String limit) {
+    return '$name ist größer als die Grenze von $limit';
+  }
+
+  @override
+  String composerTooManyFiles(int count) {
+    return 'Höchstens $count Dateien pro Nachricht';
+  }
+
+  @override
+  String composerFileUnreadable(String name) {
+    return '$name kann nicht gelesen werden';
+  }
+
+  @override
+  String get composerDropFiles => 'Dateien hier ablegen, um sie anzuhängen';
+
+  @override
+  String composerAttachments(int count) {
+    return 'Anhänge ($count)';
+  }
+
+  @override
+  String voiceRecording(String elapsed) {
+    return 'Aufnahme $elapsed';
+  }
+
+  @override
+  String voiceRecorded(String elapsed) {
+    return 'Sprachnachricht $elapsed';
+  }
+
+  @override
+  String get voiceSend => 'Sprachnachricht senden';
+
+  @override
+  String get voiceStop => 'Aufnahme beenden';
+
+  @override
+  String get voiceCancel => 'Aufnahme verwerfen';
+
+  @override
+  String get voiceMicrophoneDenied =>
+      'Der Zugriff auf das Mikrofon ist aus. Erlaube ihn in den Systemeinstellungen unter Datenschutz und Sicherheit, Mikrofon.';
+
+  @override
+  String voiceLimitReached(String limit) {
+    return 'Die Aufnahme endete an der Grenze von $limit';
+  }
+
+  @override
+  String get voiceFailed => 'Die Aufnahme ist fehlgeschlagen';
+
+  @override
+  String voiceSpeed(String speed) {
+    return 'Abspielgeschwindigkeit $speed';
+  }
+
+  @override
+  String voiceSpeedValue(String speed) {
+    return '${speed}x';
+  }
+
+  @override
+  String get transcriptLabel => 'Transkript';
+
+  @override
+  String get transcriptFailed => 'Kein Transkript';
+
+  @override
+  String get transcriptRequest => 'Transkribieren';
+
+  @override
+  String get transcriptUnavailable => 'Transkription ist hier nicht verfügbar';
+
+  @override
+  String sessionFiles(int count) {
+    return 'Dateien ($count)';
+  }
+
+  @override
+  String get sessionFilesEmpty => 'Keine Dateien';
+
+  @override
+  String fileVideoTitle(String name) {
+    return 'Video $name';
+  }
 }

@@ -419,7 +419,23 @@ and `i1OnEnable` (people whose `enableUser` answers `409 i1_violation`). From M4
 an offset cursor), `exportAuditEvents` (NDJSON of the contiguous `seq` span of the range) and
 `verifyAuditChain` over `server.audit`, a `FakeAuditLog` whose rows a test adds with `add` and
 breaks with `tamper(seq)`; all three are owner actions with the catalogue's step-up. The world has `addForum`, `addForumTag`, `closeThread` and
-`putSidebar`; a new message in a closed thread reopens it (`thread.reopened`, 01 6.1). Other
+`putSidebar`; a new message in a closed thread reopens it (`thread.reopened`, 01 6.1). From
+M4-22 `rest/file_handlers.dart` serves the files of 12 over `FilesWorld` (`world_files.dart`):
+`createUpload` with the part plan of `world.fileSettings.partBytes` (`mode` `direct` or
+`presigned`; presigned parts go to `PUT /objectstore/<file_id>/<n>` without `Authorization`,
+recorded in `server.objectStorePuts`), `uploadPart` with the length and `Content-Digest` checks
+and `part_conflict`, `getUpload` with the confirmed parts, `completeUpload` with the SHA-256
+check and the scan, `abortUpload`, `getFile`, `downloadFile` and `downloadThumbnail` with the
+headers of 12 9.3 (`Repr-Digest`, one byte range), `createFileTicket` (a ticket download needs
+no DPoP and answers `404` for another file, variant or a revoked session),
+`getTranscript`, `requestTranscription` and `deleteFile`. `world.fileSettings` holds the
+faults: `abortAfterParts` (the next part answers `503 unavailable` once), `holdScan` (the file
+stays "being checked" and answers `409 file_not_ready` until `world.finishScan(id)`),
+`scanResult` (`infected` or `error`: "blocked", `409 file_blocked`), `wrongDigest` (a damaged
+`Repr-Digest`) and `transcriptionMode`. `world.addReadyFile` seeds a checked file,
+`world.setTranscript` reports a transcript, `world.limits` is what `getInstance` reports, and
+`createMessage` attaches `attachment_file_ids` by the rules of 12 10 (`409 conflict` with
+`file_not_attachable`). Other
 writes with `Idempotency-Key` repeat their
 stored answer (04 5.2). Later tickets add operations with `server.handle(operationId,
 handler)` in their own `rest/` file (D-M4-17-2). Gateway: `hello`, `identify`, `resume`,

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The frame of the session column (01 5.1 D1: "Session" with its sections; brief M4-20
-/// Scope): the section "Pinned" of the open thread. M4-21 adds the agent session and M4-22
-/// the files.
+/// Scope): the sections "Pinned" and "Files" (M4-22) of the open thread. M4-21 adds the agent
+/// session.
 library;
 
 import 'package:design_system/design_system.dart';
@@ -10,6 +10,7 @@ import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:l10n/l10n.dart';
 
+import 'files_section.dart';
 import 'pins_section.dart';
 
 /// The session column of [threadId], or a hint while no thread is open.
@@ -44,8 +45,11 @@ class SessionColumn extends StatelessWidget {
             style: dsTextStyle(DsType.caption)
                 .copyWith(color: colors.textSecondary),
           )
-        else
+        else ...[
           PinsSection(threadId: thread),
+          const SizedBox(height: DsSpace.s16),
+          FilesSection(threadId: thread),
+        ],
       ],
     );
   }

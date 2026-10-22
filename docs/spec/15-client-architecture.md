@@ -420,8 +420,10 @@ stateDiagram-v2
 
 Rules from [04](04-sync-protocol.md) sections 13.2 and 13.3; in addition: after
 `client.outbox_stuck_after` in the state `Waiting`, an entry shows the notice "Sending delayed". File uploads are
-separate entries before the message that attaches them; the message waits until its files are
-`complete`.
+separate entries before the message that attaches them; the message waits until the upload session
+of each of its files is completed (`completeUpload` with `200`, [12](12-files.md) 3.4) and then
+attaches them; the check of the server goes on, and the server holds the agent invocation until
+the check is final ([12](12-files.md) 10; ruling D-M4-22-1).
 
 `409 request_in_progress` (the first request with the same `Idempotency-Key` is still running,
 04 5.2) is retried like a `5xx` with the same ID. `412 version_conflict` ends in `Failed` with the
@@ -691,8 +693,11 @@ transcript appears as soon as `file.updated` reports it.
 
 Check the size against `file.max_upload_bytes` before sending (the server checks again). The upload protocol
 (parts, resumption, pre-signed URLs) is set by [12-files.md](12-files.md); the client
-implements it as an outbox entry with progress, resumes after an abort at the last confirmed
-part and attaches the file only when `upload_state = complete`. The app uploads photos from the
+implements it as an outbox entry with progress, resumes after an abort with the parts that
+`getUpload` did not confirm, and attaches the file as soon as its upload session is completed
+(`completeUpload` with `200`, [12](12-files.md) 3.4), not only at `upload_state = complete`: until
+the result of the check the message shows the file as "being checked" ([12](12-files.md) 2), and
+the server holds the agent invocation ([12](12-files.md) 10; ruling D-M4-22-1). The app uploads photos from the
 media library as JPEG: it requests a JPEG representation from the system or converts
 by itself ([12-files.md](12-files.md), section 7.1;
 [ADR 0047](../adr/0047-remove-image-metadata-losslessly.md)). Reason: the server does not strip HEIC
