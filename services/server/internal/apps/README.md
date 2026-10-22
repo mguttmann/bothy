@@ -176,7 +176,7 @@ Normative: [docs/api/webhooks.md](../../../../docs/api/webhooks.md) section 8,
 [11-extensions.md](../../../../docs/spec/11-extensions.md) section 8, 05 section 4.11, 08
 section 12. Rulings: `docs/DECISIONS.md` D-M2-27-1 to D-M2-27-23.
 
-- **Webhooks** (`incoming_webhooks`, migration `00054_apps_incoming_webhooks.sql`, retention class
+- **Webhooks** (`incoming_webhooks`, migration `00055_apps_incoming_webhooks.sql`, retention class
   `config`): `createIncomingWebhook` (`webhook_in.create`, `manage` on the channel, step-up,
   audited with `{webhook_id, app_id, thread_id}` only) for an app with an `active` installation
   that may write in the channel (checked with its webhook actor in filter mode), optionally with a
