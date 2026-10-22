@@ -1475,7 +1475,7 @@ reason = "deps.dev knows no license for this pub package; its LICENSE file is th
 
 [[PackageOverrides]]
 name = "video_player_avfoundation"
-version = "2.12.2"
+version = "2.12.1"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. Video playback through file tickets (M4-22, D-M4-22-4)."
