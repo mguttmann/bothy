@@ -39,7 +39,7 @@ type ScannerState struct {
 }
 
 // ScannerHealth reports the reachability of the virus scanner as the worker sees it (12 5.3,
-// health_source files.scan of 16 "Statusseite"). The state is kept in memory per process
+// health_source files.scan of 16 12 "Status page"). The state is kept in memory per process
 // (docs/DECISIONS.md D-M3-04-11); M7-09 reads it for the status component. It is safe for
 // concurrent use.
 type ScannerHealth interface {

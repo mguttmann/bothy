@@ -46,6 +46,10 @@ docker compose up -d
 
 Exactly one of `direct` and `tailscale`.
 
+The profile `scan` belongs to the default `file.scan.mode = required`: without it, completed
+uploads stay pending until clamd answers ([12-files.md](../../docs/spec/12-files.md) 5.3, fail
+closed). An installation without a virus scanner sets `file.scan.mode` to `off`.
+
 ## Security rules in this file
 
 1. Ports only on `127.0.0.1`. PostgreSQL, Loki, Tempo and SeaweedFS are attached only to the

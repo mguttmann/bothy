@@ -33,13 +33,16 @@ sequenceDiagram
   A->>MSG: POST message with file_id (message.create, plus upload)
   MSG->>F: bind attachment to the message in the same channel
   MSG-->>A: 201, display "being checked"
-  SJ->>AV: PING over the Unix socket
+  SJ->>AV: PING over the Unix socket (file.scan.mode required)
   SJ->>OBJ: one read pass: parts in order (file system) or the object, join into the object
   SJ->>SJ: size and SHA-256 against the declaration, type from the first file.sniff_bytes
-  SJ->>AV: INSTREAM in chunks of the same stream, end with a zero-length chunk
+  SJ->>AV: INSTREAM in chunks of the same stream, end with a zero-length chunk (mode required)
   alt size, SHA-256 or detected type wrong
     SJ->>DB: upload_state failed with its reason, file.updated, FileFinalized
     SJ->>OBJ: delete object and parts
+  else file.scan.mode off, no clamd call
+    SJ->>DB: upload_state complete, scan_status skipped, mime_type, file.updated, FileFinalized
+    SJ->>OBJ: delete parts
   else stream: OK
     AV-->>SJ: OK
     SJ->>DB: upload_state complete, scan_status clean, mime_type, scanned_at, file.updated, FileFinalized

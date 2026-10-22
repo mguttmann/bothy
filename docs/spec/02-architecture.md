@@ -1130,11 +1130,12 @@ server loads.
    identifiers and never `simple` (check `search_languages`); every key of `search.locale_map` is
    a first language subtag in lower-case ASCII letters and every value is listed in
    `search.languages` or is `simple` (check `search_locale_map`, the start error of
-   [14-search.md](14-search.md) 3.1; M3-13). With `file.scan.mode = required`,
+   [14-search.md](14-search.md) 3.1; M3-13). `file.scan.clamd_address` is `unix://` followed by an
+   absolute path in every scan mode (cross-check `clamd_address_unix`,
+   [19-security.md](19-security.md) SEC-TLS-5, M3-04), and with `file.scan.mode = required`,
    `file.max_upload_bytes` is at most `file.scan.clamd_stream_max_bytes`, the mirror of the clamd
    option `StreamMaxLength` (cross-check `scan_stream_limit`, [12-files.md](12-files.md) 5.4,
-   M3-04), and `file.scan.clamd_address` is `unix://` followed by an absolute path (cross-check
-   `clamd_address_unix`, [19-security.md](19-security.md) SEC-TLS-5, M3-04). In addition the loader checks a rule for a single key that no type expresses:
+   M3-04). In addition the loader checks a rule for a single key that no type expresses:
    `secrets.dir` is an absolute path in clean form (no `.` or `..`, no double or trailing `/`),
    not `/`, without a NUL character and without `<`, as the secret provider requires; a wrong
    value is a problem of `secrets.dir` alone, not of the references that use `<secrets.dir>`.

@@ -113,8 +113,7 @@ def test_clamd_conf_mandatory_options() -> None:
     opts = clamd_options()
     assert opts.get("AlertExceedsMax") == ["yes"]
     assert len(opts.get("LocalSocket", [])) == 1
-    if "TCPSocket" in opts:
-        assert opts.get("TCPAddr", [""])[0] in {"127.0.0.1", "localhost", "::1"}
+    assert "TCPSocket" not in opts, "clamd of the Compose stack listens on its Unix socket only"
     stream = clamd_size(opts["StreamMaxLength"][0])
     assert stream == int(chapter_default("12-files.md", "file.scan.clamd_stream_max_bytes"))
     max_upload = int(chapter_default("03-data-model.md", "file.max_upload_bytes"))

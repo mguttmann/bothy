@@ -83,7 +83,7 @@ type ScanMetrics interface {
 	ScanQueue(ctx context.Context, n int64)
 }
 
-// noScanMetrics records nothing (unit tests, 02 "Schichten im Modul" rule 5).
+// noScanMetrics records nothing (unit tests, 02 5 "Layers within a module" rule 5).
 type noScanMetrics struct{}
 
 func (noScanMetrics) ScanCompleted(context.Context, string, time.Duration) {}
