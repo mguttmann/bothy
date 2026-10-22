@@ -30,6 +30,15 @@ func holderInvalid() error {
 		WithFields(errs.FieldError{Pointer: pointerHolder, Code: "not_active_person", Detail: detail})
 }
 
+// checkReason checks the reason of a policy body: CheckReason, and with limit also
+// audit.reason_max_chars (M2-21 design note 2).
+func (s *Service) checkReason(reason string, limit bool) error {
+	if limit {
+		return domain.CheckReasonMax(reason, s.cfg.ReasonMaxChars)
+	}
+	return domain.CheckReason(reason)
+}
+
 // checkHolder refuses a holder that is unknown, not a person or not active. It reads inside the
 // ambient transaction, so the second unit of a change sees a holder disabled meanwhile.
 func (s *Service) checkHolder(ctx context.Context, holder ids.ID) error {
@@ -76,6 +85,11 @@ type change struct {
 	decide func(ctx context.Context, rec domain.Agent) (bool, error)
 	// apply changes rec and returns the audit details.
 	apply func(rec *domain.Agent) (auditing.Attrs, error)
+	// write, when set, replaces apply and the shared store, audit and event step: it writes the
+	// locked rec itself (the switch to organization through applySwitchToOrganization, M2-21).
+	write func(ctx context.Context, rec domain.Agent) (agents.Agent, error)
+	// limitReason checks the reason against audit.reason_max_chars as well (M2-21 design note 2).
+	limitReason bool
 }
 
 // run executes c for the agent id.
@@ -114,7 +128,7 @@ func (s *Service) runCheck(ctx context.Context, a actor.Actor, id ids.ID, c chan
 	if err != nil {
 		return agents.Agent{}, false, err
 	}
-	if err := domain.CheckReason(c.reason); err != nil {
+	if err := s.checkReason(c.reason, c.limitReason); err != nil {
 		return agents.Agent{}, false, err
 	}
 	if err := s.precondition(ctx, c.match, rec); err != nil {
@@ -145,6 +159,9 @@ func (s *Service) runWrite(ctx context.Context, id ids.ID, c change) (agents.Age
 		out, _, err := s.unchanged(ctx, c, rec)
 		return out, err
 	}
+	if c.write != nil {
+		return c.write(ctx, rec)
+	}
 	attrs, err := c.apply(&rec)
 	if err != nil {
 		return agents.Agent{}, err
@@ -167,8 +184,8 @@ func (s *Service) unchanged(ctx context.Context, c change, rec domain.Agent) (ag
 // same mode and holder answer the current agent without a write.
 func (s *Service) SetBillingMode(ctx context.Context, a actor.Actor, id ids.ID, cmd agents.BillingModeCmd) (agents.Agent, error) {
 	target := domain.Policy{Mode: domain.BillingMode(cmd.BillingMode), HolderID: cmd.CredentialHolderID}
-	return s.run(ctx, a, id, change{
-		act: authorize.ActionAgentBillingModeSet, reason: cmd.Reason, match: cmd.IfMatch,
+	c := change{
+		act: authorize.ActionAgentBillingModeSet, reason: cmd.Reason, match: cmd.IfMatch, limitReason: true,
 		decide: func(ctx context.Context, rec domain.Agent) (bool, error) {
 			changed, err := rec.Policy.To(target)
 			if err != nil || !changed {
@@ -183,14 +200,26 @@ func (s *Service) SetBillingMode(ctx context.Context, a actor.Actor, id ids.ID, 
 			}
 			return policyAttrs(from, target, cmd.Reason), nil
 		},
-	})
+	}
+	if target == organization {
+		// The shared apply step of every switch to organization (D-M2-21-5).
+		c.write = func(ctx context.Context, rec domain.Agent) (agents.Agent, error) {
+			from := rec.Policy
+			v, err := s.applySwitchToOrganization(ctx, a.ID, &rec)
+			if err != nil {
+				return agents.Agent{}, err
+			}
+			return v, s.record(ctx, authorize.ActionAgentBillingModeSet, rec.ID, policyAttrs(from, organization, cmd.Reason))
+		}
+	}
+	return s.run(ctx, a, id, c)
 }
 
 // SetCredentialHolder implements agents.Agents: only for a personal agent (else 409 conflict),
 // the holder an active person; I1 is checked for the agent.
 func (s *Service) SetCredentialHolder(ctx context.Context, a actor.Actor, id ids.ID, cmd agents.CredentialHolderCmd) (agents.Agent, error) {
 	return s.run(ctx, a, id, change{
-		act: authorize.ActionAgentCredentialHolderSet, reason: cmd.Reason, match: cmd.IfMatch,
+		act: authorize.ActionAgentCredentialHolderSet, reason: cmd.Reason, match: cmd.IfMatch, limitReason: true,
 		decide: func(ctx context.Context, rec domain.Agent) (bool, error) {
 			probe := rec
 			changed, err := probe.SetHolder(cmd.CredentialHolderID)
@@ -275,7 +304,7 @@ func (s *Service) checkAll(ctx context.Context, a actor.Actor, cmd agents.Billin
 	if err := s.check(ctx, a, authorize.ActionAgentBillingModeSetAll, instanceResource); err != nil {
 		return false, err
 	}
-	if err := domain.CheckReason(cmd.Reason); err != nil {
+	if err := domain.CheckReasonMax(cmd.Reason, s.cfg.ReasonMaxChars); err != nil {
 		return false, err
 	}
 	if _, err := (domain.Policy{}).To(target); err != nil {
@@ -352,24 +381,27 @@ func (s *Service) switchAll(ctx context.Context, a actor.Actor, cmd agents.Billi
 	if err != nil {
 		return nil, err
 	}
-	sw := switched{}
+	var pending []domain.Agent
+	var pendingIDs []ids.ID
 	for _, rec := range rows {
+		if rec.Policy != target {
+			pending, pendingIDs = append(pending, rec), append(pendingIDs, rec.ID)
+		}
+	}
+	if len(pending) > 0 && !cmd.AgentIDsGiven {
+		// Before the rows change, so their visible targets before the switch are recorded.
+		if err := s.d.Rights.AddAffected(ctx, pendingIDs...); err != nil {
+			return nil, err
+		}
+	}
+	sw := switched{}
+	for i := range pending {
+		rec := pending[i]
 		from := rec.Policy
-		ok, err := rec.SetPolicy(target, a.ID, s.d.Clock.Now())
-		if err != nil {
+		if err := s.switchOne(ctx, a.ID, &rec, target); err != nil {
 			return nil, err
 		}
-		if ok {
-			sw.add(rec, from)
-		}
-	}
-	if len(sw.ids) > 0 && !cmd.AgentIDsGiven {
-		if err := s.d.Rights.AddAffected(ctx, sw.ids...); err != nil {
-			return nil, err
-		}
-	}
-	if err := s.storeAll(ctx, sw.records); err != nil {
-		return nil, err
+		sw.add(rec, from)
 	}
 	return sw.ids, s.d.Audit.Record(ctx, auditing.Entry{
 		Action: string(authorize.ActionAgentBillingModeSetAll), Decision: auditing.DecisionAllow, ResourceKind: resourceInstance,
@@ -377,21 +409,18 @@ func (s *Service) switchAll(ctx context.Context, a actor.Actor, cmd agents.Billi
 	})
 }
 
-// storeAll writes the switched records and appends agent.updated for each.
-func (s *Service) storeAll(ctx context.Context, records []domain.Agent) error {
-	for _, rec := range records {
-		if err := s.d.Store.UpdateAgent(ctx, rec); err != nil {
-			return err
-		}
-		v, err := s.view(ctx, rec)
-		if err != nil {
-			return err
-		}
-		if err := s.emitUpdated(ctx, v); err != nil {
-			return err
-		}
+// switchOne switches the locked rec of SetBillingModeAll to target: organization through the
+// shared apply step (D-M2-21-5), personal with the same row write and event.
+func (s *Service) switchOne(ctx context.Context, by ids.ID, rec *domain.Agent, target domain.Policy) error {
+	if target == organization {
+		_, err := s.applySwitchToOrganization(ctx, by, rec)
+		return err
 	}
-	return nil
+	if _, err := rec.SetPolicy(target, by, s.d.Clock.Now()); err != nil {
+		return err
+	}
+	_, err := s.storeAndEmit(ctx, *rec)
+	return err
 }
 
 // lockForAll locks the rows of SetBillingModeAll in ascending id: the listed agents, or without a
@@ -410,14 +439,12 @@ func (s *Service) lockForAll(ctx context.Context, cmd agents.BillingModeAllCmd, 
 // switched collects the agents SetBillingModeAll changed with their old values.
 type switched struct {
 	ids                            []ids.ID
-	records                        []domain.Agent
 	changed, fromModes, held, from []auditing.Value
 }
 
 // add records rec, whose policy was from.
 func (sw *switched) add(rec domain.Agent, from domain.Policy) {
 	sw.ids = append(sw.ids, rec.ID)
-	sw.records = append(sw.records, rec)
 	sw.changed = append(sw.changed, auditing.ID(rec.ID))
 	sw.fromModes = append(sw.fromModes, auditing.Code(string(from.Mode)))
 	if !from.HolderID.IsZero() {

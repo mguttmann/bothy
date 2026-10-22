@@ -740,6 +740,16 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
 - The integration tests of the flags run in the session world (`adapters/httpapi/flags_test.go`,
   docs/DECISIONS.md M1-47).
 
+### Guided flow of owner.add (M2-21)
+
+`AddOwner` takes an optional `*identity.ResolveI1` (the port's own DTO). The first unit validates it
+together with the reason (`authz.I1Resolver.CheckResolveI1`); the second unit calls
+`authz.I1Resolver.ResolveI1` after the checks under the owner and user locks and before the owners
+row is inserted, so the listed agents are switched to `organization` in the same transaction. This
+is the way to a second owner while a personal agent exists (OQ-01, L22: I1 keeps no owner
+exception). `internal/wire` passes the resolver of authz (`IdentityWrites.Resolver`); without one
+a request with `resolve_i1` fails with kind internal.
+
 ### Principal writer (M1-51)
 
 - Port (`principals.go`): `PrincipalWriter` with `CreatePrincipal` (`CreatePrincipalCmd`: optional

@@ -30,6 +30,9 @@ type Config struct {
 	PageSizeDefault int `config:"api.page_size_default"`
 	// PageSizeMax is api.page_size_max; larger limits are capped.
 	PageSizeMax int `config:"api.page_size_max"`
+	// ReasonMaxChars is audit.reason_max_chars, the longest reason of agent.billing_mode.set,
+	// agent.billing_mode.set_all and agent.credential_holder.set (SEC-AUD-5, M2-21).
+	ReasonMaxChars int `config:"audit.reason_max_chars"`
 }
 
 // Deps are the collaborators of the agents use cases.
@@ -71,7 +74,8 @@ type Service struct {
 // Compile-time check: the incoming port.
 var _ agents.Agents = (*Service)(nil)
 
-// New returns the use cases. Errors: a missing collaborator or a page size below 1.
+// New returns the use cases. Errors: a missing collaborator, a page size below 1 or an
+// audit.reason_max_chars below 1.
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Store == nil || d.Principals == nil || d.Directory == nil || d.Tokens == nil || d.Rights == nil || d.UoW == nil ||
 		d.Authorizer == nil || d.Audit == nil || d.Events == nil || d.Cursors == nil {
@@ -79,6 +83,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault {
 		return nil, errors.New("agents: page sizes must be at least 1, the default not above the maximum")
+	}
+	if cfg.ReasonMaxChars < 1 {
+		return nil, errors.New("agents: audit.reason_max_chars must be at least 1")
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
@@ -186,6 +193,10 @@ func (s *Service) presence(rec domain.Agent) agents.PresenceStatus {
 // agentView converts a record and its principal.
 func (s *Service) agentView(rec domain.Agent, p identity.PrincipalView) agents.Agent {
 	presence := s.presence(rec)
+	// The tracker learns a desired mode changed in another unit of work (the guided flow of
+	// M2-21) only with the next heartbeat, so the comparison takes the desired mode of this read
+	// (M2-21 design note 8, docs/DECISIONS.md D-M2-21-7).
+	presence.BillingModeMatches = presence.ReportedBillingMode == "" || presence.ReportedBillingMode == string(rec.Policy.Mode)
 	return agents.Agent{
 		ID: rec.ID, Handle: p.Handle, DisplayName: p.DisplayName, AvatarFileID: p.AvatarFileID, Status: string(p.Status),
 		AdapterKind: rec.AdapterKind, Description: rec.Description, BillingMode: string(rec.Policy.Mode),

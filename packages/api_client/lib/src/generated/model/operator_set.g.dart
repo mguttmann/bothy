@@ -13,12 +13,18 @@ class _$OperatorSet extends OperatorSet {
   final String? agentId;
   @override
   final String reason;
+  @override
+  final ResolveI1? resolveI1;
 
   factory _$OperatorSet([void Function(OperatorSetBuilder)? updates]) =>
       (OperatorSetBuilder()..update(updates))._build();
 
-  _$OperatorSet._({required this.mode, this.agentId, required this.reason})
-    : super._();
+  _$OperatorSet._({
+    required this.mode,
+    this.agentId,
+    required this.reason,
+    this.resolveI1,
+  }) : super._();
   @override
   OperatorSet rebuild(void Function(OperatorSetBuilder) updates) =>
       (toBuilder()..update(updates)).build();
@@ -32,7 +38,8 @@ class _$OperatorSet extends OperatorSet {
     return other is OperatorSet &&
         mode == other.mode &&
         agentId == other.agentId &&
-        reason == other.reason;
+        reason == other.reason &&
+        resolveI1 == other.resolveI1;
   }
 
   @override
@@ -41,6 +48,7 @@ class _$OperatorSet extends OperatorSet {
     _$hash = $jc(_$hash, mode.hashCode);
     _$hash = $jc(_$hash, agentId.hashCode);
     _$hash = $jc(_$hash, reason.hashCode);
+    _$hash = $jc(_$hash, resolveI1.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -50,7 +58,8 @@ class _$OperatorSet extends OperatorSet {
     return (newBuiltValueToStringHelper(r'OperatorSet')
           ..add('mode', mode)
           ..add('agentId', agentId)
-          ..add('reason', reason))
+          ..add('reason', reason)
+          ..add('resolveI1', resolveI1))
         .toString();
   }
 }
@@ -70,6 +79,10 @@ class OperatorSetBuilder implements Builder<OperatorSet, OperatorSetBuilder> {
   String? get reason => _$this._reason;
   set reason(String? reason) => _$this._reason = reason;
 
+  ResolveI1Builder? _resolveI1;
+  ResolveI1Builder get resolveI1 => _$this._resolveI1 ??= ResolveI1Builder();
+  set resolveI1(ResolveI1Builder? resolveI1) => _$this._resolveI1 = resolveI1;
+
   OperatorSetBuilder() {
     OperatorSet._defaults(this);
   }
@@ -80,6 +93,7 @@ class OperatorSetBuilder implements Builder<OperatorSet, OperatorSetBuilder> {
       _mode = $v.mode;
       _agentId = $v.agentId;
       _reason = $v.reason;
+      _resolveI1 = $v.resolveI1?.toBuilder();
       _$v = null;
     }
     return this;
@@ -99,21 +113,38 @@ class OperatorSetBuilder implements Builder<OperatorSet, OperatorSetBuilder> {
   OperatorSet build() => _build();
 
   _$OperatorSet _build() {
-    final _$result =
-        _$v ??
-        _$OperatorSet._(
-          mode: BuiltValueNullFieldError.checkNotNull(
-            mode,
-            r'OperatorSet',
-            'mode',
-          ),
-          agentId: agentId,
-          reason: BuiltValueNullFieldError.checkNotNull(
-            reason,
-            r'OperatorSet',
-            'reason',
-          ),
+    _$OperatorSet _$result;
+    try {
+      _$result =
+          _$v ??
+          _$OperatorSet._(
+            mode: BuiltValueNullFieldError.checkNotNull(
+              mode,
+              r'OperatorSet',
+              'mode',
+            ),
+            agentId: agentId,
+            reason: BuiltValueNullFieldError.checkNotNull(
+              reason,
+              r'OperatorSet',
+              'reason',
+            ),
+            resolveI1: _resolveI1?.build(),
+          );
+    } catch (_) {
+      late String _$failedField;
+      try {
+        _$failedField = 'resolveI1';
+        _resolveI1?.build();
+      } catch (e) {
+        throw BuiltValueNestedFieldError(
+          r'OperatorSet',
+          _$failedField,
+          e.toString(),
         );
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

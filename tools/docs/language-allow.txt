@@ -27,6 +27,7 @@ path: packages/bothy_viz/harness/test/harness_test.dart
 path: services/server/internal/authz/domain/previewtext/catalog_de.go
 path: services/server/internal/authz/domain/previewtext/testdata/example_07_de.golden
 path: services/server/internal/authz/domain/previewtext/testdata/example_host_de.golden
+path: services/server/internal/authz/domain/previewtext/testdata/example_switch_de.golden
 # Third-party files, kept byte for byte as published.
 path: tools/design-tokens/vendor/fonts/*
 path: tools/design-tokens/vendor/phosphor/*

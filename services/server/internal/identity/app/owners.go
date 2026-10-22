@@ -4,7 +4,9 @@ package app
 
 import (
 	"context"
+	"slices"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -37,26 +39,46 @@ func ownerChange(act authorize.Action, userID ids.ID) txn.Option {
 // id) and the person, checks the state again and inserts the owners row. The rights hook then
 // verifies I1 and SR8: a personal agent in the instance gives 409 i1_violation, because an owner
 // has trigger everywhere (07 SR1, AZ-M23).
-func (s *People) AddOwner(ctx context.Context, a actor.Actor, userID ids.ID, reason string) (identity.OwnerView, error) {
+//
+// With resolve (the guided flow, M2-21) the first unit also validates it with the reason, and the
+// second unit lets authz switch the listed agents after the checks under the locks and before the
+// owners row is inserted, so a second owner becomes possible while a personal agent exists
+// (OQ-01, L22: I1 keeps no owner exception).
+func (s *People) AddOwner(ctx context.Context, a actor.Actor, userID ids.ID, reason string, resolve *identity.ResolveI1) (identity.OwnerView, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
 		return identity.OwnerView{}, err
 	}
-	err = s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.addOwnerCheck(ctx, a, userID, reason) })
+	req := resolveRequest(resolve)
+	err = s.d.UoW.Do(ctx, func(ctx context.Context) error { return s.addOwnerCheck(ctx, a, userID, reason, req) })
 	if err != nil {
 		return identity.OwnerView{}, err
 	}
 	var out identity.OwnerView
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		out, err = s.addOwnerWrite(ctx, a, userID, reason)
+		out, err = s.addOwnerWrite(ctx, a, userID, reason, req)
 		return err
 	}, ownerChange(authorize.ActionOwnerAdd, userID))
 	return out, err
 }
 
-// addOwnerCheck is the first unit of AddOwner.
-func (s *People) addOwnerCheck(ctx context.Context, a actor.Actor, userID ids.ID, reason string) error {
+// resolveRequest converts the guided flow of the port into the request of authz; nil stays nil.
+func resolveRequest(r *identity.ResolveI1) *authz.ResolveI1 {
+	if r == nil {
+		return nil
+	}
+	return &authz.ResolveI1{AgentIDs: slices.Clone(r.AgentIDs), Reason: r.Reason}
+}
+
+// errNoResolver is the refusal of a guided flow without a bound resolver (fail closed).
+func errNoResolver() error {
+	return errs.New(errs.CodeInternalError, "identity: the guided flow needs the resolver of authz")
+}
+
+// addOwnerCheck is the first unit of AddOwner. The field errors of the reason and of resolve_i1
+// come in one answer (06 section 5 point 3).
+func (s *People) addOwnerCheck(ctx context.Context, a actor.Actor, userID ids.ID, reason string, req *authz.ResolveI1) error {
 	rec, found, err := s.d.Store.User(ctx, userID)
 	if err != nil {
 		return err
@@ -64,14 +86,44 @@ func (s *People) addOwnerCheck(ctx context.Context, a actor.Actor, userID ids.ID
 	if err := s.checkThenFound(ctx, a, authorize.ActionOwnerAdd, userID, found); err != nil {
 		return err
 	}
-	if err := domain.CheckReason(reason); err != nil {
+	var resolveErr error
+	if req != nil {
+		if s.d.Resolver == nil {
+			return errNoResolver()
+		}
+		resolveErr = s.d.Resolver.CheckResolveI1(*req)
+	}
+	if err := joinFieldErrors(domain.CheckReason(reason), resolveErr); err != nil {
 		return err
 	}
 	return ownerCandidate(rec)
 }
 
+// joinFieldErrors returns the validation errors of list as one validation_failed with all their
+// field errors, or the first error of another code; nil entries are skipped.
+func joinFieldErrors(list ...error) error {
+	var out *errs.Error
+	for _, err := range list {
+		if err == nil {
+			continue
+		}
+		e, ok := errs.As(err)
+		if !ok || e.Code != errs.CodeValidationFailed {
+			return err
+		}
+		if out == nil {
+			out = errs.New(errs.CodeValidationFailed, e.Detail)
+		}
+		out = out.WithFields(e.Fields...)
+	}
+	if out == nil {
+		return nil
+	}
+	return out
+}
+
 // addOwnerWrite is the second unit of AddOwner, declared as the rights change.
-func (s *People) addOwnerWrite(ctx context.Context, a actor.Actor, userID ids.ID, reason string) (identity.OwnerView, error) {
+func (s *People) addOwnerWrite(ctx context.Context, a actor.Actor, userID ids.ID, reason string, req *authz.ResolveI1) (identity.OwnerView, error) {
 	if _, err := s.d.Store.LockActiveOwners(ctx); err != nil {
 		return identity.OwnerView{}, err
 	}
@@ -84,6 +136,15 @@ func (s *People) addOwnerWrite(ctx context.Context, a actor.Actor, userID ids.ID
 	}
 	if err := ownerCandidate(rec); err != nil {
 		return identity.OwnerView{}, err
+	}
+	if req != nil {
+		// After the checks under the locks, before the first write (M2-21 design note 3 e).
+		if s.d.Resolver == nil {
+			return identity.OwnerView{}, errNoResolver()
+		}
+		if err := s.d.Resolver.ResolveI1(ctx, a, *req); err != nil {
+			return identity.OwnerView{}, err
+		}
 	}
 	o, err := domain.NewOwner(ids.New(), userID, a.ID, reason)
 	if err != nil {

@@ -1,0 +1,7 @@
+First Assistent is switched to Organization; the organization key then bears the costs.
+First Helfer is switched to Organization; the organization key then bears the costs.
+The adapter of Helfer does not report an organization key yet. Invocations fail until it is switched.
+Sam gets the level "Trigger" in channel Research/Notizen.
+Sam can then: read and write messages, create threads, trigger agent Assistent.
+Upload files: no. Confirm approval cards: no.
+Note: the grant for Sam has no expiry date.

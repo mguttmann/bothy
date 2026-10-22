@@ -109,6 +109,10 @@ def sync_detailed(
 ) -> Response[Channel | Problem]:
     """Set or inherit the operator of a channel
 
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         if_match (str):
@@ -144,6 +148,10 @@ def sync(
 ) -> Channel | Problem | None:
     """Set or inherit the operator of a channel
 
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         if_match (str):
@@ -173,6 +181,10 @@ async def asyncio_detailed(
     if_match: str,
 ) -> Response[Channel | Problem]:
     """Set or inherit the operator of a channel
+
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -206,6 +218,10 @@ async def asyncio(
     if_match: str,
 ) -> Channel | Problem | None:
     """Set or inherit the operator of a channel
+
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

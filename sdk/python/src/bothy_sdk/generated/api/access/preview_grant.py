@@ -85,7 +85,10 @@ def sync_detailed(
     The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
     `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
     is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-    (07, 9.3).
+    (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+    agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+    step-up; an unknown or invisible agent gives `404`), the agents are switched to
+    `organization` before the grant, and `text` names each agent the request would switch.
 
     Args:
         body (GrantCreate): `level` is required for every target except `host`, where it must be
@@ -122,7 +125,10 @@ def sync(
     The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
     `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
     is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-    (07, 9.3).
+    (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+    agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+    step-up; an unknown or invisible agent gives `404`), the agents are switched to
+    `organization` before the grant, and `text` names each agent the request would switch.
 
     Args:
         body (GrantCreate): `level` is required for every target except `host`, where it must be
@@ -154,7 +160,10 @@ async def asyncio_detailed(
     The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
     `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
     is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-    (07, 9.3).
+    (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+    agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+    step-up; an unknown or invisible agent gives `404`), the agents are switched to
+    `organization` before the grant, and `text` names each agent the request would switch.
 
     Args:
         body (GrantCreate): `level` is required for every target except `host`, where it must be
@@ -189,7 +198,10 @@ async def asyncio(
     The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
     `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
     is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-    (07, 9.3).
+    (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+    agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+    step-up; an unknown or invisible agent gives `404`), the agents are switched to
+    `organization` before the grant, and `text` names each agent the request would switch.
 
     Args:
         body (GrantCreate): `level` is required for every target except `host`, where it must be

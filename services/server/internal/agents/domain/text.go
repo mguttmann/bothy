@@ -6,6 +6,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
@@ -52,6 +53,22 @@ func CheckDescription(s string) error {
 // and bidi characters (SEC-IN-4, SEC-AUD-5). Errors: validation_failed on /reason.
 func CheckReason(s string) error {
 	return displayText("/reason", "reason", s, true)
+}
+
+// FieldTooLong marks a value above its configured length (the code of platform/httpserver).
+const FieldTooLong = "too_long"
+
+// CheckReasonMax is CheckReason plus a length of at most maxChars characters
+// (audit.reason_max_chars, SEC-AUD-5; M2-21 design note 2). Errors: validation_failed on /reason
+// with code required, a textcheck rule or too_long.
+func CheckReasonMax(s string, maxChars int) error {
+	if err := CheckReason(s); err != nil {
+		return err
+	}
+	if utf8.RuneCountInString(strings.TrimSpace(s)) > maxChars {
+		return fieldError("/reason", FieldTooLong, "the reason is longer than audit.reason_max_chars")
+	}
+	return nil
 }
 
 // displayText checks s under SEC-IN-4 and, with required, that it is not blank. The error never

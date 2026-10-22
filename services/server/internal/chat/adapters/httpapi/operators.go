@@ -10,6 +10,19 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
+// operatorResolve converts the member resolve_i1 of an OperatorSet body (schema ResolveI1,
+// M2-21); nil stays nil.
+func operatorResolve(b *rest.OperatorSet) *chat.ResolveI1 {
+	if b == nil || b.ResolveI1 == nil {
+		return nil
+	}
+	out := &chat.ResolveI1{Reason: b.ResolveI1.Reason, AgentIDs: make([]ids.ID, 0, len(b.ResolveI1.SwitchToOrganization))}
+	for _, id := range b.ResolveI1.SwitchToOrganization {
+		out.AgentIDs = append(out.AgentIDs, ids.ID(id))
+	}
+	return out
+}
+
 // operatorSet converts an OperatorSet body; an absent agent_id is the zero ID.
 func operatorSet(b *rest.OperatorSet) (chat.OperatorAssignment, string) {
 	if b == nil {
@@ -26,7 +39,7 @@ func operatorSet(b *rest.OperatorSet) (chat.OperatorAssignment, string) {
 func (h *Spaces) SetSpaceOperator(ctx context.Context, req rest.SetSpaceOperatorRequestObject) (rest.SetSpaceOperatorResponseObject, error) {
 	op, reason := operatorSet(req.Body)
 	sp, err := h.structure.SetSpaceOperator(ctx, principal(ctx), chat.SetSpaceOperatorCmd{
-		SpaceID: ids.ID(req.SpaceId), Operator: op, Reason: reason, IfMatch: precondition(req.Params.IfMatch),
+		SpaceID: ids.ID(req.SpaceId), Operator: op, Reason: reason, IfMatch: precondition(req.Params.IfMatch), ResolveI1: operatorResolve(req.Body),
 	})
 	if err != nil {
 		return nil, err
@@ -39,7 +52,7 @@ func (h *Spaces) SetSpaceOperator(ctx context.Context, req rest.SetSpaceOperator
 func (h *Channels) SetChannelOperator(ctx context.Context, req rest.SetChannelOperatorRequestObject) (rest.SetChannelOperatorResponseObject, error) {
 	op, reason := operatorSet(req.Body)
 	c, err := h.structure.SetChannelOperator(ctx, principal(ctx), chat.SetChannelOperatorCmd{
-		ChannelID: ids.ID(req.ChannelId), Operator: op, Reason: reason, IfMatch: precondition(req.Params.IfMatch),
+		ChannelID: ids.ID(req.ChannelId), Operator: op, Reason: reason, IfMatch: precondition(req.Params.IfMatch), ResolveI1: operatorResolve(req.Body),
 	})
 	if err != nil {
 		return nil, err

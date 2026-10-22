@@ -50,6 +50,9 @@ type Agents struct {
 	Handlers *agentshttp.Agents
 	// Presence is the presence tracker of the process (M2-20, BindPresence); nil until bound.
 	Presence *agentsapp.Tracker
+	// Switch implements authz.AgentPolicySwitch over Service (M2-21); the start steps bind it into
+	// the resolver of authz (AuthzAdmin.BindAgentPolicySwitch).
+	Switch *authzsource.Switch
 }
 
 // NewAgents builds the agents module over pool with the unit of work uow, the Authorizer az, the
@@ -74,5 +77,5 @@ func NewAgents(cfg agentsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az autho
 	if err != nil {
 		return nil, err
 	}
-	return &Agents{Service: svc, Consumers: cons, Handlers: agentshttp.New(svc, cons)}, nil
+	return &Agents{Service: svc, Consumers: cons, Handlers: agentshttp.New(svc, cons), Switch: authzsource.NewSwitch(svc)}, nil
 }

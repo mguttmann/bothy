@@ -121,6 +121,9 @@ type Deps struct {
 	Errors ErrorCounter
 	// Log receives the record of such a filter mismatch; nil means slog.Default().
 	Log *slog.Logger
+	// Resolver runs the guided flow resolve_i1 of space.operator.set and channel.operator.set
+	// (authz, M2-21); nil refuses a request with resolve_i1 with kind internal (fail closed).
+	Resolver authz.I1Resolver
 }
 
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06 section 6
