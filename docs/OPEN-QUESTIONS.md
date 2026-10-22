@@ -97,6 +97,12 @@ Sorted by deadline.
   that route is excluded there, with `personal` only `/login` in a session remains; if that does not
   work either for a user without a login session, the host offers the profile `claude` only with
   `organization`.
+- **Result of the check (M2-45, D-M2-45-1, pages retrieved 2026-10-20):** both routes are
+  documented: the token of `claude setup-token` in `CLAUDE_CODE_OAUTH_TOKEN` and `/login` with the
+  login in a file of the home (on macOS in the keychain, with the file as fallback when the
+  keychain refuses the write). No sentence of the pages restricts either route to non-interactive
+  use, so the host offers the profile `claude` with `personal`; the quotes stand in
+  [chapter 24](spec/24-terminal.md) section 7.4. The question itself stays with the owner.
 - **Due by:** before M2-45.
 
 ### OQ-04: Content recording of terminal sessions
