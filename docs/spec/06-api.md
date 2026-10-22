@@ -470,6 +470,11 @@ all texts of the YAML files (R-API-15); every response component names its statu
    agents, backend policy, credential holder, templates, components, commands, branding and
    "mark as unread". If `If-Match` is missing: `428 precondition_required`. If it does not match:
    `412 version_conflict` with the current version in `current`.
+   Branding here means name and accent (`updateBranding`). The logo is replaced or removed as a
+   whole with `uploadBrandingLogo` and `deleteBrandingLogo` without `If-Match`: last write wins,
+   and the lock on the setting row `branding.logo_file_id` serializes concurrent writes. Every
+   logo change still raises the branding version, so an older `If-Match` of `updateBranding`
+   fails with `412` (D-M3-10-11).
 3. Where "last write wins" applies (instance settings, switches, project binding,
    thread tags), `If-Match` is optional and is checked when it is sent.
 4. Personal sync data follow 04, section 14: drafts with `base_version` and

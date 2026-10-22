@@ -100,6 +100,11 @@ type Store interface {
 	// UpdateUser writes display name, e-mail, locale and time zone of u (handle, kind and
 	// status stay). The caller runs it inside a unit of work.
 	UpdateUser(ctx context.Context, u domain.User) error
+	// SetAvatar sets avatar_file_id of the person id to fileID; the zero ID clears it (M3-10). The
+	// caller locks the person first (LockUser) and runs it inside that unit of work. Errors:
+	// internal for a fileID without files row (the foreign key; the id comes from
+	// AvatarFiles.Stage, never from the client) and for an unknown person.
+	SetAvatar(ctx context.Context, id, fileID ids.ID) error
 	// EnableUser sets a pending or disabled person active and clears disabled_at. user.enable
 	// is a rights change: the caller declares it.
 	EnableUser(ctx context.Context, id ids.ID) error

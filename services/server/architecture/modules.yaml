@@ -144,7 +144,9 @@ modules:
     events: [file.updated]
     ephemeral_events: []
     ws_ops: []
-    depends_on: [identity, chat]
+    # M3-10: instance for the source port LogoFiles that adapters/profileimages implements; the edge
+    # points down to the lowest layer and makes no cycle (docs/decisions.d/M3-10.md D-M3-10-1).
+    depends_on: [identity, chat, instance]
     # The S3 driver (M3-02); depguard in .golangci.yml narrows the SDK to adapters/s3, because
     # go-arch-lint grants a vendor to all adapters of a module (docs/DECISIONS.md M3-02/12).
     # M3-03: sqlc code and the repository (pgx), NFC of file names (xtext, adapters/unicode), the

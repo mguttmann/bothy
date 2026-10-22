@@ -417,6 +417,15 @@ type ServerInterface interface {
 	// UpdateBranding Change branding
 	// (PUT /instance/branding)
 	UpdateBranding(w http.ResponseWriter, r *http.Request, params UpdateBrandingParams)
+	// DeleteBrandingLogo Remove the logo
+	// (DELETE /instance/branding/logo)
+	DeleteBrandingLogo(w http.ResponseWriter, r *http.Request)
+	// GetBrandingLogo Download the instance logo
+	// (GET /instance/branding/logo)
+	GetBrandingLogo(w http.ResponseWriter, r *http.Request)
+	// UploadBrandingLogo Upload the logo
+	// (PUT /instance/branding/logo)
+	UploadBrandingLogo(w http.ResponseWriter, r *http.Request)
 	// GetDiscovery Public instance metadata
 	// (GET /instance/discovery)
 	GetDiscovery(w http.ResponseWriter, r *http.Request)
@@ -435,6 +444,12 @@ type ServerInterface interface {
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// DeleteMyAvatar Remove own avatar
+	// (DELETE /me/avatar)
+	DeleteMyAvatar(w http.ResponseWriter, r *http.Request)
+	// SetMyAvatar Upload own avatar
+	// (PUT /me/avatar)
+	SetMyAvatar(w http.ResponseWriter, r *http.Request)
 	// GetMyCredentials List own identities and passkeys
 	// (GET /me/credentials)
 	GetMyCredentials(w http.ResponseWriter, r *http.Request)
@@ -6232,6 +6247,48 @@ func (siw *ServerInterfaceWrapper) UpdateBranding(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteBrandingLogo operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBrandingLogo(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBrandingLogo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBrandingLogo operation middleware
+func (siw *ServerInterfaceWrapper) GetBrandingLogo(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBrandingLogo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadBrandingLogo operation middleware
+func (siw *ServerInterfaceWrapper) UploadBrandingLogo(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadBrandingLogo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetDiscovery operation middleware
 func (siw *ServerInterfaceWrapper) GetDiscovery(w http.ResponseWriter, r *http.Request) {
 
@@ -6343,6 +6400,34 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMyAvatar operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMyAvatar(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMyAvatar(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetMyAvatar operation middleware
+func (siw *ServerInterfaceWrapper) SetMyAvatar(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetMyAvatar(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10478,6 +10563,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/discovery", wrapper.GetDiscovery)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/jwks", wrapper.GetJwks)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/webhook-keys", wrapper.GetWebhookKeys)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/instance/branding/logo", wrapper.DeleteBrandingLogo)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/branding/logo", wrapper.GetBrandingLogo)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/branding/logo", wrapper.UploadBrandingLogo)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/problems/{code}", wrapper.GetProblemType)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/oidc/begin", wrapper.BeginOidcLogin)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/oidc/callback", wrapper.HandleOidcCallback)
@@ -10504,6 +10592,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/csp-reports", wrapper.SubmitCspReport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me/profile", wrapper.UpdateMyProfile)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/avatar", wrapper.DeleteMyAvatar)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/avatar", wrapper.SetMyAvatar)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/credentials", wrapper.GetMyCredentials)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/identities/begin", wrapper.BeginIdentityLink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/identities/complete", wrapper.CompleteIdentityLink)
@@ -11300,6 +11390,15 @@ type StrictServerInterface interface {
 	// UpdateBranding Change branding
 	// (PUT /instance/branding)
 	UpdateBranding(ctx context.Context, request UpdateBrandingRequestObject) (UpdateBrandingResponseObject, error)
+	// DeleteBrandingLogo Remove the logo
+	// (DELETE /instance/branding/logo)
+	DeleteBrandingLogo(ctx context.Context, request DeleteBrandingLogoRequestObject) (DeleteBrandingLogoResponseObject, error)
+	// GetBrandingLogo Download the instance logo
+	// (GET /instance/branding/logo)
+	GetBrandingLogo(ctx context.Context, request GetBrandingLogoRequestObject) (GetBrandingLogoResponseObject, error)
+	// UploadBrandingLogo Upload the logo
+	// (PUT /instance/branding/logo)
+	UploadBrandingLogo(ctx context.Context, request UploadBrandingLogoRequestObject) (UploadBrandingLogoResponseObject, error)
 	// GetDiscovery Public instance metadata
 	// (GET /instance/discovery)
 	GetDiscovery(ctx context.Context, request GetDiscoveryRequestObject) (GetDiscoveryResponseObject, error)
@@ -11318,6 +11417,12 @@ type StrictServerInterface interface {
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// DeleteMyAvatar Remove own avatar
+	// (DELETE /me/avatar)
+	DeleteMyAvatar(ctx context.Context, request DeleteMyAvatarRequestObject) (DeleteMyAvatarResponseObject, error)
+	// SetMyAvatar Upload own avatar
+	// (PUT /me/avatar)
+	SetMyAvatar(ctx context.Context, request SetMyAvatarRequestObject) (SetMyAvatarResponseObject, error)
 	// GetMyCredentials List own identities and passkeys
 	// (GET /me/credentials)
 	GetMyCredentials(ctx context.Context, request GetMyCredentialsRequestObject) (GetMyCredentialsResponseObject, error)
@@ -15711,6 +15816,85 @@ func (sh *strictHandler) UpdateBranding(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// DeleteBrandingLogo operation middleware
+func (sh *strictHandler) DeleteBrandingLogo(w http.ResponseWriter, r *http.Request) {
+	var request DeleteBrandingLogoRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteBrandingLogo(ctx, request.(DeleteBrandingLogoRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteBrandingLogo")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteBrandingLogoResponseObject); ok {
+		if err := validResponse.VisitDeleteBrandingLogoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetBrandingLogo operation middleware
+func (sh *strictHandler) GetBrandingLogo(w http.ResponseWriter, r *http.Request) {
+	var request GetBrandingLogoRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBrandingLogo(ctx, request.(GetBrandingLogoRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBrandingLogo")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetBrandingLogoResponseObject); ok {
+		if err := validResponse.VisitGetBrandingLogoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadBrandingLogo operation middleware
+func (sh *strictHandler) UploadBrandingLogo(w http.ResponseWriter, r *http.Request) {
+	var request UploadBrandingLogoRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadBrandingLogo(ctx, request.(UploadBrandingLogoRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadBrandingLogo")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadBrandingLogoResponseObject); ok {
+		if err := validResponse.VisitUploadBrandingLogoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDiscovery operation middleware
 func (sh *strictHandler) GetDiscovery(w http.ResponseWriter, r *http.Request) {
 	var request GetDiscoveryRequestObject
@@ -15858,6 +16042,61 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteMyAvatar operation middleware
+func (sh *strictHandler) DeleteMyAvatar(w http.ResponseWriter, r *http.Request) {
+	var request DeleteMyAvatarRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMyAvatar(ctx, request.(DeleteMyAvatarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMyAvatar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMyAvatarResponseObject); ok {
+		if err := validResponse.VisitDeleteMyAvatarResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetMyAvatar operation middleware
+func (sh *strictHandler) SetMyAvatar(w http.ResponseWriter, r *http.Request) {
+	var request SetMyAvatarRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetMyAvatar(ctx, request.(SetMyAvatarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetMyAvatar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetMyAvatarResponseObject); ok {
+		if err := validResponse.VisitSetMyAvatarResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

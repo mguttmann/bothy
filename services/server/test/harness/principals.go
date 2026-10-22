@@ -149,6 +149,30 @@ func (s *Server) NewAgent(tb testing.TB, spec AgentSpec) *Client {
 	return &Client{PrincipalID: agent.ID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true, proofs: s.proofs, tokens: s.tokens}
 }
 
+// NewTokenClient creates an API token of the principal of c through the public API as the owner
+// (createToken with a fresh DPoP key) and returns a client that acts with it: a personal API
+// token of a person, which never carries a step-up (07 SR5). Errors fail tb.
+func (s *Server) NewTokenClient(tb testing.TB, c *Client) *Client {
+	tb.Helper()
+	key := newDeviceKey()
+	jwk, err := jose.ParseJWK(key.jwk)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	tok := MustDo(tb, s.Owner, Request{Method: http.MethodPost, Path: "/principals/" + c.PrincipalID + "/tokens", Body: map[string]any{
+		"name": "harness", "dpop_jkt": jwk.Thumbprint(), "expires_at": s.clk.Now().Add(apiTokenTTL).UTC().Format("2006-01-02T15:04:05.000Z"),
+	}}, http.StatusCreated)
+	var token struct {
+		Secret string `json:"secret"`
+	}
+	tok.JSON(tb, &token)
+	if s.tokens != nil {
+		s.tokens(token.Secret, "")
+	}
+	return &Client{PrincipalID: c.PrincipalID, publicURL: s.PublicURL, http: s.http, tb: s.tb, key: key, access: token.Secret, apiToken: true,
+		proofs: s.proofs, tokens: s.tokens}
+}
+
 // ifMatch returns an If-Match header for version.
 func ifMatch(version int64) http.Header {
 	h := http.Header{}

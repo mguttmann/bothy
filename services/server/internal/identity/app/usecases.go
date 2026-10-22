@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
@@ -68,6 +69,11 @@ type PeopleDeps struct {
 type People struct {
 	cfg Config
 	d   PeopleDeps
+
+	// avatarMu guards avatarFiles: internal/wire builds files after identity and binds it later
+	// (BindAvatarFiles, M3-10).
+	avatarMu    sync.RWMutex
+	avatarFiles identity.AvatarFiles
 }
 
 // Compile-time checks: the two incoming ports.

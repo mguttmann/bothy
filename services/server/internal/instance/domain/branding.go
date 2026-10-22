@@ -2,7 +2,11 @@
 
 package domain
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
 
 // BrandingVersion returns the version of the branding: the sum of the versions of
 // branding.product_name, branding.accent_color and branding.logo_file_id, 0 for a key without a
@@ -32,4 +36,18 @@ func BrandingChanges(cur, next BrandingValues) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// LogoFileID returns the logo file id of the stored value of branding.logo_file_id: the zero id
+// for NoLogo, which Branding and discovery treat like an absent row (brief M3-10 design note 9).
+// Errors: a value that is neither NoLogo nor a UUIDv7.
+//
+// Example:
+//
+//	id, err := domain.LogoFileID("") // zero id, nil: no logo
+func LogoFileID(stored string) (ids.ID, error) {
+	if stored == NoLogo {
+		return ids.ID{}, nil
+	}
+	return ids.Parse(stored)
 }

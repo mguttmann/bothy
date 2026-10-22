@@ -502,7 +502,7 @@ func newEnv(t testing.TB, driver string, cfg app.Config) *env {
 	}
 	e.scans = &scanQueue{}
 	svc, err := app.New(cfg, app.Deps{Repo: e.repo, Parts: parts, UoW: e.uow, Authorizer: e.az, Events: e.events,
-		Channels: channels{space: ids.New()}, Names: names{}, Types: types{"image/png": {".png"}}, FreeSpace: fs, Clock: e.clk,
+		Channels: channels{space: ids.New()}, Names: names{}, Types: types{"image/png": {".png"}}, FreeSpace: fs, Clock: e.clk, Store: e.store,
 		ScanQueue: e.scans})
 	if err != nil {
 		t.Fatal(err)

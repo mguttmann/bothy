@@ -53,6 +53,13 @@ def sync_detailed(
 ) -> Response[Problem]:
     """Download the instance logo
 
+     Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the
+    server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and
+    while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant
+    `medium`, always with the same status, body and headers. The response carries `Content-Disposition:
+    inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-
+    Allow-Origin: *` without credentials; `Range` is ignored.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -76,6 +83,13 @@ def sync(
 ) -> Problem | None:
     """Download the instance logo
 
+     Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the
+    server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and
+    while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant
+    `medium`, always with the same status, body and headers. The response carries `Content-Disposition:
+    inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-
+    Allow-Origin: *` without credentials; `Range` is ignored.
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -94,6 +108,13 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[Problem]:
     """Download the instance logo
+
+     Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the
+    server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and
+    while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant
+    `medium`, always with the same status, body and headers. The response carries `Content-Disposition:
+    inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-
+    Allow-Origin: *` without credentials; `Range` is ignored.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -115,6 +136,13 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> Problem | None:
     """Download the instance logo
+
+     Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the
+    server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and
+    while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant
+    `medium`, always with the same status, body and headers. The response carries `Content-Disposition:
+    inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-
+    Allow-Origin: *` without credentials; `Range` is ignored.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

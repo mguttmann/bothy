@@ -119,7 +119,7 @@ func TestAgentInvoke_NewThreadUsesMainRule(t *testing.T) {
 func TestEventTarget_AudienceAgent(t *testing.T) {
 	w := newWorld(t)
 	ctx := authorize.Filter(context.Background())
-	r := authorize.ResourceFromEvent("run", ids.New(), w.support, w.allgemein, w.mainThread[w.allgemein])
+	r := authorize.ResourceFromEvent("run", ids.New(), w.support, w.allgemein, w.mainThread[w.allgemein], ids.ID{})
 	without := r
 	r.Event = &authorize.EventScope{SpaceID: w.support, ChannelID: w.allgemein, ThreadID: w.mainThread[w.allgemein], AudienceID: w.lotse}
 	if d := w.decide(t, ctx, w.agent(w.lotse), authorize.ActionAgentEventsConsume, r); !d.Allowed() {

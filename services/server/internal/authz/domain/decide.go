@@ -315,7 +315,6 @@ func humanSession(p Principal) bool { return p.Kind == KindUser && p.HasSession 
 // unknown resource kind, a deferred or system requirement, a missing descriptor, missing token
 // facts of a requirement with Token on any path); it is never an allow.
 func Decide(in Input) (Decision, error) {
-	in.Req = fileReadRequirement(in)
 	if in.Req.Contains(Token()) {
 		if err := checkInvocation(&in); err != nil {
 			return Decision{}, err
@@ -338,25 +337,6 @@ func Decide(in Input) (Decision, error) {
 		d.QuickReattach = in.quickReattach
 	}
 	return d, err
-}
-
-// fileReadRequirement is the requirement of file.read by purpose (brief M3-05 design note 7): an
-// attachment keeps the read of the table, an avatar needs Auth and a branding file is Public. A
-// file of another purpose has no channel path and thus no effective rights, so read could never
-// hold for it; the table keeps read because list scopes and filter mode decide file events by
-// their channel path. Every other input keeps in.Req.
-func fileReadRequirement(in Input) Expr {
-	f := in.Resource.File
-	if in.Action != actionFileRead || f == nil {
-		return in.Req
-	}
-	switch f.Purpose {
-	case purposeAvatar:
-		return Auth
-	case purposeBranding:
-		return Public
-	}
-	return in.Req
 }
 
 // decideVisibility is step 5: no visibility gives not_found; a pending device lists only itself.
@@ -591,9 +571,12 @@ var combinators map[op]combinator
 
 func init() {
 	combinators = map[op]combinator{
-		opAll:       func(v evaluator, e Expr) (bool, Reason, error) { return v.all(e.args) },
-		opAny:       func(v evaluator, e Expr) (bool, Reason, error) { return v.any(e.args) },
-		opByKind:    func(v evaluator, e Expr) (bool, Reason, error) { return v.byKind(e) },
+		opAll:    func(v evaluator, e Expr) (bool, Reason, error) { return v.all(e.args) },
+		opAny:    func(v evaluator, e Expr) (bool, Reason, error) { return v.any(e.args) },
+		opByKind: func(v evaluator, e Expr) (bool, Reason, error) { return v.byKind(e) },
+		opByFilePurpose: func(v evaluator, e Expr) (bool, Reason, error) {
+			return v.byFilePurpose(e)
+		},
 		opTargetCap: func(v evaluator, e Expr) (bool, Reason, error) { return v.targetCap(e) },
 		opPreview:   func(v evaluator, _ Expr) (bool, Reason, error) { return v.preview() },
 		opCommandLevel: func(v evaluator, _ Expr) (bool, Reason, error) {
@@ -638,9 +621,27 @@ func (v evaluator) all(parts []Expr) (bool, Reason, error) {
 
 // byKind chooses the expression by the resource kind; a kind not listed is an internal error.
 func (v evaluator) byKind(e Expr) (bool, Reason, error) {
-	x, ok := e.byKind[v.in.Resource.Kind]
+	x, ok := e.byKey[v.in.Resource.Kind]
 	if !ok {
 		return false, "", internalError("no requirement for resource kind " + v.in.Resource.Kind)
+	}
+	return v.eval(x)
+}
+
+// byFilePurpose chooses the expression by the purpose of the file (ByFilePurpose); a file without
+// facts takes FileEventSelf on no path and FileEventPath otherwise. A key not listed is an internal
+// error.
+func (v evaluator) byFilePurpose(e Expr) (bool, Reason, error) {
+	key := FileEventPath
+	switch {
+	case v.in.Resource.File != nil:
+		key = v.in.Resource.File.Purpose
+	case v.in.Path.Kind == PathNone:
+		key = FileEventSelf
+	}
+	x, ok := e.byKey[key]
+	if !ok {
+		return false, "", internalError("no requirement for file purpose " + key)
 	}
 	return v.eval(x)
 }

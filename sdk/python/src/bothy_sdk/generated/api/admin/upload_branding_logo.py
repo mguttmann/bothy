@@ -90,9 +90,22 @@ def sync_detailed(
 ) -> Response[Branding | Problem]:
     """Upload the logo
 
+     Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks
+    in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is
+    JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in
+    `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and
+    `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part
+    follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503
+    `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the
+    previous logo; it becomes deliverable later, after scan and metadata removal, and until then
+    `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
+
     Args:
-        body (ImageUpload): Image as multipart part `file`. The server detects the type (PNG,
-            JPEG, WebP) and re-encodes it without metadata.
+        body (ImageUpload): Image as the one multipart part `file` (a further part is rejected
+            with 400 `validation_failed`). The server detects the type from the bytes; it accepts only
+            JPEG and PNG, whose metadata it removes losslessly, and still WebP, which it converts to
+            PNG or JPEG without metadata. Thumbnails are re-encoded. Any other detected type ends the
+            file `failed` with `file_type_denied`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -120,9 +133,22 @@ def sync(
 ) -> Branding | Problem | None:
     """Upload the logo
 
+     Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks
+    in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is
+    JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in
+    `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and
+    `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part
+    follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503
+    `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the
+    previous logo; it becomes deliverable later, after scan and metadata removal, and until then
+    `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
+
     Args:
-        body (ImageUpload): Image as multipart part `file`. The server detects the type (PNG,
-            JPEG, WebP) and re-encodes it without metadata.
+        body (ImageUpload): Image as the one multipart part `file` (a further part is rejected
+            with 400 `validation_failed`). The server detects the type from the bytes; it accepts only
+            JPEG and PNG, whose metadata it removes losslessly, and still WebP, which it converts to
+            PNG or JPEG without metadata. Thumbnails are re-encoded. Any other detected type ends the
+            file `failed` with `file_type_denied`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -145,9 +171,22 @@ async def asyncio_detailed(
 ) -> Response[Branding | Problem]:
     """Upload the logo
 
+     Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks
+    in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is
+    JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in
+    `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and
+    `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part
+    follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503
+    `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the
+    previous logo; it becomes deliverable later, after scan and metadata removal, and until then
+    `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
+
     Args:
-        body (ImageUpload): Image as multipart part `file`. The server detects the type (PNG,
-            JPEG, WebP) and re-encodes it without metadata.
+        body (ImageUpload): Image as the one multipart part `file` (a further part is rejected
+            with 400 `validation_failed`). The server detects the type from the bytes; it accepts only
+            JPEG and PNG, whose metadata it removes losslessly, and still WebP, which it converts to
+            PNG or JPEG without metadata. Thumbnails are re-encoded. Any other detected type ends the
+            file `failed` with `file_type_denied`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,9 +212,22 @@ async def asyncio(
 ) -> Branding | Problem | None:
     """Upload the logo
 
+     Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks
+    in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is
+    JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in
+    `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and
+    `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part
+    follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503
+    `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the
+    previous logo; it becomes deliverable later, after scan and metadata removal, and until then
+    `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
+
     Args:
-        body (ImageUpload): Image as multipart part `file`. The server detects the type (PNG,
-            JPEG, WebP) and re-encodes it without metadata.
+        body (ImageUpload): Image as the one multipart part `file` (a further part is rejected
+            with 400 `validation_failed`). The server detects the type from the bytes; it accepts only
+            JPEG and PNG, whose metadata it removes losslessly, and still WebP, which it converts to
+            PNG or JPEG without metadata. Thumbnails are re-encoded. Any other detected type ends the
+            file `failed` with `file_type_denied`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
