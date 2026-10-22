@@ -260,6 +260,15 @@ What reruns (`tools/ci/flakes.py`, tests `tools/ci/tests/test_flakes.py`):
   configuration `add_presets: [ci]`: a failed test runs once more. A member without the preset
   fails in CI ("Undefined preset") and in `test_flakes.py`. The JSON report of
   `flutter test --file-reporter` names the tests that reported an error and then passed.
+* Not in the packages a pull request changes (PL/26): `ci.yml` sets `FLAKE_BASE` to the base
+  commit of a pull request, and a failed test of a package whose directory (or a `testdata`
+  folder below it) has a file the pull request adds, changes or removes against the merge base
+  fails the job even when its rerun passed, because the pull request may have made it flaky
+  (`FAIL in a package the pull request changes`). It is not listed as a flake. Packages outside
+  the change rerun as above; a push to `main` (no `FLAKE_BASE`) reruns every package. When git
+  cannot compare with the base (the base commit is not checked out), `flakes.py go` fails
+  before the tests, so every job that runs `go test` checks out with `fetch-depth: 0`
+  (`test_ci_sets_the_base_of_a_pull_request_and_fetches_it_for_every_go_test`).
 * Not rerun: `perf` (not in CI; a budget miss must not pass on a second try), the platform
   suite of the host service (`make -C services/host platform-test`, it changes the machine), the
   JVM tests and the Python and TypeScript tests.

@@ -8,7 +8,9 @@ with the filters of the first run. The run passes only when every rerun target p
 attempt. It still fails for a test that fails in every attempt, for more than MAX_FAILURES failed
 tests of one run (then nothing reruns), for a data race (WARNING: DATA RACE, never rerun), for a
 panic or a test timeout, for a build error and for any other `go test` error. Locally `make test`
-runs plain `go test` without reruns.
+runs plain `go test` without reruns. In a pull request (FLAKE_BASE, the base commit, set by
+ci.yml) a failed test of a package the pull request changes fails even when its rerun passed,
+and it is not a flake: the pull request may have made it flaky (`changed_packages`).
 
 Coverage: every `go test` gotestsum starts (the first run and each rerun) writes its own profile
 FILE.attemptN instead of the -coverprofile=FILE of the flags (`flakes.py exec`, the raw command of
@@ -51,7 +53,7 @@ import sys
 import tempfile
 import uuid
 from collections.abc import Callable, Iterable, Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import go_shards
@@ -223,9 +225,78 @@ def flakes_from_events(lines: Iterable[str]) -> list[Flake]:
     return out
 
 
+def _git(args: Sequence[str], cwd: Path) -> str:
+    done = subprocess.run(  # nosec B603 B607 - git with fixed arguments
+        ["git", *args], cwd=cwd, capture_output=True, text=True, check=False
+    )
+    if done.returncode != 0:
+        raise ValueError(f"git {' '.join(args)} failed: {done.stderr.strip()}")
+    return done.stdout
+
+
+def _module() -> tuple[Path, str]:
+    """The directory and the module path of the Go module of the working directory."""
+    here = Path.cwd().resolve()
+    for directory in (here, *here.parents):
+        gomod = directory / "go.mod"
+        if gomod.is_file():
+            for line in gomod.read_text(encoding="utf-8").splitlines():
+                words = line.split("//", 1)[0].split()
+                if len(words) == 2 and words[0] == "module":
+                    return directory, words[1].strip('"`')
+            raise ValueError(f"{gomod} has no module line")
+    raise ValueError(f"no go.mod in {here} or above")
+
+
+def _package_dir(path: str) -> str:
+    """The directory of the package a changed file belongs to: testdata belongs to its package."""
+    parts = PurePosixPath(path).parts[:-1]
+    if "testdata" in parts:
+        parts = parts[: parts.index("testdata")]
+    return "/".join(parts) or "."
+
+
+def changed_packages_of(base: str) -> Callable[[Iterable[str]], set[str]]:
+    """A function from import paths to those of them the pull request changes.
+
+    A package is changed when a file of its directory (or of a testdata folder below it) differs
+    between the merge base of HEAD and `base` and HEAD, also a removed or renamed file. Only the
+    packages of the module of the working directory count. Raises ValueError when git cannot
+    compare, for example when the checkout lacks the base commit (fetch-depth: 0).
+    """
+    module_dir, module_path = _module()
+    root = Path(_git(["rev-parse", "--show-toplevel"], module_dir).strip()).resolve()
+    names = _git(["diff", "--name-only", "--no-renames", "-z", f"{base}...HEAD", "--"], root)
+    dirs = {_package_dir(name) for name in names.split("\0") if name}
+
+    def changed(packages: Iterable[str]) -> set[str]:
+        out: set[str] = set()
+        for package in packages:
+            if package == module_path:
+                directory = module_dir
+            elif package.startswith(module_path + "/"):
+                directory = module_dir / package[len(module_path) + 1 :]
+            else:
+                continue
+            if Path(os.path.relpath(directory, root)).as_posix() in dirs:
+                out.add(package)
+        return out
+
+    return changed
+
+
+def changed_packages(base: str, packages: Iterable[str]) -> set[str]:
+    """The import paths of `packages` the pull request with the base commit `base` changes."""
+    return changed_packages_of(base)(packages)
+
+
 def _go(args: argparse.Namespace) -> int:
     packages = args.packages.split()
     flags = list(args.rest)
+    # FLAKE_BASE (ci.yml sets it in a pull request): a rerun that passed in a package the pull
+    # request changes does not count, the pull request may have made the test flaky (PL/26).
+    base = os.environ.get("FLAKE_BASE", "")
+    changed = changed_packages_of(base) if base else (lambda _: set())
     profiles = [Path(f.split("=", 1)[1]) for f in flags if f.startswith("-coverprofile=")]
     for profile in profiles:
         for stale in attempts(profile):
@@ -238,11 +309,20 @@ def _go(args: argparse.Namespace) -> int:
         for profile in profiles:
             merge_attempts(profile)
         lines = events.read_text(encoding="utf-8").splitlines() if events.exists() else []
-    record(args.dir, "go", flakes_from_events(lines))
+    found = flakes_from_events(lines)
+    strict = changed({f["package"] for f in found})
+    held = [f for f in found if f["package"] in strict]
+    record(args.dir, "go", [f for f in found if f["package"] not in strict])
     failing = still_failing(lines)
     for package, test in failing:
         print(f"FAIL after the reruns: {package} {test or '(package)'}", file=sys.stderr)
-    return done.returncode or (1 if failing else 0)
+    for f in held:
+        print(
+            f"FAIL in a package the pull request changes (its reruns do not count): "
+            f"{f['package']} {_test_name(f)}",
+            file=sys.stderr,
+        )
+    return done.returncode or (1 if failing or held else 0)
 
 
 # --- Dart: the JSON report of flutter test -----------------------------------------------------
