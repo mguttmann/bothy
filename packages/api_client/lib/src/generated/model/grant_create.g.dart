@@ -23,6 +23,8 @@ class _$GrantCreate extends GrantCreate {
   final DateTime? expiresAt;
   @override
   final String reason;
+  @override
+  final ResolveI1? resolveI1;
 
   factory _$GrantCreate([void Function(GrantCreateBuilder)? updates]) =>
       (GrantCreateBuilder()..update(updates))._build();
@@ -36,6 +38,7 @@ class _$GrantCreate extends GrantCreate {
     this.capabilities,
     this.expiresAt,
     required this.reason,
+    this.resolveI1,
   }) : super._();
   @override
   GrantCreate rebuild(void Function(GrantCreateBuilder) updates) =>
@@ -55,7 +58,8 @@ class _$GrantCreate extends GrantCreate {
         level == other.level &&
         capabilities == other.capabilities &&
         expiresAt == other.expiresAt &&
-        reason == other.reason;
+        reason == other.reason &&
+        resolveI1 == other.resolveI1;
   }
 
   @override
@@ -69,6 +73,7 @@ class _$GrantCreate extends GrantCreate {
     _$hash = $jc(_$hash, capabilities.hashCode);
     _$hash = $jc(_$hash, expiresAt.hashCode);
     _$hash = $jc(_$hash, reason.hashCode);
+    _$hash = $jc(_$hash, resolveI1.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
   }
@@ -83,7 +88,8 @@ class _$GrantCreate extends GrantCreate {
           ..add('level', level)
           ..add('capabilities', capabilities)
           ..add('expiresAt', expiresAt)
-          ..add('reason', reason))
+          ..add('reason', reason)
+          ..add('resolveI1', resolveI1))
         .toString();
   }
 }
@@ -126,6 +132,10 @@ class GrantCreateBuilder implements Builder<GrantCreate, GrantCreateBuilder> {
   String? get reason => _$this._reason;
   set reason(String? reason) => _$this._reason = reason;
 
+  ResolveI1Builder? _resolveI1;
+  ResolveI1Builder get resolveI1 => _$this._resolveI1 ??= ResolveI1Builder();
+  set resolveI1(ResolveI1Builder? resolveI1) => _$this._resolveI1 = resolveI1;
+
   GrantCreateBuilder() {
     GrantCreate._defaults(this);
   }
@@ -141,6 +151,7 @@ class GrantCreateBuilder implements Builder<GrantCreate, GrantCreateBuilder> {
       _capabilities = $v.capabilities?.toBuilder();
       _expiresAt = $v.expiresAt;
       _reason = $v.reason;
+      _resolveI1 = $v.resolveI1?.toBuilder();
       _$v = null;
     }
     return this;
@@ -189,12 +200,16 @@ class GrantCreateBuilder implements Builder<GrantCreate, GrantCreateBuilder> {
               r'GrantCreate',
               'reason',
             ),
+            resolveI1: _resolveI1?.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
         _$failedField = 'capabilities';
         _capabilities?.build();
+
+        _$failedField = 'resolveI1';
+        _resolveI1?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'GrantCreate',

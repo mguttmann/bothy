@@ -91,8 +91,42 @@ type fakeStore struct {
 	mu       gosync.Mutex
 	rows     map[ids.ID]domain.PresenceRow
 	lockRow  map[ids.ID]domain.PresenceRow // returned by LockPresenceRow instead of rows when set
+	gate     *gate                         // parks a heartbeat in one of its database calls
 	changes  []app.PresenceWrite
 	persists []app.PresenceWrite
+}
+
+// gate parks the first call that reaches the armed point until release is closed, as a row lock
+// held by another transaction would; entered is closed when the call arrives.
+type gate struct {
+	mu      gosync.Mutex
+	point   string
+	entered chan struct{}
+	release chan struct{}
+}
+
+// arm parks the next call at point.
+func (g *gate) arm(point string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.point, g.entered, g.release = point, make(chan struct{}), make(chan struct{})
+}
+
+// wait parks the caller when point is armed; the gate fires once.
+func (g *gate) wait(point string) {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	if g.point != point {
+		g.mu.Unlock()
+		return
+	}
+	g.point = ""
+	entered, release := g.entered, g.release
+	g.mu.Unlock()
+	close(entered)
+	<-release
 }
 
 func newFakeStore() *fakeStore {
@@ -100,6 +134,7 @@ func newFakeStore() *fakeStore {
 }
 
 func (s *fakeStore) GetPresenceRow(_ context.Context, id ids.ID) (domain.PresenceRow, bool, error) {
+	s.gate.wait("GetPresenceRow")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	r, ok := s.rows[id]
@@ -107,6 +142,7 @@ func (s *fakeStore) GetPresenceRow(_ context.Context, id ids.ID) (domain.Presenc
 }
 
 func (s *fakeStore) LockPresenceRow(_ context.Context, id ids.ID) (domain.PresenceRow, bool, error) {
+	s.gate.wait("LockPresenceRow")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r, ok := s.lockRow[id]; ok {
@@ -142,6 +178,7 @@ func (s *fakeStore) ListLivePresence(context.Context) ([]domain.PresenceRow, err
 }
 
 func (s *fakeStore) WriteReportedChange(_ context.Context, w app.PresenceWrite) error {
+	s.gate.wait("WriteReportedChange")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.changes = append(s.changes, w)
@@ -227,11 +264,13 @@ func (runUoW) Do(ctx context.Context, fn func(ctx context.Context) error, _ ...t
 
 // fakeRecorder records the entries.
 type fakeRecorder struct {
+	gate    *gate
 	mu      gosync.Mutex
 	entries []auditing.Entry
 }
 
 func (r *fakeRecorder) Record(_ context.Context, e auditing.Entry) error {
+	r.gate.wait("Record")
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.entries = append(r.entries, e)
@@ -265,11 +304,13 @@ func (p *fakePublisher) events() []eventlog.EphemeralEvent {
 
 // fakeReadiness counts the calls of the readiness port.
 type fakeReadiness struct {
+	gate  *gate
 	mu    gosync.Mutex
 	calls [][]chat.ProjectReadiness
 }
 
 func (r *fakeReadiness) ApplyProjectReadiness(_ context.Context, _ ids.ID, reports []chat.ProjectReadiness) error {
+	r.gate.wait("ApplyProjectReadiness")
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, reports)
@@ -600,5 +641,98 @@ func TestPresenceStartRule(t *testing.T) {
 	w.store.mu.Unlock()
 	if stored != domain.RuntimeOffline {
 		t.Fatalf("the old agent is stored %s after the first flush", stored)
+	}
+}
+
+// TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase is the class test of the lock cycle of
+// M2-21 (docs/DECISIONS.md D-M2-21-11): while a heartbeat waits in any of its database calls (a
+// row lock held by another transaction), every other entry of the tracker that takes the entry
+// lock returns at once, inside and outside a unit of work. A caller of those entries may hold the
+// agents row or a channel row the heartbeat waits for (a switch, the guided flow, disable or
+// enable under Idempotency-Key), so any wait here is a cycle that only a lock timeout ends. After
+// the release the heartbeat ends, and a Changed that ran meanwhile keeps its configured values.
+func TestPresenceNoTrackerCallWaitsForAHeartbeatInTheDatabase(t *testing.T) {
+	t.Parallel()
+	points := []string{"GetPresenceRow", "ApplyProjectReadiness", "LockPresenceRow", "WriteReportedChange", "Record"}
+	inUnit := func() context.Context {
+		u, setPhase := txn.NewUnit(txn.NewRegistry(), txn.Options{})
+		setPhase(txn.PhaseWork)
+		return txn.WithUnit(context.Background(), u)
+	}
+	calls := []struct {
+		name    string
+		changes bool
+		call    func(w *tracker) error
+	}{
+		{"Statuses", false, func(w *tracker) error {
+			_, err := w.tr.Statuses(context.Background(), []ids.ID{w.agent.ID})
+			return err
+		}},
+		{"Statuses in a unit", false, func(w *tracker) error {
+			_, err := w.tr.Statuses(inUnit(), []ids.ID{w.agent.ID})
+			return err
+		}},
+		{"Changed", true, func(w *tracker) error { return w.tr.Changed(context.Background(), []ids.ID{w.agent.ID}) }},
+		{"Changed in a unit", true, func(w *tracker) error { return w.tr.Changed(inUnit(), []ids.ID{w.agent.ID}) }},
+		{"Samples", false, func(w *tracker) error { w.tr.Samples(); return nil }},
+		{"Flush", false, func(w *tracker) error { return w.tr.Flush(context.Background()) }},
+		{"expire", false, func(w *tracker) error { w.tm.advance(2 * tTimeout); return nil }},
+		{"Stop", false, func(w *tracker) error { return w.tr.Stop(context.Background()) }},
+	}
+	for _, point := range points {
+		for _, c := range calls {
+			t.Run(point+"/"+c.name, func(t *testing.T) {
+				t.Parallel()
+				w := newTracker(t)
+				g := &gate{}
+				w.store.gate, w.rd.gate, w.rec.gate = g, g, g
+				w.beat(`{"state":"online","reported_billing_mode":"organization"}`)
+				g.arm(point)
+				beat := make(chan error, 1)
+				go func() {
+					_, err := w.tr.Heartbeat(actor.WithActor(context.Background(), w.agent), json.RawMessage(
+						`{"state":"online","reported_billing_mode":"personal","project_readiness":[{"channel_id":"`+ids.New().String()+`","ready":true}]}`))
+					beat <- err
+				}()
+				select {
+				case <-g.entered:
+				case <-time.After(5 * time.Second):
+					t.Fatalf("the heartbeat never reached %s", point)
+				}
+				if c.changes {
+					w.store.setTarget(w.agent.ID, domain.Target{BillingMode: domain.Personal, ToolClass: domain.ToolChat})
+				}
+				done := make(chan error, 1)
+				go func() { done <- c.call(w) }()
+				var err error
+				waited := false
+				select {
+				case err = <-done:
+				case <-time.After(2 * time.Second):
+					t.Errorf("%s waits for a heartbeat parked in %s", c.name, point)
+					waited = true
+				}
+				close(g.release)
+				select {
+				case err := <-beat:
+					if err != nil {
+						t.Fatalf("heartbeat after the release: %v", err)
+					}
+				case <-time.After(5 * time.Second):
+					t.Fatal("the heartbeat did not end after the release")
+				}
+				if waited {
+					err = <-done
+				}
+				if err != nil {
+					t.Errorf("%s: %v", c.name, err)
+				}
+				if c.changes {
+					if st := w.status(); !st.BillingModeMatches {
+						t.Fatalf("the heartbeat overwrote the configured values of the Changed that ran meanwhile: %+v", st)
+					}
+				}
+			})
+		}
 	}
 }

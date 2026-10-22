@@ -95,6 +95,10 @@ def sync_detailed(
 ) -> Response[Grant | Problem]:
     """Create a grant
 
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (GrantCreate): `level` is required for every target except `host`, where it must be
@@ -128,6 +132,10 @@ def sync(
 ) -> Grant | Problem | None:
     """Create a grant
 
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (GrantCreate): `level` is required for every target except `host`, where it must be
@@ -155,6 +163,10 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Grant | Problem]:
     """Create a grant
+
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -186,6 +198,10 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Grant | Problem | None:
     """Create a grant
+
+     Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are
+    authorized with `agent.billing_mode.set` and switched to `organization` first, in the same
+    transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

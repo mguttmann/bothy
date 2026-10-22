@@ -207,7 +207,7 @@ func newWorld(t *testing.T) *world {
 	if w.id, err = wire.NewIdentity(idCfg, pool, w.uow, az, writes, testPepper, w.clk, log); err != nil {
 		t.Fatal(err)
 	}
-	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 2, PageSizeMax: 3}, pool, w.uow, az, hook, writes, w.id, w.clk, log)
+	ag, err := wire.NewAgents(agentsapp.Config{PageSizeDefault: 2, PageSizeMax: 3, ReasonMaxChars: 200}, pool, w.uow, az, hook, writes, w.id, w.clk, log)
 	if err != nil {
 		t.Fatal(err)
 	}

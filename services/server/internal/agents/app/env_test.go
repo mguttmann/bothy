@@ -61,6 +61,9 @@ type world struct {
 	structure *fake.Structure
 	svc       *app.Service
 	id        *wire.Identity
+	// uow is the unit of work of the use cases; the tests of the guided flow (M2-21) run
+	// SwitchToOrganization inside it the way authz does.
+	uow txn.UnitOfWork
 }
 
 // newWorld builds a world on a new database.
@@ -93,6 +96,7 @@ func newWorld(t *testing.T) *world {
 	}
 	reg.Seal()
 	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{RetryMax: 3, StatementTimeout: 30 * time.Second, LockTimeout: 20 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
+	w.uow = uow
 	rec, err := auditapp.NewRecorder(auditapp.Config{
 		DenyAggregateWindow: time.Hour, DenyAggregateMaxKeys: 100, IPKeyPeriod: 30 * 24 * time.Hour,
 		IPKeyRetention: 90 * 24 * time.Hour, IPKEKRef: "file:<secrets.dir>/audit_ip_kek",
@@ -141,7 +145,7 @@ func newWorld(t *testing.T) *world {
 	if w.id, err = wire.NewIdentity(idCfg, pool, uow, az, writes, []byte("0123456789abcdef0123456789abcdef"), clk, log); err != nil {
 		t.Fatal(err)
 	}
-	w.svc, err = app.New(app.Config{PageSizeDefault: 2, PageSizeMax: 3}, app.Deps{
+	w.svc, err = app.New(app.Config{PageSizeDefault: 2, PageSizeMax: 3, ReasonMaxChars: 40}, app.Deps{
 		Store: agentspg.NewRepository(pool), Principals: w.id.Principals, Directory: identityapp.NewDirectory(repo), Tokens: w.id.Tokens,
 		Rights: hook, UoW: uow, Authorizer: az, Audit: rec, Events: appender, Cursors: agentshttp.Cursors{}, Clock: clk,
 	})

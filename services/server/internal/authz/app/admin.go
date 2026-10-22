@@ -32,6 +32,9 @@ type AdminConfig struct {
 	// api.page_size_max, the cap of a larger limit.
 	PageSizeDefault int `config:"api.page_size_default"`
 	PageSizeMax     int `config:"api.page_size_max"`
+	// ReasonMaxChars is audit.reason_max_chars, the longest reason of the guided flow resolve_i1
+	// (SEC-AUD-5, M2-21); internal/wire passes it to the Resolver.
+	ReasonMaxChars int `config:"audit.reason_max_chars"`
 }
 
 // Limits returns the group text limits of c.
@@ -84,6 +87,9 @@ type AdminDeps struct {
 	// Views stores the view of viewAsUser called from a console session (M6-01); nil refuses that
 	// call with kind internal, so a console view is never only a snapshot.
 	Views authz.ConsoleViews
+	// Resolver runs the guided flow resolve_i1 of createGrant, addGroupMember and previewGrant
+	// (M2-21); nil refuses a request with resolve_i1 with kind internal (fail closed).
+	Resolver *Resolver
 }
 
 // AdminService implements authz.Admin (brief M1-29 scope 5). It is safe for concurrent use.
@@ -508,6 +514,9 @@ func (s *AdminService) AddGroupMember(ctx context.Context, caller actor.Actor, g
 	if err != nil {
 		return authz.Membership{}, err
 	}
+	if err := s.checkResolve(cmd.ResolveI1); err != nil {
+		return authz.Membership{}, err
+	}
 	var out domain.Membership
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
@@ -557,6 +566,11 @@ func (s *AdminService) addMember(ctx context.Context, caller actor.Actor, groupI
 		return domain.Membership{}, err
 	}
 	if err := s.closeExpired(ctx, g, cmd.UserID, caller.ID, now); err != nil {
+		return domain.Membership{}, err
+	}
+	// The guided flow switches its agents after the outer checks and before the membership is
+	// written (M2-21 design note 3 e).
+	if err := s.resolve(ctx, caller, cmd.ResolveI1); err != nil {
 		return domain.Membership{}, err
 	}
 	if err := s.d.Store.InsertMembership(ctx, m); err != nil {
@@ -670,13 +684,10 @@ func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd 
 	if err != nil {
 		return authz.Grant{}, err
 	}
-	subject, target, level, caps, err := grantParts(cmd)
-	if err != nil {
-		return authz.Grant{}, err
-	}
 	now := s.d.Clock.Now()
 	reason := strings.TrimSpace(cmd.Reason)
-	if err := domain.CheckGrantShape(subject, target, level, caps, cmd.ExpiresAt, reason, now); err != nil {
+	subject, target, level, caps, err := grantShape(cmd, reason, now)
+	if err := joinFields(err, s.checkResolve(cmd.ResolveI1)); err != nil {
 		return authz.Grant{}, err
 	}
 	proposed := domain.Grant{Subject: subject, Target: target, Level: level, Caps: caps}
@@ -689,7 +700,7 @@ func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd 
 		if g, err = domain.NewGrant(ids.New(), subject, target, level, caps, cmd.ExpiresAt, reason, caller.ID, now); err != nil {
 			return err
 		}
-		return s.createGrant(ctx, g)
+		return s.createGrant(ctx, g, func(ctx context.Context) error { return s.resolve(ctx, caller, cmd.ResolveI1) })
 	}, grantRightsChange(subject, target, cmd.TargetID))
 	if err != nil {
 		return authz.Grant{}, err
@@ -713,8 +724,9 @@ func (s *AdminService) authorizeGrant(ctx context.Context, caller actor.Actor, t
 }
 
 // createGrant is CreateGrant inside its unit of work after authorize: target, archived target,
-// subject, the members of a subject group, the insert, the event and the audit.
-func (s *AdminService) createGrant(ctx context.Context, g domain.Grant) error {
+// subject, then beforeWrite (the switch of the guided flow, M2-21; nil for none), the members of a
+// subject group, the insert, the event and the audit.
+func (s *AdminService) createGrant(ctx context.Context, g domain.Grant, beforeWrite func(ctx context.Context) error) error {
 	if err := s.targetExists(ctx, g.Target); err != nil {
 		return err
 	}
@@ -723,6 +735,11 @@ func (s *AdminService) createGrant(ctx context.Context, g domain.Grant) error {
 	}
 	if err := s.subjectExists(ctx, g.Subject); err != nil {
 		return err
+	}
+	if beforeWrite != nil {
+		if err := beforeWrite(ctx); err != nil {
+			return err
+		}
 	}
 	if err := s.affectGroup(ctx, g.Subject); err != nil {
 		return err
@@ -734,6 +751,40 @@ func (s *AdminService) createGrant(ctx context.Context, g domain.Grant) error {
 		return err
 	}
 	return s.record(ctx, authorize.ActionGrantCreate, authorize.ResourceGrant, g.ID, grantAttrs(g))
+}
+
+// grantShape parses cmd with grantParts and checks the shape of the grant with the trimmed reason
+// at now (400 before authorize).
+func grantShape(cmd authz.CreateGrantCmd, reason string, now time.Time) (domain.Subject, domain.Target, domain.Level, domain.Caps, error) {
+	subject, target, level, caps, err := grantParts(cmd)
+	if err != nil {
+		return subject, target, level, caps, err
+	}
+	return subject, target, level, caps, domain.CheckGrantShape(subject, target, level, caps, cmd.ExpiresAt, reason, now)
+}
+
+// checkResolve validates the guided flow of a request (M2-21 design note 2); nil for none.
+// Errors: validation_failed; internal without a resolver (fail closed).
+func (s *AdminService) checkResolve(req *authz.ResolveI1) error {
+	if req == nil {
+		return nil
+	}
+	if s.d.Resolver == nil {
+		return internal("the guided flow needs the resolver")
+	}
+	return s.d.Resolver.CheckResolveI1(*req)
+}
+
+// resolve runs the switch part of the guided flow of a request inside its unit of work (M2-21
+// design note 3 e); nil for none.
+func (s *AdminService) resolve(ctx context.Context, caller actor.Actor, req *authz.ResolveI1) error {
+	if req == nil {
+		return nil
+	}
+	if s.d.Resolver == nil {
+		return internal("the guided flow needs the resolver")
+	}
+	return s.d.Resolver.ResolveI1(ctx, caller, *req)
 }
 
 // grantParts parses the column values of cmd: subject and target with their ids, level and

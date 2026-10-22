@@ -16,6 +16,142 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// PutProjectBinding Bind a forum to a project
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/project-binding (the `PutProjectBinding` operationId).
+func (c *Client) PutProjectBinding(ctx context.Context, channelId ChannelIdPath, params *PutProjectBindingParams, body PutProjectBindingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutProjectBindingRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetChannelReadOnlyWithBody Switch the read-only state of a channel
+//
+// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /channels/{channel_id}/read-only (the `SetChannelReadOnly` operationId).
+func (c *Client) SetChannelReadOnlyWithBody(ctx context.Context, channelId ChannelIdPath, params *SetChannelReadOnlyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetChannelReadOnlyRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetChannelReadOnly Switch the read-only state of a channel
+//
+// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /channels/{channel_id}/read-only (the `SetChannelReadOnly` operationId).
+func (c *Client) SetChannelReadOnly(ctx context.Context, channelId ChannelIdPath, params *SetChannelReadOnlyParams, body SetChannelReadOnlyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetChannelReadOnlyRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListForumTags List forum tags
+//
+// Corresponds with GET /channels/{channel_id}/tags (the `ListForumTags` operationId).
+func (c *Client) ListForumTags(ctx context.Context, channelId ChannelIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListForumTagsRequest(c.Server, channelId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateForumTagWithBody Create a forum tag
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /channels/{channel_id}/tags (the `CreateForumTag` operationId).
+func (c *Client) CreateForumTagWithBody(ctx context.Context, channelId ChannelIdPath, params *CreateForumTagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateForumTagRequestWithBody(c.Server, channelId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateForumTag Create a forum tag
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /channels/{channel_id}/tags (the `CreateForumTag` operationId).
+func (c *Client) CreateForumTag(ctx context.Context, channelId ChannelIdPath, params *CreateForumTagParams, body CreateForumTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateForumTagRequest(c.Server, channelId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteForumTag Delete a forum tag
+//
+// Corresponds with DELETE /channels/{channel_id}/tags/{tag_id} (the `DeleteForumTag` operationId).
+func (c *Client) DeleteForumTag(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteForumTagRequest(c.Server, channelId, tagId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateForumTagWithBody Change a forum tag
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /channels/{channel_id}/tags/{tag_id} (the `UpdateForumTag` operationId).
+func (c *Client) UpdateForumTagWithBody(ctx context.Context, channelId ChannelIdPath, tagId TagIdPath, params *UpdateForumTagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateForumTagRequestWithBody(c.Server, channelId, tagId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // UpdateForumTag Change a forum tag
 //
 // Takes a body of the `application/json` content type.
@@ -1076,6 +1212,8 @@ func (c *Client) ListGrants(ctx context.Context, params *ListGrantsParams, reqEd
 
 // CreateGrantWithBody Create a grant
 //
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /grants (the `CreateGrant` operationId).
@@ -1092,6 +1230,8 @@ func (c *Client) CreateGrantWithBody(ctx context.Context, params *CreateGrantPar
 }
 
 // CreateGrant Create a grant
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1115,7 +1255,10 @@ func (c *Client) CreateGrant(ctx context.Context, params *CreateGrantParams, bod
 // The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
 // `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
 // is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-// (07, 9.3).
+// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+// `organization` before the grant, and `text` names each agent the request would switch.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1139,7 +1282,10 @@ func (c *Client) PreviewGrantWithBody(ctx context.Context, contentType string, b
 // The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
 // `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
 // is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-// (07, 9.3).
+// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+// `organization` before the grant, and `text` names each agent the request would switch.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1335,6 +1481,8 @@ func (c *Client) ListGroupMembers(ctx context.Context, groupId GroupIdPath, para
 
 // AddGroupMemberWithBody Add a member
 //
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /groups/{group_id}/members (the `AddGroupMember` operationId).
@@ -1351,6 +1499,8 @@ func (c *Client) AddGroupMemberWithBody(ctx context.Context, groupId GroupIdPath
 }
 
 // AddGroupMember Add a member
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3418,6 +3568,8 @@ func (c *Client) ListOwners(ctx context.Context, reqEditors ...RequestEditorFn) 
 
 // AddOwnerWithBody Make a person owner
 //
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /owners (the `AddOwner` operationId).
@@ -3434,6 +3586,8 @@ func (c *Client) AddOwnerWithBody(ctx context.Context, params *AddOwnerParams, c
 }
 
 // AddOwner Make a person owner
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -4359,6 +4513,8 @@ func (c *Client) MoveSpace(ctx context.Context, spaceId SpaceIdPath, params *Mov
 
 // SetSpaceOperatorWithBody Set the default operator of a space
 //
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /spaces/{space_id}/operator (the `SetSpaceOperator` operationId).
@@ -4375,6 +4531,8 @@ func (c *Client) SetSpaceOperatorWithBody(ctx context.Context, spaceId SpaceIdPa
 }
 
 // SetSpaceOperator Set the default operator of a space
+//
+// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -22765,12 +22923,16 @@ type ClientWithResponsesInterface interface {
 
 	// SetChannelOperatorWithBodyWithResponse Set or inherit the operator of a channel
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /channels/{channel_id}/operator (the `SetChannelOperator` operationId).
 	SetChannelOperatorWithBodyWithResponse(ctx context.Context, channelId ChannelIdPath, params *SetChannelOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetChannelOperatorResponse, error)
 
 	// SetChannelOperatorWithResponse Set or inherit the operator of a channel
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23341,12 +23503,16 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGrantWithBodyWithResponse Create a grant
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /grants (the `CreateGrant` operationId).
 	CreateGrantWithBodyWithResponse(ctx context.Context, params *CreateGrantParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGrantResponse, error)
 
 	// CreateGrantWithResponse Create a grant
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23360,7 +23526,10 @@ type ClientWithResponsesInterface interface {
 	// The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
 	// `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
 	// is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-	// (07, 9.3).
+	// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+	// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+	// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+	// `organization` before the grant, and `text` names each agent the request would switch.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23374,7 +23543,10 @@ type ClientWithResponsesInterface interface {
 	// The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
 	// `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
 	// is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
-	// (07, 9.3).
+	// (07, 9.3). With `resolve_i1` the preview is a dry run of the whole guided flow: every listed
+	// agent needs `access.preview` with the target action `agent.billing_mode.set` (owner, no
+	// step-up; an unknown or invisible agent gives `404`), the agents are switched to
+	// `organization` before the grant, and `text` names each agent the request would switch.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -23460,12 +23632,16 @@ type ClientWithResponsesInterface interface {
 
 	// AddGroupMemberWithBodyWithResponse Add a member
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /groups/{group_id}/members (the `AddGroupMember` operationId).
 	AddGroupMemberWithBodyWithResponse(ctx context.Context, groupId GroupIdPath, params *AddGroupMemberParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddGroupMemberResponse, error)
 
 	// AddGroupMemberWithResponse Add a member
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24419,12 +24595,16 @@ type ClientWithResponsesInterface interface {
 
 	// AddOwnerWithBodyWithResponse Make a person owner
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /owners (the `AddOwner` operationId).
 	AddOwnerWithBodyWithResponse(ctx context.Context, params *AddOwnerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AddOwnerResponse, error)
 
 	// AddOwnerWithResponse Make a person owner
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -24872,12 +25052,16 @@ type ClientWithResponsesInterface interface {
 
 	// SetSpaceOperatorWithBodyWithResponse Set the default operator of a space
 	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /spaces/{space_id}/operator (the `SetSpaceOperator` operationId).
 	SetSpaceOperatorWithBodyWithResponse(ctx context.Context, spaceId SpaceIdPath, params *SetSpaceOperatorParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSpaceOperatorResponse, error)
 
 	// SetSpaceOperatorWithResponse Set the default operator of a space
+	//
+	// Optional `resolve_i1` runs the guided flow (05 rule 1.6, 10 section 11): the listed agents are authorized with `agent.billing_mode.set` and switched to `organization` first, in the same transaction as the change; I1 is checked before the commit, and either both parts commit or none.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27039,300 +27223,4 @@ func (r UpdateAgentResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r UpdateAgentResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON412() *PreconditionFailed {
-	return r.ApplicationproblemJSON412
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
-	return r.ApplicationproblemJSON428
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r UpdateAgentResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r UpdateAgentResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r UpdateAgentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r UpdateAgentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r UpdateAgentResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// SetAgentBillingModeResponse200Headers the declared response headers of an HTTP 200 response for SetAgentBillingMode
-type SetAgentBillingModeResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// SetAgentBillingModeResponse400Headers the declared response headers of an HTTP 400 response for SetAgentBillingMode
-type SetAgentBillingModeResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentBillingModeResponse401Headers the declared response headers of an HTTP 401 response for SetAgentBillingMode
-type SetAgentBillingModeResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// SetAgentBillingModeResponse403Headers the declared response headers of an HTTP 403 response for SetAgentBillingMode
-type SetAgentBillingModeResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentBillingModeResponse404Headers the declared response headers of an HTTP 404 response for SetAgentBillingMode
-type SetAgentBillingModeResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentBillingModeResponse409Headers the declared response headers of an HTTP 409 response for SetAgentBillingMode
-type SetAgentBillingModeResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentBillingModeResponse412Headers the declared response headers of an HTTP 412 response for SetAgentBillingMode
-type SetAgentBillingModeResponse412Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentBillingModeResponse428Headers the declared response headers of an HTTP 428 response for SetAgentBillingMode
-type SetAgentBillingModeResponse428Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetAgentBillingModeResponse429Headers the declared response headers of an HTTP 429 response for SetAgentBillingMode
-type SetAgentBillingModeResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// SetAgentBillingModeResponseDefaultHeaders the declared response headers of an HTTP default response for SetAgentBillingMode
-type SetAgentBillingModeResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type SetAgentBillingModeResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Agent
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
-	ApplicationproblemJSON412 *PreconditionFailed
-	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
-	ApplicationproblemJSON428 *PreconditionRequired
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *SetAgentBillingModeResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *SetAgentBillingModeResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *SetAgentBillingModeResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *SetAgentBillingModeResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *SetAgentBillingModeResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *SetAgentBillingModeResponse409Headers
-	// Headers412 the parsed response headers for an HTTP 412 response
-	Headers412 *SetAgentBillingModeResponse412Headers
-	// Headers428 the parsed response headers for an HTTP 428 response
-	Headers428 *SetAgentBillingModeResponse428Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *SetAgentBillingModeResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *SetAgentBillingModeResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r SetAgentBillingModeResponse) GetJSON200() *Agent {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON412() *PreconditionFailed {
-	return r.ApplicationproblemJSON412
-}
-
-// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON428() *PreconditionRequired {
-	return r.ApplicationproblemJSON428
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r SetAgentBillingModeResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r SetAgentBillingModeResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SetAgentBillingModeResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetAgentBillingModeResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r SetAgentBillingModeResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// SetCredentialHolderResponse200Headers the declared response headers of an HTTP 200 response for SetCredentialHolder
-type SetCredentialHolderResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	ETag            *string
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// SetCredentialHolderResponse400Headers the declared response headers of an HTTP 400 response for SetCredentialHolder
-type SetCredentialHolderResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetCredentialHolderResponse401Headers the declared response headers of an HTTP 401 response for SetCredentialHolder
-type SetCredentialHolderResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// SetCredentialHolderResponse403Headers the declared response headers of an HTTP 403 response for SetCredentialHolder
-type SetCredentialHolderResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetCredentialHolderResponse404Headers the declared response headers of an HTTP 404 response for SetCredentialHolder
-type SetCredentialHolderResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetCredentialHolderResponse409Headers the declared response headers of an HTTP 409 response for SetCredentialHolder
-type SetCredentialHolderResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetCredentialHolderResponse412Headers the declared response headers of an HTTP 412 response for SetCredentialHolder
-type SetCredentialHolderResponse412Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetCredentialHolderResponse428Headers the declared response headers of an HTTP 428 response for SetCredentialHolder
-type SetCredentialHolderResponse428Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SetCredentialHolderResponse429Headers the declared response headers of an HTTP 429 response for SetCredentialHolder
-type SetCredentialHolderResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// SetCredentialHolderResponseDefaultHeaders the declared response headers of an HTTP default response for SetCredentialHolder
-type SetCredentialHolderResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }

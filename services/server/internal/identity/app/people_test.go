@@ -258,18 +258,18 @@ func TestOwners_AddRevokeAndInvariants(t *testing.T) {
 	owner := w.person("owner", "active", true)
 	alex := w.person("alex", "active", false)
 	ctx := ctxOf(owner)
-	o, err := w.p.AddOwner(ctx, owner, alex.ID, "Deputy")
+	o, err := w.p.AddOwner(ctx, owner, alex.ID, "Deputy", nil)
 	if err != nil || o.User.ID != alex.ID || o.GrantedBy != owner.ID {
 		t.Fatalf("AddOwner = %+v, %v", o, err)
 	}
-	_, err = w.p.AddOwner(ctx, owner, alex.ID, "again")
+	_, err = w.p.AddOwner(ctx, owner, alex.ID, "again", nil)
 	wantCode(t, err, errs.CodeConflict)
-	_, err = w.p.AddOwner(ctx, owner, ids.New(), "x")
+	_, err = w.p.AddOwner(ctx, owner, ids.New(), "x", nil)
 	wantCode(t, err, errs.CodeNotFound)
 	dora := w.person("dora", "disabled", false)
-	_, err = w.p.AddOwner(ctx, owner, dora.ID, "x")
+	_, err = w.p.AddOwner(ctx, owner, dora.ID, "x", nil)
 	wantCode(t, err, errs.CodeConflict)
-	_, err = w.p.AddOwner(ctx, owner, alex.ID, "")
+	_, err = w.p.AddOwner(ctx, owner, alex.ID, "", nil)
 	wantCode(t, err, errs.CodeValidationFailed)
 	list, err := w.p.ListOwners(ctx, owner)
 	if err != nil || len(list) != 2 {
@@ -287,13 +287,13 @@ func TestOwners_AddRevokeAndInvariants(t *testing.T) {
 	space, ch := ids.New(), ids.New()
 	w.str.PutSpace(space)
 	w.str.PutChannel(authz.ChannelFacts{ID: ch, SpaceID: space, Kind: authz.ChannelText, EffectiveOperatorID: bot.ID})
-	_, err = w.p.AddOwner(ctx, owner, alex.ID, "Deputy")
+	_, err = w.p.AddOwner(ctx, owner, alex.ID, "Deputy", nil)
 	var inv *authz.InvariantError
 	if !errors.As(err, &inv) || inv.Code != errs.CodeI1Violation {
 		t.Fatalf("AddOwner with a personal agent = %v", err)
 	}
 	// A caller other than the request principal is a programming error.
-	_, err = w.p.AddOwner(ctxOf(alex), owner, alex.ID, "x")
+	_, err = w.p.AddOwner(ctxOf(alex), owner, alex.ID, "x", nil)
 	wantCode(t, err, errs.CodeInternalError)
 }
 

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -58,6 +59,9 @@ type PeopleDeps struct {
 	Settings instance.Settings
 	// Clock gives the time of getMe and of the local identity; nil means clock.System().
 	Clock clock.Clock
+	// Resolver runs the guided flow resolve_i1 of owner.add (authz, M2-21); nil refuses a request
+	// with resolve_i1 with kind internal (fail closed).
+	Resolver authz.I1Resolver
 }
 
 // People implements identity.People and identity.Owners. It is safe for concurrent use.
