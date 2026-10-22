@@ -129,12 +129,6 @@ func (s *memStore) ValidSessionUsers(context.Context, []ids.ID) (map[ids.ID][]do
 	return map[ids.ID][]domain.SessionUser{}, nil
 }
 
-func (s *memStore) CloseSessionByPerson(_ context.Context, id ids.ID, reason domain.CloseReason, by ids.ID, at time.Time) error {
-	return s.update(id, func(x *domain.Session) {
-		x.State, x.CloseReason, x.ClosedBy, x.ClosedAt = domain.SessionClosed, reason, by, at
-	})
-}
-
 // TestUseCasesStageSignals (M2-47 Design note 4): every use case that acts on a live connection
 // after its commit stages its signal in its unit and hands it over after the commit; the ends of
 // sessions stage nothing (they travel through the log tail); a failing unit never calls

@@ -138,7 +138,7 @@ func (s *Service) repairWrite(ctx context.Context, hostID ids.ID, hash []byte, r
 	}
 	ended := 0
 	if plan.EndSessions {
-		if ended, err = s.EndSessions(ctx, SessionSelector{HostID: h.ID}, domain.CloseHostRekeyed); err != nil {
+		if ended, err = s.EndSessions(ctx, SessionSelector{HostID: h.ID}, domain.ServerEnd(domain.CloseHostRekeyed)); err != nil {
 			return time.Time{}, err
 		}
 	}

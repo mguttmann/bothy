@@ -76,18 +76,6 @@ func (r *Repository) AddCounters(ctx context.Context, id ids.ID, in, out int64, 
 	return mapError(err, "writing the counters of a terminal session")
 }
 
-// CloseSessionByPerson implements app.Store.
-func (r *Repository) CloseSessionByPerson(ctx context.Context, id ids.ID, reason domain.CloseReason, by ids.ID, at time.Time) error {
-	q, err := r.write(ctx)
-	if err != nil {
-		return err
-	}
-	n, err := q.CloseTerminalSessionByPerson(ctx, sqlcgen.CloseTerminalSessionByPersonParams{
-		ID: uuid(id), CloseReason: optionalText(string(reason)), ClosedBy: uuid(by), ClosedAt: optionalTime(at),
-	})
-	return oneRow(n, err, "closing a terminal session")
-}
-
 // ListSessions implements app.Store.
 func (r *Repository) ListSessions(ctx context.Context, userID, hostID ids.ID, state string, beforeID ids.ID, limit int) ([]domain.Session, error) {
 	rows, err := r.read(ctx).ListTerminalSessions(ctx, sqlcgen.ListTerminalSessionsParams{

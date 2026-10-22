@@ -37,6 +37,14 @@ type AuthorizerConfig struct {
 	// QuickReattachWindow is how long after the detachment terminal.attach from the same device
 	// and login session needs no new step-up (terminal.quick_reattach_window, M2-40).
 	QuickReattachWindow time.Duration `config:"terminal.quick_reattach_window"`
+	// MaxSessionsPerPerson and MaxSessionsPerHost are the session limits of terminal.open
+	// (terminal.max_sessions_per_person, terminal.max_sessions_per_host, M2-46): an opening is
+	// refused with terminal_session_limit once the open sessions of the person or of the host
+	// reach the value. Zero means not configured and the guard does not apply, so hand-built
+	// configurations without terminal limits keep working; the binding through internal/wire
+	// requires at least 1 from the key registration. Negative values are refused.
+	MaxSessionsPerPerson int `config:"terminal.max_sessions_per_person"`
+	MaxSessionsPerHost   int `config:"terminal.max_sessions_per_host"`
 }
 
 // AuthorizerDeps are the collaborators of the Authorizer. Facts owned by other modules come only
@@ -96,7 +104,7 @@ var _ authorize.Authorizer = (*Authorizer)(nil)
 var errMissingDep = errors.New("authz: NewAuthorizer needs every dependency")
 
 // NewAuthorizer returns the Authorizer. Errors: a nil dependency other than Log, a cache bound
-// below 1 or a negative step-up age.
+// below 1, a negative step-up age or window or a negative terminal session limit.
 //
 // Example:
 //
@@ -118,6 +126,9 @@ func NewAuthorizer(cfg AuthorizerConfig, d AuthorizerDeps) (*Authorizer, error) 
 	}
 	if cfg.TerminalStepUpMaxAge < 0 || cfg.QuickReattachWindow < 0 {
 		return nil, errors.New("authz: terminal.step_up_max_age and terminal.quick_reattach_window must not be negative")
+	}
+	if cfg.MaxSessionsPerPerson < 0 || cfg.MaxSessionsPerHost < 0 {
+		return nil, errors.New("authz: terminal.max_sessions_per_person and terminal.max_sessions_per_host must not be negative")
 	}
 	log := d.Log
 	if log == nil {

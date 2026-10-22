@@ -137,6 +137,12 @@ type Options struct {
 	// FilesImageHooks are the test seams of the job files.thumbnail (wire.Deps.FilesImageHooks,
 	// M3-06): hold, fail or observe a run; nil in every other test.
 	FilesImageHooks *filesapp.ImageHooks
+	// JobModules receives the use cases of the jobs (wire.Deps.JobModules, M2-46): a test runs
+	// authz.expiry_sweep or terminal.sweep directly.
+	JobModules func(*wire.JobModules)
+	// TerminalSessionMetrics replaces the session instruments of the terminal
+	// (wire.Deps.TerminalSessionMetrics, M2-46).
+	TerminalSessionMetrics terminalapp.SessionMetrics
 }
 
 // Server is a running harness server.
@@ -298,8 +304,8 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		Env: env, Stdout: out, Signals: sigs, Clock: clk, EgressDenyAll: opts.EgressDenyAll, OIDCRootCAs: opts.OIDCRootCAs,
 		TerminalTimers: opts.TerminalTimers, TerminalBeforeOpenCommit: opts.TerminalBeforeOpenCommit,
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
-		TerminalModule:  opts.TerminalModule,
-		FilesImageHooks: opts.FilesImageHooks,
+		TerminalModule: opts.TerminalModule, FilesImageHooks: opts.FilesImageHooks,
+		JobModules: opts.JobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

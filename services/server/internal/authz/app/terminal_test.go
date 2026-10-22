@@ -414,7 +414,7 @@ func TestAZ_M57_GroupGrantOnPersonalHost(t *testing.T) {
 
 // TestTerminalGuard_HostNotActive (M2-44, 24 section 6.1 step 2): a host that is not active, or
 // active without a reported control connection, gives host_not_active after SR12, mapped to 409
-// host_unavailable; a nil descriptor counts as not connected.
+// host_unavailable.
 func TestTerminalGuard_HostNotActive(t *testing.T) {
 	t.Parallel()
 	w := newTermWorld(t)
@@ -434,7 +434,7 @@ func TestTerminalGuard_HostNotActive(t *testing.T) {
 	if e, _ := errs.As(d.Err()); e == nil || e.Code != errs.CodeHostUnavailable {
 		t.Fatalf("problem %+v, want 409 host_unavailable", e)
 	}
-	w.expect(t, w.person(w.alex), actOpen, host(w.r1), authorize.OutcomeForbidden, "host_not_active")
+	// A nil descriptor of terminal.open is an internal error since M2-46 (TestTerminalOpenLimitGuard).
 	ses := w.session(w.alex, w.r1, "detached", w.clk.Now())
 	ses.Terminal.HostConnected = false
 	w.expect(t, w.person(w.alex), attach, ses, authorize.OutcomeForbidden, "host_not_active")
@@ -493,6 +493,8 @@ func TestRecheck_PassesStepUpOnly(t *testing.T) {
 	if d := w.decide(t, ctx, consumed, actOpen, hostOpen(w.r1)); !d.Allowed() {
 		t.Fatalf("recheck with a consumed step-up: %+v", d)
 	}
+	offline := hostOpen(w.r1)
+	offline.Terminal.HostConnected = false
 	none := w.person(w.alex)
 	none.StepUpAt = time.Time{}
 	if d := w.decide(t, ctx, none, authorize.ActionTerminalAttach, w.session(w.alex, w.r1, "active", time.Time{})); !d.Allowed() {
@@ -508,7 +510,7 @@ func TestRecheck_PassesStepUpOnly(t *testing.T) {
 		{w.person(w.owner), hostOpen(w.r2), "i6_holder_only"},
 		{w.person(w.sam), hostOpen(w.r3), "terminal_server_host_owner_only"},
 		{w.agent(w.lotse), hostOpen(w.r1), "subject_kind_not_allowed"},
-		{w.person(w.alex), host(w.r1), "host_not_active"},
+		{w.person(w.alex), offline, "host_not_active"},
 	} {
 		d := w.decide(t, ctx, c.who, actOpen, c.r)
 		if d.Allowed() || string(d.Reason) != c.reason {

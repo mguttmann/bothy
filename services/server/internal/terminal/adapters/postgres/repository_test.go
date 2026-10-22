@@ -154,16 +154,16 @@ func TestRepository_RoundTrip(t *testing.T) {
 		if err != nil || len(open) != 1 || open[0].ID != s1 || open[0].BytesIn != 7 {
 			t.Errorf("LockOpenSessions %v %v", open, err)
 		}
-		if err := e.repo.CloseSession(ctx, s1, domain.CloseAccessRevoked, at); err != nil {
+		if err := e.repo.EndSession(ctx, s1, domain.ServerEnd(domain.CloseAccessRevoked), at); err != nil {
 			return err
 		}
 		// A second close changes no row: an internal error that rolls the unit back.
-		return e.repo.CloseSession(ctx, s1, domain.CloseAccessRevoked, at)
+		return e.repo.EndSession(ctx, s1, domain.ServerEnd(domain.CloseAccessRevoked), at)
 	}); errs.KindOf(err) != errs.KindInternal {
 		t.Fatalf("closing a closed session: %v", err)
 	}
 	if err := e.write(func(ctx context.Context) error {
-		if err := e.repo.CloseSession(ctx, s1, domain.CloseAccessRevoked, at); err != nil {
+		if err := e.repo.EndSession(ctx, s1, domain.ServerEnd(domain.CloseAccessRevoked), at); err != nil {
 			return err
 		}
 		return e.repo.RevokeSessionUser(ctx, su, robin, at)

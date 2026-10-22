@@ -67,3 +67,10 @@ SELECT id FROM auth_sessions WHERE device_id = @device_id AND revoked_at IS NULL
 -- name: ClearSessionStepUp :exec
 -- A pairing code without an open pairing ends the step-up of the approving session (M1-38).
 UPDATE auth_sessions SET step_up_at = NULL, step_up_method = NULL WHERE id = @id;
+
+-- name: EndedAuthSessions :many
+-- The sessions among ids that ended by at: revoked, or expires_at not after at (M2-46, the job
+-- terminal.sweep). Unknown ids give no row.
+SELECT id FROM auth_sessions
+WHERE id = ANY(@ids::uuid[]) AND (revoked_at IS NOT NULL OR expires_at <= @at)
+ORDER BY id;

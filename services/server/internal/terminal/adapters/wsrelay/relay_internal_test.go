@@ -27,6 +27,14 @@ type fakeRelayUC struct {
 	calls []string
 	// state is the session state RelaySessionState answers ("" means opening).
 	state string
+	// progress are the counts of every RelayEnd (M2-46).
+	progress []domain.Progress
+	// written are the counts of every RelayCounters write (M2-46); failCounters makes every
+	// write fail.
+	written      []app.Counts
+	failCounters bool
+	// okWritten are the counts of the writes that succeeded.
+	okWritten []app.Counts
 }
 
 func (f *fakeRelayUC) add(s string) {
@@ -43,9 +51,23 @@ func (f *fakeRelayUC) RelayOpenFailed(_ context.Context, _ ids.ID, d domain.Clos
 }
 func (f *fakeRelayUC) RelayCounters(_ context.Context, _ ids.ID, c app.Counts) error {
 	f.add("counters")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.written = append(f.written, c)
+	if f.failCounters {
+		return errors.New("counters: database unavailable")
+	}
+	f.okWritten = append(f.okWritten, c)
 	return nil
 }
 func (f *fakeRelayUC) RelayUnpaired(_ context.Context, s domain.Side) { f.add("unpaired:" + string(s)) }
+func (f *fakeRelayUC) RelayEnd(_ context.Context, _ ids.ID, r domain.CloseReason, p domain.Progress) error {
+	f.add("end:" + string(r))
+	f.mu.Lock()
+	f.progress = append(f.progress, p)
+	f.mu.Unlock()
+	return nil
+}
 func (f *fakeRelayUC) RelaySessionState(context.Context, ids.ID) (string, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

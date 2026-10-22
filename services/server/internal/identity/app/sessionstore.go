@@ -108,6 +108,9 @@ type SessionStore interface {
 	// ActiveSessionsOfUser returns up to limit sessions of userID that are neither revoked nor
 	// expired at now, by id descending, with ids below before (zero for the first page).
 	ActiveSessionsOfUser(ctx context.Context, userID, before ids.ID, now time.Time, limit int) ([]SessionRecord, error)
+	// EndedSessions returns those of list that are revoked or whose expires_at is not after at,
+	// ascending; unknown ids are absent (M2-46).
+	EndedSessions(ctx context.Context, list []ids.ID, at time.Time) ([]ids.ID, error)
 	// AuthState returns the session id with its device and active dpop key; found is false for an
 	// unknown session.
 	AuthState(ctx context.Context, id ids.ID) (st AuthState, found bool, err error)
