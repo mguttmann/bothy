@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/runs/adapters/runstest"
 )
 
@@ -123,16 +124,16 @@ func (w *invocationWorld) count(query string, args ...any) int {
 	return n
 }
 
-// nextInvocation reads frames of c until a dispatch of agent.invocation arrives or d passed; ok
-// false when none came. ack acknowledges the other dispatches on the way.
-func (w *invocationWorld) nextInvocation(c *wstest.Client, d time.Duration, ack bool) (invocationFrame, bool) {
+// nextInvocation reads frames of c until a dispatch of agent.invocation arrives; the test fails
+// when none comes within testkit.Patience. ack acknowledges the other dispatches on the way.
+func (w *invocationWorld) nextInvocation(c *wstest.Client, ack bool) invocationFrame {
 	w.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), d)
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Patience)
 	defer cancel()
 	for {
 		op, raw, err := c.Next(ctx)
 		if errors.Is(err, context.DeadlineExceeded) {
-			return invocationFrame{}, false
+			w.t.Fatal("no agent.invocation within testkit.Patience")
 		}
 		if err != nil {
 			w.t.Fatal(err)
@@ -152,12 +153,23 @@ func (w *invocationWorld) nextInvocation(c *wstest.Client, d time.Duration, ack 
 			}
 			continue
 		}
-		{
-			if f.InvocationToken != "" {
-				w.remember(f.InvocationToken)
-			}
-			return f, true
+		if f.InvocationToken != "" {
+			w.remember(f.InvocationToken)
 		}
+		return f
+	}
+}
+
+// nothingDeliveredBefore proves that the refused run of message never reached the agent on c:
+// it waits until the run failed, lets p trigger again in thread and reads the next invocation,
+// which must be the one of the new message. The consumer delivers in seq order and the refused
+// invocation has the lower seq, so a delivery of it would arrive first; no fixed window decides.
+func (w *invocationWorld) nothingDeliveredBefore(c *wstest.Client, message string, p gwPerson, thread, text string) {
+	w.t.Helper()
+	testkit.Until(w.t, "the refused run", func() bool { r, _ := w.runOf(message); return r.state == "failed" })
+	next, _ := w.say(p, thread, text)
+	if f := w.nextInvocation(c, true); f.Payload.MessageID != next {
+		w.t.Fatalf("a refused invocation was delivered: %+v", f)
 	}
 }
 
@@ -166,8 +178,8 @@ func (w *invocationWorld) nextInvocation(c *wstest.Client, d time.Duration, ack 
 func (w *invocationWorld) pollInvocations(a consumerAgent, consumer string, upTo int64) ([]invocationFrame, int64) {
 	w.t.Helper()
 	var out []invocationFrame
-	deadline := time.Now().Add(15 * time.Second)
-	for {
+	var cursor int64
+	testkit.Until(w.t, "the consumer cursor at the invocation", func() bool {
 		p, _ := w.poll(w.base, a, consumer, "?limit=50")
 		for _, raw := range p.Events {
 			var f invocationFrame
@@ -184,14 +196,10 @@ func (w *invocationWorld) pollInvocations(a consumerAgent, consumer string, upTo
 		if code, b := w.call(w.base, a, http.MethodPost, "/api/v1/agents/me/consumers/"+consumer+"/ack", map[string]any{"seq": p.NextCursor}); code != http.StatusOK {
 			w.t.Fatalf("ack = %d %s", code, b)
 		}
-		if p.NextCursor >= upTo {
-			return out, p.NextCursor
-		}
-		if time.Now().After(deadline) {
-			w.t.Fatalf("the cursor stayed at %d below %d", p.NextCursor, upTo)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+		cursor = p.NextCursor
+		return cursor >= upTo
+	})
+	return out, cursor
 }
 
 // invocationSeq reads the seq of the agent.invocation of run.
@@ -248,8 +256,8 @@ func TestInvocationDelivery(t *testing.T) {
 		if n := w.count(`SELECT count(*) FROM messages WHERE run_id = $1 AND thread_id = $2 AND kind = 'run' AND origin = 'agent' AND silent`, r.id, r.thread); n != 1 {
 			t.Fatal("no anchor in the auto thread")
 		}
-		f, ok := w.nextInvocation(c, 15*time.Second, true)
-		if !ok || f.InvocationToken == "" || f.Redelivered || f.Audience != "self" || f.Resource.Kind != "run" || f.Resource.ID != r.id ||
+		f := w.nextInvocation(c, true)
+		if f.InvocationToken == "" || f.Redelivered || f.Audience != "self" || f.Resource.Kind != "run" || f.Resource.ID != r.id ||
 			f.Resource.Version != 0 || f.Payload.MessageID != m {
 			t.Fatalf("invocation %+v", f)
 		}
@@ -283,8 +291,8 @@ func TestInvocationDelivery(t *testing.T) {
 			t.Fatal("the token is in audit_events")
 		}
 		// TestDelivery_EveryDeliveryFreshToken: without an ack the redelivery carries a new token.
-		g, ok := w.nextInvocation(c, 3*consumerAckTimeout, false)
-		if !ok || !g.Redelivered || g.InvocationToken == "" || g.InvocationToken == f.InvocationToken {
+		g := w.nextInvocation(c, false)
+		if !g.Redelivered || g.InvocationToken == "" || g.InvocationToken == f.InvocationToken {
 			t.Fatalf("redelivery %+v", g)
 		}
 		c2, err := w.verifier(a).Check(context.Background(), g.InvocationToken, runstest.ReferenceExpectation{RunID: ids.MustParse(r.id),
@@ -314,10 +322,9 @@ func TestInvocationDelivery(t *testing.T) {
 		m, _ := w.say(w.sam, ch.thread, "@"+handle+" please look")
 		w.must(w.owner, http.MethodPost, "/api/v1/grants/"+grant+"/revoke", map[string]any{"reason": "left the team"})
 		c, _ = w.ready(t, w.agentParams(a, ""))
-		if f, ok := w.nextInvocation(c, 3*time.Second, true); ok {
-			t.Fatalf("a revoked trigger was delivered: %+v", f)
-		}
-		eventually(t, 10*time.Second, "the failed run", func() bool { r, _ := w.runOf(m); return r.state == "failed" })
+		// A new grant lets Sam trigger again; the next delivery must be the new run.
+		w.triggerGrant(w.sam, ch)
+		w.nothingDeliveredBefore(c, m, w.sam, ch.thread, "@"+handle+" and now")
 		r, _ := w.runOf(m)
 		if r.reason != "access_revoked" {
 			t.Fatalf("run %+v", r)
@@ -387,8 +394,8 @@ func TestInvocationDelivery(t *testing.T) {
 		readUntil(t, c, func(f frame) bool { return f.op == "catchup.complete" })
 		// AZ-M19: the owner triggers the host agent; the delivery has no request of the owner.
 		m, _ := w.say(w.owner, ch.thread, "@"+handle+" build it")
-		f, ok := w.nextInvocation(c, 15*time.Second, true)
-		if !ok || f.InvocationToken == "" {
+		f := w.nextInvocation(c, true)
+		if f.InvocationToken == "" {
 			t.Fatal("the owner's trigger of a host agent was not delivered")
 		}
 		r, _ := w.runOf(m)
@@ -411,10 +418,10 @@ func TestInvocationDelivery(t *testing.T) {
 		}
 		w.sql(`UPDATE agents SET reported_tool_class = 'host' WHERE principal_id = $1`, a.id.String())
 		c, _ = w.ready(t, w.agentParams(a, ""))
-		if f, ok := w.nextInvocation(c, 3*time.Second, true); ok {
-			t.Fatalf("delivered %+v", f)
-		}
-		eventually(t, 10*time.Second, "the refused run", func() bool { r, _ := w.runOf(m2); return r.state == "failed" })
+		testkit.Until(t, "the refused run", func() bool { r, _ := w.runOf(m2); return r.state == "failed" })
+		// The agent reports scoped again; the next delivery must be Sam's new trigger.
+		w.sql(`UPDATE agents SET reported_tool_class = 'scoped' WHERE principal_id = $1`, a.id.String())
+		w.nothingDeliveredBefore(c, m2, w.sam, ch2.thread, "@"+handle+" scoped this time")
 		if r, _ := w.runOf(m2); r.reason != "tool_class_owner_only" {
 			t.Fatalf("run %+v", r)
 		}
@@ -436,10 +443,7 @@ func TestInvocationDelivery(t *testing.T) {
 		}
 		w.sql(`UPDATE runs SET queued_at = queued_at - interval '49 hours' WHERE id = $1`, r.id)
 		c, _ := w.ready(t, w.agentParams(a, ""))
-		if f, ok := w.nextInvocation(c, 3*time.Second, true); ok {
-			t.Fatalf("an expired run was delivered: %+v", f)
-		}
-		eventually(t, 10*time.Second, "the expired run", func() bool { r, _ := w.runOf(m); return r.state == "failed" })
+		w.nothingDeliveredBefore(c, m, w.sam, ch.thread, "@"+handle+" still there")
 		if r, _ := w.runOf(m); r.reason != "agent_unavailable" {
 			t.Fatalf("run %+v", r)
 		}

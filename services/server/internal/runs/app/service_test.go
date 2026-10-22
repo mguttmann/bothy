@@ -14,7 +14,7 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
 	full := app.Deps{
-		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j}, Threads: w.threads, Channels: w.channels,
+		Repo: w.repo, UoW: uow{}, Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{},
 	}
 	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256}
