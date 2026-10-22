@@ -95,6 +95,12 @@ def sync_detailed(
 ) -> Response[Command | Problem]:
     """Register a command
 
+     Registers a command of the calling agent or app. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (CommandRegister):
@@ -127,6 +133,12 @@ def sync(
 ) -> Command | Problem | None:
     """Register a command
 
+     Registers a command of the calling agent or app. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (CommandRegister):
@@ -153,6 +165,12 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[Command | Problem]:
     """Register a command
+
+     Registers a command of the calling agent or app. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -183,6 +201,12 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Command | Problem | None:
     """Register a command
+
+     Registers a command of the calling agent or app. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -104,6 +104,12 @@ def sync_detailed(
 ) -> Response[Command | Problem]:
     """Replace a command definition
 
+     Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason. An identical definition answers the command unchanged.
+
     Args:
         command_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         if_match (str):
@@ -139,6 +145,12 @@ def sync(
 ) -> Command | Problem | None:
     """Replace a command definition
 
+     Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason. An identical definition answers the command unchanged.
+
     Args:
         command_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         if_match (str):
@@ -168,6 +180,12 @@ async def asyncio_detailed(
     if_match: str,
 ) -> Response[Command | Problem]:
     """Replace a command definition
+
+     Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason. An identical definition answers the command unchanged.
 
     Args:
         command_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -201,6 +219,12 @@ async def asyncio(
     if_match: str,
 ) -> Command | Problem | None:
     """Replace a command definition
+
+     Replaces the definition of a command of the caller. A built-in name answers `409 conflict` with
+    `reason:
+    command_name_reserved`; a name the owner already uses on the same scope target answers `409
+    conflict` without a
+    reason. An identical definition answers the command unchanged.
 
     Args:
         command_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

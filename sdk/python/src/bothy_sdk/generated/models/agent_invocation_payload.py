@@ -15,6 +15,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.agent_session import AgentSession
+    from ..models.command_option_value import CommandOptionValue
     from ..models.principal_ref import PrincipalRef
 
 
@@ -37,6 +38,10 @@ class AgentInvocationPayload:
         message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         interaction_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         command_invocation_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        command_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+        command_name (str | Unset): Name of the triggering command; set exactly for `trigger_kind = command`.
+        options (list[CommandOptionValue] | Unset): Parsed option values in the order of the command definition; set
+            exactly for `trigger_kind = command`.
         agent_session (AgentSession | Unset):
         settings_version (int | Unset): Channel settings version; reload `agent.config.read` when newer than cached.
     """
@@ -51,6 +56,9 @@ class AgentInvocationPayload:
     message_id: UUID | Unset = UNSET
     interaction_id: UUID | Unset = UNSET
     command_invocation_id: UUID | Unset = UNSET
+    command_id: UUID | Unset = UNSET
+    command_name: str | Unset = UNSET
+    options: list[CommandOptionValue] | Unset = UNSET
     agent_session: AgentSession | Unset = UNSET
     settings_version: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -84,6 +92,19 @@ class AgentInvocationPayload:
         if not isinstance(self.command_invocation_id, Unset):
             command_invocation_id = str(self.command_invocation_id)
 
+        command_id: str | Unset = UNSET
+        if not isinstance(self.command_id, Unset):
+            command_id = str(self.command_id)
+
+        command_name = self.command_name
+
+        options: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.options, Unset):
+            options = []
+            for options_item_data in self.options:
+                options_item = options_item_data.to_dict()
+                options.append(options_item)
+
         agent_session: dict[str, Any] | Unset = UNSET
         if not isinstance(self.agent_session, Unset):
             agent_session = self.agent_session.to_dict()
@@ -110,6 +131,12 @@ class AgentInvocationPayload:
             field_dict["interaction_id"] = interaction_id
         if command_invocation_id is not UNSET:
             field_dict["command_invocation_id"] = command_invocation_id
+        if command_id is not UNSET:
+            field_dict["command_id"] = command_id
+        if command_name is not UNSET:
+            field_dict["command_name"] = command_name
+        if options is not UNSET:
+            field_dict["options"] = options
         if agent_session is not UNSET:
             field_dict["agent_session"] = agent_session
         if settings_version is not UNSET:
@@ -120,6 +147,7 @@ class AgentInvocationPayload:
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
         from ..models.agent_session import AgentSession
+        from ..models.command_option_value import CommandOptionValue
         from ..models.principal_ref import PrincipalRef
 
         d = dict(src_dict)
@@ -163,6 +191,24 @@ class AgentInvocationPayload:
         else:
             command_invocation_id = UUID(_command_invocation_id)
 
+        _command_id = d.pop("command_id", UNSET)
+        command_id: UUID | Unset
+        if isinstance(_command_id, Unset):
+            command_id = UNSET
+        else:
+            command_id = UUID(_command_id)
+
+        command_name = d.pop("command_name", UNSET)
+
+        _options = d.pop("options", UNSET)
+        options: list[CommandOptionValue] | Unset = UNSET
+        if _options is not UNSET:
+            options = []
+            for options_item_data in _options:
+                options_item = CommandOptionValue.from_dict(options_item_data)
+
+                options.append(options_item)
+
         _agent_session = d.pop("agent_session", UNSET)
         agent_session: AgentSession | Unset
         if isinstance(_agent_session, Unset):
@@ -183,6 +229,9 @@ class AgentInvocationPayload:
             message_id=message_id,
             interaction_id=interaction_id,
             command_invocation_id=command_invocation_id,
+            command_id=command_id,
+            command_name=command_name,
+            options=options,
             agent_session=agent_session,
             settings_version=settings_version,
         )

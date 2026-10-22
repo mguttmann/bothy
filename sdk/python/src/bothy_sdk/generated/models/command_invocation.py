@@ -19,7 +19,7 @@ class CommandInvocation:
         invocation_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         command_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        accepted (bool):
+        accepted (bool): Always true; a refusal is an error response.
         thread_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         run_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
     """
