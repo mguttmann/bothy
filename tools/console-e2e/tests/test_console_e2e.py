@@ -548,10 +548,10 @@ def test_uuid7_has_version_and_variant() -> None:
 
 
 def test_totp_secret_reads_the_otpauth_uri() -> None:
-    uri = "otpauth://totp/Bothy:sam?secret=jbswy3dpehpk3pxp%3D%3D&issuer=Bothy"
+    uri = "otpauth://totp/Team%20Chat:sam?secret=jbswy3dpehpk3pxp%3D%3D&issuer=Team%20Chat"
     assert admin.totp_secret(uri) == "JBSWY3DPEHPK3PXP"
     with pytest.raises(admin.CheckError):
-        admin.totp_secret("otpauth://totp/Bothy:sam?issuer=Bothy")
+        admin.totp_secret("otpauth://totp/Team%20Chat:sam?issuer=Team%20Chat")
 
 
 def _seed() -> dict[str, object]:

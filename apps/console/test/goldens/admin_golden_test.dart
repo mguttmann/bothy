@@ -87,7 +87,7 @@ final _viewAs = ViewAsResult(
 Widget _shell(Widget body) => Material(child: _bare(body));
 
 Widget _bare(Widget body) => ConsoleShell(
-  productName: 'Bothy',
+  productName: 'Team Chat',
   displayName: 'Alex',
   page: ConsolePage.people,
   onOpen: (_) {},
