@@ -526,10 +526,9 @@ requested_grants:
         purpose: 'Pause',
       );
       expect(updated.subscription.state, SubscriptionState.paused);
-      expect(
-        jsonDecode(last('PATCH', '/api/v1/webhooks/$_sub').body),
-        {'state': 'paused'},
-      );
+      expect(jsonDecode(last('PATCH', '/api/v1/webhooks/$_sub').body), {
+        'state': 'paused',
+      });
       await repository.deleteSubscription(_sub, purpose: 'Delete');
       expect(
         last(

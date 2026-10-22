@@ -138,9 +138,8 @@ class _OnceOnlySecretState extends State<OnceOnlySecret> {
               const SizedBox(height: DsSpace.s16),
               Text(
                 widget.label,
-                style: dsTextStyle(
-                  DsType.bodyStrong,
-                ).copyWith(color: colors.textPrimary),
+                style: dsTextStyle(DsType.bodyStrong)
+                    .copyWith(color: colors.textPrimary),
               ),
               const SizedBox(height: DsSpace.s4),
               if (secret != null)
@@ -157,9 +156,8 @@ class _OnceOnlySecretState extends State<OnceOnlySecret> {
                       child: SelectableText(
                         secret,
                         key: ValueKey('$p.secret'),
-                        style: dsTextStyle(
-                          DsType.code,
-                        ).copyWith(color: colors.textPrimary),
+                        style: dsTextStyle(DsType.code)
+                            .copyWith(color: colors.textPrimary),
                       ),
                     ),
                   ),

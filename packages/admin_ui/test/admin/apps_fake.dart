@@ -146,6 +146,7 @@ mixin FakeApps {
   AppRecord seedApp(
     Map<String, Object?> manifest, {
     List<String>? grantedScopes,
+    List<String> eventSubscriptions = const [],
     AppInstallState state = AppInstallState.active,
   }) {
     final info = AppManifestInfo.fromJson(manifest);
@@ -158,7 +159,7 @@ mixin FakeApps {
       manifest: info,
       installationId: 'inst-$id',
       grantedScopes: grantedScopes ?? info.requiredScopes,
-      eventSubscriptions: const [],
+      eventSubscriptions: eventSubscriptions,
       state: state,
       installedAt: DateTime.utc(2026, 10, 18, 9),
       installedBy: 'alex',
@@ -450,14 +451,25 @@ mixin FakeApps {
     }
   }
 
-  /// The deliveries of a subscription, newest first, in one page.
+  /// Deliveries per page of `deliveries` (an offset cursor).
+  int deliveryPageSize = 50;
+
+  /// The `listWebhookDeliveries` requests: subscription and cursor.
+  final List<String> deliveryRequests = [];
+
+  /// The deliveries of a subscription, newest first, [deliveryPageSize] per page.
   Future<AdminPage<AppDelivery>> deliveries(
     String subscriptionId, {
     String? cursor,
   }) async {
+    deliveryRequests.add('$subscriptionId ${cursor ?? ''}'.trim());
     refused('deliveries');
+    final all = deliveriesBySubscription[subscriptionId] ?? const [];
+    final start = int.tryParse(cursor ?? '') ?? 0;
+    final end = (start + deliveryPageSize).clamp(0, all.length);
     return AdminPage(
-      List.of(deliveriesBySubscription[subscriptionId] ?? const []),
+      all.sublist(start.clamp(0, all.length), end),
+      nextCursor: end < all.length ? '$end' : null,
     );
   }
 
