@@ -204,7 +204,7 @@ const dropped = <String>[
 void main() {
   group('passes unchanged', () {
     test('text, UTF-8 and C0 controls', () {
-      expectAllSplits(b('Grüße, Alex ✓ 日本'), [t('Grüße, Alex ✓ 日本')]);
+      expectAllSplits(b('Café, Alex ✓ 日本'), [t('Café, Alex ✓ 日本')]);
       expectAllSplits(b('a\x07\x08\t\n\x0b\x0c\r\x0e\x0fz'), [
         t('a\x07\x08\t\n\x0b\x0c\r\x0e\x0fz'),
       ]);
@@ -296,10 +296,10 @@ void main() {
       'a percent-encoded target is kept; a raw non-ASCII one is dropped',
       () {
         expectAllSplits(
-          b('\x1b]8;;https://example.com/gr%C3%BC%C3%9Fe\x1b\\'),
-          ['S:https://example.com/gr%C3%BC%C3%9Fe'],
+          b('\x1b]8;;https://example.com/caf%C3%A9\x1b\\'),
+          ['S:https://example.com/caf%C3%A9'],
         );
-        expectAllSplits(b('a\x1b]8;;https://example.com/grüße\x1b\\b'), [
+        expectAllSplits(b('a\x1b]8;;https://example.com/café\x1b\\b'), [
           'T:ab',
         ]);
       },
