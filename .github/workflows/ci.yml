@@ -305,10 +305,13 @@ jobs:
             ~/.cache/pre-commit
           key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
       - run: make bootstrap-ci
+      # In a pull request a vulnerability that its merge base has too (a new advisory) does
+      # not fail; a push to main and the daily advisories.yml scan everything (PL/25).
       - name: make gitleaks semgrep trivy osv licenses
         env:
           COMPONENTS: ${{ needs.plan.outputs.components }}
-        run: make gitleaks semgrep trivy osv licenses COMPONENTS="$COMPONENTS"
+          OSV_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+        run: make gitleaks semgrep trivy osv licenses COMPONENTS="$COMPONENTS" OSV_BASE="$OSV_BASE"
 
   # The tests of the Python tools and their coverage: no component selected. On every change:
   # some also build component sources for other platforms (the release builds).
