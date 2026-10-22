@@ -358,10 +358,10 @@ internal/wire, HTTP through the chain with response validation).
 
 ## Port (root package `internal/chat`)
 
-- Inbound: `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
+- Inbound: `Structure` (spaces, channels, read-only), `ImportStructure` and `ReadOnlySwitch` (M8-03), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
 - Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
 - Subscribes to in-tx events: none.
-- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`; declares `ReadOnlyGuard` (implemented by `importer`, bound by `internal/wire`, M8-03).
 
 ## Dependencies
 
@@ -456,6 +456,26 @@ canary class `manage_only` of `test/canary`.
 Rulings: docs/DECISIONS.md D-M2-03-1 to D-M2-03-13. Tests: `domain/project_binding_test.go`,
 `test/integration/project_binding_test.go`, `migrations/chat_project_bindings_test.go` and the
 canary scenario `test/canary/scenario_project.go`.
+
+## Import structure and read-only switch (M8-03)
+
+- `chat.ImportStructure` (`app/importstructure.go`) is how the importer creates structure inside
+  the unit of work of its batch, without a permission check of its own (the batch was authorized
+  with `import.apply`) and without an audit entry, with the normal events: `Space` creates a space
+  with the name and the fractional sort key of the tool or adopts a live existing one; `Channel`
+  creates a text channel with its main thread (search language of the instance, 14 3.1) or a
+  forum, with `read_only` as given, operator mode `none` and no grant, or adopts a live existing
+  channel and sets its flag; a new name that a live space or channel already holds is `409
+  conflict` with `reason` `name_collision` (22 5.1 rule 1). `ForumTag` adopts a live tag with the
+  same name without regard to case, otherwise inserts it at the end and raises the channel version
+  with `channel.updated` (22 6.6). `SetReadOnly` writes `channels.read_only` with a new version,
+  `channel.updated` and the in-transaction event `ChannelReadOnlySet`, whose subscriber in `runs`
+  cancels the active runs of a channel that becomes read-only.
+- `chat.ReadOnlySwitch` is `setChannelReadOnly` (`channel.read_only.set`, manage, step-up,
+  If-Match, audit with `reason` and `read_only`); the same flag records `no_change`. While the
+  source port `ReadOnlyGuard` (implemented by `importer`) reports the channel as controlled by the
+  ownership list of an import that is neither completed nor failed, the switch answers `409
+  conflict` with `reason` `import_lead_controls` (22 12.1).
 
 ## Port (root package `internal/chat`)
 

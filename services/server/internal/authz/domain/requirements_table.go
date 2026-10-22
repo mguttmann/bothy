@@ -145,7 +145,9 @@ var requirementGroups = []struct {
 	// refresh token; the host is visible to any principal for exactly this requirement.
 	{"public (valid pairing code)", Public, []string{"host.pair"}},
 	{"owner or assignee or +terminal", All(HumanSession, Any(Owner, Assignee, Terminal)), []string{"host.read"}},
-	{"owner", Deferred("M8"), []string{"import.apply"}},
+	// import.apply (M8-03): an owner; the running source and the target in a channel of the source
+	// are checks of the importer use case (409 import_not_running, target_outside_source).
+	{"owner", Owner, []string{"import.apply"}},
 	// interaction.create (M2-15 design note 8 b): trigger on the path; the guard of agent.invoke with
 	// the interaction rules follows in step 9.
 	{"trigger", AtLeast(LevelTrigger), []string{"interaction.create"}},

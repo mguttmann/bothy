@@ -61,11 +61,11 @@ SELECT id, sort_key FROM channels WHERE space_id = @space_id AND archived_at IS 
 
 -- name: InsertChannel :exec
 INSERT INTO channels (id, space_id, kind, name, topic, sort_key, operator_inherit, require_mention, thread_require_mention,
-    free_response, auto_thread, allow_mentioned_agents, history_backfill_limit, forum_default_sort, created_by, created_at,
-    version, settings_version)
+    free_response, auto_thread, allow_mentioned_agents, history_backfill_limit, forum_default_sort, read_only, created_by,
+    created_at, version, settings_version)
 VALUES (@id, @space_id, @kind, @name, @topic, @sort_key, @operator_inherit, @require_mention, @thread_require_mention,
-    @free_response, @auto_thread, @allow_mentioned_agents, @history_backfill_limit, sqlc.narg(forum_default_sort), @created_by,
-    @created_at, @version, @settings_version);
+    @free_response, @auto_thread, @allow_mentioned_agents, @history_backfill_limit, sqlc.narg(forum_default_sort), @read_only,
+    @created_by, @created_at, @version, @settings_version);
 
 -- name: SaveChannel :exec
 -- Writes the columns of channel.update, channel.reorder and channel.archive and the version; a

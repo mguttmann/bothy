@@ -653,6 +653,54 @@ func (stubServer) FinishRun(context.Context, rest.FinishRunRequestObject) (rest.
 	return nil, nil
 }
 
+func (stubServer) ListImports(context.Context, rest.ListImportsRequestObject) (rest.ListImportsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateImport(context.Context, rest.CreateImportRequestObject) (rest.CreateImportResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetImport(context.Context, rest.GetImportRequestObject) (rest.GetImportResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListImportItems(context.Context, rest.ListImportItemsRequestObject) (rest.ListImportItemsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) StartImport(context.Context, rest.StartImportRequestObject) (rest.StartImportResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) PauseImport(context.Context, rest.PauseImportRequestObject) (rest.PauseImportResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CancelImport(context.Context, rest.CancelImportRequestObject) (rest.CancelImportResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteImport(context.Context, rest.CompleteImportRequestObject) (rest.CompleteImportResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetImportLead(context.Context, rest.SetImportLeadRequestObject) (rest.SetImportLeadResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ApplyImportBatch(context.Context, rest.ApplyImportBatchRequestObject) (rest.ApplyImportBatchResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetImportCursor(context.Context, rest.SetImportCursorRequestObject) (rest.SetImportCursorResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetChannelReadOnly(context.Context, rest.SetChannelReadOnlyRequestObject) (rest.SetChannelReadOnlyResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CancelRun(context.Context, rest.CancelRunRequestObject) (rest.CancelRunResponseObject, error) {
 	return nil, nil
 }
@@ -1255,6 +1303,19 @@ func TestRealTable_Enabled(t *testing.T) {
 		"createInteraction":    {"POST /api/v1/components/{component_id}/interactions", "interaction.create", "rl.interaction"},
 		"respondToInteraction": {"POST /api/v1/interactions/{interaction_id}/respond", "interaction.respond", "rl.agent_runtime"},
 		"updateComponent":      {"PATCH /api/v1/components/{component_id}", "component.update", "rl.write"},
+		// M8-03
+		"listImports":        {"GET /api/v1/imports", "import.read", "rl.read"},
+		"createImport":       {"POST /api/v1/imports", "import.manage", "rl.admin"},
+		"getImport":          {"GET /api/v1/imports/{import_id}", "import.read", "rl.read"},
+		"listImportItems":    {"GET /api/v1/imports/{import_id}/items", "import.read", "rl.read"},
+		"startImport":        {"POST /api/v1/imports/{import_id}/start", "import.manage", "rl.admin"},
+		"pauseImport":        {"POST /api/v1/imports/{import_id}/pause", "import.manage", "rl.admin"},
+		"cancelImport":       {"POST /api/v1/imports/{import_id}/cancel", "import.manage", "rl.admin"},
+		"completeImport":     {"POST /api/v1/imports/{import_id}/complete", "import.manage", "rl.admin"},
+		"setImportLead":      {"PUT /api/v1/imports/{import_id}/leads", "import.manage", "rl.admin"},
+		"applyImportBatch":   {"POST /api/v1/imports/{import_id}/batches", "import.apply", "rl.import"},
+		"setImportCursor":    {"PUT /api/v1/imports/{import_id}/cursor", "import.apply", "rl.import"},
+		"setChannelReadOnly": {"PUT /api/v1/channels/{channel_id}/read-only", "channel.read_only.set", "rl.admin"},
 		// M1-58
 		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
 		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},

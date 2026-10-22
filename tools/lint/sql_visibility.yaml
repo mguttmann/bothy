@@ -236,6 +236,9 @@ exceptions:
   - query: runs.LockActiveRunsByAgent
     category: system_job
     reason: "the in-transaction subscriber of agents.AgentDisabled locks the active runs of the disabled agent and ends them cancelled; nothing of the rows leaves the server (09 2.1, M2-09)"
+  - query: runs.LockActiveRunsByThreads
+    category: system_job
+    reason: "the in-transaction subscriber of chat.ChannelReadOnlySet locks the active runs of the threads of a channel that became read-only and sends their agent run.cancel_requested; nothing of the rows leaves the server (05 channel.read_only.set, M8-03)"
   - query: runs.OrphanCandidates
     category: system_job
     reason: "the job runs.stall_check reads the started active runs without a principal and fails the interrupted and stale ones; nothing of the rows leaves the server (09 5.5, M2-09)"

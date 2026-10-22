@@ -223,6 +223,9 @@ type Repository interface {
 	// ActiveRunsOfThreads reads the active runs of threadIDs (at most one per thread, R-DM-14) for
 	// the delivery reads of runs.LiveBox, whose recipients the gateway admitted.
 	ActiveRunsOfThreads(ctx context.Context, threadIDs []ids.ID) ([]RunRow, error)
+	// LockActiveRunsByThreads locks the active runs of the threads in ascending id (M8-03: a
+	// channel became read-only). It needs a unit of work.
+	LockActiveRunsByThreads(ctx context.Context, threadIDs []ids.ID) ([]RunRow, error)
 	// OrphanCandidates reads the runs in running or waiting_input, ascending by id, for the job
 	// runs.stall_check (M2-09); a thread has at most one (R-DM-14).
 	OrphanCandidates(ctx context.Context) ([]RunRow, error)

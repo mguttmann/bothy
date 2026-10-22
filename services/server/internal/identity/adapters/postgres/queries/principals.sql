@@ -6,6 +6,15 @@ INSERT INTO principals (id, kind, status, handle, display_name, avatar_file_id)
 VALUES (@id, @kind, @status, @handle, @display_name, @avatar_file_id)
 RETURNING created_at;
 
+-- name: InsertPrincipalIfAbsent :one
+-- A placeholder person of an import (M8-03): a handle that is taken, also by a concurrent unit
+-- that commits first, inserts nothing and returns no row, so the unit stays usable and the
+-- importer takes the next counter.
+INSERT INTO principals (id, kind, status, handle, display_name, avatar_file_id)
+VALUES (@id, @kind, @status, @handle, @display_name, @avatar_file_id)
+ON CONFLICT DO NOTHING
+RETURNING created_at;
+
 -- name: InsertUser :exec
 INSERT INTO users (principal_id, email, locale, time_zone)
 VALUES (@principal_id, @email, @locale, @time_zone);

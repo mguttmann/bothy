@@ -392,6 +392,12 @@ The server executes every item like this ([03-data-model.md](03-data-model.md), 
 4. `content_sha256` stores the hash of the converted content. A later run that sees a
    different hash counts "changed at the source" in the report and changes nothing.
 
+The answer to such a key carries the stored item with the member `source_changed = true`
+(`ImportItem`), and the server raises its counter `server.source_changed` in
+`import_sources.stats`; nothing else changes and no other event is written (M8-03). A key that
+exists is locked before it is read, so a concurrent batch with the same key waits for the commit of
+the other (section 7.4). A batch whose items all existed already writes no event at all.
+
 ### 7.3 Cursor
 
 `import_sources.cursor` holds, per Discord channel and thread, the highest fully taken-over
@@ -435,6 +441,29 @@ and a read mirror runs for days. A batch concerns exactly one thread and has at 
 `import.batch_max_items` items; it is one transaction. Structure items (spaces, channels,
 forum tags, people) come in separate batches without a thread. Every batch writes `import.progress`
 and `thread.updated` (section 6.4). Start, cancellation and completion are recorded in the audit log.
+
+States and answers of the interface (M8-03): `startImport` moves `draft` or `paused` to
+`running` and sets `started_at` on the first start; `pauseImport` moves `running` to `paused`;
+`cancelImport` moves `draft`, `running` or `paused` to `failed` with the counter
+`server.cancelled = true` (there is no state `cancelled`); `completeImport` moves `running` or
+`paused` to `completed` only when every mapped channel whose target is not `skip` and whose channel
+item is `posted` has `lead = bothy` (else `409 conflict` with `reason` `lead_not_bothy`). Repeating
+the transition that already happened (start on `running`, pause on `paused`) answers the source
+unchanged without an event; every other transition is `409 conflict` with `reason`
+`import_state`. `setImportLead` answers `404` for a channel the mapping does not name or maps to
+`skip`, `409 conflict` with `reason` `channel_not_imported` while its channel item is not `posted`
+and `import_state` for a `completed` or `failed` source. `applyImportBatch` and `setImportCursor`
+answer `409 conflict` with `reason` `import_not_running` for a source that is not `running` (also
+`paused`); a batch target outside the channels of the source is `409 conflict` with `reason`
+`target_outside_source`, a new space or channel whose name a live object holds `409 conflict` with
+`reason` `name_collision`. Each refusal of `import.apply` is recorded in the audit log as a denial
+with reason `import_not_running`. The mapping of section 5.2 is the schema
+`ImportSourceDiscordConfig`; the `data` of the structure items follows `ImportSpaceData`,
+`ImportChannelData`, `ImportForumTagData` and `ImportUserData` (`docs/api/openapi.yaml`); thread,
+message, pin and file items and `thread_origin_key` answer `400 validation_failed` with the code
+`not_enabled` until the content items are built (M8-11). `setImportCursor` replaces `cursor` and
+merges the members of `stats` into `stats.tool`; the server's own counters are under
+`stats.server`. `getImport` and `listImports` return the stored `cursor`.
 
 The command line logs in as a device with `platform = cli` through device pairing
 (`bothy import login`, [08-identity.md](08-identity.md) sections 5.3 and 6.4). Such a session

@@ -170,6 +170,10 @@ var appPrivileges = map[string][]string{
 	// 03 incoming_webhooks (M2-27): a revoke sets revoked_at; the retention job of class config
 	// deletes revoked rows (M7-05).
 	"incoming_webhooks": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 import_sources and import_items (M8-03): the importer writes sources and items; the
+	// retention job of class import deletes items and sources (M7).
+	"import_sources": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"import_items":   {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 backup_runs (M7-02): the console and the status page read the runs; only bothy_backup
 	// writes them (TestMigrationBackupRuns holds its rights).
 	"backup_runs": {"SELECT"},

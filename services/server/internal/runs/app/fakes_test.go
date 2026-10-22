@@ -294,6 +294,10 @@ func (r *repo) LockActiveRunsByAgent(_ context.Context, agent ids.ID) ([]app.Run
 	return r.lockActive(func(x app.RunRow) bool { return x.AgentID == agent }), nil
 }
 
+func (r *repo) LockActiveRunsByThreads(_ context.Context, threads []ids.ID) ([]app.RunRow, error) {
+	return r.lockActive(func(x app.RunRow) bool { return slices.Contains(threads, x.ThreadID) }), nil
+}
+
 func (r *repo) OrphanCandidates(context.Context) ([]app.RunRow, error) {
 	return r.lockActive(func(x app.RunRow) bool { return x.State != domain.StateQueued }), nil
 }

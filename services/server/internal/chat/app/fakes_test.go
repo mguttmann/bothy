@@ -480,6 +480,10 @@ func (s *store) TouchChannel(ctx context.Context, c domain.Channel) error {
 	return s.SaveChannel(ctx, c)
 }
 
+func (s *store) SaveChannelReadOnly(ctx context.Context, c domain.Channel) error {
+	return s.SaveChannel(ctx, c)
+}
+
 func (s *store) LockInheritingChannels(_ context.Context, space ids.ID) ([]app.ChannelRow, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

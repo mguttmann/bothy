@@ -69,6 +69,7 @@ func moduleWirings() []moduleWiring {
 		filesWiring(),
 		gatewayWiring(),
 		identityWiring(),
+		importerWiring(),
 		instanceWiring(),
 		messagingWiring(),
 		notifyWiring(),

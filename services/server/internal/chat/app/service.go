@@ -129,6 +129,9 @@ type Deps struct {
 	// Resolver runs the guided flow resolve_i1 of space.operator.set and channel.operator.set
 	// (authz, M2-21); nil refuses a request with resolve_i1 with kind internal (fail closed).
 	Resolver authz.I1Resolver
+	// Guard tells whether the ownership list of an import controls the read-only flag of a channel
+	// (importer, M8-03); nil means no channel is controlled.
+	Guard chat.ReadOnlyGuard
 }
 
 // Cursors is the outgoing port that encodes and checks the opaque list cursors (06 section 6

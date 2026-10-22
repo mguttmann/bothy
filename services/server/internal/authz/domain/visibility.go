@@ -56,7 +56,10 @@ var ownedKinds = map[string]bool{
 // ownerOnlyKinds are visible to effective owners only.
 //
 //nolint:goconst // resource kinds of the generated catalogue, listed once per rule
-var ownerOnlyKinds = map[string]bool{KindApp: true, "webhook_delivery": true, "import_source": true}
+var ownerOnlyKinds = map[string]bool{KindApp: true, "webhook_delivery": true, kindImportSource: true}
+
+// kindImportSource is the resource kind of an import source (M8-03).
+const kindImportSource = "import_source"
 
 // IsChannelPathKind reports whether kind lives in a channel (05 section 2.2).
 func IsChannelPathKind(kind string) bool { return channelPathKinds[kind] }
@@ -83,10 +86,12 @@ func Visible(in Input) (visible bool, reason Reason, err error) {
 		return in.Eff.Level >= LevelRead, ReasonNoGrant, nil
 	case ownedKinds[kind]:
 		return isSelf(in) || (in.Eff.Owner && in.Req.Contains(Owner)), ReasonNotSelf, nil
-	case kind == KindApp && in.Resource.ID.IsZero():
+	case (kind == KindApp || kind == kindImportSource) && in.Resource.ID.IsZero():
 		// The collection of apps (listApps, validateManifest) names no app, so it hides nothing:
 		// its visibility is that of the instance, and the requirement owner answers a non-owner
-		// with owner_only (06 section 4 point 2, M2-24 design note 13).
+		// with owner_only (06 section 4 point 2, M2-24 design note 13). The same holds for the
+		// collection of import sources (listImports, createImport, M8-03): a personal token of an
+		// owner gets 403 (SR5).
 		return in.Principal.Kind != KindAnonymous, ReasonNoGrant, nil
 	case ownerOnlyKinds[kind]:
 		return in.Eff.Owner, ReasonNoGrant, nil
