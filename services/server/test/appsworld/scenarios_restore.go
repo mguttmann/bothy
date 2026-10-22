@@ -13,6 +13,7 @@ import (
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -58,7 +59,7 @@ func ScenarioWebhookCarriesEpochAfterRestore(t *testing.T) {
 	w.StartWorker()
 	esk(w, "Before the restore")
 	w.Round()
-	waitFor(t, 30*time.Second, "the first delivery", func() bool {
+	waitFor(t, testkit.Patience, "the first delivery", func() bool {
 		d := w.Deliveries(sub)
 		return len(d) == 1 && d[0].Status == "succeeded"
 	})
@@ -84,7 +85,7 @@ func ScenarioWebhookCarriesEpochAfterRestore(t *testing.T) {
 
 	msg := esk(w, "After the restore")
 	w.Round()
-	waitFor(t, 30*time.Second, "the delivery after the restore", func() bool {
+	waitFor(t, testkit.Patience, "the delivery after the restore", func() bool {
 		d := w.Deliveries(sub)
 		return len(d) == 2 && d[0].Status == "succeeded" && d[1].Status == "succeeded"
 	})

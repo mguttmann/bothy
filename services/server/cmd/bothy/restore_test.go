@@ -9,10 +9,10 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // restoreState is the part of the instance row bothy restore finalize changes, as the superuser
@@ -77,20 +77,14 @@ func TestFinalizeRestore_RefusesWithConnectedApp(t *testing.T) {
 	app.Close()
 	// Close does not wait for the backend to end; the command counts it until it has.
 	super := db.SuperConn(t)
-	for i := 0; ; i++ {
+	testkit.Until(t, "no bothy_app session connected", func() bool {
 		var n int
 		if err := super.QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity
 			WHERE usename = 'bothy_app' AND datname = current_database()`).Scan(&n); err != nil {
 			t.Fatal(err)
 		}
-		if n == 0 {
-			break
-		}
-		if i > 600 {
-			t.Fatalf("%d bothy_app sessions still connected", n)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return n == 0
+	})
 	code, stdout, stderr = runBothy(t, env, "restore", "finalize")
 	after := readRestoreState(t, db)
 	if code != exitOK || after.epoch == before.epoch {

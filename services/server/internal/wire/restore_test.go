@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	statusdomain "github.com/OWNER/bothy/services/server/internal/status/domain"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
@@ -107,21 +108,14 @@ func ownerEnv(t *testing.T, db *pgtest.DB) []string {
 // stopped process does not wait for its backends to end, and bothy restore finalize counts them.
 func waitNoServerSessions(t *testing.T, db *pgtest.DB) {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
-	for {
+	testkit.Until(t, "no bothy_app session connected", func() bool {
 		var n int
 		if err := superOf(t, db).QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity
 			WHERE usename = 'bothy_app' AND datname = current_database()`).Scan(&n); err != nil {
 			t.Fatal(err)
 		}
-		if n == 0 {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("%d bothy_app sessions still connected", n)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return n == 0
+	})
 }
 
 // finalizeRestore runs bothy restore finalize through wire.NewRestoreFinalize, the assembly of the
@@ -249,26 +243,21 @@ func TestStart_RestoreNotFinalized_NotReady(t *testing.T) {
 	db := newServeDB(t)
 	simulateRestore(t, db)
 	// presenceStarts counts the starts of the presence tracker (M2-20), whose start rule and flush
-	// loop write the agents table: the lock holds them too (INT-W51/14).
+	// loop write the agents table: the lock holds them too (D-M7-04-7).
 	var presenceStarts atomic.Int32
 	gauges := func(func() []agentsapp.GaugeSample) error { presenceStarts.Add(1); return nil }
 	for _, role := range []wire.Role{wire.RoleAPI, wire.RoleWorker, wire.RoleAll} {
 		p := start(t, role, serveEnv(t, db), wire.Deps{PresenceGauges: gauges})
 		internal := p.waitInternal(t)
-		deadline := time.Now().Add(30 * time.Second)
-		for !strings.Contains(p.logs.String(), `"msg":"server started, not ready"`) && time.Now().Before(deadline) {
-			time.Sleep(20 * time.Millisecond)
-		}
+		testkit.Until(t, string(role)+": the start ended not ready", func() bool {
+			return strings.Contains(p.logs.String(), `"msg":"server started, not ready"`)
+		})
 		// The database check may fail for a moment on a loaded host; the lock fails for good.
 		want := `{"status":"unavailable","failed":["restore_not_finalized"]}` + "\n"
-		code, body := get(t, internal, "/readyz")
-		for (code != http.StatusServiceUnavailable || body != want) && time.Now().Before(deadline) {
-			time.Sleep(100 * time.Millisecond)
-			code, body = get(t, internal, "/readyz")
-		}
-		if code != http.StatusServiceUnavailable || body != want {
-			t.Fatalf("%s: /readyz = %d %q; logs:\n%s", role, code, body, p.logs)
-		}
+		testkit.Until(t, string(role)+": /readyz names only restore_not_finalized", func() bool {
+			code, body := get(t, internal, "/readyz")
+			return code == http.StatusServiceUnavailable && body == want
+		})
 		if logs := p.logs.String(); strings.Count(logs, "database identity differs from the stored one") != 1 ||
 			!strings.Contains(logs, "bothy restore finalize") || strings.Contains(logs, `"msg":"server ready"`) {
 			t.Fatalf("%s: want one log line with the runbook step and no ready line:\n%s", role, logs)
@@ -455,9 +444,7 @@ func appendEvents(t *testing.T, db *pgtest.DB, n int) int64 {
 func (w *gwWorld) listEvents(t *testing.T, p gwPerson, after int64, epoch string) (int, map[string]any) {
 	t.Helper()
 	path := "/api/v1/events"
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.base+path+"?after="+strconv.FormatInt(after, 10)+"&epoch="+epoch, nil)
+	req, err := http.NewRequestWithContext(testkit.Context(t), http.MethodGet, w.base+path+"?after="+strconv.FormatInt(after, 10)+"&epoch="+epoch, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,7 +504,7 @@ func TestEpochChanged_AfterOvertake(t *testing.T) {
 	if r2.SyncEpoch.String() != res.SyncEpoch.String() || r2.HeadSeq < head {
 		t.Fatalf("ready %+v, want epoch %s and head %d", r2, res.SyncEpoch, head)
 	}
-	op, data := nextOp(c2, 10*time.Second)
+	op, data := nextOp(c2, testkit.Patience)
 	var rr rest.GatewayResyncRequired
 	if op != "resync_required" || wstest.Strict(data, &rr) != nil || rr.Reason != "epoch_changed" || rr.SyncEpoch != r2.SyncEpoch {
 		t.Fatalf("after ready: %s %s", op, data)

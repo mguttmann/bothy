@@ -119,6 +119,10 @@ func TestStartAfterPITRWithoutFinalize(t *testing.T) {
 	}
 	mustDocker(t, "stop", serve)
 	mustDocker(t, "rm", "--force", serve)
+	// A stopped process does not wait for its backends to end, and the command counts them.
+	eventually(t, "no bothy_app session after the stop of api", func() bool {
+		return psql(t, db2, "select count(*) from pg_stat_activity where usename = 'bothy_app'") == "0"
+	}, func() string { return psql(t, db2, "select usename, state from pg_stat_activity") })
 	out, code := w.once(append(migrateArgs, "restore", "finalize")...)
 	if code != 0 || !regexp.MustCompile(`sync epoch `+epoch+` -> [0-9a-f-]{36}, cursors at head_seq [0-9]+`).MatchString(out) {
 		t.Fatalf("restore finalize: exit %d:\n%s", code, out)
