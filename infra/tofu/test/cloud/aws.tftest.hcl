@@ -36,6 +36,13 @@ run "edge_port_only_public" {
     source = "../../modules/aws"
   }
 
+  # The host has a public address from the launch on, so the setup at the first boot has egress
+  # before the Elastic IP is attached.
+  assert {
+    condition     = aws_instance.host.associate_public_ip_address == true
+    error_message = "the host must get a public address at launch"
+  }
+
   assert {
     condition = alltrue([
       for r in values(aws_vpc_security_group_ingress_rule.host) : r.from_port == 443 && r.to_port == 443 && r.ip_protocol == "tcp"

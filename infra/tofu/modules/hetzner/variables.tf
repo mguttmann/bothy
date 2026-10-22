@@ -221,11 +221,11 @@ variable "ssh_allowed_cidrs" {
 # ---- Inputs of hetzner --------------------------------------------------------------------------------
 
 variable "location" {
-  description = "Hetzner Cloud location of the server, e.g. nbg1, fsn1 or hel1."
+  description = "Hetzner Cloud location of the server, e.g. nbg1, fsn1, hel1 or ash."
   type        = string
   validation {
-    condition     = can(regex("^[a-z]+[0-9]+$", var.location))
-    error_message = "location: a Hetzner Cloud location name such as nbg1."
+    condition     = can(regex("^[a-z]+[0-9]*$", var.location))
+    error_message = "location: a Hetzner Cloud location name such as nbg1 or ash."
   }
 }
 

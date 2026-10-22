@@ -189,3 +189,34 @@ run "a_host_without_ssh_key_is_refused" {
 
   expect_failures = [var.admin_ssh_public_keys]
 }
+
+# Azure accepts only RSA and Ed25519 keys for the administrator (the first key); an ECDSA key
+# would fail only at apply.
+run "an_ecdsa_administrator_key_is_refused" {
+  command = plan
+
+  module {
+    source = "../../modules/azure"
+  }
+
+  variables {
+    admin_ssh_public_keys = ["ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTY= admin@chat.example.com"]
+  }
+
+  expect_failures = [var.admin_ssh_public_keys]
+}
+
+run "an_ecdsa_key_after_an_ed25519_key_is_accepted" {
+  command = plan
+
+  module {
+    source = "../../modules/azure"
+  }
+
+  variables {
+    admin_ssh_public_keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGli5i6DCRTCblR1XFviXAN6md6ke0167D63NKgFFxHK admin@chat.example.com",
+      "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTY= second@chat.example.com",
+    ]
+  }
+}

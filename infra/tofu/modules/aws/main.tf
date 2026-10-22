@@ -175,6 +175,9 @@ resource "aws_instance" "host" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.host.id
   vpc_security_group_ids = [aws_security_group.host.id]
+  # A public address from the launch on: the setup at the first boot needs egress before the
+  # Elastic IP below is attached; the Elastic IP then replaces this address.
+  associate_public_ip_address = true
   # gzip, because the user data of generic-vm exceeds the 16 KiB limit of EC2 in plain form;
   # cloud-init unpacks it.
   user_data_base64 = base64gzip(module.host.user_data)

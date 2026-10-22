@@ -200,3 +200,16 @@ run "a_server_without_ssh_key_is_refused" {
 
   expect_failures = [var.admin_ssh_public_keys]
 }
+
+# Hetzner Cloud names some locations without a digit (ash, hil, sin).
+run "a_location_without_digit_is_accepted" {
+  command = plan
+
+  module {
+    source = "../../modules/hetzner"
+  }
+
+  variables {
+    location = "ash"
+  }
+}

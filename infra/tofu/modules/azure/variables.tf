@@ -122,6 +122,10 @@ variable "admin_ssh_public_keys" {
     error_message = "admin_ssh_public_keys: OpenSSH public keys, one line each."
   }
   validation {
+    condition     = length(var.admin_ssh_public_keys) == 0 || can(regex("^(ssh-ed25519|ssh-rsa) ", var.admin_ssh_public_keys[0]))
+    error_message = "admin_ssh_public_keys: the first key is the key of the Azure administrator and must be ssh-ed25519 or ssh-rsa; Azure accepts no other type."
+  }
+  validation {
     condition     = length(var.admin_ssh_public_keys) > 0
     error_message = "admin_ssh_public_keys: at least one key; Azure needs a key for the administrator when password login is off."
   }
