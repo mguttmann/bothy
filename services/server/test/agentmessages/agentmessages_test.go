@@ -17,20 +17,16 @@ import (
 	"os"
 	"strconv"
 	"testing"
-	"time"
 
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/OWNER/bothy/services/server/api/specschema"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
 func TestMain(m *testing.M) { os.Exit(harness.Main(m)) }
-
-// waitFor bounds every wait on the gateway and on the metric reader; a missing frame or count
-// fails the test instead of hanging it.
-const waitFor = 30 * time.Second
 
 // message is the part of Message (openapi.yaml) the tests check.
 type message struct {
@@ -242,7 +238,8 @@ func TestAgentMessage_OriginEverywhere(t *testing.T) {
 
 	// The gateway dispatch to Alex: skip every other frame until the message.created of this
 	// message arrives.
-	dctx, cancel := context.WithTimeout(ctx, waitFor)
+	// testkit.Patience bounds the wait: a missing frame fails the test instead of hanging it.
+	dctx, cancel := context.WithTimeout(ctx, testkit.Patience)
 	defer cancel()
 	var dispatched []byte
 	for dispatched == nil {
@@ -326,12 +323,11 @@ func TestAgentMessage_OriginEverywhere(t *testing.T) {
 		t.Errorf("listThreadMessages: message %s not among %d items", id, len(page.Items))
 	}
 
-	// The counter is added after commit; poll briefly so a late add is not a false failure. The
-	// replay must not count, so the difference is exactly one.
-	deadline := time.Now().Add(waitFor)
-	for createdCount(t, ts, "agent")-before < 1 && time.Now().Before(deadline) {
-		time.Sleep(50 * time.Millisecond)
-	}
+	// The counter is added after commit; wait until it grew so a late add is not a false failure.
+	// The replay must not count, so the difference is exactly one.
+	testkit.Until(t, "bothy.message.created{bothy.message.origin=agent} grew", func() bool {
+		return createdCount(t, ts, "agent")-before >= 1
+	})
 	if d := createdCount(t, ts, "agent") - before; d != 1 {
 		t.Errorf("bothy.message.created{bothy.message.origin=agent} grew by %d, want 1", d)
 	}
