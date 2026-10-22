@@ -11,6 +11,7 @@ Makefile and workflows.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -257,11 +258,52 @@ def test_ci_gives_the_security_gate_the_base_only_for_a_pull_request() -> None:
     assert 'OSV_BASE="$OSV_BASE"' in step["run"]
 
 
-def test_the_osv_target_diffs_only_with_a_base() -> None:
-    make = (REPO / "Makefile").read_text()
-    recipe = make.split("\nosv:", 1)[1].split("\n\n", 1)[0]
-    assert "OSV_BASE" in recipe
-    assert "tools/ci/advisories.py" in recipe
+def _make_osv(tmp: Path, env_base: str | None) -> tuple[int, list[str], str]:
+    """Run the real `make osv` with a fake OSV-Scanner (through FETCH) and a fake `go`."""
+    calls = tmp / "go-calls.txt"
+    bin_dir = tmp / "bin"
+    bin_dir.mkdir()
+    osv = bin_dir / "osv-scanner"
+    osv.write_text(f"#!{sys.executable}\nprint('{{}}')\n")
+    fetch = bin_dir / "fetch"
+    fetch.write_text(f"#!/bin/sh\necho {osv}\n")
+    go = bin_dir / "go"
+    go.write_text(
+        f'#!/bin/sh\necho "$*" >> {calls}\n'
+        'echo \'{"config": {"scanner_name": "govulncheck"}}\'\n'
+    )
+    for f in (osv, fetch, go):
+        f.chmod(0o755)
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    env.pop("OSV_BASE", None)
+    if env_base is not None:
+        env["OSV_BASE"] = env_base
+    done = subprocess.run(
+        ["make", "-s", "-C", str(REPO), "osv", f"FETCH={fetch}", "COMPONENTS=all"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    lines = calls.read_text().splitlines() if calls.exists() else []
+    return done.returncode, lines, done.stdout + done.stderr
+
+
+def test_the_osv_target_with_a_base_runs_only_the_diff(tmp_path: Path) -> None:
+    rc, go_calls, out = _make_osv(tmp_path, "HEAD")
+    assert rc == 0, out
+    assert "advisories: findings of the merge base" in out
+    # govulncheck runs once per Go module, in JSON mode for the diff, never in full text mode.
+    assert go_calls
+    assert all("-format json" in c for c in go_calls), go_calls
+
+
+def test_the_osv_target_without_a_base_scans_in_full(tmp_path: Path) -> None:
+    rc, go_calls, out = _make_osv(tmp_path, None)
+    assert rc == 0, out
+    assert "advisories:" not in out
+    assert go_calls
+    assert not any("-format json" in c for c in go_calls), go_calls
 
 
 def test_a_daily_schedule_runs_the_full_scan() -> None:

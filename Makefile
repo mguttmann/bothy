@@ -737,7 +737,7 @@ osv: ## Known vulnerabilities: every lock file (OSV-Scanner), Go call graphs (go
 	if [ -z "$$locks" ]; then $(call skip,osv,no lock file tracked); \
 	else args=(); for l in $$locks; do args+=(-L "$$l"); done; \
 	  $(call tool,osv-scanner) scan source --format table "$${args[@]}"; fi
-	@if [ -z "$(GO_ON)" ]; then $(call skip,govulncheck,no Go module selected); \
+	@if [ -n "$${OSV_BASE:-}" ]; then :; elif [ -z "$(GO_ON)" ]; then $(call skip,govulncheck,no Go module selected); \
 	else for m in $(GO_MODS); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...) || exit 1; done; fi
 
 licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of shipped components
