@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The entry point of the `patrol` web suites of the console administration (brief M6-04 Design
-// note 4, docs/DECISIONS.md D-M6-04-4). `patrol_cli` has no command that builds a web bundle
-// for another server, so this file takes the place of the `test_bundle.dart` it generates: the
+// note 4, docs/decisions.d/M6-04.md D-M6-04-4). `patrol_cli` has no command that builds a web
+// bundle for another server, so this file takes the place of the `test_bundle.dart` it generates: the
 // same steps as the template of patrol_cli 4.8.0 for patrol 4.10.0 (an explorer test, then the
 // app service the browser side calls through window.__patrol__getTests and
 // window.__patrol__runTest). The Dockerfile target console-e2e-web builds it with the flags of

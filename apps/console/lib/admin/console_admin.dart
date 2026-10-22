@@ -2,7 +2,7 @@
 
 /// The administration of the console: the `admin_ui` repository over the console's cookie
 /// based API, the stored "View as person" and the time zone of the signed-in person (brief
-/// M6-04 Design notes 1 and 3, docs/DECISIONS.md D-M6-04-1 and D-M6-04-3).
+/// M6-04 Design notes 1 and 3, docs/decisions.d/M6-04.md D-M6-04-1 and D-M6-04-3).
 library;
 
 import 'dart:math';

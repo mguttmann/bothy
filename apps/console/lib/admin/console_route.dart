@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The places of the administration below the pages of the console (brief M6-04 Design note 1,
-/// docs/DECISIONS.md D-M6-04-1): the pages of M6-02 host the screens of `admin_ui`, and a
+/// docs/decisions.d/M6-04.md D-M6-04-1): the pages of M6-02 host the screens of `admin_ui`, and a
 /// detail adds the ID of its person, group or agent to the page's path.
 library;
 

@@ -72,7 +72,7 @@ void main() {
     );
     final text = _previewText($);
     // The wizard sends the typed last day as an end at the start of the next day (M4-27), and
-    // the server's text names the day of that end (docs/DECISIONS.md D-M6-04-7).
+    // the server's text names the day of that end (docs/decisions.d/M6-04.md D-M6-04-7).
     final end = DateTime(last.year, last.month, last.day + 1);
     final expected = {
       _golden['en']!.replaceFirst(

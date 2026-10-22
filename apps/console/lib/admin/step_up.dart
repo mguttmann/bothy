@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The step-up of an administration action in the browser (brief M6-04 Design note 2,
-/// docs/spec/08-identitaet.md 6.2, docs/DECISIONS.md D-M6-04-2): the confirmation dialog of
+/// docs/spec/08-identity.md 6.2, docs/decisions.d/M6-04.md D-M6-04-2): the confirmation dialog of
 /// `admin_ui` comes first and sends the request; a `401 step_up_required` answer starts the
 /// console's step-up, and after its success the request repeats once with the same
 /// `Idempotency-Key`. A cancel sends nothing more.

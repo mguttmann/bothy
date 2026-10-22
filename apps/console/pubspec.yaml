@@ -50,7 +50,7 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
-  # The browser flows of A1 to A6 under the enforced CSP (docs/spec/15-client-architektur.md 20,
+  # The browser flows of A1 to A6 under the enforced CSP (docs/spec/15-client-architecture.md 20,
   # brief M6-04 Design note 4); tools/console-e2e drives the web bundle.
   patrol: 4.10.0
 

@@ -34,7 +34,7 @@ change), and after it the request repeats once with the same `Idempotency-Key`. 
 with name and remaining time stands on every page until "End view" or the end time, and the page
 `/people/view-as` shows the structure the person sees and the spaces they do not see, never
 content. The audit export goes to a browser download; codes and tokens the server shows once stay
-in the widget state only. Rulings: `D-M6-04-0` to `D-M6-04-6` in `docs/decisions.d/M6-04.md`.
+in the widget state only. Rulings: `D-M6-04-0` to `D-M6-04-8` in `docs/decisions.d/M6-04.md`.
 
 ## Layout
 
