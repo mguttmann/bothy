@@ -74,7 +74,20 @@ void main() {
         adminLocationOf(['admin', 'agents', 'a']),
         const AdminLocation(AdminSection.agents, id: 'a'),
       );
-      expect(adminLocationOf(['admin', 'apps']), isNull);
+      expect(
+        adminLocationOf(['admin', 'apps']),
+        const AdminLocation(AdminSection.apps),
+      );
+      expect(
+        adminLocationOf(['admin', 'apps', 'a']),
+        const AdminLocation(AdminSection.apps, id: 'a'),
+      );
+      expect(
+        adminLocationOf(['admin', 'incoming-webhooks']),
+        const AdminLocation(AdminSection.webhooks),
+      );
+      expect(adminLocationOf(['admin', 'incoming-webhooks', 'x']), isNull);
+      expect(adminLocationOf(['admin', 'statistics']), isNull);
       expect(adminLocationOf(['admin', 'devices', 'x']), isNull);
       expect(
         adminPathOf(const AdminLocation(AdminSection.groups, id: 'g')),
