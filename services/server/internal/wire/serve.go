@@ -234,7 +234,8 @@ type server struct {
 //     6e. agents (M1-51): build the agent records over the unit of work, the Authorizer, the rights
 //     hook and the identity module (startAgents),
 //     6f. chat (M1-52): build the spaces and the sidebar over the unit of work, the Authorizer,
-//     the recorder and the appender, then messaging over the threads of chat (M1-56; startChat),
+//     the recorder and the appender (startChat), then messaging over the threads of chat (M1-56),
+//     runs, the personal data, catch-up and snapshot, notify and stats (their module files),
 //     6f'. files (M3-03): open the object store of file.storage.driver and build the upload
 //     sessions over the unit of work, the Authorizer, the appender and the structure of chat
 //     (startFiles); a root the file system driver refuses ends the start; worker and all also
