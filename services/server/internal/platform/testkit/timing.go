@@ -2,7 +2,10 @@
 
 package testkit
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // raceTimingFactor widens a timing bound under the race detector, which makes Go code 2 to 20
 // times slower (https://go.dev/doc/articles/race_detector, "Runtime Overhead") and turns a
@@ -41,25 +44,7 @@ func TimingSame(tolerance time.Duration, a, b func() time.Duration) (time.Durati
 	bound := TimingBound(tolerance)
 	smallest := time.Duration(-1)
 	for range TimingRounds {
-		minA, minB := time.Duration(-1), time.Duration(-1)
-		for i := range TimingWarmup + TimingSamples {
-			var da, db time.Duration
-			if i%2 == 0 {
-				da, db = a(), b()
-			} else {
-				db, da = b(), a()
-			}
-			if i < TimingWarmup {
-				continue
-			}
-			if minA < 0 || da < minA {
-				minA = da
-			}
-			if minB < 0 || db < minB {
-				minB = db
-			}
-		}
-		d := (minA - minB).Abs()
+		d := timingRound(a, b)
 		if d <= bound {
 			return d, true
 		}
@@ -68,4 +53,22 @@ func TimingSame(tolerance time.Duration, a, b func() time.Duration) (time.Durati
 		}
 	}
 	return smallest, false
+}
+
+// timingRound runs one round of TimingSame and returns the difference of the shortest counted
+// durations of a and b.
+func timingRound(a, b func() time.Duration) time.Duration {
+	var as, bs []time.Duration
+	for i := range TimingWarmup + TimingSamples {
+		var da, db time.Duration
+		if i%2 == 0 {
+			da, db = a(), b()
+		} else {
+			db, da = b(), a()
+		}
+		if i >= TimingWarmup {
+			as, bs = append(as, da), append(bs, db)
+		}
+	}
+	return (slices.Min(as) - slices.Min(bs)).Abs()
 }
