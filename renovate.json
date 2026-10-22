@@ -96,6 +96,11 @@
       "groupName": "PostgreSQL test image"
     },
     {
+      "description": "clamd image of the clamd adapter tests (docs/DECISIONS.md D-M3-04-12): its version equals BOTHY_CLAMAV_VERSION, so it joins the group Compose-Images; TestClamdImagePinned fails when the three differ",
+      "matchFileNames": ["services/server/internal/files/adapters/clamd/clamdtest/container.go"],
+      "groupName": "Compose-Images"
+    },
+    {
       "description": "Local SonarQube and its database",
       "matchFileNames": ["tools/sonarqube/compose.yaml"],
       "groupName": "local SonarQube"
@@ -165,6 +170,14 @@
       "managerFilePatterns": ["/^services/server/internal/files/adapters/s3/seaweed_test\\.go$/"],
       "matchStrings": [
         "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nconst seaweedImage = \"[^:\"]+:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "clamd image of the clamd adapter tests, pinned by digest; the version follows BOTHY_CLAMAV_VERSION",
+      "managerFilePatterns": ["/^services/server/internal/files/adapters/clamd/clamdtest/container\\.go$/"],
+      "matchStrings": [
+        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nconst Image = \"[^:\"]+:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""
       ]
     },
     {

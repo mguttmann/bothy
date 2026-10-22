@@ -50,7 +50,8 @@ x-server-env: &server-env
   BOTHY_FILE__FS__ROOT: /var/lib/bothy/files
   BOTHY_FILE__S3__ENDPOINT: ${BOTHY_S3_ENDPOINT:-http://seaweedfs:8333}
   BOTHY_FILE__S3__BUCKET: ${BOTHY_S3_BUCKET:-bothy-files}
-  BOTHY_FILE__SCAN__CLAMD_ADDRESS: ${BOTHY_CLAMD_ADDRESS:-tcp://clamav:3310}
+  # clamd only over its Unix socket in the volume clamav-socket (19 SEC-TLS-5, M3-04).
+  BOTHY_FILE__SCAN__CLAMD_ADDRESS: ${BOTHY_CLAMD_ADDRESS:-unix:///run/clamav/clamd.sock}
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
   OTEL_EXPORTER_OTLP_PROTOCOL: grpc
   OTEL_METRIC_EXPORT_INTERVAL: ${BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS:-15000}
@@ -238,6 +239,8 @@ services:
         read_only: true
         volume:
           subpath: server
+      # The socket of clamd; connecting writes nothing, so the mount is read-only (M3-04).
+      - clamav-socket:/run/clamav:ro
     networks: [internal, default]
     depends_on:
       migrate:
@@ -330,14 +333,29 @@ services:
       - "127.0.0.1:${BOTHY_OTLP_PUBLISH_PORT:-4318}:4318"   # only for adapters on the same host
     networks: [internal, default]
 
+  # clamd listens only on its Unix socket in the volume clamav-socket, shared read-only with the
+  # worker; no ports, no expose, no TCPSocket (19 SEC-TLS-5, M3-04). The network default stays for
+  # freshclam, which downloads the signatures. The volume is created owned by root, so the
+  # entrypoint hands /run/clamav to the user clamav before the image's /init starts clamd.
   clamav:
     image: clamav/clamav-debian:${BOTHY_CLAMAV_VERSION:-1.5.4}
     profiles: [scan]
     restart: unless-stopped
     logging: *logging
+    entrypoint: ["/bin/sh", "-c", "install -d -o clamav -g clamav -m 0755 /run/clamav && exec /init"]
     volumes:
       - clamav-db:/var/lib/clamav
+      - clamav-socket:/run/clamav
+      - ./clamav/clamd.conf:/etc/clamav/clamd.conf:ro
     networks: [default]
+    # PING over the socket (clamdscan reads LocalSocket from clamd.conf); loading the signatures
+    # takes minutes, the image allows up to CLAMD_STARTUP_TIMEOUT.
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30m
     deploy:
       resources:
         limits:
@@ -491,6 +509,7 @@ volumes:
   backup-scratch: {}
   files: {}
   clamav-db: {}
+  clamav-socket: {}
   seaweedfs-data: {}
   tailscale-state: {}
   prometheus-data: {}

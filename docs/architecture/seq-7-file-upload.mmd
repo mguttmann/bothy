@@ -28,24 +28,33 @@ sequenceDiagram
     F->>OBJ: write, SHA-256 while passing through
   end
   A->>F: POST complete upload
-  F->>OBJ: check size and checksum, read head for MIME detection
-  F->>DB: upload_state complete, scan_status pending, job files.scan in the same transaction, file.updated
-  F-->>A: 200 file (scan pending)
+  F->>DB: session completed, job files.scan (round 0) in the same transaction, no event
+  F-->>A: 200 file (pending, being checked)
   A->>MSG: POST message with file_id (message.create, plus upload)
   MSG->>F: bind attachment to the message in the same channel
   MSG-->>A: 201, display "being checked"
-  SJ->>OBJ: stream object
-  SJ->>AV: INSTREAM in chunks, end with zero-length chunk
-  alt result OK
+  SJ->>AV: PING over the Unix socket (file.scan.mode required)
+  SJ->>OBJ: one read pass: parts in order (file system) or the object, join into the object
+  SJ->>SJ: size and SHA-256 against the declaration, type from the first file.sniff_bytes
+  SJ->>AV: INSTREAM in chunks of the same stream, end with a zero-length chunk (mode required)
+  alt size, SHA-256 or detected type wrong
+    SJ->>DB: upload_state failed with its reason, file.updated, FileFinalized
+    SJ->>OBJ: delete object and parts
+  else file.scan.mode off, no clamd call
+    SJ->>DB: upload_state complete, scan_status skipped, mime_type, file.updated, FileFinalized
+    SJ->>OBJ: delete parts
+  else stream: OK
     AV-->>SJ: OK
-    SJ->>DB: scan_status clean, scanned_at, job files.thumbnail if image, file.updated
-    TJ->>OBJ: read, decode, re-encode (metadata removed), write variants
+    SJ->>DB: upload_state complete, scan_status clean, mime_type, scanned_at, file.updated, FileFinalized
+    SJ->>OBJ: delete parts
+    TJ->>OBJ: read, decode, re-encode (metadata removed), write variants (M3-06)
     TJ->>DB: file_thumbnails, file.updated
-  else detection
+  else FOUND
     AV-->>SJ: FOUND
-    SJ->>DB: scan_status infected, serving blocked, audit entry, file.updated
+    SJ->>DB: scan_status infected, audit entry, file.updated, FileFinalized
+    SJ->>OBJ: delete object and parts
   else clamd not reachable
-    SJ->>SJ: error, River retries with backoff, status stays pending (fail closed)
+    SJ->>DB: next files.scan with growing delay up to file.scan.retry_backoff_cap, stays pending (fail closed)
   end
   HUB-->>S: dispatch file.updated
   S->>F: GET thumbnail (file.read, only when clean or skipped)

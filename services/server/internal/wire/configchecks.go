@@ -49,6 +49,8 @@ var configChecks = []configCheck{
 	{name: "upload_part_plan", keys: []string{keyMaxUploadBytes, keyUploadPartBytes}, fn: uploadPartPlan},
 	{name: "upload_part_size_s3", keys: []string{keyStorageDriver, keyUploadPartBytes}, fn: uploadPartSizeS3},
 	{name: "presigned_mode_unavailable", keys: []string{keyPresignedUpload}, fn: presignedModeUnavailable},
+	{name: "scan_stream_limit", keys: []string{keyScanMode, keyMaxUploadBytes, keyClamdStreamMaxByte}, fn: scanStreamLimit},
+	{name: "clamd_address_unix", keys: []string{keyClamdAddress}, fn: clamdAddressUnix},
 	{name: "consumer_alert_below_retention", keys: []string{keyConsumerPendingAlertAfter, keySyncEventRetention}, fn: consumerAlertBelowRetention},
 	{name: "dpop_required_for", keys: []string{keyDPoPRequiredFor}, fn: dpopRequiredFor},
 	{name: "client_versions_semver", keys: clientVersionKeys, fn: clientVersionsSemVer},

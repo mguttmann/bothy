@@ -40,11 +40,15 @@ docker compose up -d
 | (always) | `secrets-init`, `postgres`, `migrate`, `worker`, `backup`, `otel-collector` | |
 | `direct` | `api` on `127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT}` | TLS and login through a reverse proxy or OIDC |
 | `tailscale` | `tailscale`, `api-tailscale` | header identity; see [tailscale.md](../../docs/operations/tailscale.md) |
-| `scan` | `clamav` | needs a lot of memory (vendor: at least 3 GiB) |
+| `scan` | `clamav` | needs a lot of memory (vendor: at least 3 GiB); clamd's socket lies in the volume `clamav-socket`, mounted read-only in `worker` |
 | `s3` | `seaweedfs` | S3 driver on one host; set `BOTHY_STORAGE_DRIVER=s3` |
 | `observability` | `prometheus`, `alertmanager`, `loki`, `tempo`, `grafana` | together with `BOTHY_OTEL_EXPORTER=local` |
 
 Exactly one of `direct` and `tailscale`.
+
+The profile `scan` belongs to the default `file.scan.mode = required`: without it, completed
+uploads stay pending until clamd answers ([12-files.md](../../docs/spec/12-files.md) 5.3, fail
+closed). An installation without a virus scanner sets `file.scan.mode` to `off`.
 
 ## Security rules in this file
 
@@ -57,6 +61,11 @@ Exactly one of `direct` and `tailscale`.
    (kernel networking, see [tailscale.md](../../docs/operations/tailscale.md) 2).
 4. Images of the auxiliary services are pinned to versions; Bothy images to `BOTHY_VERSION`.
 5. Container logs are rotated by the log driver.
+6. clamd is reached only over its Unix socket (19 SEC-TLS-5, M3-04): the volume `clamav-socket`
+   is mounted at `/run/clamav` in `clamav` and read-only in `worker`, in no other service;
+   `clamav` publishes no port, exposes none and has no `TCPSocket` in
+   [clamav/clamd.conf](clamav/clamd.conf), which also sets the mandatory options of
+   [12-files.md](../../docs/spec/12-files.md) 5.4. Its health check pings over the socket.
 
 ## Checked
 

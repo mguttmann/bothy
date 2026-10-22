@@ -213,7 +213,23 @@ The checksum per part (3.2) catches transfer errors early; the total checksum he
 errors during joining and in presigned mode.
 
 If all is well: `upload_state = 'complete'`, `mime_type` = detected type, `scan_status` per
-section 5.2, `scanned_at`, `scan_engine`, event `file.updated`. If the file is servable,
+section 5.2, `scanned_at`, `scan_engine`, event `file.updated`.
+
+Rules of the pass (M3-04, docs/DECISIONS.md D-M3-04-1 to D-M3-04-15): the job reads
+`object_key` when it exists (after an earlier attempt or, on S3, after the pass ran
+`CompleteMultipartUpload`), otherwise the parts in order, and writes the joined object from the
+same stream; the source is limited to the declared size plus one byte. Size, SHA-256 and a
+detected type listed in `file.denied_mime_types` decide first (`failed` with `size_mismatch`,
+`checksum_mismatch` or `file_type_denied`), also when the scan failed transiently; a malware
+finding is audited for such a file as well. Then 5.2 applies; the reasons of blocked files are
+`malware_detected`, `scan_limits_exceeded`, `scan_stream_limit_exceeded` and
+`scan_engine_error` in the session's `failure_reason`. `scan_engine = 'clamd'` and `scanned_at`
+are set when clamd decided the file, NULL for `skipped` and `failed`. The result is written in one
+transaction that locks the session and then the file, writes `file.updated` without actor and
+publishes `files.FileFinalized` for a final file; objects of failed and blocked files and the
+parts are deleted after the commit. A transient failure inserts the next `files.scan` with a
+delay that doubles from `file.scan.health_interval` up to `file.scan.retry_backoff_cap`, without
+an attempt limit, and changes nothing else. If the file is servable,
 the processing of sections 7 and 8 follows and, if supported, the text extraction
 ([14-search.md](14-search.md)).
 
@@ -475,9 +491,10 @@ Decision and alternatives: ADR 0033. ClamAV runs as a separate service; the serv
 
 ### 5.1 Flow
 
-1. Connection to `file.scan.clamd_address` (Unix socket or TCP in the internal network). clamd
-   checks requests neither for origin nor for authentication; TCP must therefore never be
-   reachable outside the internal network [Q7, verified].
+1. Connection to `file.scan.clamd_address`, only a Unix socket (19 SEC-TLS-5): clamd checks
+   requests neither for origin nor for authentication [Q7, verified], so the server accepts only
+   `unix://` with an absolute path and no TCP address. The Compose stack shares the socket with
+   the worker through the volume `clamav-socket` (`infra/compose/README.md`).
 2. Command `zINSTREAM\0` (NUL framing is the recommended form) [Q7, verified].
 3. Data in chunks: per chunk 4 bytes of length in network byte order, then the bytes; end
    with a chunk of length 0 [Q7, verified]. Chunk size `file.scan.chunk_bytes`.
@@ -939,7 +956,7 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.denied_mime_types` | empty | blocked types |
 | `file.name_max_bytes` | `255` | length of a file name in UTF-8 bytes |
 | `file.scan.mode` | `required` | `required` or `off` |
-| `file.scan.clamd_address` | `tcp://clamav:3310` | clamd in the internal network; alternatively `unix:///...` |
+| `file.scan.clamd_address` | `unix:///run/clamav/clamd.sock` | Unix socket of clamd, `unix://` plus an absolute path; no other transport (19 SEC-TLS-5) |
 | `file.scan.chunk_bytes` | `65536` | chunk size for `INSTREAM` |
 | `file.scan.timeout` | `120s` | time limit per scan |
 | `file.scan.max_concurrent` | `4` | scans per worker process |

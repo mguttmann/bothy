@@ -517,8 +517,8 @@ sequenceDiagram
    Part size `file.upload_part_bytes`, validity of the session `file.upload_session_ttl`,
    presigned PUT URLs for parts (only mode `presigned`, S3) `file.s3.presign_ttl`
    ([12-files.md](12-files.md), section 3).
-2. `complete` closes the session and leads to the check of size and SHA-256 in the verify pass,
-   which also detects the MIME type and runs the virus scan (M3-03, M3-04). Download works only
+2. `complete` closes the session and queues the job `files.scan`, which checks size and SHA-256,
+   detects the MIME type and runs the virus scan in one read pass (M3-03, M3-04). Download works only
    once `scan_status` is `clean` or `skipped`; before that
    `409 file_not_ready`, on `infected`, `error` or a failed upload `409 file_blocked`
    ([12-files.md](12-files.md), section 9.3); without read permission always `404`.

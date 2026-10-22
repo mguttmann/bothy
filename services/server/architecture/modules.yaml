@@ -149,7 +149,11 @@ modules:
     # go-arch-lint grants a vendor to all adapters of a module (docs/DECISIONS.md M3-02/12).
     # M3-03: sqlc code and the repository (pgx), NFC of file names (xtext, adapters/unicode), the
     # extensions of denied types (mimetype, adapters/mimetype) and bothy.file.upload.size (otel).
-    adapter_vendors: [awssdk, pgx, xtext, mimetype, otel]
+    # M3-04: the type detection of the scan pass (mimetype), the span file.scan and the scan
+    # instruments (otel), and the throwaway clamd container of adapters/clamd/clamdtest, used only
+    # by tests (testcontainers, mobyapi). No scanner library: the clamd client uses the standard
+    # library only (ADR 0033).
+    adapter_vendors: [awssdk, pgx, xtext, mimetype, otel, testcontainers, mobyapi]
   messaging:
     tables: [messages, message_revisions, mentions, reactions, pins, message_templates]
     actions: [thread.create, message.read, message.create, message.update, message.delete,
@@ -291,7 +295,7 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   # M1-59).
   uniseg: [github.com/rivo/uniseg]
   # The type table of file formats: the extensions of file.denied_mime_types (files
-  # adapters/mimetype, M3-03); the detection of the verify pass follows with M3-04.
+  # adapters/mimetype, M3-03) and the type detection of the scan pass (M3-04).
   mimetype: [github.com/gabriel-vasile/mimetype]
   # Argon2id password hashes of local accounts (identity adapters/passwordhash, M1-39).
   xcrypto: [golang.org/x/crypto/argon2]

@@ -104,6 +104,15 @@ func (w *worker[A]) NextRetry(j *river.Job[A]) time.Time {
 	return time.Now().Add(w.o.NextRetry(j.Attempt))
 }
 
+// Timeout returns River's job timeout of the kind from HandlerOptions.Timeout: 0 keeps River's
+// client default, a negative value becomes -1, River's "never time out".
+func (w *worker[A]) Timeout(*river.Job[A]) time.Duration {
+	if w.o.Timeout < 0 {
+		return -1
+	}
+	return w.o.Timeout
+}
+
 // outcomeOf maps the result of an attempt to bothy.outcome.
 func outcomeOf(ctx context.Context, err error) string {
 	switch {

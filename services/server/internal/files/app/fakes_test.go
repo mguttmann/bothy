@@ -26,11 +26,25 @@ import (
 )
 
 // uow runs fn in a unit in the work phase and runs the after-commit functions on success; inside
-// a unit it joins it.
-type uow struct{ reg *txn.Registry }
+// a unit it joins it. Units run one at a time, as row locks would order them.
+type uow struct {
+	reg *txn.Registry
+	mu  sync.Mutex
+}
 
 func newUoW() *uow {
 	reg := txn.NewRegistry()
+	reg.Seal()
+	return &uow{reg: reg}
+}
+
+// newUoWWith seals reg after register added its subscribers.
+func newUoWWith(t testing.TB, register func(*txn.Registry) error) *uow {
+	t.Helper()
+	reg := txn.NewRegistry()
+	if err := register(reg); err != nil {
+		t.Fatal(err)
+	}
 	reg.Seal()
 	return &uow{reg: reg}
 }
@@ -39,6 +53,8 @@ func (u *uow) Do(ctx context.Context, fn func(ctx context.Context) error, _ ...t
 	if txn.InUnit(ctx) {
 		return fn(ctx)
 	}
+	u.mu.Lock()
+	defer u.mu.Unlock()
 	unit, ctl := txn.NewControlledUnit(u.reg, txn.Options{})
 	ctl.SetPhase(txn.PhaseWork)
 	if err := fn(txn.WithUnit(ctx, unit)); err != nil {
@@ -54,13 +70,17 @@ type repo struct {
 	files    map[ids.ID]app.FileRecord
 	sessions map[ids.ID]app.SessionRecord
 	parts    map[ids.ID]map[int]app.PartRecord
+	// finished and failure record the writes of the scan pass.
+	finished []app.ScanResult
+	failure  map[ids.ID]string
 	// usedBytes and openCount override the computed limits when set.
 	usedBytes *int64
 	openCount *int
 }
 
 func newRepo() *repo {
-	return &repo{files: map[ids.ID]app.FileRecord{}, sessions: map[ids.ID]app.SessionRecord{}, parts: map[ids.ID]map[int]app.PartRecord{}}
+	return &repo{files: map[ids.ID]app.FileRecord{}, sessions: map[ids.ID]app.SessionRecord{}, parts: map[ids.ID]map[int]app.PartRecord{},
+		failure: map[ids.ID]string{}}
 }
 
 var errNoUnit = errors.New("fake repo: write outside a unit of work")
@@ -454,6 +474,7 @@ type env struct {
 	events *events
 	clk    *clock.Fake
 	uow    *uow
+	scans  *scanQueue
 	alex   actor.Actor
 	ctx    context.Context
 }
@@ -469,8 +490,10 @@ func newEnv(t testing.TB, driver string, cfg app.Config) *env {
 	if driver == "s3" {
 		parts, fs = app.NewS3PartStore(e.store, e.repo, e.uow), nil
 	}
+	e.scans = &scanQueue{}
 	svc, err := app.New(cfg, app.Deps{Repo: e.repo, Parts: parts, UoW: e.uow, Authorizer: e.az, Events: e.events,
-		Channels: channels{space: ids.New()}, Names: names{}, Types: types{"image/png": {".png"}}, FreeSpace: fs, Clock: e.clk})
+		Channels: channels{space: ids.New()}, Names: names{}, Types: types{"image/png": {".png"}}, FreeSpace: fs, Clock: e.clk,
+		ScanQueue: e.scans})
 	if err != nil {
 		t.Fatal(err)
 	}
