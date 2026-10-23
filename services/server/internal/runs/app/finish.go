@@ -301,15 +301,28 @@ func (s *Service) lockAgentRun(ctx context.Context, a actor.Actor, id ids.ID) (R
 //
 // Extension point: M2-11 (follow-ups deferred or discarded at the end of a run) and M2-15
 // (components disabled at the end) add their steps here, after the transition and in the same
-// unit of work, so they see the ended run and commit with it.
+// unit of work, so they see the ended run and commit with it: M2-15 disables the open components
+// of the run at every end state (DisableRunComponents, ruling D-M2-15-21), then the follow-ups are
+// settled by Followups.OnRunEnded (M2-11 design note 7); the delivery's denial of a queued
+// invocation and runs.queued_expiry end their runs here as well.
 func (s *Service) endRun(ctx context.Context, row RunRow, to domain.State, reason string, setBy domain.Setter,
 	store TransitionStore) (Transitioned, error) {
 	if !to.Ended() {
 		return Transitioned{}, errs.New(errs.CodeInternalError, "runs: endRun needs an end state")
 	}
-	return s.Transition(ctx, TransitionCmd{
+	t, err := s.Transition(ctx, TransitionCmd{
 		RunID: row.ID, From: row.State, Version: row.Version, To: to, Reason: reason, SetBy: setBy, Store: store,
 	})
+	if err != nil {
+		return Transitioned{}, err
+	}
+	if err := s.DisableRunComponents(ctx, row.ID); err != nil {
+		return Transitioned{}, err
+	}
+	if s.fu == nil {
+		return t, nil
+	}
+	return t, s.fu.OnRunEnded(ctx, t)
 }
 
 // auditReportedMismatch writes the audit entry of an I3 mismatch the adapter reported (design note

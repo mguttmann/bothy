@@ -320,7 +320,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	// The template, list and page limits (M1-57, M1-60) and the write ports (M1-58) are required (INT-W22/3).
 	m, err := wire.NewMessaging(messagingapp.Config{MaxContentBytes: 4096, MaxMentions: 4, EventPayloadMaxBytes: 65536,
 		TemplateNameMaxChars: 64, TemplateMaxPerScope: 100, ListContentMaxBytes: 4096, PageSizeDefault: 20, PageSizeMax: 50,
-		EmojiMaxBytes: 64, MaxDistinctReactions: 20, MaxPinsPerThread: 50},
+		EmojiMaxBytes: 64, MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50},
 		pool, uow, w.az, wire.MessagingWrites{Events: appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, c.Service, w.id.Directory, w.clk, nil)
 	must(t, err)
 	// The personal data of sync (read states and drafts, M1-61) serve the move tests of M1-62.
@@ -340,7 +340,9 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	must(t, err)
 	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: 48 * time.Hour,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
-		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500}, pool, uow, w.az, wire.RunsDeps{
+		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000,
+		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, EventPayloadMaxBytes: 65536, MaxContentBytes: 4096,
+		InvocationHoldMax: 2 * time.Minute}, pool, uow, w.az, wire.RunsDeps{
 		Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Metrics: w.metrics,
 		Expiry: noExpiry{}, Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: w.rec, CancelTimeouts: w.cancels,
 		Sessions: ss.Service, Costs: bl.Service,
