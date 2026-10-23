@@ -2,7 +2,7 @@
 
 // The DAO methods M4-14 added: deleting a setting and a notification preference by the
 // version rule (04 14, `deleted: true`) and reading the reactions of a message inside a
-// transaction (the `me` flag of `reaction.*`).
+// transaction (the `me` flag of `reaction.*`); M4-33 the watched quiet hours rules.
 
 import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
@@ -73,6 +73,31 @@ void main() {
     );
     expect(await dao.notificationPreferences(), isEmpty);
   });
+
+  test(
+    'watchQuietHours lists the rules by ID and follows changes (M4-33)',
+    () async {
+      final dao = db.personalDao;
+      QuietHours rule(int n, String start) => QuietHours(
+        id: QuietHoursId.parse(uuid(0x200 + n)),
+        weekdays: 31,
+        startLocal: start,
+        endLocal: '07:00',
+        enabled: true,
+        version: const ResourceVersion(1),
+      );
+      List<String> starts(List<QuietHours> rules) => [
+        for (final r in rules) r.startLocal,
+      ];
+      await dao.upsertQuietHoursIfNewer(rule(2, '20:00'));
+      await dao.upsertQuietHoursIfNewer(rule(1, '19:00'));
+      expect(starts(await dao.watchQuietHours().first), ['19:00', '20:00']);
+      final next = dao.watchQuietHours().skip(1).first;
+      await pumpEventQueue();
+      await dao.deleteQuietHours(rule(2, '20:00').id);
+      expect(starts(await next), ['19:00']);
+    },
+  );
 
   test('reactionsOf reads the summaries inside a transaction', () async {
     final dao = db.messagesDao;

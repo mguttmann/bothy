@@ -152,6 +152,14 @@ void main() {
 
     test('duplicateNextDispatch delivers the next dispatch twice', () async {
       final g = await live();
+      // Sam follows the thread already, so the posts append no `notification_pref.updated`
+      // of 13 3.2 between the two messages.
+      h.server.world.setNotificationPref(
+        h.seed.sam.id,
+        'thread',
+        h.seed.releaseNotes,
+        'all',
+      );
       h.server.faults.duplicateNextDispatch();
       h.seed.post(h.seed.sam, h.seed.releaseNotes, 'Twice');
       h.seed.post(h.seed.sam, h.seed.releaseNotes, 'Once');

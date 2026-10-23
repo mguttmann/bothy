@@ -190,6 +190,13 @@ final class PersonalDao {
     )..where((t) => t.id.equals(id.value))).go();
   }
 
+  /// Every quiet hours rule by ID, emitted on each change (the screen D9, M4-33).
+  Stream<List<QuietHours>> watchQuietHours() =>
+      (_db.select(_db.quietHoursRules)
+            ..orderBy([(t) => OrderingTerm(expression: t.id)]))
+          .map(quietHoursFromRow)
+          .watch();
+
   /// All quiet hours rules.
   Future<List<QuietHours>> quietHours() async {
     final rows = await (_db.select(
