@@ -445,7 +445,7 @@ func newAttWorld(t *testing.T, withFiles bool) *attWorld {
 	}
 	svc, err := app.New(app.Config{MaxContentBytes: 1000, MaxMentions: 4, EventPayloadMaxBytes: 100000, TemplateNameMaxChars: 10,
 		TemplateMaxPerScope: 5, ListContentMaxBytes: 1000, PageSizeDefault: 10, PageSizeMax: 10, EmojiMaxBytes: 64,
-		MaxDistinctReactions: 20, MaxPinsPerThread: 50, MaxAttachments: attMaxAttachments}, deps)
+		MaxDistinctReactions: 20, MaxPinsPerThread: 50, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxAttachments: attMaxAttachments}, deps)
 	if err != nil {
 		t.Fatal(err)
 	}

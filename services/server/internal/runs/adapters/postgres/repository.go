@@ -73,7 +73,7 @@ func (r *Repository) InsertRun(ctx context.Context, n app.NewRun) (app.RunRow, b
 		TriggeringInteractionID: optionalUUID(n.TriggeringInteractionID),
 		TriggeredBy:             uuid(n.TriggeredBy),
 		BillingModeExpected:     n.BillingModeExpected, InvocationJti: uuid(n.InvocationJTI), QueuedAt: ts(n.QueuedAt),
-		InvocationHeldUntil:     optionalTS(n.InvocationHeldUntil),
+		InvocationHeldUntil: optionalTS(n.InvocationHeldUntil),
 	})
 	return one(row, err, "inserting a run")
 }

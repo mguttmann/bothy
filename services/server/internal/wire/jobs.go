@@ -193,13 +193,7 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if err := filesjobs.RegisterThumbnail(reg, m.FilesImages, m.FilesImageTimeout); err != nil {
 		return nil, err
 	}
-	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
-		return nil, err
-	}
-	if err := runsjobs.RegisterLifecycle(reg, m.RunsLifecycle, m.StallInterval); err != nil {
-		return nil, err
-	}
-	if err := runsjobs.RegisterComponentExpiry(reg, m.ComponentExpiry); err != nil {
+	if err := registerRunsJobs(reg, m); err != nil {
 		return nil, err
 	}
 	if err := terminaljobs.Register(reg, m.TerminalSweep, m.TerminalSweepInterval); err != nil {
@@ -208,10 +202,23 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if err := notifyjobs.Register(reg, m.Push); err != nil {
 		return nil, err
 	}
-	if err := runsjobs.RegisterHold(reg, m.InvocationHolds); err != nil {
-		return nil, err
-	}
 	return reg, nil
+}
+
+// registerRunsJobs registers the jobs of runs into reg: runs.queued_expiry (M2-08),
+// runs.cancel_timeout and runs.stall_check (M2-09), runs.component_expiry (M2-15) and
+// runs.invocation_hold_timeout (M3-07); the error is the first rejected registration.
+func registerRunsJobs(reg *jobs.Registry, m *JobModules) error {
+	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
+		return err
+	}
+	if err := runsjobs.RegisterLifecycle(reg, m.RunsLifecycle, m.StallInterval); err != nil {
+		return err
+	}
+	if err := runsjobs.RegisterComponentExpiry(reg, m.ComponentExpiry); err != nil {
+		return err
+	}
+	return runsjobs.RegisterHold(reg, m.InvocationHolds)
 }
 
 // riverStep is the before-step of bothy migrate up that creates the schema of River's tables
