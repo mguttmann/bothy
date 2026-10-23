@@ -110,6 +110,9 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
   `seq` stays gapless, the counter equals its maximum, every acknowledged message exists once with
   one `message.created`, no idempotency key stays `in_progress`, the audit chain is valid and every
   receiver gets every event once in order.
+- Build ticket M3-24: `make perf` measures `perf.push_handoff_p95` against Fake-APNs on a durable
+  database in the profile modes and fails when it is exceeded (`TestPerf_PushHandoffP95` in
+  `services/server/perf/push_handoff`, `TestReport_PushHandoffFailsAboveThreshold`).
 - Exit criterion of every milestone ([PLAN.md](../PLAN.md), section 4, item 3).
 
 ## Pros and Cons of the Options
@@ -152,3 +155,6 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
   databases only. The modes `match` and `emulated` are evidence; `below` prints the values as not
   proven. `services/server/perf/README.md` names each test, its parameters and how to read the
   table; the milestone-close run on the reference host is an owner operation.
+- The push target `perf.push_handoff_p95` (M3-24) runs in the same `make perf`: commit of a
+  mention to the `200` of Fake-APNs under `perf.sustained_messages_per_s`, with the server in the
+  test process and the same profile modes and durability rules.

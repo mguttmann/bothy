@@ -71,6 +71,11 @@ type Request struct {
 	KeyID, Issuer string
 	// IssuedAt is the claim iat of JWT when it parsed.
 	IssuedAt time.Time
+	// AcceptedAt is the time of the test process at which the Fake accepted the request: after it
+	// read the whole request and verified the JWT, immediately before it wrote the status 200
+	// ("the provider has accepted", t1 of 13 section 9; the push handoff measurement of M3-24).
+	// It is zero for every other answer.
+	AcceptedAt time.Time
 }
 
 // Server is a running Fake-APNs. It is safe for concurrent use.
@@ -82,7 +87,10 @@ type Server struct {
 	pub     *ecdsa.PublicKey
 	scripts map[string][]Response
 	reqs    []Request
-	conns   int
+	// answered marks the entries of reqs whose answer is decided; Requests returns only those,
+	// so no reader sees a request before its AcceptedAt is final.
+	answered []bool
+	conns    int
 	// hold, when set, makes requests wait until holdN of them wait (Hold).
 	hold     chan struct{}
 	holdN    int
@@ -170,11 +178,19 @@ func (s *Server) wait(r *http.Request) {
 	}
 }
 
-// Requests returns a copy of every recorded request in arrival order.
+// Requests returns a copy of every recorded request whose answer is decided, in arrival order;
+// a request still on its way (held, or between its JWT check and its answer) is left out, so its
+// AcceptedAt is final in every copy.
 func (s *Server) Requests() []Request {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]Request(nil), s.reqs...)
+	out := make([]Request, 0, len(s.reqs))
+	for i, r := range s.reqs {
+		if s.answered[i] {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // Connections returns the number of TLS connections accepted so far.
@@ -206,21 +222,31 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	verified := s.parseJWT(&rec)
 	s.mu.Lock()
+	idx := len(s.reqs)
 	s.reqs = append(s.reqs, rec)
+	s.answered = append(s.answered, false)
 	s.mu.Unlock()
 	s.wait(r)
+	var resp Response
 	switch {
 	case r.Method != http.MethodPost:
-		answer(w, r, Response{Status: http.StatusMethodNotAllowed, Reason: "MethodNotAllowed"})
+		resp = Response{Status: http.StatusMethodNotAllowed, Reason: "MethodNotAllowed"}
 	case !strings.HasPrefix(r.URL.Path, devicePrefix) || rec.Token == "" || strings.Contains(rec.Token, "/"):
-		answer(w, r, Response{Status: http.StatusNotFound, Reason: "BadPath"})
+		resp = Response{Status: http.StatusNotFound, Reason: "BadPath"}
 	case rec.JWT == "":
-		answer(w, r, Response{Status: http.StatusForbidden, Reason: "MissingProviderToken"})
+		resp = Response{Status: http.StatusForbidden, Reason: "MissingProviderToken"}
 	case !verified:
-		answer(w, r, Response{Status: http.StatusForbidden, Reason: "InvalidProviderToken"})
+		resp = Response{Status: http.StatusForbidden, Reason: "InvalidProviderToken"}
 	default:
-		answer(w, r, s.next(rec.Token))
+		resp = s.next(rec.Token)
 	}
+	s.mu.Lock()
+	if resp.Status == 0 || resp.Status == http.StatusOK {
+		s.reqs[idx].AcceptedAt = time.Now()
+	}
+	s.answered[idx] = true
+	s.mu.Unlock()
+	answer(w, r, resp)
 }
 
 // parseJWT fills KeyID, Issuer and IssuedAt of rec and reports whether the JWT verifies with the

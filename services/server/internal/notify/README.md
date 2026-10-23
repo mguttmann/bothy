@@ -197,7 +197,7 @@ Structs, not maps: `aps` with `alert` (`title-loc-key` `PUSH_TITLE`, `loc-key` `
 
 ### Fake-APNs
 
-`adapters/apns/apnstest` is an in-process HTTP/2 server with TLS on `127.0.0.1` that verifies the bearer JWT like APNs (`403 MissingProviderToken`, `403 InvalidProviderToken`), answers `405` and `404` to a wrong method or path, answers per token from a script and records every request and TLS connection. It imports no testing package (M3-24 uses it for the push handoff measurement) and is never linked into `cmd/bothy`. The tests of M3-20 and the integration tests in `test/integration/notify` (`withAPNs`) use it; M3-21 to M3-24 build on it.
+`adapters/apns/apnstest` is an in-process HTTP/2 server with TLS on `127.0.0.1` that verifies the bearer JWT like APNs (`403 MissingProviderToken`, `403 InvalidProviderToken`), answers `405` and `404` to a wrong method or path, answers per token from a script and records every request and TLS connection. It imports no testing package (M3-24 uses it for the push handoff measurement) and is never linked into `cmd/bothy`. The tests of M3-20 and the integration tests in `test/integration/notify` (`withAPNs`) use it; M3-21 to M3-24 build on it. `Request.AcceptedAt` is the time at which the Fake accepted a request with `200`, after reading it and verifying the JWT and right before writing the status (t1 of 13 section 9 for `perf/push_handoff`, M3-24); it is zero for every other answer.
 
 ### Rulings
 

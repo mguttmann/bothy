@@ -69,6 +69,9 @@ type APNsDeps struct {
 	// the process.
 	Egress     egress.Config
 	EgressDeps egress.Deps
+	// Endpoints maps an environment to a base URL (apns.Deps.Endpoints); only in-process tests
+	// against Fake-APNs set it (Deps.APNsEndpoints), nil means the two Apple hosts.
+	Endpoints map[string]string
 	// Clock is the time source; nil means clock.System().
 	Clock clock.Clock
 	// Logger receives the records of the adapter.
@@ -77,7 +80,7 @@ type APNsDeps struct {
 
 // APNsProviders returns the push providers of APNs for role: the adapter when APNs is enabled
 // and the role runs notify.push_send (worker and all), otherwise none. Without APNs it reads no
-// secret. The adapter targets the two Apple hosts; Endpoints stays nil.
+// secret. The adapter targets the two Apple hosts unless d.Endpoints (tests only) names others.
 //
 // Errors: a configuration the adapter refuses, a key that cannot be resolved or parsed (naming
 // push.apns.private_key_ref, never a value); they stop the start (fail fast).
@@ -93,7 +96,7 @@ func APNsProviders(ctx context.Context, v *config.Values, role Role, d APNsDeps)
 	if clk == nil {
 		clk = clock.System()
 	}
-	a, err := apns.New(ctx, cfg, apns.Deps{Egress: d.Egress, EgressDeps: d.EgressDeps, Secrets: d.Secrets, Clock: clk, Logger: d.Logger})
+	a, err := apns.New(ctx, cfg, apns.Deps{Egress: d.Egress, EgressDeps: d.EgressDeps, Secrets: d.Secrets, Clock: clk, Logger: d.Logger, Endpoints: d.Endpoints})
 	if err != nil {
 		return nil, err
 	}

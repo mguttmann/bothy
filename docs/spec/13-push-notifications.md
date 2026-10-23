@@ -677,6 +677,11 @@ SLIs (targets, windows and thresholds in `docs/observability/slos.md`, Team F):
 - **Confirmation rate:** preview fetches per sent push, per platform. Not a target, but a
   diagnosis: a drop shows that devices do not reach the server (placeholders stay).
 
+The load test `perf/push_handoff` (`make perf`) measures t1 minus t0 for `mention` hints against
+Fake-APNs under the sustained load `perf.sustained_messages_per_s`, with t0 read as `occurred_at`
+of the triggering transaction and t1 as the `200` of the Fake; the value is held by
+`perf.push_handoff_p95` (02 section 17). The operational SLI above stays as written.
+
 Signal names: `docs/observability/signals.md`. Attributes only provider, kind, result, platform;
 no person, device or thread IDs.
 
@@ -841,6 +846,7 @@ disabled), because tokens can move between installations.
 | Run with three agent messages | exactly one `run_done` to the triggering person |
 | `input_needed` with `mute` | push arrives, silent during quiet hours |
 | Automatic following | the first answer in a thread sets `all`; not in the main thread |
+| Load test `perf/push_handoff` (`make perf`) | `perf.push_handoff_p95`; every mention gives exactly one push per registration, with IDs, badge and no text |
 
 ## 15. Decisions of this chapter
 

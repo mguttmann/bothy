@@ -47,8 +47,19 @@ func MessagesPerSender(rate float64, perMinute int, headroom float64) int {
 // send runs in its own goroutine, so a slow answer never delays the next one. It returns every
 // send in order; the caller excludes the warm-up by Scheduled.
 func OpenLoop(ctx context.Context, senders []*harness.Client, threads []string, rate float64, warmup, window time.Duration) (time.Time, []Sent) {
+	out := make([]Sent, int(rate*(warmup+window).Seconds()))
+	start, n := Schedule(ctx, rate, warmup, window, func(i int, due time.Time) {
+		out[i] = Send(ctx, senders[i%len(senders)], threads[i%len(threads)], due)
+	})
+	return start, out[:n]
+}
+
+// Schedule is the open-loop scheduler of the load tests: it calls send for i = 0, 1, ... with
+// the due time start + i/rate for warmup plus window, each call in its own goroutine at its due
+// time, so a slow call never delays the next one (no coordinated omission). It returns start and
+// how many calls it made (fewer when ctx ends) after every call returned.
+func Schedule(ctx context.Context, rate float64, warmup, window time.Duration, send func(i int, due time.Time)) (time.Time, int) {
 	total := int(rate * (warmup + window).Seconds())
-	out := make([]Sent, total)
 	start := time.Now().Add(100 * time.Millisecond)
 	interval := time.Duration(float64(time.Second) / rate)
 	var wg sync.WaitGroup
@@ -58,16 +69,14 @@ func OpenLoop(ctx context.Context, senders []*harness.Client, threads []string, 
 			select {
 			case <-ctx.Done():
 				wg.Wait()
-				return start, out[:i]
+				return start, i
 			case <-time.After(d):
 			}
 		}
-		wg.Go(func() {
-			out[i] = Send(ctx, senders[i%len(senders)], threads[i%len(threads)], due)
-		})
+		wg.Go(func() { send(i, due) })
 	}
 	wg.Wait()
-	return start, out
+	return start, total
 }
 
 // Send posts one message with a fresh client_msg_id into thread as c (createMessage) and records

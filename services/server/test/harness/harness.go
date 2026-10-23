@@ -48,6 +48,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
@@ -92,6 +93,10 @@ type Options struct {
 	// DurableDB puts the database on the durable pgtest server (pgtest.Durable: fsync,
 	// synchronous_commit and full_page_writes on); every perf and chaos test sets it (ADR 0063).
 	DurableDB bool
+	// DBCPUs and DBMemoryBytes limit the PostgreSQL container (pgtest.Limits) of a DurableDB, as
+	// the emulated profile of make perf asks (ADR 0063 point 3); 0 is no limit.
+	DBCPUs        float64
+	DBMemoryBytes int64
 	// SecretFiles are extra files of the secrets directory of the server by relative path, written
 	// with mode 0400 after bothy secrets init (the client secret of a fake OIDC provider as
 	// idp/<name>, referenced as file:<secrets.dir>/idp/<name>; M1-69).
@@ -147,6 +152,12 @@ type Options struct {
 	// TerminalSessionMetrics replaces the session instruments of the terminal
 	// (wire.Deps.TerminalSessionMetrics, M2-46).
 	TerminalSessionMetrics terminalapp.SessionMetrics
+	// APNsFake, when set, points the wired APNs adapter of the server at this Fake-APNs for both
+	// environments (wire.Deps.APNsEndpoints), trusts its certificate (wire.Deps.APNsRootCAs) and
+	// appends its rule to egress.allowed_hosts. The test still sets the keys push.apns.* through
+	// Config, so the adapter is enabled as in production (M3-24). Do not combine it with
+	// EgressDenyAll.
+	APNsFake *apnstest.Server
 }
 
 // Server is a running harness server.
@@ -214,6 +225,9 @@ func Start(tb testing.TB, opts Options) *Server {
 	var dbOpts []pgtest.Option
 	if opts.DurableDB {
 		dbOpts = append(dbOpts, pgtest.Durable())
+		if opts.DBCPUs > 0 || opts.DBMemoryBytes > 0 {
+			dbOpts = append(dbOpts, pgtest.Limits(opts.DBCPUs, opts.DBMemoryBytes))
+		}
 	}
 	db := pgtest.New(tb, dbOpts...)
 	jobstest.Migrate(tb, db, "jobs")
@@ -314,6 +328,10 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()
 	}
+	if opts.APNsFake != nil {
+		deps.APNsEndpoints = map[string]string{"production": opts.APNsFake.URL(), "sandbox": opts.APNsFake.URL()}
+		deps.APNsRootCAs = opts.APNsFake.RootCAs()
+	}
 	role := opts.Role
 	if role == "" {
 		role = wire.RoleAll
@@ -390,6 +408,14 @@ func environment(db *pgtest.DB, opts Options, public, secretsDir, keys, files st
 	}
 	for k, v := range opts.Config {
 		set[k] = v
+	}
+	if opts.APNsFake != nil {
+		// egress.allowed_hosts is a comma-separated list; the Fake's rule joins what Config set.
+		rules := opts.APNsFake.EgressRule()
+		if prev := set["egress.allowed_hosts"]; prev != "" {
+			rules = prev + "," + rules
+		}
+		set["egress.allowed_hosts"] = rules
 	}
 	env := make([]string, 0, len(set))
 	for k, v := range set {

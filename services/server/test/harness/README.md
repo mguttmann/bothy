@@ -28,7 +28,11 @@ process against a disposable PostgreSQL 18 from `internal/platform/pg/pgtest`.
   into the secrets directory (mode 0400; the client secret of a fake OIDC provider), `OIDCRootCAs`
   is the TLS root of the OIDC provider requests, `PublicHost` (`localhost`) gives the server a
   domain name as WebAuthn relying party, `ProofObserver` sees every DPoP proof a client sends and `TokenObserver` every token pair a client
-  takes over and the API token of `NewAgent`.
+  takes over and the API token of `NewAgent`. `APNsFake` (M3-24) points the wired APNs adapter at a Fake-APNs of
+  `apnstest` for both environments, trusts its certificate and appends its rule to
+  `egress.allowed_hosts`; the test still enables APNs through the keys `push.apns.*`
+  (`TestStartWithAPNsFake`). `DBCPUs` and `DBMemoryBytes` limit the container of a `DurableDB`
+  (`pgtest.Limits`, the emulated profile of `make perf`).
 - `Server{PublicURL, APIBase, GatewayURL, InternalURL, SecretsDir, SigningKeyDir, Owner}`,
   `AdminDB()` (superuser pool, assertions only), `ConfigValue(key)`, `Clock()`,
   `FlushTelemetry(ctx)` (flushes the global tracer and logger providers into the sinks),

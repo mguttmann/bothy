@@ -15,8 +15,8 @@ import (
 	"text/tabwriter"
 )
 
-// Required are the targets make perf measures in M1 (brief M1-72, requirement 9); a results file
-// without one of them does not end green.
+// Required are the targets make perf measures: those of M1 (brief M1-72, requirement 9) and
+// perf.push_handoff_p95 (M3-24); a results file without one of them does not end green.
 var Required = []string{
 	"perf.message_create_p99",
 	"perf.event_commit_min_per_s",
@@ -27,6 +27,7 @@ var Required = []string{
 	"perf.ws_idle_conn_mem_max",
 	"perf.idle_rss_max",
 	"perf.startup_ready_max",
+	"perf.push_handoff_p95",
 }
 
 // Result is one measured target. Value and Threshold are in Unit, the unit of the threshold.

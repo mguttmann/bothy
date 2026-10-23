@@ -205,9 +205,19 @@ func (c *PushConsumer) HandleEvent(ctx context.Context, ev sync.Event) error {
 		authorize.EventReadStateUpdated: c.p.onReadState,
 	}
 	if h, ok := handlers[typ]; ok {
-		return h(ctx, ev)
+		return h(eventScope(ctx), ev)
 	}
 	return nil
+}
+
+// eventScope returns ctx with one rights version and one read of the thread and channel facts
+// for all push.deliver checks of one event: every recipient of the event is decided against the
+// same rights version, as the checks of one request are (authorize.WithRequestScope), and the
+// structure of the event's thread is read once instead of once per recipient
+// (authorize.WithStructureScope). Without them the consumer read both again for every reader of
+// the channel and fell behind the sustained load (perf.push_handoff_p95, M3-24).
+func eventScope(ctx context.Context) context.Context {
+	return authorize.WithStructureScope(authorize.WithRequestScope(authorize.WithoutRequestScope(ctx)))
 }
 
 // FailClosedRoutes is the default LiveRoutes until M3-23: every route over the gateway or a
