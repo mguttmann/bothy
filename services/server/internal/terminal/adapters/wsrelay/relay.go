@@ -315,17 +315,13 @@ func (r *Relay) limitDeadline(id ids.ID, gen int) {
 	for {
 		s := r.slots[id]
 		if s == nil || s.limitGen != gen || !s.held {
-			if marked != nil {
-				marked.ending = false
-			}
+			unmark(marked)
 			r.mu.Unlock()
 			return
 		}
 		at, reason := domain.RelayDeadline(s.times, s.lastDev, r.cfg.Windows)
 		if !domain.Reached(at, r.clk.Now()) {
-			if marked != nil {
-				marked.ending = false
-			}
+			unmark(marked)
 			r.armLimit(s)
 			r.mu.Unlock()
 			return
@@ -347,6 +343,14 @@ func (r *Relay) limitDeadline(id ids.ID, gen int) {
 			r.endFailed(ctx, s, c, err)
 		}
 		return
+	}
+}
+
+// unmark clears the wait mark of D-M2-46-24 on s, which a limit end set while it waited; s is nil
+// when the end did not wait. r.mu is held.
+func unmark(s *slot) {
+	if s != nil {
+		s.ending = false
 	}
 }
 
