@@ -1073,6 +1073,10 @@ func (stubServer) GetFile(context.Context, rest.GetFileRequestObject) (rest.GetF
 	return nil, nil
 }
 
+func (stubServer) DeleteFile(context.Context, rest.DeleteFileRequestObject) (rest.DeleteFileResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) DownloadFile(context.Context, rest.DownloadFileRequestObject) (rest.DownloadFileResponseObject, error) {
 	return nil, nil
 }
