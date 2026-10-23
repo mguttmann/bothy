@@ -40,6 +40,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"terminal.open_timeout":                 {Kind: config.KindDuration, Default: "20s", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.relay_buffer_max_bytes":       {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "24-terminal.md"},
 		"cluster.mode":                          {Kind: config.KindEnum, Default: "single", Enum: []string{"single", "multi"}, Chapter: "02-architecture.md"},
+		"cluster.presence_flush_interval":       {Kind: config.KindDuration, Default: "2s", Min: "100ms", Chapter: "02-architecture.md"},
+		"cluster.presence_ttl":                  {Kind: config.KindDuration, Default: "10s", Min: "1s", Chapter: "02-architecture.md"},
 		"terminal.idle_timeout":                 {Kind: config.KindDuration, Default: "30m", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.detach_grace":                 {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.idle_grace":                   {Kind: config.KindDuration, Default: "2m", Min: "1s", Chapter: "24-terminal.md"},

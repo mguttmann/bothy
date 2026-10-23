@@ -71,7 +71,7 @@ func startBody(token string) map[string]any {
 // recorded (the bound perf.fanout_cross_node_p99 is checked by perf/gateway_fanout_multi).
 func TestTypingAndLiveBoxCrossNode(t *testing.T) {
 	t.Parallel()
-	c := newCluster(t, nil)
+	c := newCluster(t)
 	alex, sam, lotse := c.w.People["Alex"], c.w.People["Sam"], c.w.Agents["Lotse"]
 	// The first poll creates the REST consumer at the head of the log, before the trigger.
 	c.must(nodeA, lotse, http.MethodGet, "/agents/me/consumers/"+consumer+"/events?limit=1", nil, http.StatusOK)
@@ -117,7 +117,7 @@ func TestTypingAndLiveBoxCrossNode(t *testing.T) {
 // changes nothing.
 func TestConsumerFencing4015(t *testing.T) {
 	t.Parallel()
-	c := newCluster(t, nil)
+	c := newCluster(t)
 	alex, lotse := c.w.People["Alex"], c.w.Agents["Lotse"]
 	onA := c.connect(nodeA, lotse)
 	onB := c.connect(nodeB, lotse)
@@ -154,7 +154,7 @@ func TestConsumerFencing4015(t *testing.T) {
 // node b closes the older connection on node a with 4017 and leaves the new one open.
 func TestDeviceReplacement4017(t *testing.T) {
 	t.Parallel()
-	c := newCluster(t, nil)
+	c := newCluster(t)
 	alex := c.w.People["Alex"]
 	onA := c.connect(nodeA, alex)
 	onB := c.connect(nodeB, alex)
@@ -230,7 +230,7 @@ func (c *cluster) phone(user string) {
 // pushes at once.
 func TestDesktopHintWithSeparateWorker(t *testing.T) {
 	t.Parallel()
-	c := newCluster(t, nil)
+	c := newCluster(t)
 	alex, owner := c.w.People["Alex"], c.w.Owner
 	c.phone(alex.PrincipalID)
 	threads := []string{c.w.Threads["Support/Allgemein"], c.w.Threads["Support/Eskalation"]}
@@ -306,7 +306,7 @@ func (c *cluster) refresh(node string, cl *harness.Client) {
 // private key from the shared store, issues tokens of the new key too.
 func TestSharedKeyStore(t *testing.T) {
 	t.Parallel()
-	c := newCluster(t, nil)
+	c := newCluster(t)
 	alex, owner := c.w.People["Alex"], c.w.Owner
 	channel := "/channels/" + c.w.Channels["Support/Allgemein"]
 	r, err := harness.DoWithStepUp(t.Context(), owner, harness.Request{Method: http.MethodPost, Path: "/signing-keys/rotate", Header: via(nodeA),

@@ -106,16 +106,13 @@ type cluster struct {
 	w      *harness.World
 }
 
-// newCluster starts the cluster with the configuration overrides extra.
-func newCluster(t *testing.T, extra map[string]string) *cluster {
+// newCluster starts the cluster.
+func newCluster(t *testing.T) *cluster {
 	t.Helper()
 	clusterSlots <- struct{}{}
 	t.Cleanup(func() { <-clusterSlots })
 	conf := harness.RaisedRateLimits()
 	for k, v := range clusterConfig {
-		conf[k] = v
-	}
-	for k, v := range extra {
 		conf[k] = v
 	}
 	e := newEdge(t)

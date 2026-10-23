@@ -37,7 +37,7 @@ func clusterConfigKeys() []config.Key {
 			Chapter: chapter02,
 		},
 		{
-			Name: keyPresenceTTL, Kind: config.KindDuration, Default: "10s", Min: "1s",
+			Name: keyPresenceTTL, Kind: config.KindDuration, Default: defaultTenSeconds, Min: "1s",
 			Doc:     "Age after which a row of gateway_presence that its node stopped refreshing is ignored and deleted; more than twice cluster.presence_flush_interval.",
 			Chapter: chapter02,
 		},

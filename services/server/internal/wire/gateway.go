@@ -213,11 +213,7 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	publisher := ephemeralPublisher(hub)
-	var signals gatewayapp.ClusterSignals
-	if d.Cluster != nil && d.ClusterSignals {
-		publisher, signals = d.Cluster.Publisher(publisher), d.Cluster
-	}
+	publisher, signals := clusterPublisher(d, ephemeralPublisher(hub))
 	engine, err := newConsumerEngine(cfg, d, hub, signals)
 	if err != nil {
 		return nil, err
@@ -260,14 +256,8 @@ func NewGateway(cfg GatewayConfig, d GatewayDeps) (*Gateway, error) {
 			return nil, err
 		}
 	}
-	for _, op := range ops {
-		action, ok := authorize.ParseAction(op.Action)
-		if !ok {
-			return nil, errors.New("wire: the gateway op " + op.Op + " names an unknown action")
-		}
-		if err := gw.Register(op.Op, action); err != nil {
-			return nil, err
-		}
+	if err := registerOps(gw, ops); err != nil {
+		return nil, err
 	}
 	h, err := gatewayws.NewHandler(gatewayws.Config{
 		PublicURL: cfg.PublicURL, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,
@@ -332,6 +322,31 @@ func (g *Gateway) StartLiveBox() lifecycle.StopStep {
 			return stopCtx.Err()
 		}
 	}}
+}
+
+// clusterPublisher returns the publisher of the process and the cluster signals of the gateway:
+// with d.Cluster and d.ClusterSignals the cluster's decorator over local and the cluster itself
+// (M7-17), else local and nil.
+func clusterPublisher(d GatewayDeps, local eventlog.EphemeralPublisher) (eventlog.EphemeralPublisher, gatewayapp.ClusterSignals) {
+	if d.Cluster != nil && d.ClusterSignals {
+		return d.Cluster.Publisher(local), d.Cluster
+	}
+	return local, nil
+}
+
+// registerOps registers every op of ops with its action on gw. Errors: an unknown action or an
+// op without a handler.
+func registerOps(gw *gatewayapp.Gateway, ops []routes.GatewayOp) error {
+	for _, op := range ops {
+		action, ok := authorize.ParseAction(op.Action)
+		if !ok {
+			return errors.New("wire: the gateway op " + op.Op + " names an unknown action")
+		}
+		if err := gw.Register(op.Op, action); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // newConsumerEngine builds the delivery engine of agent consumers over the hub (M2-07) and binds

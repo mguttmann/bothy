@@ -150,12 +150,7 @@ func (l *EphemeralListener) run(ctx context.Context) {
 	for ctx.Err() == nil {
 		conn, errType := l.listen(ctx)
 		if conn != nil {
-			if lost {
-				for _, r := range l.routes {
-					r.Reconcile(ctx)
-				}
-				l.log.LogAttrs(ctx, slog.LevelInfo, msgListenerRestored)
-			}
+			l.restored(ctx, lost)
 			lost, first = false, false
 			errType = l.wait(ctx, conn)
 			l.closeConn(ctx, conn)
@@ -171,13 +166,33 @@ func (l *EphemeralListener) run(ctx context.Context) {
 			}
 		}
 		first = false
-		timer := time.NewTimer(l.cfg.ReconnectBackoffCap)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
+		if !l.backoff(ctx) {
 			return
-		case <-timer.C:
 		}
+	}
+}
+
+// restored lets every route reconcile and logs the restore when the connection came back from a
+// loss; nothing on the first connection.
+func (l *EphemeralListener) restored(ctx context.Context, lost bool) {
+	if !lost {
+		return
+	}
+	for _, r := range l.routes {
+		r.Reconcile(ctx)
+	}
+	l.log.LogAttrs(ctx, slog.LevelInfo, msgListenerRestored)
+}
+
+// backoff waits database.listen_reconnect_backoff_cap; false when ctx ended first.
+func (l *EphemeralListener) backoff(ctx context.Context) bool {
+	timer := time.NewTimer(l.cfg.ReconnectBackoffCap)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 

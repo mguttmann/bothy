@@ -99,8 +99,10 @@ type wireSignal struct {
 	Count          *int64     `json:"count,omitempty"`
 }
 
-// The members of a signal besides kind and node.
+// The members of a signal: kind and node in every one, the others by kind.
 const (
+	mKind      = "kind"
+	mNode      = "node"
 	mThread    = "thread_id"
 	mPrincipal = "principal_id"
 	mRun       = "run_id"
@@ -268,11 +270,11 @@ func DecodeSignal(payload []byte) (s Signal, ours bool, err error) {
 		return Signal{}, true, ErrMalformedSignal
 	}
 	for name := range raw {
-		if name != "kind" && name != "node" && !contains(sh.required, name) && !contains(sh.optional, name) {
+		if name != mKind && name != mNode && !contains(sh.required, name) && !contains(sh.optional, name) {
 			return Signal{}, true, ErrMalformedSignal
 		}
 	}
-	for _, name := range append([]string{"node"}, sh.required...) {
+	for _, name := range append([]string{mNode}, sh.required...) {
 		if _, ok := raw[name]; !ok {
 			return Signal{}, true, ErrMalformedSignal
 		}
@@ -289,64 +291,69 @@ func DecodeSignal(payload []byte) (s Signal, ours bool, err error) {
 // type or form.
 func decodeMembers(raw map[string]json.RawMessage) (Signal, bool) {
 	var s Signal
-	ok := true
-	id := func(name string, dst *ids.ID) {
-		v, present := raw[name]
-		if !present || !ok {
-			return
-		}
-		var text string
-		if json.Unmarshal(v, &text) != nil {
-			ok = false
-			return
-		}
-		parsed, err := ids.Parse(text)
-		if err != nil || parsed.IsZero() || parsed.String() != text {
-			ok = false
-			return
-		}
-		*dst = parsed
+	d := memberDecoder{raw: raw, ok: true}
+	for name, dst := range map[string]*ids.ID{
+		mNode: &s.Node, mThread: &s.ThreadID, mPrincipal: &s.PrincipalID, mRun: &s.RunID, mAgent: &s.AgentID, mActor: &s.ActorID,
+		mDevice: &s.DeviceID, mSession: &s.SessionID, mBind: &s.BindID, mRecipient: &s.RecipientID, mNID: &s.NotificationID,
+		mMessage: &s.MessageID, mTarget: &s.TargetID,
+	} {
+		d.id(name, dst)
 	}
-	code := func(name string, dst *string) {
-		v, present := raw[name]
-		if !present || !ok {
-			return
-		}
-		if json.Unmarshal(v, dst) != nil || !codePattern.MatchString(*dst) {
-			ok = false
-		}
+	d.code(mState, &s.State)
+	d.code(mBilling, &s.BillingMode)
+	d.code(mHintKind, &s.HintKind)
+	d.number(mVersion, &s.Version, 1)
+	d.number(mCount, &s.Count, 0)
+	if v, present := raw[mQuiet]; present && d.ok {
+		d.ok = json.Unmarshal(v, &s.Quiet) == nil
 	}
-	number := func(name string, dst *int64, low int64) {
-		v, present := raw[name]
-		if !present || !ok {
-			return
-		}
-		if json.Unmarshal(v, dst) != nil || *dst < low || !isInteger(v) {
-			ok = false
-		}
+	return s, d.ok
+}
+
+// memberDecoder reads members of one payload; ok turns false at the first member of the wrong
+// type or form, and every later read does nothing.
+type memberDecoder struct {
+	raw map[string]json.RawMessage
+	ok  bool
+}
+
+// present returns the member name when it is present and nothing failed yet.
+func (d *memberDecoder) present(name string) (json.RawMessage, bool) {
+	v, ok := d.raw[name]
+	return v, ok && d.ok
+}
+
+// id reads a canonical lower-case UUID string that is not zero into dst.
+func (d *memberDecoder) id(name string, dst *ids.ID) {
+	v, ok := d.present(name)
+	if !ok {
+		return
 	}
-	id("node", &s.Node)
-	id(mThread, &s.ThreadID)
-	id(mPrincipal, &s.PrincipalID)
-	id(mRun, &s.RunID)
-	id(mAgent, &s.AgentID)
-	id(mActor, &s.ActorID)
-	id(mDevice, &s.DeviceID)
-	id(mSession, &s.SessionID)
-	id(mBind, &s.BindID)
-	id(mRecipient, &s.RecipientID)
-	id(mNID, &s.NotificationID)
-	id(mMessage, &s.MessageID)
-	id(mTarget, &s.TargetID)
-	code(mState, &s.State)
-	code(mBilling, &s.BillingMode)
-	code(mHintKind, &s.HintKind)
-	number(mVersion, &s.Version, 1)
-	number(mCount, &s.Count, 0)
-	if v, present := raw[mQuiet]; present && ok {
-		ok = json.Unmarshal(v, &s.Quiet) == nil
+	var text string
+	if json.Unmarshal(v, &text) != nil {
+		d.ok = false
+		return
 	}
-	return s, ok
+	parsed, err := ids.Parse(text)
+	if err != nil || parsed.IsZero() || parsed.String() != text {
+		d.ok = false
+		return
+	}
+	*dst = parsed
+}
+
+// code reads a lower-case code of a 05 schema into dst.
+func (d *memberDecoder) code(name string, dst *string) {
+	if v, ok := d.present(name); ok && (json.Unmarshal(v, dst) != nil || !codePattern.MatchString(*dst)) {
+		d.ok = false
+	}
+}
+
+// number reads an integer of at least low into dst.
+func (d *memberDecoder) number(name string, dst *int64, low int64) {
+	if v, ok := d.present(name); ok && (json.Unmarshal(v, dst) != nil || *dst < low || !isInteger(v)) {
+		d.ok = false
+	}
 }
 
 // isInteger reports whether the JSON number v has no fraction and no exponent.

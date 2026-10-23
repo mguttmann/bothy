@@ -1378,7 +1378,9 @@ orchestrator restarts, clients resume according to 04.
    and `open_timeout` and sets every `active` session `detached`, one unit of work per session in
    ascending `id`, because the relay slots and connections lived only in the memory of the previous
    process. With several nodes (`cluster.mode = multi`, M2-47) this step does nothing.
-8. Role `api`: start the log tail, set `local_head` to the current head, open the public listener.
+8. Role `api`: start the log tail, set `local_head` to the current head, open the public listener,
+   then the `LISTEN ephemeral` connection of the process (component `ephemeral_listener`, M7-17;
+   role `all` only with `cluster.mode = multi`, 11.6).
    Role `worker`: start River and the consumers.
 9. Report ready.
 

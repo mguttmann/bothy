@@ -14,10 +14,11 @@ import (
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
 
-// componentNames returns the start sequence of role.
-func componentNames(role Role) []string {
+// componentNames returns the start sequence of role with the default configuration.
+func componentNames(t *testing.T, role Role) []string {
+	t.Helper()
 	var out []string
-	for _, c := range (&server{role: role}).components() {
+	for _, c := range (&server{role: role, values: loadValues(t)}).components() {
 		out = append(out, c.Name())
 	}
 	return out
@@ -28,7 +29,7 @@ func componentNames(role Role) []string {
 func TestWorkerRoleStartsConsumersAfterRiver(t *testing.T) {
 	t.Parallel()
 	for _, role := range []Role{RoleWorker, RoleAll} {
-		names := componentNames(role)
+		names := componentNames(t, role)
 		jobs, consumers := slices.Index(names, "jobs"), slices.Index(names, "event_consumers")
 		if jobs < 0 || consumers != jobs+1 {
 			t.Errorf("%s: start sequence %v, want event_consumers right after jobs", role, names)
@@ -46,7 +47,7 @@ func TestWorkerRoleStartsConsumersAfterRiver(t *testing.T) {
 // still builds the event log in step sync, which registers the lag gauges.
 func TestApiRoleStartsNoConsumers(t *testing.T) {
 	t.Parallel()
-	names := componentNames(RoleAPI)
+	names := componentNames(t, RoleAPI)
 	if slices.Contains(names, "event_consumers") {
 		t.Fatalf("api starts the consumers: %v", names)
 	}
