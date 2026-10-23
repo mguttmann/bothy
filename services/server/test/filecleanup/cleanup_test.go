@@ -87,15 +87,15 @@ func TestCleanup_UnattachedAfterTTL(t *testing.T) {
 	w.mustScan(slow)
 	w.clk.Advance(unattachedTTL - (sessionTTL - time.Minute) - time.Second)
 	w.mustCleanup()
-	if w.deleted(f) || !w.original(f) {
+	if w.gone(f) || !w.original(f) {
 		t.Fatal("deleted one second before the TTL")
 	}
 	w.clk.Advance(time.Second)
 	w.mustCleanup()
-	if !w.deleted(f) {
-		t.Fatal("not deleted after the TTL")
+	if !w.gone(f) {
+		t.Fatalf("not deleted after the TTL: %s, clock %s", w.times(f), w.clk.Now().UTC())
 	}
-	if w.deleted(slow) {
+	if w.gone(slow) {
 		t.Fatal("the slow upload lost its window")
 	}
 	w.purgeQueued(f)
@@ -107,7 +107,7 @@ func TestCleanup_UnattachedAfterTTL(t *testing.T) {
 	}
 	w.clk.Advance(sessionTTL)
 	w.mustCleanup()
-	if !w.deleted(slow) {
+	if !w.gone(slow) {
 		t.Fatal("the slow upload stays after its window")
 	}
 }
@@ -124,8 +124,8 @@ func TestCleanup_UploaderDraftKeepsFile(t *testing.T) {
 		Body: map[string]any{"content_md": "keep", "file_ids": []string{g}}}, http.StatusOK)
 	w.clk.Advance(unattachedTTL)
 	w.mustCleanup()
-	if w.deleted(f) || !w.deleted(g) {
-		t.Fatalf("held %v, foreign %v", w.deleted(f), w.deleted(g))
+	if w.gone(f) || !w.gone(g) {
+		t.Fatalf("held gone %v, foreign gone %v", w.gone(f), w.gone(g))
 	}
 	w.purgeQueued(g)
 	if n := w.count(`SELECT count(*) FROM drafts WHERE $1::uuid = ANY(file_ids)`, g); n != 1 {
@@ -135,7 +135,7 @@ func TestCleanup_UploaderDraftKeepsFile(t *testing.T) {
 	wantProblem(t, r, http.StatusConflict, "conflict", "file_not_attachable")
 	harness.MustDo(t, w.alex, harness.Request{Method: http.MethodDelete, Path: "/threads/" + w.main + "/draft"}, http.StatusNoContent)
 	w.mustCleanup()
-	if !w.deleted(f) && w.rowExists(f) {
+	if !w.gone(f) {
 		t.Fatal("F stays after its draft went")
 	}
 }
@@ -278,12 +278,12 @@ func TestDeleteFile_ConcurrentWithAttach(t *testing.T) {
 		attached := w.count(`SELECT count(*) FROM message_attachments WHERE file_id = $1`, f) == 1
 		switch {
 		case send.Status == http.StatusCreated && del.Status == http.StatusConflict:
-			if !attached || w.deleted(f) {
-				t.Fatalf("send won but attached %v deleted %v", attached, w.deleted(f))
+			if !attached || w.gone(f) {
+				t.Fatalf("send won but attached %v gone %v", attached, w.gone(f))
 			}
 		case send.Status == http.StatusConflict && del.Status == http.StatusNoContent:
-			if attached || !w.deleted(f) {
-				t.Fatalf("delete won but attached %v deleted %v", attached, w.deleted(f))
+			if attached || !w.gone(f) {
+				t.Fatalf("delete won but attached %v gone %v", attached, w.gone(f))
 			}
 		default:
 			t.Fatalf("send %d %s, delete %d %s", send.Status, send.Body, del.Status, del.Body)
@@ -308,8 +308,8 @@ func TestCleanup_ConcurrentWithAttach(t *testing.T) {
 		t.Fatal(cerr)
 	}
 	attached := w.count(`SELECT count(*) FROM message_attachments WHERE file_id = $1`, f) == 1
-	if attached == w.deleted(f) || (send.Status == http.StatusCreated) != attached {
-		t.Fatalf("send %d, attached %v, deleted %v", send.Status, attached, w.deleted(f))
+	if attached == w.gone(f) || (send.Status == http.StatusCreated) != attached {
+		t.Fatalf("send %d, attached %v, gone %v", send.Status, attached, w.gone(f))
 	}
 }
 

@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -62,6 +63,8 @@ type world struct {
 	clk   *clock.Fake
 	db    *pgxpool.Pool
 	clamd *clamdtest.Fake
+	// logs holds the JSON log lines of the server; a failed test prints its warnings and errors.
+	logs *serverLog
 
 	mu      sync.Mutex
 	scan    filesjobs.Runner
@@ -71,6 +74,35 @@ type world struct {
 	owner, alex, sam, robin *harness.Client
 	allg                    string
 	main                    string
+}
+
+// serverLog keeps the log lines of a test server; it is safe for concurrent use.
+type serverLog struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+// Write implements io.Writer.
+func (l *serverLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+// lines returns the log lines that contain one of the needles.
+func (l *serverLog) lines(needles ...string) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []string
+	for _, ln := range strings.Split(l.buf.String(), "\n") {
+		for _, n := range needles {
+			if strings.Contains(ln, n) {
+				out = append(out, ln)
+				break
+			}
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 func seconds(d time.Duration) string { return strconv.FormatInt(int64(d/time.Second), 10) + "s" }
@@ -103,8 +135,13 @@ func newWorld(t *testing.T) *world {
 	} {
 		cfg[k] = v
 	}
-	w := &world{t: t, clk: clock.NewFake(time.Now().UTC().Truncate(time.Millisecond)), clamd: fake}
-	w.s = harness.Start(t, harness.Options{Config: cfg, Clock: w.clk, EgressDenyAll: true, JobModules: w.takeJobs})
+	w := &world{t: t, clk: clock.NewFake(time.Now().UTC().Truncate(time.Millisecond)), clamd: fake, logs: &serverLog{}}
+	w.s = harness.Start(t, harness.Options{Config: cfg, Clock: w.clk, EgressDenyAll: true, JobModules: w.takeJobs, LogWriter: w.logs})
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("server warnings and errors:\n%s", w.logs.lines(`"level":"WARN"`, `"level":"ERROR"`))
+		}
+	})
 	w.db = w.s.AdminDB()
 	mw := harness.BuildMatrixWorld(t, w.s)
 	w.owner, w.alex, w.sam, w.robin = w.s.Owner, mw.People["Alex"], mw.People["Sam"], mw.People["Robin"]
@@ -304,6 +341,10 @@ func (w *world) deleted(fileID string) bool {
 	return w.count(`SELECT count(*) FROM files WHERE id = $1 AND deleted_at IS NOT NULL`, fileID) == 1
 }
 
+// gone reports a file that is marked deleted or whose row the purge removed already (the
+// catch-up of the same cleanup run purges a file the run just marked).
+func (w *world) gone(fileID string) bool { return w.deleted(fileID) || !w.rowExists(fileID) }
+
 // objectsLeft returns the regular files left in the key space of the file: its directory under
 // f/ and its part directory under uploads/.
 func (w *world) objectsLeft(fileID string) []string {
@@ -393,4 +434,15 @@ func wantProblem(t *testing.T, r harness.Response, status int, code, reason stri
 	if c, rs := problem(t, r); c != code || rs != reason {
 		t.Fatalf("problem %s/%s, want %s/%s: %s", c, rs, code, reason, r.Body)
 	}
+}
+
+// times describes the stored times of a file for a failure message.
+func (w *world) times(fileID string) string {
+	w.t.Helper()
+	var out string
+	if err := w.db.QueryRow(w.t.Context(), `SELECT concat_ws(' ', 'created', f.created_at, 'scanned', f.scanned_at, 'completed', s.completed_at,
+		'state', f.upload_state, f.scan_status, f.purpose) FROM files f LEFT JOIN file_upload_sessions s ON s.file_id = f.id WHERE f.id = $1`, fileID).Scan(&out); err != nil {
+		return err.Error()
+	}
+	return out
 }

@@ -24,8 +24,10 @@ const (
 // brief M3-08 design note 9):
 //
 //   - no row (never existed or purged): 404 not_found, the answer of an unknown id (06 7);
-//   - deleted already: nil (204) for its uploader, the same 404 for everyone else, without asking
-//     authorize about the dead row (AZ-P4);
+//   - deleted already: the same 404 for everyone but its uploader, without asking authorize
+//     (AZ-P4); for the uploader file.delete on the descriptor of the dead row, which the HTTP
+//     chain needs as proof of the check (02 "Proof of the check"), and nil (204) when it allows,
+//     the 404 otherwise;
 //   - otherwise authorize file.delete on fileResource: not_found answers 404, a denial with read
 //     403 forbidden;
 //   - after authorize an attached file answers 409 conflict file_attached and a file whose purpose
@@ -42,7 +44,7 @@ func (s *Service) Delete(ctx context.Context, fileID ids.ID) error {
 		return notFound()
 	}
 	if f.Deleted {
-		return deletedAnswer(a, f.UploadedBy)
+		return s.deletedAgain(ctx, a, f)
 	}
 	ref, err := s.attachmentRef(ctx, fileID)
 	if err != nil {
@@ -83,6 +85,23 @@ func (s *Service) Delete(ctx context.Context, fileID ids.ID) error {
 		}
 		return s.markDeleted(ctx, Deletion{FileIDs: []ids.ID{fileID}})
 	})
+}
+
+// deletedAgain answers deleteFile for a file that is deleted already (design note 9 b): the 404 of
+// an unknown id for everyone but the uploader, without authorize; for the uploader the check of
+// file.delete on the unattached descriptor of the row, then nil (06 7) or the same 404.
+func (s *Service) deletedAgain(ctx context.Context, a actor.Actor, f FileRecord) error {
+	if err := deletedAnswer(a, f.UploadedBy); err != nil {
+		return err
+	}
+	d, err := s.decide(ctx, a, authorize.ActionFileDelete, fileResource(f, nil))
+	if err != nil {
+		return err
+	}
+	if !d.Allowed() {
+		return notFound()
+	}
+	return nil
 }
 
 // deletedAnswer is the answer of deleteFile for a file that is deleted already: success for its
