@@ -3,6 +3,7 @@
 package filecleanup_test
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -379,5 +381,60 @@ func TestCleanup_TempSweep(t *testing.T) {
 	}
 	if _, err := os.Stat(fresh); err != nil {
 		t.Errorf("fresh temporary file went: %v", err)
+	}
+}
+
+// TestPurge_Idempotent: two purge jobs of one file and a catch-up run in parallel delete the row
+// once, end without error and leave no object.
+func TestPurge_Idempotent(t *testing.T) {
+	w := newWorld(t)
+	f := w.clean(w.alex, "twice.txt")
+	harness.MustDo(t, w.alex, harness.Request{Method: http.MethodDelete, Path: "/files/" + f}, http.StatusNoContent)
+	errs := make(chan error, 3)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Go(func() { errs <- w.purgeFile(f) })
+	}
+	wg.Go(func() { errs <- w.runCleanup() })
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if w.rowExists(f) || len(w.objectsLeft(f)) != 0 {
+		t.Fatalf("row %v, objects %v", w.rowExists(f), w.objectsLeft(f))
+	}
+}
+
+// TestPurge_WhileScanRuns: deleteFile while the scan pass of the file waits for clamd; after both
+// no object and no row exist, and the scan job ends with nil.
+func TestPurge_WhileScanRuns(t *testing.T) {
+	w := newWorld(t)
+	content := []byte("scanned while it is deleted")
+	f := w.upload(w.alex, "scan.txt", content, content)
+	started := make(chan struct{})
+	w.clamd.SetScript(clamdtest.Script{Delay: 200 * time.Millisecond})
+	scanErr := make(chan error, 1)
+	go func() {
+		close(started)
+		w.mu.Lock()
+		pass := w.scan
+		w.mu.Unlock()
+		_, err := pass.Run(context.Background(), ids.MustParse(f), 0)
+		scanErr <- err
+	}()
+	<-started
+	if r := w.deleteFile(w.alex, f); r.Status != http.StatusNoContent {
+		t.Fatalf("deleteFile %d %s", r.Status, r.Body)
+	}
+	w.mustPurge(f)
+	if err := <-scanErr; err != nil {
+		t.Fatalf("scan pass: %v", err)
+	}
+	w.mustPurge(f)
+	if w.rowExists(f) || len(w.objectsLeft(f)) != 0 {
+		t.Fatalf("row %v, objects %v", w.rowExists(f), w.objectsLeft(f))
 	}
 }
