@@ -105,10 +105,15 @@ def sync_detailed(
 ) -> Response[Price | Problem]:
     """End the validity of a price
 
+     Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again
+    answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already
+    closed with another end (a closed row is never reopened or moved; a gap is filled by a new row),
+    `price_in_use` when a `computed` cost entry at or after the new end used the row.
+
     Args:
         price_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceClose):
+        body (PriceClose): The new end of the validity, after `valid_from`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -140,10 +145,15 @@ def sync(
 ) -> Price | Problem | None:
     """End the validity of a price
 
+     Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again
+    answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already
+    closed with another end (a closed row is never reopened or moved; a gap is filled by a new row),
+    `price_in_use` when a `computed` cost entry at or after the new end used the row.
+
     Args:
         price_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceClose):
+        body (PriceClose): The new end of the validity, after `valid_from`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -170,10 +180,15 @@ async def asyncio_detailed(
 ) -> Response[Price | Problem]:
     """End the validity of a price
 
+     Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again
+    answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already
+    closed with another end (a closed row is never reopened or moved; a gap is filled by a new row),
+    `price_in_use` when a `computed` cost entry at or after the new end used the row.
+
     Args:
         price_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceClose):
+        body (PriceClose): The new end of the validity, after `valid_from`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -203,10 +218,15 @@ async def asyncio(
 ) -> Price | Problem | None:
     """End the validity of a price
 
+     Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again
+    answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already
+    closed with another end (a closed row is never reopened or moved; a gap is filled by a new row),
+    `price_in_use` when a `computed` cost entry at or after the new end used the row.
+
     Args:
         price_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        body (PriceClose):
+        body (PriceClose): The new end of the validity, after `valid_from`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -12,18 +12,22 @@ T = TypeVar("T", bound="CostReport")
 
 @_attrs_define
 class CostReport:
-    """Cost of one model in this run as reported by the adapter; stored as estimate.
+    """Cost of one model in this run as reported by the adapter: the consumption of this run, never a session sum; stored
+    as estimate. The server computes the amount from the price table when the price set of provider, model and the end
+    of the run covers every consumed unit (source `computed`, the adapter amount is ignored), otherwise it books
+    `amount_micros` (source `adapter_reported`), otherwise 0 (source `unpriced`, "Price missing"). Token counts and
+    `amount_micros` are not negative and below 2^53; absent token counts are 0.
 
-    Attributes:
-        provider (str):
-        model (str):
-        currency (str):
-        tokens_in (int | Unset):
-        tokens_out (int | Unset):
-        tokens_cache_read (int | Unset):
-        tokens_cache_write (int | Unset): Cache writes with 5 minutes (or without a stated duration).
-        tokens_cache_write_1h (int | Unset): Cache writes with 1 hour, priced with `cache_write_1h_mtok`.
-        amount_micros (int | Unset): Absent lets the server compute from the price table.
+        Attributes:
+            provider (str):
+            model (str):
+            currency (str): ISO 4217 code.
+            tokens_in (int | Unset):
+            tokens_out (int | Unset):
+            tokens_cache_read (int | Unset):
+            tokens_cache_write (int | Unset): Cache writes with 5 minutes (or without a stated duration).
+            tokens_cache_write_1h (int | Unset): Cache writes with 1 hour, priced with `cache_write_1h_mtok`.
+            amount_micros (int | Unset): Absent lets the server compute from the price table.
     """
 
     provider: str

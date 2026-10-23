@@ -250,6 +250,31 @@ type Command struct {
 	RemovedAt        pgtype.Timestamptz
 }
 
+type CostEntry struct {
+	ID                 pgtype.UUID
+	RunID              pgtype.UUID
+	AgentID            pgtype.UUID
+	ThreadID           pgtype.UUID
+	ChannelID          pgtype.UUID
+	SpaceID            pgtype.UUID
+	AgentSessionID     pgtype.UUID
+	BillingMode        string
+	Provider           string
+	Model              string
+	TokensIn           int64
+	TokensOut          int64
+	TokensCacheRead    int64
+	TokensCacheWrite   int64
+	TokensCacheWrite1h int64
+	AmountMicros       int64
+	Currency           string
+	IsEstimate         bool
+	Source             string
+	OccurredAt         pgtype.Timestamptz
+	ReconciledAt       pgtype.Timestamptz
+	SupersedesID       pgtype.UUID
+}
+
 type Device struct {
 	ID           pgtype.UUID
 	UserID       pgtype.UUID
@@ -771,6 +796,21 @@ type Pin struct {
 	ThreadID  pgtype.UUID
 	PinnedBy  pgtype.UUID
 	PinnedAt  pgtype.Timestamptz
+}
+
+type PriceTable struct {
+	ID          pgtype.UUID
+	Provider    string
+	Model       string
+	Unit        string
+	PriceMicros int64
+	Currency    string
+	ValidFrom   pgtype.Timestamptz
+	ValidTo     pgtype.Timestamptz
+	SourceUrl   string
+	RetrievedAt pgtype.Timestamptz
+	CreatedBy   pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
 }
 
 type Principal struct {

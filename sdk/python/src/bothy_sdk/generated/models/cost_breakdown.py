@@ -8,7 +8,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
-    from ..models.money import Money
+    from ..models.cost_total import CostTotal
     from ..models.run_cost import RunCost
 
 
@@ -20,19 +20,23 @@ class CostBreakdown:
     """
     Attributes:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
-        total (Money): Amount in micro units of the currency. Never a float.
-        runs (list[RunCost]):
+        totals (list[CostTotal]): Valid sums per billing mode and currency, never converted; sums of mode `personal`
+            only when `billing.show_personal_estimates` is on.
+        runs (list[RunCost]): Runs of the thread with at least one valid cost entry, by `run_id` ascending.
     """
 
     thread_id: UUID
-    total: Money
+    totals: list[CostTotal]
     runs: list[RunCost]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         thread_id = str(self.thread_id)
 
-        total = self.total.to_dict()
+        totals = []
+        for totals_item_data in self.totals:
+            totals_item = totals_item_data.to_dict()
+            totals.append(totals_item)
 
         runs = []
         for runs_item_data in self.runs:
@@ -44,7 +48,7 @@ class CostBreakdown:
         field_dict.update(
             {
                 "thread_id": thread_id,
-                "total": total,
+                "totals": totals,
                 "runs": runs,
             }
         )
@@ -53,13 +57,18 @@ class CostBreakdown:
 
     @classmethod
     def from_dict(cls, src_dict: Mapping[str, Any]) -> Self:
-        from ..models.money import Money
+        from ..models.cost_total import CostTotal
         from ..models.run_cost import RunCost
 
         d = dict(src_dict)
         thread_id = UUID(d.pop("thread_id"))
 
-        total = Money.from_dict(d.pop("total"))
+        totals = []
+        _totals = d.pop("totals")
+        for totals_item_data in _totals:
+            totals_item = CostTotal.from_dict(totals_item_data)
+
+            totals.append(totals_item)
 
         runs = []
         _runs = d.pop("runs")
@@ -70,7 +79,7 @@ class CostBreakdown:
 
         cost_breakdown = cls(
             thread_id=thread_id,
-            total=total,
+            totals=totals,
             runs=runs,
         )
 

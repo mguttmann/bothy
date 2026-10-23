@@ -2436,7 +2436,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Costs of a thread per run */
+        /**
+         * Costs of a thread per run
+         * @description Valid cost entries of the thread (entries no correction supersedes), whatever channel they were booked in, per run (by `run_id` ascending, unpaginated) and summed per billing mode and currency without conversion. `tokens` are always present; amounts of runs in mode `personal` (their `costs` and their totals) appear only when the server key `billing.show_personal_estimates` is on (10, 12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for an unknown thread. A thread without entries answers empty lists.
+         */
         get: operations["getThreadCosts"];
         put?: never;
         post?: never;
@@ -4304,10 +4307,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List prices */
+        /**
+         * List prices
+         * @description Every row of the price table, closed ones included, ordered by `provider`, `model`, `unit`, `valid_from` and `id`; `valid_to` is absent while a row is open. A small unpaginated list (06, 6 point 6). Owner only; an owner's personal token gets 403.
+         */
         get: operations["listPrices"];
         put?: never;
-        /** Add a price with source */
+        /**
+         * Add a price with source
+         * @description Owner with step-up, audited with row, source and retrieval time (10, 14). `source_url` is an absolute https URL without user info and fragment, `retrieved_at` not in the future, `currency` an ISO 4217 code. 409 `conflict` with `reason` `price_overlap` when the validity overlaps a row of the same provider, model and unit, `price_currency_mismatch` when an overlapping row of the same provider and model has another currency (one currency per price set).
+         */
         post: operations["createPrice"];
         delete?: never;
         options?: never;
@@ -4324,7 +4333,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** End the validity of a price */
+        /**
+         * End the validity of a price
+         * @description Sets `valid_to` of an open row, the only change a row ever gets (R-DM-23). The same end again answers 200 without change. 409 `conflict` with `reason` `price_closed` when the row is already closed with another end (a closed row is never reopened or moved; a gap is filled by a new row), `price_in_use` when a `computed` cost entry at or after the new end used the row.
+         */
         post: operations["closePrice"];
         delete?: never;
         options?: never;
@@ -8123,9 +8135,10 @@ export interface components {
             /** @example Found the cause and proposed a fix */
             summary?: string;
             metrics?: components["schemas"]["RunMetrics"];
+            /** @description The consumption of this run, one report per model (a second report of the same provider and model is invalid). The server books one cost entry per report at the end of the run (10, 12.1); a repeated finish books nothing. Only a run that started (`billing_mode_used` set) may report costs. */
             costs?: components["schemas"]["CostReport"][];
         };
-        /** @description Cost of one model in this run as reported by the adapter; stored as estimate. */
+        /** @description Cost of one model in this run as reported by the adapter: the consumption of this run, never a session sum; stored as estimate. The server computes the amount from the price table when the price set of provider, model and the end of the run covers every consumed unit (source `computed`, the adapter amount is ignored), otherwise it books `amount_micros` (source `adapter_reported`), otherwise 0 (source `unpriced`, "Price missing"). Token counts and `amount_micros` are not negative and below 2^53; absent token counts are 0. */
         CostReport: {
             /** @example anthropic */
             provider: string;
@@ -8152,7 +8165,10 @@ export interface components {
              * @description Absent lets the server compute from the price table.
              */
             amount_micros?: number;
-            /** @example USD */
+            /**
+             * @description ISO 4217 code.
+             * @example USD
+             */
             currency: string;
         };
         RunCancel: {
@@ -8161,13 +8177,44 @@ export interface components {
         };
         CostBreakdown: {
             thread_id: components["schemas"]["Uuid"];
-            total: components["schemas"]["Money"];
+            /** @description Valid sums per billing mode and currency, never converted; sums of mode `personal` only when `billing.show_personal_estimates` is on. */
+            totals: components["schemas"]["CostTotal"][];
+            /** @description Runs of the thread with at least one valid cost entry, by `run_id` ascending. */
             runs: components["schemas"]["RunCost"][];
+        };
+        CostTotal: {
+            billing_mode: components["schemas"]["BillingMode"];
+            /** Format: int64 */
+            amount_micros: number;
+            /**
+             * @description ISO 4217 code.
+             * @example USD
+             */
+            currency: string;
+            /** @description True while any summed entry is an estimate. */
+            is_estimate: boolean;
         };
         RunCost: {
             run_id: components["schemas"]["Uuid"];
             billing_mode: components["schemas"]["BillingMode"];
-            cost: components["schemas"]["Money"];
+            agent_session_id?: components["schemas"]["Uuid"];
+            tokens: components["schemas"]["TokenCounts"];
+            /** @description One amount per currency; absent when amounts are hidden (mode `personal` without `billing.show_personal_estimates`). */
+            costs?: components["schemas"]["Money"][];
+            /** @description A valid entry of the run has neither a price nor an amount of the adapter ("Price missing"). */
+            unpriced: boolean;
+        };
+        TokenCounts: {
+            /** Format: int64 */
+            tokens_in: number;
+            /** Format: int64 */
+            tokens_out: number;
+            /** Format: int64 */
+            tokens_cache_read: number;
+            /** Format: int64 */
+            tokens_cache_write: number;
+            /** Format: int64 */
+            tokens_cache_write_1h: number;
         };
         Component: {
             id: components["schemas"]["Uuid"];
@@ -8709,6 +8756,7 @@ export interface components {
             source_url: string;
             retrieved_at: components["schemas"]["Timestamp"];
         };
+        /** @description A price per unit (per million tokens for the `*_mtok` units) with its public source. `valid_to`, when present, lies after `valid_from`; `valid_from` may lie in the past. `source_url` is an absolute https URL without user info and fragment; `retrieved_at` is not in the future. */
         PriceCreate: {
             /** @example anthropic */
             provider: string;
@@ -8725,6 +8773,7 @@ export interface components {
             source_url: string;
             retrieved_at: components["schemas"]["Timestamp"];
         };
+        /** @description The new end of the validity, after `valid_from`. */
         PriceClose: {
             valid_to: components["schemas"]["Timestamp"];
         };

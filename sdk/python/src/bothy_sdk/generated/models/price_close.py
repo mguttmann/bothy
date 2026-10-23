@@ -11,7 +11,8 @@ T = TypeVar("T", bound="PriceClose")
 
 @_attrs_define
 class PriceClose:
-    """
+    """The new end of the validity, after `valid_from`.
+
     Attributes:
         valid_to (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """

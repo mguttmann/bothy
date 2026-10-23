@@ -406,8 +406,13 @@ SET state = $1::text,
     model = COALESCE($7::text, model),
     status_line = COALESCE($8::text, status_line),
     metrics = COALESCE($9::jsonb, metrics),
-    summary = COALESCE($10::text, summary)
-WHERE id = $11 AND state = $12::text AND version = $13
+    summary = COALESCE($10::text, summary),
+    -- The cost columns of a finish that booked costs (M2-22); NULL keeps them, so a finish
+    -- without costs leaves what the live /cost patches stored.
+    cost_micros = COALESCE($11::bigint, cost_micros),
+    currency = COALESCE($12::text, currency),
+    cost_is_estimate = COALESCE($13::boolean, cost_is_estimate)
+WHERE id = $14 AND state = $15::text AND version = $16
 RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms
 `
 
@@ -422,6 +427,9 @@ type TransitionRunParams struct {
 	StatusLine      pgtype.Text
 	Metrics         []byte
 	Summary         pgtype.Text
+	CostMicros      pgtype.Int8
+	Currency        pgtype.Text
+	CostIsEstimate  pgtype.Bool
 	ID              pgtype.UUID
 	FromState       string
 	Version         int64
@@ -443,6 +451,9 @@ func (q *Queries) TransitionRun(ctx context.Context, arg TransitionRunParams) (R
 		arg.StatusLine,
 		arg.Metrics,
 		arg.Summary,
+		arg.CostMicros,
+		arg.Currency,
+		arg.CostIsEstimate,
 		arg.ID,
 		arg.FromState,
 		arg.Version,

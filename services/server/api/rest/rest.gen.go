@@ -627,6 +627,15 @@ type ServerInterface interface {
 	// RevokeOwner Remove the owner role
 	// (POST /owners/{user_id}/revoke)
 	RevokeOwner(w http.ResponseWriter, r *http.Request, userId UserIdPath, params RevokeOwnerParams)
+	// ListPrices List prices
+	// (GET /prices)
+	ListPrices(w http.ResponseWriter, r *http.Request)
+	// CreatePrice Add a price with source
+	// (POST /prices)
+	CreatePrice(w http.ResponseWriter, r *http.Request, params CreatePriceParams)
+	// ClosePrice End the validity of a price
+	// (POST /prices/{price_id}/close)
+	ClosePrice(w http.ResponseWriter, r *http.Request, priceId PriceIdPath, params ClosePriceParams)
 	// ListTokens List API tokens of a principal
 	// (GET /principals/{principal_id}/tokens)
 	ListTokens(w http.ResponseWriter, r *http.Request, principalId PrincipalIdPath, params ListTokensParams)
@@ -747,6 +756,9 @@ type ServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath, params CloseThreadParams)
+	// GetThreadCosts Costs of a thread per run
+	// (GET /threads/{thread_id}/costs)
+	GetThreadCosts(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
 	// DeleteThreadDraft Delete the draft of a thread
 	// (DELETE /threads/{thread_id}/draft)
 	DeleteThreadDraft(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath)
@@ -8511,6 +8523,111 @@ func (siw *ServerInterfaceWrapper) RevokeOwner(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListPrices operation middleware
+func (siw *ServerInterfaceWrapper) ListPrices(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPrices(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreatePrice operation middleware
+func (siw *ServerInterfaceWrapper) CreatePrice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePriceParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePrice(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ClosePrice operation middleware
+func (siw *ServerInterfaceWrapper) ClosePrice(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "price_id" -------------
+	var priceId PriceIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "price_id", r.PathValue("price_id"), &priceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "price_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ClosePriceParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClosePrice(w, r, priceId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTokens operation middleware
 func (siw *ServerInterfaceWrapper) ListTokens(w http.ResponseWriter, r *http.Request) {
 
@@ -10123,6 +10240,32 @@ func (siw *ServerInterfaceWrapper) CloseThread(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CloseThread(w, r, threadId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetThreadCosts operation middleware
+func (siw *ServerInterfaceWrapper) GetThreadCosts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "thread_id" -------------
+	var threadId ThreadIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "thread_id", r.PathValue("thread_id"), &threadId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "thread_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetThreadCosts(w, r, threadId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11903,6 +12046,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/agent-sessions/bind", wrapper.BindAgentSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/agent-sessions/report", wrapper.ReportAgentSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/runs", wrapper.ListThreadRuns)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/costs", wrapper.GetThreadCosts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/threads/{thread_id}/pins", wrapper.ListPins)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/threads/{thread_id}/read-state", wrapper.PutReadState)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/threads/{thread_id}/read-state/mark-unread", wrapper.MarkThreadUnread)
@@ -12000,6 +12144,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events", wrapper.ListAuditEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/export", wrapper.ExportAuditEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/audit/verify", wrapper.VerifyAuditChain)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/prices", wrapper.ListPrices)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices", wrapper.CreatePrice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/prices/{price_id}/close", wrapper.ClosePrice)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports", wrapper.ListImports)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/imports", wrapper.CreateImport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/imports/{import_id}", wrapper.GetImport)
@@ -12816,6 +12963,15 @@ type StrictServerInterface interface {
 	// RevokeOwner Remove the owner role
 	// (POST /owners/{user_id}/revoke)
 	RevokeOwner(ctx context.Context, request RevokeOwnerRequestObject) (RevokeOwnerResponseObject, error)
+	// ListPrices List prices
+	// (GET /prices)
+	ListPrices(ctx context.Context, request ListPricesRequestObject) (ListPricesResponseObject, error)
+	// CreatePrice Add a price with source
+	// (POST /prices)
+	CreatePrice(ctx context.Context, request CreatePriceRequestObject) (CreatePriceResponseObject, error)
+	// ClosePrice End the validity of a price
+	// (POST /prices/{price_id}/close)
+	ClosePrice(ctx context.Context, request ClosePriceRequestObject) (ClosePriceResponseObject, error)
 	// ListTokens List API tokens of a principal
 	// (GET /principals/{principal_id}/tokens)
 	ListTokens(ctx context.Context, request ListTokensRequestObject) (ListTokensResponseObject, error)
@@ -12936,6 +13092,9 @@ type StrictServerInterface interface {
 	// CloseThread Mark a thread as done
 	// (POST /threads/{thread_id}/close)
 	CloseThread(ctx context.Context, request CloseThreadRequestObject) (CloseThreadResponseObject, error)
+	// GetThreadCosts Costs of a thread per run
+	// (GET /threads/{thread_id}/costs)
+	GetThreadCosts(ctx context.Context, request GetThreadCostsRequestObject) (GetThreadCostsResponseObject, error)
 	// DeleteThreadDraft Delete the draft of a thread
 	// (DELETE /threads/{thread_id}/draft)
 	DeleteThreadDraft(ctx context.Context, request DeleteThreadDraftRequestObject) (DeleteThreadDraftResponseObject, error)
@@ -19111,6 +19270,97 @@ func (sh *strictHandler) RevokeOwner(w http.ResponseWriter, r *http.Request, use
 	}
 }
 
+// ListPrices operation middleware
+func (sh *strictHandler) ListPrices(w http.ResponseWriter, r *http.Request) {
+	var request ListPricesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPrices(ctx, request.(ListPricesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPrices")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPricesResponseObject); ok {
+		if err := validResponse.VisitListPricesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreatePrice operation middleware
+func (sh *strictHandler) CreatePrice(w http.ResponseWriter, r *http.Request, params CreatePriceParams) {
+	var request CreatePriceRequestObject
+
+	request.Params = params
+
+	var body CreatePriceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePrice(ctx, request.(CreatePriceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePrice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePriceResponseObject); ok {
+		if err := validResponse.VisitCreatePriceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ClosePrice operation middleware
+func (sh *strictHandler) ClosePrice(w http.ResponseWriter, r *http.Request, priceId PriceIdPath, params ClosePriceParams) {
+	var request ClosePriceRequestObject
+
+	request.PriceId = priceId
+	request.Params = params
+
+	var body ClosePriceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ClosePrice(ctx, request.(ClosePriceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ClosePrice")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ClosePriceResponseObject); ok {
+		if err := validResponse.VisitClosePriceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListTokens operation middleware
 func (sh *strictHandler) ListTokens(w http.ResponseWriter, r *http.Request, principalId PrincipalIdPath, params ListTokensParams) {
 	var request ListTokensRequestObject
@@ -20296,6 +20546,32 @@ func (sh *strictHandler) CloseThread(w http.ResponseWriter, r *http.Request, thr
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CloseThreadResponseObject); ok {
 		if err := validResponse.VisitCloseThreadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetThreadCosts operation middleware
+func (sh *strictHandler) GetThreadCosts(w http.ResponseWriter, r *http.Request, threadId ThreadIdPath) {
+	var request GetThreadCostsRequestObject
+
+	request.ThreadId = threadId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetThreadCosts(ctx, request.(GetThreadCostsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetThreadCosts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetThreadCostsResponseObject); ok {
+		if err := validResponse.VisitGetThreadCostsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
