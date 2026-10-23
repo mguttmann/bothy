@@ -28,6 +28,7 @@ import '../support/file_widgets.dart';
 import '../support/structure.dart';
 import '../support/thread_fixtures.dart';
 import '../support/thread_host.dart';
+import '../support/until.dart';
 import '../support/widgets.dart';
 
 void main() {
@@ -47,25 +48,25 @@ void main() {
         onSend: (f) async => sent = f,
       );
       // In fake time, so the limit timer runs on the fake clock; the folder and the file of
-      // the recording are real IO, which the real zone completes.
-      Future<void> settle() async {
-        for (var i = 0; i < 10; i++) {
-          await tester.runAsync(
-            () => Future<void>.delayed(const Duration(milliseconds: 5)),
-          );
-          await tester.pump();
-        }
-      }
-
+      // the recording are real IO, which the real zone completes: wait for the phase, never
+      // for a number of rounds (a loaded runner needs more).
       unawaited(voice.start());
-      await settle();
+      await pumpUntil(
+        tester,
+        () => voice.phase == VoicePhase.recording,
+        what: 'the start',
+      );
       expect(voice.phase, VoicePhase.recording);
       expect(recorder.bitRate, 64000);
       await tester.pump(const Duration(seconds: 2));
       expect(recorder.calls, isNot(contains('stop')));
       await tester.pump(const Duration(seconds: 1));
-      await settle();
       expect(recorder.calls, contains('stop'));
+      await pumpUntil(
+        tester,
+        () => voice.phase != VoicePhase.recording,
+        what: 'the stop at the limit',
+      );
       expect(voice.phase, VoicePhase.recorded);
       expect(voice.limitReached, isTrue);
       await tester.runAsync(voice.send);
