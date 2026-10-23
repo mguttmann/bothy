@@ -34,6 +34,12 @@ type Interactions interface {
 	// card (component.update) with If-Match on the component version; a change raises the
 	// component and message versions and appends message.updated.
 	UpdateComponent(ctx context.Context, cmd UpdateComponent) (Component, error)
+	// DisableAuthoredBy disables every active component of the cards of authorID in the ambient
+	// unit of work and returns how many it disabled (M2-25: app.suspend and app.uninstall, 11
+	// section 4.3). It calls no authorize: the caller authorized its owner action. Per card one
+	// message.updated; the lock order of M2-15 holds (messages, then components, ascending).
+	// Errors: internal outside a unit of work; the errors of the database and of messaging.
+	DisableAuthoredBy(ctx context.Context, authorID ids.ID) (int, error)
 }
 
 // CreateInteraction is the request of createInteraction (schema InteractionCreate).

@@ -536,8 +536,8 @@ func (a *Authorizer) loadRecheck(ctx context.Context, ref authz.CredentialRef, v
 }
 
 // checkRecheck passes every principal without the marker and refuses the marker of the check
-// without a request (R-AZ-29) outside its uses in this build: only agent.invoke (command.invoke
-// and interaction.create follow with M2-25) and push.deliver, the hint check of the worker
+// without a request (R-AZ-29) outside its uses in this build: only agent.invoke, command.invoke and
+// interaction.create (the re-check of the job runs.app_dispatch, M2-25 design note 8) and push.deliver, the hint check of the worker
 // consumer push and of the job notify.push_send (R-AZ-31, M3-19 design note 7); only a person, and
 // never with a session, device, token, installation, "view as" or acting for. Each violation is a
 // programming error of the server, never a decision (M2-08 design note 4).
@@ -545,8 +545,9 @@ func checkRecheck(p authorize.Principal, act authorize.Action) error {
 	if !authorize.IsRecheckPrincipal(p) {
 		return nil
 	}
-	if act != authorize.ActionAgentInvoke && act != authorize.ActionPushDeliver {
-		return internal("the re-check principal is allowed only with agent.invoke and push.deliver")
+	if act != authorize.ActionAgentInvoke && act != authorize.ActionPushDeliver && act != authorize.ActionCommandInvoke &&
+		act != authorize.ActionInteractionCreate {
+		return internal("the re-check principal is allowed only with agent.invoke, command.invoke, interaction.create and push.deliver")
 	}
 	if p.PrincipalKind() != domain.KindUser || p.PrincipalID().IsZero() || !p.SessionRef().IsZero() || !p.DeviceRef().IsZero() ||
 		!p.TokenRef().IsZero() || !p.InstallationRef().IsZero() || !p.ViewAsPerson().IsZero() || !p.ActingForPerson().IsZero() {
@@ -615,6 +616,11 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	r, found, err := a.eventTarget(ctx, act, r)
 	if err != nil || !found {
 		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
+	}
+	if p != nil && domain.IsAppReceive(string(act), p.PrincipalKind(), authorize.IsFilter(ctx)) {
+		// The receive rule of personal events for apps (M2-25 design note 4); request mode keeps
+		// AgentSelf, which refuses an app with subject_kind_not_allowed.
+		return a.authorizeAppReceive(ctx, p, r)
 	}
 	spec, req, preview, err := a.checkedAction(ctx, act, r)
 	if err != nil {

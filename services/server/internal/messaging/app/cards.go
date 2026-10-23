@@ -25,7 +25,7 @@ const (
 
 // cardRules applies the body rules of a card after the decoder (M2-15 design note 6 a) to the kind
 // of the request and returns whether it is a card: components require kind card, a card requires
-// a component, and only agents send cards (people: invalid; apps: not_enabled until M2-25).
+// a component, and only agents and apps send cards (people: invalid; M2-25).
 // run_id follows the answer rules of M2-19 for every kind; on a card it also binds the components.
 func cardRules(a actor.Actor, kind string, cmd messaging.CreateMessageCmd) (bool, error) {
 	card := kind == string(domain.KindCard)
@@ -39,14 +39,13 @@ func cardRules(a actor.Actor, kind string, cmd messaging.CreateMessageCmd) (bool
 		return false, nil
 	}
 	switch a.Kind {
-	case actor.KindAgent:
+	case actor.KindAgent, actor.KindApp:
+		// Apps send cards like agents (M2-25 design note 6); their components never trigger an
+		// agent (R-AZ-18).
 		return true, nil
-	case actor.KindApp:
-		// App components come with M2-25 (R-AZ-18).
-		return false, domain.NotEnabled("/components")
 	case actor.KindUser, actor.KindHost, actor.KindAnonymous:
 	}
-	return false, cardField("/components", domain.FieldInvalid, "only agents send cards")
+	return false, cardField("/components", domain.FieldInvalid, "only agents and apps send cards")
 }
 
 // cardField is a validation_failed with one field error.
@@ -213,6 +212,12 @@ func (s *Service) LockCard(ctx context.Context, messageID ids.ID) (messaging.Car
 		MessageID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, SpaceID: info.SpaceID, AuthorID: m.AuthorID,
 		AuthorKind: author.Kind, Kind: string(m.Kind), Deleted: !m.DeletedAt.IsZero(), Version: m.Version,
 	}, nil
+}
+
+// Authors implements messaging.Messages (M2-25): the authors of messageIDs from the store, without
+// an authorization.
+func (s *Service) Authors(ctx context.Context, messageIDs []ids.ID) (map[ids.ID]ids.ID, error) {
+	return s.d.Store.Authors(ctx, messageIDs)
 }
 
 // ComponentsChanged implements messaging.Messages (M2-15 design note 2 b): the version of the card

@@ -5,6 +5,8 @@ package sync
 import (
 	"context"
 	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
 // ConsumerName names a worker consumer of the event log: one row of event_consumer_cursors
@@ -62,12 +64,17 @@ type ConsumerLossHandler interface {
 }
 
 // LogReader reads single events of the event log for the delivery jobs of the worker consumers
-// (M2-26): the event of a pending delivery and the smallest retained seq. It reads without the
+// (M2-26) and the interaction address of apps (M2-25): the event of a pending delivery or of a
+// job by seq or id, and the smallest retained seq. It reads without the
 // visible-channel predicate like the consumers; the job checks the rights of its receiver before
 // it sends (R-AZ-11). Implementations read in the ambient transaction of ctx or on the pool.
 type LogReader interface {
 	// EventBySeq returns the event seq; found is false when it is not (or no longer) in the log.
 	EventBySeq(ctx context.Context, seq int64) (Event, bool, error)
+	// EventByID returns the event id; found is false when it is not (or no longer) in the log.
+	// The interaction address of an app (M2-25) names its event by id, because the job of a
+	// command or an interaction carries the id the app also sees as webhook-id.
+	EventByID(ctx context.Context, id ids.ID) (Event, bool, error)
 	// MinRetainedSeq returns min(seq) of event_log, 0 when it is empty.
 	MinRetainedSeq(ctx context.Context) (int64, error)
 }

@@ -236,9 +236,11 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 		return false, authorize.Decision{}, nil
 	}
 	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID, ev.AudiencePrincipalID)
-	if agentConsumer {
+	if agentConsumer || (a.Kind == actor.KindApp && !ev.AudiencePrincipalID.IsZero()) {
 		// The audience is matched above; for the consumer engine, which runs runs.Delivery before
 		// every invocation-bearing event, a receive action on the agent itself decides on it (M2-08).
+		// A personal event of an app (command.invoked, interaction.created) is decided on its
+		// audience too: authz admits the audience app with events:subscribe (M2-25 design note 4).
 		r.Event.AudienceID = ev.AudiencePrincipalID
 	}
 	d, err := az.Authorize(ctx, a, act, r)

@@ -43,7 +43,7 @@ func (s *PrincipalSource) WithApps(apps identity.AppInstallations) *PrincipalSou
 
 // Principal implements authz.PrincipalSource: ok is false for an unknown id. IsOwner reports an
 // active owners row whatever the status of the principal; AppInstallationActive an active
-// installation of an app, read on every call in the ambient transaction (M2-24 design note 11 b).
+// installation of an app and AppGrantedScopes its granted scopes, read on every call in the ambient transaction (M2-24 design note 11 b).
 // Errors: those of the Store and of the installations.
 func (s *PrincipalSource) Principal(ctx context.Context, id ids.ID) (authz.PrincipalFacts, bool, error) {
 	rec, found, err := s.store.Principal(ctx, id)
@@ -58,11 +58,14 @@ func (s *PrincipalSource) Principal(ctx context.Context, id ids.ID) (authz.Princ
 		IsOwner: rec.IsOwner,
 	}
 	if f.Kind == actor.KindApp {
-		_, active, err := s.apps.ActiveInstallation(ctx, id)
+		inst, active, err := s.apps.ActiveInstallation(ctx, id)
 		if err != nil {
 			return authz.PrincipalFacts{}, false, err
 		}
 		f.AppInstallationActive = active
+		if active {
+			f.AppGrantedScopes = slices.Clone(inst.GrantedScopes)
+		}
 	}
 	return f, true, nil
 }

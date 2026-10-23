@@ -133,6 +133,9 @@ func (s *Service) applyUpgrade(ctx context.Context, rec StoredApp, inst Installa
 		return err
 	}
 	attrs := upgradeAttrs(rec, inst, hash[:], domain.DiffManifests(old, p.m), p.next, cmd.Reason)
+	if err := s.upgradeCommands(ctx, rec.PrincipalID, old, p.m, attrs); err != nil {
+		return err
+	}
 	if err := s.record(ctx, authorize.ActionAppInstall, rec.PrincipalID, attrs); err != nil {
 		return err
 	}

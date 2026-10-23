@@ -255,6 +255,10 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 		return domain.Input{}, err
 	}
 	baseIn.Command = in.Command
+	if in.AppOwner, err = a.appOwnerFacts(ctx, s, spec, r, res, t); err != nil {
+		return domain.Input{}, err
+	}
+	baseIn.AppOwner = in.AppOwner
 	if in.Principal.ActingFor {
 		if in.BaseVisible, _, err = domain.Visible(baseIn); err != nil {
 			return domain.Input{}, err

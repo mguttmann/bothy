@@ -1,6 +1,6 @@
 # Module `runs`
 
-Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07).
+Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). The booking of costs in the finish, the cost columns and the metric `bothy.run.cost` (M2-22). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07). Commands and interactions of apps: the source port `AppDispatcher`, the app branches of `CommandExec`, `Interactions` and the autocompletion, `Interactions.DisableAuthoredBy` and the job `runs.app_dispatch` (M2-25).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -15,6 +15,7 @@ Trigger decision, runs and run document, steps, follow-ups, components, interact
 - M2-06: `domain/invocation.go` (claims, header constants, `ParseInvocationToken`, `CheckInvocationClaims`; it adds `kernel/jose` to the imports of the domain), `app/invocation.go` (`InvocationTokens` with `Issue` and `Verify`, the redacting `InvocationToken`) and `adapters/runstest` (the reference verifier, test support only).
 - M2-15: `interactions.go` (the port `Interactions` with `Create`, `Respond`, `UpdateComponent` and the DTOs `CreateInteraction`, `InteractionResult`, `RespondInteraction`, `UpdateComponent`, `Interaction`, `Component`); `domain/components.go` (`component.v1` as typed structs, `CheckCard` with the canonical bytes of the request hash, `CheckDefinition`, `SameDefinition`), `domain/values.go` (`CheckValues`, `SameValues`), `domain/interaction.go` (`EffectiveState`, `StateTransition`, `RouteInteraction`, `InteractionAuditDetails`, `InteractionCreatedPayload`); `app/components.go` (`CheckCard`, `AttachCard`, `ForMessages`, `UpdateComponent`), `app/interactions.go` (`Create`, `Respond`), `app/component_lifecycle.go` (`DisableRunComponents`, `Acceptor.OnMessageDeleted`, `ExpireComponents`) and `app/component_ports.go` (`ComponentRepository` and its row types); `adapters/messagingsource` (`Source`, the source ports of `messaging`), `adapters/jobs/component_expiry.go` (the job and `ComponentScheduler`), `adapters/postgres/components.go` with `queries/components.sql` and `queries/interactions.sql`, and the three handlers in `adapters/httpapi/interactions.go`. `FuzzCheckCard` and `FuzzCheckValues` sit next to the domain functions.
 - `internal/runs/adapters/postgres` (M2-05): the sqlc queries over `runs` and `run_steps` and `Repository`. `adapters/httpapi`: the four REST operations and the cursor codec. `adapters/otelmetrics`: the run metrics of signals.md 4.3 and the gauge `bothy.run.active`.
+- M2-25: `appdispatch.go` (the source port `AppDispatcher` with `AppWay`, `AppPost`, `AppAsk`, `AppOutcome` and the closed reason list `AppReasons`); `domain/appowner.go` (the target thread of an app command, the `CommandInvokedPayload` of an app owner, the map from `AppOutcome` to the next interaction state); `app/app_commands.go`, `app/app_interactions.go` and `app/app_autocomplete.go` (the app branches of `CommandExec` and `Interactions`), `app/app_dispatch.go` (the use case of the job), `app/components_authored.go` (`DisableAuthoredBy`); `adapters/jobs/app_dispatch.go` (the job `runs.app_dispatch`).
 
 ## Trigger decision
 
@@ -88,11 +89,11 @@ This package never yields `queued`, `working`, `done`, `cancelled` or `followup_
 
 ## Port (root package `internal/runs`)
 
-- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). M2-09: start, resume, renewal, wait, finish and cancel in `Runs`; M2-10 adds `Runs.Patch` and the delivery reads `LiveBox`. M2-15: `Interactions` (`interactions.go`: `Create` for `createInteraction`, `Respond` for `respondToInteraction`, `UpdateComponent` for `updateComponent`; the principal comes from the context). M2-16: `CommandExec` (`Autocomplete` and `AnswerAutocomplete` M2-17). Source port (M2-17): `AutocompleteRelay`.
-- Emits durable events (M2-08): `agent.invocation` (audience the agent, receive action `agent.events.consume`, resource the run without version, no token). M2-15: `interaction.created` (audience the card's agent, receive action `agent.events.consume`, resource the interaction without version, payload `InteractionCreatedPayload` with the values and without `response`).
+- Incoming (M2-05): `Runs` (reads). M2-08: `Delivery` (`delivery.go`: `Prepare`, `DeliveryInput`, `DeliveryOutcome`, `InvocationBearing`), called by the agent consumer engine of `gateway` (WebSocket and REST poll). M2-09: start, resume, renewal, wait, finish and cancel in `Runs`; M2-10 adds `Runs.Patch` and the delivery reads `LiveBox`. M2-15: `Interactions` (`interactions.go`: `Create` for `createInteraction`, `Respond` for `respondToInteraction`, `UpdateComponent` for `updateComponent`; the principal comes from the context). M2-16: `CommandExec` (`Autocomplete` and `AnswerAutocomplete` M2-17). M2-25: `Interactions.DisableAuthoredBy`, called by `apps` at `app.suspend` and `app.uninstall`. Source ports: `AutocompleteRelay` (M2-17), `AppDispatcher` (M2-25, implemented by `apps/adapters/appdispatch`).
+- Emits durable events (M2-08): `agent.invocation` (audience the agent, receive action `agent.events.consume`, resource the run without version, no token). M2-15: `interaction.created` (audience the card's agent, receive action `agent.events.consume`, resource the interaction without version, payload `InteractionCreatedPayload` with the values and without `response`). M2-25: `command.invoked` and `interaction.created` of app commands and app components with the owning app as audience, the same receive action (an app passes it with an active installation and `events:subscribe`, decided by `authz` in filter mode) and without `run_id`.
 - Emits in-tx events: none.
 - Subscribes (M2-05): `messaging.MessagePosted` (the acceptance, `app.Acceptor`, registered after the subscriber of sync). M2-09: kernel `authorize.AccessChanged` and `agents.AgentDisabled`. M2-15: `messaging.MessageDeleted` (`Acceptor.OnMessageDeleted`, registered after them). `chat.ChannelReadOnlySet` (M8-03): see "Run lifecycle after the delivery". M2-12: `agents.SessionAttached` (`Acceptor.OnSessionAttached`). M2-28: `billing.CostsReconciled` (`Acceptor.OnCostsReconciled`, registered last). Planned: `files.FileFinalized`.
-- Uses the ports `chat.Threads` (`Info`, `Locate`, `Create`; M2-15 `LockForMessageChange`), `chat.TriggerFacts`, `agents.Facts` (M2-15 `RunFacts.ComponentsAllowed`), `agents.Sessions` (`ForInvocation`, `AttachOnStart`, `CheckStartModel`; M2-12; `AddCost`, M2-22), `billing.Costs` (`ValidateReports`, `BookRun`; M2-22) and `messaging.Messages` (`CreateRunAnchor`, `SetTriggerState`, `TriggerMessageOf`; M2-12 `AppendSystemLine`; M2-15 `LockCard`, `ComponentsChanged`, `PrincipalOf`).
+- Uses the ports `chat.Threads` (`Info`, `Locate`, `Create`; M2-15 `LockForMessageChange`), `chat.TriggerFacts`, `agents.Facts` (M2-15 `RunFacts.ComponentsAllowed`), `agents.Sessions` (`ForInvocation`, `AttachOnStart`, `CheckStartModel`; M2-12; `AddCost`, M2-22), `billing.Costs` (`ValidateReports`, `BookRun`; M2-22) and `messaging.Messages` (`CreateRunAnchor`, `SetTriggerState`, `TriggerMessageOf`; M2-12 `AppendSystemLine`; M2-15 `LockCard`, `ComponentsChanged`, `PrincipalOf`; M2-25 `Authors`).
 - Implements source ports and cross-cutting ports: `agents.RunSource` (M2-12, `adapters/postgres.RunSource`), `messaging.ComponentReader` and `messaging.ComponentWriter` (M2-15, `adapters/messagingsource`), kernel `personaldata.Participant` (M7-06).
 
 ## Run lifecycle (M2-05)
@@ -170,7 +171,7 @@ The port `runs.Runs` gains `Start`, `Resume`, `RenewToken`, `AwaitInput`, `Finis
 
 **Ports.** Incoming `runs.Interactions` (`Create`, `Respond`, `UpdateComponent`). The source ports of `messaging` are implemented in `adapters/messagingsource`: `Source.Check` and `Source.Attach` (`messaging.ComponentWriter`, over `app.Service.CheckCard` and `AttachCard`) and `Source.ForMessages` (`messaging.ComponentReader`, one statement for all messages of an answer or page, in the ambient transaction when there is one). `internal/wire` builds the `Source` before the messaging module, which receives it, and binds it in `NewRuns`; an unbound source fails closed with an internal error (D-M2-15-25). The outgoing ports are `ComponentRepository` (`app/component_ports.go`, implemented by `adapters/postgres`), `CardMessages` (`messaging.Messages`: `LockCard`, `ComponentsChanged`, `PrincipalOf`), `ThreadLocker` (`chat.Threads.LockForMessageChange`) and `ComponentExpiryScheduler` (`adapters/jobs.ComponentScheduler` over `jobs.Inserter.InsertTx`, bound by `Runs.BindJobs`). Without `Deps.Components` the components are off: a card is refused, `ForMessages` returns none.
 
-**Card rules and error codes.** `CheckCard` (no database access) applies `component.v1` and the server fields: closed member sets per type, semantic icon names of `kernel/designkeys`, `kernel/textcheck` on every display text, `value` and `custom_id`, the keys `component.max_per_message`, `component.custom_id_max_chars`, `component.form_max_fields` and `component.default_ttl`; `400 validation_failed` with one `errors[]` entry per finding below `/components/<index>/...` and the codes `required`, `too_long`, `limit_reached` or `invalid` (`detail` names the rule, never the text). It returns the canonical bytes of the request hash `bothy-msg-v2` and the components as they will be stored (normalized definition with defaults). `AttachCard` (inside the unit of work of `createMessage`, after the message row) checks the request again, locks the run of `run_id` with `FOR SHARE` (an active run of the author in the message's thread, with the answers of M2-19: `400 validation_failed` with `run_mismatch` on `/run_id`, or `409 conflict` with `run_not_active` for an ended own run; D-M2-15-29), refuses `supports_components = false` with `403 feature_disabled` (`agents.RunFacts.ComponentsAllowed`), inserts the rows (`state = active`, `version = 1`, `run_id` the card's run; `messages.run_id` stays NULL) and schedules `runs.component_expiry` at the earliest `expires_at`. The body rules before it (`kind`, people and apps, `run_id` on other kinds) and the size rule belong to `messaging`.
+**Card rules and error codes.** `CheckCard` (no database access) applies `component.v1` and the server fields: closed member sets per type, semantic icon names of `kernel/designkeys`, `kernel/textcheck` on every display text, `value` and `custom_id`, the keys `component.max_per_message`, `component.custom_id_max_chars`, `component.form_max_fields` and `component.default_ttl`; `400 validation_failed` with one `errors[]` entry per finding below `/components/<index>/...` and the codes `required`, `too_long`, `limit_reached` or `invalid` (`detail` names the rule, never the text). It returns the canonical bytes of the request hash `bothy-msg-v2` and the components as they will be stored (normalized definition with defaults). `AttachCard` (inside the unit of work of `createMessage`, after the message row) checks the request again, locks the run of `run_id` with `FOR SHARE` (an active run of the author in the message's thread, with the answers of M2-19: `400 validation_failed` with `run_mismatch` on `/run_id`, or `409 conflict` with `run_not_active` for an ended own run; D-M2-15-29), refuses `supports_components = false` with `403 feature_disabled` (`agents.RunFacts.ComponentsAllowed`; an app author has no agents row and is not asked, M2-25), inserts the rows (`state = active`, `version = 1`, `run_id` the card's run; `messages.run_id` stays NULL) and schedules `runs.component_expiry` at the earliest `expires_at`. The body rules before it (`kind`, people and apps, `run_id` on other kinds) and the size rule belong to `messaging`.
 
 **`createInteraction` (`Create`).** `client_interaction_id` must be a UUIDv7 (`not_uuid_v7`). The component and its card are read without locks (unknown: `404`); one unit of work takes the locks below, answers a repetition (the person must still read the card, else `404`; the same `component_id` and `values` equal as JSON give `200` with `Idempotent-Replay`, anything else `422 idempotency_key_reuse`), decides `interaction.create` with `authorize.InteractionFacts` at stage `accept` from the locked rows (denials are audited by authz and mapped by `Decision.Err`: `component_inactive` as `409 component_used`), runs `CheckValues` (`interaction_values_invalid`) and the payload size rule (`too_long` on `/values`), and writes: the single-use rule (chosen `used` with `used_by` and `used_at`, the rest of the locked group `disabled`, each `version + 1`; a component without `single_use` stays unchanged, D-M2-15-13), the interaction in `received`, `ComponentsChanged` when a component changed, the run of `domain.RouteInteraction` (the component's run, or `Open` with `trigger_kind = interaction`, `TriggeringInteractionID`, the person as `TriggeredBy`), `interaction.created`, `agent.invocation` last for a new run (`triggered_by` through `Messages.PrincipalOf`) and the allow audit of an `approve_actions` component (`domain.InteractionAuditDetails`: IDs, `component_type`, `required_capability`, `restricted_to`, `choice` only for `once`, `session`, `always`, `deny`). A unique violation of the idempotency key (`ErrInteractionTaken`, only when the locks were bypassed) is answered like a repetition in a new unit of work.
 
@@ -186,7 +187,7 @@ The port `runs.Runs` gains `Start`, `Resume`, `RenewToken`, `AwaitInput`, `Finis
 
 **Job `runs.component_expiry`** (`adapters/jobs/component_expiry.go`, queue `maintenance`, args `ComponentExpiry{MessageID}` only, registered in every role, run by `worker` and `all`): scheduled per card at its earliest `expires_at`, never periodic. `ExpireComponents` locks the card (missing or deleted: done), locks its active components with `expires_at` at or before now in ascending id, sets them `expired` with `version + 1`, calls `ComponentsChanged` once if any changed and schedules itself for the next `expires_at`. Repeated execution is harmless; correctness never depends on the job, because `authorize` treats a passed `expires_at` as expired.
 
-**Visibility.** `message_components` and `interactions` have no `channel_id`: every query names the components of messages that `authorize` checked, that `messaging` loaded for an event of the same transaction, or that a job or the end of a run names (07 7.4 rule 1, `tools/lint/sql_visibility.yaml`). Form values live only in `interactions`; they leave the server only in the answers of `createInteraction`, in `interaction.created` and in the answer of `respondToInteraction` to the card's agent (SEC-T10).
+**Visibility.** `message_components` and `interactions` have no `channel_id`: every query names the components of messages that `authorize` checked, that `messaging` loaded for an event of the same transaction, or that a job or the end of a run names (07 7.4 rule 1, `tools/lint/sql_visibility.yaml`). Form values live only in `interactions`; they leave the server only in the answers of `createInteraction`, in `interaction.created` and in the answer of `respondToInteraction` to the card's agent or app, and for an app with `delivery.interactions_url` in the signed request to that address (M2-25; SEC-T10).
 
 ## Autocompletion (M2-17)
 
@@ -202,8 +203,8 @@ neither creates a run or a cost entry (R-AG-14).
   thread of a text channel, else none in a forum, R-AZ-26), then `command.autocomplete` in request
   mode at the permission version read once (`instance.Versions`) and the query rules
   (`domain.ValidateAutocompleteQuery`). An agent owner without a target thread gets an empty list
-  at once. An app command is `404` until M2-25, because `Resolve` hides it (D-M2-16-20); the
-  use case would answer an empty list for an app owner and the requirement already decides it. Otherwise the payload of `command.autocomplete_requested`
+  at once. An app owner takes the app branch (section "Commands and interactions of apps
+  (M2-25)" below). Otherwise, for an agent owner, the payload of `command.autocomplete_requested`
   (`400 validation_failed` with the field code `too_long` and an empty pointer above
   `sync.event_payload_max_bytes`), a fresh token with
   `trigger_kind = autocomplete`, no `run_id`, the command and the target thread
@@ -233,6 +234,133 @@ neither creates a run or a cost entry (R-AG-14).
   `internal/wire`, `BindAutocomplete`), `sync.event_payload_max_bytes`, `agent.invocation_token_ttl`.
 - Registrations: `runs.Register` declares the ephemeral `command.autocomplete_requested` and the op
   `command.autocomplete_result`, whose handler the gateway runs on `CommandExec`.
+
+## Commands and interactions of apps (M2-25)
+
+An installed app owns commands and components like an agent, and none of them ever reaches an
+agent: no run, no invocation token, no `trigger_state`, no `agent.invoke` and no I2 (09 sections
+10.4 and 11, 11 section 9, 05 section 5, R-AZ-18). The branch is chosen by the owner kind: an owner
+with an agents row is an agent, every other owner is an app. Rulings: docs/decisions.d/M2-25.md.
+
+**Source port `AppDispatcher`** (`appdispatch.go`; 02 4.1 point 4). `runs` declares it and
+`apps/adapters/appdispatch` implements it, because only `apps` reads the manifest, the event log and
+the egress client of the interaction address; `runs` imports neither `apps` nor `sync`.
+`internal/wire` binds it into `runs`.
+
+- `Way(ctx, appID)` gives an `AppWay`: `inactive` without an active installation,
+  `interactions_url` when the manifest declares `delivery.interactions_url`, `gateway` otherwise.
+  The way follows the manifest, not a live connection, so it is the same on every api node (OQ-07).
+- `Post(ctx, AppPost{AppID, EventID, ReplyThreadID})` sends a stored `command.invoked` or
+  `interaction.created` to the interaction address and writes a `200` reply as a message of the app
+  into `ReplyThreadID` (zero when there is none).
+- `Ask(ctx, AppAsk{AppID, Event, Deadline})` sends an ephemeral `command.autocomplete_requested`
+  and returns the choices of a valid `200` answer.
+- `AppOutcome` holds exactly one of `Answered`, `Deferred` (a `202`: the app answers later through
+  the API) and a `Reason` of the closed list `AppReasons`: `inactive`, `no_url`, `denied`,
+  `timeout`, `transport`, `blocked`, `redirect`, `http_status`, `too_large`, `invalid_reply`,
+  `no_thread`, `reply_refused`; `Choices` only for an answered `Ask`. Errors are returned only for
+  faults of the server (database, programming); every answer of the app is an outcome.
+
+**App commands** (`CommandExec.Invoke`, `app/app_commands.go`).
+
+1. `agents.Commands.Resolve` (`404` for an unknown, removed, not covered or shadowed command); a
+   given `thread_id` must be a thread of the channel (`404`, before `authorize`).
+2. Target thread (`domain/appowner.go`): the given thread, else the main thread of a text channel,
+   else none in a forum. No `auto_thread`: it exists to give an agent's run a thread.
+3. `command.invoke` in request mode on the channel with the target thread, `Resource.OwnerID` the
+   thread's creator and `CommandFacts{OwnerID: the app, OwnerKind: "app", RequiredLevel}`. `authz`
+   decides the visibility of the place, the app-owner guard (`AppOwnerReachable` on the facts of
+   the owning app: an active installation, `commands:write` and `write` on the channel; false gives
+   `404 not_found` like an unknown command), `required_level` and the read-only and archive rules;
+   never the `agent.invoke` guard. The answers map as for agent commands: `404 not_found`,
+   `403 channel_read_only`, `403 agent_invocation_denied` with `reason`. Agents and apps may run
+   an app command whose level they hold (spec gap reported).
+4. Option values through `domain.ValidateOptionValues` (`400 validation_failed`).
+5. One unit of work, joined with the idempotency stage: `command.invoked` (audience the app,
+   receive action `agent.events.consume`, resource `command` without version, payload without
+   `run_id`) and the job `runs.app_dispatch` through `jobs.Inserter.InsertTx`. No run, no token,
+   no `trigger_state` and no `run_active` rule; `control` is passed through and changes nothing.
+6. `202` with `CommandInvocation{invocation_id, command_id, channel_id, thread_id (with a target
+   thread), accepted: true}` and without `run_id`. A replay with the same `Idempotency-Key` answers
+   the stored answer without a second event or job.
+
+**App cards.** `messaging` accepts `kind = card` from an app (`message.create` with `write` and
+`messages:write`); `AttachCard` applies every card rule above except `supports_components`, which
+is not consulted for an app, and stores the components without a run. An app has no run, so a
+`run_id` on its card gives `400 validation_failed` with `run_mismatch` on `/run_id` (the answer
+of M2-19). Posting needs no `components:write`; without it the app's components are inactive.
+`updateComponent` and `respondToInteraction` by the app need app-self with `components:write` and
+the card's author as `OwnerID` (`403 scope_missing` without the scope). The card header is the
+author and `origin = app`, set by the server.
+
+**Interactions on app components** (`Interactions.Create`, `app/app_interactions.go`).
+`InteractionFacts{Stage: "accept", OwnerKind: "app"}` without `Invoke`, with the card's author
+as `OwnerID`; `authz` checks `Level(trigger)`, the read-only and archive rules, then state, expiry
+and the app-owner guard with `components:write` (any of them false: `component_inactive`,
+answered `409 component_used`), `required_capability` (`capability_missing`) and `restricted_to`
+(`owner` and `run_starter` pass only owners, because no run exists; `component_restricted`).
+Replay, locks, the single-use rule, the value checks and `message.updated` are those of agent
+cards. No run is opened or resumed; the unit appends `interaction.created` with the app as
+audience (never `agent.invocation`) and inserts `runs.app_dispatch` with kind `interaction`. The
+answer is `201` with `state = received` and without `run_id`.
+
+**Job `runs.app_dispatch`** (`adapters/jobs/app_dispatch.go`, use case `app/app_dispatch.go`, queue
+`default`, run by `worker` and `all`, paused in maintenance mode because it may write a reply).
+Inserted for every app command and every interaction on an app component, whatever the way of the
+app. The args are IDs only: the event, the app, the invoking principal and the installation of an
+invoking app, the channel, the thread, and the command or the interaction (whichever is set gives
+the kind; the kind of the invoker is read from the directory). The handler, in this order:
+
+1. `Way`: `gateway` returns (the event reaches the app through its connection, `listEvents` or a
+   webhook subscription, and an interaction stays `received` until `respondToInteraction`);
+   `inactive` sets an interaction `failed` (compare-and-swap from `received`) and returns.
+2. Re-check with the rights of this moment in filter mode, without audit: `command.invoke` with
+   the descriptor of the invocation, or `interaction.create` at stage `deliver`. A person is the
+   principal of a check without a request (`actor.Recheck`, R-AZ-29, which `authz` admits for
+   `command.invoke` and `interaction.create` too); an agent or app that ran an app command is
+   checked as itself, with its kind and installation from the args. A denial sends nothing, sets
+   an interaction `failed` and logs the reason `denied`.
+3. Interaction: compare-and-swap `received -> dispatched`; `dispatched` (a rerun) continues;
+   `acknowledged`, `failed` or `rejected` (set by `respondToInteraction`) end the job without a
+   request.
+4. `Post` outside every transaction, with the thread of the args as `ReplyThreadID`.
+5. Outcome to state (`domain/appowner.go`), each a compare-and-swap from `dispatched` in its own
+   short transaction: answered gives `acknowledged`, deferred keeps `dispatched`, every reason
+   gives `failed`; the component stays `used`. A command stores nothing; `apps` logs the outcome.
+6. After the request the handler always returns nil: one request, no repetition (09 section 1
+   point 5). A fault before the request (a database error, the keys; `Post` without
+   `runs.ErrAfterRequest`) returns an error and is retried within
+   River's default attempts, and a shutdown returns `ctx.Err()`; a repeated request carries the
+   same `webhook-id`, which the app uses as its idempotency key.
+
+Whichever of the job and `respondToInteraction` leaves `received` or `dispatched` first wins; the
+job's final change starts only from `dispatched`. The outcome reaches the person only through the
+stored state (spec gap reported).
+
+**Autocompletion for app commands** (`app/app_autocomplete.go`). After `command.autocomplete` in
+request mode (the app-owner guard as for `command.invoke`), the payload is built and the open
+request registered as for agents, without a token. `Way`: `interactions_url` calls `Ask` with the
+deadline the earlier of the end of the person's wait (`command.autocomplete_timeout`) and now plus
+`app.interaction_timeout`; answered gives the choices through the compare-and-swap to `answered`,
+deferred keeps waiting for `answerAutocomplete` or the op `command.autocomplete_result` until
+`command.autocomplete_timeout`, every other outcome expires the request at once with an empty
+list. `gateway` offers the event through `AutocompleteRelay.Ask` with an empty token to one live
+connection of the app (the live phase of an app starts with `ready`). `inactive` gives an empty
+list at once. The use case holds no transaction, so the request to the app runs inside the
+person's request; the person never waits longer than `command.autocomplete_timeout`. The app
+answers with `command.autocomplete.respond` (app-self, `commands:write`).
+
+**`DisableAuthoredBy`** (`Interactions.DisableAuthoredBy(ctx, authorID)`,
+`app/components_authored.go`). `apps` calls it at `app.suspend` and `app.uninstall` inside its
+unit of work; it calls no `authorize`, because the owner action was authorized. It reads the cards
+with `active` components without a run (`run_id IS NULL`), keeps those whose author is `authorID`
+(one batched `messaging.Messages.Authors`, which reads only the author and checks nothing), then
+per card in ascending message id `LockCard`, the card's active components `FOR UPDATE` in
+ascending id, each `disabled` with `version + 1`, and one `ComponentsChanged` (one
+`message.updated`). It returns the number of disabled components. The locks follow the lock order
+above, so a click racing it either wins or finds the component `disabled` (`409 component_used`).
+`app.resume` does not bring the components back.
+
 ## Live box (M2-10)
 
 The port `runs.Runs` gains `Patch` (REST `patchRun` in `adapters/httpapi/patch.go` and the gateway
@@ -564,6 +692,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 | `runs.component_expiry` | scheduled per card message at its earliest `expires_at`, not periodic (M2-15) | `maintenance` |
 | `runs.invocation_hold_timeout` | scheduled, `file.invocation_hold_max` (M3-07) or `voice.transcript_hold_max` | `default` |
 | `runs.queued_expiry` | scheduled, `run.queued_max_age` (M2-08) | `default` |
+| `runs.app_dispatch` | `InsertTx` on `command.invoked` and `interaction.created` for an app, one request, no retry after it (M2-25) | `default` |
 
 ## Notes for the build
 

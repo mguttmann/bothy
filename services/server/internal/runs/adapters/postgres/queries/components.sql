@@ -78,6 +78,19 @@ WHERE run_id = sqlc.arg(run_id) AND message_id = sqlc.arg(message_id) AND state 
 ORDER BY id
 FOR UPDATE;
 
+-- name: ActiveUnboundComponentMessages :many
+-- The card messages with active components that belong to no run, ascending: the candidates of
+-- DisableAuthoredBy when an app is suspended or uninstalled (an app card never has a run, M2-25).
+SELECT DISTINCT message_id FROM message_components
+WHERE run_id IS NULL AND state = 'active'
+ORDER BY message_id;
+
+-- name: LockActiveComponentsOfMessage :many
+SELECT * FROM message_components
+WHERE message_id = sqlc.arg(message_id) AND state = 'active'
+ORDER BY id
+FOR UPDATE;
+
 -- name: DeleteComponentsOfMessage :execrows
 -- The components of a deleted message; its interactions follow by cascade and
 -- runs.triggering_interaction_id becomes NULL (03 messages "Deletion ... deletes ... components").

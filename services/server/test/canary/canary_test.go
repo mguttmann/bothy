@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/OWNER/bothy/services/server/internal/wire"
+	"github.com/OWNER/bothy/services/server/test/apps/fakeapp"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -236,7 +237,8 @@ func scenario(t *testing.T) *scenarioResult {
 func runScenario(t *testing.T) *scenarioResult {
 	t.Helper()
 	idp := NewIDP(t, randomSecret())
-	r := StartRun(t, PushRunOptions(t, IDPRunOptions(idp)))
+	fake := fakeapp.Start(t, nil, interactionHost)
+	r := StartRun(t, AppWayOptions(PushRunOptions(t, IDPRunOptions(idp)), fake))
 	ctx := t.Context()
 	sc := NewScenario(ctx, r)
 	sc.content()
@@ -256,6 +258,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc.auth(idp)
 	sc.push()
 	sc.apps()
+	sc.appWay(fake)
 	sc.incomingWebhooks()
 	sc.hosts()
 	sc.terminalSessions()

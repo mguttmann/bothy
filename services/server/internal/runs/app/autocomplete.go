@@ -28,6 +28,9 @@ type AutocompleteConfig struct {
 	Timeout time.Duration `config:"command.autocomplete_timeout"`
 	// MaxChoices is command.autocomplete_max_choices, the most choices of one answer.
 	MaxChoices int `config:"command.autocomplete_max_choices"`
+	// InteractionTimeout is app.interaction_timeout: an app asked through its interaction address
+	// answers within it, and never later than the end of the person's wait (M2-25 design note 10).
+	InteractionTimeout time.Duration `config:"app.interaction_timeout"`
 }
 
 // AutocompleteDeps are the collaborators of autocompletion.
@@ -71,8 +74,9 @@ func (s *Service) BindAutocomplete(cfg AutocompleteConfig, d AutocompleteDeps) e
 	if d.Relay == nil {
 		return errors.New("runs: BindAutocomplete needs the relay")
 	}
-	if cfg.Timeout <= 0 || cfg.MaxChoices < 1 {
-		return errors.New("runs: command.autocomplete_timeout must be positive and command.autocomplete_max_choices at least 1")
+	if cfg.Timeout <= 0 || cfg.MaxChoices < 1 || cfg.InteractionTimeout <= 0 {
+		return errors.New("runs: command.autocomplete_timeout and app.interaction_timeout must be positive and " +
+			"command.autocomplete_max_choices at least 1")
 	}
 	if d.After == nil {
 		d.After = runtimeTimer
@@ -127,10 +131,13 @@ func (s *Service) Autocomplete(ctx context.Context, q runs.AutocompleteQuery) (r
 	if err := domain.ValidateAutocompleteQuery(optionDefs(c), q.Option, optionValues(q.Options)); err != nil {
 		return runs.AutocompleteResult{}, err
 	}
+	if c.OwnerKind == ownerKindApp {
+		// An app is asked over its way, without a token (M2-25 design note 10).
+		return s.askApp(ctx, b, c, q, ch.SpaceID, target)
+	}
 	if c.OwnerKind != ownerKindAgent || target.IsZero() {
-		// An app is asked through its interaction address from M2-25 on; a forum without a thread
-		// has no main thread for a token (R-AZ-26). The check above ran, so the empty list reveals
-		// nothing.
+		// A forum without a thread has no main thread for a token (R-AZ-26). The check above ran,
+		// so the empty list reveals nothing.
 		return emptyResult(), nil
 	}
 	return s.askOwner(ctx, b, issuer.issuer, c, q, ch.SpaceID, target, v)
@@ -162,7 +169,7 @@ func (s *Service) autocompletePlace(ctx context.Context, q runs.AutocompleteQuer
 func (s *Service) authorizeAutocomplete(ctx context.Context, c agents.Command, channel, target ids.ID) error {
 	r := authorize.Resource{
 		Kind: authorize.ResourceChannel, ID: channel, ThreadID: target,
-		Command: &authorize.CommandFacts{OwnerKind: c.OwnerKind, RequiredLevel: c.RequiredLevel},
+		Command: &authorize.CommandFacts{OwnerKind: c.OwnerKind, OwnerID: c.OwnerPrincipalID, RequiredLevel: c.RequiredLevel},
 	}
 	if c.OwnerKind == ownerKindAgent {
 		// A slash command addresses its owner explicitly, like a mention (09 section 10.3); no
@@ -236,14 +243,14 @@ func (s *Service) askOwner(ctx context.Context, b *autocompleteBox, issuer Token
 		}
 		return emptyResult(), nil
 	}
-	return b.wait(ctx, e)
+	return b.wait(ctx, e, b.cfg.Timeout)
 }
 
-// wait waits for the first accepted answer, the end of command.autocomplete_timeout or the end of
-// ctx (design note 6); every transition is a compare-and-swap under the mutex, so a timer that
-// fires after an answer won returns the answer's choices.
-func (b *autocompleteBox) wait(ctx context.Context, e *openRequest) (runs.AutocompleteResult, error) {
-	fire, stop := b.after(b.cfg.Timeout)
+// wait waits for the first accepted answer, the end of d (command.autocomplete_timeout, or what is
+// left of it) or the end of ctx (design note 6); every transition is a compare-and-swap under the
+// mutex, so a timer that fires after an answer won returns the answer's choices.
+func (b *autocompleteBox) wait(ctx context.Context, e *openRequest, d time.Duration) (runs.AutocompleteResult, error) {
+	fire, stop := b.after(d)
 	defer stop()
 	ctxEnded := false
 	select {

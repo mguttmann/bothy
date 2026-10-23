@@ -26,7 +26,8 @@ const moduleRuns = "runs"
 // runsWiring wires the runs module into the start step chat, after messaging, binds its
 // acting-for source into identity at the start of step sessions (SR9, M2-14), and wires its jobs
 // runs.queued_expiry (M2-08), runs.cancel_timeout and runs.stall_check (M2-09) and
-// runs.component_expiry (M2-15) and runs.invocation_hold_timeout (M3-07).
+// runs.component_expiry (M2-15), runs.invocation_hold_timeout (M3-07) and runs.app_dispatch
+// (M2-25).
 func runsWiring() moduleWiring {
 	return moduleWiring{
 		module: moduleRuns,
@@ -41,6 +42,7 @@ func runsWiring() moduleWiring {
 			s.mu.Unlock()
 			if rn != nil {
 				m.QueuedExpiry, m.RunsLifecycle, m.ComponentExpiry, m.InvocationHolds = rn.Service, rn.Service, rn.Service, rn.Service
+				m.AppDispatch = rn.Service
 			}
 			// runs.stall_check runs every agent.presence_timeout (M2-09, D-M2-09-19).
 			m.StallInterval = s.values.Duration(keyPresenceTimeout)

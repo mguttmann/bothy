@@ -55,7 +55,7 @@ var componentStates = []string{ComponentActive, ComponentUsed, ComponentExpired,
 type InteractionFacts struct {
 	// Stage is InteractionStageAccept or InteractionStageDeliver.
 	Stage string
-	// OwnerKind is the kind of the card's author: agent, or app (refused until M2-25).
+	// OwnerKind is the kind of the card's author: agent or app.
 	OwnerKind string
 	// ComponentState is the state of the component, read from the locked row.
 	ComponentState string
@@ -75,9 +75,14 @@ type InteractionFacts struct {
 
 // interactionGuard is the guard of interaction.create: the agent.invoke guard with the interaction
 // facts (brief M2-15 design note 8 b). Missing trigger or interaction facts, a stage other than
-// accept, a trigger of an agent other than the card's author and a card of an app (apps post no
-// cards before M2-25) are internal errors.
+// accept and a trigger of an agent other than the card's author are internal errors.
+//
+// A card of an app (M2-25 design note 3 d) takes appInteractionGuard instead: no agent.invoke rule
+// applies, because no agent runtime is involved (05 section 5, R-AZ-18).
 func interactionGuard(in *Input) (Decision, error) {
+	if in.Interaction != nil && in.Interaction.OwnerKind == KindApp {
+		return appInteractionGuard(in)
+	}
 	if in.Invoke == nil || in.Interaction == nil {
 		return Decision{}, internalError(actionInteractionCreate + " without its trigger or component")
 	}
@@ -91,10 +96,10 @@ func interactionGuard(in *Input) (Decision, error) {
 }
 
 // checkInteraction reports interaction facts that cannot be evaluated as an internal error: a
-// card whose author is not an agent, and a state, restriction or capability outside its list.
+// card whose author is neither an agent nor an app, and a state, restriction or capability outside its list.
 func checkInteraction(f *InteractionFacts) error {
-	if f.OwnerKind != KindAgent {
-		return internalError("interaction facts of a card whose author is not an agent")
+	if f.OwnerKind != KindAgent && f.OwnerKind != KindApp {
+		return internalError("interaction facts of a card whose author is neither an agent nor an app")
 	}
 	if !slices.Contains(componentStates, f.ComponentState) {
 		return internalError("interaction facts with an unknown component state")
@@ -151,4 +156,38 @@ func componentActive(f *InteractionFacts, now time.Time) bool {
 		return false
 	}
 	return f.ComponentRunID.IsZero() || f.ComponentRunActive
+}
+
+// appInteractionGuard is point 6 of 05 section 5 for a card of an app (brief M2-25 design note 3
+// d): the app-owner guard with components:write first, then the component rules. At stage accept
+// a false guard, a state other than active or a passed expiry give component_inactive; at both
+// stages a missing required capability gives capability_missing and a restriction the person does
+// not meet component_restricted (an app card has no run, so run_starter admits only owners). Stage
+// deliver is the re-check of the job runs.app_dispatch: the state is not checked (the interaction
+// already used the component), the guard is. Missing facts, trigger facts of an agent and a
+// component run of an app card are internal errors.
+func appInteractionGuard(in *Input) (Decision, error) {
+	f := in.Interaction
+	switch {
+	case in.AppOwner == nil:
+		return Decision{}, internalError(actionInteractionCreate + " of an app card without the facts of the app")
+	case in.Invoke != nil:
+		return Decision{}, internalError(actionInteractionCreate + " of an app card with the trigger of an agent")
+	case !f.ComponentRunID.IsZero():
+		return Decision{}, internalError(actionInteractionCreate + " of an app card bound to a run")
+	case f.Stage != InteractionStageAccept && f.Stage != InteractionStageDeliver:
+		return Decision{}, internalError(actionInteractionCreate + " with an unknown stage")
+	case in.AppOwner.ID != in.Resource.OwnerID:
+		return Decision{}, internalError(actionInteractionCreate + ": the facts of the app are not the card's author")
+	}
+	if err := checkInteraction(f); err != nil {
+		return Decision{}, err
+	}
+	if !AppOwnerReachable(*in.AppOwner, ScopeComponentsWrite) {
+		return deny(OutcomeForbidden, ReasonComponentInactive), nil
+	}
+	if r := componentRules(in, f); r != "" {
+		return deny(OutcomeForbidden, r), nil
+	}
+	return Allow, nil
 }
