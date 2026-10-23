@@ -174,7 +174,7 @@ func (r *Repository) ThreadsMatching(ctx context.Context, channels []ids.ID, f s
 func (r *Repository) ChannelsInSpaces(ctx context.Context, spaces []ids.ID) ([]ids.ID, error) {
 	rows, err := r.read(ctx).ChannelsInSpaces(ctx, uuids(spaces))
 	if err != nil {
-		return nil, mapError(err, "reading the channels of spaces")
+		return nil, searchError(ctx, err, "reading the channels of spaces")
 	}
 	return idList(rows), nil
 }
@@ -185,14 +185,14 @@ func (r *Repository) Labels(ctx context.Context, visibleSpaces, channels, thread
 	out := chat.Labels{Channels: map[ids.ID]chat.ChannelLabel{}, ThreadTitles: map[ids.ID]string{}}
 	crows, err := q.ChannelLabels(ctx, sqlcgen.ChannelLabelsParams{VisibleSpaceIds: uuids(visibleSpaces), ChannelIds: uuids(channels)})
 	if err != nil {
-		return chat.Labels{}, mapError(err, "reading the channel labels")
+		return chat.Labels{}, searchError(ctx, err, "reading the channel labels")
 	}
 	for _, row := range crows {
 		out.Channels[idOf(row.ID)] = chat.ChannelLabel{Name: row.Name, SpaceName: row.SpaceName}
 	}
 	trows, err := q.ThreadTitleLabels(ctx, sqlcgen.ThreadTitleLabelsParams{ChannelIds: uuids(channels), ThreadIds: uuids(threads)})
 	if err != nil {
-		return chat.Labels{}, mapError(err, "reading the thread labels")
+		return chat.Labels{}, searchError(ctx, err, "reading the thread labels")
 	}
 	for _, row := range trows {
 		out.ThreadTitles[idOf(row.ID)] = row.Title

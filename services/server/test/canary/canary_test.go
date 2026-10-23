@@ -241,6 +241,7 @@ func runScenario(t *testing.T) *scenarioResult {
 	sc := NewScenario(ctx, r)
 	sc.content()
 	sc.files()
+	sc.search()
 	sc.profileImages()
 	sc.behavior()
 	sc.runs()

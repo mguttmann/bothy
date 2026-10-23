@@ -44,7 +44,7 @@ func (s *server) startSearch(context.Context) error {
 		return errors.New("wire: search needs audit, the Authorizer, messaging, chat and files")
 	}
 	sr, err := NewSearch(cfg, langs.Languages(), pool, a.UoW(), az, SearchReads{
-		Messaging: m.Service.SearchReads(), Chat: c.Service.SearchReads(), Files: f.Service.SearchReads(),
+		Messaging: m.Service, Chat: c.Service, Files: f.Service,
 	}, s.deps.Clock, s.logger())
 	if err != nil {
 		return err

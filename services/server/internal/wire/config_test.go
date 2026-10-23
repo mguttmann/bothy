@@ -1173,6 +1173,54 @@ func TestSearchLocaleMapCheck(t *testing.T) {
 	}
 }
 
+// TestSearchConfig_StartChecks holds the checks search_page_size and search_headline_words
+// (D-M3-14-14): search.page_size_default above search.page_size_max and search.headline_min_words
+// at or above search.headline_max_words stop the start with both key names and no value; the
+// defaults and a minimum below the maximum pass. test/integration proves with a real ts_headline
+// call that PostgreSQL refuses the stopped pairs.
+func TestSearchConfig_StartChecks(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		env   []string
+		check string
+		keys  []string
+	}{
+		{env: []string{"BOTHY_SEARCH__PAGE_SIZE_DEFAULT=51"}, check: "search_page_size", keys: []string{"search.page_size_default", "search.page_size_max"}},
+		{env: []string{"BOTHY_SEARCH__PAGE_SIZE_DEFAULT=5", "BOTHY_SEARCH__PAGE_SIZE_MAX=4"}, check: "search_page_size",
+			keys: []string{"search.page_size_default", "search.page_size_max"}},
+		{env: []string{"BOTHY_SEARCH__HEADLINE_MIN_WORDS=30"}, check: "search_headline_words", keys: []string{"search.headline_min_words", "search.headline_max_words"}},
+		{env: []string{"BOTHY_SEARCH__HEADLINE_MIN_WORDS=31"}, check: "search_headline_words", keys: []string{"search.headline_min_words", "search.headline_max_words"}},
+		{env: []string{"BOTHY_SEARCH__PAGE_SIZE_DEFAULT=50", "BOTHY_SEARCH__HEADLINE_MIN_WORDS=29"}},
+		{},
+	} {
+		got := load(t, c.env...)
+		if c.check == "" {
+			if len(got) != 0 {
+				t.Errorf("%v: problems %v", c.env, got)
+			}
+			continue
+		}
+		if len(got) != 1 {
+			t.Errorf("%v: problems %v, want one of %s", c.env, got, c.check)
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, c.check+":") {
+			t.Errorf("%v: problem %q does not come from %s", c.env, msg, c.check)
+		}
+		for _, k := range c.keys {
+			if !strings.Contains(msg, k) {
+				t.Errorf("%v: problem %q does not name %s", c.env, msg, k)
+			}
+		}
+		for _, n := range []string{"51", "30", "31"} {
+			if strings.Contains(strings.ReplaceAll(msg, "search.", ""), " "+n) {
+				t.Errorf("%v: problem %q names a value", c.env, msg)
+			}
+		}
+	}
+}
+
 // TestConfig_PresenceTimeoutAboveHeartbeatInterval: agent.presence_timeout must be greater than
 // sync.heartbeat_interval (cross-check presence_timeout_above_heartbeat_interval, M2-20): equal
 // values abort the start with a problem naming both keys and no value.

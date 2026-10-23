@@ -51,10 +51,11 @@ type SearchReads interface {
 	// every thread. Errors as SearchThreadTitles.
 	ThreadsMatching(ctx context.Context, channelIDs []ids.ID, f searchkit.ThreadFilter) ([]ids.ID, error)
 	// ChannelsInSpaces returns the ids of the channels of spaceIDs, ascending; the caller passes
-	// only visible spaces. Errors: the database error.
+	// only visible spaces. Errors: searchkit.ErrTimeout at search.statement_timeout (it runs in
+	// the unit of the search), the context error when ctx ended, otherwise the database error.
 	ChannelsInSpaces(ctx context.Context, spaceIDs []ids.ID) ([]ids.ID, error)
 	// Labels returns the names of channelIDs whose space is in visibleSpaceIDs and the titles of
-	// threadIDs that lie in channelIDs. Errors: the database error.
+	// threadIDs that lie in channelIDs. Errors as ChannelsInSpaces.
 	Labels(ctx context.Context, visibleSpaceIDs, channelIDs, threadIDs []ids.ID) (Labels, error)
 	// HitThreads returns the threads threadIDs in the representation of getThread, in the order
 	// of threadIDs; an id that is missing or outside channelIDs is absent. It does not authorize.

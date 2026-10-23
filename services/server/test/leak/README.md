@@ -13,7 +13,7 @@ reveals a foreign channel, thread, message, space or agent.
 | `TestAZ_P4_TimingMedian` | AZ-P4 | same subtests: after a warm-up, interleaved samples of both IDs have medians within `authz.not_found_timing_tolerance` (read from `docs/operations/configuration.md`) |
 | `TestAZ_M52_ForeignMessageEqualsUnknown` | AZ-M52 | Alex reading a message of Marketing/Kampagnen gets the answer of a random ID |
 | `TestAZ_P5_ListsAndCountersMatchAuthorize` | AZ-P5 property 1 | on random worlds, for a person and an agent: every ID a surface names is readable by the per-item truth, events have a visible scope or `audience` self, unread and mention counts equal the model, no totals |
-| `TestAZ_P5_NoiseInvariance` | AZ-P5 property 2 | threads, messages, mentions, reactions and pins in unreadable channels leave every surface equal (without `head_seq`, `next_cursor`, cursor frames) |
+| `TestAZ_P5_NoiseInvariance` | AZ-P5 property 2 | threads, messages, mentions, reactions and pins in unreadable channels leave every surface equal (without `head_seq`, `next_cursor`, cursor frames; for the search the presence of `next_cursor` and `candidates_capped` stay compared, with `search.max_candidates` set low) |
 
 Unit tests: `TestNormalize*`, `TestSelectRoutes*`, `TestToleranceFromReference`,
 `TestWorldPlanReproducible`.
@@ -51,7 +51,10 @@ run uses that seed and the following ones.
 ## Not proven here
 
 - Timing on hosts other than the build host; the medians hold on the host that ran the test.
-- Search, facets, suggestions and "Running now" (AZ-P5 joins them with M2 and M3).
+- Facets, suggestions and "Running now" (AZ-P5 joins them with M2 and M3). The search (M3-14) is a
+  surface of both properties for messages and thread titles; the random worlds hold no attached
+  files, so the type `files` is collected but always empty there (files are covered by
+  `test/search`).
 - Routes with a `user_id` for a person as requester: every person is readable for a person
   (05 `user.read`), so there is no foreign instance; the agent requester covers them.
 - Mentions of the observed agent and thread-level operators in lists (07 7.2 "Limit").

@@ -255,6 +255,8 @@ attachments.
   The server splits the result at them into segments `[{text, match}]`. A text cannot contain the
   marker in advance; HTML in the content stays text. The default markers `<b>`
   would be unsafe, because `ts_headline` does not guarantee safe HTML output [Q2, verified].
+  The parser of `ts_headline` reads an HTML tag of the content as one token and puts a space in
+  its place in the excerpt; entities and every other text stay as they are (M3-14).
 
 ### 4.7 Paging
 
