@@ -524,34 +524,34 @@ Booking details (M2-22):
   recomputed after it is written: an entry booked `adapter_reported` or `unpriced` stays so when a
   price for its time is added later.
 - **Order in `finishRun`** (one unit of work):
-  1. Before the unit: the reports are validated (non-empty `provider` and `model` without control
-     or bidi characters, counts and `amount_micros` not negative and below `2^53`, `currency` of
-     the form `^[A-Z]{3}$`, no second report of the same `provider` and `model`); an error is
-     `400 validation_failed` with pointers `/costs/<i>/<field>` and changes nothing.
-  2. In the unit, after the run row is locked and the end decision is known: a repeat of the same
-     end state books nothing (06 section 2 "No effect"), so a retried `finishRun` never books twice;
-     only a real transition with a non-empty `costs` books. A run without `billing_mode_used` (it
-     never started) and a non-empty `costs` gives `400 validation_failed` with code `invalid` on
-     `/costs`, and the unit rolls back.
-  3. One clock reading is both `runs.finished_at` and `occurred_at` of every entry; the prices of
-     that time apply.
-  4. Copies: `agent_id` and `thread_id` of the run, `channel_id` and `space_id` of the thread at
-     this moment (no space in a DM channel), `agent_session_id` of the run when set,
-     `billing_mode = runs.billing_mode_used`.
-  5. Per report in order: the rows of `S` are read `FOR SHARE` in ascending `id` (03 section 6.3),
-     then one entry is inserted with `is_estimate = true` and without `reconciled_at` and
-     `supersedes_id`. Lock order of the unit: run row, price rows, session row.
-  6. The run columns take the booking in the same update as the transition, so `version` rises
-     once and the one `run.state_changed` carries the booked cost: `cost_micros` is the sum in the
-     currency of the first entry, `currency` that currency, `cost_is_estimate = true`; other
-     currencies stay only in `cost_entries` (spec gap: 03 `runs.currency` holds one currency). A
-     finish without `costs` or with an empty list leaves the cost columns as they were.
-  7. With a session, its sum grows per currency of the booking: a row with
-     `cumulative_cost_micros` and `cost_baseline_micros` both `0` first takes the booking's
-     currency; an amount in another currency is skipped (no conversion). `version` rises only when
-     a value changes; no `agent_session.changed` is written, because a booking is none of its
-     causes ([05-actions.md](05-actions.md) section 6).
-  8. After the commit, never inside, `bothy.run.cost` counts each entry.
+    1. Before the unit: the reports are validated (non-empty `provider` and `model` without control
+       or bidi characters, counts and `amount_micros` not negative and below `2^53`, `currency` of
+       the form `^[A-Z]{3}$`, no second report of the same `provider` and `model`); an error is
+       `400 validation_failed` with pointers `/costs/<i>/<field>` and changes nothing.
+    2. In the unit, after the run row is locked and the end decision is known: a repeat of the same
+       end state books nothing (06 section 2 "No effect"), so a retried `finishRun` never books twice;
+       only a real transition with a non-empty `costs` books. A run without `billing_mode_used` (it
+       never started) and a non-empty `costs` gives `400 validation_failed` with code `invalid` on
+       `/costs`, and the unit rolls back.
+    3. One clock reading is both `runs.finished_at` and `occurred_at` of every entry; the prices of
+       that time apply.
+    4. Copies: `agent_id` and `thread_id` of the run, `channel_id` and `space_id` of the thread at
+       this moment (no space in a DM channel), `agent_session_id` of the run when set,
+       `billing_mode = runs.billing_mode_used`.
+    5. Per report in order: the rows of `S` are read `FOR SHARE` in ascending `id` (03 section 6.3),
+       then one entry is inserted with `is_estimate = true` and without `reconciled_at` and
+       `supersedes_id`. Lock order of the unit: run row, price rows, session row.
+    6. The run columns take the booking in the same update as the transition, so `version` rises
+       once and the one `run.state_changed` carries the booked cost: `cost_micros` is the sum in the
+       currency of the first entry, `currency` that currency, `cost_is_estimate = true`; other
+       currencies stay only in `cost_entries` (spec gap: 03 `runs.currency` holds one currency). A
+       finish without `costs` or with an empty list leaves the cost columns as they were.
+    7. With a session, its sum grows per currency of the booking: a row with
+       `cumulative_cost_micros` and `cost_baseline_micros` both `0` first takes the booking's
+       currency; an amount in another currency is skipped (no conversion). `version` rises only when
+       a value changes; no `agent_session.changed` is written, because a booking is none of its
+       causes ([05-actions.md](05-actions.md) section 6).
+    8. After the commit, never inside, `bothy.run.cost` counts each entry.
 - **Server-ended runs** (`stale`, `interrupted`, `cancel_timeout`, `agent_disabled`,
   `access_revoked` without a later `run.finish` transition) get no entry: `run.finish` is the only
   source of the usage per model ([09-agents.md](09-agents.md) 4.10). The lost consumption is part
