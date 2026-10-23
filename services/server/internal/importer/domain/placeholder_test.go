@@ -29,7 +29,10 @@ func TestPlaceholderHandle(t *testing.T) {
 		{"Sam Example", 2, 32, "imported-sam-example-2"},
 		{"Sam Example", 3, 32, "imported-sam-example-3"},
 		{"  Robin!!__x  ", 1, 32, "imported-robin-__x"},
+		// Letters outside a to z are dropped (test input, not prose).
+		// language-check: off
 		{"Ünïcødé", 1, 32, "imported-n-c-d"},
+		// language-check: on
 		{"😀😀", 1, 32, "imported"},
 		{"😀😀", 2, 32, "imported-2"},
 		{"alex.example", 1, 32, "imported-alex.example"},
