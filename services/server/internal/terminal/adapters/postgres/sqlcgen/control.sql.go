@@ -11,37 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const closeSessionReported = `-- name: CloseSessionReported :execrows
-UPDATE terminal_sessions
-SET state = 'closed', closed_at = $1, close_reason = $2, close_detail = $3,
-    exit_code = $4, detached_at = NULL, version = version + 1
-WHERE id = $5 AND state <> 'closed'
-`
-
-type CloseSessionReportedParams struct {
-	ClosedAt    pgtype.Timestamptz
-	CloseReason pgtype.Text
-	CloseDetail pgtype.Text
-	ExitCode    pgtype.Int4
-	ID          pgtype.UUID
-}
-
-// Closes a session the host service ended (session.ended): reason, detail and exit code as
-// reported, detached_at cleared, version raised.
-func (q *Queries) CloseSessionReported(ctx context.Context, arg CloseSessionReportedParams) (int64, error) {
-	result, err := q.db.Exec(ctx, closeSessionReported,
-		arg.ClosedAt,
-		arg.CloseReason,
-		arg.CloseDetail,
-		arg.ExitCode,
-		arg.ID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const detachSession = `-- name: DetachSession :execrows
 UPDATE terminal_sessions SET state = 'detached', detached_at = $1, version = version + 1
 WHERE id = $2 AND state = 'active'

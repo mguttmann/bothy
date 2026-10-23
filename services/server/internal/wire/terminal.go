@@ -30,6 +30,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
+	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/otelmetrics"
 	terminalpg "github.com/OWNER/bothy/services/server/internal/terminal/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/terminal/adapters/wsrelay"
 	terminalapp "github.com/OWNER/bothy/services/server/internal/terminal/app"
@@ -118,6 +119,27 @@ type Terminal struct {
 	Handlers *terminalhttp.Hosts
 	// Sessions are the REST handlers of the terminal sessions (M2-44).
 	Sessions *terminalhttp.TerminalSessions
+	// Metrics are the OpenTelemetry instruments of the module (M2-44, M2-46), created once per
+	// process by bindSessionMetrics; nil before.
+	Metrics *otelmetrics.Metrics
+}
+
+// bindSessionMetrics creates the instruments of the module once and binds the session instruments
+// of M2-46 (bothy.terminal.sessions.closed, sessions.active, hosts.connected): override replaces
+// them (a test seam), else the OpenTelemetry adapter on the global provider. Every role binds
+// them, because a worker commits ends too (terminal.sweep, authz.expiry_sweep).
+func (t *Terminal) bindSessionMetrics(override terminalapp.SessionMetrics) error {
+	om, err := otelmetrics.New(nil)
+	if err != nil {
+		return err
+	}
+	t.Metrics = om
+	var m terminalapp.SessionMetrics = om
+	if override != nil {
+		m = override
+	}
+	t.Service.BindSessionMetrics(m)
+	return nil
 }
 
 // NewTerminal builds the terminal module over pool with the unit of work uow, the Authorizer az,
@@ -136,7 +158,7 @@ func NewTerminal(cfg terminalapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 		Instance: instanceIdentity{state: instanceapp.NewState(instancepg.NewRepository(pool), uow)},
 		People:   people{dir: identityapp.NewDirectory(identitypg.NewRepository(pool))}, Presence: terminalapp.NoConnections{},
 		UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: terminalhttp.Cursors{}, Clock: clk,
-		StepUps: lateStepUps{id: id}, BeforeOpenCommit: beforeOpenCommit,
+		StepUps: lateStepUps{id: id}, AuthSessions: lateAuthSessions{id: id}, BeforeOpenCommit: beforeOpenCommit,
 	})
 	if err != nil {
 		return nil, err
@@ -169,6 +191,19 @@ func (l lateStepUps) ConsumeFresh(ctx context.Context, a actor.Actor) error {
 		return errs.New(errs.CodeInternalError, "wire: the step-ups of identity are not bound")
 	}
 	return l.id.StepUps.ConsumeFresh(ctx, a)
+}
+
+// lateAuthSessions binds terminal/app.AuthSessions to identity's Auth (identity.Auth.EndedSessions,
+// M2-46), which the sessions step of identity sets after the terminal module is built; before it
+// the read fails, so terminal.sweep fails closed.
+type lateAuthSessions struct{ id *Identity }
+
+// EndedSessions implements terminalapp.AuthSessions.
+func (l lateAuthSessions) EndedSessions(ctx context.Context, sessionIDs []ids.ID, at time.Time) ([]ids.ID, error) {
+	if l.id == nil || l.id.Sessions == nil {
+		return nil, errs.New(errs.CodeInternalError, "wire: the sessions of identity are not bound")
+	}
+	return l.id.Sessions.EndedSessions(ctx, sessionIDs, at)
 }
 
 // The route of the control connection of the host services (M2-43, asyncapi channel hostControl):
@@ -238,7 +273,7 @@ var hostSchemas = stdsync.OnceValues(func() (*httpserver.SchemaValidator, error)
 // terminal from keys, and the module closes and updates the links after its commits
 // (Service.BindControl). Errors: an invalid configuration value.
 func NewHostControl(cfg HostControlConfig, t *Terminal, publisher eventlog.EphemeralPublisher, keys terminalapp.TerminalKeys,
-	clk clock.Clock, log *slog.Logger) (*HostControl, error) {
+	clk clock.Clock, log *slog.Logger, limiter wsrelay.Limiter) (*HostControl, error) {
 	if t == nil || t.Service == nil {
 		return nil, errors.New("wire: the control connection needs the terminal module")
 	}
@@ -252,12 +287,13 @@ func NewHostControl(cfg HostControlConfig, t *Terminal, publisher eventlog.Ephem
 		ClockLeeway: cfg.ClockLeeway, IdleTimeout: cfg.IdleTimeout, DetachGrace: cfg.DetachGrace,
 		DuplicateProbeTimeout: cfg.DuplicateProbeTimeout, MaxFrameBytes: cfg.MaxFrameBytes, MaxJSONDepth: cfg.MaxJSONDepth,
 		OutboundQueueMax: cfg.OutboundQueueMax, WriteTimeout: cfg.WriteTimeout,
-	}, wsrelay.Deps{UseCases: t.Service, Links: links, Schemas: schemas, Clock: clk, Log: log})
+	}, wsrelay.Deps{UseCases: t.Service, Links: links, Schemas: schemas, Clock: clk, Log: log, Limiter: limiter})
 	if err != nil {
 		return nil, err
 	}
 	t.Service.BindKeys(keys)
 	links.Bind(t.Service, t.Service)
+	links.BindMetrics(t.Service.Instruments())
 	t.Service.BindControl(links)
 	return &HostControl{Links: links, Handler: h}, nil
 }

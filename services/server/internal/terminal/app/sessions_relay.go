@@ -63,7 +63,7 @@ func (s *Service) RelayOpenFailed(ctx context.Context, id ids.ID, detail domain.
 		if ses.State == domain.SessionClosed {
 			return nil
 		}
-		return s.endSession(ctx, ses, domain.HostSessionEnd{Reason: domain.CloseOpenFailed, Detail: detail}, true)
+		return s.endSession(ctx, ses, domain.End{Reason: domain.CloseOpenFailed, Detail: detail, Source: domain.EndByServer})
 	})
 }
 
@@ -77,6 +77,13 @@ func (s *Service) RelayCounters(ctx context.Context, id ids.ID, c Counts) error 
 	return s.d.UoW.Do(system(ctx), func(ctx context.Context) error {
 		return s.d.Store.AddCounters(ctx, id, c.In, c.Out, c.LastInput)
 	})
+}
+
+// RelayEnd ends the session id at a limit of the relay (idle_timeout, max_duration or
+// detach_expired, M2-46 Design note 7) through the one end function with source server and the
+// counts the relay had not written yet; a session that is already closed changes nothing.
+func (s *Service) RelayEnd(ctx context.Context, id ids.ID, reason domain.CloseReason, p domain.Progress) error {
+	return s.EndSession(ctx, SessionSelector{SessionID: id}, domain.End{Reason: reason, Source: domain.EndByServer, Progress: &p})
 }
 
 // RelayUnpaired counts bothy.terminal.relay.unpaired once with side (D-W-105).

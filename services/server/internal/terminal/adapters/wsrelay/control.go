@@ -80,6 +80,9 @@ type Deps struct {
 	Clock clock.Clock
 	// Log receives panics and internal errors without content; nil means slog.Default().
 	Log *slog.Logger
+	// Limiter applies rl.host after the proof check and rl.public_auth to failed proofs (M2-46);
+	// nil means NoLimiter.
+	Limiter Limiter
 }
 
 // Handler is the HTTP handler of GET /api/v1/hosts/connect (asyncapi channel hostControl, 24
@@ -111,6 +114,9 @@ func NewHandler(cfg Config, d Deps) (*Handler, error) {
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()
+	}
+	if d.Limiter == nil {
+		d.Limiter = NoLimiter{}
 	}
 	return &Handler{cfg: cfg, d: d}, nil
 }
@@ -288,13 +294,27 @@ func (c *conn) identify(ctx context.Context, data bool) (app.Login, app.Identify
 	}
 	in := identifyOf(f.d.(*rest.HostIdentify))
 	in.Data = data
+	// A failed proof consumes one token of rl.public_auth of the client address; with the bucket
+	// empty nothing is checked (02 section 9.1, M2-46 Design note 10 c).
+	ok, retry, settle := h.d.Limiter.ReserveCredentials(clientIP(ctx))
+	if !ok {
+		k.closeReason(domain.CodeRateLimited, retryText(retry))
+		return app.Login{}, app.Identify{}, false
+	}
 	l, code, err := h.d.UseCases.Authenticate(ctx, app.Exchange{Challenge: challenge, HelloAt: helloAt}, in)
+	settle(err == nil && failedHostProof(code))
 	switch {
 	case err != nil:
 		c.fail(ctx)
 		return app.Login{}, app.Identify{}, false
 	case code != 0:
 		k.close(code)
+		return app.Login{}, app.Identify{}, false
+	}
+	// rl.host counts per host after the proof check, so nobody drains the bucket of a foreign host
+	// (05 section 3, M2-46 Design note 10 b).
+	if ok, retry := h.d.Limiter.AllowHost(l.HostID); !ok {
+		k.closeReason(domain.CodeRateLimited, retryText(retry))
 		return app.Login{}, app.Identify{}, false
 	}
 	return l, in, true

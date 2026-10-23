@@ -269,7 +269,8 @@ func TestCrossNode_CloseReachesRelayAndControl(t *testing.T) {
 	}, "process_exited")
 	_, svc := c.worker()
 	check("worker_end", func(s string) {
-		if err := svc.RelayOpenFailed(context.Background(), ids.MustParse(s), ""); err != nil {
+		// open_failed carries a detail (the pair rule of 24 10.3, D-M2-46-2).
+		if err := svc.RelayOpenFailed(context.Background(), ids.MustParse(s), domain.DetailOpenTimeout); err != nil {
 			c.t.Fatal(err)
 		}
 	}, "open_failed")

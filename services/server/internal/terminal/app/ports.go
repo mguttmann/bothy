@@ -56,9 +56,29 @@ type Store interface {
 	// LockOpenSessions returns the sessions of hostID that are not closed, of userID or of every
 	// person (zero userID), locked in ascending id.
 	LockOpenSessions(ctx context.Context, hostID, userID ids.ID) ([]domain.Session, error)
-	// CloseSession closes the session id as the server with reason at at: closed_at,
-	// close_reason, detached_at cleared, no detail, no closer, version raised.
-	CloseSession(ctx context.Context, id ids.ID, reason domain.CloseReason, at time.Time) error
+	// EndSession closes the session id with end at at (M2-46, the one closing statement of the
+	// module): closed_at, close_reason, close_detail, exit_code and closed_by of end (the caller
+	// normalized and validated it), the counts of end.Progress added once and last_input_at moved
+	// only forward, detached_at cleared, version raised. A session that is already closed changes no
+	// row: kind internal.
+	EndSession(ctx context.Context, id ids.ID, end domain.End, at time.Time) error
+	// LockOpenSessionsOfUsers returns the sessions of the people that are not closed, locked in
+	// ascending id (M2-46).
+	LockOpenSessionsOfUsers(ctx context.Context, userIDs []ids.ID) ([]domain.Session, error)
+	// LockOpenSessionsOfDevice returns the sessions that are not closed whose current device is
+	// deviceID, locked in ascending id (M2-46).
+	LockOpenSessionsOfDevice(ctx context.Context, deviceID ids.ID) ([]domain.Session, error)
+	// LockOpenSessionsOfAuthSessions returns the sessions that are not closed of the login sessions,
+	// locked in ascending id (M2-46).
+	LockOpenSessionsOfAuthSessions(ctx context.Context, authSessionIDs []ids.ID) ([]domain.Session, error)
+	// SweepCandidates returns every session that is not closed with the state of its host, without
+	// a lock, ascending (terminal.sweep, M2-46).
+	SweepCandidates(ctx context.Context) ([]SweepCandidate, error)
+	// LockPersonForOpen takes the person lock of an opening (an advisory lock until the end of the
+	// transaction, M2-46 Design note 9).
+	LockPersonForOpen(ctx context.Context, userID ids.ID) error
+	// CountOpenSessions returns the sessions that are not closed of userID and of hostID (M2-46).
+	CountOpenSessions(ctx context.Context, userID, hostID ids.ID) (ofPerson, ofHost int, err error)
 	// UpdateLlmCredentials writes the declaration d of the host id with llm_credentials_declared_by
 	// = by, llm_credentials_declared_at = at and version; credential_holder_id is NULL unless
 	// personal (M2-40).
@@ -105,9 +125,6 @@ type Store interface {
 	StartSession(ctx context.Context, id ids.ID, at time.Time) error
 	// DetachSession turns the active session id detached with detached_at = at.
 	DetachSession(ctx context.Context, id ids.ID, at time.Time) error
-	// CloseSessionReported closes the session id as the host service ended it: reason, detail
-	// and exit code of end, closed_at = at, detached_at cleared, version raised.
-	CloseSessionReported(ctx context.Context, id ids.ID, end domain.HostSessionEnd, at time.Time) error
 	// InsertSession inserts the session s in opening with the columns of its grant (M2-44).
 	InsertSession(ctx context.Context, s domain.Session) error
 	// Session returns the session id without a lock; found is false for an unknown id (M2-44).
@@ -120,9 +137,6 @@ type Store interface {
 	// AddCounters adds the counts of one pairing to bytes_in and bytes_out and moves last_input_at
 	// forward (zero lastInput leaves it), without an event and without a new version (M2-44).
 	AddCounters(ctx context.Context, id ids.ID, in, out int64, lastInput time.Time) error
-	// CloseSessionByPerson closes the session id as the person by ended it: reason, closed_by,
-	// closed_at = at, no detail, detached_at cleared, version raised (M2-44).
-	CloseSessionByPerson(ctx context.Context, id ids.ID, reason domain.CloseReason, by ids.ID, at time.Time) error
 	// ListSessions returns up to limit sessions in descending id below beforeID (zero: from the
 	// top), of userID (zero: everyone), of hostID (zero: every host) and in state ("": any) (M2-44).
 	ListSessions(ctx context.Context, userID, hostID ids.ID, state string, beforeID ids.ID, limit int) ([]domain.Session, error)
@@ -131,6 +145,14 @@ type Store interface {
 	// HostStatesByIDs returns state and disabled_reason of the hosts of list that exist, ordered by
 	// id (M2-47, the reconciliation after a lost listener).
 	HostStatesByIDs(ctx context.Context, list []ids.ID) ([]HostState, error)
+}
+
+// SweepCandidate is one session that is not closed as terminal.sweep reads it (M2-46): the session,
+// its login session, the state of its host and whether the host reports require_local_confirm.
+type SweepCandidate struct {
+	SessionID, AuthSessionID ids.ID
+	HostState                string
+	LocalConfirm             bool
 }
 
 // PairingWrite is what host.pair stores (M2-41, Design note 3h): the checked keys, the

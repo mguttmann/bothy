@@ -143,6 +143,14 @@ type Deps struct {
 	// FilesImageHooks are the test seams of the job files.thumbnail (app.ImageHooks, ADR 0071),
 	// for the integration tests of M3-06; nil in production.
 	FilesImageHooks *filesapp.ImageHooks
+	// JobModules receives the use cases of the jobs before the registry is built (M2-46): a test
+	// runs a job handler directly (authz.expiry_sweep, terminal.sweep) instead of waiting for its
+	// period. nil in production.
+	JobModules func(*JobModules)
+	// TerminalSessionMetrics replaces the session instruments of M2-46 (sessions.closed,
+	// sessions.active, hosts.connected), so a test counts them per process. nil creates the
+	// OpenTelemetry adapter.
+	TerminalSessionMetrics terminalapp.SessionMetrics
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -816,6 +824,9 @@ func (s *server) startJobs(ctx context.Context) error {
 	var modules JobModules
 	if err := s.moduleJobs(&modules); err != nil {
 		return err
+	}
+	if s.deps.JobModules != nil {
+		s.deps.JobModules(&modules)
 	}
 	reg, err := NewJobRegistry(&modules)
 	if err != nil {

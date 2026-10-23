@@ -829,15 +829,15 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server | duration | `15m` | this long a detached session stays attachable | active |
 | `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | duration | `60s` | Reattach from the same device without a new step-up within this time after the detach | active |
 | `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server | duration | `30m` | without input from the device for this long, the session ends | active |
-| `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server |  | `2m` | Extra time after which the server itself ends the session because of idleness | planned (M2) |
-| `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server |  | `12h` | Maximum duration of a session | planned (M2) |
-| `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server |  | `5` | open sessions per person | planned (M2) |
-| `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server |  | `10` | open sessions per host | planned (M2) |
+| `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server | duration | `2m` | Extra time after which the server itself ends the session because of idleness | active |
+| `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server | duration | `12h` | Maximum duration of a session | active |
+| `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server | int | `5` | open sessions per person | active |
+| `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server | int | `10` | open sessions per host | active |
 | `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | int | `262144` | Buffer of the relay per direction and session | active |
 | `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | duration | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) | active |
 | `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | int | `3` | missing heartbeats until the control connection is closed | active |
 | `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | duration | `10s` | Deadline between `hello` and `identify` of the control and data connection | active |
-| `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server |  | `30s` | Interval of the job `terminal.sweep` ([02-architecture.md](../spec/02-architecture.md), section 12.3) | planned (M2) |
+| `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server | duration | `30s` | Interval of the job `terminal.sweep` ([02-architecture.md](../spec/02-architecture.md), section 12.3) | active |
 | `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server | duration | `5s` | this long the server waits for the answer of the older control connection (3.4) | active |
 | `host_service.state_dir` |  | Host service |  | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | State directory with the keys of the host, the bindings of the session users to people and, with `organization`, the API key of the profile `claude`; also the pairing record and the last declaration from `ready`, both without secrets (D-M2-42-4); never a subscription login (7.4) |  |
 | `host_service.auth_status_timeout` |  | Host service |  | `30s` | bound of one call of `claude auth status` and of the login shell probe of HD6; a timeout gives `auth_status_unknown` (7.4, D-M2-42-3) |  |

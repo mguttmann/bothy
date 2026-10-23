@@ -25,11 +25,13 @@ import (
 	"testing"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
-	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
+	"github.com/OWNER/bothy/services/server/test/harness"
 	"github.com/OWNER/bothy/services/server/test/terminalworld"
 )
 
-func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
+// TestMain migrates the pgtest templates like bothy migrate up (harness.Main): the full-server
+// harness of the M2-46 tests needs the instance row the migration steps write.
+func TestMain(m *testing.M) { os.Exit(harness.Main(m)) }
 
 // buildHost builds bothy-host from the host module next to this one.
 func buildHost(t *testing.T) string {

@@ -22,6 +22,39 @@ func (q *Queries) ClearSessionStepUp(ctx context.Context, id pgtype.UUID) error 
 	return err
 }
 
+const endedAuthSessions = `-- name: EndedAuthSessions :many
+SELECT id FROM auth_sessions
+WHERE id = ANY($1::uuid[]) AND (revoked_at IS NOT NULL OR expires_at <= $2)
+ORDER BY id
+`
+
+type EndedAuthSessionsParams struct {
+	Ids []pgtype.UUID
+	At  pgtype.Timestamptz
+}
+
+// The sessions among ids that ended by at: revoked, or expires_at not after at (M2-46, the job
+// terminal.sweep). Unknown ids give no row.
+func (q *Queries) EndedAuthSessions(ctx context.Context, arg EndedAuthSessionsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, endedAuthSessions, arg.Ids, arg.At)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAuthState = `-- name: GetAuthState :one
 SELECT s.id, s.user_id, s.device_id, s.client_component, s.parent_session_id, s.identity_id, s.auth_method, s.cookie_hash, s.created_at, s.expires_at, s.step_up_at, s.step_up_method, s.step_up_consumed_at, s.last_seen_at, s.last_ip, s.revoked_at, s.revoke_reason, s.view_as_user_id, s.view_as_started_at,
        d.state        AS device_state,

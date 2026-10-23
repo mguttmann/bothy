@@ -49,6 +49,8 @@ type Scenario struct {
 	consoleCookie *http.Cookie
 	ownerLogin    oidctest.Login
 	lastRaw       map[string]any
+	// TerminalIO is what the terminal step with Noise saw (scenario_terminal.go).
+	TerminalIO TerminalIO
 }
 
 // harnessResponse is the response of a step.

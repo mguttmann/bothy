@@ -117,7 +117,7 @@ func (s *Service) attachUnit(ctx context.Context, p actor.Actor, h domain.Host, 
 	if err != nil {
 		return terminal.Grant{}, err
 	}
-	ses.DeviceID, ses.AuthSessionID, ses.TokenJTI = p.DeviceID, p.SessionID, ids.New()
+	ses.DeviceID, ses.AuthSessionID, ses.TokenJTI = p.DeviceID, p.SessionID, s.idgen.New()
 	if err := s.d.Store.AttachSession(ctx, ses.ID, ses.DeviceID, ses.AuthSessionID, ses.TokenJTI); err != nil {
 		return terminal.Grant{}, err
 	}

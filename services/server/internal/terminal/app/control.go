@@ -252,7 +252,7 @@ func (s *Service) reconcile(ctx context.Context, hostID ids.ID, live []ids.ID) (
 		if !slices.Contains(rec.End, ses.ID) {
 			continue
 		}
-		if err := s.endSession(ctx, ses, domain.HostSessionEnd{Reason: domain.CloseHostRestarted}, false); err != nil {
+		if err := s.endSession(ctx, ses, domain.ServerEnd(domain.CloseHostRestarted)); err != nil {
 			return nil, err
 		}
 	}
@@ -479,7 +479,7 @@ func (s *Service) endNonOwners(ctx context.Context, hostID ids.ID) ([]ids.ID, er
 		if !slices.Contains(end, ses.ID) {
 			continue
 		}
-		if err := s.endSession(ctx, ses, domain.HostSessionEnd{Reason: domain.CloseAccessRevoked}, false); err != nil {
+		if err := s.endSession(ctx, ses, domain.ServerEnd(domain.CloseAccessRevoked)); err != nil {
 			return nil, err
 		}
 	}
@@ -584,7 +584,7 @@ func (s *Service) SessionEnded(ctx context.Context, l Login, sessionID ids.ID, e
 		case !found || ses.HostID != l.HostID:
 			out = foreign(sessionID)
 		case ses.State != domain.SessionClosed:
-			return s.endSession(ctx, ses, end, true)
+			return s.endSession(ctx, ses, domain.HostEnd(end))
 		}
 		return nil
 	})
@@ -641,7 +641,7 @@ func (s *Service) duplicateTransition(ctx context.Context, h domain.Host, r doma
 	if err := s.d.Store.UpdateHost(ctx, h.Apply(r, s.d.Clock.Now())); err != nil {
 		return err
 	}
-	_, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID}, r.CloseReason)
+	_, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID}, domain.ServerEnd(r.CloseReason))
 	return err
 }
 

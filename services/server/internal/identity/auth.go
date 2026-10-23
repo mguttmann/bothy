@@ -248,4 +248,12 @@ type Auth interface {
 	// gives an actor without session, device or key (DeviceState unknown). Errors: only store
 	// failures. Example: a, err := auth.SessionActor(ctx, ticket.PrincipalID, ticket.SessionID).
 	SessionActor(ctx context.Context, userID, sessionID ids.ID) (actor.Actor, error)
+	// EndedSessions returns those of sessionIDs that ended by at: revoked (revoked_at set), or
+	// with expires_at not after at, ascending; unknown ids are absent and an empty list gives nil
+	// without a query. A system read for the job terminal.sweep (M2-46 design note 8 c), so it
+	// authorizes nothing; it reads in the ambient transaction of ctx when there is one. It follows
+	// the columns of auth_sessions only: a revocation of a parent revokes its children in the same
+	// step, so a child of a revoked parent is revoked itself. Errors: only store failures.
+	// Example: ended, err := auth.EndedSessions(ctx, []ids.ID{a, b}, now).
+	EndedSessions(ctx context.Context, sessionIDs []ids.ID, at time.Time) ([]ids.ID, error)
 }

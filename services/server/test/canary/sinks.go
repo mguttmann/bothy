@@ -31,6 +31,10 @@ const (
 	// SinkForeign is 6: frames, event pages and snapshots of observers without read permission
 	// on the scenario's scopes.
 	SinkForeign Sink = "foreign"
+	// SinkRelay is 7 (M2-46): the raw binary WebSocket messages the device and the Fake-Host of the
+	// terminal step sent and received, what passed the relay; the terminal content is encrypted
+	// end to end, so no value of any class may appear there.
+	SinkRelay Sink = "relay"
 )
 
 // Field is one text of a record at a location: an attribute key, a JSON pointer or a header

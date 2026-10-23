@@ -156,7 +156,7 @@ func (s *Service) ApplyLlmDeclaration(ctx context.Context, h domain.Host, d doma
 	if !domain.EndsForeignSessions(before, d) {
 		return next, 0, nil
 	}
-	n, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID, ExceptUserID: d.HolderID}, domain.CloseI6Violation)
+	n, err := s.EndSessions(ctx, SessionSelector{HostID: h.ID, ExceptUserID: d.HolderID}, domain.ServerEnd(domain.CloseI6Violation))
 	if err != nil {
 		return domain.Host{}, 0, err
 	}
