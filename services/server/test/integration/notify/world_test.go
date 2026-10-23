@@ -589,10 +589,10 @@ func (w *world) build() {
 		`","level":"trigger","capabilities":["upload"],"reason":"Marketing"`)
 	w.g3 = w.grant(`"subject_kind":"user","subject_id":"` + w.robin.String() + `","target_kind":"channel","target_id":"` + w.projektA.String() +
 		`","level":"trigger","capabilities":["upload"],"expires_at":"2026-12-31T00:00:00Z","reason":"Project work"`)
-	g := w.want(w.do("owner", http.MethodPost, "/api/v1/groups", `{"name":"Leser"}`, key()...), http.StatusCreated, "")
+	g := w.want(w.do("owner", http.MethodPost, "/api/v1/groups", `{"name":"Leser"}`, key()...), http.StatusCreated)
 	w.leser = ids.MustParse(g["id"].(string))
 	w.want(w.do("owner", http.MethodPost, "/api/v1/groups/"+w.leser.String()+"/members", `{"user_id":"`+w.sam.String()+
-		`","expires_at":"2026-11-30T00:00:00Z"}`, key()...), http.StatusCreated, "")
+		`","expires_at":"2026-11-30T00:00:00Z"}`, key()...), http.StatusCreated)
 	w.g4 = w.grant(`"subject_kind":"group","subject_id":"` + w.leser.String() + `","target_kind":"channel","target_id":"` + w.allgemein.String() +
 		`","level":"read","reason":"Readers"`)
 	w.g5 = w.grant(`"subject_kind":"agent","subject_id":"` + w.lotse.String() + `","target_kind":"space","target_id":"` + w.support.String() +
@@ -659,13 +659,6 @@ func (w *world) setActor(name string, a actor.Actor) {
 	w.actors.Set(name, a)
 }
 
-// actor returns the principal registered under name.
-func (w *world) actor(name string) actor.Actor {
-	w.actorsMu.Lock()
-	defer w.actorsMu.Unlock()
-	return w.acts[name]
-}
-
 // person inserts an active person, with owner an active owners row, and registers the token name
 // for it in a session with a fresh step-up.
 func (w *world) person(name string, owner bool) ids.ID {
@@ -700,18 +693,11 @@ func (w *world) do(name, method, path, body string, headers ...string) *httpserv
 	return w.h.Do(w.h.NewRequest(method, path, body, headers...))
 }
 
-// want checks status and, for a problem, its code; it returns the decoded body.
-func (w *world) want(r *httpservertest.Response, status int, code string) map[string]any {
+// want checks status and returns the decoded body.
+func (w *world) want(r *httpservertest.Response, status int) map[string]any {
 	w.t.Helper()
 	if r.StatusCode != status {
 		w.t.Fatalf("status %d, want %d: %s", r.StatusCode, status, r.Body)
-	}
-	if code != "" {
-		p := r.Problem(w.t)
-		if p["code"] != code {
-			w.t.Fatalf("code %v, want %s: %s", p["code"], code, r.Body)
-		}
-		return p
 	}
 	var m map[string]any
 	if len(r.Body) > 0 {
@@ -725,7 +711,7 @@ func (w *world) want(r *httpservertest.Response, status int, code string) map[st
 // wantOK checks a 200 answer and returns its body.
 func (w *world) wantOK(r *httpservertest.Response) map[string]any {
 	w.t.Helper()
-	return w.want(r, http.StatusOK, "")
+	return w.want(r, http.StatusOK)
 }
 
 // key returns a fresh Idempotency-Key header.
@@ -739,7 +725,7 @@ func ifMatch(version int64) []string {
 // space creates a space through the API as the owner.
 func (w *world) space(name string) ids.ID {
 	w.t.Helper()
-	m := w.want(w.do("owner", http.MethodPost, "/api/v1/spaces", `{"name":"`+name+`"}`, key()...), http.StatusCreated, "")
+	m := w.want(w.do("owner", http.MethodPost, "/api/v1/spaces", `{"name":"`+name+`"}`, key()...), http.StatusCreated)
 	return ids.MustParse(m["id"].(string))
 }
 
@@ -747,7 +733,7 @@ func (w *world) space(name string) ids.ID {
 func (w *world) channel(space ids.ID, kind, name string) ids.ID {
 	w.t.Helper()
 	m := w.want(w.do("owner", http.MethodPost, "/api/v1/spaces/"+space.String()+"/channels", `{"kind":"`+kind+`","name":"`+name+`"}`, key()...),
-		http.StatusCreated, "")
+		http.StatusCreated)
 	return ids.MustParse(m["id"].(string))
 }
 
@@ -756,7 +742,7 @@ func (w *world) channel(space ids.ID, kind, name string) ids.ID {
 func (w *world) agent(handle string) ids.ID {
 	w.t.Helper()
 	m := w.want(w.do("owner", http.MethodPost, "/api/v1/agents", `{"handle":"`+handle+`","display_name":"`+handle+`","adapter_kind":"hermes"}`, key()...),
-		http.StatusCreated, "")
+		http.StatusCreated)
 	id := ids.MustParse(m["id"].(string))
 	issued, err := w.id.Tokens.Issue(context.Background(), identity.IssueTokenCmd{
 		PrincipalID: id, Name: "Adapter", ExpiresAt: w.clk.Now().Add(365 * 24 * time.Hour), CreatedBy: w.owner,
@@ -778,7 +764,7 @@ func (w *world) setPersonal(agent, holder ids.ID) {
 // and returns its id.
 func (w *world) grant(body string) ids.ID {
 	w.t.Helper()
-	m := w.want(w.do("owner", http.MethodPost, "/api/v1/grants", "{"+body+"}", key()...), http.StatusCreated, "")
+	m := w.want(w.do("owner", http.MethodPost, "/api/v1/grants", "{"+body+"}", key()...), http.StatusCreated)
 	return ids.MustParse(m["id"].(string))
 }
 

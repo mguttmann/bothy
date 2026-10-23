@@ -188,17 +188,16 @@ func (c *PushConsumer) HandleEvent(ctx context.Context, ev sync.Event) error {
 	if !known {
 		return nil
 	}
-	switch typ {
-	case authorize.EventMessageCreated:
-		return c.p.onMessage(ctx, ev)
-	case authorize.EventRunStateChanged:
-		return c.p.onRun(ctx, ev)
-	case authorize.EventAccessExpiring:
-		return c.p.onAccessExpiring(ctx, ev)
-	case authorize.EventDevicePending:
-		return c.p.onDevicePending(ctx, ev)
-	case authorize.EventReadStateUpdated:
-		return c.p.onReadState(ctx, ev)
+	// Every type outside this table moves the cursor without effect (13 12 point 1).
+	handlers := map[authorize.EventType]func(context.Context, sync.Event) error{
+		authorize.EventMessageCreated:   c.p.onMessage,
+		authorize.EventRunStateChanged:  c.p.onRun,
+		authorize.EventAccessExpiring:   c.p.onAccessExpiring,
+		authorize.EventDevicePending:    c.p.onDevicePending,
+		authorize.EventReadStateUpdated: c.p.onReadState,
+	}
+	if h, ok := handlers[typ]; ok {
+		return h(ctx, ev)
 	}
 	return nil
 }

@@ -161,18 +161,6 @@ func (w *world) send(j pushJob) error {
 	return nil
 }
 
-// sendPending runs every pending job notify.push_send due at the clock (send) and fails the test
-// on an error.
-func (w *world) sendPending() {
-	w.t.Helper()
-	now := w.clk.Now()
-	for _, j := range w.pushJobs() {
-		if j.pending() && !j.ScheduledAt.After(now) {
-			must(w.t, w.send(j))
-		}
-	}
-}
-
 // flushDue runs every pending notify.coalesce_window (its handler does nothing) and
 // notify.coalesce_flush (Push.Flush) scheduled at or before the clock, then completes them.
 func (w *world) flushDue() {

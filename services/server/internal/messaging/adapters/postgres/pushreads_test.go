@@ -57,6 +57,8 @@ func TestRepository_PushReads(t *testing.T) {
 			m.SystemCode, m.ContentMD, m.Silent = domain.SystemThreadReopened, "", true
 		case domain.KindRun:
 			m.ContentMD, m.Silent = "", true
+		case domain.KindText, domain.KindVoice, domain.KindCard:
+			// The kinds of an answer keep the content of the fixture.
 		}
 		return m
 	}

@@ -64,7 +64,7 @@ func TestBadgeCount(t *testing.T) {
 		}, 1},
 		{"unread with level all", func() {
 			th := w.newThread(w.allgemein)
-			w.setLevel("alex", "thread", th, "all")
+			w.setLevel("alex", th, "all")
 			w.post("owner", th, "Export numbers are in")
 		}, 1},
 		{"unread with level mentions and no mention", func() {
@@ -72,18 +72,18 @@ func TestBadgeCount(t *testing.T) {
 			w.post("owner", th, "Nothing for Alex here")
 		}, 0},
 		{"unread dm thread", func() {
-			_, th := w.dmChannel(w.alex, w.sam)
+			th := w.dmChannel(w.alex, w.sam)
 			w.post("sam", th, "Lunch at noon?")
 		}, 1},
 		{"read thread with level all", func() {
 			th := w.newThread(w.allgemein)
-			w.setLevel("alex", "thread", th, "all")
+			w.setLevel("alex", th, "all")
 			m := w.post("owner", th, "Already seen")
 			w.readUpTo("alex", th, m.ThreadSeq)
 		}, 0},
 		{"messages below unread_floor_seq", func() {
 			th := w.newThread(w.allgemein)
-			w.setLevel("alex", "thread", th, "all")
+			w.setLevel("alex", th, "all")
 			w.post("owner", th, "Below the floor")
 			w.sql(`UPDATE threads SET unread_floor_seq = last_message_seq WHERE id = $1`, th.String())
 		}, 0},
@@ -177,7 +177,7 @@ func TestBadgeSync(t *testing.T) {
 	var msgs []msg
 	for range 2 {
 		th := w.newThread(w.allgemein)
-		w.setLevel("alex", "thread", th, "all")
+		w.setLevel("alex", th, "all")
 		threads, msgs = append(threads, th), append(msgs, w.post("owner", th, "Export numbers are in"))
 	}
 	w.consume()
@@ -238,7 +238,7 @@ func TestBadgeSync(t *testing.T) {
 
 	// Sam's fcm registration gets the sync when Sam reads.
 	own := w.newThread(w.allgemein)
-	w.setLevel("sam", "thread", own, "all")
+	w.setLevel("sam", own, "all")
 	m := w.post("owner", own, "For Sam")
 	w.consume()
 	if n := w.badge(w.sam); n != 1 {

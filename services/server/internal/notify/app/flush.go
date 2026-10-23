@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 )
@@ -33,31 +34,44 @@ func (p *Push) Flush(ctx context.Context, user, thread ids.ID, end time.Time) er
 		if info.ChannelKind == channelKindDM {
 			return nil
 		}
-		now := p.d.Clock.Now()
-		g := group{kind: domain.KindMessage, threadID: thread, channelID: info.ChannelID, spaceID: info.SpaceID}
-		facts, err := p.gather(ctx, g, users, now)
-		if err != nil {
-			return err
-		}
-		pos, err := p.d.Positions.PositionsFor(ctx, thread, users)
-		if err != nil {
-			return err
-		}
-		unread := info.LastMessageSeq - max(pos[user], info.UnreadFloorSeq)
-		d, err := domain.Flush(facts[user], domain.FlushState{Collected: 1, Unread: unread})
+		facts, d, err := p.flushDecision(ctx, user, users, info)
 		if err != nil {
 			return err
 		}
 		h := Hint{RecipientID: user, ThreadID: thread, Kind: domain.KindMessage, DueAt: end}
 		if d.Outcome == domain.OutcomeSend {
-			newest, found, err := p.d.Messages.Newest(ctx, thread)
-			if err != nil {
+			if h.MessageID, err = p.newestMessage(ctx, thread); err != nil {
 				return err
 			}
-			if found {
-				h.MessageID = newest.ID
-			}
 		}
-		return p.apply(ctx, h, facts[user], d)
+		return p.apply(ctx, h, facts, d)
 	})
+}
+
+// flushDecision gathers the facts of user for the thread of info at now and decides the flush
+// with the unread count of 03 read_states (threads.last_message_seq minus the greater of
+// last_read_seq and threads.unread_floor_seq).
+func (p *Push) flushDecision(ctx context.Context, user ids.ID, users []ids.ID, info chat.ThreadInfo) (domain.RecipientFacts, domain.Decision, error) {
+	g := group{kind: domain.KindMessage, threadID: info.ID, channelID: info.ChannelID, spaceID: info.SpaceID}
+	facts, err := p.gather(ctx, g, users, p.d.Clock.Now())
+	if err != nil {
+		return domain.RecipientFacts{}, domain.Decision{}, err
+	}
+	pos, err := p.d.Positions.PositionsFor(ctx, info.ID, users)
+	if err != nil {
+		return domain.RecipientFacts{}, domain.Decision{}, err
+	}
+	unread := info.LastMessageSeq - max(pos[user], info.UnreadFloorSeq)
+	d, err := domain.Flush(facts[user], domain.FlushState{Collected: 1, Unread: unread})
+	return facts[user], d, err
+}
+
+// newestMessage returns the newest message of thread a bundled hint points at, or the zero ID
+// when the thread has none.
+func (p *Push) newestMessage(ctx context.Context, thread ids.ID) (ids.ID, error) {
+	newest, found, err := p.d.Messages.Newest(ctx, thread)
+	if err != nil || !found {
+		return ids.ID{}, err
+	}
+	return newest.ID, nil
 }

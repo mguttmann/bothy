@@ -76,7 +76,7 @@ func TestRevocationBetweenEventAndSend(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
 	th := w.newThread(w.allgemein)
-	w.setLevel("sam", "thread", th, "all")
+	w.setLevel("sam", th, "all")
 	m := w.post("owner", th, "The export is back")
 	w.consume()
 	jobs := w.pushJobsFor(w.sam)
@@ -101,7 +101,7 @@ func TestRevocationBetweenEventAndSend(t *testing.T) {
 func TestDMHint(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
-	_, th := w.dmChannel(w.alex, w.sam)
+	th := w.dmChannel(w.alex, w.sam)
 	plain := w.post("sam", th, "Lunch at noon?")
 	w.consume()
 	w.advance(2 * time.Minute) // past notify.coalesce_window, so the second message is judged on its own
@@ -193,7 +193,7 @@ func TestAutomaticFollowing(t *testing.T) {
 		t.Fatal("a message in the main thread wrote notification_pref.updated")
 	}
 	t3 := w.newThread(w.allgemein)
-	w.setLevel("alex", "thread", t3, "mute")
+	w.setLevel("alex", t3, "mute")
 	muted, _ := w.pref(w.alex, t3)
 	eventsBefore, _ := w.prefEvents(w.alex, t3, ids.ID{})
 	w.post("alex", t3, "Muted, but answering")

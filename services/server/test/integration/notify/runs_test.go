@@ -82,7 +82,7 @@ type runScene struct {
 func (w *world) runScene() runScene {
 	w.t.Helper()
 	th := w.newThread(w.allgemein)
-	w.setLevel("sam", "thread", th, "all")
+	w.setLevel("sam", th, "all")
 	m := w.post("alex", th, "@lotse please look at the export")
 	run, ok := w.runOf(m.ID.String())
 	if !ok {
@@ -157,7 +157,7 @@ func TestRunWithThreeAgentMessages_ExactlyOneRunDone(t *testing.T) {
 			s := w.runScene()
 			if variant == "await_input" {
 				// Alex follows T with all since his message; his own mute replaces it.
-				w.setLevel("alex", "thread", s.thread, "mute")
+				w.setLevel("alex", s.thread, "mute")
 			}
 			w.startRun(s.run)
 			var agent []msg
@@ -168,12 +168,12 @@ func TestRunWithThreeAgentMessages_ExactlyOneRunDone(t *testing.T) {
 			var fourth msg
 			switch variant {
 			case "completed", "fourth_message":
-				w.wantOK(w.finish("lotse", s.run, `"state":"completed","summary":"Export fixed"`))
+				w.wantOK(w.finish(s.run, `"state":"completed","summary":"Export fixed"`))
 			case "failed":
-				w.wantOK(w.finish("lotse", s.run, `"state":"failed","reason":"adapter_error"`))
+				w.wantOK(w.finish(s.run, `"state":"failed","reason":"adapter_error"`))
 			case "cancelled":
-				w.want(w.cancel("alex", s.run), http.StatusAccepted, "")
-				w.wantOK(w.finish("lotse", s.run, `"state":"cancelled","reason":"user_cancelled"`))
+				w.want(w.cancel("alex", s.run), http.StatusAccepted)
+				w.wantOK(w.finish(s.run, `"state":"cancelled","reason":"user_cancelled"`))
 			case "await_input":
 				w.wantOK(w.await("lotse", s.run, "Waiting for approval"))
 			}
@@ -270,7 +270,7 @@ func TestAgentMentionDuringRun_GoesAtOnce(t *testing.T) {
 	w.advance(pastWindow)
 	w.flushDue()
 	a3 := w.post("lotse", s.thread, "Confirmed and fixed")
-	w.wantOK(w.finish("lotse", s.run, `"state":"completed"`))
+	w.wantOK(w.finish(s.run, `"state":"completed"`))
 	w.consume()
 	w.wantHints("Sam", w.sam, s.thread, first, hint{Kind: domain.KindMention, Message: a2.ID}, hint{Kind: domain.KindMessage, Message: a3.ID})
 	w.wantHints("Alex", w.alex, s.thread, hint{Kind: domain.KindRunDone, Message: a3.ID})

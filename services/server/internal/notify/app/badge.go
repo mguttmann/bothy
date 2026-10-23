@@ -68,6 +68,62 @@ func (p *Push) counting(ctx context.Context, user ids.ID) (map[ids.ID]bool, erro
 // positions pos (absent: 0); their channels are among channels.
 func (p *Push) countThreads(ctx context.Context, user ids.ID, cands []chat.ThreadPosition, channels []ids.ID, pos map[ids.ID]int64) (map[ids.ID]bool, error) {
 	out := map[ids.ID]bool{}
+	unread, floors := unreadThreads(cands, pos)
+	if len(unread) == 0 {
+		return out, nil
+	}
+	mentioned, err := p.mentionedThreads(ctx, user, channels, floors)
+	if err != nil {
+		return nil, err
+	}
+	levelThreads := levelCandidates(unread, mentioned)
+	levels, err := p.d.Facts.LevelFactsOfUser(ctx, user, levelThreads)
+	if err != nil {
+		return nil, err
+	}
+	now := p.d.Clock.Now()
+	for _, c := range unread {
+		// A thread neither mentioned nor in a DM channel is one of levelThreads.
+		counts := mentioned[c.ThreadID] || c.ChannelKind == channelKindDM
+		if !counts {
+			if counts, err = levelCounts(levels, c.ThreadID, now); err != nil {
+				return nil, err
+			}
+		}
+		if counts {
+			if out[c.ThreadID], err = p.canRead(ctx, user, c.ThreadID, c.ChannelID, ids.ID{}); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return pruneFalse(out), nil
+}
+
+// pruneFalse removes the threads that do not count, so the result holds only counted threads.
+func pruneFalse(m map[ids.ID]bool) map[ids.ID]bool {
+	for k, v := range m {
+		if !v {
+			delete(m, k)
+		}
+	}
+	return m
+}
+
+// levelCandidates returns the unread threads that count only by their effective level: neither
+// mentioned nor in a DM channel.
+func levelCandidates(unread []chat.ThreadPosition, mentioned map[ids.ID]bool) []ids.ID {
+	var out []ids.ID
+	for _, c := range unread {
+		if !mentioned[c.ThreadID] && c.ChannelKind != channelKindDM {
+			out = append(out, c.ThreadID)
+		}
+	}
+	return out
+}
+
+// unreadThreads returns the candidates that are unread at the read positions pos (absent: 0)
+// and the read floor of each, the greater of its position and its unread floor (13 8).
+func unreadThreads(cands []chat.ThreadPosition, pos map[ids.ID]int64) ([]chat.ThreadPosition, map[ids.ID]int64) {
 	var unread []chat.ThreadPosition
 	floors := map[ids.ID]int64{}
 	for _, c := range cands {
@@ -77,9 +133,11 @@ func (p *Push) countThreads(ctx context.Context, user ids.ID, cands []chat.Threa
 			floors[c.ThreadID] = from
 		}
 	}
-	if len(unread) == 0 {
-		return out, nil
-	}
+	return unread, floors
+}
+
+// mentionedThreads reports the threads among floors that hold an unread mention of user.
+func (p *Push) mentionedThreads(ctx context.Context, user ids.ID, channels []ids.ID, floors map[ids.ID]int64) (map[ids.ID]bool, error) {
 	mentions, err := p.d.Mentions.CountUnread(ctx, messaging.UnreadMentionQuery{PrincipalID: user, VisibleChannelIDs: channels, LastReadSeq: floors})
 	if err != nil {
 		return nil, err
@@ -88,42 +146,21 @@ func (p *Push) countThreads(ctx context.Context, user ids.ID, cands []chat.Threa
 	for _, m := range mentions {
 		mentioned[m.ThreadID] = m.Count > 0
 	}
-	var levelThreads []ids.ID
-	for _, c := range unread {
-		if !mentioned[c.ThreadID] && c.ChannelKind != channelKindDM {
-			levelThreads = append(levelThreads, c.ThreadID)
-		}
+	return mentioned, nil
+}
+
+// levelCounts reports whether the effective level of thread at now is all and not muted; a
+// thread without level facts does not count.
+func levelCounts(levels map[ids.ID]domain.LevelFacts, thread ids.ID, now time.Time) (bool, error) {
+	lf, ok := levels[thread]
+	if !ok {
+		return false, nil
 	}
-	levels, err := p.d.Facts.LevelFactsOfUser(ctx, user, levelThreads)
+	eff, err := domain.ResolveLevel(lf, now)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	now := p.d.Clock.Now()
-	for _, c := range unread {
-		counts := mentioned[c.ThreadID] || c.ChannelKind == channelKindDM
-		if !counts && slices.Contains(levelThreads, c.ThreadID) {
-			lf, ok := levels[c.ThreadID]
-			if !ok {
-				continue
-			}
-			eff, err := domain.ResolveLevel(lf, now)
-			if err != nil {
-				return nil, err
-			}
-			counts = eff.Level == domain.LevelAll && !eff.Muted
-		}
-		if !counts {
-			continue
-		}
-		ok, err := p.canRead(ctx, user, c.ThreadID, c.ChannelID, ids.ID{})
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			out[c.ThreadID] = true
-		}
-	}
-	return out, nil
+	return eff.Level == domain.LevelAll && !eff.Muted, nil
 }
 
 // threadCounts reports whether thread counts for the badge of user at the read position pos
@@ -231,32 +268,42 @@ func (p *Push) BadgeSync(ctx context.Context, user ids.ID, afterSeq int64) error
 		} else if ok && end.After(now) {
 			return p.d.Scheduler.ScheduleBadgeSync(ctx, user, afterSeq, end)
 		}
-		counting, err := p.counting(ctx, user)
+		cleared, err := p.clearedSince(ctx, user, afterSeq)
 		if err != nil {
 			return err
-		}
-		events, err := p.d.History.PersonalEvents(ctx, sync.PersonalQuery{
-			AudienceID: user, Types: []string{string(authorize.EventReadStateUpdated)}, After: afterSeq,
-		})
-		if err != nil {
-			return err
-		}
-		var cleared []ids.ID
-		for _, ev := range events {
-			var pl readStatePayload
-			if err := decode(ev, &pl); err != nil {
-				return err
-			}
-			t := pl.ReadState.ThreadID
-			if !counting[t] && !slices.Contains(cleared, t) {
-				cleared = append(cleared, t)
-			}
 		}
 		if err := p.d.Scheduler.Hold(ctx, user, now.Add(p.cfg.BadgeSyncMinInterval)); err != nil {
 			return err
 		}
 		return p.enqueueSync(ctx, user, cleared, now)
 	})
+}
+
+// clearedSince returns the threads of the reads of user after afterSeq that no longer count for
+// the badge, distinct and in event order (13 8, D-M3-19-15).
+func (p *Push) clearedSince(ctx context.Context, user ids.ID, afterSeq int64) ([]ids.ID, error) {
+	counting, err := p.counting(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	events, err := p.d.History.PersonalEvents(ctx, sync.PersonalQuery{
+		AudienceID: user, Types: []string{string(authorize.EventReadStateUpdated)}, After: afterSeq,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var cleared []ids.ID
+	for _, ev := range events {
+		var pl readStatePayload
+		if err := decode(ev, &pl); err != nil {
+			return nil, err
+		}
+		t := pl.ReadState.ThreadID
+		if !counting[t] && !slices.Contains(cleared, t) {
+			cleared = append(cleared, t)
+		}
+	}
+	return cleared, nil
 }
 
 // enqueueSync inserts the sync jobs of user for its mobile registrations.

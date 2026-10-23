@@ -68,7 +68,7 @@ func TestFlushWithStandingMarker_OpensNextWindow(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
 	th := w.newThread(w.allgemein)
-	w.setLevel("alex", "thread", th, "all")
+	w.setLevel("alex", th, "all")
 	t0 := w.clk.Now()
 	w.post("owner", th, "Update 1")
 	w.consume()
@@ -117,7 +117,7 @@ func TestBadgeSyncWithStandingHold_KeepsInterval(t *testing.T) {
 	var threads []threadAt
 	for range 3 {
 		th := w.newThread(w.allgemein)
-		w.setLevel("alex", "thread", th, "all")
+		w.setLevel("alex", th, "all")
 		m := w.post("owner", th, "Export numbers are in")
 		threads = append(threads, threadAt{th: th, seq: m.ThreadSeq})
 	}
@@ -153,7 +153,7 @@ func TestBadgeSyncRunning_KeepsLaterFallingRead(t *testing.T) {
 	var threads []threadAt
 	for range 2 {
 		th := w.newThread(w.allgemein)
-		w.setLevel("alex", "thread", th, "all")
+		w.setLevel("alex", th, "all")
 		m := w.post("owner", th, "Export numbers are in")
 		threads = append(threads, threadAt{th: th, seq: m.ThreadSeq})
 	}

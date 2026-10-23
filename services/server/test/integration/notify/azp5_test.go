@@ -57,7 +57,7 @@ func TestAZP5_PushOnlyReadableChannels(t *testing.T) {
 // azp5World runs one random world of TestAZP5_PushOnlyReadableChannels.
 func azp5World(t *testing.T, seed uint64) {
 	w := newWorld(t)
-	rnd := rand.New(rand.NewPCG(seed, seed^0x5eed))
+	rnd := rand.New(rand.NewPCG(seed, seed^0x5eed)) //nolint:gosec // G404: a seeded generator keeps a failing world reproducible; no secret
 	channels := []ids.ID{w.allgemein, w.eskalation, w.kampagnen, w.werkzeuge, w.notizen}
 	spaceOf := map[ids.ID]ids.ID{w.allgemein: w.support, w.eskalation: w.support, w.kampagnen: w.marketing, w.werkzeuge: w.engineering,
 		w.notizen: w.research}
@@ -107,7 +107,7 @@ func azp5World(t *testing.T, seed uint64) {
 		}
 	}
 	// A random group with random members and a read grant on a random channel.
-	g := w.want(w.do("owner", http.MethodPost, "/api/v1/groups", `{"name":"Zufall"}`, key()...), http.StatusCreated, "")
+	g := w.want(w.do("owner", http.MethodPost, "/api/v1/groups", `{"name":"Zufall"}`, key()...), http.StatusCreated)
 	group := ids.MustParse(g["id"].(string))
 	target := channels[rnd.IntN(len(channels))]
 	w.grant(`"subject_kind":"group","subject_id":"` + group.String() + `","target_kind":"channel","target_id":"` + target.String() +
@@ -115,7 +115,7 @@ func azp5World(t *testing.T, seed uint64) {
 	for _, p := range people {
 		if rnd.IntN(2) == 0 {
 			w.want(w.do("owner", http.MethodPost, "/api/v1/groups/"+group.String()+"/members", `{"user_id":"`+p.id.String()+`"}`, key()...),
-				http.StatusCreated, "")
+				http.StatusCreated)
 			model.set(p.id, target)
 		}
 	}

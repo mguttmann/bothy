@@ -158,14 +158,13 @@ func newPushWorld(t *testing.T) *pushWorld {
 	return w
 }
 
-// addPhone gives person an active ios phone with one registration of provider and returns the
-// registration ID.
-func (w *pushWorld) addPhone(person ids.ID, provider string) ids.ID {
-	return w.addDevice(person, "ios", provider)
+// addPhone gives person an active ios phone with one registration of provider.
+func (w *pushWorld) addPhone(person ids.ID, provider string) {
+	w.addDevice(person, "ios", provider)
 }
 
 // addDevice gives person an active device of platform with one registration of provider.
-func (w *pushWorld) addDevice(person ids.ID, platform, provider string) ids.ID {
+func (w *pushWorld) addDevice(person ids.ID, platform, provider string) {
 	dev, reg := ids.New(), ids.New()
 	w.devices[person] = append(w.devices[person], identity.DeviceRef{ID: dev, Platform: platform})
 	r := notify.PushRegistration{ID: reg, UserID: person, DeviceID: dev, Provider: provider, Environment: "production",
@@ -173,7 +172,6 @@ func (w *pushWorld) addDevice(person ids.ID, platform, provider string) ids.ID {
 	w.regs[person] = append(w.regs[person], r)
 	w.store.put(app.Registration{ID: reg, UserID: person, DeviceID: dev, Provider: provider, Environment: "production",
 		AppID: "com.example.app", Token: "token-" + reg.String()[:8], CreatedAt: r.CreatedAt})
-	return reg
 }
 
 // push builds the push path over the fakes.
@@ -312,9 +310,8 @@ func (w *pushWorld) event(seq int64, typ, kind string, id, audience ids.ID, payl
 }
 
 // remember stores ev in the fake history.
-func (w *pushWorld) remember(ev sync.Event) sync.Event {
+func (w *pushWorld) remember(ev sync.Event) {
 	w.history = append(w.history, ev)
-	return ev
 }
 
 // ---- fakes of the ports ----
@@ -682,18 +679,6 @@ func (s *fakeScheduler) Hold(_ context.Context, u ids.ID, at time.Time) error {
 		s.holds[u] = at
 	}
 	return nil
-}
-
-// endWindow drops the window marker and the flush of (u, t), as the jobs complete at the end.
-func (s *fakeScheduler) endWindow(u, t ids.ID) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.windows, [2]ids.ID{u, t})
-	for k := range s.flushes {
-		if len(k) > 0 && k[:len(u.String())+1+len(t.String())] == u.String()+"/"+t.String() {
-			delete(s.flushes, k)
-		}
-	}
 }
 
 // fakeRegStore is the registration store in memory.

@@ -146,9 +146,9 @@ func (w *world) await(handle, run, line string) *httpservertest.Response {
 	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/await-input", `{"status_line":"`+line+`"}`)
 }
 
-// finish sends finishRun as the agent handle with the JSON members body.
-func (w *world) finish(handle, run, body string) *httpservertest.Response {
-	return w.do(handle, http.MethodPost, "/api/v1/runs/"+run+"/finish", "{"+body+"}")
+// finish sends finishRun as the agent lotse with the JSON members body.
+func (w *world) finish(run, body string) *httpservertest.Response {
+	return w.do("lotse", http.MethodPost, "/api/v1/runs/"+run+"/finish", "{"+body+"}")
 }
 
 // cancel sends cancelRun as name with a fresh Idempotency-Key.
