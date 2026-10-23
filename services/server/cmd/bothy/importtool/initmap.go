@@ -128,23 +128,27 @@ func readAuthors(ctx context.Context, dc discordAPI, gs *guildState, botID strin
 		return nil, err
 	}
 	for _, c := range p.taken() {
-		ids := []string{}
-		if c.kind == kindText {
-			ids = append(ids, c.ch.ID)
-		}
-		for _, t := range c.threads {
-			ids = append(ids, t.th.ID)
-		}
-		for _, id := range ids {
-			if err := collectAuthors(ctx, dc, id, botID, cfg.DiscordPageSize, out); err != nil {
-				if errors.Is(err, discord.ErrForbidden) || errors.Is(err, discord.ErrNotFound) {
-					continue
-				}
+		for _, id := range readIDs(c) {
+			err := collectAuthors(ctx, dc, id, botID, cfg.DiscordPageSize, out)
+			if err != nil && !errors.Is(err, discord.ErrForbidden) && !errors.Is(err, discord.ErrNotFound) {
 				return nil, err
 			}
 		}
 	}
 	return out, nil
+}
+
+// readIDs returns the IDs whose messages a channel has: the channel itself for a text channel,
+// then its threads.
+func readIDs(c *channelPlan) []string {
+	var ids []string
+	if c.kind == kindText {
+		ids = append(ids, c.ch.ID)
+	}
+	for _, t := range c.threads {
+		ids = append(ids, t.th.ID)
+	}
+	return ids
 }
 
 // collectAuthors reads every message of one channel or thread and records its authors.

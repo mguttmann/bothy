@@ -13,9 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
-	"github.com/google/uuid"
 )
 
 // cursorVersion is the version of the cursor object the tool owns (22 7.3; docs/DECISIONS.md

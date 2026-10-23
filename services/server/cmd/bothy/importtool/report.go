@@ -233,8 +233,8 @@ func (r *report) writeText(w io.Writer) error {
 		verb = "would take over"
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "Check report (%s) of the Discord server %q\n\n", r.mode(), r.guildName)
-	fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed\tAttachments %s/too large/failed\tPeople mapped/placeholders\tSessions\tPins\tTags\tReactions not taken\tNotes\n", verb, verb)
+	_, _ = fmt.Fprintf(tw, "Check report (%s) of the Discord server %q\n\n", r.mode(), r.guildName)
+	_, _ = fmt.Fprintf(tw, "Channel\tTarget\tThreads open/done\tMessages %s/present/skipped/failed\tAttachments %s/too large/failed\tPeople mapped/placeholders\tSessions\tPins\tTags\tReactions not taken\tNotes\n", verb, verb)
 	for _, row := range r.rows {
 		writeRow(tw, row.Channel, row.Target, row.Counts, row.Notes)
 	}
@@ -244,13 +244,13 @@ func (r *report) writeText(w io.Writer) error {
 		return err
 	}
 	if len(t.MessagesSkipped) > 0 {
-		fmt.Fprintf(w, "\nMessages skipped by reason: %s\n", counts(t.MessagesSkipped))
+		_, _ = fmt.Fprintf(w, "\nMessages skipped by reason: %s\n", counts(t.MessagesSkipped))
 	}
 	if len(r.skipped) > 0 {
-		fmt.Fprintf(w, "Channels not taken over: %s\n", counts(r.skipped))
+		_, _ = fmt.Fprintf(w, "Channels not taken over: %s\n", counts(r.skipped))
 	}
 	for _, n := range r.notes {
-		fmt.Fprintf(w, "Note: %s\n", n)
+		_, _ = fmt.Fprintf(w, "Note: %s\n", n)
 	}
 	return nil
 }
@@ -265,7 +265,7 @@ func writeRow(w io.Writer, channel, target string, c *channelReport, notes []str
 	if c.SourceChanged > 0 {
 		note = strings.TrimPrefix(note+"; "+noteSourceChanged+" "+strconv.Itoa(c.SourceChanged), "; ")
 	}
-	fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d\t%d/%d/%d\t%d/%d\t%d/%d\t%d\t%d\t%d\t%s\n", channel, target,
+	_, _ = fmt.Fprintf(w, "%s\t%s\t%d/%d\t%d/%d/%d/%d\t%d/%d/%d\t%d/%d\t%d/%d\t%d\t%d\t%d\t%s\n", channel, target,
 		c.ThreadsOpen, c.ThreadsDone, c.MessagesTaken, c.MessagesPresent, skipped, c.MessagesFailed,
 		c.AttachmentsTaken, c.AttachmentsTooLarge, c.AttachmentsFailed, c.PeopleMapped, c.PeoplePlaceholders,
 		c.SessionsTaken, c.SessionsDiscarded, c.PinsTaken, c.TagsTaken, c.ReactionsNotTaken, note)

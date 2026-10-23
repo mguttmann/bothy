@@ -21,7 +21,7 @@ import (
 )
 
 // testToken is the invented bot token of the tests.
-const testToken = "invented.bot-token.for-tests-only"
+const testToken = "invented.bot-token.for-tests-only" // #nosec G101 -- an invented test value
 
 // The IDs of the basic fixture (discord/testdata/guild_basic.json).
 const (

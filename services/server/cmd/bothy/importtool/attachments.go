@@ -13,9 +13,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
-	"github.com/google/uuid"
 )
 
 // The reasons of an attachment line (22 6.5 item 6).

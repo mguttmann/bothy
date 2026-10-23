@@ -14,11 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/bothyapi"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
-	"github.com/google/uuid"
 )
 
 // The exit codes of 22 10.3.

@@ -272,26 +272,9 @@ func (p *plan) taken() []*channelPlan {
 // the archived public list and the archived private list, whose 403 is a note, not an abort.
 func (p *plan) readThreads(ctx context.Context, dc discordAPI, gs *guildState, closedTags []string) error {
 	for _, c := range p.taken() {
-		seen := map[string]discord.Channel{}
-		for _, t := range gs.activeBy[c.ch.ID] {
-			seen[t.ID] = t
-		}
-		add := func(page []discord.Channel) error {
-			for _, t := range page {
-				if _, ok := seen[t.ID]; !ok {
-					seen[t.ID] = t
-				}
-			}
-			return nil
-		}
-		if err := dc.ArchivedPublicThreads(ctx, c.ch.ID, add); err != nil {
-			return fmt.Errorf("read the archived threads: %w", err)
-		}
-		if err := dc.ArchivedPrivateThreads(ctx, c.ch.ID, add); err != nil {
-			if !errors.Is(err, discord.ErrForbidden) {
-				return fmt.Errorf("read the archived private threads: %w", err)
-			}
-			c.rep.notes = append(c.rep.notes, notePrivateThreads)
+		seen, err := threadList(ctx, dc, gs, c)
+		if err != nil {
+			return err
 		}
 		for _, t := range seen {
 			tp := &threadPlan{th: t}
@@ -305,35 +288,66 @@ func (p *plan) readThreads(ctx context.Context, dc discordAPI, gs *guildState, c
 	return nil
 }
 
+// threadList returns the threads of one channel by ID: active ones first, so a thread in both
+// lists keeps its active object.
+func threadList(ctx context.Context, dc discordAPI, gs *guildState, c *channelPlan) (map[string]discord.Channel, error) {
+	seen := map[string]discord.Channel{}
+	for _, t := range gs.activeBy[c.ch.ID] {
+		seen[t.ID] = t
+	}
+	add := func(page []discord.Channel) error {
+		for _, t := range page {
+			if _, ok := seen[t.ID]; !ok {
+				seen[t.ID] = t
+			}
+		}
+		return nil
+	}
+	if err := dc.ArchivedPublicThreads(ctx, c.ch.ID, add); err != nil {
+		return nil, fmt.Errorf("read the archived threads: %w", err)
+	}
+	if err := dc.ArchivedPrivateThreads(ctx, c.ch.ID, add); err != nil {
+		if !errors.Is(err, discord.ErrForbidden) {
+			return nil, fmt.Errorf("read the archived private threads: %w", err)
+		}
+		c.rep.note(notePrivateThreads)
+	}
+	return seen, nil
+}
+
 // doneRule is the archive rule of 22 5.1.1 (R-IM-11): a thread is done when thread_metadata.archived
 // is exactly true and it is not active, or when it carries a tag of import.discord.closed_tags.
 // Missing metadata, false or a thread in both lists stays open. closedAt is archive_timestamp, or
 // the time of the thread ID when Discord gave none.
 func doneRule(t discord.Channel, active bool, parent discord.Channel, closedTags []string) (bool, time.Time) {
-	closed := false
-	if md := t.ThreadMetadata; md != nil && md.Archived != nil && *md.Archived && !active {
-		closed = true
-	}
-	if !closed && len(closedTags) > 0 {
-		names := map[string]string{}
-		for _, tag := range parent.AvailableTags {
-			names[tag.ID] = tag.Name
-		}
-		for _, id := range t.AppliedTags {
-			if slices.Contains(closedTags, names[id]) {
-				closed = true
-			}
-		}
-	}
-	if !closed {
+	md := t.ThreadMetadata
+	archived := md != nil && md.Archived != nil && *md.Archived && !active
+	if !archived && !closedTag(t, parent, closedTags) {
 		return false, time.Time{}
 	}
-	if md := t.ThreadMetadata; md != nil && md.ArchiveTimestamp != "" {
+	if md != nil && md.ArchiveTimestamp != "" {
 		if at, err := ParseDiscordTime(md.ArchiveTimestamp); err == nil {
 			return true, at
 		}
 	}
 	return true, SnowflakeTime(t.ID)
+}
+
+// closedTag reports a thread that carries a tag of import.discord.closed_tags.
+func closedTag(t discord.Channel, parent discord.Channel, closedTags []string) bool {
+	if len(closedTags) == 0 {
+		return false
+	}
+	names := map[string]string{}
+	for _, tag := range parent.AvailableTags {
+		names[tag.ID] = tag.Name
+	}
+	for _, id := range t.AppliedTags {
+		if slices.Contains(closedTags, names[id]) {
+			return true
+		}
+	}
+	return false
 }
 
 // errSelection is an ID of --channel or --only-thread that is no mapped channel and no thread of
@@ -352,6 +366,14 @@ func (p *plan) selectScope(channels, threads []string) error {
 			t.selected = all
 		}
 	}
+	if err := p.selectChannels(channels); err != nil {
+		return err
+	}
+	return p.selectThreads(channels, threads)
+}
+
+// selectChannels selects the channels of --channel with all their threads.
+func (p *plan) selectChannels(channels []string) error {
 	for _, id := range channels {
 		c := p.byID[id]
 		if c == nil || c.skip != "" {
@@ -362,6 +384,12 @@ func (p *plan) selectScope(channels, threads []string) error {
 			t.selected = true
 		}
 	}
+	return nil
+}
+
+// selectThreads narrows to the threads of --only-thread; with --channel each must be a thread of
+// one of those channels. Without --channel the main threads stay out.
+func (p *plan) selectThreads(channels, threads []string) error {
 	for _, id := range threads {
 		c := p.threadOf[id]
 		if c == nil {
@@ -370,14 +398,16 @@ func (p *plan) selectScope(channels, threads []string) error {
 		if len(channels) > 0 && !slices.Contains(channels, c.ch.ID) {
 			return fmt.Errorf("%w: --only-thread %s is not a thread of a channel of --channel", errSelection, id)
 		}
-		for _, t := range c.threads {
-			if t.th.ID == id {
-				t.selected = true
-			}
-		}
 		if len(channels) == 0 {
-			// Only the named threads: the main thread of the channel stays out.
 			c.selected = false
+		}
+	}
+	if len(threads) == 0 {
+		return nil
+	}
+	for _, c := range p.taken() {
+		for _, t := range c.threads {
+			t.selected = slices.Contains(threads, t.th.ID)
 		}
 	}
 	return nil

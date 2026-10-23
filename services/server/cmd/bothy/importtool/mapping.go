@@ -21,6 +21,9 @@ import (
 
 // The leads of a mapped channel (22 12.1).
 const (
+	// tagStr is the YAML tag of a text scalar.
+	tagStr = "!!str"
+
 	// LeadDiscord keeps Discord the place of work; it is the default of a channel entry.
 	LeadDiscord = "discord"
 	// LeadBothy makes Bothy the place of work.
@@ -433,7 +436,7 @@ func (p *mappingParser) text(n *yaml.Node, member string, required bool, missing
 		}
 		return "", false
 	}
-	if n.Kind != yaml.ScalarNode || n.ShortTag() != "!!str" {
+	if n.Kind != yaml.ScalarNode || n.ShortTag() != tagStr {
 		p.add(n.Line, member+" must be text")
 		return "", false
 	}
@@ -478,7 +481,7 @@ func (p *mappingParser) uncategorized(n *yaml.Node, missingLine int) string {
 		p.add(missingLine, memberUncategorizedSpace+" is required")
 		return ""
 	}
-	if n.Kind == yaml.ScalarNode && ((n.Value == valueSkip && n.ShortTag() == "!!str") || isSnowflake(n.Value)) {
+	if n.Kind == yaml.ScalarNode && ((n.Value == valueSkip && n.ShortTag() == tagStr) || isSnowflake(n.Value)) {
 		return n.Value
 	}
 	p.add(n.Line, memberUncategorizedSpace+" must be skip or a Discord category ID")
@@ -620,7 +623,7 @@ func (p *mappingParser) target(n *yaml.Node, missingLine int) (Target, bool) {
 	case n.Kind == 0:
 		p.add(missingLine, "target is required")
 		return Target{}, false
-	case n.Kind == yaml.ScalarNode && n.ShortTag() == "!!str" && n.Value == valueSkip:
+	case n.Kind == yaml.ScalarNode && n.ShortTag() == tagStr && n.Value == valueSkip:
 		return Target{Skip: true}, true
 	case n.Kind != yaml.MappingNode:
 		p.add(n.Line, targetForms)

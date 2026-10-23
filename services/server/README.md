@@ -33,7 +33,7 @@ the overview.
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | setup, first owner, enrollment code (08-identity.md) |
 | `bothy config check\|print` | check the configuration (with `--secrets` also resolve every reference) and print it redacted |
 | `bothy import login\|logout` | login of the import tool as a `cli` device through device pairing and logout (22-import-migration.md 10.1); session file and DPoP client: [`cmd/bothy/importtool/bothyapi`](cmd/bothy/importtool/bothyapi/README.md) |
-| `bothy import discord ...` | import and read mirror through the API (22-import-migration.md); code under `cmd/bothy/importtool` (D-W-124), Discord read client: [`cmd/bothy/importtool/discord`](cmd/bothy/importtool/discord/README.md) |
+| `bothy import discord ...` | import through the API: dry run, `--apply`, `init-map`, `status` (22-import-migration.md 10; the read mirror follows with M8-05): [`cmd/bothy/importtool`](cmd/bothy/importtool/README.md) (D-W-124), Discord read client: [`cmd/bothy/importtool/discord`](cmd/bothy/importtool/discord/README.md) |
 | `bothy restore finalize [--relocation FILE]` | after a restore: new sync epoch, cursors to `head_seq`, stored database identity; with `--relocation` the manifest of the final backup of a relocation keeps the epoch (16-operations.md 8.4, M7-04) |
 | `bothy secrets init\|export` | create and back up secrets (16-operations.md) |
 | `bothy healthcheck --url` | health check of a loopback URL of the internal listener (16-operations.md) |

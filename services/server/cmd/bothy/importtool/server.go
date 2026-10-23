@@ -10,8 +10,9 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/google/uuid"
+
+	"github.com/OWNER/bothy/services/server/api/restclient"
 )
 
 // bothyAPI is the part of the generated client (api/restclient) that the tool calls; the client of

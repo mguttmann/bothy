@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
-	"github.com/google/uuid"
 )
 
 // The Discord message types of 22 6.1 that the walker treats specially.
@@ -290,16 +291,21 @@ func (wk *walker) thread(ctx context.Context, c *channelPlan, t *threadPlan) err
 		after = wk.w.position(pd.main, pd.readID)
 	}
 	pd.consumed = after
+	if err := wk.read(ctx, c, pd, after); err != nil {
+		return err
+	}
+	return wk.flush(ctx, c, pd, true)
+}
+
+// read consumes the messages of a main thread or thread after the ID after, page by page.
+func (wk *walker) read(ctx context.Context, c *channelPlan, pd *pending, after string) error {
 	for {
 		page, err := wk.dc.MessagesAfter(ctx, pd.readID, after, wk.cfg.DiscordPageSize)
 		if err != nil {
-			if err := wk.readError(c, err); err != nil {
-				return err
-			}
-			break
+			return wk.readError(c, err)
 		}
 		if len(page) == 0 {
-			break
+			return nil
 		}
 		for _, msg := range page {
 			if err := wk.consume(ctx, c, pd, msg); err != nil {
@@ -308,7 +314,6 @@ func (wk *walker) thread(ctx context.Context, c *channelPlan, t *threadPlan) err
 		}
 		after = page[len(page)-1].ID
 	}
-	return wk.flush(ctx, c, pd, true)
 }
 
 // readError turns a 403 of a thread into a note, and a 404 (the channel or thread was deleted

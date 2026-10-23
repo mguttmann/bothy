@@ -56,7 +56,7 @@ func (c cdnLog) Handle(ctx context.Context, r slog.Record) error {
 	out := slog.NewRecord(r.Time, r.Level, r.Message, r.PC)
 	r.Attrs(func(a slog.Attr) bool {
 		if a.Key == cdnLogKey {
-			a = slog.String(a.Key, cutPath(a.Value.String()))
+			a = slog.String(cdnLogKey, cutPath(a.Value.String()))
 		}
 		out.AddAttrs(a)
 		return true

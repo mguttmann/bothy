@@ -16,7 +16,7 @@ import (
 const (
 	secretText     = "zq-content-marker-7731 about the invoice"
 	secretFile     = "zq-attachment-name-5521.pdf"
-	secretDisplay  = "Sam Zq-Display-Marker"
+	secretDisplay  = "Sam Zq-Display-Marker" // #nosec G101 -- an invented test marker
 	secretUsername = "zq-username-marker"
 	secretPath     = "/attachments/13000103/13009001/" + secretFile
 )

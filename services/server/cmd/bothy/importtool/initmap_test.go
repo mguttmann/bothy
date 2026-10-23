@@ -28,7 +28,7 @@ func TestInitMap(t *testing.T) {
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("dir holds %v (%v), want only the mapping", entries, err)
 	}
-	data, err := os.ReadFile(out)
+	data, err := os.ReadFile(out) // #nosec G304 -- a path below t.TempDir()
 	if err != nil {
 		t.Fatal(err)
 	}

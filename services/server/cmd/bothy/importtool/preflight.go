@@ -6,11 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
-	"github.com/google/uuid"
 )
 
 // usageError ends a run with exit 2 (22 10.3): an invocation, mapping or preflight finding;
@@ -114,41 +116,52 @@ func intentProbe(ctx context.Context, dc discordAPI, gs *guildState, m *Mapping,
 	return nil
 }
 
-// probeChannel reads the first messages of a channel: with full false only the first page (to
+// probeChannel reads the first messages of a channel: with onlyReadable only the first page (to
 // prove the channel readable), else up to sample messages by other authors than the bot. It
 // returns how many such messages it saw and whether one had content, an attachment or an embed.
+// A 404 (the channel vanished) counts as a channel without messages.
 func probeChannel(ctx context.Context, dc discordAPI, channelID, botID string, sample, pageSize int, onlyReadable bool) (int, bool, error) {
 	after := "0"
 	others := 0
 	for others < sample {
 		page, err := dc.MessagesAfter(ctx, channelID, after, min(sample, pageSize))
-		if errors.Is(err, discord.ErrNotFound) {
+		switch {
+		case errors.Is(err, discord.ErrNotFound):
+			return others, false, nil
+		case err != nil:
+			return 0, false, err
+		case onlyReadable:
+			return 0, false, nil
+		case len(page) == 0:
 			return others, false, nil
 		}
-		if err != nil {
-			return 0, false, err
-		}
-		if onlyReadable {
-			return 0, false, nil
-		}
-		for _, msg := range page {
-			if msg.Author.ID == botID {
-				continue
-			}
-			others++
-			if strings.TrimSpace(msg.Content) != "" || len(msg.Attachments) > 0 || len(msg.Embeds) > 0 {
-				return others, true, nil
-			}
-			if others == sample {
-				break
-			}
-		}
-		if len(page) == 0 {
-			break
+		n, filled := countFilled(page, botID, sample-others)
+		others += n
+		if filled {
+			return others, true, nil
 		}
 		after = page[len(page)-1].ID
 	}
 	return others, false, nil
+}
+
+// countFilled counts up to limit messages of page by other authors than the bot and reports
+// whether one of them has content, an attachment or an embed.
+func countFilled(page []discord.Message, botID string, limit int) (int, bool) {
+	n := 0
+	for _, msg := range page {
+		if msg.Author.ID == botID {
+			continue
+		}
+		n++
+		if strings.TrimSpace(msg.Content) != "" || len(msg.Attachments) > 0 || len(msg.Embeds) > 0 {
+			return n, true
+		}
+		if n == limit {
+			break
+		}
+	}
+	return n, false
 }
 
 // preflightBothy runs steps 4 to 6 of 22 4.4 against Bothy: an active owner, every mapped person,
@@ -255,6 +268,8 @@ func findSource(ctx context.Context, r bothyReads, guildID string) (*restclient.
 		switch s.State {
 		case restclient.ImportSourceStateDraft, restclient.ImportSourceStateRunning, restclient.ImportSourceStatePaused:
 			found = append(found, s)
+		case restclient.ImportSourceStateCompleted, restclient.ImportSourceStateFailed:
+			// A closed source is history; a new one may exist for the same guild.
 		}
 	}
 	switch len(found) {
@@ -266,13 +281,24 @@ func findSource(ctx context.Context, r bothyReads, guildID string) (*restclient.
 	return nil, finding("preflight: more than one open import source exists for this Discord server; cancel the extra ones in the web console")
 }
 
+// collisions holds what step 6 of 22 4.4 compares: the targets of the posted items of the source,
+// the live spaces and, per space, the names of its live channels the import did not create.
+type collisions struct {
+	r      bothyReads
+	m      *Mapping
+	gs     *guildState
+	ours   map[uuid.UUID]bool
+	posted map[string]uuid.UUID
+	spaces []restclient.Space
+	names  map[uuid.UUID]map[string]bool
+}
+
 // checkCollisions is step 6 of 22 4.4 (22 5.1 rule 1): a create name equal (without regard to
 // case, like the unique indexes of spaces and channels) to the name of a live space, or of a live
 // channel in the target space, that is not the target of a posted item of this source ends the run
-// before the first write; so does a name the mapping creates twice.
+// before the first write; so does a name the mapping creates twice in one place.
 func checkCollisions(ctx context.Context, r bothyReads, m *Mapping, gs *guildState, src *restclient.ImportSource) error {
-	ours := map[uuid.UUID]bool{}
-	posted := map[string]uuid.UUID{}
+	c := &collisions{r: r, m: m, gs: gs, ours: map[uuid.UUID]bool{}, posted: map[string]uuid.UUID{}, names: map[uuid.UUID]map[string]bool{}}
 	if src != nil {
 		items, err := r.items(ctx, src.Id, restclient.ImportItemStatePosted)
 		if err != nil {
@@ -280,76 +306,92 @@ func checkCollisions(ctx context.Context, r bothyReads, m *Mapping, gs *guildSta
 		}
 		for key, it := range items {
 			if it.TargetId != nil {
-				ours[*it.TargetId] = true
-				posted[key] = *it.TargetId
+				c.ours[*it.TargetId] = true
+				c.posted[key] = *it.TargetId
 			}
 		}
 	}
-	spaces, err := r.spaces(ctx)
-	if err != nil {
+	var err error
+	if c.spaces, err = r.spaces(ctx); err != nil {
 		return err
 	}
+	if err := c.spaceNames(); err != nil {
+		return err
+	}
+	return c.channelNames(ctx)
+}
+
+// spaceNames checks the create names of the spaces.
+func (c *collisions) spaceNames() error {
 	taken := map[string]bool{}
-	for _, sp := range spaces {
-		if !ours[sp.Id] {
+	for _, sp := range c.spaces {
+		if !c.ours[sp.Id] {
 			taken[strings.ToLower(sp.Name)] = true
 		}
 	}
 	mine := map[string]bool{}
-	for _, s := range m.Spaces {
+	for _, s := range c.m.Spaces {
 		if s.Target.CreateName == "" {
 			continue
 		}
 		n := strings.ToLower(s.Target.CreateName)
-		if _, done := posted[keySpace+s.Category]; !done && (taken[n] || mine[n]) {
+		if _, done := c.posted[keySpace+s.Category]; !done && (taken[n] || mine[n]) {
 			return finding("preflight: mapping file line %d: the space name of category %s is taken in Bothy", s.Line, s.Category)
 		}
 		mine[n] = true
 	}
-	return checkChannelNames(ctx, r, m, gs, spaces, ours, posted)
+	return nil
 }
 
-// checkChannelNames checks the create names of channels against the live channels of their target
+// channelNames checks the create names of channels against the live channels of their target
 // space (an existing space of the mapping, or a space this source already posted) and against each
 // other within one category.
-func checkChannelNames(ctx context.Context, r bothyReads, m *Mapping, gs *guildState, spaces []restclient.Space, ours map[uuid.UUID]bool, posted map[string]uuid.UUID) error {
-	live := map[uuid.UUID]bool{}
-	for _, sp := range spaces {
-		live[sp.Id] = true
-	}
-	names := map[uuid.UUID]map[string]bool{}
+func (c *collisions) channelNames(ctx context.Context) error {
 	mine := map[string]bool{}
-	for _, c := range m.Channels {
-		if c.Target.CreateName == "" {
+	for _, e := range c.m.Channels {
+		if e.Target.CreateName == "" {
 			continue
 		}
-		n := strings.ToLower(c.Target.CreateName)
-		cat := categoryOf(gs, m, c.Channel)
+		n := strings.ToLower(e.Target.CreateName)
+		cat := categoryOf(c.gs, c.m, e.Channel)
 		if mine[cat+"/"+n] {
-			return finding("preflight: mapping file line %d: the channel name of channel %s is used twice in one space", c.Line, c.Channel)
+			return finding("preflight: mapping file line %d: the channel name of channel %s is used twice in one space", e.Line, e.Channel)
 		}
 		mine[cat+"/"+n] = true
-		space, ok := targetSpace(m, cat, posted)
-		if _, done := posted[keyChannel+c.Channel]; done || !ok || !live[space] {
-			continue
+		taken, err := c.channelTaken(ctx, e, cat, n)
+		if err != nil {
+			return err
 		}
-		if names[space] == nil {
-			chans, err := r.channels(ctx, space)
-			if err != nil {
-				return err
-			}
-			names[space] = map[string]bool{}
-			for _, ch := range chans {
-				if !ours[ch.Id] {
-					names[space][strings.ToLower(ch.Name)] = true
-				}
-			}
-		}
-		if names[space][n] {
-			return finding("preflight: mapping file line %d: the channel name of channel %s is taken in its space in Bothy", c.Line, c.Channel)
+		if taken {
+			return finding("preflight: mapping file line %d: the channel name of channel %s is taken in its space in Bothy", e.Line, e.Channel)
 		}
 	}
 	return nil
+}
+
+// channelTaken reports whether a live channel of the known target space of a new channel that the
+// import did not create holds the name n.
+func (c *collisions) channelTaken(ctx context.Context, e ChannelEntry, category, n string) (bool, error) {
+	if _, done := c.posted[keyChannel+e.Channel]; done {
+		return false, nil
+	}
+	space, ok := targetSpace(c.m, category, c.posted)
+	if !ok || !slices.ContainsFunc(c.spaces, func(s restclient.Space) bool { return s.Id == space }) {
+		return false, nil
+	}
+	if c.names[space] == nil {
+		chans, err := c.r.channels(ctx, space)
+		if err != nil {
+			return false, err
+		}
+		c.names[space] = map[string]bool{}
+		for _, ch := range chans {
+			if !c.ours[ch.Id] {
+				c.names[space][strings.ToLower(ch.Name)] = true
+			}
+		}
+	}
+	return c.names[space][n], nil
 }
 
 // categoryOf returns the category whose space a new channel goes to: its parent on Discord, or

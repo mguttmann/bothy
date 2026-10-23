@@ -61,7 +61,7 @@ func TestPreflightFindings(t *testing.T) {
 			mapping: strings.Replace(fixtureMapping, `"user:alex"`, `"user:sam"`, 1), want: "user:sam"},
 		{name: "unknown planned operator", fixture: discordtest.BasicFixture,
 			mapping: strings.Replace(fixtureMapping, `name: "general"}}`, `name: "general"}}`+"\n    planned_operator: \"agent:lotse\"", 1),
-			want: "agent:lotse"},
+			want:    "agent:lotse"},
 		{name: "space name collision", fixture: discordtest.BasicFixture, mapping: fixtureMapping,
 			setup: func(e *testEnv) { e.bothy.AddSpace("projects") }, want: "space name"},
 		{name: "channel name collision", fixture: discordtest.BasicFixture, mapping: fixtureMapping,
