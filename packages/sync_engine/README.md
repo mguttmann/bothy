@@ -477,7 +477,7 @@ directly with `setNotificationPref(userId, targetKind, targetId, level, mutedUnt
 `deleteNotificationPref` (setup steps without events). Since M4-33 `rest/notify_handlers.dart`
 serves `listMyNotificationPreferences`, `putNotificationPreference` and
 `deleteNotificationPreference` (`notification_pref.updated` per row, an equal write keeps the
-version, `409 target_archived`), the quiet hours operations (`world.quietHoursRules`, the
+version, `409 conflict` with reason `target_archived`), the quiet hours operations (`world.quietHoursRules`, the
 complete list in `quiet_hours.updated`; stored, not evaluated) and `exportChannel` (NDJSON of the
 channel's messages in the range, read access, the capability `export` and the step-up of
 `export.channel`); a person's message in a thread with `kind = thread` follows it at `all`
