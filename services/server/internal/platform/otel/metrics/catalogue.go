@@ -51,6 +51,8 @@ const (
 	keyBackupKind    = "bothy.backup.kind"
 	keyVolume        = "bothy.volume"
 	keyRunState      = "bothy.run.state"
+	keyPushProvider  = "bothy.push.provider"
+	unitNotification = "{notification}"
 	unitConnection   = "{connection}"
 	unitRun          = "{run}"
 	unitSession      = "{session}"
@@ -70,6 +72,9 @@ var (
 	backupKinds = []string{"physical", "logical", "objects"}
 	// volumes are bothy.volume: the volumes bothy-backupd measures (signals.md 4.6).
 	volumes = []string{"pgdata", "files", "pgbackrest-repo", "backup-scratch"}
+	// pushProviders are bothy.push.provider: the values of push_registrations.provider (03,
+	// signals.md 5.3).
+	pushProviders = []string{"apns", "fcm", "unifiedpush", "wns"}
 	// runEndStates are bothy.run.state of an ended run (09 5.1).
 	runEndStates = []string{"completed", valueFailed, valueCancelled}
 	// runReasons are bothy.reason of bothy.run.finished: the codes of runs.state_reason, the 18
@@ -274,6 +279,40 @@ var (
 	FileScanQueue = Spec{
 		Name: "bothy.file.scan.queue", Kind: KindGauge, Unit: "{file}",
 		Description: "Files awaiting the read pass with the virus scan.",
+	}
+	// PushSent is bothy.push.sent (4.4, M3-19): one per provider answer of the job
+	// notify.push_send, with the outcome of its result class (13 7.3, D-M3-19-12).
+	PushSent = Spec{
+		Name: "bothy.push.sent", Kind: KindCounter, Unit: unitNotification,
+		Description: "Push requests answered by a provider, by outcome.",
+		Attrs: []Attr{
+			{Key: keyPushProvider, Values: pushProviders},
+			{Key: keyOutcome, Values: []string{"accepted", "rejected_token", "rejected_other", "throttled", "provider_error"}},
+		},
+	}
+	// PushSendDuration is bothy.push.send.duration (4.4, M3-19): one provider request of the job
+	// notify.push_send, outside any transaction.
+	PushSendDuration = Spec{
+		Name: "bothy.push.send.duration", Kind: KindHistogram, Unit: "s",
+		Description: "Duration of one push request to a provider.",
+		Attrs:       []Attr{{Key: keyPushProvider, Values: pushProviders}},
+		Buckets:     BucketsSeconds,
+	}
+	// PushSkipped is bothy.push.skipped (4.4, M3-19): one per recipient and hint decided none and
+	// one per job notify.push_send that ends without sending (D-M3-19-13). Quiet hours make a hint
+	// quiet and never drop it (R-PN-05), so they are no reason here.
+	PushSkipped = Spec{
+		Name: "bothy.push.skipped", Kind: KindCounter, Unit: unitNotification,
+		Description: "Hints and push jobs that ended without a push, by reason.",
+		Attrs: []Attr{{Key: keyReason, Values: []string{
+			"no_access", "preference", "active_in_thread", "no_registration", "read", "expired", "no_provider"}}},
+	}
+	// PushRegistrationsActive is bothy.push.registrations.active (4.4, M3-19): the rows of
+	// push_registrations with disabled_at IS NULL per provider, observed at each collection.
+	PushRegistrationsActive = Spec{
+		Name: "bothy.push.registrations.active", Kind: KindGauge, Unit: "{registration}",
+		Description: "Active push registrations per provider.",
+		Attrs:       []Attr{{Key: keyPushProvider, Values: pushProviders}},
 	}
 	// JobDuration is bothy.job.duration (4.4).
 	JobDuration = Spec{
@@ -514,6 +553,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
+		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,

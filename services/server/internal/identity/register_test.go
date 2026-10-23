@@ -10,14 +10,15 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 )
 
-// TestRegister: identity declares exactly the durable events user.updated (M1-31) and
-// session.revoked (M1-34).
+// TestRegister: identity declares exactly the durable events user.updated (M1-31),
+// session.revoked (M1-34) and device.pending (M3-19, R-AZ-31).
 func TestRegister(t *testing.T) {
 	t.Parallel()
 	r := authorize.NewRegistry()
 	identity.Register(r)
 	want := []authorize.EventRegistration{
-		{Module: "identity", Type: authorize.EventSessionRevoked}, {Module: "identity", Type: authorize.EventUserUpdated},
+		{Module: "identity", Type: authorize.EventDevicePending}, {Module: "identity", Type: authorize.EventSessionRevoked},
+		{Module: "identity", Type: authorize.EventUserUpdated},
 	}
 	if got := r.Events(); !slices.Equal(got, want) {
 		t.Fatalf("Events() = %v, want %v", got, want)

@@ -392,6 +392,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
 		"migrate.recent_backup_max_age = 1d  # default\n" +
 		"migrate.require_recent_backup = true  # default\n" +
+		"notify.badge_sync_min_interval = 1m  # default\n" +
+		"notify.coalesce_window = 1m  # default\n" +
+		"notify.default_admin_enabled = true  # default\n" +
+		"notify.default_input_needed_breaks_quiet_hours = false  # default\n" +
+		"notify.mobile_delay_when_desktop_active = 1m  # default\n" +
 		"notify.user_default_level = mentions  # default\n" +
 		"pin.max_per_thread = 50  # default\n" +
 		"principal.display_name_max_chars = 64  # default\n" +
@@ -401,6 +406,11 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"privacy.audit_ip_key_retention = 90d  # default\n" +
 		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
 		"project.binding_text_max_chars = 512  # default\n" +
+		"push.max_age = 1h  # default\n" +
+		"push.max_concurrent_requests = 32  # default\n" +
+		"push.max_consecutive_failures = 5  # default\n" +
+		"push.retry_base = 2s  # default\n" +
+		"push.retry_cap = 5m  # default\n" +
 		"ratelimit.max_tracked_keys = 100000  # default\n" +
 		"ratelimit.rl.admin.burst = 20  # default\n" +
 		"ratelimit.rl.admin.per_minute = 60  # default\n" +

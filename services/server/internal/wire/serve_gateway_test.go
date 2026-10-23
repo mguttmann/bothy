@@ -597,6 +597,8 @@ func TestGateway(t *testing.T) {
 	})
 
 	t.Run("TestClose4016PendingDevice", func(t *testing.T) {
+		// Registering a pending device appends device.pending (R-AZ-31), which needs a partition.
+		w.partitions(t)
 		p := w.newPerson("alex", identity.DeviceStatePending)
 		w.identifyErr(t, w.params(p), 4016)
 	})

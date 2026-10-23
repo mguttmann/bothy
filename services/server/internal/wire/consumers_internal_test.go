@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
+	"github.com/OWNER/bothy/services/server/internal/sync"
 	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
 
@@ -85,3 +87,16 @@ func (idleWaker) Run(ctx context.Context) error {
 }
 
 func (idleWaker) Wake() <-chan struct{} { return nil }
+
+// TestConsumerHandlersRegisterPush: the production consumers hold push once the push path exists
+// and webhooks once apps exists (M3-19).
+func TestConsumerHandlersRegisterPush(t *testing.T) {
+	t.Parallel()
+	if got := consumerHandlers(nil, nil); got != nil {
+		t.Fatalf("without steps: %v", got)
+	}
+	got := consumerHandlers(nil, &Push{Push: &notifyapp.Push{}})
+	if _, ok := got[sync.ConsumerPush]; !ok || len(got) != 1 {
+		t.Fatalf("handlers %v", got)
+	}
+}

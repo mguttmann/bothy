@@ -441,9 +441,12 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate, f
 	@# The tables of packages/domain: AppConfig from the configuration reference and the event
 	@# catalogue from actions.yaml (docs/DECISIONS.md D-M4-08-3, D-M4-08-5). Python only, so
 	@# they run for every component selection; a reference row added without regeneration fails.
+	@# event_copies.py holds the hand-kept lists of the durable event types (TypeScript SDK,
+	@# sync_engine) equal to the catalogue, whichever component a change selects (docs/decisions.d/M3-19.md D-M3-19-23).
 	@if [ ! -f packages/domain/pubspec.yaml ]; then $(call skip,codegen-domain,packages/domain is not tracked); \
 	else $(UVRUN) python tools/configdoc/app_config.py --check || exit 1; \
-	  $(UVRUN) python tools/catalog/event_catalog_dart.py --check || exit 1; fi
+	  $(UVRUN) python tools/catalog/event_catalog_dart.py --check || exit 1; \
+	  $(UVRUN) python tools/catalog/event_copies.py || exit 1; fi
 	@# The copy of docs/api/ in the fake server of sync_engine, which the app's integration tests
 	@# read inside the macOS app sandbox (docs/DECISIONS.md D-M4-18-17); Python only, like above.
 	@if [ ! -f packages/sync_engine/pubspec.yaml ]; then $(call skip,codegen-contract,packages/sync_engine is not tracked); \

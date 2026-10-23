@@ -59,6 +59,18 @@ type ThreadInfo struct {
 	LastMessageSeq, UnreadFloorSeq int64
 }
 
+// ThreadPosition is one thread that can be unread for somebody (Threads.UnreadCandidates, M3-19):
+// last_message_seq is above unread_floor_seq. A person's unread count is LastMessageSeq -
+// GREATEST(last_read_seq, UnreadFloorSeq) (03 read_states "Unread").
+type ThreadPosition struct {
+	// ThreadID is the thread; ChannelID its channel.
+	ThreadID, ChannelID ids.ID
+	// ChannelKind is text, forum or dm.
+	ChannelKind string
+	// LastMessageSeq and UnreadFloorSeq are the counters of the thread (03 threads).
+	LastMessageSeq, UnreadFloorSeq int64
+}
+
 // ThreadCounter are the counters of one thread for the unread counters of the snapshot (M1-63):
 // a person's unread count there is LastMessageSeq - GREATEST(last_read_seq, UnreadFloorSeq).
 type ThreadCounter struct {
@@ -238,6 +250,19 @@ type Threads interface {
 	//
 	//	counters, err := threads.Counters(ctx, scope.ChannelIDs)
 	Counters(ctx context.Context, channelIDs []ids.ID) ([]ThreadCounter, error)
+	// UnreadCandidates returns the threads of channelIDs with last_message_seq above
+	// unread_floor_seq, each with its channel, the channel kind (text, forum or dm) and both
+	// counters, ascending by thread id, for the badge of notify (M3-19, 13 section 8). It never
+	// authorizes and applies no visibility predicate: the caller passes the channels of the
+	// recipient's authz Scope for push.deliver and confirms every thread that counts with
+	// push.deliver, so this read is a system job read like the log tail. No channel returns an
+	// empty list without a query. Errors: internal when the service has no unread store, else the
+	// database error.
+	//
+	// Example:
+	//
+	//	positions, err := threads.UnreadCandidates(ctx, scope.ChannelIDs)
+	UnreadCandidates(ctx context.Context, channelIDs []ids.ID) ([]ThreadPosition, error)
 
 	// List returns a page of the threads of kind thread of a channel (thread.read on the channel,
 	// then per item in filter mode, 07 section 7.4), newest first by last_activity or created,

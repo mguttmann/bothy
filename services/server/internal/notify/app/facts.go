@@ -75,6 +75,49 @@ func (f Facts) LevelFacts(ctx context.Context, threadID ids.ID, userIDs []ids.ID
 	return out, nil
 }
 
+// LevelFactsOfUser gathers the facts of 13 section 3.1 of one person for many threads (the badge
+// of 13 8, brief M3-19 design note 16 a): one read of the person's own rows, one read of the
+// stored notify.default_level and one path read per thread. A thread that no longer exists is
+// absent from the result. Like LevelFacts it never resolves the level and does not authorize.
+//
+// Errors: the errors of the reads other than not_found of a thread.
+func (f Facts) LevelFactsOfUser(ctx context.Context, userID ids.ID, threadIDs []ids.ID) (map[ids.ID]domain.LevelFacts, error) {
+	out := make(map[ids.ID]domain.LevelFacts, len(threadIDs))
+	if len(threadIDs) == 0 {
+		return out, nil
+	}
+	rows, err := f.d.Store.Preferences(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	vals, err := f.d.Settings.ValuesFor(ctx, []ids.ID{userID}, []string{settingDefaultLevel})
+	if err != nil {
+		return nil, err
+	}
+	personal, ok := personalDefault(vals[userID])
+	if !ok {
+		f.d.Log.WarnContext(ctx, "notify: a stored notify.default_level is not a level and counts as unset")
+	}
+	for _, t := range threadIDs {
+		path, err := f.d.Paths.NotificationPath(ctx, chat.TargetThread, t)
+		if err != nil {
+			if errs.KindOf(err) == errs.KindNotFound {
+				continue
+			}
+			return nil, err
+		}
+		lf := domain.LevelFacts{
+			ChannelDefault: domain.Level(path.DefaultNotificationLevel), DirectMessage: path.ChannelKind == "dm",
+			PersonalDefault: personal, InstanceDefault: domain.Level(f.cfg.UserDefaultLevel),
+		}
+		for _, r := range rows {
+			lf = withRow(lf, path, PreferenceRow{UserID: userID, Preference: r})
+		}
+		out[t] = lf
+	}
+	return out, nil
+}
+
 // withRow puts the own row r into the slot of lf its target names on path.
 func withRow(lf domain.LevelFacts, path chat.NotificationPath, r PreferenceRow) domain.LevelFacts {
 	p := &domain.Preference{Level: domain.Level(r.Level), MutedUntil: r.MutedUntil}

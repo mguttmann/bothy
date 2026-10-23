@@ -15,6 +15,7 @@ import (
 	filesjobs "github.com/OWNER/bothy/services/server/internal/files/adapters/jobs"
 	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
 	instancejobs "github.com/OWNER/bothy/services/server/internal/instance/adapters/jobs"
+	notifyjobs "github.com/OWNER/bothy/services/server/internal/notify/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -122,6 +123,9 @@ type JobModules struct {
 	TerminalSweep terminaljobs.Sweeper
 	// TerminalSweepInterval is terminal.sweep_interval.
 	TerminalSweepInterval time.Duration
+	// Push is the push path of notify, the use cases of notify.push_send, notify.coalesce_flush
+	// and notify.badge_sync (M3-19); nil only where no job runs.
+	Push notifyjobs.UseCases
 }
 
 // TerminalSweepConfig binds terminal.sweep_interval, the period of terminal.sweep (M2-46).
@@ -145,9 +149,10 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // audit.chain_verify (M1-50), apps.webhook_deliver on the queue delivery (M2-26), files.scan
 // on the queue files without a River job timeout (M3-04), files.thumbnail on the queue files with
 // the timeout file.image.processing_timeout (M3-06), runs.queued_expiry on the queue default
-// (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09)
-// and terminal.sweep on the queue maintenance, periodic with terminal.sweep_interval and once at
-// the start (M2-46); the error is the first rejected registration.
+// (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09),
+// terminal.sweep on the queue maintenance, periodic with terminal.sweep_interval and once at the
+// start (M2-46), and the five jobs of notify on the queue delivery (M3-19); the error is the first
+// rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -187,6 +192,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := terminaljobs.Register(reg, m.TerminalSweep, m.TerminalSweepInterval); err != nil {
+		return nil, err
+	}
+	if err := notifyjobs.Register(reg, m.Push); err != nil {
 		return nil, err
 	}
 	return reg, nil

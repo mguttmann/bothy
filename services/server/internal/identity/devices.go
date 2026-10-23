@@ -81,6 +81,15 @@ type RegisterDevice struct {
 	ApprovedBy *ids.ID
 }
 
+// DeviceRef is one active device of a person as the consumer push reads it
+// (Devices.ActiveForUsers, M3-19 design note 8).
+type DeviceRef struct {
+	// ID is devices.id.
+	ID ids.ID
+	// Platform is devices.platform (ios, android, macos, windows, web, cli).
+	Platform string
+}
+
 // Device is a device as the API shows it (schema Device without push_registrations, which M3
 // adds). Zero values are absent members.
 type Device struct {
@@ -136,9 +145,11 @@ type DevicePage struct {
 type Devices interface {
 	// Register validates and stores a new device with its keys (brief M1-33 "Device
 	// registration"). It joins the ambient unit of work of ctx, or runs its own. The login
-	// tickets (M1-37 to M1-43) call it after their own authorization. Errors: validation_failed
-	// with field pointers, not_found when UserID is no person, conflict for a known device id or
-	// jkt.
+	// tickets (M1-37 to M1-43) call it after their own authorization. A device with state pending
+	// appends exactly one durable event device.pending in the same unit of work (R-AZ-31), so a
+	// later veto removes the device and the event together; an active device appends none.
+	// Errors: validation_failed with field pointers, not_found when UserID is no person, conflict
+	// for a known device id or jkt, internal for a pending device without an event appender.
 	Register(ctx context.Context, r RegisterDevice) (Device, error)
 	// Get returns the device deviceID if a may read it (self or owner; a pending device only
 	// itself). Errors: not_found for a missing or invisible device, device_pending for another
@@ -153,4 +164,11 @@ type Devices interface {
 	// ActiveKey returns the key of deviceID and purpose with revoked_at IS NULL. It does not
 	// authorize: the authentication path calls it. Errors: not_found when there is none.
 	ActiveKey(ctx context.Context, deviceID ids.ID, purpose KeyPurpose) (DeviceKey, error)
+	// ActiveForUsers returns the devices with devices.state = 'active' of the people userIDs,
+	// grouped by person, each list ascending by id; a person without an active device is absent
+	// from the map, and an empty userIDs gives an empty map. It never authorizes: its consumer,
+	// the worker consumer push of notify (M3-19 design note 8), selected the people itself and
+	// decides every hint with authorize. It reads inside the ambient transaction of ctx when there
+	// is one. Errors: those of the read, as kernel/errs errors without SQL or values.
+	ActiveForUsers(ctx context.Context, userIDs []ids.ID) (map[ids.ID][]DeviceRef, error)
 }

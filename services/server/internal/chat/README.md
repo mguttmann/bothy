@@ -1,6 +1,6 @@
 # Module `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62), channel behaviour with agent configuration (M2-02) and the project binding with readiness (M2-03) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62), channel behaviour with agent configuration (M2-02) and the project binding with readiness (M2-03) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63); `Threads.UnreadCandidates` for the badge of notify (M3-19).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -207,6 +207,16 @@ checks under the lock (archive state, If-Match, no-op) and before the operator c
   (query `LocateThreads`, `id = ANY($1)`, joined with channel and space), ascending by id; an
   unknown id is absent. It does not authorize and reads in the ambient transaction: runs keeps only
   threads whose channel is in its `Authorizer.Scope` and authorizes per item ("Running now").
+- `UnreadCandidates` (M3-19 design note 16 a, `ThreadPosition`) returns `thread_id`,
+  `channel_id`, the channel kind (`text`, `forum` or `dm`), `last_message_seq` and
+  `unread_floor_seq` of the threads of the given channels with `last_message_seq >
+  unread_floor_seq`, ascending by thread id (query `UnreadCandidates` in `queries/unread.sql`,
+  `channel_id = ANY($1)`, joined with the channel); no channel returns an empty list without a
+  query. It never authorizes and applies no visibility of its own: the badge of notify passes the
+  channels of the recipient's `authz` Scope for `push.deliver` and confirms every thread that counts
+  with `push.deliver` (13 section 8). The store is the port `app.UnreadStore` beside `Store`
+  (`Deps.Unread`, which falls back to `Store` when it implements the port, like `Behaviors`);
+  without one the method answers internal.
 - Port `chat.ThreadsByParent` (`threads.go`, M2-27): `ThreadByParentMessage(ctx, messageID)`
   returns the `ThreadInfo` of the thread whose `parent_message_id` is `messageID` and `found =
   false` when no thread started from it, without authorization (callers authorize first). It is a
@@ -448,6 +458,11 @@ Rulings: docs/DECISIONS.md D-M2-03-1 to D-M2-03-13. Tests: `domain/project_bindi
 canary scenario `test/canary/scenario_project.go`.
 
 ## Port (root package `internal/chat`)
+
+- Inbound: `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate, UnreadCandidates), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
+- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`.
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).

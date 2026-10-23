@@ -118,6 +118,9 @@ type Deps struct {
 	// Bindings reads and writes project_bindings (M2-03); nil means Store when it implements
 	// BindingStore. Without one the chat.ProjectBindings methods answer internal.
 	Bindings BindingStore
+	// Unread reads the threads that can be unread for the badge of notify (M3-19); nil means Store
+	// when it implements UnreadStore. Without one Threads.UnreadCandidates answers internal.
+	Unread UnreadStore
 	// Errors counts a filter mismatch of listServedChannels in bothy.authz.errors; nil counts
 	// nothing (M2-02).
 	Errors ErrorCounter
@@ -169,6 +172,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Bindings == nil {
 		d.Bindings, _ = d.Store.(BindingStore)
+	}
+	if d.Unread == nil {
+		d.Unread, _ = d.Store.(UnreadStore)
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()
