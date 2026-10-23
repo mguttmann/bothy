@@ -11568,6 +11568,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set the operator of {name}'**
   String stepUpPurposeImportOperator(String name);
+
+  /// Notification level all (13 section 3.1): every message notifies.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get notifyLevelAll;
+
+  /// Notification level mentions (13 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Mentions'**
+  String get notifyLevelMentions;
+
+  /// Notification level mute (13 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get notifyLevelMute;
+
+  /// Shown for a target without an own level: the level it inherits (01 5.1 D9).
+  ///
+  /// In en, this message translates to:
+  /// **'inherits: {level}'**
+  String notifyInherits(String level);
+
+  /// Menu item that deletes the own level of a target, with the inherited level and its source.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherit ({level} from {source})'**
+  String notifyInheritFrom(String level, String source);
+
+  /// Source of an effective level: the own level of the thread (step 1 of 13 section 3.1).
+  ///
+  /// In en, this message translates to:
+  /// **'the thread'**
+  String get notifySourceThread;
+
+  /// Source of an effective level: the own level of the channel (step 2).
+  ///
+  /// In en, this message translates to:
+  /// **'the channel'**
+  String get notifySourceChannel;
+
+  /// Source of an effective level: the own level of the space (step 3).
+  ///
+  /// In en, this message translates to:
+  /// **'the space'**
+  String get notifySourceSpace;
+
+  /// Source of an effective level: the default level an operator set on the channel (step 4).
+  ///
+  /// In en, this message translates to:
+  /// **'the default of the channel'**
+  String get notifySourceChannelDefault;
+
+  /// Source of an effective level: a direct message channel notifies every message (step 5).
+  ///
+  /// In en, this message translates to:
+  /// **'the direct message'**
+  String get notifySourceDm;
+
+  /// Source of an effective level: the personal default notify.default_level (step 6).
+  ///
+  /// In en, this message translates to:
+  /// **'your default'**
+  String get notifySourcePersonalDefault;
+
+  /// Source of an effective level: the default of the instance (step 7).
+  ///
+  /// In en, this message translates to:
+  /// **'the default of the instance'**
+  String get notifySourceInstanceDefault;
+
+  /// Shown for a thread the person follows with level all, as the server sets it after a write in the thread (13 section 3.2).
+  ///
+  /// In en, this message translates to:
+  /// **'Following'**
+  String get notifyFollowing;
+
+  /// Shown while a level is muted until a time.
+  ///
+  /// In en, this message translates to:
+  /// **'muted until {when}'**
+  String notifyMutedUntil(String when);
+
+  /// Submenu of the menu of a space, channel or thread with the notification levels; also the button in the thread header that opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notifyMenuNotifications;
+
+  /// Submenu with the fixed choices of a temporary mute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute until'**
+  String get notifyMenuMuteUntil;
+
+  /// Choice of the Mute until submenu: mute for one hour.
+  ///
+  /// In en, this message translates to:
+  /// **'For 1 hour'**
+  String get notifyMuteOneHour;
+
+  /// Choice of the Mute until submenu: mute until tomorrow at the given time in the person's time zone.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow {time}'**
+  String notifyMuteTomorrow(String time);
+
+  /// Choice of the Mute until submenu: pick the end of the mute.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose date and time'**
+  String get notifyMuteChooseDate;
+
+  /// Screen reader label of the menu of a space, channel or thread.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu of {name}'**
+  String notifyMenuOf(String name);
+
+  /// Button in the thread header that opens the menu of the thread or the channel.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get notifyMenuOpen;
+
+  /// Item of the channel menu, only where the server gives the capability export (07 section 2.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Export history'**
+  String get channelMenuExport;
+
+  /// Title of the export dialog of a channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Export {name}'**
+  String exportTitle(String name);
+
+  /// First day of the export range (included).
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get exportFrom;
+
+  /// Last day of the export range (included).
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get exportTo;
+
+  /// Error of the export dialog for a range that ends before it starts.
+  ///
+  /// In en, this message translates to:
+  /// **'The first day must not be after the last day.'**
+  String get exportRangeInvalid;
+
+  /// Button of the export dialog: asks for the file, then streams the history into it.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose file and export'**
+  String get exportStart;
+
+  /// Progress of a running export.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} written'**
+  String exportProgress(String size);
+
+  /// Shown when the export is complete.
+  ///
+  /// In en, this message translates to:
+  /// **'Export saved: {size}.'**
+  String exportDone(String size);
+
+  /// Shown after the person cancelled a running export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export cancelled. The incomplete file was deleted.'**
+  String get exportCancelled;
+
+  /// Shown when the stream ended with an error after it started.
+  ///
+  /// In en, this message translates to:
+  /// **'The export broke off. The incomplete file was deleted.'**
+  String get exportBrokeOff;
+
+  /// Button of the export dialog: closes it, or aborts a running export.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get exportCancel;
+
+  /// Button of the export dialog after the export ended.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get exportClose;
+
+  /// Purpose shown in the step-up dialog of a channel export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export the history of {name}'**
+  String stepUpPurposeChannelExport(String name);
+
+  /// Row of D9: the personal default notify.default_level.
+  ///
+  /// In en, this message translates to:
+  /// **'Default for each new channel'**
+  String get notifySettingsDefault;
+
+  /// Hint of the personal default level in D9.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies where nothing else is set.'**
+  String get notifySettingsDefaultHint;
+
+  /// Row of D9 that explains the notifications of the person's own runs (01 section 10.1); there is no setting for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs I triggered'**
+  String get notifySettingsRuns;
+
+  /// Explanation of the row Runs I triggered in D9 (01 section 10.1).
+  ///
+  /// In en, this message translates to:
+  /// **'A question of your run always notifies you, also when muted. Its end or failure follows the level.'**
+  String get notifySettingsRunsExplain;
+
+  /// Row of D9: notify.preview_mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Content in notifications'**
+  String get notifySettingsPreview;
+
+  /// notify.preview_mode full: the app loads the text (13 section 6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Text and names'**
+  String get notifyPreviewFull;
+
+  /// notify.preview_mode names: only channel, thread and sender names.
+  ///
+  /// In en, this message translates to:
+  /// **'Names only'**
+  String get notifyPreviewNames;
+
+  /// notify.preview_mode none: only the placeholder text.
+  ///
+  /// In en, this message translates to:
+  /// **'Only New message'**
+  String get notifyPreviewNone;
+
+  /// Row of D9 with the quiet hours rules (13 section 3.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet hours'**
+  String get notifySettingsQuietHours;
+
+  /// Row of D9: notify.input_needed_breaks_quiet_hours.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions break quiet hours'**
+  String get notifySettingsInputBreaks;
+
+  /// Hint of the switch Questions break quiet hours.
+  ///
+  /// In en, this message translates to:
+  /// **'A question of your own run stays audible.'**
+  String get notifySettingsInputBreaksHint;
+
+  /// Row of D9 for owners: notify.admin_enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Administration reminders'**
+  String get notifySettingsAdmin;
+
+  /// Hint of the switch Administration reminders.
+  ///
+  /// In en, this message translates to:
+  /// **'For example an access grant that expires.'**
+  String get notifySettingsAdminHint;
+
+  /// Heading of the tree of D9 with the level of each target.
+  ///
+  /// In en, this message translates to:
+  /// **'Per space, channel and thread'**
+  String get notifySettingsTree;
+
+  /// Shown in the tree of D9 while no space or channel is known.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to show yet.'**
+  String get notifySettingsTreeEmpty;
+
+  /// Choice of the level control in the tree of D9: delete the own level.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherit'**
+  String get notifyChoiceInherit;
+
+  /// Shown in D9 while the person has no quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'No quiet hours.'**
+  String get quietHoursNone;
+
+  /// Button of D9 that opens the editor for a new quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Add quiet hours'**
+  String get quietHoursAdd;
+
+  /// Button of a quiet hours rule in D9.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get quietHoursEdit;
+
+  /// Button of a quiet hours rule in D9 and its editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get quietHoursDelete;
+
+  /// A quiet hours rule from 00:00 to 00:00, 24 hours on each chosen day (D-M3-17-4).
+  ///
+  /// In en, this message translates to:
+  /// **'All day'**
+  String get quietHoursAllDay;
+
+  /// The time range of a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'{start} to {end}'**
+  String quietHoursRange(String start, String end);
+
+  /// Marks a disabled quiet hours rule in D9.
+  ///
+  /// In en, this message translates to:
+  /// **'off'**
+  String get quietHoursOff;
+
+  /// Short name of Monday in a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Mon'**
+  String get quietHoursDayMon;
+
+  /// Short name of Tuesday in a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Tue'**
+  String get quietHoursDayTue;
+
+  /// Short name of Wednesday in a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Wed'**
+  String get quietHoursDayWed;
+
+  /// Short name of Thursday in a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Thu'**
+  String get quietHoursDayThu;
+
+  /// Short name of Friday in a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Fri'**
+  String get quietHoursDayFri;
+
+  /// Short name of Saturday in a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Sat'**
+  String get quietHoursDaySat;
+
+  /// Short name of Sunday in a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Sun'**
+  String get quietHoursDaySun;
+
+  /// Title of the editor of one quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet hours'**
+  String get quietHoursEditorTitle;
+
+  /// Label of the weekday choice of a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get quietHoursDays;
+
+  /// Start time of a quiet hours rule (HH:MM).
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get quietHoursStart;
+
+  /// End time of a quiet hours rule (HH:MM); before the start means across midnight.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get quietHoursEnd;
+
+  /// Time zone of a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Time zone'**
+  String get quietHoursTimeZone;
+
+  /// Choice of the time zone of a quiet hours rule: follow the person's time zone.
+  ///
+  /// In en, this message translates to:
+  /// **'Mine ({zone})'**
+  String quietHoursTimeZoneMine(String zone);
+
+  /// Switch of a quiet hours rule.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get quietHoursEnabled;
+
+  /// Button of the quiet hours editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get quietHoursSave;
+
+  /// Button of the quiet hours editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get quietHoursCancel;
+
+  /// Error of a time field of the quiet hours editor.
+  ///
+  /// In en, this message translates to:
+  /// **'Use HH:MM, for example 07:30.'**
+  String get quietHoursTimeInvalid;
+
+  /// Error of the quiet hours editor without a weekday.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose at least one day.'**
+  String get quietHoursNoDays;
 }
 
 class _AppLocalizationsDelegate
