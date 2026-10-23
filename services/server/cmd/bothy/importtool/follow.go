@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -32,12 +33,19 @@ type mirror struct {
 	notes    []string
 }
 
-// sourceEnd ends the mirror because the owner completed (err nil, exit 0) or failed (exit 1) the
+// The keys of the debug log of the mirror; the values carry no content.
+const (
+	logKeyError  = "error"
+	logKeyReason = "reason"
+	logKeyHeld   = "held"
+)
+
+// sourceEndError ends the mirror because the owner completed (err nil, exit 0) or failed (exit 1) the
 // source (brief design note 3).
-type sourceEnd struct{ err error }
+type sourceEndError struct{ err error }
 
 // Error returns the reason.
-func (e *sourceEnd) Error() string {
+func (e *sourceEndError) Error() string {
 	if e.err == nil {
 		return "the import source is completed"
 	}
@@ -65,43 +73,47 @@ func follow(ctx context.Context, o options, env Env, wk *walker, src *restclient
 	}
 	failures := 0
 	for first := true; ; first = false {
+		var err error
 		if !first {
-			if err := m.wait(ctx, backoff(wk.cfg, failures)); err != nil {
-				if ctx.Err() != nil {
-					return m.finish(work)
-				}
-				var le *leaseError
-				if errors.As(err, &le) {
-					return err
-				}
-				failures++
-				m.failed(err, failures)
-				continue
-			}
+			err = m.wait(ctx, backoff(wk.cfg, failures))
 		}
-		err := m.round(work)
-		var end *sourceEnd
-		var le *leaseError
-		switch {
-		case errors.As(err, &end):
-			return end.err
-		case errors.Is(err, errHalted):
-			return m.finish(work)
-		case errors.As(err, &le):
-			return err
-		case err != nil && o.once:
-			_ = m.finish(work)
-			return err
-		case err != nil:
+		if err == nil {
+			err = m.round(work)
+		}
+		done, ret := m.outcome(ctx, err)
+		if done {
+			return ret
+		}
+		if err != nil {
 			failures++
 			m.failed(err, failures)
-		default:
+		} else {
 			failures = 0
 		}
-		if o.once || ctx.Err() != nil {
-			return m.finish(work)
-		}
 	}
+}
+
+// outcome decides after a wait or a round whether the mirror ends and with which error: a stop
+// request, --once, a lost lease or the end of the source end it; any other error is a failed
+// round and the loop goes on.
+func (m *mirror) outcome(ctx context.Context, err error) (bool, error) {
+	work := context.WithoutCancel(ctx)
+	var end *sourceEndError
+	var le *leaseError
+	switch {
+	case errors.As(err, &end):
+		return true, end.err
+	case errors.As(err, &le):
+		return true, err
+	case errors.Is(err, errHalted), ctx.Err() != nil:
+		return true, m.finish(work)
+	case err != nil && m.o.once:
+		_ = m.finish(work)
+		return true, err
+	case err == nil && m.o.once:
+		return true, m.finish(work)
+	}
+	return false, nil
 }
 
 // backoff is the wait before the next round (brief design note 3): import.follow.poll_interval
@@ -245,9 +257,9 @@ func (m *mirror) source(ctx context.Context) (bool, error) {
 		m.cur = m.wk.w.snapshot()
 		return true, nil
 	case restclient.ImportSourceStateCompleted:
-		return false, &sourceEnd{}
+		return false, &sourceEndError{}
 	case restclient.ImportSourceStateFailed:
-		return false, &sourceEnd{err: errors.New("the import source failed")}
+		return false, &sourceEndError{err: errors.New("the import source failed")}
 	case restclient.ImportSourceStateDraft, restclient.ImportSourceStatePaused:
 	}
 	m.notes = append(m.notes, noteSourcePaused)
@@ -349,7 +361,7 @@ func (m *mirror) local(c *channelPlan, err error) error {
 	if err == nil || !threadLocal(err) {
 		return err
 	}
-	m.wk.log.Debug("mirror: thread failed", "error", err.Error())
+	m.wk.log.DebugContext(context.Background(), "mirror: thread failed", slog.String(logKeyError, err.Error()))
 	c.rep.note(noteThreadFailed)
 	return nil
 }
@@ -444,38 +456,52 @@ func (m *mirror) thread(ctx context.Context, c *channelPlan, t *threadPlan) erro
 	}
 	after := m.cur.position(pd.main, pd.readID)
 	pd.consumed = after
-	cfg := SettleConfig{BusyReactions: wk.cfg.FollowBusyReactions, SettleAfter: wk.cfg.FollowSettleAfter}
+	if err := m.read(ctx, c, pd, after); err != nil {
+		return err
+	}
+	return wk.flush(ctx, c, pd, true)
+}
+
+// read reads the new messages of a thread page by page from after and hands each page to page,
+// until a page is empty or the settle rule held a message back.
+func (m *mirror) read(ctx context.Context, c *channelPlan, pd *pending, after string) error {
 	for first := true; ; first = false {
-		page, err := wk.dc.MessagesAfter(ctx, pd.readID, after, wk.cfg.DiscordPageSize)
-		if err != nil {
+		msgs, err := m.wk.dc.MessagesAfter(ctx, pd.readID, after, m.wk.cfg.DiscordPageSize)
+		if err != nil || len(msgs) == 0 {
 			return err
-		}
-		if len(page) == 0 {
-			break
 		}
 		var lookback []discord.Message
 		if first && after != "0" {
-			if lookback, err = m.lookback(ctx, pd.readID, page[0].ID); err != nil {
+			if lookback, err = m.lookback(ctx, pd.readID, msgs[0].ID); err != nil {
 				return err
 			}
 		}
-		if err := m.loadStarters(ctx, c, slices.Concat(lookback, page)); err != nil {
+		if held, err := m.page(ctx, c, pd, msgs, lookback); err != nil || held {
 			return err
 		}
-		cp, held, reason := Settle(m.env.clock().Now(), page, lookback, func(id string) *discord.Message { return m.starters[id] }, cfg)
-		for _, msg := range cp {
-			if err := wk.consume(ctx, c, pd, msg); err != nil {
-				return err
-			}
-		}
-		if held > 0 {
-			c.rep.MessagesHeld += held
-			wk.log.Debug("mirror: thread held back", "reason", string(reason), "held", held)
-			break
-		}
-		after = page[len(page)-1].ID
+		after = msgs[len(msgs)-1].ID
 	}
-	return wk.flush(ctx, c, pd, true)
+}
+
+// page applies the settle rule to one page of new messages and hands the copy to the walker; held
+// is true when the rule held a message back, which ends the reading of the thread for this round.
+func (m *mirror) page(ctx context.Context, c *channelPlan, pd *pending, page, lookback []discord.Message) (bool, error) {
+	if err := m.loadStarters(ctx, c, slices.Concat(lookback, page)); err != nil {
+		return false, err
+	}
+	cfg := SettleConfig{BusyReactions: m.wk.cfg.FollowBusyReactions, SettleAfter: m.wk.cfg.FollowSettleAfter}
+	cp, held, reason := Settle(m.env.clock().Now(), page, lookback, func(id string) *discord.Message { return m.starters[id] }, cfg)
+	for _, msg := range cp {
+		if err := m.wk.consume(ctx, c, pd, msg); err != nil {
+			return false, err
+		}
+	}
+	if held == 0 {
+		return false, nil
+	}
+	c.rep.MessagesHeld += held
+	m.wk.log.DebugContext(ctx, "mirror: thread held back", slog.String(logKeyReason, string(reason)), slog.Int(logKeyHeld, held))
+	return true, nil
 }
 
 // lookback reads the import.follow.busy_lookback messages before first (22 12.3 item 4), in pages
@@ -513,21 +539,30 @@ func (m *mirror) loadStarters(ctx context.Context, c *channelPlan, msgs []discor
 		if channel == "" {
 			channel = c.ch.ID
 		}
-		m.starters[ref.MessageID] = nil
-		around, err := m.wk.dc.MessagesAround(ctx, channel, ref.MessageID, 1)
+		s, err := m.starter(ctx, channel, ref.MessageID)
 		if err != nil {
-			if errors.Is(err, discord.ErrForbidden) || errors.Is(err, discord.ErrNotFound) {
-				continue
-			}
 			return err
 		}
-		for i := range around {
-			if around[i].ID == ref.MessageID {
-				m.starters[ref.MessageID] = &around[i]
-			}
-		}
+		m.starters[ref.MessageID] = s
 	}
 	return nil
+}
+
+// starter reads one message (GET around its ID); nil when it is not readable or gone.
+func (m *mirror) starter(ctx context.Context, channel, id string) (*discord.Message, error) {
+	around, err := m.wk.dc.MessagesAround(ctx, channel, id, 1)
+	if errors.Is(err, discord.ErrForbidden) || errors.Is(err, discord.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for i := range around {
+		if around[i].ID == id {
+			return &around[i], nil
+		}
+	}
+	return nil, nil
 }
 
 // print writes the report of the round: always in a dry mirror and with --once, with --follow
@@ -540,13 +575,13 @@ func (m *mirror) print() {
 		return
 	}
 	var err error
-	if m.o.report == "json" {
+	if m.o.report == reportJSON {
 		err = rep.writeJSON(m.env.Stdout)
 	} else {
 		err = rep.writeText(m.env.Stdout)
 	}
 	if err != nil {
-		m.wk.log.Debug("mirror: report not written", "error", err.Error())
+		m.wk.log.DebugContext(context.Background(), "mirror: report not written", slog.String(logKeyError, err.Error()))
 	}
 }
 

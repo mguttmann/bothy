@@ -17,9 +17,9 @@ import (
 // pathGuildChannels is the path of GET /guilds/{id}/channels of the fixture guild in the fake.
 const pathGuildChannels = discordtest.APIPath + "/guilds/" + fxGuild + "/channels"
 
-// newMessage is a raw Discord message of Alex (mapped) of type 0 in channel, written at.
-func newMessage(id, channel string, at time.Time) json.RawMessage {
-	b, err := json.Marshal(map[string]any{"id": id, "channel_id": channel, "type": 0, "content": "a new message",
+// newMessage is a raw Discord message of Alex (mapped) of type 0 in general, written at.
+func newMessage(id string, at time.Time) json.RawMessage {
+	b, err := json.Marshal(map[string]any{"id": id, "channel_id": fxGeneral, "type": 0, "content": "a new message",
 		"timestamp": at.UTC().Format(time.RFC3339Nano), "pinned": false, "mentions": []any{},
 		"author": map[string]any{"id": "13000011", "username": "alex", "global_name": "Alex", "bot": false}})
 	if err != nil {
@@ -83,7 +83,7 @@ func TestFailedRoundWaitsAndContinues(t *testing.T) {
 		case 1:
 			e.discord.Inject(pathGuildChannels, discordtest.Status(http.StatusBadGateway))
 		case 2:
-			e.discord.AddMessage(fxGeneral, newMessage("13009001", fxGeneral, e.clk.Now().Add(-time.Hour)))
+			e.discord.AddMessage(fxGeneral, newMessage("13009001", e.clk.Now().Add(-time.Hour)))
 		case 4:
 			stop()
 		}
@@ -232,7 +232,7 @@ func TestLeadsRereadEachRound(t *testing.T) {
 				t.Fatal(err)
 			}
 			e.bothy.SetConfig(src, m.Normalized())
-			e.discord.AddMessage(fxGeneral, newMessage("13009001", fxGeneral, e.clk.Now().Add(-time.Hour)))
+			e.discord.AddMessage(fxGeneral, newMessage("13009001", e.clk.Now().Add(-time.Hour)))
 		case 2:
 			stop()
 		}
@@ -330,7 +330,7 @@ func TestPausedSourceIsNoop(t *testing.T) {
 		switch call {
 		case 1:
 			e.bothy.SetState(src, "paused")
-			e.discord.AddMessage(fxGeneral, newMessage("13009001", fxGeneral, e.clk.Now().Add(-time.Hour)))
+			e.discord.AddMessage(fxGeneral, newMessage("13009001", e.clk.Now().Add(-time.Hour)))
 		case 2:
 			stop()
 		}
@@ -424,10 +424,10 @@ func TestMirrorSettle(t *testing.T) {
 		switch call {
 		case 1:
 			now := e.clk.Now()
-			e.discord.AddMessage(fxGeneral, newMessage(settled, fxGeneral, now.Add(-time.Hour)))
-			e.discord.AddMessage(fxGeneral, newMessage(busyID, fxGeneral, now.Add(-time.Hour)))
+			e.discord.AddMessage(fxGeneral, newMessage(settled, now.Add(-time.Hour)))
+			e.discord.AddMessage(fxGeneral, newMessage(busyID, now.Add(-time.Hour)))
 			e.discord.EditMessage(fxGeneral, busyID, map[string]any{"reactions": []any{map[string]any{"count": 1, "emoji": map[string]any{"name": "\U0001F440"}}}})
-			e.discord.AddMessage(fxGeneral, newMessage(after, fxGeneral, now))
+			e.discord.AddMessage(fxGeneral, newMessage(after, now))
 		case 2:
 			e.discord.EditMessage(fxGeneral, busyID, map[string]any{"reactions": nil})
 			e.clk.Advance(DefaultConfig().FollowSettleAfter)

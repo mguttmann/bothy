@@ -95,6 +95,9 @@ a new run resumes; 2 invocation, mapping file or preflight faulty, nothing writt
 holds the lease of the source (use --takeover; with --once the normal case for scheduled calls).
 `
 
+// reportJSON is the --report value of the JSON report.
+const reportJSON = "json"
+
 // stringList is a repeatable flag.
 type stringList []string
 
@@ -158,7 +161,7 @@ func parseRun(args []string, env Env) (options, int) {
 		problem = "--guild and --map are required"
 	case !snowflake(o.guild):
 		problem = "--guild is not a Discord ID (digits)"
-	case o.report != "text" && o.report != "json":
+	case o.report != "text" && o.report != reportJSON:
 		problem = "--report must be text or json"
 	case o.takeover && !o.apply:
 		problem = "--takeover needs --apply"
@@ -454,7 +457,7 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, cl
 	if err := walk(ctx, o, env, wk); err != nil {
 		return err
 	}
-	if o.report == "json" {
+	if o.report == reportJSON {
 		return rep.writeJSON(env.Stdout)
 	}
 	return rep.writeText(env.Stdout)

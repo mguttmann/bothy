@@ -102,7 +102,7 @@ type testEnv struct {
 	hook    func(int) error
 	sleep   Sleeper
 	follow  Sleeper // the FollowSleep of a run; nil means sleep
-	mapText string // a mapping a test case builds after the fakes started
+	mapText string  // a mapping a test case builds after the fakes started
 }
 
 // newTestEnv starts the fakes for fixture and logs the tool in to the fake server.

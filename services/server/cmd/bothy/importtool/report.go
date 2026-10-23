@@ -180,7 +180,7 @@ func (r *report) stats() map[string]any {
 	out := map[string]any{
 		"threads_open": t.ThreadsOpen, "threads_done": t.ThreadsDone,
 		"messages_taken": t.MessagesTaken, "messages_present": t.MessagesPresent, "messages_failed": t.MessagesFailed,
-		"messages_held": t.MessagesHeld,
+		"messages_held":     t.MessagesHeld,
 		"attachments_taken": t.AttachmentsTaken, "attachments_too_large": t.AttachmentsTooLarge,
 		"attachments_failed": t.AttachmentsFailed, "people_mapped": t.PeopleMapped,
 		"people_placeholders": t.PeoplePlaceholders, "pins_taken": t.PinsTaken, "tags_taken": t.TagsTaken,

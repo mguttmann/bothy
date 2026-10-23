@@ -524,6 +524,12 @@ func (wk *walker) flush(ctx context.Context, c *channelPlan, pd *pending, end bo
 	if err != nil {
 		return err
 	}
+	return wk.sent(ctx, c, pd, got)
+}
+
+// sent records an accepted thread batch: the counters, the test hook, the fingerprint of a posted
+// thread item, the cursor; then a stop request of the read mirror ends the walk.
+func (wk *walker) sent(ctx context.Context, c *channelPlan, pd *pending, got map[string]restclient.ImportItem) error {
 	wk.tally(c, got)
 	wk.batches++
 	if wk.afterBatch != nil {

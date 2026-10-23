@@ -116,11 +116,11 @@ type File struct {
 
 // imports is the state of the import interface, guarded by Server.mu.
 type imports struct {
-	me         person
-	users      []*person
-	agents     []*person
-	spaces     []*space
-	sources    []*source
+	me          person
+	users       []*person
+	agents      []*person
+	spaces      []*space
+	sources     []*source
 	partSize    int64
 	afterStore  []*afterFault
 	batchFaults map[string]*batchFault
