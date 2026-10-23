@@ -216,7 +216,9 @@ async def test_installer_busy_mode_and_switch(world: HermesWorld) -> None:
         except AssertionError:
             raise AssertionError(gateway_log(rig)) from None
         used = [
-            str(r["credential"]) for r in rig.model_requests() if r["route"] == "anthropic.messages"
+            str(r["credential"])
+            for r in rig.model_requests()
+            if r["route"] == "anthropic.messages" and r.get("tools")
         ]
         assert used
         assert set(used) == {"oauth"}

@@ -199,9 +199,13 @@ async def test_ack_after_inbox_before_context(tmp_path: Path) -> None:
         r.handler.prepare = prepare  # type: ignore[method-assign] # record the order
         triggered = await r.fake.trigger()
         await r.until(lambda: r.finished(triggered.run_id))
-        entries = await r.loop.inbox.for_run(triggered.run_id)
-        assert entries
-        assert entries[0].state is EntryState.CLOSED
+
+        async def closed() -> bool:
+            entries = await r.loop.inbox.for_run(triggered.run_id)
+            return bool(entries) and entries[0].state is EntryState.CLOSED
+
+        # The SDK closes the entry after finishRun answered, which may be after the server ended.
+        await r.until(closed, "the inbox entry to close")
     assert order[:3] == ["inbox", "ack", "prepare"]
     ops = _ops(r)
     assert ops.index("getRunContext") < ops.index("startRun")

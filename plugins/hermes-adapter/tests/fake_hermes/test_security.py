@@ -163,7 +163,13 @@ async def test_actual_mode_matches_used_credential(world: HermesWorld) -> None:
             start = next(q for q in rig.requests("startRun") if str(triggered.run_id) in q.path)
             assert start.json["billing_mode_used"] == mode
             assert start.json["billing_evidence"]["key_type"] == kind
-            used = [r for r in rig.model_requests()[before:] if r["route"] == "anthropic.messages"]
+            # Only the turn's own requests (they offer tools): a title or memory request of the
+            # previous run may still arrive with that run's credential.
+            used = [
+                r
+                for r in rig.model_requests()[before:]
+                if r["route"] == "anthropic.messages" and r.get("tools")
+            ]
             assert used
             assert {str(u["credential"]) for u in used} == {kind}
 
