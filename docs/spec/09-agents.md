@@ -56,7 +56,7 @@ keys of the column "Reported" below; any other key is refused.
 | Components | `supports_components` | `components: true` | Section 11; otherwise text only |
 | Voice input | `supports_voice` | `voice_input: true` | Section 13 |
 | Title suggestion | `supports_title` | `title: true` | Section 12 |
-| Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload` |
+| Sending files | `supports_files_out` | `files_out: true` | Agent additionally needs `+upload`. If `supports_files_out` is off, the server rejects messages of an agent with attachments with `403 feature_disabled`. |
 
 Schema `agent_operator_config.v1` (03, `agents`): a JSON object without further keys
 (`additionalProperties: false`); every key is optional. `operator_config` never contains

@@ -62,7 +62,7 @@ func (s *server) startAudit(ctx context.Context) error {
 	s.mu.Lock()
 	pool := s.pool
 	s.mu.Unlock()
-	a, err := NewAuditWithClock(pool, unitCfg, cfg, kek, s.deps.Clock, s.logger())
+	a, err := newAudit(pool, unitCfg, cfg, kek, s.deps.Clock, s.deps.TxnTestSubscribers, s.logger())
 	if err != nil {
 		return err
 	}

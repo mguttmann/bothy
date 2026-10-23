@@ -1679,6 +1679,18 @@
       "doc": "Time limit of one run of the image job files.thumbnail."
     },
     {
+      "name": "file.invocation_hold_max",
+      "env": "BOTHY_FILE__INVOCATION_HOLD_MAX",
+      "kind": "duration",
+      "default": "120s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Longest time the agent invocation of a message waits for its attachments to become final; after it the agent is invoked with the attachments in their current state."
+    },
+    {
       "name": "file.max_upload_bytes",
       "env": "BOTHY_FILE__MAX_UPLOAD_BYTES",
       "kind": "int",

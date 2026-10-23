@@ -18,13 +18,17 @@ type filesState struct {
 	// files is the files module (M3-03): the upload sessions over the object store, built in the
 	// files step after chat.
 	files *Files
+	// attachments is the port files.Attachments that messaging and runs receive in the chat step
+	// and the files step binds to the files module (M3-07).
+	attachments LazyAttachments
 }
 
 // moduleFiles is the name of the module in architecture/modules.yaml and of its start step, where it has one.
 const moduleFiles = "files"
 
 // filesWiring wires the files module: its start step (6f'), the health monitor of the virus
-// scanner (worker, all; M3-04) and the job files.scan.
+// scanner (worker, all; M3-04) and the job files.scan; the start step binds the port
+// files.Attachments that messaging and runs received earlier (M3-07).
 func filesWiring() moduleWiring {
 	return moduleWiring{
 		module: moduleFiles,
@@ -91,6 +95,7 @@ func (s *server) startFiles(ctx context.Context) error {
 			return err
 		}
 	}
+	s.attachments.Bind(f.Service)
 	s.mu.Lock()
 	s.files = f
 	id, st := s.identity, s.settings

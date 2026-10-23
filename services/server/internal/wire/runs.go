@@ -12,6 +12,7 @@ import (
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/autocompleterelay"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -35,8 +36,8 @@ import (
 // RunsConfig binds the keys of the runs use cases (api.page_size_default, api.page_size_max,
 // run.step_detail_max_bytes, run.queued_max_age, and for M2-09 auth.clock_leeway,
 // agent.cancel_grace, agent.presence_timeout, run.orphan_timeout, audit.reason_max_chars, and for
-// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes). The
-// error names the key whose binding failed, never a value.
+// M2-10 run.excerpt_max_chars, run.max_steps_persisted, sync.event_payload_max_bytes, and for M3-07
+// file.invocation_hold_max). The error names the key whose binding failed, never a value.
 func RunsConfig(v *config.Values) (runsapp.Config, error) {
 	var c runsapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -66,6 +67,9 @@ type Runs struct {
 	// ComponentExpiry schedules runs.component_expiry (M2-15); the jobs step binds its inserter
 	// (BindJobs).
 	ComponentExpiry *runsjobs.ComponentScheduler
+	// Holds schedules runs.invocation_hold_timeout (M3-07); the jobs step binds its inserter
+	// (BindJobs).
+	Holds *runsjobs.HoldScheduler
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -103,6 +107,12 @@ type RunsDeps struct {
 	// ComponentExpiry schedules runs.component_expiry (M2-15); nil means the scheduler over the
 	// job runtime of the process (Runs.BindJobs).
 	ComponentExpiry runsapp.ComponentExpiryScheduler
+	// Files answers whether the attachments of a triggering message are final and where a file
+	// is attached (M3-07); the server passes its LazyAttachments. nil holds no invocation.
+	Files files.Attachments
+	// Holds schedules runs.invocation_hold_timeout (M3-07); nil means the scheduler over the job
+	// runtime of the process (Runs.BindJobs).
+	Holds runsapp.HoldScheduler
 }
 
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
@@ -139,6 +149,11 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		cancels = &runsjobs.CancelScheduler{}
 		d.CancelTimeouts = cancels
 	}
+	var holds *runsjobs.HoldScheduler
+	if d.Holds == nil {
+		holds = &runsjobs.HoldScheduler{}
+		d.Holds = holds
+	}
 	if d.Heartbeats == nil {
 		hb, err := agentsapp.NewHeartbeatReader(agentspg.NewRepository(pool))
 		if err != nil {
@@ -156,13 +171,14 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
 		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics),
+		Files: d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
 		return nil, err
 	}
 	return &Runs{Service: svc, Handlers: runshttp.New(svc), CommandHandlers: runshttp.NewCommandExec(svc), Expiry: sched,
-		CancelTimeouts: cancels, ComponentExpiry: components}, nil
+		CancelTimeouts: cancels, ComponentExpiry: components, Holds: holds}, nil
 }
 
 // newRunsService builds the runs use cases over deps with the component collaborators of d
@@ -230,6 +246,9 @@ func (r *Runs) BindJobs(ins jobs.Inserter) {
 	}
 	if r.ComponentExpiry != nil {
 		r.ComponentExpiry.Bind(ins)
+	}
+	if r.Holds != nil {
+		r.Holds.Bind(ins)
 	}
 }
 

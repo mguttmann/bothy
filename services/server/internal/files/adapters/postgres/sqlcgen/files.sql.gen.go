@@ -140,6 +140,36 @@ func (q *Queries) LockPrincipalUploads(ctx context.Context, principal pgtype.UUI
 	return err
 }
 
+const markFilesDeleted = `-- name: MarkFilesDeleted :execrows
+UPDATE files SET deleted_at = $1
+WHERE id = ANY($2::uuid[]) AND deleted_at IS NULL
+  AND ($3::text IS NULL OR purpose = $3::text)
+  AND ($4::uuid IS NULL OR uploaded_by = $4::uuid)
+`
+
+type MarkFilesDeletedParams struct {
+	DeletedAt  pgtype.Timestamptz
+	Ids        []pgtype.UUID
+	Purpose    pgtype.Text
+	UploadedBy pgtype.UUID
+}
+
+// The one deleted_at write of the module (app markDeleted, brief M3-07 design note 7 c): the listed
+// files that are not deleted yet, optionally only of one purpose (a replaced avatar or logo, M3-10,
+// docs/DECISIONS.md D-M3-10-5) or of one uploader; the objects go with files.purge_objects (M3-08).
+func (q *Queries) MarkFilesDeleted(ctx context.Context, arg MarkFilesDeletedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markFilesDeleted,
+		arg.DeletedAt,
+		arg.Ids,
+		arg.Purpose,
+		arg.UploadedBy,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const quotaUsedBytes = `-- name: QuotaUsedBytes :one
 SELECT coalesce(sum(size_bytes), 0)::bigint AS used
 FROM files
@@ -152,33 +182,4 @@ func (q *Queries) QuotaUsedBytes(ctx context.Context, uploadedBy pgtype.UUID) (i
 	var used int64
 	err := row.Scan(&used)
 	return used, err
-}
-
-const releaseFile = `-- name: ReleaseFile :execrows
-UPDATE files SET deleted_at = $1
-WHERE id = $2 AND purpose = $3 AND deleted_at IS NULL
-  AND ($4::uuid IS NULL OR uploaded_by = $4::uuid)
-`
-
-type ReleaseFileParams struct {
-	DeletedAt  pgtype.Timestamptz
-	ID         pgtype.UUID
-	Purpose    string
-	UploadedBy pgtype.UUID
-}
-
-// The release of a replaced or removed avatar or logo (M3-10, docs/decisions.d/M3-10.md D-M3-10-5): the
-// deleted mark of one file of the purpose, of the uploader when one is named; the objects go with
-// files.purge_objects (M3-08).
-func (q *Queries) ReleaseFile(ctx context.Context, arg ReleaseFileParams) (int64, error) {
-	result, err := q.db.Exec(ctx, releaseFile,
-		arg.DeletedAt,
-		arg.ID,
-		arg.Purpose,
-		arg.UploadedBy,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }

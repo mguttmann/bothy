@@ -3,7 +3,6 @@
 package app
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"time"
@@ -93,18 +92,30 @@ type thumbnailJSON struct {
 // timestampLayout is the timestamp of the API: UTC with milliseconds and Z (06 "Basic rules").
 const timestampLayout = "2006-01-02T15:04:05.000Z"
 
-// FileUpdated builds the durable event file.updated of f (12 2, 05 6) for the actor a in the
-// space of the file's channel: resource file without a version (File has none), receive action
-// file.read, payload FilePayload. Before attachment the event goes to the uploader only
-// (AudiencePrincipalID, D-M3-03-16), because the event scope alone would show the file name to
-// every reader of the channel. M3-04 to M3-10 reuse it; M3-07 writes attached files without an
-// audience.
+// EventScope is where file.updated of a file goes (brief M3-07 design note 10 a, domain.EventTarget):
+// the scope of the event and whether only the uploader receives it.
+type EventScope struct {
+	// SpaceID, ChannelID and ThreadID are the scope; ThreadID is zero before the file is attached
+	// and SpaceID zero for a file without channel (an avatar or a logo).
+	SpaceID, ChannelID, ThreadID ids.ID
+	// Uploader makes the event personal to the uploader (AudiencePrincipalID), as long as the file
+	// is not attached.
+	Uploader bool
+}
+
+// FileUpdated is the one builder of the durable event file.updated of f (12 2, 05 6) for the
+// actor a (the zero actor for a job without principal): resource file without a version (File
+// has none), receive action file.read, payload FilePayload, scope and audience from sc. Before
+// attachment the event goes to the uploader only (D-M3-03-16), because the scope alone would show
+// the file name to every reader of the channel; once attached it goes without audience to the
+// readers of the message, and f is in its attached form without scope_channel_id (D-M3-07). Only
+// recordFileChange calls it.
 //
 // Example:
 //
-//	ev, err := app.FileUpdated(a, space, file, true)
+//	ev, err := app.FileUpdated(a, app.EventScope{SpaceID: space, ChannelID: ch, Uploader: true}, file)
 //	err = events.Append(ctx, ev)
-func FileUpdated(a actor.Actor, spaceID ids.ID, f files.File, uploaderOnly bool) (eventlog.Event, error) {
+func FileUpdated(a actor.Actor, sc EventScope, f files.File) (eventlog.Event, error) {
 	thumbs := make([]thumbnailJSON, 0, len(f.Thumbnails))
 	for _, t := range f.Thumbnails {
 		thumbs = append(thumbs, thumbnailJSON(t))
@@ -125,24 +136,11 @@ func FileUpdated(a actor.Actor, spaceID ids.ID, f files.File, uploaderOnly bool)
 	}
 	ev := eventlog.Event{
 		Type: string(authorize.EventFileUpdated), SchemaVersion: 1, ActorKind: eventlog.ActorKind(a.Kind), ActorPrincipalID: a.ID,
-		SpaceID: spaceID, ChannelID: f.ScopeChannelID, ResourceKind: string(authorize.ResourceFile), ResourceID: f.ID,
+		SpaceID: sc.SpaceID, ChannelID: sc.ChannelID, ThreadID: sc.ThreadID, ResourceKind: string(authorize.ResourceFile), ResourceID: f.ID,
 		ReceiveAction: string(authorize.ActionFileRead), Payload: payload,
 	}
-	if uploaderOnly {
+	if sc.Uploader {
 		ev.AudiencePrincipalID = f.UploadedBy
 	}
 	return ev, nil
-}
-
-// appendUpdated appends file.updated of f to the unit of work of ctx for the uploader only.
-func (s *Service) appendUpdated(ctx context.Context, a actor.Actor, f FileRecord) error {
-	space, err := s.d.Channels.SpaceOf(ctx, f.ScopeChannelID)
-	if err != nil {
-		return err
-	}
-	ev, err := FileUpdated(a, space, FileView(f), true)
-	if err != nil {
-		return err
-	}
-	return s.d.Events.Append(ctx, ev)
 }

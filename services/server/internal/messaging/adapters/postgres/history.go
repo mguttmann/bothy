@@ -95,5 +95,6 @@ func historyMessage(row historyRow) domain.Message {
 		TriggerState: row.TriggerState.String, TriggerStateReason: row.TriggerStateReason.String, TriggerStateAt: timeOf(row.TriggerStateAt),
 		Silent: row.Silent.Bool, Version: row.Version.Int64,
 		EditedAt: timeOf(row.EditedAt), DeletedAt: timeOf(row.DeletedAt), DeletedBy: idOf(row.DeletedBy), CreatedAt: timeOf(row.CreatedAt),
+		HasAttachments: row.HasAttachments.Bool,
 	}
 }

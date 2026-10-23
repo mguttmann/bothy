@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
@@ -59,5 +60,19 @@ func TestCorrelation_FallsBackToTheRequestID(t *testing.T) {
 	bad := reqmeta.WithCorrelationID(context.Background(), "not-a-uuid")
 	if id, _ := (telemetry.Correlator{}).Correlation(bad); !id.IsZero() {
 		t.Fatalf("an invalid request ID became %v", id)
+	}
+}
+
+// TestUncorrelated: a context with a valid span context gives the zero correlation after
+// Uncorrelated (M3-07).
+func TestUncorrelated(t *testing.T) {
+	t.Parallel()
+	sc := trace.NewSpanContext(trace.SpanContextConfig{TraceID: trace.TraceID{1, 2, 3}, SpanID: trace.SpanID{4}, TraceFlags: trace.FlagsSampled})
+	ctx := trace.ContextWithSpanContext(context.Background(), sc)
+	if id, _ := (telemetry.Correlator{}).Correlation(ctx); id.IsZero() {
+		t.Fatal("precondition: the span context gives a correlation")
+	}
+	if id, tc := (telemetry.Correlator{}).Correlation(telemetry.Uncorrelated(ctx)); !id.IsZero() || tc != "" {
+		t.Fatalf("correlation %v %q, want none", id, tc)
 	}
 }

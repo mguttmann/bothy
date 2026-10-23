@@ -102,7 +102,7 @@ class MessagesApi {
   }
 
   /// Send a message
-  /// Idempotent by &#x60;(author, client_msg_id)&#x60;: a repeat with the same body returns the original with 200 and &#x60;Idempotent-Replay: true&#x60;; with a different body 422 &#x60;idempotency_key_reuse&#x60;. Sending into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing; denial sets &#x60;trigger_state &#x3D; failed&#x60; with &#x60;trigger_state_reason&#x60;.
+  /// Idempotent by &#x60;(author, client_msg_id)&#x60;: a repeat with the same body returns the original with 200 and &#x60;Idempotent-Replay: true&#x60;; with a different body 422 &#x60;idempotency_key_reuse&#x60;. Sending into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing; denial sets &#x60;trigger_state &#x3D; failed&#x60; with &#x60;trigger_state_reason&#x60;. When the message triggers an agent while one of its attachments is not final (scan or check still running), the agent invocation waits until all attachments are final or until &#x60;file.invocation_hold_max&#x60; has passed; &#x60;trigger_state&#x60; stays &#x60;received&#x60; meanwhile.
   ///
   /// Parameters:
   /// * [threadId]

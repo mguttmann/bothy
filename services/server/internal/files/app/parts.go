@@ -258,7 +258,9 @@ func (s *Service) ownSession(ctx context.Context, a actor.Actor, fileID ids.ID, 
 	}
 	r := authorize.Resource{Kind: authorize.ResourceChannel, ID: rec.File.ScopeChannelID}
 	if act == authorize.ActionFileDelete {
-		r = fileResource(rec.File)
+		if r, err = s.readResource(ctx, rec.File); err != nil {
+			return SessionRecord{}, err
+		}
 	}
 	d, err := s.decide(ctx, a, act, r)
 	if err != nil {
@@ -283,12 +285,6 @@ func actingPrincipal(a actor.Actor) error {
 		return nil
 	}
 	return authorize.Decision{Outcome: authorize.OutcomeUnauthenticated}.Err()
-}
-
-// fileResource describes a file for file.read and file.delete (design note 15).
-func fileResource(f FileRecord) authorize.Resource {
-	return authorize.Resource{Kind: authorize.ResourceFile, ID: f.ID, ChannelID: f.ScopeChannelID, OwnerID: f.UploadedBy,
-		File: &authorize.FileFacts{Purpose: f.Purpose, Attached: false}}
 }
 
 // logDiscard logs a failed removal of parts with the file id only; the cleanup of failed files

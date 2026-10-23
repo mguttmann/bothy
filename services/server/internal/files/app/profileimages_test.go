@@ -9,7 +9,6 @@ import (
 	"io"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/app"
@@ -17,22 +16,6 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
-
-// ReleaseFile implements app.Repository for the fake (M3-10).
-func (r *repo) ReleaseFile(ctx context.Context, fileID ids.ID, purpose string, uploadedBy ids.ID, _ time.Time) (bool, error) {
-	if err := needUnit(ctx); err != nil {
-		return false, err
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	f, ok := r.files[fileID]
-	if !ok || f.Deleted || f.Purpose != purpose || (!uploadedBy.IsZero() && f.UploadedBy != uploadedBy) {
-		return false, nil
-	}
-	f.Deleted = true
-	r.files[fileID] = f
-	return true, nil
-}
 
 // stageCfg allows images of up to 8 bytes: the part size is the cap.
 var stageCfg = func() app.Config {

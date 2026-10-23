@@ -3,11 +3,13 @@
 package wire_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
+	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -182,5 +184,22 @@ func TestJobRegistryHasNotifyJobs(t *testing.T) {
 		if q, ok := reg.Queue(kind); !ok || q != jobs.QueueDelivery {
 			t.Errorf("%s: queue %q, %v", kind, q, ok)
 		}
+	}
+}
+
+// TestInvocationHoldJobRegistration (M3-07): every role registers runs.invocation_hold_timeout on
+// the queue default with the arguments of the run id only.
+func TestInvocationHoldJobRegistration(t *testing.T) {
+	t.Parallel()
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q, ok := reg.Queue(runsjobs.KindInvocationHoldTimeout); !ok || q != jobs.QueueDefault {
+		t.Fatalf("queue = %q, %v", q, ok)
+	}
+	if typ := reg.ArgTypes()[runsjobs.KindInvocationHoldTimeout]; typ != reflect.TypeFor[runsjobs.InvocationHoldTimeout]() {
+		t.Fatalf("argument type %v", typ)
 	}
 }

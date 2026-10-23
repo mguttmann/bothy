@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
@@ -163,10 +164,77 @@ type Repository interface {
 	// unit of work.
 	SetMediaInfo(ctx context.Context, fileID ids.ID, m MediaInfo) error
 
-	// ReleaseFile sets deleted_at = at on the file fileID when its purpose is purpose, it is not
-	// deleted and, unless uploadedBy is zero, uploadedBy uploaded it (M3-10); released reports
-	// whether it did. It needs a unit of work.
-	ReleaseFile(ctx context.Context, fileID ids.ID, purpose string, uploadedBy ids.ID, at time.Time) (released bool, err error)
+	// MarkFilesDeleted sets deleted_at = at on the files of d that are not deleted yet and returns
+	// how many it marked. Only markDeleted calls it (the one deleted_at write of the module). It
+	// needs a unit of work.
+	MarkFilesDeleted(ctx context.Context, d Deletion, at time.Time) (int, error)
+
+	// LockAttachTargets reads the files of fileIDs, deleted or not, with the state of their upload
+	// session and their thumbnails, and locks the files rows FOR UPDATE in ascending id (the session
+	// rows are not locked: completed is final for a session). Unknown ids are absent. It needs a
+	// unit of work (M3-07).
+	LockAttachTargets(ctx context.Context, fileIDs []ids.ID) ([]AttachTarget, error)
+	// AttachedFileIDs returns the ids of fileIDs that have a row in message_attachments.
+	AttachedFileIDs(ctx context.Context, fileIDs []ids.ID) ([]ids.ID, error)
+	// InsertAttachments inserts the rows in one statement; a row of a file that has one already
+	// gives ErrAlreadyAttached. It needs a unit of work.
+	InsertAttachments(ctx context.Context, rows []AttachmentRecord) error
+	// MessageAttachments returns the attachments of messageIDs with their files and thumbnails,
+	// ordered by message id and position.
+	MessageAttachments(ctx context.Context, messageIDs []ids.ID) ([]AttachedFile, error)
+	// AttachmentOf returns the attachment row of fileID; found is false for an unattached file.
+	AttachmentOf(ctx context.Context, fileID ids.ID) (AttachmentRecord, bool, error)
+	// LockMessageFiles locks the files of the attachments of messageID FOR UPDATE in ascending id
+	// and returns their ids. It needs a unit of work.
+	LockMessageFiles(ctx context.Context, messageID ids.ID) ([]ids.ID, error)
+	// DeleteMessageAttachments deletes the attachment rows of messageID and returns how many. It
+	// needs a unit of work.
+	DeleteMessageAttachments(ctx context.Context, messageID ids.ID) (int, error)
+	// AttachmentStates returns the state of every attached file of messageID. It needs a unit of
+	// work.
+	AttachmentStates(ctx context.Context, messageID ids.ID) ([]domain.StateFacts, error)
+}
+
+// Deletion selects the files markDeleted marks: the ids, and optionally only those of one purpose
+// or of one uploader.
+type Deletion struct {
+	FileIDs []ids.ID
+	// Purpose limits the mark to files of this purpose; "" marks every purpose.
+	Purpose string
+	// UploadedBy limits the mark to files of this uploader; zero marks every uploader.
+	UploadedBy ids.ID
+}
+
+// AttachTarget is a files row as Attach locks it (brief M3-07 design note 4 a), with the state of
+// its upload session; SessionState is "" when the file has no session.
+type AttachTarget struct {
+	File         FileRecord
+	SessionState domain.SessionState
+}
+
+// AttachmentRecord is a row of message_attachments (docs/spec/03-data-model.md 4.7): the message,
+// the file, the position from 1 and the copies of the thread and channel of the message (R-DM-43).
+type AttachmentRecord struct {
+	MessageID, FileID, ThreadID, ChannelID ids.ID
+	Position                               int
+}
+
+// AttachedFile is an attachment row with its file and the file's thumbnails.
+type AttachedFile struct {
+	Row  AttachmentRecord
+	File FileRecord
+}
+
+// ErrAlreadyAttached reports a unique violation on message_attachments(file_id): a concurrent
+// attach of the same file committed first.
+var ErrAlreadyAttached = errors.New("files: the file is attached already")
+
+// ThreadAttachments is the outgoing port of the subscriber of chat.ThreadMoved (M3-07);
+// adapters/postgres implements it over message_attachments.
+type ThreadAttachments interface {
+	// MoveThreadAttachments sets channel_id = channelID on every row of threadID, without a
+	// version and without an event. It needs a unit of work.
+	MoveThreadAttachments(ctx context.Context, threadID, channelID ids.ID) error
 }
 
 // FreeSpace reports the free bytes of the file system of file.fs.root (adapters/fs); only the

@@ -518,7 +518,7 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.scan.health_interval` | `BOTHY_FILE__SCAN__HEALTH_INTERVAL` | Server | duration | `30s` | `PING` interval | active |
 | `file.scan.pending_alert_after` | `BOTHY_FILE__SCAN__PENDING_ALERT_AFTER` | Server |  | `10m` | age of the oldest `pending` file before the alert | planned (M3) |
 | `file.scan.clamd_stream_max_bytes` | `BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES` | Server | int | `104857600` | mirror of clamd `StreamMaxLength` | active |
-| `file.invocation_hold_max` | `BOTHY_FILE__INVOCATION_HOLD_MAX` | Server |  | `120s` | longest wait of the agent invocation for attachments | planned (M3) |
+| `file.invocation_hold_max` | `BOTHY_FILE__INVOCATION_HOLD_MAX` | Server | duration | `120s` | longest wait of the agent invocation for attachments | active |
 | `file.image.libvips_enabled` | `BOTHY_FILE__IMAGE__LIBVIPS_ENABLED` | Server |  | `false` | use the libvips build | planned (M3) |
 | `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server | int | `50000000` | largest decoded pixel count | active |
 | `file.image.jpeg_quality` | `BOTHY_FILE__IMAGE__JPEG_QUALITY` | Server | int | `90` | quality when converting still WebP images without alpha to JPEG | active |

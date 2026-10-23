@@ -409,9 +409,9 @@ deps:
   runs-domain:
     mayDependOn: [runs-domain]
   runs-app:
-    mayDependOn: [runs-app, runs, runs-domain, kernel-ports, instance, chat, agents, messaging, billing]
+    mayDependOn: [runs-app, runs, runs-domain, kernel-ports, instance, chat, agents, messaging, billing, files]
   runs-adapters:
-    mayDependOn: [runs-adapters, runs, runs-app, runs-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, instance, chat, agents, messaging, billing]
+    mayDependOn: [runs-adapters, runs, runs-app, runs-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, instance, chat, agents, messaging, billing, files]
     canUse: [v-pgx, v-otel]
   search:
     mayDependOn: [search, kernel-ports]

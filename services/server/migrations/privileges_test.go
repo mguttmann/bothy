@@ -155,6 +155,9 @@ var appPrivileges = map[string][]string{
 	"file_upload_sessions": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_upload_parts":    {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"file_thumbnails":      {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 message_attachments (M3-07): an attach inserts the rows, a thread move changes the copy
+	// channel_id and the deletion of the message removes them (12 section 12).
+	"message_attachments": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	// 03 local_credentials (M1-39): one row per local identity, changed in place; it goes with
 	// its identity (ON DELETE CASCADE).
 	"local_credentials": {"SELECT", "INSERT", "UPDATE"},

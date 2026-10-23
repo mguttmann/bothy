@@ -19,7 +19,7 @@ WITH page AS (
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
        p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
        p.trigger_state_at, p.silent, p.version, p.edited_at,
-       p.deleted_at, p.deleted_by, p.created_at, true AS before_side, false AS opposite
+       p.deleted_at, p.deleted_by, p.created_at, p.has_attachments, true AS before_side, false AS opposite
 FROM (SELECT 1) f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;
 
@@ -40,7 +40,7 @@ WITH page AS (
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
        p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
        p.trigger_state_at, p.silent, p.version, p.edited_at,
-       p.deleted_at, p.deleted_by, p.created_at, true AS before_side, f.opposite
+       p.deleted_at, p.deleted_by, p.created_at, p.has_attachments, true AS before_side, f.opposite
 FROM f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;
 
@@ -61,7 +61,7 @@ WITH page AS (
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
        p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
        p.trigger_state_at, p.silent, p.version, p.edited_at,
-       p.deleted_at, p.deleted_by, p.created_at, false AS before_side, f.opposite
+       p.deleted_at, p.deleted_by, p.created_at, p.has_attachments, false AS before_side, f.opposite
 FROM f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;
 
@@ -86,7 +86,7 @@ WITH below AS (
 SELECT p.id, p.thread_id, p.channel_id, p.thread_seq, p.author_principal_id, p.client_msg_id, p.origin, p.kind,
        p.system_code, p.content_md, p.content_format, p.reply_to_message_id, p.run_id, p.trigger_state, p.trigger_state_reason,
        p.trigger_state_at, p.silent, p.version, p.edited_at,
-       p.deleted_at, p.deleted_by, p.created_at, coalesce(p.before_side, false)::boolean AS before_side, false AS opposite
+       p.deleted_at, p.deleted_by, p.created_at, p.has_attachments, coalesce(p.before_side, false)::boolean AS before_side, false AS opposite
 FROM (SELECT 1) f LEFT JOIN page p ON true
 ORDER BY p.thread_seq;
 
@@ -96,5 +96,5 @@ ORDER BY p.thread_seq;
 -- search_language nor search_vector (D-M3-13-10).
 SELECT id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, kind,
     system_code, content_md, content_format, reply_to_message_id, run_id, trigger_state, trigger_state_reason, trigger_state_at,
-    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at
+    silent, import_item_id, version, edited_at, deleted_at, deleted_by, created_at, has_attachments
 FROM messages m WHERE m.id = @id AND m.channel_id = ANY(@visible_channel_ids::uuid[]);

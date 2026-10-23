@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -152,6 +153,10 @@ type Deps struct {
 	// runs a job handler directly (authz.expiry_sweep, terminal.sweep) instead of waiting for its
 	// period. nil in production.
 	JobModules func(*JobModules)
+	// TxnTestSubscribers registers in-transaction subscribers of a test after every production
+	// subscriber of the txn registry (Modules.TestSubscribers, M3-07): a veto after
+	// files.OnThreadMoved or runs.OnFileFinalized rolls the whole unit back. nil in production.
+	TxnTestSubscribers func(reg *txn.Registry) error
 	// TerminalSessionMetrics replaces the session instruments of M2-46 (sessions.closed,
 	// sessions.active, hosts.connected), so a test counts them per process. nil creates the
 	// OpenTelemetry adapter.

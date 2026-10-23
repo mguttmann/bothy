@@ -2540,7 +2540,10 @@ export interface paths {
          * @description Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
          *     200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
          *     into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-         *     denial sets `trigger_state = failed` with `trigger_state_reason`.
+         *     denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+         *     agent while one of its attachments is not final (scan or check still running), the agent
+         *     invocation waits until all attachments are final or until `file.invocation_hold_max` has
+         *     passed; `trigger_state` stays `received` meanwhile.
          */
         post: operations["createMessage"];
         delete?: never;
@@ -7158,6 +7161,7 @@ export interface components {
             /** @description Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`. */
             trigger_state_reason?: string;
             silent: boolean;
+            /** @description Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message. */
             attachments: components["schemas"]["Attachment"][];
             /** @description Principals resolved from the mention tokens of `content_md`, sorted. Clients render a token as a mention only for these. */
             mention_ids: components["schemas"]["Uuid"][];
@@ -7177,9 +7181,13 @@ export interface components {
             client_msg_id: components["schemas"]["Uuid"];
             /** @enum {string} */
             kind?: "text" | "voice" | "card";
-            /** @example @support-agent the invoice export fails since this morning. */
+            /**
+             * @description Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
+             * @example @support-agent the invoice export fails since this morning.
+             */
             content_md?: string;
             reply_to_message_id?: components["schemas"]["Uuid"];
+            /** @description Own files uploaded for the channel of this message with a completed upload session, in the order they appear in the message; at most `message.max_attachments`. Needs the right `upload` in addition to `write` (`403 forbidden` with `reason` `capability_missing`). A file that is not attachable (not the caller's, another channel, upload not completed or failed, deleted, already attached, or listed twice) answers `409 conflict` with `reason` `file_not_attachable` and the pointer of the entry in `detail`; more than `message.max_attachments` answer `400 validation_failed` with `errors[].code` `limit_reached`. Files whose scan has not ended are attachable. */
             attachment_file_ids?: components["schemas"]["Uuid"][];
             /** @description Optional check. The server resolves mentions from `content_md` (03 `messages`, content format; 07 section 4.6); when present, the set must equal the resolved set, else `400 validation_failed` with code `mention_mismatch`. */
             mention_ids?: components["schemas"]["Uuid"][];
@@ -7289,6 +7297,7 @@ export interface components {
             uploaded_by: components["schemas"]["Uuid"];
             /** @enum {string} */
             purpose: "attachment" | "avatar" | "branding" | "gdpr_export";
+            /** @description Channel the file was uploaded for; present only before the file is attached to a message. An attached file is read through the channel of its message. */
             scope_channel_id?: components["schemas"]["Uuid"];
             /**
              * @example complete

@@ -1,6 +1,6 @@
 # Module `runs`
 
-Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`.
+Status: the trigger decision as pure functions in `domain/` (M2-04); runs, the state machine, the acceptance of a triggering message and the run reads (M2-05). The invocation tokens and the reference verifier of the adapter check (M2-06). The delivery check `runs.Delivery` with the fresh token and the job `runs.queued_expiry` (M2-08). Start, renewal, end and cancellation of runs, the revocation and disabled-agent subscribers and the jobs `runs.cancel_timeout` and `runs.stall_check` (M2-09). Components and interactions: the tables `message_components` and `interactions`, the port `Interactions`, the source ports of `messaging` in `adapters/messagingsource`, the job `runs.component_expiry` and the resolvers of `interaction.created` and of `agent.invocation` with `trigger_kind = interaction` (M2-15). Patches (M2-10) and follow-ups (M2-11) build on `app.Open`, `app.Transition`, the end-of-run function `endRun` and `app.Service.Prepare`. The hold of an agent invocation while an attachment of the triggering message is not final, `ReleaseInvocation`, the subscriber of `files.FileFinalized`, the job `runs.invocation_hold_timeout` and the owner's switch `supports_files_out` (M3-07).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
 ## Purpose
@@ -405,6 +405,53 @@ changes a follow-up state (D-M2-11-1); it joins the unit of work of its caller.
   run or one message whose run the use case authorized or changes in the same unit; they stand
   under `after_authorize` in `tools/lint/sql_visibility.yaml`.
 
+## Hold of the agent invocation (M3-07)
+
+A message that triggers an agent while one of its attachments is not final (12 section 2
+"final") keeps `trigger_state = received` and gets no `agent.invocation` yet (04 15.3 point 1,
+12 section 10, R-FI-09). `runs` reads the attachment facts only through the port
+`files.Attachments` (`Deps.Files`; nil means nothing is ever pending).
+
+- **Hold** (`app/hold.go`, `invokeOrHold`): the last step of the acceptance and of the follow-on
+  run of M2-11. A message created with attachments (`MessagePosted.HasAttachments`) asks
+  `Attachments.Pending`; a message without attachments costs no `files` call; the follow-on run
+  asks unconditionally (it has no `MessagePosted`). Pending: `domain.HoldUntil` gives one clock
+  reading plus `file.invocation_hold_max`, `Open` stores it in `runs.invocation_held_until`
+  (R-DM-44), no `agent.invocation` is written and the job `runs.invocation_hold_timeout` is
+  scheduled at that time (`Deps.Holds`). The release time is fixed at acceptance, so a later
+  change of the key does not move held runs. Everything else of the acceptance (anchor,
+  `run.state_changed`, `received`, `runs.queued_expiry`) is unchanged. Follow-ups
+  (`agent.followup`) are never held.
+- **Release** (`Service.ReleaseInvocation(ctx, runID, cause)`, inside the caller's unit of work):
+  the run row is locked; for `domain.ReleaseFinal` `Pending` is read after the lock;
+  `domain.ReleaseVerdict` releases only a `queued` run whose column is set, for `ReleaseFinal`
+  only when nothing is pending. The release clears the column and raises `runs.version` by one
+  (no `run.state_changed`), then appends `agent.invocation` with the facts of now (the scope of
+  the run's thread, the agent's billing mode, the channel's `settings_version`, `triggered_by`)
+  and without `actor` and `correlation_id` (`Deps.Uncorrelated` removes the trace span). It never
+  authorizes (`Prepare` checks `agent.invoke` before the hand-over) and never touches
+  `trigger_state`. The first release clears the column, so a run gets exactly one
+  `agent.invocation`; a run that ended while held keeps its column and is never released. A
+  release by `ReleaseTimeout` logs one Info line with `bothy.run.id` only.
+- **Subscriber** (`Acceptor.OnFileFinalized`, in-transaction subscriber of
+  `files.FileFinalized`): `Attachments.MessageOf` of the file; for an attached file the queued
+  held runs of its message are locked in ascending id and released with `ReleaseFinal`, so the
+  final state of the last attachment, its `file.updated` and the `agent.invocation` commit
+  together. Unbound or without `files` it does nothing.
+- **Job** `runs.invocation_hold_timeout` (`adapters/jobs/hold.go`, args `InvocationHoldTimeout{RunID}`,
+  queue `default`, `HoldScheduler` over `jobs.Inserter.InsertTx`; use case
+  `Service.InvocationHoldTimeout`): in one unit of work, a run that is not queued or not held is
+  nothing; before the stored release time the job schedules itself again at that time; else
+  `ReleaseInvocation` with `ReleaseTimeout`. Repeated execution has no second effect.
+- **Owner's switch `supports_files_out`** (09 section 2.2): the acceptance checks, before every
+  other branch, a message of an agent with attachments: `agents.RunFacts.FilesOutPermitted`
+  `false` returns `feature_disabled` (403), which vetoes the unit of work of the message; a
+  missing key allows. The adapter's capability `files_out` is not evaluated here.
+- **Queries** (`adapters/postgres/queries/hold.sql`): `LockHeldRunsOfMessage` (the held-run
+  lookup, served by the partial index of the active runs) and `ReleaseHeldInvocation` (the
+  release UPDATE); the run lock is `LockRun` of `delivery.sql`. The reads stand under
+  `system_job` in `tools/lint/sql_visibility.yaml`.
+
 ## Invocation tokens (M2-06)
 
 `app.InvocationTokens` issues and verifies the invocation tokens of invariant I3 (09 4.5, 05 section 5, ADR 0023). `internal/wire` builds it once per process in the signing keys step (`Runs.BindInvocationTokens`) over `instance.Keys`, the instance row and the configuration keys `agent.invocation_token_ttl` and `auth.clock_leeway`. It stays inside the module: every consumer up to M2-17 is in `runs`; M2-14 adds a port for other modules (D-M2-06-1).
@@ -434,9 +481,9 @@ The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads th
 
 ## Dependencies
 
-May use the ports of these modules: `instance`, `chat`, `agents`, `messaging`, `billing`.
+May use the ports of these modules: `instance`, `chat`, `agents`, `messaging`, `billing`, `files`.
 
-Reason: sign the token; operator, mention rule, project binding; policy and session; anchor and `trigger_state`; post costs.
+Reason: sign the token; operator, mention rule, project binding; policy and session; anchor and `trigger_state`; post costs; write the held invocation on `files.FileFinalized` and read the attachment state (M3-07).
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).
@@ -464,7 +511,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 | `runs.cancel_timeout` | scheduled per cancel request, `agent.cancel_grace` (M2-09) | `maintenance` |
 | `runs.stall_check` | periodic, `agent.presence_timeout` (M2-09) | `maintenance` |
 | `runs.component_expiry` | scheduled per card message at its earliest `expires_at`, not periodic (M2-15) | `maintenance` |
-| `runs.invocation_hold_timeout` | scheduled, `file.invocation_hold_max` or `voice.transcript_hold_max` | `default` |
+| `runs.invocation_hold_timeout` | scheduled, `file.invocation_hold_max` (M3-07) or `voice.transcript_hold_max` | `default` |
 | `runs.queued_expiry` | scheduled, `run.queued_max_age` (M2-08) | `default` |
 
 ## Notes for the build

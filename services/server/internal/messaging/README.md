@@ -1,6 +1,6 @@
 # Module `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Agent answers built (M2-19): `run_id` of agents, `MessagePosted.RunID`. The reads of the consumer push of notify built (M3-19): `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore` and `Newest`. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Agent answers built (M2-19): `run_id` of agents, `MessagePosted.RunID`. The reads of the consumer push of notify built (M3-19): `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore` and `Newest`. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message. Attachments built (M3-07): `attachment_file_ids` in `createMessage` and `createThread`, the column `messages.has_attachments`, the attachments in every representation and their deletion with the message, all through the port `files.Attachments` (section "Attachments (M3-07)").
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -27,8 +27,10 @@ Messages, revisions, mentions, reactions, pins, templates, channel export.
   `ComponentInput`, `CardInput`, `CheckedCard`, `Component` and `CardFacts`; `Message.Components`
   and `CreateMessageCmd.Components` and `RunID`; `Messages.LockCard`, `ComponentsChanged` and
   `PrincipalOf`.
-- `domain/`: the message row (`Message`), `OriginFor` (09 section 3.2), `CheckClientMsgID`,
-  `CheckContent`, `CheckMentionCount`, the mention scanner `ScanMentions` with `CodeMask` (the code
+- `domain/`: the message row (`Message`, with `HasAttachments` since M3-07), `OriginFor` (09
+  section 3.2), `CheckClientMsgID`, `CheckContent`, `CheckMentionCount`, the body rules of M3-07
+  (`CheckAttachments`, `CheckNewContent`, the pointers `AttachmentsPointer` and
+  `FirstMessagePointer`), the mention scanner `ScanMentions` with `CodeMask` (the code
   structure of CommonMark 0.31.2), `RequestHash` (04 section 5.1 point 3), `SystemLine` and
   `TruncateForEvent` (04 payload rule 2); for reading `ValidateHistoryRequest`, `PickAround`,
   `PageFlags` and `CutForList`; for M1-58 `Revision`, the edit rules `Unchanged` and
@@ -47,10 +49,12 @@ Messages, revisions, mentions, reactions, pins, templates, channel export.
   `ReactionRow` and `PinRow`), `Cursors`, `SymbolNormalizer` and `ErrorCounter`, and
   `ErrClientMsgIDTaken`.
   `Deps` holds the kernel ports `eventlog.Redactor` (implemented by sync) and `auditing.Recorder`
-  besides those of M1-56. `Config` binds `message.max_content_bytes`, `message.max_mentions`,
-  `sync.event_payload_max_bytes`, `message.list_content_max_bytes`, `template.name_max_chars`,
-  `template.max_per_scope`, `api.page_size_default`, `api.page_size_max`,
-  `reaction.emoji_max_bytes`, `reaction.max_distinct_per_message` and `pin.max_per_thread`
+  besides those of M1-56, and the port `files.Attachments` (`Deps.Files`, M3-07; nil keeps
+  `attachment_file_ids` refused as `not_enabled` for test worlds without files). `Config` binds
+  `message.max_content_bytes`, `message.max_mentions`, `sync.event_payload_max_bytes`,
+  `message.list_content_max_bytes`, `template.name_max_chars`, `template.max_per_scope`,
+  `api.page_size_default`, `api.page_size_max`, `reaction.emoji_max_bytes`,
+  `reaction.max_distinct_per_message`, `pin.max_per_thread` and `message.max_attachments`
   (`wire.MessagingConfig`).
 - `adapters/postgres/`: `queries/messages.sql`, `queries/mentions.sql`, `queries/templates.sql`,
   `queries/revisions.sql`, `queries/reactions.sql`, `queries/pins.sql` and `queries/history.sql` (`ListThreadNewest`, `ListThreadBefore`,
@@ -71,7 +75,11 @@ Messages, revisions, mentions, reactions, pins, templates, channel export.
   `NOT VALID`), `00033_threads_parent_fk_validate.sql` (validates it),
   `00034_message_templates.sql` (`message_templates` as 03 section 4.6) and
   `00040_messaging_message_revisions.sql` (`message_revisions` as 03 states it, M1-58) and
-  `00041_messaging_reactions_pins.sql` (`reactions` and `pins` as 03 states them, M1-59).
+  `00041_messaging_reactions_pins.sql` (`reactions` and `pins` as 03 states them, M1-59), and
+  `00062_messaging_has_attachments.sql` with `00063_messaging_has_attachments_validate.sql`
+  (`messages.has_attachments` and the CHECK `messages_has_attachments_deleted_check`, added
+  `NOT VALID` and validated separately, M3-07), which close the `has_attachments` deviation the
+  header of 00032 names.
 - The test world of both handlers is `services/server/test/messagingworld`.
 
 ## Metrics (M1-68)
@@ -88,13 +96,13 @@ adapter on the global meter provider.
 - Inbound: `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
 - Emits in-tx events: `MessagePosted`, `MessageDeleted`.
 - Subscribes to in-tx events: `chat.ThreadMoved`.
-- Implements source ports and cross-cutting ports: `files.AttachmentLocator`, kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.
 
 ## Dependencies
 
 May use the ports of these modules: `identity`, `chat`, `files`.
 
-Reason: resolve mentions; thread sequence and reopening; bind and read attachments.
+Reason: resolve mentions; thread sequence and reopening; bind and read attachments (`files.Attachments`; delete them with the message, M3-07).
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).
@@ -121,10 +129,14 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 1. `chat.Threads.Info`, then `message.create` on the thread; an unknown and an invisible thread
    give the same `404`, `read` only `403`, a read-only or archived channel
-   `403 channel_read_only`, an app without `messages:write` `403 scope_missing`.
+   `403 channel_read_only`, an app without `messages:write` `403 scope_missing`. With
+   attachments the resource carries `HasAttachments`, so authz also needs `upload` (`403
+   forbidden`, reason `capability_missing`; M3-07).
 2. The body: `client_msg_id` a UUIDv7 (`not_uuid_v7`); `kind` absent, `text` or (M2-15) `card`
-   with the card rules of "Cards and components" below (`voice` is `not_enabled`, so are non-empty
-   `attachment_file_ids` and `run_id` with any kind but `card`); `content_md` with a visible character (`empty`), without U+0000 (`invalid`) and at
+   with the card rules of "Cards and components" below (`voice` is `not_enabled`, so is `run_id`
+   with any kind but `card`); at most `message.max_attachments` ids in `attachment_file_ids`
+   (`limit_reached` on the list, M3-07); `content_md` with a visible character (`empty`; a message
+   with at least one attachment may have an empty or white space only content), without U+0000 (`invalid`) and at
    most `message.max_content_bytes` UTF-8 bytes (`413 payload_too_large`), stored byte for byte;
    `reply_to_message_id` a message of the same thread (`not_in_thread`, the same for an unknown
    id); at most `message.max_mentions` distinct handles (`too_many_mentions`).
@@ -132,7 +144,8 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
    `Idempotent-Replay` or `422 idempotency_key_reuse` by the canonical hash; otherwise the
    mentions are resolved, `chat.Threads.AppendToThread` hands out `thread_seq` and reopens a
    closed thread (then the system line takes that number and a second append gives the message
-   its own), the rows are written, `message.created` is appended for the unit (system line
+   its own), the rows are written (with `has_attachments`), the attachments are bound through
+   `files.Attachments.Attach` (M3-07), `message.created` is appended for the unit (system line
    first, then the message) and only then `MessagePosted` is published in the same order
    (ruling D-M2-05-3): a subscriber that appends a message to the same thread, the run anchor,
    must not overtake the message in the log (04 section 10). A concurrent identical request that committed first makes the
@@ -177,7 +190,7 @@ thread by its channel path and the flow of `createMessage` with `CreatedThread`.
 
 Events: `message.created` per message with `message.read` as receive action, scope space,
 channel and thread, resource the message with version 1, `client_msg_id` echoed (not for a system
-line) and the payload `{message: Message}` with empty attachments and reactions, the components of
+line) and the payload `{message: Message}` with its attachments (M3-07), empty reactions, the components of
 a card (M2-15; `[]` for every other message), `pinned: false` and no `my_reactions`; `run_id`, `trigger_state`, `trigger_state_at` and
 `trigger_state_reason` are members only when set, never `null` (ADR 0053), in events and in REST
 alike, and a tombstone keeps them because they are not content (03 `messages`). A payload that is not smaller than
@@ -187,7 +200,9 @@ alike, and a tombstone keeps them because they are not content (03 `messages`). 
 In-transaction event `MessagePosted`: published for every new message, system lines included,
 inside the writing transaction; a subscriber error rolls everything back. It carries ids, the
 thread kind and sequence, author and origin, `AuthorDeviceID` (people only), the reply target,
-the sorted mentions, `Silent`, `ClearDraft`, `CreatedThread` and `ReopenedThread`, never content.
+the sorted mentions, `Silent`, `ClearDraft`, `CreatedThread`, `ReopenedThread` and
+`HasAttachments` (M3-07: runs holds the agent invocation while an attachment is not final),
+never content.
 `Kind` is `text`, `system` or `run` (the anchor). sync subscribes since M1-61 (it deletes the
 author's draft for `ClearDraft`, so `draft.deleted` follows `message.created`); runs since M2-05
 (the acceptance); notify in M3.
@@ -445,8 +460,10 @@ repetition with the stored response.
 `deleteMessage`: `authorize(message.delete)`; an already deleted message is `204` without a
 write, an event or an audit entry. The unit of work locks the thread (`chat.Threads.
 LockForMessageChange`) and then the message row (a message deleted meanwhile ends it without a
-write), remembers the mentions, writes the tombstone (`content_md = ''`, `deleted_at`,
-`deleted_by`, next version), removes the revisions, mentions, reactions and the pin (M1-59), counts the message down (`chat.Threads.DecrementMessageCount`), redacts the
+write), remembers the mentions, writes the tombstone (`content_md = ''`, `has_attachments =
+false`, `deleted_at`, `deleted_by`, next version), removes the revisions, mentions, reactions and
+the pin (M1-59), then, only when the locked row had `has_attachments`, the attachments through
+`files.Attachments.DeleteForMessage` (M3-07), counts the message down (`chat.Threads.DecrementMessageCount`), redacts the
 payloads of every stored event with resource `message` and this id through
 `eventlog.Redactor` with `domain.RedactPayload`, publishes `MessageDeleted` and appends
 `message.deleted` (payload `MessageDeletedPayload`, after the redaction, so never redacted). A
@@ -457,7 +474,9 @@ deletion of another principal's message writes an `allow` audit entry with only 
 unpaginated, `{"items": []}` for a deleted message.
 
 Lock order: the thread row (through `chat`) before the message row; several message rows in
-ascending `id`; the counters last (03 section 6.3, enforced by the unit of work). A thread move
+ascending `id`; then (deletion with attachments, M3-07) the `files` rows of the attachments in
+ascending `id` and the rows of `message_attachments`, both through `files`; the counters last
+(03 section 6.3, enforced by the unit of work). A thread move
 (M1-62) also locks the thread first, so a deletion and a move cannot deadlock; an edit locks only
 the message row, which serialises edits, deletions and (from M1-59) reactions and pins of one
 message, and revision numbers come from `max(revision) + 1` under it.
@@ -468,6 +487,59 @@ no attachments, mentions, reactions or components, `pinned` false, `deleted_at` 
 version, no `my_reactions`, no `content_truncated`); `reaction.added` and `reaction.removed` keep
 `message_id`, `thread_id` and `principal_id` with `emoji: ""` and `count: 0`; `pin.added` and
 `pin.removed` stay; any other type fails the deletion. The envelope columns never change.
+
+## Attachments (M3-07)
+
+The flag: `messages.has_attachments` is `true` exactly when the message was created with at least
+one attachment and is not deleted (03 `messages`, R-DM-43). The INSERT of a send writes it, the
+tombstone UPDATE resets it, and the CHECK `messages_has_attachments_deleted_check` refuses a
+deleted message with the flag. Every read that builds `domain.Message` returns it
+(`queries/messages.sql`, `history.sql`, `mentions.sql`, `export.sql`). `messaging` never reads
+`message_attachments`; `files` owns that table and never reads `messages` (03 principle 12).
+
+The create path (`app/create.go`, also the first message of `createThread`, `app/threads.go`):
+`message.create` with `HasAttachments` (`+upload`), the body rules above, the request hash with
+the ids in request order (unchanged encoding: an empty list hashes as before), then in the unit of
+work after the repetition lookup: `AppendToThread`, the INSERT with `has_attachments`, the
+mentions, `files.Attachments.Attach` with the message id, its thread, the channel of the row just
+inserted (the channel `AppendToThread` returned under the thread lock), the author, the ids and
+the pointer of the list (`/attachment_file_ids`, in `createThread`
+`/first_message/attachment_file_ids`), then `message.created` and `MessagePosted` with
+`HasAttachments`. A refusal of `files` (`409 conflict`, reason `file_not_attachable`, `detail`
+the pointer of the entry) rolls the unit back with the message and its thread number. A
+repetition attaches nothing and answers the stored message with its attachments. A message
+without attachments makes no `files` call and no extra statement (`perf.message_create_p99`).
+Every caller of the create use case (incoming webhooks, the run anchor, system lines) goes
+through the same path; the anchor and system lines never have attachments.
+
+The representation (`app/view.go`): `Message.HasAttachments` from the row, `Message.Attachments`
+never nil. `decorate`, the one decoration of `stored`, `History`, `Get`, the mention list, the
+export and `SetTriggerState`, fills the attachments with one `files.Attachments.ForMessages` call
+per list, only for live messages with the flag, none when no message has it; a tombstone shows
+`[]`. The `201` of a send and its `message.created` use the result of `Attach` instead of a read.
+The file is the `files.File` of the attachment mapped into the port (`Attachment`,
+`AttachedFile`, `AttachedThumbnail`) without `scope_channel_id`, which an attached file never
+shows (after a move it would name a channel the reader may not see); `sha256` only when `files`
+set it (`upload_state` complete), `thumbnails` always an array, no JSON `null` (ADR 0053). The
+event form (`messageJSON`) and the REST form (`MessageREST`) list them in position order. An edit
+never changes the attachments; `message.updated` carries them like `message.created`. The redacted
+payload of a deleted message lists none.
+
+Deleting (`app/edit.go`): after the tombstone, the revisions, mentions, reactions and the pin, and
+only when the locked row had the flag, `files.Attachments.DeleteForMessage` removes the rows of
+`message_attachments` and sets `files.deleted_at` in the same unit of work, without
+`file.updated`.
+
+Lock order of a send with attachments: thread, message (insert), `files` rows in ascending `id`,
+`message_attachments` (insert), then what subscribers of `MessagePosted` lock (`runs`). Of a
+deletion: thread, message, `files` rows in ascending `id`, `message_attachments`.
+
+Tests: `domain/attachments_test.go` (`TestAttachmentBodyRules`), `app/attachments_test.go` over a
+fake `files.Attachments` (`TestCreate_NoFilesCallWithoutAttachments` and the authorization,
+hash, replay, limit, `createThread`, deletion and edit cases), `adapters/postgres/attachments_test.go`
+(`TestRepository_HasAttachments`, `TestHasAttachments_CheckRejectsDeletedWithFlag`) and
+`adapters/httpapi/attachments_test.go` (`TestMessageREST_Attachments`). The end-to-end tests over
+HTTP with real files live outside the module.
 
 ## Reactions and pins (M1-59)
 
@@ -590,7 +662,7 @@ Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContex
 - Deletion empties the content and redacts the payload of the events in the same transaction (03, 6.5).
 - A mention of a principal without read permission is stored but triggers nothing (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md and D-M2-15-1 to D-M2-15-30 in docs/decisions.d/M2-15.md.
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md, D-M2-15-1 to D-M2-15-30 in docs/decisions.d/M2-15.md, and the rows `D-M3-07-<n>` in docs/decisions.d/M3-07.md (empty content with attachments, `scope_channel_id` absent once attached, no `file.updated` on deletion with the message).
 
 ## Chapters
 

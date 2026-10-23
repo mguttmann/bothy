@@ -73,6 +73,7 @@ func (r *Repository) InsertRun(ctx context.Context, n app.NewRun) (app.RunRow, b
 		TriggeringInteractionID: optionalUUID(n.TriggeringInteractionID),
 		TriggeredBy:             uuid(n.TriggeredBy),
 		BillingModeExpected:     n.BillingModeExpected, InvocationJti: uuid(n.InvocationJTI), QueuedAt: ts(n.QueuedAt),
+		InvocationHeldUntil:     optionalTS(n.InvocationHeldUntil),
 	})
 	return one(row, err, "inserting a run")
 }
@@ -378,7 +379,7 @@ func toRun(row sqlcgen.Run) app.RunRow {
 		LastTextExcerpt: row.LastTextExcerpt.String, Summary: row.Summary.String, Plan: row.Plan, Metrics: row.Metrics,
 		CostMicros: row.CostMicros, Currency: row.Currency, CostIsEstimate: row.CostIsEstimate,
 		QueuedAt: timeOf(row.QueuedAt), StartedAt: timeOf(row.StartedAt), FinishedAt: timeOf(row.FinishedAt),
-		DurationMS: row.DurationMs.Int64, HasDuration: row.DurationMs.Valid,
+		InvocationHeldUntil: timeOf(row.InvocationHeldUntil), DurationMS: row.DurationMs.Int64, HasDuration: row.DurationMs.Valid,
 	}
 }
 

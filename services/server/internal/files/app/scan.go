@@ -13,7 +13,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -387,8 +386,8 @@ func (p *ScanPass) finish(ctx context.Context, t SessionRecord, st passState, ou
 	return PassResult{Outcome: outcome, Transitioned: true}, nil
 }
 
-// write is the work of the result unit: lock and check again, the rows, file.updated, the
-// malware entry and FileFinalized. It returns the locked state and whether this run wrote.
+// write is the work of the result unit: lock and check again, the rows, the malware entry, then
+// recordFileChange (file.updated and FileFinalized). It returns the locked state and whether this run wrote.
 func (p *ScanPass) write(ctx context.Context, fileID ids.ID, st passState, out domain.PassOutcome) (SessionRecord, bool, error) {
 	cur, found, err := p.d.Scans.LockScanTarget(ctx, fileID)
 	if err != nil || !found || !awaiting(cur) {
@@ -405,18 +404,15 @@ func (p *ScanPass) write(ctx context.Context, fileID ids.ID, st passState, out d
 	}
 	f := cur.File
 	f.UploadState, f.ScanStatus, f.MIMEType, f.SHA256, f.SizeBytes = res.UploadState, res.ScanStatus, res.MIMEType, res.SHA256, res.SizeBytes
-	if err := p.appendUpdated(ctx, f); err != nil {
-		return cur, false, err
-	}
 	if out.AuditMalware {
 		if err := p.auditMalware(ctx, fileID, st); err != nil {
 			return cur, false, err
 		}
 	}
-	if domain.Final(f.UploadState, f.ScanStatus, false) {
-		if err := txn.Publish(ctx, files.FileFinalized{FileID: fileID}); err != nil {
-			return cur, false, err
-		}
+	// file.updated without actor (a job without principal, 04 2.2) and FileFinalized when the
+	// outcome is final; an image stays pending for files.thumbnail and is finalized there.
+	if err := p.changes().recordFileChange(ctx, actor.Actor{}, cur.File, f); err != nil {
+		return cur, false, err
 	}
 	// files.thumbnail for the images of 12 7.1 and the MP4 and QuickTime files of 12 7.3 (M3-06);
 	// M3-15 inserts files.extract_text here for a deliverable file, in this unit of work (12 3.4
@@ -460,22 +456,9 @@ func (p *ScanPass) result(cur SessionRecord, st passState, out domain.PassOutcom
 	return res
 }
 
-// appendUpdated writes file.updated of f without actor (a job without principal, 04 2.2) to the
-// uploader, in the scope of the channel of an attachment (design note 6c).
-func (p *ScanPass) appendUpdated(ctx context.Context, f FileRecord) error {
-	var space ids.ID
-	if !f.ScopeChannelID.IsZero() {
-		s, err := p.d.Channels.SpaceOf(ctx, f.ScopeChannelID)
-		if err != nil {
-			return err
-		}
-		space = s
-	}
-	ev, err := FileUpdated(actor.Actor{}, space, FileView(f), true)
-	if err != nil {
-		return err
-	}
-	return p.d.Events.Append(ctx, ev)
+// changes returns the collaborators of recordFileChange of the scan pass.
+func (p *ScanPass) changes() fileChanges {
+	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events}
 }
 
 // auditMalware records the malware entry (design note 6d): signature, digest and size, never

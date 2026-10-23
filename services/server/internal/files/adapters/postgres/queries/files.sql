@@ -33,10 +33,11 @@ SELECT pg_advisory_xact_lock(hashtextextended('bothy.files.uploads:' || sqlc.arg
 -- name: FailFile :exec
 UPDATE files SET upload_state = 'failed' WHERE id = sqlc.arg(id) AND upload_state = 'pending';
 
--- name: ReleaseFile :execrows
--- The release of a replaced or removed avatar or logo (M3-10, docs/decisions.d/M3-10.md D-M3-10-5): the
--- deleted mark of one file of the purpose, of the uploader when one is named; the objects go with
--- files.purge_objects (M3-08).
+-- name: MarkFilesDeleted :execrows
+-- The one deleted_at write of the module (app markDeleted, brief M3-07 design note 7 c): the listed
+-- files that are not deleted yet, optionally only of one purpose (a replaced avatar or logo, M3-10,
+-- docs/DECISIONS.md D-M3-10-5) or of one uploader; the objects go with files.purge_objects (M3-08).
 UPDATE files SET deleted_at = sqlc.arg(deleted_at)
-WHERE id = sqlc.arg(id) AND purpose = sqlc.arg(purpose) AND deleted_at IS NULL
+WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND deleted_at IS NULL
+  AND (sqlc.narg(purpose)::text IS NULL OR purpose = sqlc.narg(purpose)::text)
   AND (sqlc.narg(uploaded_by)::uuid IS NULL OR uploaded_by = sqlc.narg(uploaded_by)::uuid);

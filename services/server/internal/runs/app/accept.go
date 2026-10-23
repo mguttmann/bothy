@@ -100,10 +100,14 @@ func (a *Acceptor) OnMessageDeleted(ctx context.Context, ev messaging.MessageDel
 	return s.deleteComponentsOf(ctx, ev.MessageID)
 }
 
-// accept is the acceptance of one new message. Its first branch is the answer check of M2-19
-// (design note 2 f): an agent message that names a run is checked and may veto the unit; then
-// every message whose origin is not human returns without trigger work (AG-01, 07 SR4).
+// accept is the acceptance of one new message. The owner's switch supports_files_out comes before
+// every other branch (M3-07); then the answer check of M2-19 (design note 2 f): an agent message
+// that names a run is checked and may veto the unit; then every message whose origin is not human
+// returns without trigger work (AG-01, 07 SR4).
 func (s *Service) accept(ctx context.Context, ev messaging.MessagePosted) error {
+	if err := s.checkFilesOut(ctx, ev); err != nil {
+		return err
+	}
 	if err := s.answer(ctx, ev); err != nil {
 		return err
 	}
@@ -360,7 +364,8 @@ func (s *Service) fail(ctx context.Context, message ids.ID, reason string) error
 	return s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: message, State: string(domain.TriggerStateFailed), Reason: reason})
 }
 
-// invoke is step 7 on allow: the auto thread, then Open in the target. When another path opened a
+// invoke is step 7 on allow: the auto thread, then Open in the target with the invocation or its
+// hold (invokeOrHold, M3-07). When another path opened a
 // run in the target meanwhile, it returns that run, locked, for another round of the decision.
 func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info chat.ThreadInfo, d domain.Decision, p actor.Actor) (*redecide, error) {
 	target := info.ID
@@ -381,10 +386,10 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 	if mode == "" {
 		mode = string(d.Agent.BillingMode)
 	}
-	sum, err := s.Open(ctx, OpenCmd{
+	_, err = s.invokeOrHold(ctx, OpenCmd{
 		ThreadID: target, AgentID: d.Agent.ID, TriggeredBy: ev.AuthorID, TriggeringMessageID: ev.MessageID,
 		TriggerKind: triggerKindMessage, BillingModeExpected: mode,
-	})
+	}, ev.HasAttachments)
 	var exists *ActiveRunExistsError
 	if errors.As(err, &exists) && d.NewThread == nil {
 		// The winner is locked like the run of trigger; one that ended meanwhile leaves the thread
@@ -398,17 +403,17 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 		}
 		return &redecide{run: &row}, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	return nil, s.emitInvocation(ctx, sum, ev.MessageID, mode)
+	return nil, err
 }
 
 // emitInvocation appends agent.invocation as the last write of the acceptance (M2-08 design note
 // 14): audience the agent, receive action agent.events.consume, resource the run without version,
 // the scope of the run's thread and the payload AgentInvocationPayload without a token. The token
-// is a delivery field that Prepare adds per delivery (R-SY-07, R-SY-17).
-func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, message ids.ID, mode string) error {
+// is a delivery field that Prepare adds per delivery (R-SY-07, R-SY-17). released marks the
+// release of a held invocation (ReleaseInvocation, M3-07): its envelope has no actor and no
+// correlation_id even when ctx carries them, because the writer is a job or a finalizing write
+// without principal (04 section 2.2 row actor); the trigger stays in triggered_by.
+func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, message ids.ID, mode string, released bool) error {
 	info, err := s.d.Threads.Info(ctx, sum.ThreadID)
 	if err != nil {
 		return err
@@ -433,6 +438,10 @@ func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, messa
 		return errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.invocation")
 	}
 	kind, actorID := eventActor(ctx)
+	if released {
+		kind, actorID = "", ids.ID{}
+		ctx = s.uncorrelated(ctx)
+	}
 	return s.d.Events.Append(ctx, eventlog.Event{
 		Type: string(authorize.EventAgentInvocation), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
 		SpaceID: info.SpaceID, ChannelID: info.ChannelID, ThreadID: sum.ThreadID, ResourceKind: resourceRun, ResourceID: sum.ID,

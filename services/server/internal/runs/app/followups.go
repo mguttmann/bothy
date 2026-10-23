@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"slices"
 
@@ -388,16 +389,19 @@ func (f *Followups) followOn(ctx context.Context, ended runs.RunSummary, cands [
 		if a, ok := actor.FromContext(ctx); !ok || a.ID.IsZero() {
 			ctx = actor.WithActor(ctx, actor.Actor{ID: ended.AgentID, Kind: actor.KindAgent})
 		}
-		sum, err := s.Open(ctx, OpenCmd{
+		// The follow-on run is held like an acceptance while an attachment of its triggering
+		// message is not final; without a MessagePosted it asks files unconditionally (M3-07).
+		sum, err := s.invokeOrHold(ctx, OpenCmd{
 			ThreadID: ended.ThreadID, AgentID: ended.AgentID, TriggeredBy: msg.Author.ID, TriggeringMessageID: m,
 			TriggerKind: triggerKindMessage, BillingModeExpected: agent.BillingMode,
-		})
-		if err != nil {
+		}, true)
+		var exists *ActiveRunExistsError
+		if errors.As(err, &exists) {
 			// The ended run is no longer active and the acceptances of the thread wait at the run
 			// row lock, so an active run here is a programming error (design note 8 f).
 			return errs.Wrap(errs.CodeInternalError, err, "runs: the follow-on run")
 		}
-		if err := s.emitInvocation(ctx, sum, m, agent.BillingMode); err != nil {
+		if err != nil {
 			return err
 		}
 		return f.moveRest(ctx, ended.ID, sum, cands[i+1:])

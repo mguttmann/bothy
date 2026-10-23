@@ -16,6 +16,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -23,6 +24,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/runs/app"
@@ -69,6 +71,7 @@ func (r *repo) InsertRun(_ context.Context, n app.NewRun) (app.RunRow, bool, err
 		ID: n.ID, ThreadID: n.ThreadID, AgentID: n.AgentID, TriggerKind: n.TriggerKind, TriggeringMessageID: n.TriggeringMessageID,
 		TriggeredBy: n.TriggeredBy, State: domain.StateQueued, Version: 1, BillingModeExpected: n.BillingModeExpected,
 		InvocationJTI: n.InvocationJTI, Plan: []byte("{}"), Metrics: []byte("{}"), Currency: "USD", CostIsEstimate: true, QueuedAt: n.QueuedAt,
+		InvocationHeldUntil: n.InvocationHeldUntil,
 	}
 	r.runs = append(r.runs, row)
 	return row, true, nil
@@ -122,6 +125,33 @@ func (r *repo) ActiveRunOfThread(_ context.Context, thread ids.ID) (app.RunRow, 
 
 func (r *repo) LockActiveRunOfThread(ctx context.Context, thread ids.ID) (app.RunRow, bool, error) {
 	return r.ActiveRunOfThread(ctx, thread)
+}
+
+// LockHeldRunsOfMessage returns the held queued runs of message ascending by id; journaled as
+// "held-lookup".
+func (r *repo) LockHeldRunsOfMessage(_ context.Context, message ids.ID) ([]ids.ID, error) {
+	held := r.lockActive(func(x app.RunRow) bool {
+		return x.State == domain.StateQueued && x.TriggeringMessageID == message && !x.InvocationHeldUntil.IsZero()
+	})
+	out := make([]ids.ID, 0, len(held))
+	for _, x := range held {
+		out = append(out, x.ID)
+	}
+	return out, nil
+}
+
+// ReleaseHeldInvocation clears the column of a held queued run and raises its version, like the
+// UPDATE of queries/hold.sql; released is false when no such row exists.
+func (r *repo) ReleaseHeldInvocation(_ context.Context, id ids.ID) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID == id && x.State == domain.StateQueued && !x.InvocationHeldUntil.IsZero() {
+			r.runs[i].InvocationHeldUntil, r.runs[i].Version = time.Time{}, x.Version+1
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *repo) RaiseRunVersion(_ context.Context, id ids.ID) (int64, error) {
@@ -598,12 +628,16 @@ func (m msgs) CreateRunAnchor(_ context.Context, cmd messaging.RunAnchorCmd) (me
 	return messaging.AnchorRef{MessageID: ids.New(), ThreadSeq: 1}, nil
 }
 
-// events is the fake appender.
+// events is the fake appender; an append whose context carries a request correlation id is
+// journaled as "correlated" too.
 type events struct{ j *journal }
 
-func (e events) Append(_ context.Context, evs ...eventlog.Event) error {
+func (e events) Append(ctx context.Context, evs ...eventlog.Event) error {
 	for _, ev := range evs {
 		e.j.add("event", ev)
+		if reqmeta.CorrelationID(ctx) != "" {
+			e.j.add("correlated", ev.Type)
+		}
 	}
 	return nil
 }
@@ -843,7 +877,8 @@ type world struct {
 	uow                 txn.UnitOfWork
 	fus                 *followupRepo
 	// gate, when set, makes the ports of the next build fail at its armed call (faults_test.go).
-	gate *faultGate
+	gate  *faultGate
+	files *attachments
 }
 
 // newWorld builds the world.
@@ -856,6 +891,7 @@ func newWorld(t *testing.T) *world {
 		pub: &publisher{}, steps: &stepCounter{}, payloadMax: 65536,
 	}
 	w.fus = &followupRepo{j: w.j}
+	w.files = &attachments{j: w.j, pending: map[ids.ID]bool{}, attached: map[ids.ID]files.AttachmentRef{}}
 	w.msgFacts = &msgFacts{m: map[ids.ID]messaging.TriggerMessage{}, dflt: messaging.TriggerMessage{
 		Origin: "human", Kind: "text", ThreadID: w.main, ChannelID: w.channel,
 		Author: messaging.PrincipalRef{ID: w.alex, Kind: "user", Handle: "alex", DisplayName: "Alex"},
@@ -884,7 +920,7 @@ func (w *world) build() {
 	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
-		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax}, d)
+		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax, InvocationHoldMax: holdMax}, d)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -902,7 +938,7 @@ func (w *world) deps() app.Deps {
 		Repo: w.repo, UoW: cmp.Or[txn.UnitOfWork](w.uow, uow{}), Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
-		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus,
+		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus, Files: w.files, Holds: holdJournal{w.j},
 	}
 	if w.gate != nil {
 		d = w.gate.wrap(d)
@@ -1041,4 +1077,66 @@ func (s *stepCounter) StepAdded(_ context.Context, handle, kind string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.list = append(s.list, handle+":"+kind)
+}
+
+// holdMax is file.invocation_hold_max of the unit tests.
+const holdMax = 3 * time.Minute
+
+// holdJournal records the scheduled runs.invocation_hold_timeout jobs as "hold".
+type holdJournal struct{ j *journal }
+
+func (h holdJournal) ScheduleInvocationHoldTimeout(_ context.Context, run ids.ID, at time.Time) error {
+	h.j.add("hold", expiryAt{run, at})
+	return nil
+}
+
+// attachments is the fake files.Attachments: pending per message, the attachment of a file; the
+// reads are journaled as "files:pending" and "files:message-of".
+type attachments struct {
+	j        *journal
+	mu       sync.Mutex
+	pending  map[ids.ID]bool
+	attached map[ids.ID]files.AttachmentRef
+}
+
+func (a *attachments) setPending(message ids.ID, p bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.pending[message] = p
+}
+
+func (a *attachments) attach(file, message, thread, channel ids.ID) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.attached[file] = files.AttachmentRef{MessageID: message, ThreadID: thread, ChannelID: channel, Position: 1}
+}
+
+func (a *attachments) Attach(context.Context, files.AttachCmd) ([]files.Attachment, error) {
+	return nil, errs.New(errs.CodeInternalError, "runs never attaches")
+}
+
+func (a *attachments) ForMessages(context.Context, []ids.ID) (map[ids.ID][]files.Attachment, error) {
+	return nil, errs.New(errs.CodeInternalError, "runs never reads attachments")
+}
+
+func (a *attachments) DeleteForMessage(context.Context, ids.ID) error {
+	return errs.New(errs.CodeInternalError, "runs never deletes attachments")
+}
+
+func (a *attachments) MessageOf(_ context.Context, file ids.ID) (files.AttachmentRef, bool, error) {
+	a.j.add("files:message-of", file)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	ref, ok := a.attached[file]
+	return ref, ok, nil
+}
+
+func (a *attachments) Pending(ctx context.Context, message ids.ID) (bool, error) {
+	if !txn.InUnit(ctx) {
+		return false, errs.New(errs.CodeInternalError, "Pending outside a unit of work")
+	}
+	a.j.add("files:pending", message)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.pending[message], nil
 }

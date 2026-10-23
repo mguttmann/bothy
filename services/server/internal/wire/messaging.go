@@ -9,6 +9,7 @@ import (
 
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -30,7 +31,8 @@ import (
 // message.max_mentions, sync.event_payload_max_bytes, message.list_content_max_bytes,
 // template.name_max_chars, template.max_per_scope, api.page_size_default, api.page_size_max,
 // reaction.emoji_max_bytes, reaction.max_distinct_per_message, pin.max_per_thread,
-// principal.handle_max_chars, principal.display_name_max_chars). The error names
+// principal.handle_max_chars, principal.display_name_max_chars, and for M3-07
+// message.max_attachments). The error names
 // the key whose binding failed, never a value.
 func MessagingConfig(v *config.Values) (messagingapp.Config, error) {
 	var c messagingapp.Config
@@ -73,6 +75,10 @@ type MessagingWrites struct {
 	// shows every message without components and answers a card with not_enabled (a role or a
 	// test without runs).
 	Components ComponentSource
+	// Files binds and reads the attachments of messages (M3-07): the server passes its
+	// LazyAttachments, bound in the files step; nil keeps attachment_file_ids refused as
+	// not_enabled (a test world without the files module).
+	Files files.Attachments
 }
 
 // ComponentSource is the pair of source ports runs implements for messaging (M2-15).
@@ -116,7 +122,7 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	d := messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
-		Metrics: w.Metrics, Credentials: w.Credentials,
+		Metrics: w.Metrics, Credentials: w.Credentials, Files: w.Files,
 	}
 	if w.Components != nil {
 		d.Components, d.Cards = w.Components, w.Components

@@ -128,6 +128,27 @@ exceptions:
   - query: files.GetFile
     category: authorize_resolution
     reason: "resolves one file by its id (scope channel, uploader, purpose) for authorize; getFile returns it only after file.read allowed it (M3-03)"
+  - query: files.GetAttachmentByFile
+    category: authorize_resolution
+    reason: "resolves where one file is attached (message, thread and channel copies) by its id for the file.read descriptor; getFile, downloads, tickets and transcripts serve the file only after file.read allowed it on that path; MessageOf and recordFileChange reuse it (M3-07)"
+  - query: files.LockAttachTargets
+    category: after_authorize
+    reason: "locks the files the author listed in one message after message.create with upload was allowed, keyed by those ids and checked against the author (12 section 10, M3-07)"
+  - query: files.AttachedFileIDs
+    category: after_authorize
+    reason: "the attachment rows of the same listed files inside the same Attach after their lock; only ids leave the use case (M3-07)"
+  - query: files.ListMessageAttachments
+    category: after_authorize
+    reason: "the attachments of messages the caller already read with message.read (ForMessages, M3-07)"
+  - query: files.ListThumbnailsOfFiles
+    category: after_authorize
+    reason: "the thumbnails of the files of one Attach or ForMessages call, whose messages were already allowed (M3-07)"
+  - query: files.LockMessageAttachmentFiles
+    category: after_authorize
+    reason: "locks the files of the one message whose message.delete authorize allowed (DeleteForMessage, M3-07)"
+  - query: files.ListAttachmentStates
+    category: after_authorize
+    reason: "the states of the attachments of one message whose creation or run was already decided (Pending, M3-07); only a boolean leaves the use case"
   - query: files.GetFileForDelivery
     category: authorize_resolution
     reason: "resolves one file by its id (scope channel, uploader, purpose, states) for authorize; downloads, tickets and transcripts serve it only after file.read allowed it (M3-05)"
@@ -230,6 +251,9 @@ exceptions:
   - query: runs.LockRunForAnswer
     category: after_authorize
     reason: "the answer check reads the one run an agent names in run_id by primary key inside the unit of its authorized message.create, under a shared lock so the run cannot end before the answer commits; only the verdict leaves the module, and a run of another thread or agent answers like an unknown one (M2-19 design note 4)"
+  - query: runs.LockHeldRunsOfMessage
+    category: system_job
+    reason: "the subscriber of files.FileFinalized locks the queued held runs of the finalized file's message, without a principal, to release their agent.invocation; nothing of the rows leaves before the delivery decides agent.invoke (M3-07)"
   - query: runs.LockActiveRunsByStarter
     category: system_job
     reason: "the in-transaction subscriber of authorize.AccessChanged locks the active runs started by the principals whose access the committed change removes, keeps those whose channel they lost and sends their agent run.cancel_requested; nothing of the rows leaves the server (R-SY-11, M2-09)"

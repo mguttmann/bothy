@@ -22,7 +22,7 @@ part 'file.g.dart';
 /// * [originalName]
 /// * [uploadedBy] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [purpose]
-/// * [scopeChannelId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [scopeChannelId] - Channel the file was uploaded for; present only before the file is attached to a message. An attached file is read through the channel of its message.
 /// * [uploadState]
 /// * [scanStatus]
 /// * [width]
@@ -61,7 +61,7 @@ abstract class File implements Built<File, FileBuilder> {
   FilePurposeEnum get purpose;
   // enum purposeEnum {  attachment,  avatar,  branding,  gdpr_export,  };
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// Channel the file was uploaded for; present only before the file is attached to a message. An attached file is read through the channel of its message.
   @BuiltValueField(wireName: r'scope_channel_id')
   String? get scopeChannelId;
 

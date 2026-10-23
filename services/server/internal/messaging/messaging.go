@@ -107,6 +107,9 @@ type MessagePosted struct {
 	CreatedThread bool
 	// ReopenedThread marks the message that reopened the thread.
 	ReopenedThread bool
+	// HasAttachments reports that the message was created with at least one attachment (M3-07);
+	// runs holds the agent invocation while one of them is not final (04 section 15.3 point 1).
+	HasAttachments bool
 	// CreatedAt is the creation time.
 	CreatedAt time.Time
 }
@@ -117,6 +120,44 @@ type MessageRef struct {
 	ID ids.ID
 	// ThreadSeq is its position in the thread.
 	ThreadSeq int64
+}
+
+// Attachment is one attachment of a message (schema Attachment, M3-07): its position from 1 and
+// its file. The port of messaging depends on no other module (02 section 7.2), so the file is the
+// messaging mirror of files.File in its attached form, without scope_channel_id.
+type Attachment struct {
+	Position int
+	File     AttachedFile
+}
+
+// AttachedFile is the schema File of an attached file: zero values are absent members. SHA256 is
+// set only once UploadState is complete; scope_channel_id is never shown once a file is attached
+// (docs/decisions.d/M3-07.md D-M3-07).
+type AttachedFile struct {
+	ID        ids.ID
+	SHA256    string
+	SizeBytes int64
+	// MIMEType is the detected type; OriginalName the cleaned name (never logged).
+	MIMEType, OriginalName string
+	UploadedBy             ids.ID
+	// Purpose is attachment; UploadState pending, complete or failed; ScanStatus pending, clean,
+	// infected, error or skipped.
+	Purpose, UploadState, ScanStatus string
+	// Width, Height and DurationMS are zero when unknown.
+	Width, Height int
+	DurationMS    int64
+	// TranscriptStatus is none, pending, done or failed; TranscriptLanguage and TranscriptSource
+	// are empty when absent.
+	TranscriptStatus, TranscriptLanguage, TranscriptSource string
+	// Thumbnails are the stored variants in the order small, medium, large, poster; never nil.
+	Thumbnails []AttachedThumbnail
+	CreatedAt  time.Time
+}
+
+// AttachedThumbnail is one stored variant of an attached file (schema Thumbnail).
+type AttachedThumbnail struct {
+	Variant, MIMEType string
+	Width, Height     int
 }
 
 // PrincipalRef is the minimal public view of a principal (schema PrincipalRef).
@@ -130,9 +171,8 @@ type PrincipalRef struct {
 	AvatarFileID ids.ID
 }
 
-// Message is a message as the API shows it (schema Message) without attachments, which M3-07
-// adds. Zero values are absent members. It is the one message DTO of the port
-// (the MessageView of brief M1-57): Create, CreateThread, History and Get return it. A deleted
+// Message is a message as the API shows it (schema Message). Zero values are absent members. It
+// is the one message DTO of the port (the MessageView of brief M1-57): Create, CreateThread, History and Get return it. A deleted
 // message is a tombstone: empty content, no mentions, no reactions, not pinned, DeletedAt set.
 type Message struct {
 	ID, ThreadID, ChannelID ids.ID
@@ -169,7 +209,14 @@ type Message struct {
 	// Components are the components of a card in position order, read through ComponentReader
 	// (M2-15); never nil. A tombstone has none.
 	Components []Component
-	Version    int64
+	// HasAttachments is messages.has_attachments (M3-07): true exactly when the message was
+	// created with at least one attachment and is not deleted. The representation reads the
+	// attachments only for such messages.
+	HasAttachments bool
+	// Attachments are the attachments in position order with the file state at the time of the
+	// read (M3-07); never nil, empty for a message without attachments and for a tombstone.
+	Attachments []Attachment
+	Version     int64
 	// EditedAt and DeletedAt are zero while not edited or deleted.
 	EditedAt, DeletedAt, CreatedAt time.Time
 }
@@ -184,7 +231,8 @@ type CreateMessageCmd struct {
 	ContentMD *string
 	// ReplyToID is the quoted message; nil for none.
 	ReplyToID *ids.ID
-	// AttachmentIDs are refused until M3-07 (brief D2) when not empty.
+	// AttachmentIDs are the files of attachment_file_ids in request order (M3-07): at most
+	// message.max_attachments, each attachable by the author (docs/spec/12-files.md section 10).
 	AttachmentIDs []ids.ID
 	// Components are the members of components in request order; nil when absent (M2-15).
 	Components []ComponentInput

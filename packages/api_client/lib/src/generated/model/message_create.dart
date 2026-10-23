@@ -15,9 +15,9 @@ part 'message_create.g.dart';
 /// Properties:
 /// * [clientMsgId] - UUIDv7 created by the client before the first attempt; unique per author forever.
 /// * [kind]
-/// * [contentMd]
+/// * [contentMd] - Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
 /// * [replyToMessageId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [attachmentFileIds]
+/// * [attachmentFileIds] - Own files uploaded for the channel of this message with a completed upload session, in the order they appear in the message; at most `message.max_attachments`. Needs the right `upload` in addition to `write` (`403 forbidden` with `reason` `capability_missing`). A file that is not attachable (not the caller's, another channel, upload not completed or failed, deleted, already attached, or listed twice) answers `409 conflict` with `reason` `file_not_attachable` and the pointer of the entry in `detail`; more than `message.max_attachments` answer `400 validation_failed` with `errors[].code` `limit_reached`. Files whose scan has not ended are attachable.
 /// * [mentionIds] - Optional check. The server resolves mentions from `content_md` (03 `messages`, content format; 07 section 4.6); when present, the set must equal the resolved set, else `400 validation_failed` with code `mention_mismatch`.
 /// * [silent]
 /// * [clearDraft]
@@ -34,6 +34,7 @@ abstract class MessageCreate
   MessageCreateKindEnum? get kind;
   // enum kindEnum {  text,  voice,  card,  };
 
+  /// Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
   @BuiltValueField(wireName: r'content_md')
   String? get contentMd;
 
@@ -41,6 +42,7 @@ abstract class MessageCreate
   @BuiltValueField(wireName: r'reply_to_message_id')
   String? get replyToMessageId;
 
+  /// Own files uploaded for the channel of this message with a completed upload session, in the order they appear in the message; at most `message.max_attachments`. Needs the right `upload` in addition to `write` (`403 forbidden` with `reason` `capability_missing`). A file that is not attachable (not the caller's, another channel, upload not completed or failed, deleted, already attached, or listed twice) answers `409 conflict` with `reason` `file_not_attachable` and the pointer of the entry in `detail`; more than `message.max_attachments` answer `400 validation_failed` with `errors[].code` `limit_reached`. Files whose scan has not ended are attachable.
   @BuiltValueField(wireName: r'attachment_file_ids')
   BuiltList<String>? get attachmentFileIds;
 

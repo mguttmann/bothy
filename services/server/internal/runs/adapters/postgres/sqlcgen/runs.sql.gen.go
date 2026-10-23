@@ -221,10 +221,10 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 const insertRun = `-- name: InsertRun :one
 
 INSERT INTO runs (id, thread_id, agent_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id,
-    triggered_by, state, version, billing_mode_expected, invocation_jti, queued_at)
+    triggered_by, state, version, billing_mode_expected, invocation_jti, queued_at, invocation_held_until)
 VALUES ($1, $2, $3, $4, $5,
     $6, $7, $8, 'queued', 1,
-    $9, $10, $11)
+    $9, $10, $11, $12)
 ON CONFLICT (thread_id) WHERE state IN ('queued', 'running', 'waiting_input') DO NOTHING
 RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms
 `
@@ -241,6 +241,7 @@ type InsertRunParams struct {
 	BillingModeExpected     string
 	InvocationJti           pgtype.UUID
 	QueuedAt                pgtype.Timestamptz
+	InvocationHeldUntil     pgtype.Timestamptz
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -251,6 +252,7 @@ type InsertRunParams struct {
 // active runs without a principal. tools/lint/sql_visibility.yaml lists each read.
 // The conflict target names the predicate of runs_thread_active_key: a thread with an active run
 // gets no second one (R-DM-14), and no row comes back.
+// invocation_held_until is the release time of a held agent.invocation, NULL when not held (M3-07).
 func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, insertRun,
 		arg.ID,
@@ -264,6 +266,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (Run, erro
 		arg.BillingModeExpected,
 		arg.InvocationJti,
 		arg.QueuedAt,
+		arg.InvocationHeldUntil,
 	)
 	var i Run
 	err := row.Scan(

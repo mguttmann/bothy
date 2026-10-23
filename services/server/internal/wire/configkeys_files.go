@@ -66,6 +66,11 @@ const (
 // thumbnail_sizes_ordered holds small below medium below large. file.poster_max_bytes enters with
 // the poster of a video, which UploadCreate cannot carry yet.
 //
+// file.invocation_hold_max of attachments and agent invocation (M3-07, 12 section 10) follows:
+// the longest time an acceptance holds agent.invocation while an attachment of the triggering
+// message is not final; runs reads it for the release time and the job
+// runs.invocation_hold_timeout.
+//
 // voice.max_duration is here because getInstance reports it as a client limit (M1-46) before the
 // voice messages of M3 read it.
 func filesConfigKeys() []config.Key {
@@ -173,7 +178,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: "file.scan.timeout", Kind: config.KindDuration, Default: "120s", Min: "1s",
+			Name: "file.scan.timeout", Kind: config.KindDuration, Default: defaultTwoMinutes, Min: "1s",
 			Doc:     "Deadline of the read pass with the scan of one file.",
 			Chapter: chapter12,
 		},
@@ -215,6 +220,11 @@ func filesConfigKeys() []config.Key {
 		{
 			Name: "file.not_ready_retry_after", Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h",
 			Doc:     "Retry-After of the 409 file_not_ready responses, in whole seconds.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.invocation_hold_max", Kind: config.KindDuration, Default: defaultTwoMinutes, Min: "1s",
+			Doc:     "Longest time the agent invocation of a message waits for its attachments to become final; after it the agent is invoked with the attachments in their current state.",
 			Chapter: chapter12,
 		},
 		{

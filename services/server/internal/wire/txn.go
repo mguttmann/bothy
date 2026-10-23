@@ -14,6 +14,8 @@ import (
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	filespg "github.com/OWNER/bothy/services/server/internal/files/adapters/postgres"
+	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -50,6 +52,9 @@ type Modules struct {
 	// MessagingSubscribers are the in-transaction subscribers of messaging (ThreadMoved moves
 	// messages.channel_id, M1-62); required.
 	MessagingSubscribers *messagingapp.Subscribers
+	// FilesSubscribers are the in-transaction subscribers of files (ThreadMoved moves the copies
+	// message_attachments.channel_id, M3-07); required.
+	FilesSubscribers *filesapp.Subscribers
 	// RunsAcceptor is the in-transaction subscriber of runs (MessagePosted, the acceptance of a
 	// triggering message, M2-05); required. It writes nothing until the chat step binds it to the
 	// runs use cases (Acceptor.Bind, D-M2-05-19).
@@ -61,6 +66,10 @@ type Modules struct {
 	// DeviceRevoked and SessionEnded end terminal sessions, M2-46); required. The terminal step
 	// binds the use cases (Subscribers.Bind).
 	TerminalSubscribers *terminalapp.Subscribers
+	// TestSubscribers registers the subscribers of a test after every production one (a veto
+	// after files.OnThreadMoved or runs.OnFileFinalized, M3-07; wire.Deps.TxnTestSubscribers);
+	// nil in production.
+	TestSubscribers func(reg *txn.Registry) error
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
@@ -74,10 +83,25 @@ func NewModules(pool *pg.Pool, log *slog.Logger) *Modules { return NewModulesWit
 func NewModulesWithClock(pool *pg.Pool, clk clock.Clock, log *slog.Logger) *Modules {
 	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, clk, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log),
 		SyncSubscribers: newSyncSubscribers(pool), NotifySubscribers: newNotifySubscribers(pool),
-		MessagingSubscribers: newMessagingSubscribers(pool), RunsAcceptor: runsapp.NewAcceptor(),
+		MessagingSubscribers: newMessagingSubscribers(pool), FilesSubscribers: newFilesSubscribers(pool), RunsAcceptor: runsapp.NewAcceptor(),
 		AppsArchive:         appsapp.NewArchiveSubscriber(appspg.NewRepository(pool)),
 		TerminalSubscribers: newTerminalSubscribers(pool)}
 }
+
+// newFilesSubscribers returns the in-transaction subscribers of files over pool (ThreadMoved moves
+// the copies message_attachments.channel_id, M3-07). It opens no connection.
+func newFilesSubscribers(pool *pg.Pool) *filesapp.Subscribers {
+	subs, err := filesapp.NewSubscribers(filespg.NewRepository(pool))
+	if err != nil {
+		// The repository is never nil, so this is a programming error.
+		panic(err)
+	}
+	return subs
+}
+
+// errNoFilesSubscribers reports Modules without the subscribers of files: a moved thread would
+// keep the attachment copies at the old channel (R-DM-43).
+var errNoFilesSubscribers = errors.New("wire: the txn registry needs the subscribers of files (Modules.FilesSubscribers)")
 
 // newTerminalSubscribers returns the unbound subscribers of terminal over pool (nil: none read, the
 // golden test). It opens no connection.
@@ -107,6 +131,11 @@ func NewTxnRegistry(m *Modules) (*txn.Registry, error) {
 	reg := txn.NewRegistry()
 	if err := registerTxn(reg, m); err != nil {
 		return nil, err
+	}
+	if m.TestSubscribers != nil {
+		if err := m.TestSubscribers(reg); err != nil {
+			return nil, err
+		}
 	}
 	reg.Seal()
 	return reg, nil
@@ -141,8 +170,8 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // because the registry derives their owner from the Go package. It sets the tracer of subscriber
 // spans, the rights hooks of phases 1 and 3.1, the sync hook of phase 3.2 and the audit hook of
 // phase 3.3, the subscription messaging.MessagePosted -> sync (drafts with clear_draft, M1-61),
-// chat.ThreadMoved -> messaging, then -> sync (the copies of channel_id, M1-62) and
-// chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18) and, after the
+// chat.ThreadMoved -> messaging, then -> sync (the copies of channel_id, M1-62), then -> files (the
+// copies message_attachments.channel_id, M3-07) and chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18) and, after the
 // existing subscribers, messaging.MessagePosted -> runs (the acceptance of a triggering message,
 // M2-05), chat.ChannelArchived -> apps (M2-27), authorize.AccessChanged, published by authz, and
 // agents.AgentDisabled -> runs (M2-09, 02 section 4.3), chat.ChannelReadOnlySet -> runs (the
@@ -188,6 +217,14 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.SyncSubscribers.OnThreadMoved); err != nil {
 		return err
 	}
+	if m.FilesSubscribers == nil {
+		return errNoFilesSubscribers
+	}
+	// After messaging and sync, so the move locks thread, messages, the rows of sync, then
+	// message_attachments (03 section 6.3, brief M3-07 note 8).
+	if err := txn.Subscribe(reg, m.FilesSubscribers.OnThreadMoved); err != nil {
+		return err
+	}
 	return registerArchiveAndTerminal(reg, m)
 }
 
@@ -207,7 +244,8 @@ func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 // channel, M2-27), then authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09), then
 // kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46), then
 // messaging.MessageDeleted -> runs (the open follow-up of a deleted message, M2-11, and the
-// components of a deleted card, M2-15, in one subscriber).
+// components of a deleted card, M2-15, in one subscriber), then files.FileFinalized -> runs (the
+// release of held agent invocations, M3-07).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -256,7 +294,12 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.TerminalSubscribers.OnSessionEnded); err != nil {
 		return err
 	}
-	return txn.Subscribe(reg, m.RunsAcceptor.OnMessageDeleted)
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnMessageDeleted); err != nil {
+		return err
+	}
+	// The transaction that makes the last attachment final writes the held agent.invocation
+	// (04 section 15.3 point 1, D-K-G6).
+	return txn.Subscribe(reg, m.RunsAcceptor.OnFileFinalized)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

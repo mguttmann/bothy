@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -30,12 +31,6 @@ import (
 type uow struct {
 	reg *txn.Registry
 	mu  sync.Mutex
-}
-
-func newUoW() *uow {
-	reg := txn.NewRegistry()
-	reg.Seal()
-	return &uow{reg: reg}
 }
 
 // newUoWWith seals reg after register added its subscribers.
@@ -79,11 +74,19 @@ type repo struct {
 	// thumbs are the file_thumbnails rows; writes records T1 and T2 in order.
 	thumbs map[ids.ID][]app.ThumbnailRecord
 	writes []string
+	// attachments are the message_attachments rows by file id (M3-07); deletedAt the times
+	// MarkFilesDeleted wrote; insertErr replaces InsertAttachments; calls records the
+	// attachment methods in order.
+	attachments map[ids.ID]app.AttachmentRecord
+	deletedAt   map[ids.ID]time.Time
+	insertErr   error
+	calls       []string
 }
 
 func newRepo() *repo {
 	return &repo{files: map[ids.ID]app.FileRecord{}, sessions: map[ids.ID]app.SessionRecord{}, parts: map[ids.ID]map[int]app.PartRecord{},
-		failure: map[ids.ID]string{}, thumbs: map[ids.ID][]app.ThumbnailRecord{}}
+		failure: map[ids.ID]string{}, thumbs: map[ids.ID][]app.ThumbnailRecord{}, attachments: map[ids.ID]app.AttachmentRecord{},
+		deletedAt: map[ids.ID]time.Time{}}
 }
 
 var errNoUnit = errors.New("fake repo: write outside a unit of work")
@@ -415,12 +418,18 @@ func (s *store) PresignUploadPart(ctx context.Context, _, _ string, _ int, _ int
 	return app.PresignedPart{}, app.ErrNotSupported
 }
 
-// authorizer decides by a rule per action; nil rules allow.
+// authorizer decides by a rule per action; nil rules allow. It records every resource it was
+// asked about.
 type authorizer struct {
-	rules map[authorize.Action]authorize.Decision
+	rules     map[authorize.Action]authorize.Decision
+	mu        sync.Mutex
+	resources []authorize.Resource
 }
 
-func (a *authorizer) Authorize(_ context.Context, _ authorize.Principal, act authorize.Action, _ authorize.Resource) (authorize.Decision, error) {
+func (a *authorizer) Authorize(_ context.Context, _ authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+	a.mu.Lock()
+	a.resources = append(a.resources, r)
+	a.mu.Unlock()
 	if d, ok := a.rules[act]; ok {
 		return d, nil
 	}
@@ -487,14 +496,39 @@ type env struct {
 	scans  *scanQueue
 	alex   actor.Actor
 	ctx    context.Context
+	// space is the space of every channel; finalized lists the published files.FileFinalized.
+	space     ids.ID
+	mu        sync.Mutex
+	finalized []ids.ID
+}
+
+// finalCount returns how often FileFinalized of id was published.
+func (e *env) finalCount(id ids.ID) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	n := 0
+	for _, f := range e.finalized {
+		if f == id {
+			n++
+		}
+	}
+	return n
 }
 
 // newEnv builds the service with the part strategy of driver ("fs" or "s3").
 func newEnv(t testing.TB, driver string, cfg app.Config) *env {
 	t.Helper()
 	e := &env{repo: newRepo(), store: newStore(t), az: &authorizer{rules: map[authorize.Action]authorize.Decision{}}, events: &events{},
-		clk: clock.NewFake(time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)), uow: newUoW(),
+		clk: clock.NewFake(time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)), space: ids.New(),
 		alex: actor.Actor{ID: ids.New(), Kind: actor.KindUser}}
+	e.uow = newUoWWith(t, func(r *txn.Registry) error {
+		return txn.Subscribe(r, func(_ context.Context, ev files.FileFinalized) error {
+			e.mu.Lock()
+			defer e.mu.Unlock()
+			e.finalized = append(e.finalized, ev.FileID)
+			return nil
+		})
+	})
 	parts := app.NewFSPartStore(e.store)
 	var fs app.FreeSpace = freeSpace{free: 1 << 30}
 	if driver == "s3" {
@@ -502,7 +536,7 @@ func newEnv(t testing.TB, driver string, cfg app.Config) *env {
 	}
 	e.scans = &scanQueue{}
 	svc, err := app.New(cfg, app.Deps{Repo: e.repo, Parts: parts, UoW: e.uow, Authorizer: e.az, Events: e.events,
-		Channels: channels{space: ids.New()}, Names: names{}, Types: types{"image/png": {".png"}}, FreeSpace: fs, Clock: e.clk, Store: e.store,
+		Channels: channels{space: e.space}, Names: names{}, Types: types{"image/png": {".png"}}, FreeSpace: fs, Clock: e.clk, Store: e.store,
 		ScanQueue: e.scans})
 	if err != nil {
 		t.Fatal(err)
