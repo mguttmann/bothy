@@ -16,6 +16,277 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CompleteEnrollmentWithBody Register the first passkey and log in
+//
+// Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes `active`. A failed verification counts as a failed attempt of the code. Every rejection gives `401`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/enroll/complete (the `CompleteEnrollment` operationId).
+func (c *Client) CompleteEnrollmentWithBody(ctx context.Context, params *CompleteEnrollmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteEnrollmentRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteEnrollment Register the first passkey and log in
+//
+// Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes `active`. A failed verification counts as a failed attempt of the code. Every rejection gives `401`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/enroll/complete (the `CompleteEnrollment` operationId).
+func (c *Client) CompleteEnrollment(ctx context.Context, params *CompleteEnrollmentParams, body CompleteEnrollmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteEnrollmentRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RedeemEnrollmentCodeWithBody Redeem an enrollment code with device keys and log in
+//
+// Redeems an enrollment code without a passkey; the redeeming device becomes `active` (08, 3.2). Every rejected code (unknown, used, expired, exhausted, wrong purpose, person not active) gets the same `401` body. Code and device keys are checked in one transaction; a failed attempt with a matching code counts against `auth.enrollment_code_max_attempts`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/enroll/redeem (the `RedeemEnrollmentCode` operationId).
+func (c *Client) RedeemEnrollmentCodeWithBody(ctx context.Context, params *RedeemEnrollmentCodeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeemEnrollmentCodeRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RedeemEnrollmentCode Redeem an enrollment code with device keys and log in
+//
+// Redeems an enrollment code without a passkey; the redeeming device becomes `active` (08, 3.2). Every rejected code (unknown, used, expired, exhausted, wrong purpose, person not active) gets the same `401` body. Code and device keys are checked in one transaction; a failed attempt with a matching code counts against `auth.enrollment_code_max_attempts`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/enroll/redeem (the `RedeemEnrollmentCode` operationId).
+func (c *Client) RedeemEnrollmentCode(ctx context.Context, params *RedeemEnrollmentCodeParams, body RedeemEnrollmentCodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeemEnrollmentCodeRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// Logout End the current session
+//
+// Corresponds with POST /auth/logout (the `Logout` operationId).
+func (c *Client) Logout(ctx context.Context, params *LogoutParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLogoutRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginOidcLoginWithBody Start an OIDC login
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/oidc/begin (the `BeginOidcLogin` operationId).
+func (c *Client) BeginOidcLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginOidcLoginRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginOidcLogin Start an OIDC login
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/oidc/begin (the `BeginOidcLogin` operationId).
+func (c *Client) BeginOidcLogin(ctx context.Context, body BeginOidcLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginOidcLoginRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// HandleOidcCallback OIDC redirect target of the identity provider
+//
+// Exchanges the code at the provider and verifies the ID token. It stores only the verified external identity in the login flow; mapping, linking and provisioning happen at `completeOidcLogin` (08, 2.2). Then it redirects to `app_redirect_uri` with the query parameters `login_code` (one-time, valid `auth.server_code_ttl`) and `login_attempt_id`. After the flow was found, every failure redirects with `error` and `login_attempt_id`; `error` is one of `access_denied` (the provider sent an error), `login_failed` (a check failed) and `flow_expired`. An unknown or expired `state` gets `400` without a redirect.
+//
+// Corresponds with GET /auth/oidc/callback (the `HandleOidcCallback` operationId).
+func (c *Client) HandleOidcCallback(ctx context.Context, params *HandleOidcCallbackParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewHandleOidcCallbackRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteOidcLoginWithBody Finish an OIDC login and register the device
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/oidc/complete (the `CompleteOidcLogin` operationId).
+func (c *Client) CompleteOidcLoginWithBody(ctx context.Context, params *CompleteOidcLoginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteOidcLoginRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteOidcLogin Finish an OIDC login and register the device
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/oidc/complete (the `CompleteOidcLogin` operationId).
+func (c *Client) CompleteOidcLogin(ctx context.Context, params *CompleteOidcLoginParams, body CompleteOidcLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteOidcLoginRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginPairingWithBody Start a device pairing without login
+//
+// The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/pairing/begin (the `BeginPairing` operationId).
+func (c *Client) BeginPairingWithBody(ctx context.Context, params *BeginPairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginPairingRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginPairing Start a device pairing without login
+//
+// The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/pairing/begin (the `BeginPairing` operationId).
+func (c *Client) BeginPairing(ctx context.Context, params *BeginPairingParams, body BeginPairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginPairingRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompletePairingWithBody Collect the tokens of an approved pairing
+//
+// The DPoP proof must be signed with the `dpop` key registered at `beginPairing`; a proof signed by another key rejects the pairing. Before approval the answer is `202` with the status; after expiry or rejection `410`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/pairing/complete (the `CompletePairing` operationId).
+func (c *Client) CompletePairingWithBody(ctx context.Context, params *CompletePairingParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompletePairingRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompletePairing Collect the tokens of an approved pairing
+//
+// The DPoP proof must be signed with the `dpop` key registered at `beginPairing`; a proof signed by another key rejects the pairing. Before approval the answer is `202` with the status; after expiry or rejection `410`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/pairing/complete (the `CompletePairing` operationId).
+func (c *Client) CompletePairing(ctx context.Context, params *CompletePairingParams, body CompletePairingJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompletePairingRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginPasskeyLoginWithBody Start a passkey login
+//
+// Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/passkey/begin (the `BeginPasskeyLogin` operationId).
+func (c *Client) BeginPasskeyLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginPasskeyLoginRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // BeginPasskeyLogin Start a passkey login
 //
 // Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.
@@ -7084,6 +7355,174 @@ func (c *Client) ListWebhookDeliveries(ctx context.Context, subscriptionId Subsc
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListExpiringAccessRequest constructs an http.Request for the ListExpiringAccess method
+func NewListExpiringAccessRequest(server string, params *ListExpiringAccessParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/access/expiring")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListPermissionHintsRequest constructs an http.Request for the ListPermissionHints method
+func NewListPermissionHintsRequest(server string, params *ListPermissionHintsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/access/hints")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kind", *params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewListAgentsRequest constructs an http.Request for the ListAgents method
