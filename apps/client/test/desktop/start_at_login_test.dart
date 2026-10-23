@@ -41,9 +41,13 @@ class MemoryStartAtLogin implements StartAtLogin {
   @override
   Future<bool> isEnabled() async => on;
 
+  /// When set, the system refuses every write.
+  bool refuse = false;
+
   @override
   Future<void> setEnabled(bool value) async {
     writes.add(value);
+    if (refuse) throw StateError('refused by the system');
     on = value;
   }
 }
@@ -92,4 +96,21 @@ void main() {
     expect(find.text(en.settingsStartAtLoginUnavailable), findsOneWidget);
     expect(find.byKey(const ValueKey('settings.startAtLogin')), findsNothing);
   });
+
+  testWidgets(
+    'a write the system refuses keeps the switch at the system value',
+    (tester) async {
+      final login = MemoryStartAtLogin()..refuse = true;
+      await tester.pumpWidget(entry(login));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('settings.startAtLogin')));
+      await tester.pumpAndSettle();
+      expect(login.writes, [true]);
+      final sw = tester.widget<Switch>(
+        find.byKey(const ValueKey('settings.startAtLogin')),
+      );
+      expect(sw.value, isFalse);
+      expect(sw.onChanged, isNotNull, reason: 'the person can try again');
+    },
+  );
 }
