@@ -416,7 +416,7 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
 		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000,
 		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10,
-		MaxContentBytes: 4096}, pool, uow, az,
+		MaxContentBytes: 4096, InvocationHoldMax: 2 * time.Minute}, pool, uow, az,
 		wire.RunsDeps{Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Expiry: noExpiry{}}, w.Clock, log)
 	if err != nil {
 		w.t.Fatal(err)
