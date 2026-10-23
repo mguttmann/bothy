@@ -187,9 +187,6 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		ContextRows: repo,
 		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
 	}
-	if err := withContext(&deps, az, d); err != nil {
-		return nil, err
-	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
 		return nil, err
@@ -199,10 +196,14 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 }
 
 // newRunsService builds the runs use cases over deps with the component collaborators of d
-// (componentDeps) and binds the component source of messaging to them (M2-15). It returns the
-// scheduler of runs.component_expiry that BindJobs binds (nil when there is none to bind).
+// (componentDeps) and the run-context collaborators (withContext, M2-13) and binds the component
+// source of messaging to them (M2-15). It returns the scheduler of runs.component_expiry that
+// BindJobs binds (nil when there is none to bind).
 func newRunsService(cfg runsapp.Config, deps runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*runsapp.Service,
 	*runsjobs.ComponentScheduler, error) {
+	if err := withContext(&deps, deps.Authorizer, d); err != nil {
+		return nil, nil, err
+	}
 	components, err := componentDeps(&deps, d, repo)
 	if err != nil {
 		return nil, nil, err
