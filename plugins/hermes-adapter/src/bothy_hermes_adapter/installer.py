@@ -8,7 +8,8 @@ module of the package starts a process; docs/DECISIONS.md D-M2-33-12):
   (``<home>/plugins/<platform key>``), writes the platform section with the adapter's keys, the
   own access policy (``dm_policy: allowlist``), the adapter's control sender as slash-command
   admin, ``display.busy_input_mode`` (``steer`` or ``queue``; ``interrupt`` is refused) and
-  ``tool_progress: off`` for the platform; it refuses to change an existing platform key
+  ``tool_progress: off`` for the platform and a placeholder home channel (Hermes would otherwise
+  ask for one in the first turn's thread; cron delivery is not built yet, 09 17.9); it refuses to change an existing platform key
   (D-AG-19), because every thread would lose its Hermes session.
 * ``switch-mode``: ``organization`` requires the API-key variable of the profile environment to
   be set (judged by its name), empties the OAuth variables and Hermes's allow list of the
@@ -54,6 +55,9 @@ CONTROL_SENDER: Final = "bothy-adapter-control"
 """The adapter's control sender (``platform.CONTROL_SENDER``); a test holds both equal."""
 
 _LOGIN_FILE: Final = Path(".claude") / ".credentials.json"
+
+HOME_CHANNEL_UNASSIGNED: Final = "unassigned"
+"""``chat_id`` of the platform's home channel until cron delivery is built (09 17.9)."""
 
 
 class InstallError(ValueError):
@@ -211,6 +215,14 @@ def plan_install(config: Mapping[str, Any], request: InstallRequest) -> dict[str
     new = copy.deepcopy(dict(config))
     section = _nested(new, "gateway", "platforms", request.platform_key)
     section["enabled"] = True
+    if not isinstance(section.get("home_channel"), dict):
+        # Hermes asks every platform without a home channel to set one, in the first turn's
+        # thread; cron delivery is not built yet (09 17.9), so the channel only stops the notice.
+        section["home_channel"] = {
+            "platform": request.platform_key,
+            "chat_id": HOME_CHANNEL_UNASSIGNED,
+            "name": "Not assigned",
+        }
     old_extra = section.get("extra")
     section["extra"] = {**(old_extra if isinstance(old_extra, dict) else {}), **extra}
     plugins = _nested(new, "plugins")
