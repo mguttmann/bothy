@@ -890,10 +890,13 @@ type noExpiry struct{}
 
 func (noExpiry) ScheduleQueuedExpiry(context.Context, ids.ID, time.Time) error { return nil }
 
-// noTransitions records no run transition (runsapp.Metrics).
+// noTransitions records no run transition and no booked cost (runsapp.Metrics).
 type noTransitions struct{}
 
 func (noTransitions) RunTransitioned(context.Context, runsapp.Transitioned) {}
+
+// CostBooked records no booked cost (runsapp.Metrics).
+func (noTransitions) CostBooked(context.Context, runsapp.BookedCost) {}
 
 // mustMetrics returns the push metrics over mp.
 func mustMetrics(t *testing.T, mp *sdkmetric.MeterProvider) *notifymetrics.Metrics {
