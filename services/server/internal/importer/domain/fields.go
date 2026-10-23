@@ -103,11 +103,14 @@ func object(raw json.RawMessage, pointer string, allowed []string, p *Problems) 
 	return m
 }
 
+// isNull reports a JSON null, which counts as a missing member.
+func isNull(raw json.RawMessage) bool { return string(raw) == "null" }
+
 // str reads the string member key of m. A missing member is required at pointer when required;
 // a member that is no string is invalid. ok reports a present string.
 func str(m map[string]json.RawMessage, key, pointer string, required bool, p *Problems) (string, bool) {
 	raw, present := m[key]
-	if !present || string(raw) == "null" {
+	if !present || isNull(raw) {
 		if required {
 			p.Add(Pointer(pointer, key), FieldRequired, "the member is required")
 		}
