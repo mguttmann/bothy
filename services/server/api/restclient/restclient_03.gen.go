@@ -3719,7 +3719,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetThreadTitleWithBodyWithResponse Set the title
 	//
-	// People set `title_source = manual`. The operator agent may only replace an `auto` title.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -3728,7 +3728,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetThreadTitleWithResponse Set the title
 	//
-	// People set `title_source = manual`. The operator agent may only replace an `auto` title.
+	// Every principal except the thread's operator agent sets `title_source = manual`. The operator agent may only replace an `auto` title, which stays `auto`; on a `manual` title it gets `409 title_manual`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22783,10 +22783,5 @@ type PostIncomingWebhookWithBearerResponse400Headers struct {
 
 // PostIncomingWebhookWithBearerResponse404Headers the declared response headers of an HTTP 404 response for PostIncomingWebhookWithBearer
 type PostIncomingWebhookWithBearerResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// PostIncomingWebhookWithBearerResponse413Headers the declared response headers of an HTTP 413 response for PostIncomingWebhookWithBearer
-type PostIncomingWebhookWithBearerResponse413Headers struct {
 	CorrelationId *CorrelationId
 }

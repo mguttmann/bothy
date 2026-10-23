@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# English placeholder titles of thread.placeholder_titles (docs/spec/09-agents.md section 21).
+New chat
+Chat
+Untitled
+Test

@@ -173,7 +173,11 @@ func TestThreadUseCases(t *testing.T) {
 	_, err = e.svc.SetTitle(ctx, e.owner, chat.SetTitleCmd{ThreadID: post.ID, Title: "x", IfMatch: chat.Precondition{Present: true, Valid: true, Version: 99}})
 	wantCode(t, err, errs.CodeVersionConflict)
 	match := chat.Precondition{Present: true, Valid: true, Version: cur.Version}
+	// The agent is the operator of both threads: only the operator agent keeps the source and
+	// gets title_manual (M2-18; another agent sets manual, see TestSetTitle_ByOther).
 	agent := actor.Actor{ID: ids.New(), Kind: actor.KindAgent}
+	e.setThreadOperator(post.ID, agent.ID)
+	e.setThreadOperator(th.ID, agent.ID)
 	_, err = e.svc.SetTitle(ctx, agent, chat.SetTitleCmd{ThreadID: post.ID, Title: "x", IfMatch: match})
 	wantCode(t, err, errs.CodeTitleManual)
 	if got, err := e.svc.SetTitle(ctx, e.owner, chat.SetTitleCmd{ThreadID: post.ID, Title: "Crash 2", IfMatch: match}); err != nil ||
@@ -336,4 +340,38 @@ func TestListThreads(t *testing.T) {
 			t.Errorf("%s: store error swallowed", name)
 		}
 	}
+}
+
+// setThreadOperator sets the fixed operator of the stored thread id (R-DM-12) for the title tests.
+func (e *env) setThreadOperator(id, agent ids.ID) {
+	e.store.mu.Lock()
+	defer e.store.mu.Unlock()
+	th := e.store.threads[id]
+	th.OperatorAgentID = agent
+	e.store.threads[id] = th
+}
+
+// TestSetTitle_ByOther (brief M2-18 Ruling 6d): an agent that is not the thread's operator and
+// passed authorize (the creator) sets manual on an auto title, and the operator agent then gets
+// title_manual.
+func TestSetTitle_ByOther(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sp := e.create(t, "Support", ids.ID{})
+	forum := e.channel(t, sp.ID, "forum", "forum")
+	creator, operator := actor.Actor{ID: ids.New(), Kind: actor.KindAgent}, actor.Actor{ID: ids.New(), Kind: actor.KindAgent}
+	post, err := e.newThread(creator, chat.CreateThreadCmd{ChannelID: forum.ID, Title: ptr("Release plan")})
+	if err != nil || post.TitleSource != "auto" {
+		t.Fatalf("post %+v, %v", post, err)
+	}
+	e.setThreadOperator(post.ID, operator.ID)
+	got, err := e.svc.SetTitle(ctx, creator, chat.SetTitleCmd{ThreadID: post.ID, Title: "Release plan 2",
+		IfMatch: chat.Precondition{Present: true, Valid: true, Version: post.Version}})
+	if err != nil || got.TitleSource != "manual" || got.Version != post.Version+1 {
+		t.Fatalf("creator title %+v, %v", got, err)
+	}
+	_, err = e.svc.SetTitle(ctx, operator, chat.SetTitleCmd{ThreadID: post.ID, Title: "Summary",
+		IfMatch: chat.Precondition{Present: true, Valid: true, Version: got.Version}})
+	wantCode(t, err, errs.CodeTitleManual)
 }

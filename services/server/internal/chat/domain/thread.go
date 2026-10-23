@@ -4,7 +4,6 @@ package domain
 
 import (
 	"slices"
-	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -53,10 +52,11 @@ const (
 	ThreadClosed ThreadState = "closed"
 )
 
-// TitleSource is threads.title_source (09 section 12).
+// TitleSource is threads.title_source (09 section 12); package title decides it.
 type TitleSource string
 
-// The title sources: manual once a person set a title, and it stays manual.
+// The title sources: auto until a principal other than the thread's operator agent sets a title,
+// then manual for good (package title).
 const (
 	TitleAuto   TitleSource = "auto"
 	TitleManual TitleSource = "manual"
@@ -155,62 +155,6 @@ func CheckThreadTitle(title string, maxChars int) error {
 		return fieldError("/title", FieldTooLong, "the title is too long")
 	}
 	return nil
-}
-
-// PlaceholderTitle reports a placeholder title (09 section 12 point 2): after trimming and
-// collapsing inner white space to one space, the title equals an entry of placeholders (Unicode
-// simple case folding, strings.EqualFold), or a non-empty entry followed by one space and one or
-// more ASCII digits ("Neuer Chat 3"). The empty title is always a placeholder; an empty entry
-// matches only it.
-//
-// Example:
-//
-//	domain.PlaceholderTitle("  neuer   chat 3", []string{"Neuer Chat"}) // true
-func PlaceholderTitle(title string, placeholders []string) bool {
-	n := collapse(title)
-	if n == "" {
-		return true
-	}
-	prefix, number := n, false
-	if i := strings.LastIndexByte(n, ' '); i > 0 && asciiDigits(n[i+1:]) {
-		prefix, number = n[:i], true
-	}
-	for _, p := range placeholders {
-		e := collapse(p)
-		if e == "" {
-			continue
-		}
-		if strings.EqualFold(n, e) || (number && strings.EqualFold(prefix, e)) {
-			return true
-		}
-	}
-	return false
-}
-
-// collapse trims s and joins its words with one space.
-func collapse(s string) string { return strings.Join(strings.Fields(s), " ") }
-
-// asciiDigits reports a non-empty string of the digits 0 to 9 only.
-func asciiDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		if s[i] < '0' || s[i] > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-// CreateTitleSource returns the title source of a new thread (brief D1, 09 section 12): manual for
-// a person whose title is neither empty nor a placeholder, auto otherwise; agents and apps
-// always give auto.
-func CreateTitleSource(human bool, title string, placeholders []string) TitleSource {
-	if human && !PlaceholderTitle(title, placeholders) {
-		return TitleManual
-	}
-	return TitleAuto
 }
 
 // CheckTagSet checks a complete tag set of a thread (brief D5): no tag twice and at most maxTags

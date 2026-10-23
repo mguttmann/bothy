@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
+	"github.com/OWNER/bothy/services/server/internal/chat/domain/title"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -46,7 +47,8 @@ type Config struct {
 	ThreadTitleMaxChars int `config:"thread.title_max_chars"`
 	// ThreadMaxTags is thread.max_tags, the most forum tags of one thread.
 	ThreadMaxTags int `config:"thread.max_tags"`
-	// PlaceholderTitles is thread.placeholder_titles, the placeholder titles of 09 section 12.
+	// PlaceholderTitles is thread.placeholder_titles, the placeholder titles of 09 section 12; the
+	// effective value replaces the default of the word lists completely (package title).
 	PlaceholderTitles []string `config:"thread.placeholder_titles"`
 	// PageSizeDefault is api.page_size_default, the page size of listChannelThreads without limit.
 	PageSizeDefault int `config:"api.page_size_default"`
@@ -141,6 +143,9 @@ type Cursors interface {
 type Service struct {
 	cfg Config
 	d   Deps
+	// placeholders is the effective thread.placeholder_titles, built once at construction
+	// (02 section 13 points 5 and 6).
+	placeholders title.Placeholders
 }
 
 // Compile-time check: the incoming port.
@@ -168,7 +173,7 @@ func New(cfg Config, d Deps) (*Service, error) {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
-	return &Service{cfg: cfg, d: d}, nil
+	return &Service{cfg: cfg, d: d, placeholders: title.NewPlaceholders(cfg.PlaceholderTitles)}, nil
 }
 
 // Values of the audit entries and of the events (05 sections 4.5 and 6).

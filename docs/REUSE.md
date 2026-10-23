@@ -264,7 +264,8 @@ in Discord, V1 reads from Discord. They were tested mainly against fake servers.
   protected short names decides whether a human title starts as `auto`.
 - Implementation: `threads.title_source`, `thread.title.update`
   ([05-actions.md](spec/05-actions.md)); code piece 5.1.
-- Test: A table test with placeholders and protected short names.
+- Test: `TestIsPlaceholder_ProtectedShortNames` in `internal/chat/domain/title` (a table test with
+  placeholders and protected short names).
 
 ### L24 New chat through a detour channel (V3)
 

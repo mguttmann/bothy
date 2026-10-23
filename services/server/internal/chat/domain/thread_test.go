@@ -13,37 +13,6 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// placeholders are the default entries of thread.placeholder_titles (09 section 12); the empty
-// title is a placeholder through the rule itself.
-var placeholders = []string{"Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"}
-
-// TestPlaceholderTitle (09 section 12 point 2): every default entry, case and white space
-// variants, an entry with a number, a bare number, the empty entry and real titles.
-func TestPlaceholderTitle(t *testing.T) {
-	t.Parallel()
-	for _, p := range placeholders {
-		for _, v := range []string{p, strings.ToUpper(p), strings.ToLower(p), "  " + p + "\t", strings.ReplaceAll(p, " ", "   "), p + " 3", p + " 042"} {
-			if !domain.PlaceholderTitle(v, placeholders) {
-				t.Errorf("%q is not a placeholder", v)
-			}
-		}
-	}
-	for _, v := range []string{"", "   ", " "} {
-		if !domain.PlaceholderTitle(v, placeholders) {
-			t.Errorf("%q is not a placeholder", v)
-		}
-	}
-	for _, v := range []string{"3", " 3", "Chat3", "Chat 3a", "Chat -3", "Chat 3 4", "Neuer Chatbot", "Invoice export fails", "Chat ٣"} {
-		if domain.PlaceholderTitle(v, placeholders) {
-			t.Errorf("%q is a placeholder", v)
-		}
-	}
-	// A configured empty entry matches only the empty title, never a bare number.
-	if !domain.PlaceholderTitle("", []string{""}) || domain.PlaceholderTitle("7", []string{""}) {
-		t.Error("the empty entry matches more than the empty title")
-	}
-}
-
 // TestTitleLength_CountsRunes: the limit counts Unicode characters, not bytes; empty is allowed.
 func TestTitleLength_CountsRunes(t *testing.T) {
 	t.Parallel()
@@ -146,25 +115,4 @@ func TestCheckTagSet(t *testing.T) {
 	}
 	wantCode(t, domain.CheckTagSet([]ids.ID{a, a}, 5), "/tag_ids", domain.FieldDuplicate)
 	wantCode(t, domain.CheckTagSet([]ids.ID{a, b}, 1), "/tag_ids", domain.FieldLimitReached)
-}
-
-// TestCreateTitleSource: a person with a real title gives manual; a placeholder, an empty title
-// and every agent or app give auto.
-func TestCreateTitleSource(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct {
-		human bool
-		title string
-		want  domain.TitleSource
-	}{
-		{true, "Invoice export fails", domain.TitleManual},
-		{true, "", domain.TitleAuto},
-		{true, "New chat", domain.TitleAuto},
-		{true, "Neuer Chat 3", domain.TitleAuto},
-		{false, "Invoice export fails", domain.TitleAuto},
-	} {
-		if got := domain.CreateTitleSource(c.human, c.title, placeholders); got != c.want {
-			t.Errorf("%v %q: %s", c.human, c.title, got)
-		}
-	}
 }
