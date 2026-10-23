@@ -21,6 +21,7 @@ import 'package:patrol/src/platform/contracts/contracts.dart';
 import 'package:patrol/src/platform/mobile/patrol_runtime_ports.dart';
 import 'package:test_api/src/backend/invoker.dart';
 
+import 'a10_login_providers_test.dart' as a10_login_providers_test;
 import 'a1_people_test.dart' as a1_people_test;
 import 'a2_grants_test.dart' as a2_grants_test;
 import 'a3_who_has_access_test.dart' as a3_who_has_access_test;
@@ -29,10 +30,11 @@ import 'a5_agents_test.dart' as a5_agents_test;
 import 'a6_audit_test.dart' as a6_audit_test;
 import 'a7_apps_test.dart' as a7_apps_test;
 import 'a8_incoming_webhooks_test.dart' as a8_incoming_webhooks_test;
+import 'a9_instance_test.dart' as a9_instance_test;
 
 /// Registers the flows in the order they run (they share one server: A2 grants Sam on
 /// Marketing before A4 looks at Sam's view, A5 switches the agent A2 found in I1; A7 installs
-/// the only app before A8 adds the incoming app) and serves them to the browser side.
+/// the only app before A8 adds the incoming app; A10 logs out and comes last) and serves them to the browser side.
 Future<void> main() async {
   final explored = Completer<DartGroupEntry>();
   final automator = PlatformAutomator(
@@ -56,6 +58,9 @@ Future<void> main() async {
   group('a6_audit_test', a6_audit_test.main);
   group('a7_apps_test', a7_apps_test.main);
   group('a8_incoming_webhooks_test', a8_incoming_webhooks_test.main);
+  group('a9_instance_test', a9_instance_test.main);
+  // Logs the console out, so it runs last.
+  group('a10_login_providers_test', a10_login_providers_test.main);
 
   final service = PatrolAppService(
     topLevelDartTestGroup: await explored.future,

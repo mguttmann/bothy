@@ -6540,7 +6540,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get instanceProviderSecretRefHelp =>
-      'Eine Referenz wie file:/run/secrets/idp/client oder env:BOTHY_IDP_CLIENT, nie das Secret selbst. Sie wird nie wieder angezeigt.';
+      'Eine Referenz wie file:/srv/secrets/idp/client oder env:BOTHY_IDP_CLIENT, nie das Secret selbst. Sie wird nie wieder angezeigt.';
 
   @override
   String get instanceProviderSecretKeep =>
@@ -6779,4 +6779,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String instanceFlagConflict(String key, String state) {
     return 'Eine andere Person mit Inhaberrechten hat $key inzwischen geändert; es ist jetzt $state. Nichts wurde geändert; schalte bei Bedarf erneut.';
   }
+
+  @override
+  String get adminLogoFileType => 'Bild';
 }

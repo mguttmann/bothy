@@ -41,4 +41,27 @@ void main() {
     );
     expect(await pick(), isNull);
   });
+
+  test('the logo dialog offers PNG, JPEG and WebP (M6-09)', () async {
+    List<XTypeGroup>? offered;
+    final pick = logoPicker(
+      label: 'Image',
+      open: ({List<XTypeGroup> acceptedTypeGroups = const []}) async {
+        offered = acceptedTypeGroups;
+        return XFile.fromData(
+          Uint8List.fromList([1, 2, 3]),
+          path: '/home/alex/logo.webp',
+        );
+      },
+    );
+    final file = await pick();
+    expect(file!.name, 'logo.webp');
+    expect(file.bytes, [1, 2, 3]);
+    expect(offered!.single.extensions, ['png', 'jpg', 'jpeg', 'webp']);
+    expect(offered!.single.mimeTypes, [
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+    ]);
+  });
 }

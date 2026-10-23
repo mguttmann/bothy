@@ -10450,7 +10450,7 @@ abstract class AppLocalizations {
   /// Helper text of a secret reference (08 section 2.6).
   ///
   /// In en, this message translates to:
-  /// **'A reference such as file:/run/secrets/idp/client or env:BOTHY_IDP_CLIENT, never the secret itself. It is never shown again.'**
+  /// **'A reference such as file:/srv/secrets/idp/client or env:BOTHY_IDP_CLIENT, never the secret itself. It is never shown again.'**
   String get instanceProviderSecretRefHelp;
 
   /// Helper text of a secret reference when editing.
@@ -10794,6 +10794,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Another owner changed {key} in the meantime; it is now {state}. Nothing was changed; switch again if needed.'**
   String instanceFlagConflict(String key, String state);
+
+  /// Name of the file type group of the logo in the system file dialog (PNG, JPEG, WebP).
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get adminLogoFileType;
 }
 
 class _AppLocalizationsDelegate

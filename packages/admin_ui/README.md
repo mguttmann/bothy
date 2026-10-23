@@ -9,7 +9,8 @@ agents with their backend switch, the guided flow and their tokens (M4-28), what
 console needs to host the administration: the body without navigation and the stored view of
 "View as person" (M6-04), the lists "Permission hints" and "Expiring soon" (M6-07), and the
 apps with their consent, lifecycle and outgoing webhooks and the incoming webhooks per channel
-(M6-08). Kind: Flutter package, a member of the Dart
+(M6-08), and the instance settings, branding, login providers and feature flags for owners
+(M6-09). Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
@@ -59,20 +60,30 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `AccessHintKind`, `AccessHint`, `AccessHintPage`, `ExpiringKind`, `ExpiringEntry`, `ExpiringPage`, `AccessPageLabels` | the answers of `permissionHints` (`listPermissionHints`, 07 9.5: kind, space and cursor) and `expiringAccess` (`listExpiringAccess`, 07 9.4: space and cursor) of `AccessRepository`, unchanged, with the names of each page (`labels`), joined over "Load more" |
 | `PermissionHintsView`, `ExpiringAccessView`, `AccessListView` | the places `/hints` and `/expiring` of `AdminSection` (M6-07): the scope filter (the instance, owners only, or one space) and, for hints, the kind; per entry the kind as icon and text and the sentence from the templates of `l10n` ("Sam can learn content of Marketing/Intern through agent Texter."); "Explain" opens "Who has access?" of the channel or space in a dialog; a grant has "Revoke" and, with an end, "Extend": the `GrantWizard` with subject, target, level and capabilities of the old grant, an empty reason and no last day, then `createGrant` and after it `revokeGrant` of the old grant with the new reason (one step-up within `auth.step_up_max_age`); an agent token opens the agent's page with its tokens ("Renew token"), an app token has no screen here yet and says how to renew it (a new token, then revoking the old one, 08 12); a membership opens its group; a personal agent opens its page |
 | `hintLines`, `hintKindLabel`, `hintKindGlyph`, `expiringText`, `expiringKindLabel`, `expiringKindGlyph`, `grantSubjectName`, `grantLevelText`, `grantTarget`, `isAppToken` | the texts and icons of both lists, from `l10n` and the labels of the page only |
+| `InstanceRepository`, `ApiInstanceRepository`, `InstanceVersionConflict` | the instance administration over REST (part of `AdminRepository`): `listInstanceSettings`, `putInstanceSetting`, `getInstance` (branding and the flags evaluated for the caller), `updateBranding`, `uploadBrandingLogo`, `deleteBrandingLogo`, `getBrandingLogo` (a `404` is "no preview yet"), `listFeatureFlags`, `putFeatureFlag` (the rollout is sent unchanged), `listIdentityProviders`, `createIdentityProvider`, `updateIdentityProvider` (only the changed members), `deleteIdentityProvider`, and the OIDC redirect URI of the server; setting values and provider configurations travel as plain JSON; a versioned write that loses against another owner ends in `InstanceVersionConflict` with the newer state (from the problem's `current`, or read again) |
+| `InstanceView`, `InstanceTab` | the place `/instance` of `AdminSection` (01 5.5 "Instance, branding"), listed for owners: settings, branding, login providers and feature flags; `instanceChanges` opens the desktop's `instance.updated` events, after which settings and flags load again |
+| `SettingsSection`, `SettingEditorDialog`, `instanceSettingSchemas`, `SettingSchema`, `SettingKind` | every setting with its kind and allowed values from the configuration reference section 6 (the table here is held equal to it by a test), value, version and who changed it when; a typed editor (a choice for a closed list, text otherwise) that states "from, to", confirms and sends `If-Match`; the server's `400` at the input, a `412` with the newer value next to the input; branding keys point to the branding screen, an unknown key is read-only with the note to use the API |
+| `BrandingSection`, `AccentPicker`, `AccentPreview`, `LogoPicker`, `accentPaletteKeys` | product name (the server's `400` at the field: too long, control or bidi character; no counter of its own), the accent from exactly the seven palette keys with a swatch each and a preview of the accent roles in light and dark built with `buildDsTheme` (no input takes a color), the logo uploaded through the host's file dialog, shown from the server's preview once checked, removed; `onBrandingChanged` lets the console read discovery again |
+| `ProvidersSection`, `ProviderEditorDialog`, `RedirectUriView` | the login providers: list with driver and state, add OIDC, proxy header or local accounts, change, enable, disable and delete; the OIDC form has the fields of 08 2.6, the redirect URI to register with "Copy", and secret references written only (masked, empty keeps the stored reference, a stored reference is never shown, the confirmation names changed members, never values); the proxy header form states the loopback rule and shows the server's `409` with its hint; disable and delete say that the provider's sessions end at once (R-ID-12) |
+| `FlagsSection`, `FlagSwitchDialog` | the flags with key, description, kind, the state evaluated for the signed-in person and the stored value with default and rollout; the switch states the change, takes the required reason and keeps the rollout; a `412` shows the newer state and changes nothing; orphaned flags are read-only |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
 (`stepUpPurposeExtra`), and the step-up interceptor of `auth` asks when the server answers
 `401 step_up_required` (05: `device.approve`, `device.revoke`, `host.manage`, `audit.read`, `agent.billing_mode.set`,
-`agent.billing_mode.set_all`, `agent.credential_holder.set` and `token.create` have step-up,
+`agent.billing_mode.set_all`, `agent.credential_holder.set`, `token.create`,
+`instance.settings.update`, `instance.branding.update`, `feature_flag.update` and
+`identity_provider.manage` have step-up,
 `session.revoke` and `token.revoke` have none). A `403` hides the refused action for that item and shows the
 translated reason; the screens hold no permission logic (15 1 principle 1).
 
 ## Embedding the administration
 
 The desktop app hosts `AdminShell` at `/admin` (`apps/client/lib/admin/admin_route.dart`) and
-passes the system file dialog as the `ManifestPicker` of the apps; the console passes a file
-input of the browser:
+passes the system file dialog as the `ManifestPicker` of the apps and the `LogoPicker` of the
+instance logo, and the `instance.updated` events of its local store as `instanceChanges`; the
+console passes a file input of the browser for both and reads discovery again after a branding
+change (`onBrandingChanged`), because it has no live updates:
 it builds `ApiAdminRepository` over the client of the signed-in session and maps
 `AdminLocation` to `/admin/<section>/<id>`. The console (M6-04) passes its own repository and
 maps the same locations to its routes: it hosts `AdminBody` inside its own shell, with
@@ -113,6 +124,8 @@ Further rules checked by `make arch`:
 | `lib/src/apps/`, `lib/src/incoming_webhooks/`, `lib/src/secrets/`, `lib/src/data/apps_repository.dart` | apps, outgoing and incoming webhooks and the once-only secret of M6-08 |
 | `test/apps/`, `test/incoming_webhooks/`, `test/secrets/` | the app screens, subscriptions, deliveries, incoming webhooks and the once-only test over the app fake (`test/admin/apps_fake.dart`) |
 | `lib/src/hints/` | "Permission hints" and "Expiring soon" of M6-07 (07 9.4, 9.5) |
+| `lib/src/instance/`, `lib/src/data/instance_repository.dart` | the instance administration of M6-09 |
+| `test/instance/` | settings, branding, accent picker, providers, flags, the step-up of every write and the REST source over the instance fake (`test/admin/instance_fake.dart`) |
 | `test/hints/` | both lists, "Extend" with one step-up, "Explain", the navigation entries and the REST source of the two lists |
 | `test/agents/` | agent page, switches, switch of all agents, tokens, guided flow and the REST source over the agent fake (`test/admin/agents_fake.dart`) |
 | `test/hosts/` | pairing, I6, session users, check results, grants on a host and the host page over the host fake (`test/admin/hosts_fake.dart`) |

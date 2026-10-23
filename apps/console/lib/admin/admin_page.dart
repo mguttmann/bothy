@@ -113,6 +113,10 @@ class ConsoleAdminPage extends StatelessWidget {
       clock: admin.clock,
       saveTarget: save == null ? null : downloadSaveTarget(save),
       pickManifest: chooser == null ? null : manifestPickerOf(chooser),
+      pickLogo: chooser == null ? null : logoPickerOf(chooser),
+      // The console has no live updates: after a branding change it reads discovery again,
+      // so its theme and product name follow (brief M6-09 Design note 2).
+      onBrandingChanged: () => unawaited(controller.refreshDiscovery()),
       onNavigate: controller.openAdmin,
       onViewAs: (person) => unawaited(
         admin.startViewAs(

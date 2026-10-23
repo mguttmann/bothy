@@ -9989,7 +9989,7 @@
   "@instanceProviderKeyRef": {
     "description": "Label of the reference to the private key."
   },
-  "instanceProviderSecretRefHelp": "A reference such as file:/run/secrets/idp/client or env:BOTHY_IDP_CLIENT, never the secret itself. It is never shown again.",
+  "instanceProviderSecretRefHelp": "A reference such as file:/srv/secrets/idp/client or env:BOTHY_IDP_CLIENT, never the secret itself. It is never shown again.",
   "@instanceProviderSecretRefHelp": {
     "description": "Helper text of a secret reference (08 section 2.6)."
   },
@@ -10364,5 +10364,9 @@
         "example": "on"
       }
     }
+  },
+  "adminLogoFileType": "Image",
+  "@adminLogoFileType": {
+    "description": "Name of the file type group of the logo in the system file dialog (PNG, JPEG, WebP)."
   }
 }

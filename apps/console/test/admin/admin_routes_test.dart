@@ -106,6 +106,17 @@ void main() {
       },
     );
 
+    test('the instance page hosts the instance administration (M6-09)', () {
+      final r = ConsoleRoute.parse('/instance')!;
+      expect(r.page, ConsolePage.instance);
+      expect(r.admin, const AdminLocation(AdminSection.instance));
+      expect(
+        ConsoleRoute.forAdmin(const AdminLocation(AdminSection.instance)).path,
+        '/instance',
+      );
+      expect(ConsoleRoute.parse('/instance/x'), isNull);
+    });
+
     test('view as person has its own place below people', () {
       final r = ConsoleRoute.parse('/people/view-as')!;
       expect(r.page, ConsolePage.people);

@@ -84,7 +84,8 @@ AdminRepository? adminRepository(Ref ref) {
 /// The screen of `/admin/...`: the [AdminShell] at the location of [uri]; a path that names no
 /// screen shows "Not found or no access" (01 6.7). Navigation inside the shell goes through the
 /// router, so links and the back button work; "Back to the chat" goes to `/`. The manifest of an
-/// app comes from the system file dialog ([manifestPicker], M6-08).
+/// app comes from the system file dialog ([manifestPicker], M6-08), the logo of the instance as
+/// well ([logoPicker], M6-09), and `instance.updated` reloads the instance screen.
 class AdminRoute extends ConsumerWidget {
   /// Creates the screen for [uri].
   const AdminRoute({super.key, required this.uri});
@@ -96,6 +97,7 @@ class AdminRoute extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repository = ref.watch(adminRepositoryProvider);
     final engine = ref.watch(syncEngineProvider);
+    final db = ref.watch(localDatabaseProvider);
     final location = adminLocationOf(uri.pathSegments);
     final colors = context.dsColors;
     if (repository == null || location == null) {
@@ -123,6 +125,14 @@ class AdminRoute extends ConsumerWidget {
       pickManifest: manifestPicker(
         label: AppLocalizations.of(context).adminManifestFileType,
       ),
+      pickLogo: logoPicker(
+        label: AppLocalizations.of(context).adminLogoFileType,
+      ),
+      // `instance.updated` stores the instance again (sync engine); each change after the first
+      // value reloads the instance settings and flags (brief M6-09 Design note 4).
+      instanceChanges: db == null
+          ? null
+          : () => db.instanceDao.watch().skip(1).map((_) {}),
     );
   }
 }

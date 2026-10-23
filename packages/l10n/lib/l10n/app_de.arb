@@ -1724,7 +1724,7 @@
   "instanceProviderClientAuth": "Client-Authentifizierung",
   "instanceProviderSecretRef": "Referenz auf das Client-Secret",
   "instanceProviderKeyRef": "Referenz auf den privaten Schlüssel",
-  "instanceProviderSecretRefHelp": "Eine Referenz wie file:/run/secrets/idp/client oder env:BOTHY_IDP_CLIENT, nie das Secret selbst. Sie wird nie wieder angezeigt.",
+  "instanceProviderSecretRefHelp": "Eine Referenz wie file:/srv/secrets/idp/client oder env:BOTHY_IDP_CLIENT, nie das Secret selbst. Sie wird nie wieder angezeigt.",
   "instanceProviderSecretKeep": "Leer lassen, um die gespeicherte Referenz zu behalten.",
   "instanceProviderKeyAlg": "Schlüsselalgorithmus",
   "instanceProviderKeyId": "Schlüssel-ID",
@@ -1781,5 +1781,6 @@
   "instanceFlagSwitchOff": "Ausschalten",
   "instanceFlagSwitchedOn": "{key} ist eingeschaltet.",
   "instanceFlagSwitchedOff": "{key} ist ausgeschaltet.",
-  "instanceFlagConflict": "Eine andere Person mit Inhaberrechten hat {key} inzwischen geändert; es ist jetzt {state}. Nichts wurde geändert; schalte bei Bedarf erneut."
+  "instanceFlagConflict": "Eine andere Person mit Inhaberrechten hat {key} inzwischen geändert; es ist jetzt {state}. Nichts wurde geändert; schalte bei Bedarf erneut.",
+  "adminLogoFileType": "Bild"
 }
