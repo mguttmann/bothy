@@ -5,6 +5,7 @@ package wire_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -960,15 +961,41 @@ func TestGatewayTokenExpiry(t *testing.T) {
 // TestGatewayWorldTokenOutlivesTheRun: a person of a gateway world gets an access token for
 // gwAccessTokenTTL, longer than any run of the package, so a suite that takes longer than the
 // default auth.access_token_ttl on a loaded runner keeps its people signed in. The token of the side identity carries the lifetime of the
-// process's configuration, which serves the same key.
+// process's configuration, which serves the same key. The lifetime is exp - iat of the token:
+// expires_in counts from an earlier clock reading of the issue than iat, so on a slow runner it
+// can be one second longer than the TTL.
 func TestGatewayWorldTokenOutlivesTheRun(t *testing.T) {
 	t.Parallel()
 	w := newGatewayWorld(t)
 	p := w.newPerson("alex", identity.DeviceStateActive)
-	if got := time.Duration(p.set.ExpiresIn) * time.Second; got != gwAccessTokenTTL {
+	if got := accessTokenLifetime(t, p.access); got != gwAccessTokenTTL {
 		t.Fatalf("access token for %s, want %s", got, gwAccessTokenTTL)
+	}
+	if got := time.Duration(p.set.ExpiresIn) * time.Second; got < gwAccessTokenTTL {
+		t.Fatalf("expires_in %s, want at least %s", got, gwAccessTokenTTL)
 	}
 	if v := envValue(w.env, "BOTHY_AUTH__ACCESS_TOKEN_TTL"); v != "24h" {
 		t.Fatalf("auth.access_token_ttl of the process %q, want 24h", v)
 	}
+}
+
+// accessTokenLifetime returns exp - iat of the compact access token tok (its payload, unverified).
+func accessTokenLifetime(t *testing.T, tok string) time.Duration {
+	t.Helper()
+	parts := strings.Split(tok, ".")
+	if len(parts) != 3 {
+		t.Fatalf("access token of %d parts, want 3", len(parts))
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c struct {
+		IssuedAt int64 `json:"iat"`
+		Expiry   int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(raw, &c); err != nil {
+		t.Fatal(err)
+	}
+	return time.Duration(c.Expiry-c.IssuedAt) * time.Second
 }
