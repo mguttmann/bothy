@@ -22642,19 +22642,3 @@ func (r AddGroupMemberResponse) Status() string {
 	}
 	return http.StatusText(0)
 }
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r AddGroupMemberResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r AddGroupMemberResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}

@@ -16,6 +16,25 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CreateAgentWebhookSubscriptionWithBody Subscribe an agent to webhooks
+//
+// Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{agent_id}/webhooks (the `CreateAgentWebhookSubscription` operationId).
+func (c *Client) CreateAgentWebhookSubscriptionWithBody(ctx context.Context, agentId AgentIdPath, params *CreateAgentWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAgentWebhookSubscriptionRequestWithBody(c.Server, agentId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CreateAgentWebhookSubscription Subscribe an agent to webhooks
 //
 // Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.

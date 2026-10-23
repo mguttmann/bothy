@@ -3,7 +3,7 @@
 -- when the message was created with at least one attachment and is not deleted. messaging sets it
 -- in the INSERT of a message and resets it in the UPDATE that deletes the message. The constant
 -- default adds the column without a table rewrite (docs/operations/upgrade.md rule M3); the CHECK
--- starts NOT VALID (rule M5) and 00066 validates it in its own step.
+-- starts NOT VALID (rule M5) and 00068 validates it in its own step.
 
 -- +goose Up
 ALTER TABLE messages ADD COLUMN has_attachments boolean NOT NULL DEFAULT false;
