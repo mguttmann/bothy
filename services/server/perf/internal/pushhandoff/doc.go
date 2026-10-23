@@ -11,6 +11,6 @@
 //
 //	in, err := pushhandoff.Defaults()
 //	plan, err := pushhandoff.NewPlan(in)
-//	msgs := plan.Schedule(plan.Total())
-//	res := pushhandoff.Check(pushhandoff.Run{Plan: plan, Sends: sends, Requests: fake.Requests(), ...})
+//	msgs, err := plan.Schedule(plan.Total())
+//	res := pushhandoff.Check(pushhandoff.Run{Sends: sends, Requests: fake.Requests(), ...})
 package pushhandoff
