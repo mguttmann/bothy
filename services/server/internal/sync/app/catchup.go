@@ -220,6 +220,13 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 		if ev.ReceiveAction == receiveSelf {
 			return agentConsumer || !ownSelfEventInRun(a), authorize.Decision{}, nil
 		}
+		if ev.Type == string(authorize.EventNotificationCreated) && ev.ResourceKind == resourceUser {
+			// A hint without a thread (security, admin) has the recipient as its resource and
+			// replaces push.deliver by the recipient rule of R-AZ-30, which the job
+			// notify.gateway_send evaluated with the rights of that moment; here it goes only to
+			// the recipient's own connections (05 section 6, M3-23 design note 6).
+			return ev.ResourceID == a.ID, authorize.Decision{}, nil
+		}
 		// A personal event with a receive action (agent.config_changed, M2-02) also needs that
 		// action at delivery time: an agent that stopped operating the channel gets nothing.
 	}

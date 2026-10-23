@@ -155,8 +155,8 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09),
 // runs.component_expiry, scheduled per card, on the queue maintenance (M2-15), terminal.sweep on
 // the queue maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), and
-// the five jobs of notify on the queue delivery (M3-19); the error is the first rejected
-// registration.
+// the six jobs of notify on the queue delivery (M3-19, notify.gateway_send M3-23); the error is the
+// first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")

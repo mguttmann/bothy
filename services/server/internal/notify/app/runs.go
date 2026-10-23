@@ -8,6 +8,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/notify/domain"
 	"github.com/OWNER/bothy/services/server/internal/sync"
 )
@@ -46,26 +47,27 @@ func (p *Push) duringRun(ctx context.Context, threadID ids.ID, threadSeq, seq in
 // lastAgentMessage returns the last agent message of run runID of agent in thread, as of the
 // event with seq end that ended the run (design note 5 b): the newest message of the agent after
 // the run's anchor whose message.created was committed before end. Messages written after the end
-// are skipped; the loop ends at the anchor. found is false when the run wrote none.
-func (p *Push) lastAgentMessage(ctx context.Context, runID, threadID, agent ids.ID, end int64) (ids.ID, bool, error) {
+// are skipped; the loop ends at the anchor. found is false when the run wrote none. The ref
+// carries the message's thread_seq (Hint.MessageSeq, M3-23).
+func (p *Push) lastAgentMessage(ctx context.Context, runID, threadID, agent ids.ID, end int64) (messaging.MessageRef, bool, error) {
 	anchor, found, err := p.d.Messages.AnchorOf(ctx, runID)
 	if err != nil || !found {
-		return ids.ID{}, false, err
+		return messaging.MessageRef{}, false, err
 	}
 	before := int64(math.MaxInt64)
 	for {
 		m, found, err := p.d.Messages.LastAgentMessageBefore(ctx, threadID, agent, anchor.ThreadSeq, before)
 		if err != nil || !found {
-			return ids.ID{}, false, err
+			return messaging.MessageRef{}, false, err
 		}
 		created, err := p.d.History.ResourceEvents(ctx, sync.ResourceQuery{
 			ResourceKind: resourceMessage, ResourceID: m.ID, Types: []string{string(authorize.EventMessageCreated)}, Before: end,
 		})
 		if err != nil {
-			return ids.ID{}, false, err
+			return messaging.MessageRef{}, false, err
 		}
 		if len(created) > 0 {
-			return m.ID, true, nil
+			return m, true, nil
 		}
 		before = m.ThreadSeq
 	}

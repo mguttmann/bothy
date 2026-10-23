@@ -19,12 +19,18 @@ import (
 type recordingUseCases struct {
 	err   error
 	sent  []app.PushJob
+	gw    []app.GatewayJob
 	flush []string
 	syncs []int64
 }
 
 func (r *recordingUseCases) Send(_ context.Context, job app.PushJob) error {
 	r.sent = append(r.sent, job)
+	return r.err
+}
+
+func (r *recordingUseCases) GatewaySend(_ context.Context, job app.GatewayJob) error {
+	r.gw = append(r.gw, job)
 	return r.err
 }
 
@@ -57,6 +63,17 @@ func TestHandlers_RunTheUseCases(t *testing.T) {
 	}
 	if len(uc.sent) != 1 || uc.sent[0].RecipientID != user || uc.sent[0].Kind != domain.KindMention || !uc.sent[0].DueAt.Equal(end) {
 		t.Fatalf("sent %+v", uc.sent)
+	}
+	gargs, err := gatewayArgs(app.GatewayJob{NotificationID: job.NotificationID, RecipientID: user, ThreadID: thread,
+		Kind: domain.KindMention, Count: 1, DueAt: end})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (gatewayHandler{uc}).Work(ctx, jobs.Job[GatewaySend]{Args: gargs}); err != nil {
+		t.Fatalf("gateway: %v", err)
+	}
+	if len(uc.gw) != 1 || uc.gw[0].RecipientID != user || uc.gw[0].Kind != domain.KindMention || !uc.gw[0].DueAt.Equal(end) {
+		t.Fatalf("gateway %+v", uc.gw)
 	}
 	if err := (flushHandler{uc}).Work(ctx, jobs.Job[CoalesceFlush]{Args: CoalesceFlush{UserID: user, ThreadID: thread, EndUnixMicro: end.UnixMicro()}}); err != nil {
 		t.Fatalf("flush: %v", err)

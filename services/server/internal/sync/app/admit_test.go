@@ -141,3 +141,70 @@ func TestAdmit_PersonalEventWithReceiveAction(t *testing.T) {
 		t.Fatalf("a self event asked for a receive action: %v", az.asked)
 	}
 }
+
+// hintAuthz allows push.deliver on the threads of readable for the people of readers and
+// records every action asked.
+type hintAuthz struct {
+	catchAuthz
+	readers  map[ids.ID]bool
+	readable map[ids.ID]bool
+	asked    []authorize.Action
+}
+
+func (f *hintAuthz) Authorize(_ context.Context, p authorize.Principal, a authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+	f.asked = append(f.asked, a)
+	if a != authorize.ActionPushDeliver {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	if r.Kind == authorize.ResourceThread && f.readable[r.ID] && f.readers[p.PrincipalID()] {
+		return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
+	}
+	return authorize.Decision{Outcome: authorize.OutcomeNotFound, Reason: "no_grant"}, nil
+}
+
+// TestAdmit_NotificationCreatedWithoutThreadSelfOnly: notification.created with resource user and
+// audience Alex is admitted for Alex's connection and refused for Sam's and for an agent
+// connection, without a push.deliver check (05 section 6, R-AZ-30, M3-23 design note 6); with
+// resource thread it still needs push.deliver and is refused for a connection without read right.
+func TestAdmit_NotificationCreatedWithoutThreadSelfOnly(t *testing.T) {
+	t.Parallel()
+	alex, sam, lotse, thread, channel, space := ids.New(), ids.New(), ids.New(), ids.New(), ids.New(), ids.New()
+	az := &hintAuthz{readers: map[ids.ID]bool{alex: true}, readable: map[ids.ID]bool{thread: true}}
+	s := newCatchUp(t, &catchLog{}, az, 5, 10)
+	ctx := context.Background()
+	asAlex, asSam := actor.Actor{ID: alex, Kind: actor.KindUser}, actor.Actor{ID: sam, Kind: actor.KindUser}
+	asAgent := actor.Actor{ID: lotse, Kind: actor.KindAgent}
+	admin := sync.Event{Type: "notification.created", SchemaVersion: 1, ResourceKind: "user", ResourceID: alex, ReceiveAction: "push.deliver",
+		AudiencePrincipalID: alex, Payload: json.RawMessage(`{}`)}
+	if ok, err := s.Admit(ctx, asAlex, admin); err != nil || !ok {
+		t.Fatalf("Alex: %v %v, want admitted", ok, err)
+	}
+	if slices.Contains(az.asked, authorize.ActionPushDeliver) {
+		t.Fatalf("a hint without a thread asked push.deliver: %v", az.asked)
+	}
+	for name, a := range map[string]actor.Actor{"Sam": asSam, "agent": asAgent} {
+		if ok, err := s.Admit(ctx, a, admin); err != nil || ok {
+			t.Errorf("%s: %v %v, want refused", name, ok, err)
+		}
+	}
+	// A resource user that names another person than the audience is refused as well.
+	foreign := admin
+	foreign.ResourceID = sam
+	if ok, err := s.Admit(ctx, asAlex, foreign); err != nil || ok {
+		t.Errorf("resource of another person: %v %v, want refused", ok, err)
+	}
+	hint := func(audience ids.ID) sync.Event {
+		return sync.Event{Type: "notification.created", SchemaVersion: 1, SpaceID: space, ChannelID: channel, ThreadID: thread,
+			ResourceKind: "thread", ResourceID: thread, ReceiveAction: "push.deliver", AudiencePrincipalID: audience, Payload: json.RawMessage(`{}`)}
+	}
+	az.asked = nil
+	if ok, err := s.Admit(ctx, asAlex, hint(alex)); err != nil || !ok {
+		t.Fatalf("thread hint to Alex: %v %v, want admitted", ok, err)
+	}
+	if !slices.Contains(az.asked, authorize.ActionPushDeliver) {
+		t.Fatalf("a thread hint did not ask push.deliver: %v", az.asked)
+	}
+	if ok, err := s.Admit(ctx, asSam, hint(sam)); err != nil || ok {
+		t.Fatalf("thread hint to Sam without read right: %v %v, want refused", ok, err)
+	}
+}

@@ -93,6 +93,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
@@ -269,6 +270,9 @@ type options struct {
 	// apns registers the real APNs adapter against Fake-APNs instead of the fakepush provider
 	// apns (withAPNs, M3-20).
 	apns bool
+	// live wires the push path as role all does (M3-23): the presence of w.live, the live routes
+	// and w.published as the publisher of notification.created (withLive).
+	live bool
 }
 
 // option changes the variant of a world.
@@ -286,6 +290,11 @@ func withProviders(names ...string) option {
 // (its appender is missing) and lets every other message pass.
 func withVeto() option {
 	return func(o *options) { o.veto = true }
+}
+
+// withLive wires the push path as role all does (M3-23, desktop_test.go).
+func withLive() option {
+	return func(o *options) { o.live = true }
 }
 
 // world is the cross-module world of the push path (see the package comment).
@@ -348,6 +357,10 @@ type world struct {
 	g1, g2, g3, g4, g5                         ids.ID
 	alexPhone, samPhone, ownerPhone            phone
 	actorsMu                                   sync.Mutex
+	// live is the presence of the gateway as the tests set it, published the recorded
+	// notification.created (withLive, M3-23).
+	live      *livePresence
+	published *recordPublisher
 }
 
 // newWorld builds the modules, the harness, the world of 07 sections 10 and 11.1, the fixture
@@ -547,11 +560,16 @@ func (w *world) buildPush(pool *pg.Pool, uow txn.UnitOfWork, syncRepo *syncpg.Re
 	w.reader = sdkmetric.NewManualReader()
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(w.reader))
 	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
-	w.push, err = wire.NewPush(cfg, pool, uow, wire.PushDeps{
+	deps := wire.PushDeps{
 		Notify: w.notify, Authorizer: w.az, Recipients: w.az, Directory: w.id.Directory, Devices: w.id.Devices,
 		Settings: w.personal.Service.Settings(), Chat: w.chat, Messaging: w.messaging, History: syncRepo,
 		Positions: syncpg.NewPersonalRepository(pool), InstanceID: w.instanceID, Providers: providers, Metrics: mustMetrics(t, mp),
-	}, w.clk, log)
+	}
+	if o.live {
+		w.live, w.published = &livePresence{conns: map[ids.ID][]presence.Connection{}}, &recordPublisher{}
+		deps.Presence, deps.LiveRoutes, deps.Publisher = w.live, true, w.published
+	}
+	w.push, err = wire.NewPush(cfg, pool, uow, deps, w.clk, log)
 	must(t, err)
 	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute,

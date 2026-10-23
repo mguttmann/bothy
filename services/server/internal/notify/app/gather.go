@@ -50,7 +50,8 @@ func (p *Push) run(ctx context.Context, g group) error {
 		if err != nil {
 			return err
 		}
-		h := Hint{RecipientID: u, ThreadID: g.threadID, MessageID: g.messageID, TargetID: g.targetID, Kind: g.kind, DueAt: g.ev.OccurredAt}
+		h := Hint{RecipientID: u, ThreadID: g.threadID, MessageID: g.messageID, TargetID: g.targetID, Kind: g.kind, DueAt: g.ev.OccurredAt,
+			MessageSeq: g.messageSeq}
 		if err := p.apply(ctx, h, facts[u], d); err != nil {
 			return err
 		}

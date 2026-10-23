@@ -101,6 +101,8 @@ type group struct {
 	threadID, channelID, spaceID ids.ID
 	// messageID and targetID are the pointers of the hint.
 	messageID, targetID ids.ID
+	// messageSeq is the thread_seq of messageID; zero without a message (Hint.MessageSeq).
+	messageSeq int64
 	// audience is the receiver of a personal event (security, admin).
 	audience ids.ID
 	// excludeDevice is the pending device of a security hint.
@@ -130,7 +132,7 @@ func (p *Push) onMessage(ctx context.Context, ev sync.Event) error {
 	if err != nil {
 		return err
 	}
-	base := group{threadID: m.ThreadID, channelID: info.ChannelID, spaceID: info.SpaceID, messageID: m.ID, ev: ev}
+	base := group{threadID: m.ThreadID, channelID: info.ChannelID, spaceID: info.SpaceID, messageID: m.ID, messageSeq: m.ThreadSeq, ev: ev}
 	author := m.Author.ID
 	if info.ChannelKind == channelKindDM {
 		readers, err := p.d.Readers.Readers(ctx, info.ChannelID)
@@ -194,7 +196,7 @@ func (p *Push) onRun(ctx context.Context, ev sync.Event) error {
 	}
 	base := group{threadID: r.ThreadID, channelID: info.ChannelID, spaceID: info.SpaceID, ev: ev}
 	if found {
-		base.messageID = last
+		base.messageID, base.messageSeq = last.ID, last.ThreadSeq
 	}
 	if starterKind != "" {
 		g := base

@@ -5,11 +5,14 @@ package wire
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
+	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 )
 
@@ -79,11 +82,42 @@ func (s *server) buildPush() (*Push, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewPush(cfg, pool, a.UoW(), PushDeps{
+	d := PushDeps{
 		Notify: n, Authorizer: az, Recipients: recipients, Directory: id.Directory, Devices: id.Devices, Settings: p.Service.Settings(),
 		Chat: c.Service, Messaging: m.Service, History: sy.History(), Positions: syncpg.NewPersonalRepository(pool),
 		InstanceID: rec.InstanceID, Providers: providers,
-	}, s.deps.Clock, s.logger())
+	}
+	s.wirePresence(&d)
+	return NewPush(cfg, pool, a.UoW(), d, s.deps.Clock, s.logger())
+}
+
+// msgPresenceUnavailable is the Info line of a worker without presence (M3-23 design note 1).
+const msgPresenceUnavailable = "presence unavailable in this role: hints go by push only"
+
+// wirePresence wires the presence of the push path by role (13 12 point 4, RK-37; M3-23 design
+// note 1; docs/decisions.d/M3-23.md D-M3-23-1): role all passes the gateway's PresenceView, the
+// live routes and the hub as publisher of notification.created, because only there the hub and
+// the consumer push share the process; role worker keeps presence.None and the fail-closed
+// routes of M3-19 and logs one Info line, so every device with a registration gets its push at
+// once; role api runs no consumer and no job and wires nothing.
+func (s *server) wirePresence(d *PushDeps) {
+	switch s.role {
+	case RoleAll:
+		s.mu.Lock()
+		gw := s.gateway
+		s.mu.Unlock()
+		if gw == nil || gw.Hub == nil {
+			return
+		}
+		pub := gw.Publisher
+		if pub == nil {
+			pub = gw.Hub
+		}
+		d.Presence, d.LiveRoutes, d.Publisher = gatewayapp.NewPresenceView(gw.Hub), true, pub
+	case RoleWorker:
+		s.logger().Info(msgPresenceUnavailable, slog.String(attr.ServerRole, string(s.role)))
+	case RoleAPI:
+	}
 }
 
 // startAPNs builds the APNs adapter (M3-20) over the secret provider and the egress

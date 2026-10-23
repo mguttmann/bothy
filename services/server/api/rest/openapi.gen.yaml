@@ -29886,14 +29886,19 @@ components:
           $ref: '#/components/schemas/NotificationKind'
         thread_id:
           $ref: '#/components/schemas/Uuid'
+          description: Thread of the hint; absent for hints without a thread.
         message_id:
           $ref: '#/components/schemas/Uuid'
+          description: Message the hint points at; absent when the hint points at no message.
+        target_id:
+          $ref: '#/components/schemas/Uuid'
+          description: 'Target of a hint without a thread: the waiting device for `security`, the grant or group of the reminder for `admin` (R-AZ-30).'
         quiet:
           type: boolean
           description: Inside quiet hours; show without sound.
         count:
           type: integer
-          description: Bundled notifications of this thread.
+          description: 1, or the unread count of a bundled hint (13 4.5).
         space_name:
           type: string
         channel_name:
