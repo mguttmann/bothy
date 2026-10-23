@@ -33,7 +33,35 @@ const (
 	FieldTooManyMentions = "too_many_mentions"
 	// FieldRequiredForForumPost marks a forum post without first_message.
 	FieldRequiredForForumPost = "required_for_forum_post"
+	// FieldRunMismatch marks a run_id that does not name an active run of the calling agent in the
+	// target thread (M2-19 design notes 3 to 5).
+	FieldRunMismatch = "run_mismatch"
 )
+
+// RunMismatchDetail is the one detail of every run_mismatch, here and in the answer check of runs,
+// so the answers of a person, an unknown run, a run of another thread and one of another agent
+// are equal (M2-19 design note 4 b).
+const RunMismatchDetail = "run_id does not name an active run of the calling agent in this thread"
+
+// CheckRunID is the body rule of MessageCreate.run_id for a principal of kind (M2-19 design note
+// 3): absent passes; an agent's run_id passes unchanged to runs, which checks the run; any other
+// principal gets 400 validation_failed on /run_id with run_mismatch, because a run belongs to an
+// agent.
+func CheckRunID(kind string, runID *ids.ID) error {
+	if runID == nil || kind == "agent" {
+		return nil
+	}
+	return fieldError("/run_id", FieldRunMismatch, RunMismatchDetail)
+}
+
+// CheckFirstMessageRunID refuses first_message.run_id of createThread for every principal (M2-19
+// design note 5): a thread created by the request has no run.
+func CheckFirstMessageRunID(runID *ids.ID) error {
+	if runID == nil {
+		return nil
+	}
+	return fieldError("/first_message/run_id", FieldRunMismatch, RunMismatchDetail)
+}
 
 // Origin is messages.origin (09 section 3.2): set by the server, never by a client.
 type Origin string

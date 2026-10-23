@@ -224,6 +224,9 @@ exceptions:
   - query: runs.LockRun
     category: system_job
     reason: "the delivery check and the job runs.queued_expiry lock the one run named by the event or the job before agent.invoke decides for its trigger; nothing of the row leaves before that decision (M2-08)"
+  - query: runs.LockRunForAnswer
+    category: after_authorize
+    reason: "the answer check reads the one run an agent names in run_id by primary key inside the unit of its authorized message.create, under a shared lock so the run cannot end before the answer commits; only the verdict leaves the module, and a run of another thread or agent answers like an unknown one (M2-19 design note 4)"
   - query: runs.LockActiveRunsByStarter
     category: system_job
     reason: "the in-transaction subscriber of authorize.AccessChanged locks the active runs started by the principals whose access the committed change removes, keeps those whose channel they lost and sends their agent run.cancel_requested; nothing of the rows leaves the server (R-SY-11, M2-09)"

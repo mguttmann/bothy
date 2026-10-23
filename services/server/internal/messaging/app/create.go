@@ -33,6 +33,9 @@ type prepared struct {
 	// handles are the distinct mention handles of content.
 	handles []string
 	hash    []byte
+	// runID is the run_id of an agent's answer (M2-19 design note 3); it goes into MessagePosted
+	// only, never into the row or the hash (design note 6).
+	runID *ids.ID
 }
 
 // Create implements messaging.Messages (brief D1): the thread (404 for an unknown or invisible
@@ -151,8 +154,9 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 		return prepared{}, domain.NotEnabled("/attachment_file_ids")
 	case cmd.Components > 0:
 		return prepared{}, domain.NotEnabled("/components")
-	case cmd.RunID != nil:
-		return prepared{}, domain.NotEnabled("/run_id")
+	}
+	if err := domain.CheckRunID(string(a.Kind), cmd.RunID); err != nil {
+		return prepared{}, err
 	}
 	content := ""
 	if cmd.ContentMD != nil {
@@ -161,7 +165,7 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err := domain.CheckContent(content, s.cfg.MaxContentBytes); err != nil {
 		return prepared{}, err
 	}
-	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft}
+	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft, runID: cmd.RunID}
 	// SkipMentions leaves handles empty, so send resolves and stores no mention (R-EX-09).
 	if !cmd.SkipMentions {
 		p.handles = domain.ScanMentions(content)
@@ -260,6 +264,11 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	m := view(row, author, mentions)
 	posted := s.posted(a, info, m, p.clearDraft)
 	posted.CreatedThread, posted.ReopenedThread = created, line != nil
+	if p.runID != nil {
+		// runs checks the named run in its subscriber and vetoes the unit (M2-19 design note 4).
+		r := *p.runID
+		posted.RunID = &r
+	}
 	if err := s.announce(ctx, a, info, line, m, posted); err != nil {
 		return messaging.Created{}, err
 	}
@@ -375,6 +384,11 @@ func (s *Service) posted(a actor.Actor, info chat.ThreadInfo, m messaging.Messag
 	if !m.ReplyToID.IsZero() {
 		r := m.ReplyToID
 		ev.ReplyToID = &r
+	}
+	if !m.RunID.IsZero() {
+		// Only the live box anchor stores run_id (03 messages, CreateRunAnchor).
+		r := m.RunID
+		ev.RunID = &r
 	}
 	return ev
 }

@@ -11083,7 +11083,7 @@ type Message struct {
 	// ReplyToMessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	ReplyToMessageId *Uuid `json:"reply_to_message_id,omitempty"`
 
-	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	// RunId Set only for `kind = run`: the run whose live box this anchor holds.
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent bool  `json:"silent"`
 
@@ -11129,7 +11129,7 @@ type MessageCreate struct {
 	// ReplyToMessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	ReplyToMessageId *Uuid `json:"reply_to_message_id,omitempty"`
 
-	// RunId Agents only; the run this answer belongs to.
+	// RunId Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`.
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent *bool `json:"silent,omitempty"`
 }
@@ -14913,7 +14913,9 @@ type ThreadClosedEventAudience string
 type ThreadClosedEventType string
 
 // ThreadCreate Creates a forum post (with `title` and `first_message`) or a thread from a message of the
-// main thread (with `parent_message_id`, optional `first_message`).
+// main thread (with `parent_message_id`, optional `first_message`). `first_message.run_id` is
+// never valid, because a new thread has no run: `400 validation_failed` with pointer
+// `/first_message/run_id` and `errors[].code` `run_mismatch`.
 type ThreadCreate struct {
 	FirstMessage *MessageCreate `json:"first_message,omitempty"`
 

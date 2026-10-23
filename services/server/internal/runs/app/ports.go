@@ -169,6 +169,11 @@ type Repository interface {
 	// LockRun reads the run id with its row lock for the rest of the unit of work (SELECT ... FOR
 	// UPDATE, M2-08); found is false for an unknown id. It needs a unit of work.
 	LockRun(ctx context.Context, id ids.ID) (row RunRow, found bool, err error)
+	// LockRunForAnswer reads thread, agent and state of the run id with a shared row lock for the
+	// rest of the unit of work (SELECT ... FOR SHARE, M2-19 design note 7): an end of the run
+	// waits for the commit of the answer, or the answer waits and sees the end state. found is
+	// false for an unknown id. It needs a unit of work.
+	LockRunForAnswer(ctx context.Context, id ids.ID) (run domain.AnswerRun, found bool, err error)
 	// RecordDelivery stores the columns of an allowed delivery and raises version by one; the
 	// caller holds the row lock and calls it only when a column changes. Errors: not_found for an
 	// unknown run.

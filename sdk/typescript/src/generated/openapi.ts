@@ -6976,7 +6976,9 @@ export interface components {
         };
         /**
          * @description Creates a forum post (with `title` and `first_message`) or a thread from a message of the
-         *     main thread (with `parent_message_id`, optional `first_message`).
+         *     main thread (with `parent_message_id`, optional `first_message`). `first_message.run_id` is
+         *     never valid, because a new thread has no run: `400 validation_failed` with pointer
+         *     `/first_message/run_id` and `errors[].code` `run_mismatch`.
          */
         ThreadCreate: {
             /** @example Invoice export fails */
@@ -7078,6 +7080,7 @@ export interface components {
             /** @description Set when `content_md` was cut (events above `sync.event_payload_max_bytes`, lists above `message.list_content_max_bytes`); `getMessage` returns the full content. */
             content_truncated?: boolean;
             reply_to_message_id?: components["schemas"]["Uuid"];
+            /** @description Set only for `kind = run`: the run whose live box this anchor holds. */
             run_id?: components["schemas"]["Uuid"];
             trigger_state?: components["schemas"]["TriggerState"];
             trigger_state_at?: components["schemas"]["Timestamp"];
@@ -7111,7 +7114,7 @@ export interface components {
             mention_ids?: components["schemas"]["Uuid"][];
             silent?: boolean;
             clear_draft?: boolean;
-            /** @description Agents only; the run this answer belongs to. */
+            /** @description Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`. */
             run_id?: components["schemas"]["Uuid"];
             /** @description Agents and apps only; requires `kind = card`. */
             components?: components["schemas"]["ComponentCreate"][];

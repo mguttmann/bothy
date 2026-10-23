@@ -70,25 +70,26 @@ func TestCreateMessage_MaxContentBytes(t *testing.T) {
 	}
 }
 
-// TestCreateMessage_NotEnabledMembers400 (brief D2): kind voice and card, attachments, components
-// and run_id are refused with not_enabled; nothing is written.
+// TestCreateMessage_NotEnabledMembers400 (brief D2): kind voice and card, attachments and
+// components are refused with not_enabled; run_id of a person is run_mismatch since M2-19 (design
+// note 3); nothing is written.
 func TestCreateMessage_NotEnabledMembers400(t *testing.T) {
 	t.Parallel()
 	w := mw.New(t, subscribe)
 	_, _, main := w.TextChannel()
-	for _, c := range []struct{ extra, pointer string }{
-		{`"kind":"voice"`, "/kind"},
-		{`"kind":"card"`, "/kind"},
-		{`"attachment_file_ids":["` + ids.New().String() + `"]`, "/attachment_file_ids"},
-		{`"components":[{"custom_id":"ok","type":"button","definition":{}}]`, "/components"},
-		{`"run_id":"` + ids.New().String() + `"`, "/run_id"},
+	for _, c := range []struct{ extra, pointer, code string }{
+		{`"kind":"voice"`, "/kind", "not_enabled"},
+		{`"kind":"card"`, "/kind", "not_enabled"},
+		{`"attachment_file_ids":["` + ids.New().String() + `"]`, "/attachment_file_ids", "not_enabled"},
+		{`"components":[{"custom_id":"ok","type":"button","definition":{}}]`, "/components", "not_enabled"},
+		{`"run_id":"` + ids.New().String() + `"`, "/run_id", "run_mismatch"},
 	} {
 		r := w.Do("owner", http.MethodPost, mw.MessagesPath(main), mw.Body(ids.New(), "x", c.extra))
 		if r.StatusCode != http.StatusBadRequest {
 			t.Fatalf("%s: %d %s", c.extra, r.StatusCode, r.Body)
 		}
 		p := r.Problem(t)
-		if ptr, code := mw.Field(p); ptr != c.pointer || (code != "not_enabled" && c.pointer != "/components") {
+		if ptr, code := mw.Field(p); ptr != c.pointer || (code != c.code && c.pointer != "/components") {
 			t.Errorf("%s: %s %s", c.extra, ptr, code)
 		}
 	}
@@ -159,5 +160,56 @@ func TestCreateMessage_RightsAndLeaks(t *testing.T) {
 	p := w.Want(w.Do("owner", http.MethodPost, mw.MessagesPath(main), mw.Body(ids.New(), "x")), http.StatusForbidden, "channel_read_only")
 	if p["reason"] != "channel_archived" {
 		t.Errorf("reason %v", p["reason"])
+	}
+}
+
+// TestCreateMessage_RunIDCarriedNotStored (M2-19 design notes 3, 5 and 6): an agent's run_id
+// reaches MessagePosted.RunID (this world subscribes no runs check), the Message carries no
+// run_id, and run_id is not part of the request hash, so the same client_msg_id without run_id
+// is the replay; an app's run_id is run_mismatch on /run_id; first_message.run_id of createThread
+// is run_mismatch on /first_message/run_id for an agent and a person, and no thread is created.
+func TestCreateMessage_RunIDCarriedNotStored(t *testing.T) {
+	t.Parallel()
+	w := mw.New(t, subscribe)
+	space, ch, main := w.TextChannel()
+	op := w.Agent("operator-agent")
+	w.SetOperator(ch, op)
+	run, id := ids.New(), ids.New()
+	r := w.Do("operator-agent", http.MethodPost, mw.MessagesPath(main), mw.Body(id, "answer", `"run_id":"`+run.String()+`"`))
+	m := w.Want(r, http.StatusCreated, "")
+	if _, ok := m["run_id"]; ok || m["origin"] != "agent" {
+		t.Fatalf("answer %v", m)
+	}
+	posted := w.Posted()
+	last := posted[len(posted)-1]
+	if last.RunID == nil || *last.RunID != run || last.Origin != "agent" || last.Kind != "text" {
+		t.Fatalf("MessagePosted %+v", last)
+	}
+	if n := w.Count(`SELECT count(*)::int FROM messages WHERE id = $1 AND run_id IS NULL`, m["id"].(string)); n != 1 {
+		t.Fatal("run_id was stored")
+	}
+	replay := w.Do("operator-agent", http.MethodPost, mw.MessagesPath(main), mw.Body(id, "answer"))
+	if got := w.Want(replay, http.StatusOK, ""); got["id"] != m["id"] || replay.Header.Get("Idempotent-Replay") != "true" {
+		t.Fatalf("replay without run_id: %d %v", replay.StatusCode, got)
+	}
+	app := w.App("deploy-app", "messages:write", "messages:read")
+	w.Grant("app", app, space, "write")
+	p := w.Want(w.Do("deploy-app", http.MethodPost, mw.MessagesPath(main), mw.Body(ids.New(), "x", `"run_id":"`+run.String()+`"`)),
+		http.StatusBadRequest, "validation_failed")
+	if ptr, code := mw.Field(p); ptr != "/run_id" || code != "run_mismatch" {
+		t.Errorf("app run_id: %s %s", ptr, code)
+	}
+	forum := w.Channel(space, "forum", "Reports")
+	w.SetOperator(forum, op)
+	before := w.Count(`SELECT count(*)::int FROM threads`)
+	for _, name := range []string{"operator-agent", "owner"} {
+		body := `{"title":"Report","first_message":` + mw.Body(ids.New(), "report", `"run_id":"`+run.String()+`"`) + `}`
+		p := w.Want(w.Do(name, http.MethodPost, mw.ThreadsPath(forum), body, mw.Key()...), http.StatusBadRequest, "validation_failed")
+		if ptr, code := mw.Field(p); ptr != "/first_message/run_id" || code != "run_mismatch" {
+			t.Errorf("%s first_message.run_id: %s %s", name, ptr, code)
+		}
+	}
+	if w.Count(`SELECT count(*)::int FROM threads`) != before {
+		t.Fatal("a refused createThread created a thread")
 	}
 }

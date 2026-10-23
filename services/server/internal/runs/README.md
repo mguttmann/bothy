@@ -208,6 +208,33 @@ neither creates a run or a cost entry (R-AG-14).
 - Registrations: `runs.Register` declares the ephemeral `command.autocomplete_requested` and the op
   `command.autocomplete_result`, whose handler the gateway runs on `CommandExec`.
 
+## Answers with `run_id` (M2-19)
+
+- `Acceptor.OnMessagePosted` has a first branch for answers: an event with `RunID` and a `Kind`
+  other than `run` must have `Origin = agent` (anything else is an internal error, because
+  messaging never builds it); for a kind other than `system` it calls `checkAnswer`
+  (`app/answer.go`). Afterwards every message whose origin is not human returns without trigger
+  work, as before: no run, no follow-up, no `SetTriggerState`, no audit (AG-01, 07 SR4).
+- `checkAnswer` reads the run with `Repository.LockRunForAnswer` (`queries/run_answer.sql`,
+  `SELECT id, thread_id, agent_id, state ... FOR SHARE`) and decides with the pure
+  `domain.AnswerVerdict`: unknown, another thread or another agent is `ErrAnswerRunMismatch`
+  (`400 validation_failed`, `/run_id`, `run_mismatch`, one detail for every case, equal to the
+  body rule of messaging); an own run in an end state is `ErrAnswerRunNotActive` (`409 conflict`,
+  `reason` `run_not_active`). Ownership comes before the state, so `run_id` cannot probe runs
+  outside the authorized thread (05 rule 1.2). There is no `authorize` call for the run: the
+  message was authorized as `message.create` on its thread, and a run's path is its thread.
+- A valid `run_id` changes nothing on the run (no `version`, no event, no step).
+- Lock and order: messaging holds the thread row (`AppendToThread`), then the answer check takes
+  the run row `FOR SHARE`, the same order as the acceptance (thread, then run). `finishRun`,
+  `cancelRun`, the cancel timeout and the stall check update the run row under `FOR UPDATE`, so
+  they wait for the answer's commit, or the answer waits for theirs and then sees the end state.
+  Every answer stored with a `run_id` therefore commits while its run is active, and its
+  `message.created` has a lower `seq` than the `run.state_changed` of the end. A deadlock with a
+  path that locks the run first and a thread later is retried by the unit of work
+  (`database.tx_retry_max`).
+- `LockRunForAnswer` is an `after_authorize` exception of the SQL visibility lint
+  (`tools/lint/sql_visibility.yaml`).
+
 ## Invocation tokens (M2-06)
 
 `app.InvocationTokens` issues and verifies the invocation tokens of invariant I3 (09 4.5, 05 section 5, ADR 0023). `internal/wire` builds it once per process in the signing keys step (`Runs.BindInvocationTokens`) over `instance.Keys`, the instance row and the configuration keys `agent.invocation_token_ttl` and `auth.clock_leeway`. It stays inside the module: every consumer up to M2-17 is in `runs`; M2-14 adds a port for other modules (D-M2-06-1).

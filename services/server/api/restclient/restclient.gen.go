@@ -11145,7 +11145,7 @@ type Message struct {
 	// ReplyToMessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	ReplyToMessageId *Uuid `json:"reply_to_message_id,omitempty"`
 
-	// RunId UUIDv7 (RFC 9562), lowercase canonical form.
+	// RunId Set only for `kind = run`: the run whose live box this anchor holds.
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent bool  `json:"silent"`
 
@@ -11191,7 +11191,7 @@ type MessageCreate struct {
 	// ReplyToMessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	ReplyToMessageId *Uuid `json:"reply_to_message_id,omitempty"`
 
-	// RunId Agents only; the run this answer belongs to.
+	// RunId Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`.
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent *bool `json:"silent,omitempty"`
 }
@@ -14975,7 +14975,9 @@ type ThreadClosedEventAudience string
 type ThreadClosedEventType string
 
 // ThreadCreate Creates a forum post (with `title` and `first_message`) or a thread from a message of the
-// main thread (with `parent_message_id`, optional `first_message`).
+// main thread (with `parent_message_id`, optional `first_message`). `first_message.run_id` is
+// never valid, because a new thread has no run: `400 validation_failed` with pointer
+// `/first_message/run_id` and `errors[].code` `run_mismatch`.
 type ThreadCreate struct {
 	FirstMessage *MessageCreate `json:"first_message,omitempty"`
 
@@ -25540,25 +25542,6 @@ func (c *Client) CompletePairing(ctx context.Context, params *CompletePairingPar
 // Corresponds with POST /auth/passkey/begin (the `BeginPasskeyLogin` operationId).
 func (c *Client) BeginPasskeyLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBeginPasskeyLoginRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// BeginPasskeyLogin Start a passkey login
-//
-// Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /auth/passkey/begin (the `BeginPasskeyLogin` operationId).
-func (c *Client) BeginPasskeyLogin(ctx context.Context, body BeginPasskeyLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBeginPasskeyLoginRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
