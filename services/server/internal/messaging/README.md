@@ -1,6 +1,6 @@
 # Module `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Agent answers built (M2-19): `run_id` of agents, `MessagePosted.RunID`. The reads of the consumer push of notify built (M3-19): `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore` and `Newest`. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message. Attachments built (M3-07): `attachment_file_ids` in `createMessage` and `createThread`, the column `messages.has_attachments`, the attachments in every representation and their deletion with the message, all through the port `files.Attachments` (section "Attachments (M3-07)").
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Agent answers built (M2-19): `run_id` of agents, `MessagePosted.RunID`. The reads of the consumer push of notify built (M3-19): `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore` and `Newest`. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message. Attachments built (M3-07): `attachment_file_ids` in `createMessage` and `createThread`, the column `messages.has_attachments`, the attachments in every representation and their deletion with the message, all through the port `files.Attachments` (section "Attachments (M3-07)"). The read operations of the search coordinator built (M3-14): `SearchReads` with `SearchMessages` and `HitMessages` (section "Read operations for the search coordinator (M3-14)").
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -98,7 +98,7 @@ adapter on the global meter provider.
 
 ## Port (root package `internal/messaging`)
 
-- Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
+- Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`, `ForPreview`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`, `SearchReads` (`SearchMessages`, `HitMessages` for the search coordinator, M3-14); declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
 - Emits in-tx events: `MessagePosted`, `MessageDeleted`.
 - Subscribes to in-tx events: `chat.ThreadMoved`.
 - Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.
@@ -444,6 +444,44 @@ empty vector. The queries list their columns, so no read carries `search_languag
 `search_vector` (docs/DECISIONS.md D-M3-13-10). `TestMessageInsertsSetSearchLanguage`
 (`adapters/postgres`) fails when an `INSERT INTO messages` of `queries/*.sql` does not name
 `search_language` (later writers: M2 agent messages, M8-03 import, V3-01 DMs).
+## Read operations for the search coordinator (M3-14)
+
+The module `search` owns no tables; it reads messages only through the port `SearchReads`
+(`search.go`, [14-search.md](../../../../docs/spec/14-search.md) section 10, R-SU-09), which
+`*app.Service` implements (`app/search.go`) over the store port `app.SearchReadStore` (part of
+`Store`) and the queries of `queries/search.sql`. Neither operation authorizes: the coordinator
+passes the visible channels of `Authorizer.Scope` and checks every delivered hit with
+`message.read` again (14 4.3); both statements carry `m.channel_id = ANY(@channel_ids::uuid[])`
+(07 section 7.4 rule 1, AZ-P12).
+
+- `SearchMessages(ctx, searchkit.Query)` runs one statement (14 4.8): the live rows of the visible
+  channels whose `search_vector` matches the tsquery the search module built, with the filters of
+  the query (`ThreadIDs` on `thread_id`, nil restricts nothing and an empty list keeps nothing;
+  `AuthorID` on `author_principal_id`; `After` and `Before` on `created_at`, half open; `HasFile`
+  on `has_attachments`, true with and false without attachments) and `created_at` at or before
+  the reference time of the first page. The newest `search.max_candidates` of them are the
+  candidates; one extra row reports `CandidatesCapped` and is never ranked or returned, and the
+  flag comes from the candidate relation, so an empty page after the keyset still reports it.
+  `relevance` scores `ts_rank(search_vector, tsq, search.rank_normalization)` divided by
+  `1 + age / search.recency_scale` with the age measured from the reference time, never from
+  `now()`, and orders by score, then id, descending; `newest` orders by `created_at`, then id,
+  descending, with score 0. The page starts strictly after `Query.From`, reads the page size plus
+  one row and sets `Page.Next` to the position of its last hit exactly when that row exists.
+  Only the rows of the page get a headline: `ts_headline` in `messages.search_language` over
+  `content_md` cut at `search.headline_input_max_chars`, with the options of
+  `Limits.HeadlineOptions` and the random markers, split with `searchkit.Split`, so content never becomes markup
+  of the excerpt: `ts_headline` drops the HTML tags of the content (its parser reads them as tags)
+  and keeps entities and any marker look-alike as text. This is the only read of `search_language` and `search_vector`; it returns
+  no message row (D-M3-13-10). A statement that hit the statement timeout of the search unit
+  (`search.statement_timeout`) returns `searchkit.ErrTimeout`, a statement the caller cancelled
+  the context error, anything else an internal error.
+- `HitMessages(ctx, messageIDs, channelIDs)` returns the hit objects: the live messages of
+  `messageIDs` in the channels of the kept hits, rendered by the code path of `History`
+  (`listThreadMessages`): content cut at `message.list_content_max_bytes` with
+  `content_truncated`, attachments, reactions, own reactions of the principal of the request, pin
+  and components. The result follows the order of `messageIDs`; a missing, deleted or foreign id
+  is absent and a repeated id appears once.
+
 ## Thread moves (M1-62)
 
 `Subscribers.OnThreadMoved` (`app/subscribers.go`) is the in-transaction subscriber of
