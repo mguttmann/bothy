@@ -1,0 +1,9 @@
+# The acting-for mode table of SR9 (brief M2-14 design note 5): the own exceptions and the unbound
+# actions, one per line; every other catalogue action is bound.
+exception agent_session.report
+exception interaction.respond
+exception message.create
+exception run.finish
+exception run.update
+unbound run.start
+unbound run.token.renew

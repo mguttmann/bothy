@@ -154,7 +154,9 @@ func TestActingFor_Intersects(t *testing.T) {
 	w.versions.Bump()
 	lotse := w.agent(w.lotse)
 	w.allow(t, lotse, authorize.ActionMessageRead, w.msg(w.projektA, w.robin))
-	lotse.ActingFor = actor.ActingFor{UserID: w.alex, RunID: ids.New(), ThreadID: w.mainThread[w.allgemein], JTI: "j"}
+	// The run's thread is another thread, so the reply exception of SR9 (M2-14) does not apply to
+	// the main thread of Allgemein.
+	lotse.ActingFor = actor.ActingFor{UserID: w.alex, RunID: ids.New(), ThreadID: ids.New(), JTI: "j"}
 	w.expect(t, lotse, authorize.ActionMessageRead, w.msg(w.projektA, w.robin), notFound, "acting_for_insufficient")
 	w.allow(t, lotse, authorize.ActionMessageRead, w.msg(w.allgemein, w.robin))
 	// Sam reads Allgemein only; Lotse acting for Sam may read but not write there.

@@ -538,7 +538,9 @@ trust mark of its message, because it is the words of its author ([ADR 0054](../
 ### 4.7 Adapter operations
 
 All operations use the agent token (DPoP-bound with `dpop_jkt`) and the
-rate-limit class from 05.
+rate-limit class from 05. Every request of the adapter inside a run also carries the header
+`Invocation-Token` with the invocation token of the run, which binds it to the rights of the
+triggering person ([07-permissions.md](07-permissions.md), SR9; [06-api.md](06-api.md), section 4 point 8).
 
 | Purpose | Action | Idempotency | Rule |
 |---|---|---|---|

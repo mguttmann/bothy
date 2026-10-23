@@ -1,0 +1,17 @@
+# The enabled GET operations whose requests call Scope of the Authorizer (07 guard rule SR9,
+# brief M2-14 "TestSR9_EveryScopedList"), observed for Lotse without and with Invocation-Token.
+# One operationId per line, sorted. A new operation here must first pass the check with T: no ID
+# of a space, channel, thread, message or run the triggering person cannot read.
+getMessage
+getSnapshot
+listActiveRuns
+listEvents
+listHosts
+listMessageRevisions
+listPins
+listReactions
+listServedChannels
+listSpaceChannels
+listSpaces
+listThreadMessages
+listThreadRuns

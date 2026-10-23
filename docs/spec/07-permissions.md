@@ -245,7 +245,7 @@ authentication ([08-identity.md](08-identity.md)) builds it; `authz` trusts only
 | `step_up_at` | last fresh confirmation of the session | `auth_sessions.step_up_at` |
 | `token_id`, `token_scopes` | API token and its scopes (agents, apps, personal tokens) | `api_tokens` |
 | `installation_id`, `granted_scopes` | apps only | `app_installations` |
-| `acting_for` | triggering person, run, thread and `jti`, if an agent acts within a run | verified invocation token in the request header (guard rule SR9) |
+| `acting_for` | triggering person, run, thread and `jti`, if an agent acts within a run | verified invocation token in the request header (guard rule SR9); the header is `Invocation-Token` ([06-api.md](06-api.md), sections 3 and 4) |
 | `view_as` | person whose view the owner is currently looking at | session with active "View as person" (section 9.2) |
 | `request_time` | one server time per call | clock |
 
@@ -301,12 +301,12 @@ reveals nothing (never with `404`).
 | `run_active` | `forbidden` | model command during an active run (05 `command.invoke`); also `interaction.create` on a component without run while the card's agent has an active run in the thread, which would need a second run (R-DM-14, [09-agents.md](09-agents.md) section 11.2, M2-15); problem code `agent_invocation_denied` with `reason` |
 | `billing_mode_mismatch` | `invariant_violation` | `run.start` with a reported mode not equal to the configured mode (I3); problem code `billing_mode_mismatch` (`409`) |
 | `tool_class_mismatch` | `invariant_violation` | the adapter reports a higher tool class than the token; problem code `tool_class_mismatch` (`409`) |
-| `invocation_token_invalid` | `forbidden` | invocation token invalid, expired, not the current one, or consumed (`run.start`, `run.token.renew`); `reason` `expired`, `superseded` or `invalid` ([09-agents.md](09-agents.md), section 4.5) |
+| `invocation_token_invalid` | `forbidden` | invocation token invalid, expired, not the current one, or consumed (`run.start`, `run.token.renew`); `reason` `expired`, `superseded` or `invalid` ([09-agents.md](09-agents.md), section 4.5); also every request with `Invocation-Token` (SR9), with `reason` `invalid` (token, run, agent or person wrong, or the header repeated, empty or sent by a principal that is not an agent) or `run_inactive` (the run of the token has ended) |
 | `import_not_running` | `forbidden` | `import.apply` without a running source or with a target outside its channels |
 | `malware_detected` | no `authorize` result | reason of the audit entry for `file.upload` on a malware finding ([12-files.md](12-files.md), section 5.2) |
 | `component_inactive` | `forbidden` | component used, expired or deactivated; also a component whose run has ended. Answered `409 component_used` without the reason, which stays in the audit, so a lost race answers the same whether `authorize` or the single-use lock decided it (09 section 11.2, M2-15) |
 | `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` and the principal is neither the triggering person nor an owner; also `restricted_to = 'owner'` and the principal is not an effective owner ("Always allow", 09 section 11.5, M2-15); problem code `forbidden` with `reason` |
-| `acting_for_insufficient` | `not_found` or `forbidden` | acting-for binding: the triggering person does not have the permission |
+| `acting_for_insufficient` | `not_found` or `forbidden` | acting-for binding: the triggering person does not have the permission; `not_found` when the target is visible with the agent's own rights but not with the intersection (answered like an unknown ID), `forbidden` (problem `forbidden` with `reason: acting_for_insufficient`) when the requirement holds with the agent's own rights but fails with the intersection; if the agent alone already fails, the agent's own reason stays |
 | `terminal_not_host_assignee` | `forbidden` | SR10: a non-owner on a host whose assignee they are not; problem code `terminal_denied` with `reason: not_host_assignee` |
 | `terminal_server_host_owner_only` | `forbidden` | SR10: server host only for owners; problem code `terminal_denied` with `reason: server_host_owner_only` |
 | `i6_holder_only` | `forbidden` | SR11: host with a personal LLM login, the principal is not its holder; problem code `terminal_denied` with `reason: i6_holder_only` |
@@ -338,6 +338,10 @@ authorize(p, action, ref) -> Decision:
       return DENY(forbidden, principal_pending)      # provisioned, 05 section 2.5
   if p.device_state == pending and action not in PENDING_ALLOWED:
       return DENY(forbidden, device_pending)         # 05, section 2.5
+  if p.acting_for.status == invalid:                 # SR9, before resolve: unknown and invisible IDs alike
+      return DENY(forbidden, invocation_token_invalid, detail invalid)
+  if p.acting_for.status == run_inactive and action not in SR9_UNBOUND:
+      return DENY(forbidden, invocation_token_invalid, detail run_inactive)   # SR9
 
   # 2. Permission snapshot (section 7)
   snap := snapshot(p, t)                             # cache per (p, permission_version), valid until snap.valid_until
@@ -350,7 +354,8 @@ authorize(p, action, ref) -> Decision:
   eff := effective(snap, res.path)                   # owner, DM, grants, groups, operator rule,
                                                      # highest level, union of the capabilities,
                                                      # limit for agents and apps
-  if p.acting_for:   eff := eff ∩ effective(snapshot(p.acting_for.user, t), res.path)   # SR9
+  if p.acting_for.status == bound and sr9_applies(action, p.acting_for, res) and not delivery_mode:
+                     eff := eff ∩ effective(snapshot(p.acting_for.user, t), res.path)   # SR9
   if p.view_as:      eff := eff ∩ effective(snapshot(p.view_as, t), res.path)            # section 9.2
 
   # 5. Visibility: no read permission results in 404
@@ -386,6 +391,18 @@ authorize(p, action, ref) -> Decision:
 
   return ALLOW
 ```
+
+SR9 in steps 1 and 4: `SR9_UNBOUND` is `run.start` (also `resumeRun`) and `run.token.renew`; with
+a valid token they answer exactly as without the header, also when the run has ended; an invalid
+header denies them like every action (step 1). `sr9_applies` is false
+for these two actions and for the own exceptions of SR9 (`message.create`, `run.update`,
+`run.finish`, `interaction.respond`, `agent_session.report`) when the resolved thread of the
+resource is the run's thread and, for a resource of kind `run`, the resource is the run itself;
+for every other action it is true (fail closed). In delivery mode (`authorize.Delivery(ctx)`, the
+REST poll and the gateway delivery to an agent consumer) decisions and `Scope` ignore `acting_for`,
+because an agent consumer receives by its own grants (8.1 row "Agent consumers"); the filter mode
+(`authorize.Filter(ctx)`) stays bound. `Scope` with status `invalid` or `run_inactive` returns the
+same `invocation_token_invalid` decision.
 
 While a view is stored on a console session, `access.view_as.end`, `auth.logout` and
 `auth.step_up` on the person's own session and `self.read` on the person themselves are decided
@@ -652,6 +669,30 @@ What the runtime knows outside the server API (its own memory, earlier sessions)
 covered by the rule; for that there is the read horizon hint (section 6) and the threat
 T-AI-02 in the threat model.
 
+The header is `Invocation-Token` with the compact JWS of `EventEnvelope.invocation_token` of the
+run ([06-api.md](06-api.md), section 4 point 8). The binding check on every request: the
+signature, `typ`, `kid` and `iss` of the token, `aud` equal to the authenticated agent, then the
+run of the claim `run_id`, which must exist, belong to this agent, be triggered by `sub` and lie in
+the claimed thread; a token without `run_id` (autocomplete, a command without an active run) is
+invalid, because SR9 binds a run. An active run (`queued`, `running`, `waiting_input`) binds; an
+ended one answers `invocation_token_invalid` with `reason: run_inactive`, every other failure
+`reason: invalid`, also for the header sent by a principal that is not an agent. Expiry and the
+currency of the `jti` are not checked: a run outlives `agent.invocation_token_ttl`, every token of
+a run names the same person, and the token never adds a right, so a leaked or older token gives its
+holder nothing the agent token alone would not give (docs/DECISIONS.md D-M2-14-3). The exceptions
+above hold only for the own thread and run: the resolved thread of the resource is the run's
+thread, and for a resource of kind `run` it is the run itself, so `run.finish` of an earlier run in
+the same thread is bound; `run.start` and `run.token.renew` are not bound at all, every other action
+is (section 4.2). The rights of the triggering person are computed at the request like the re-check
+of R-AZ-29: a principal of kind `user` with the person's ID and no session, device, token,
+`view_as` or `acting_for`, liveness from the principal status only (a `disabled`, `deleted` or
+`pending` person has no rights, SR7, so every bound action ends with `acting_for_insufficient`),
+owner status from the current owner list without a session. What SR9 does not cover: the server
+cannot tell a request inside a run that omits the header from one outside a run (AZ-M45, hint H1
+of section 6; the SDKs and reference adapters always send it); knowledge a runtime keeps across
+runs is outside the API (section 6, T-AI-01); an owner who triggered with a personal API token is
+intersected as owner (R-AZ-29).
+
 ### SR10 Terminal only on own host
 
 A person who is not an active owner gets `terminal.open` and `terminal.attach` only on a
@@ -872,7 +913,7 @@ Rules:
 |---|---|---|
 | Durable events (gateway, `GET /api/v1/events`) | `authorize(recipient, receive_action, resource)`; personal events only to `audience_principal_id` | 05, section 6; 04, section 7 |
 | Ephemeral events (typing, `run.updated`, presence) | receive action and focus | 05, section 6; 04, sections 11, 12 |
-| Agent consumers | like people, according to their own grants, plus personal events to the agent; before `agent.invocation`, `agent.followup`, `interaction.created`, `command.invoked` additionally `agent.invoke` for the triggering person | 04, section 15 |
+| Agent consumers | like people, according to their own grants, plus personal events to the agent; before `agent.invocation`, `agent.followup`, `interaction.created`, `command.invoked` additionally `agent.invoke` for the triggering person; the header `Invocation-Token` (SR9) does not narrow these decisions (delivery mode, 4.2) | 04, section 15 |
 | Push | `push.deliver` (read permission on the thread), notification preference, quiet hours, not the author; mentions without read permission produce nothing | 05; [13-push-notifications.md](13-push-notifications.md) |
 | Outgoing webhooks | `webhook_out.deliver`: receive action of the event for the app according to grants and scope, subscription to the type | 05 |
 | File fetch | `file.read` on every fetch through the server, also with a file ticket; no permanent links to clients | [12-files.md](12-files.md), [ADR 0048](../adr/0048-file-download-only-through-the-server-with-short-lived-tickets.md) |

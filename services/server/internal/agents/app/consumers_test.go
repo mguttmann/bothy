@@ -114,12 +114,16 @@ func (z *selfAuthorizer) Observe(context.Context, authorize.LogEvent) {}
 type fakeFeed struct {
 	head  int64
 	polls []string
+	// seen is the actor of the context of every Poll.
+	seen  []actor.Actor
 	acked map[agents.ConsumerKey]int64
 	page  agents.FeedPage
 }
 
-func (f *fakeFeed) Poll(_ context.Context, consumer string, _ int) (agents.FeedPage, error) {
+func (f *fakeFeed) Poll(ctx context.Context, consumer string, _ int) (agents.FeedPage, error) {
 	f.polls = append(f.polls, consumer)
+	a, _ := actor.FromContext(ctx)
+	f.seen = append(f.seen, a)
 	return f.page, nil
 }
 
@@ -289,5 +293,22 @@ func TestAckEventsUnknownConsumerNotFound(t *testing.T) {
 	}
 	if err := e.svc.AcceptAck(e.sam, "default", 1, 100); errs.KindOf(err) != errs.KindForbidden {
 		t.Fatalf("AcceptAck of a person = %v", err)
+	}
+}
+
+// TestRestPollFeedIgnoresActingFor (07 section 8.1, brief M2-14 design note 6): the feed of
+// pollAgentEvents reads with the agent's own grants; the Invocation-Token binding of the request
+// is checked by the authorization of agent.events.consume and never reaches the feed, so it can
+// neither narrow the consumer nor skip its events.
+func TestRestPollFeedIgnoresActingFor(t *testing.T) {
+	t.Parallel()
+	e := newConsumerEnv(t)
+	bound := actor.Actor{ID: e.id, Kind: actor.KindAgent, ActingFor: actor.ActingFor{Status: actor.ActingForBound, UserID: ids.New(),
+		RunID: ids.New(), ThreadID: ids.New(), JTI: "jti"}}
+	if _, err := e.svc.Poll(actor.WithActor(context.Background(), bound), "worker-1", 3); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.feed.seen) != 1 || e.feed.seen[0].ID != e.id || e.feed.seen[0].ActingFor.Present() {
+		t.Fatalf("the feed saw %+v", e.feed.seen)
 	}
 }
