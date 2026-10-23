@@ -39,7 +39,7 @@ func (i inserter) InsertTx(ctx context.Context, args Args, opts *InsertOptions) 
 	if err != nil {
 		return err
 	}
-	if _, err := i.rt.client.InsertTx(ctx, tx, args, e.insertOpts(scheduledAt(opts))); err != nil {
+	if _, err := i.rt.client.InsertTx(ctx, tx, args, e.insertOpts(scheduledAt(opts), priority(opts))); err != nil {
 		return fmt.Errorf("jobs: insert %s: %w", args.Kind(), err)
 	}
 	return nil
@@ -79,6 +79,15 @@ func scheduledAt(opts *InsertOptions) time.Time {
 		return time.Time{}
 	}
 	return opts.ScheduledAt
+}
+
+// priority returns the River priority of opts: PriorityHighest for nil and zero, the value clamped
+// to PriorityHighest..PriorityLowest otherwise.
+func priority(opts *InsertOptions) int {
+	if opts == nil || opts.Priority <= PriorityHighest {
+		return PriorityHighest
+	}
+	return min(opts.Priority, PriorityLowest)
 }
 
 // roundTrip encodes args as River stores them and decodes them into a fresh value of t, as the

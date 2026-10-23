@@ -113,7 +113,18 @@ func (r Role) works() bool { return r == RoleWorker || r == RoleAll }
 type InsertOptions struct {
 	// ScheduledAt is the earliest time the job may run; the zero time means now.
 	ScheduledAt time.Time
+	// Priority is the River job priority from PriorityHighest to PriorityLowest; a worker fetches
+	// the available jobs of a queue by priority first. Zero means PriorityHighest, the priority of
+	// every job without options.
+	Priority int
 }
+
+// The River job priorities (1 is fetched first). Bulk work that shares a queue with interactive
+// work, the scan jobs of imported files for example (M8-11), takes PriorityLowest.
+const (
+	PriorityHighest = 1
+	PriorityLowest  = 4
+)
 
 // Inserter inserts jobs inside a unit of work. Modules receive it from internal/wire.
 type Inserter interface {
@@ -275,7 +286,7 @@ func (rt *Runtime) riverConfig(periodic []PeriodicJob, d workerDeps) (*river.Con
 // periodicJob converts p to River's periodic job with the queue and attempts of its kind.
 func periodicJob(p PeriodicJob, e *entry) *river.PeriodicJob {
 	return river.NewPeriodicJob(river.PeriodicInterval(p.Interval),
-		func() (river.JobArgs, *river.InsertOpts) { return p.Args, e.insertOpts(time.Time{}) },
+		func() (river.JobArgs, *river.InsertOpts) { return p.Args, e.insertOpts(time.Time{}, PriorityHighest) },
 		&river.PeriodicJobOpts{RunOnStart: p.RunOnStart})
 }
 

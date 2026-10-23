@@ -40,6 +40,14 @@ func (s *Service) PutPart(ctx context.Context, cmd files.PutPart) (files.PartRef
 	if err != nil {
 		return files.PartRef{}, err
 	}
+	return s.storePart(ctx, a, rec, cmd)
+}
+
+// storePart is PutPart after the session was found and authorized: the state (410), the number,
+// the digest, a confirmed number answered without reading the body, then the body streamed into
+// the part store and the row in a short unit of work. a is the uploader of the session; the
+// import port passes it without a request principal (M8-11).
+func (s *Service) storePart(ctx context.Context, a actor.Actor, rec SessionRecord, cmd files.PutPart) (files.PartRef, error) {
 	if s.expired(rec, s.now()) {
 		return files.PartRef{}, gone()
 	}

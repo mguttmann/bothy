@@ -1055,6 +1055,10 @@ take neither a counter nor `NOTIFY`. The target `perf.event_commit_min_per_s` ho
 Reason for separate queues: many thumbnails or a large GDPR export must not delay push
 and webhooks. Imports do not run as a job in the server, but in the tool
 `bothy import` through the API ([22-import-migration.md](22-import-migration.md), section 2).
+The scan and processing jobs of imported files stand on the queue `files` with the lowest River
+job priority, while every other job keeps the default (highest) priority: a worker fetches the
+available jobs of a queue by priority first, so live uploads are never queued behind an import,
+without a separate queue ([12-files.md](12-files.md) 11).
 
 In maintenance mode (`server.maintenance_mode = read_only`,
 [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) the `worker` processes only the consumers

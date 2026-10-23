@@ -3,9 +3,12 @@
 package wire
 
 import (
+	"context"
 	"errors"
+	"sync/atomic"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	importerhttp "github.com/OWNER/bothy/services/server/internal/importer/adapters/httpapi"
 	importerpg "github.com/OWNER/bothy/services/server/internal/importer/adapters/postgres"
@@ -13,8 +16,11 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
@@ -36,6 +42,12 @@ type ImporterDeps struct {
 	Events    eventlog.Appender
 	Structure chat.ImportStructure
 	People    identity.ImportPeople
+	// Threads, Messages and Files are the ports of the content items (M8-11): the threads of
+	// chat, the imported messages of messaging and the import files of files (bound lazily, the
+	// files step runs after the importer).
+	Threads  chat.ImportThreads
+	Messages messaging.ImportMessages
+	Files    files.ImportFiles
 }
 
 // Importer is the importer module of the process (M8-03): the use cases of importer.Imports and
@@ -57,7 +69,8 @@ func NewImporter(cfg importerapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az a
 	}
 	svc, err := importerapp.New(cfg, importerapp.Deps{
 		Store: importerpg.NewRepository(pool), UoW: uow, Authorizer: az, Audit: d.Audit, Events: d.Events,
-		Structure: d.Structure, People: d.People, Cursors: importerhttp.Cursors{}, Clock: clk,
+		Structure: d.Structure, People: d.People, Threads: d.Threads, Messages: d.Messages, Files: d.Files, Cursors: importerhttp.Cursors{},
+		Clock: clk,
 	})
 	if err != nil {
 		return nil, err
@@ -70,4 +83,62 @@ func (i *Importer) fillHandlers(h *Handlers) {
 	if h.Imports == nil {
 		h.Imports = i.Handlers
 	}
+}
+
+// LazyImportFiles is the port files.ImportFiles for the importer (M8-11), bound to the files module
+// once its start step has run: the importer is built in the chat step before the files step, like
+// messaging with LazyAttachments. Until Bind every method fails with an internal error; the server
+// accepts requests only after every step ran. It is safe for concurrent use.
+type LazyImportFiles struct {
+	p atomic.Pointer[files.ImportFiles]
+}
+
+// Compile-time check: LazyImportFiles is the port.
+var _ files.ImportFiles = (*LazyImportFiles)(nil)
+
+// Bind sets the import files of the files module; a second call replaces the first.
+func (l *LazyImportFiles) Bind(f files.ImportFiles) { l.p.Store(&f) }
+
+// get returns the bound port or the internal error of an unbound one.
+func (l *LazyImportFiles) get() (files.ImportFiles, error) {
+	if p := l.p.Load(); p != nil && *p != nil {
+		return *p, nil
+	}
+	return nil, errs.New(errs.CodeInternalError, "wire: the import files of the files module are not bound yet")
+}
+
+// Reserve implements files.ImportFiles.
+func (l *LazyImportFiles) Reserve(ctx context.Context, r files.ImportReserve) (files.ImportSlot, error) {
+	f, err := l.get()
+	if err != nil {
+		return files.ImportSlot{}, err
+	}
+	return f.Reserve(ctx, r)
+}
+
+// Slot implements files.ImportFiles.
+func (l *LazyImportFiles) Slot(ctx context.Context, fileID ids.ID) (files.ImportSlot, error) {
+	f, err := l.get()
+	if err != nil {
+		return files.ImportSlot{}, err
+	}
+	return f.Slot(ctx, fileID)
+}
+
+// UploadPart implements files.ImportFiles.
+func (l *LazyImportFiles) UploadPart(ctx context.Context, cmd files.PutPart) (files.PartRef, error) {
+	f, err := l.get()
+	if err != nil {
+		return files.PartRef{}, err
+	}
+	return f.UploadPart(ctx, cmd)
+}
+
+// Complete implements files.ImportFiles.
+func (l *LazyImportFiles) Complete(ctx context.Context, cmd files.CompleteUpload) (files.File, error) {
+	f, err := l.get()
+	if err != nil {
+		return files.File{}, err
+	}
+	return f.Complete(ctx, cmd)
 }

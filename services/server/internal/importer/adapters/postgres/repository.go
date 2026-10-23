@@ -267,3 +267,9 @@ func (r *Repository) OriginOfTarget(ctx context.Context, kind string, id ids.ID)
 	row, err := r.read(ctx).OriginOfTarget(ctx, sqlcgen.OriginOfTargetParams{TargetKind: optionalText(kind), TargetID: uuid(id)})
 	return one(row, err, toItem, "reading the origin of a target")
 }
+
+// ItemOfTarget implements app.Store.
+func (r *Repository) ItemOfTarget(ctx context.Context, source ids.ID, kind string, id ids.ID) (app.ItemRow, bool, error) {
+	row, err := r.read(ctx).ItemOfTarget(ctx, sqlcgen.ItemOfTargetParams{SourceID: uuid(source), TargetKind: optionalText(kind), TargetID: uuid(id)})
+	return one(row, err, toItem, "reading the item of a target")
+}

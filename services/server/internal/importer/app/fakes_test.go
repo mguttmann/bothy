@@ -172,6 +172,17 @@ func (s *store) OriginOfTarget(_ context.Context, kind string, id ids.ID) (app.I
 	return app.ItemRow{}, false, nil
 }
 
+func (s *store) ItemOfTarget(_ context.Context, source ids.ID, kind string, id ids.ID) (app.ItemRow, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, r := range s.items {
+		if r.SourceID == source && r.TargetKind == kind && r.TargetID == id {
+			return r, true, nil
+		}
+	}
+	return app.ItemRow{}, false, nil
+}
+
 // uow runs fn inside a unit of a sealed registry and rolls the store back on an error, like the
 // transaction of the real unit of work.
 type uow struct {
@@ -472,7 +483,8 @@ func newEnv(t *testing.T) *env {
 }
 
 func testConfig() app.Config {
-	return app.Config{SpaceNameMaxChars: 12, ChannelNameMaxChars: 12, HandleMaxChars: 20, DisplayNameMaxChars: 20, PageSizeDefault: 2, PageSizeMax: 3}
+	return app.Config{SpaceNameMaxChars: 12, ChannelNameMaxChars: 12, HandleMaxChars: 20, DisplayNameMaxChars: 20, PageSizeDefault: 2, PageSizeMax: 3,
+		ThreadTitleMaxChars: 20}
 }
 
 // wantErr fails unless err has code and (when given) reason.

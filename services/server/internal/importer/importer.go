@@ -5,8 +5,10 @@ package importer
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -62,6 +64,12 @@ const (
 	ReasonImportNotRunning = "import_not_running"
 	// ReasonTargetOutsideSource: a batch target that is not in a channel of this source.
 	ReasonTargetOutsideSource = "target_outside_source"
+	// ReasonThreadNotImported: a thread batch whose thread (or channel of a main thread) is not
+	// posted and is not created by the batch (M8-11 design note 1).
+	ReasonThreadNotImported = "thread_not_imported"
+	// ReasonAuthorNotImported: a message or file whose author item is skipped or missing (M8-11
+	// design note 4 a).
+	ReasonAuthorNotImported = "author_not_imported"
 )
 
 // Source is an import source as the API shows it (schema ImportSource).
@@ -148,7 +156,8 @@ type BatchObject struct {
 
 // Batch is the body of applyImportBatch (schema ImportBatch).
 type Batch struct {
-	// ThreadOriginKey is "" for a structure batch; content batches come with M8-11.
+	// ThreadOriginKey is thread:<id> or channel:<id> for a thread batch (M8-11), "" for a
+	// structure batch.
 	ThreadOriginKey string
 	// ThreadOriginKeySet reports that the member was sent (also as "").
 	ThreadOriginKeySet bool
@@ -156,9 +165,50 @@ type Batch struct {
 }
 
 // BatchResult is the answer of applyImportBatch (schema ImportBatchResult): the items in request
-// order.
+// order and, for a thread batch, threads.unread_floor_seq of its thread after the batch.
 type BatchResult struct {
 	Items []Item
+	// UnreadFloorSeq is set for a thread batch whose thread exists.
+	UnreadFloorSeq *int64
+}
+
+// FileCmd is the body of createImportFile (schema ImportFileCreate).
+type FileCmd struct {
+	// OriginKey is file:<attachment id>.
+	OriginKey string
+	// ChannelID is the target channel of the attachment; AuthorID the target of the posted user
+	// item of the author.
+	ChannelID, AuthorID ids.ID
+	// Name, SizeBytes and SHA256 (64 hex digits) describe the bytes; DeclaredMIMEType is "" when
+	// absent.
+	Name             string
+	SizeBytes        int64
+	SHA256           string
+	DeclaredMIMEType string
+}
+
+// FileSlot is the answer of createImportFile and completeImportFile (schema ImportFileSlot).
+type FileSlot struct {
+	Item Item
+	// Upload is the open session; nil once the file item is posted.
+	Upload *files.UploadSession
+}
+
+// FilePartCmd is one part of uploadImportFilePart.
+type FilePartCmd struct {
+	// FileID is the reserved file; PartNumber the number from 1.
+	FileID     ids.ID
+	PartNumber int
+	// ContentDigest is the Content-Digest header as received.
+	ContentDigest string
+	// Body streams the part.
+	Body io.Reader
+}
+
+// FileCompleteCmd is the body of completeImportFile (schema UploadComplete).
+type FileCompleteCmd struct {
+	FileID ids.ID
+	Parts  []files.PartRef
 }
 
 // CursorCmd is the body of setImportCursor (schema ImportCursorSet).
@@ -211,8 +261,17 @@ type Imports interface {
 	// SetLead changes the lead of one mapped channel and the read-only flag of its target channel
 	// in one transaction (import.manage).
 	SetLead(ctx context.Context, a actor.Actor, id ids.ID, cmd LeadCmd) (Source, error)
-	// ApplyBatch writes a structure batch of a running source as one transaction (import.apply).
+	// ApplyBatch writes a structure batch or a thread batch of a running source as one
+	// transaction (import.apply).
 	ApplyBatch(ctx context.Context, a actor.Actor, id ids.ID, b Batch) (BatchResult, error)
+	// CreateFile reserves the file of a file item, or answers the reserved one (import.apply,
+	// 22 6.5 and 7.2 item 3).
+	CreateFile(ctx context.Context, a actor.Actor, id ids.ID, cmd FileCmd) (FileSlot, error)
+	// UploadFilePart stores one part of the file of a file item of the source (import.apply).
+	UploadFilePart(ctx context.Context, a actor.Actor, id ids.ID, cmd FilePartCmd) (files.PartRef, error)
+	// CompleteFile completes the upload of the file of a file item and posts the item
+	// (import.apply).
+	CompleteFile(ctx context.Context, a actor.Actor, id ids.ID, cmd FileCompleteCmd) (FileSlot, error)
 	// SetCursor replaces the cursor and merges the tool counters of a running source
 	// (import.apply).
 	SetCursor(ctx context.Context, a actor.Actor, id ids.ID, cmd CursorCmd) (Source, error)

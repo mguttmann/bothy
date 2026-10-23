@@ -27,32 +27,48 @@ const (
 	targetAgent    = "agent"
 )
 
-// parsed is one item of a batch after the checks of design note 5 a.
+// parsed is one item of a batch after the checks of design note 5 a (M8-03) and design note 2
+// (M8-11).
 type parsed struct {
-	obj   importer.BatchObject
-	key   domain.OriginKey
-	sha   []byte
-	space domain.SpaceData
-	chann domain.ChannelData
-	tag   domain.ForumTagData
-	user  domain.UserData
+	obj    importer.BatchObject
+	key    domain.OriginKey
+	sha    []byte
+	space  domain.SpaceData
+	chann  domain.ChannelData
+	tag    domain.ForumTagData
+	user   domain.UserData
+	thread domain.ThreadData
+	msg    domain.MessageData
+	pin    domain.PinData
 }
 
-// parseBatch checks the batch before anything is written (design note 5 a): thread_origin_key
-// and every item kind but space, channel, forum_tag and user are not_enabled until M8-11; the
-// origin key must match its kind; content_sha256 is 64 hex digits; data follows the schema of its
-// kind. Every violation is reported at once as 400 validation_failed.
-func parseBatch(b importer.Batch) ([]parsed, error) {
+// parseBatch checks the batch before anything is written (M8-03 design note 5 a, M8-11 design
+// note 1): a batch without thread_origin_key holds structure items only (space, channel,
+// forum_tag, user); a thread batch has the shape of domain.CheckThreadBatch. The origin key must
+// match its kind; content_sha256 is 64 hex digits; data follows the schema of its kind. Every
+// violation is reported at once as 400 validation_failed. The thread key is nil for a structure
+// batch.
+func parseBatch(b importer.Batch) ([]parsed, *domain.ThreadKey, error) {
 	var p domain.Problems
+	var tk *domain.ThreadKey
 	if b.ThreadOriginKeySet {
-		p.Add("/thread_origin_key", domain.FieldNotEnabled, "thread batches come with the content items")
+		refs := make([]domain.ItemRef, 0, len(b.Items))
+		for _, it := range b.Items {
+			refs = append(refs, domain.ItemRef{Kind: it.ItemKind, OriginKey: it.OriginKey})
+		}
+		k := domain.CheckThreadBatch(b.ThreadOriginKey, refs, &p)
+		tk = &k
 	}
 	out := make([]parsed, 0, len(b.Items))
 	for i, it := range b.Items {
 		base := domain.Pointer("/items", i)
 		x := parsed{obj: it}
-		if !domain.Structure(it.ItemKind) {
-			p.Add(base+"/item_kind", domain.FieldNotEnabled, "the item kind comes with the content items")
+		switch {
+		case tk == nil && !domain.Structure(it.ItemKind):
+			p.Add(base+"/item_kind", domain.FieldInvalid, "a thread, message or pin item belongs into a batch with thread_origin_key")
+			continue
+		case tk != nil && !domain.Content(it.ItemKind):
+			// CheckThreadBatch recorded it.
 			continue
 		}
 		key, code := domain.ParseOriginKey(it.ItemKind, it.OriginKey)
@@ -67,23 +83,33 @@ func parseBatch(b importer.Batch) ([]parsed, error) {
 			}
 			x.sha = sum
 		}
-		data := base + "/data"
-		switch it.ItemKind {
-		case domain.KindSpace:
-			x.space = domain.ParseSpaceData(it.Data, data, &p)
-		case domain.KindChannel:
-			x.chann = domain.ParseChannelData(it.Data, data, &p)
-		case domain.KindForumTag:
-			x.tag = domain.ParseForumTagData(it.Data, data, &p)
-		case domain.KindUser:
-			x.user = domain.ParseUserData(it.Data, data, &p)
-		}
+		parseData(&x, base+"/data", &p)
 		out = append(out, x)
 	}
 	if err := p.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return out, nil
+	return out, tk, nil
+}
+
+// parseData checks the data of x by its kind.
+func parseData(x *parsed, data string, p *domain.Problems) {
+	switch x.obj.ItemKind {
+	case domain.KindSpace:
+		x.space = domain.ParseSpaceData(x.obj.Data, data, p)
+	case domain.KindChannel:
+		x.chann = domain.ParseChannelData(x.obj.Data, data, p)
+	case domain.KindForumTag:
+		x.tag = domain.ParseForumTagData(x.obj.Data, data, p)
+	case domain.KindUser:
+		x.user = domain.ParseUserData(x.obj.Data, data, p)
+	case domain.KindThread:
+		x.thread = domain.ParseThreadData(x.obj.Data, data, p)
+	case domain.KindMessage:
+		x.msg = domain.ParseMessageData(x.obj.Data, data, p)
+	case domain.KindPin:
+		x.pin = domain.ParsePinData(x.obj.Data, data, p)
+	}
 }
 
 // batch is the state of one batch inside its unit of work.
@@ -91,6 +117,9 @@ type batch struct {
 	src    importer.Source
 	m      domain.Mapping
 	counts domain.Counts
+	// changed forces the counters and import.progress of a thread batch whose only change is a
+	// mirrored thread (M8-11 design note 5).
+	changed bool
 }
 
 // ApplyBatch implements importer.Imports (design note 5, 22 7.2 and 8). The checks of parseBatch
@@ -105,14 +134,14 @@ func (s *Service) ApplyBatch(ctx context.Context, a actor.Actor, id ids.ID, b im
 	if err != nil {
 		return importer.BatchResult{}, err
 	}
-	items, err := parseBatch(b)
+	items, tk, err := parseBatch(b)
 	if err != nil {
 		return importer.BatchResult{}, err
 	}
 	var out importer.BatchResult
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		out, err = s.applyBatch(ctx, a, id, items)
+		out, err = s.applyBatch(ctx, a, id, items, tk)
 		return err
 	})
 	if err != nil {
@@ -121,8 +150,8 @@ func (s *Service) ApplyBatch(ctx context.Context, a actor.Actor, id ids.ID, b im
 	return out, nil
 }
 
-// applyBatch is ApplyBatch inside its unit of work.
-func (s *Service) applyBatch(ctx context.Context, a actor.Actor, id ids.ID, items []parsed) (importer.BatchResult, error) {
+// applyBatch is ApplyBatch inside its unit of work; tk is the thread key of a thread batch.
+func (s *Service) applyBatch(ctx context.Context, a actor.Actor, id ids.ID, items []parsed, tk *domain.ThreadKey) (importer.BatchResult, error) {
 	src, err := s.load(ctx, a, authorize.ActionImportApply, id, true)
 	if err != nil {
 		return importer.BatchResult{}, err
@@ -136,6 +165,9 @@ func (s *Service) applyBatch(ctx context.Context, a actor.Actor, id ids.ID, item
 		return importer.BatchResult{}, errs.New(errs.CodeInternalError, "importer: the stored mapping does not parse")
 	}
 	bt := &batch{src: src, m: m}
+	if tk != nil {
+		return s.applyThreadBatch(ctx, a, bt, *tk, items)
+	}
 	out := importer.BatchResult{Items: make([]importer.Item, 0, len(items))}
 	for i, x := range items {
 		it, err := s.applyItem(ctx, bt, x)
@@ -151,9 +183,9 @@ func (s *Service) applyBatch(ctx context.Context, a actor.Actor, id ids.ID, item
 }
 
 // count adds the counters of the batch to stats.server and appends import.progress; a batch
-// without a new transition writes neither.
+// without a new transition and without a mirrored change writes neither.
 func (s *Service) count(ctx context.Context, bt *batch) error {
-	if bt.counts.Zero() {
+	if bt.counts.Zero() && !bt.changed {
 		return nil
 	}
 	var err error

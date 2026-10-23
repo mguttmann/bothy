@@ -30,9 +30,26 @@ type TypeDetector interface {
 	Detect(head []byte) string
 }
 
+// bulkJobsKey is the context key of WithBulkJobs.
+type bulkJobsKey struct{}
+
+// WithBulkJobs marks ctx so ScanQueue inserts files.scan and files.thumbnail of the work it does
+// with the lowest job priority (docs/spec/12-files.md 11, M8-11 design note 6 c): the completion of
+// an import file marks it, and the job handlers mark the context of a job that was inserted so,
+// which carries the mark into its retry rounds and its thumbnails. Live uploads keep the default
+// priority and are fetched first from the shared queue files.
+func WithBulkJobs(ctx context.Context) context.Context { return context.WithValue(ctx, bulkJobsKey{}, true) }
+
+// BulkJobs reports the mark of WithBulkJobs.
+func BulkJobs(ctx context.Context) bool {
+	b, _ := ctx.Value(bulkJobsKey{}).(bool)
+	return b
+}
+
 // ScanQueue inserts the jobs files.scan and files.thumbnail (02 12.3 "Job catalogue");
 // adapters/jobs implements it over the job runtime. It must be called inside a unit of work, so the
-// job exists exactly when the change that needs it commits.
+// job exists exactly when the change that needs it commits. A context marked with WithBulkJobs
+// inserts with the lowest job priority.
 type ScanQueue interface {
 	// EnqueueScan inserts files.scan for fileID with the retry round; a zero at means now.
 	EnqueueScan(ctx context.Context, fileID ids.ID, round int64, at time.Time) error

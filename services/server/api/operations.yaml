@@ -37,6 +37,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completeEnrollment
   - completeIdentityLink
   - completeImport
+  - completeImportFile
   - completeOidcLogin
   - completePairing
   - completePasskeyLogin
@@ -58,6 +59,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createHost
   - createIdentityProvider
   - createImport
+  - createImportFile
   - createIncomingWebhook
   - createInteraction
   - createMessage
@@ -275,6 +277,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateWebhookSubscription
   - upgradeAppManifest
   - uploadBrandingLogo
+  - uploadImportFilePart
   - uploadPart
   - validateManifest
   - verifyAuditChain
@@ -293,9 +296,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: V3-01
   - operation_id: createGdprRequest
     milestone: M7
-  - operation_id: createImportFile
-    milestone: M8
-    ticket: M8-11
   - operation_id: createPrice
     milestone: M2
     ticket: M2-22

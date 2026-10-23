@@ -11,6 +11,9 @@ import (
 type importerState struct {
 	// importer is the importer module (M8-03), built in the chat step over chat and identity.
 	importer *Importer
+	// importFiles is the port files.ImportFiles the importer receives in the chat step and the
+	// files step binds to the files module (M8-11).
+	importFiles LazyImportFiles
 }
 
 // moduleImporter is the name of the module in architecture/modules.yaml.
@@ -32,20 +35,21 @@ func importerWiring() moduleWiring {
 
 // startImporter builds the importer module (M8-03) over the pool, the unit of work and recorder of
 // audit, the appender of sync, the Authorizer, the import structure of chat and the people of
-// identity.
+// identity, and (M8-11) the import threads of chat, the imported messages of messaging and the
+// lazily bound import files of files.
 func (s *server) startImporter(context.Context) error {
 	cfg, err := ImporterConfig(s.values)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az, sy, c, id := s.pool, s.audit, s.authorizer, s.sync, s.chat, s.identity
+	pool, a, az, sy, c, id, m := s.pool, s.audit, s.authorizer, s.sync, s.chat, s.identity, s.messaging
 	s.mu.Unlock()
-	if a == nil || az == nil || sy == nil || c == nil || id == nil {
-		return errors.New("wire: the importer needs audit, sync, the Authorizer, chat and identity")
+	if a == nil || az == nil || sy == nil || c == nil || id == nil || m == nil {
+		return errors.New("wire: the importer needs audit, sync, the Authorizer, chat, identity and messaging")
 	}
 	im, err := NewImporter(cfg, pool, a.UoW(), az, ImporterDeps{Audit: a.Recorder(), Events: sy.Appender(), Structure: c.Service,
-		People: id.ImportPeople}, s.deps.Clock)
+		People: id.ImportPeople, Threads: c.Service.ImportThreads(), Messages: m.Service.ImportMessages(), Files: &s.importFiles}, s.deps.Clock)
 	if err != nil {
 		return err
 	}

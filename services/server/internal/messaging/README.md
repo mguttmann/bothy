@@ -93,7 +93,7 @@ adapter on the global meter provider.
 
 ## Port (root package `internal/messaging`)
 
-- Inbound: `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
+- Inbound: `ImportMessages` (M8-11), `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
 - Emits in-tx events: `MessagePosted`, `MessageDeleted`.
 - Subscribes to in-tx events: `chat.ThreadMoved`.
 - Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.
@@ -635,6 +635,25 @@ without the final chunk and a client never takes a cut export for a complete one
 (client gone) ends the stream quietly; a range without messages gives `200` with an empty body.
 The route flag `Download` gives the response `http.transfer_timeout` (D-M3-11-7). Nothing is
 stored in `files` (D-M3-11-8).
+
+## Imported messages (M8-11)
+
+`messaging.ImportMessages` (`importmessages.go`, implemented by `app.ImportMessagesPort`, which
+`Service.ImportMessages()` returns) runs only inside the unit of work of an import batch and
+authorizes nothing (`import.apply` decided). `Append` checks every message (content at most
+`message.max_content_bytes`, else `400 too_long` at `/content_md`; no U+0000; a visible character
+unless it has files; at most `message.max_attachments`; the reply target in the same thread),
+takes the numbers of all of them in one `chat.ImportThreads.Reserve` (row lock, no reopen) and
+inserts each with `queries/import.sql` (`InsertImportedMessage`, behind the store port
+`app.ImportStore`, `Deps.Imported`): `origin = import`, `kind = text`, `silent`, no mentions, no
+`trigger_state`, a server `client_msg_id`, the request hash over `import:<item id>`,
+`import_item_id`, `created_at` and `edited_at` of the source without a revision, the instance
+search language (14 3.1). Files attach through `files.Attachments.Attach` with the mapped author.
+It never publishes `MessagePosted` and never appends `message.created`, so no run, invocation,
+notification or push follows (05 5 rule 1, 04 15.8); `bothy.message.created` counts them with
+origin `import`. `Pin` pins a live message of the thread under `pin.max_per_thread` with the given
+`pinned_by` and no `pin.added`; `ThreadOf` answers the thread of a message for the starter link
+of an imported thread. `Deps.ImportThreads` is the port of chat; nil answers internal.
 
 ## Incoming webhooks (M2-27)
 

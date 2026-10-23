@@ -307,7 +307,7 @@ func toMessage(row messageRow) domain.Message {
 		ContentFormat: row.ContentFormat, ReplyToID: idOf(row.ReplyToMessageID), RunID: idOf(row.RunID), TriggerState: row.TriggerState.String,
 		TriggerStateReason: row.TriggerStateReason.String, TriggerStateAt: timeOf(row.TriggerStateAt), Silent: row.Silent, Version: row.Version,
 		EditedAt: timeOf(row.EditedAt), DeletedAt: timeOf(row.DeletedAt), DeletedBy: idOf(row.DeletedBy), CreatedAt: timeOf(row.CreatedAt),
-		HasAttachments: row.HasAttachments,
+		HasAttachments: row.HasAttachments, ImportItemID: idOf(row.ImportItemID),
 	}
 }
 

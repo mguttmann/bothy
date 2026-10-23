@@ -211,6 +211,39 @@ func (q *Queries) InsertSource(ctx context.Context, arg InsertSourceParams) (Imp
 	return i, err
 }
 
+const itemOfTarget = `-- name: ItemOfTarget :one
+SELECT id, source_id, origin_key, item_kind, target_kind, target_id, state, content_sha256, error, created_at, updated_at FROM import_items WHERE source_id = $1 AND target_kind = $2 AND target_id = $3
+ORDER BY id LIMIT 1
+`
+
+type ItemOfTargetParams struct {
+	SourceID   pgtype.UUID
+	TargetKind pgtype.Text
+	TargetID   pgtype.UUID
+}
+
+// The item of one source that created or reserved the target (M8-11: the file of a file item, the
+// channel and the author of createImportFile), in any state; the index (target_kind, target_id)
+// serves it.
+func (q *Queries) ItemOfTarget(ctx context.Context, arg ItemOfTargetParams) (ImportItem, error) {
+	row := q.db.QueryRow(ctx, itemOfTarget, arg.SourceID, arg.TargetKind, arg.TargetID)
+	var i ImportItem
+	err := row.Scan(
+		&i.ID,
+		&i.SourceID,
+		&i.OriginKey,
+		&i.ItemKind,
+		&i.TargetKind,
+		&i.TargetID,
+		&i.State,
+		&i.ContentSha256,
+		&i.Error,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const itemsOfKind = `-- name: ItemsOfKind :many
 SELECT id, source_id, origin_key, item_kind, target_kind, target_id, state, content_sha256, error, created_at, updated_at FROM import_items WHERE source_id = $1 AND item_kind = $2 AND state = $3 ORDER BY id
 `

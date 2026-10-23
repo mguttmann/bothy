@@ -66,6 +66,14 @@ func (s *Service) complete(ctx context.Context, a actor.Actor, cmd files.Complet
 	if err := d.Err(); err != nil {
 		return files.File{}, 0, false, err
 	}
+	return s.closeSession(ctx, rec, cmd)
+}
+
+// closeSession is the completion of the locked session rec after its authorization (12 3.4): a
+// completed session answers its file again; an expired one 410; then the parts against the list,
+// the session completed and files.scan enqueued in the unit of work. The import port marks ctx
+// with WithBulkJobs, so the job of an import file gets the lowest priority (M8-11).
+func (s *Service) closeSession(ctx context.Context, rec SessionRecord, cmd files.CompleteUpload) (files.File, int64, bool, error) {
 	now := s.now()
 	switch {
 	case rec.State == domain.SessionCompleted:

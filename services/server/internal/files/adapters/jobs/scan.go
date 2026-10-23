@@ -41,6 +41,9 @@ type Scan struct {
 	FileID ids.ID `json:"file_id"`
 	// Round counts the retries of the pass, 0 for the job of the completion.
 	Round int64 `json:"round"`
+	// Bulk marks the job of an import file: it and the jobs it inserts run with the lowest
+	// priority (app.WithBulkJobs, M8-11).
+	Bulk bool `json:"bulk,omitempty"`
 }
 
 // Kind implements jobs.Args.
@@ -72,6 +75,9 @@ func (h Handler) Work(ctx context.Context, job jobs.Job[Scan]) error {
 	tp := h.Tracer
 	if tp == nil {
 		tp = otel.GetTracerProvider()
+	}
+	if job.Args.Bulk {
+		ctx = app.WithBulkJobs(ctx)
 	}
 	ctx, span := tp.Tracer(instrumentationName).Start(ctx, SpanName, trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(attribute.String(attr.FileID, job.Args.FileID.String())))
@@ -111,7 +117,8 @@ func (q *Queue) Bind(ins jobs.Inserter) {
 }
 
 // EnqueueScan implements app.ScanQueue: files.scan with round in the ambient unit of work, to run
-// at or after at (zero: now).
+// at or after at (zero: now); a context marked with app.WithBulkJobs inserts it with the lowest
+// priority and the mark in its arguments.
 func (q *Queue) EnqueueScan(ctx context.Context, fileID ids.ID, round int64, at time.Time) error {
 	q.mu.RLock()
 	ins := q.ins
@@ -119,5 +126,14 @@ func (q *Queue) EnqueueScan(ctx context.Context, fileID ids.ID, round int64, at 
 	if ins == nil {
 		return errs.New(errs.CodeInternalError, "files: the scan queue has no job runtime")
 	}
-	return ins.InsertTx(ctx, Scan{FileID: fileID, Round: round}, &jobs.InsertOptions{ScheduledAt: at})
+	bulk := app.BulkJobs(ctx)
+	return ins.InsertTx(ctx, Scan{FileID: fileID, Round: round, Bulk: bulk}, &jobs.InsertOptions{ScheduledAt: at, Priority: priorityOf(bulk)})
+}
+
+// priorityOf is the job priority of the work of a live upload (bulk false) or of an import file.
+func priorityOf(bulk bool) int {
+	if bulk {
+		return jobs.PriorityLowest
+	}
+	return jobs.PriorityHighest
 }

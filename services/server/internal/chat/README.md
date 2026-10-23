@@ -477,9 +477,26 @@ canary scenario `test/canary/scenario_project.go`.
   ownership list of an import that is neither completed nor failed, the switch answers `409
   conflict` with `reason` `import_lead_controls` (22 12.1).
 
+## Imported threads (M8-11)
+
+- `chat.ImportThreads` (`importthreads.go`, implemented by `app.ImportThreadsPort`, which
+  `Service.ImportThreads()` returns; a type of its own because `Service.Create` belongs to
+  `Threads`) runs only inside the unit of work of an import batch and authorizes nothing.
+  `Create` inserts a thread of kind `thread` with the name cut to `thread.title_max_chars`,
+  `title_source` by the placeholder rule of the auto-title, the planned operator as given, the
+  times and the done state of the source, the parent only when it lies in the main thread and
+  started no thread yet, the live tags of the forum and the instance search language, without
+  `thread.created`. `MainThread` answers the main thread of a text channel (a forum is
+  `validation_failed` with `no_main_thread`). `Lock` and `ApplyMirror` apply the mirror rules of 22
+  12.2 step 3 without a version change; `Reserve` hands out the numbers of imported messages under
+  the row lock without reopening; `FinishBatch` sets `unread_floor_seq = last_message_seq`, raises
+  the version once and appends one `thread.updated` (04 15.8). The writes are the queries of
+  `queries/import_threads.sql` behind the store port `app.ImportThreadStore`
+  (`Deps.ImportThreads`, nil means `Store` when it implements it).
+
 ## Port (root package `internal/chat`)
 
-- Inbound: `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate, UnreadCandidates), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
+- Inbound: `Structure` (spaces, channels, read-only), `ImportThreads` (M8-11), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate, UnreadCandidates), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
 - Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`.

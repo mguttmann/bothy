@@ -66,11 +66,12 @@ func CheckFirstMessageRunID(runID *ids.ID) error {
 // Origin is messages.origin (09 section 3.2): set by the server, never by a client.
 type Origin string
 
-// The origins of M1; import follows with M8.
+// The origins of a message; import is written only by the import interface (M8-11).
 const (
 	OriginHuman  Origin = "human"
 	OriginAgent  Origin = "agent"
 	OriginApp    Origin = "app"
+	OriginImport Origin = "import"
 	OriginSystem Origin = "system"
 )
 
@@ -134,6 +135,9 @@ type Message struct {
 	HasAttachments bool
 	// RunID is the run of a live box anchor (KindRun, M2-05); zero for every other message.
 	RunID ids.ID
+	// ImportItemID is the import_items row of an imported message (origin import, M8-11); zero for
+	// every other message.
+	ImportItemID ids.ID
 	// TriggerState is trigger_state of a message of a person (09 section 6), "" while NULL;
 	// TriggerStateReason is set for failed and cancelled; TriggerStateAt is zero while NULL. They
 	// are not content: a tombstone keeps them (03 messages).

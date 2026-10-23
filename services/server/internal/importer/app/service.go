@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/importer"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -19,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
 )
 
 // Config holds the configuration of the importer use cases, bound in internal/wire. Every key is
@@ -36,12 +38,14 @@ type Config struct {
 	PageSizeDefault int `config:"api.page_size_default"`
 	// PageSizeMax is api.page_size_max; larger limits are capped.
 	PageSizeMax int `config:"api.page_size_max"`
+	// ThreadTitleMaxChars is thread.title_max_chars, the cut of an imported thread name (M8-11).
+	ThreadTitleMaxChars int `config:"thread.title_max_chars"`
 }
 
 // check refuses limits below 1.
 func (c Config) check() error {
 	if c.SpaceNameMaxChars < 1 || c.ChannelNameMaxChars < 1 || c.HandleMaxChars < 1 || c.DisplayNameMaxChars < 1 ||
-		c.PageSizeDefault < 1 || c.PageSizeMax < 1 {
+		c.PageSizeDefault < 1 || c.PageSizeMax < 1 || c.ThreadTitleMaxChars < 1 {
 		return errors.New("importer: every limit must be at least 1")
 	}
 	return nil
@@ -72,6 +76,13 @@ type Deps struct {
 	Structure chat.ImportStructure
 	// People resolves mapped people and agents and creates placeholders (identity).
 	People identity.ImportPeople
+	// Threads creates, mirrors and finishes the threads of thread batches (chat, M8-11); Messages
+	// appends the imported messages and pins (messaging); Files reserves and completes the files
+	// of file items (files). Nil makes thread batches and the file operations answer internal (a
+	// test world of the structure items only).
+	Threads  chat.ImportThreads
+	Messages messaging.ImportMessages
+	Files    files.ImportFiles
 	// Cursors encodes the list cursors.
 	Cursors Cursors
 	// Clock gives the times; nil means clock.System().

@@ -78,3 +78,10 @@ SELECT EXISTS (
 -- "Where does this object come from": the oldest posted item of the target.
 SELECT * FROM import_items WHERE target_kind = @target_kind AND target_id = @target_id AND state = 'posted'
 ORDER BY id LIMIT 1;
+
+-- name: ItemOfTarget :one
+-- The item of one source that created or reserved the target (M8-11: the file of a file item, the
+-- channel and the author of createImportFile), in any state; the index (target_kind, target_id)
+-- serves it.
+SELECT * FROM import_items WHERE source_id = @source_id AND target_kind = @target_kind AND target_id = @target_id
+ORDER BY id LIMIT 1;

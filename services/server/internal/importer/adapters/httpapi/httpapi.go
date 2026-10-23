@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package httpapi holds the REST handlers of the importer module (M8-03): listImports,
+// Package httpapi holds the REST handlers of the importer module (M8-03, M8-11): listImports,
 // createImport, getImport, listImportItems, startImport, pauseImport, cancelImport,
-// completeImport, setImportLead, applyImportBatch and setImportCursor of docs/api/openapi.yaml as
-// part of rest.StrictServerInterface. The use cases of importer.Imports authorize; the handlers
+// completeImport, setImportLead, applyImportBatch, setImportCursor, createImportFile,
+// uploadImportFilePart and completeImportFile of docs/api/openapi.yaml as part of
+// rest.StrictServerInterface. The use cases of importer.Imports authorize; the handlers
 // only convert and pass errors to the problem writer of the chain unchanged.
 //
 // Example:
@@ -26,7 +27,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
-// Imports implements the eleven operations of the tag Import.
+// Imports implements the fourteen operations of the tag Import.
 type Imports struct {
 	imports importer.Imports
 }
@@ -259,7 +260,7 @@ func (h *Imports) ApplyImportBatch(ctx context.Context, req rest.ApplyImportBatc
 	if err != nil {
 		return nil, err
 	}
-	out := rest.ImportBatchResult{Items: make([]rest.ImportItem, 0, len(res.Items))}
+	out := rest.ImportBatchResult{Items: make([]rest.ImportItem, 0, len(res.Items)), UnreadFloorSeq: res.UnreadFloorSeq}
 	for _, i := range res.Items {
 		out.Items = append(out.Items, itemREST(i))
 	}

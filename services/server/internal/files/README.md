@@ -24,7 +24,7 @@ Upload sessions in parts, object storage drivers, scan, metadata removal, thumbn
 
 ## Port (root package `internal/files`)
 
-- Inbound: `Uploads` (sessions, parts), `Files` (read, open, preview, file tickets, delete), `Attachments` (attach, attachments of messages, delete with the message, where a file is attached, pending state; M3-07), `Transcripts`, `TextExtracts`.
+- Inbound: `Uploads` (sessions, parts), `ImportFiles` (the files of an import, M8-11), `Files` (read, open, preview, file tickets, delete), `Attachments` (attach, attachments of messages, delete with the message, where a file is attached, pending state; M3-07), `Transcripts`, `TextExtracts`.
 - Emits in-tx events: `FileFinalized` (scan and, if applicable, transcript final; published by the one write that appends `file.updated`, M3-07).
 - Subscribes to in-tx events: `chat.ThreadMoved` (copies of `channel_id` in `message_attachments`, M3-07).
 - Implements source ports and cross-cutting ports: `identity.AvatarFiles`, `instance.LogoFiles` (both in `adapters/profileimages`, M3-10), kernel `personaldata.Participant`.
@@ -109,6 +109,23 @@ Normative: [12-files.md](../../../../docs/spec/12-files.md) sections 2, 10 and 1
 - **Query exceptions (AZ-P12).** In `tools/lint/sql_visibility.yaml`: `after_authorize` for `files.LockAttachTargets` and `files.AttachedFileIDs` (the files the author listed after `message.create` was allowed), `files.ListMessageAttachments` and `files.ListThumbnailsOfFiles` (messages the caller already read, the files of one attach), `files.ListAttachmentStates` (one message whose creation or run was decided) and `files.LockMessageAttachmentFiles` (after `message.delete`); `authorize_resolution` for `files.GetAttachmentByFile` (the row by file id that builds the `file.read` descriptor and that `MessageOf` and `recordFileChange` reuse). The inserts, the delete, the move and `MarkFilesDeleted` are writes.
 - **Tests.** `domain/attach_test.go`, `app/attach_test.go` (fakes), `adapters/postgres/attachments_test.go` (pgtest: rows and copies, every refusal, the concurrent attach of one file, deletion, the thread move with a veto), `migrations/attachments_test.go`.
 
+## Import files (M8-11)
+
+- `files.ImportFiles` (`importfiles.go`, implemented by `app.ImportFilesPort`, which
+  `Service.ImportFiles()` returns) serves the importer, which authorized `import.apply` and checked
+  that the file belongs to a file item of its source; it calls no `authorize`, so a read-only
+  mirror channel accepts the parts and the completion (05 rule 1.8, 4.12). `Reserve` inserts the
+  file and its session of mode `direct` like `createUpload` without the quota (12 11), in the
+  caller's unit of work; `Slot` answers a reserved file: completed, its open session, or a session
+  opened again for the same file ID after an abort or expiry (`app.ImportRepository.ReopenSession`,
+  `queries/import.sql`); `UploadPart` and `Complete` use the rules of `uploadPart` and
+  `completeUpload` (`storePart`, `closeSession`) for the session of the uploader.
+- Priority: `Complete` marks its context with `app.WithBulkJobs`, so `adapters/jobs.Queue` inserts
+  `files.scan` with `bulk: true` and the lowest River priority (`platform/jobs.PriorityLowest`); the
+  scan handler marks the context of such a job again, so its retries and `files.thumbnail` inherit
+  the priority. Live uploads keep the highest priority and are fetched first on the shared queue
+  `files` (12 11, 02 12.2).
+
 ## Object storage (M3-01)
 
 Normative: [12-files.md](../../../../docs/spec/12-files.md) sections 4.1, 4.2 and 4.4, [ADR 0010](../../../../docs/adr/0010-object-storage-behind-an-s3-interface-local-driver-as-default.md), rulings M3-01/1 to M3-01/19 in [docs/DECISIONS.md](../../../../docs/DECISIONS.md).
@@ -165,7 +182,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 | Job | Trigger | Queue |
 |---|---|---|
-| `files.scan` | `InsertTx` when an upload completes | `files` |
+| `files.scan` | `InsertTx` when an upload completes; an import file with the lowest priority (M8-11) | `files` |
 | `files.thumbnail` | after `clean` or `skipped`: image originals, thumbnails, dimensions and duration of MP4 and QuickTime (M3-06) | `files` |
 | `files.extract_text` | after `clean`, supported type | `files` |
 | `files.transcribe` | `file.transcribe` with server transcription | `files` |
