@@ -74,6 +74,9 @@ type Options struct {
 	ErrorMessage string
 }
 
+// detailType is the key of the type of an entry of error.details.
+const detailType = "@type"
+
 // Response is one scripted answer of the send endpoint.
 type Response struct {
 	// Status is the HTTP status; 0 means 200. A 200 answers {"name": "projects/<id>/messages/<id>"},
@@ -452,13 +455,13 @@ func (s *Server) answer(w http.ResponseWriter, resp Response) {
 	e.Error.Code, e.Error.Status, e.Error.Message = status, resp.RPCStatus, s.opts.ErrorMessage
 	if resp.ErrorCode != "" {
 		e.Error.Details = append(e.Error.Details, map[string]string{
-			"@type":     "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+			detailType:  "type.googleapis.com/google.firebase.fcm.v1.FcmError",
 			"errorCode": resp.ErrorCode,
 		})
 	}
 	if resp.TokenField {
 		e.Error.Details = append(e.Error.Details, map[string]any{
-			"@type": "type.googleapis.com/google.rpc.BadRequest",
+			detailType: "type.googleapis.com/google.rpc.BadRequest",
 			"fieldViolations": []map[string]string{{
 				"field":       "message.token",
 				"description": "The registration token is not a valid FCM registration token",
@@ -467,7 +470,7 @@ func (s *Server) answer(w http.ResponseWriter, resp Response) {
 	}
 	if resp.OtherField {
 		e.Error.Details = append(e.Error.Details, map[string]any{
-			"@type": "type.googleapis.com/google.rpc.BadRequest",
+			detailType: "type.googleapis.com/google.rpc.BadRequest",
 			"fieldViolations": []map[string]string{{
 				"field":       "message.android.ttl",
 				"description": "Invalid value",

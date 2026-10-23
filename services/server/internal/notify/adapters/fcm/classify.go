@@ -127,15 +127,20 @@ func parseBody(body []byte) parsed {
 			}
 		case typeBadRequest:
 			for _, v := range d.FieldViolations {
-				if v.Field == fieldToken {
-					p.tokenField = true
-				} else {
-					p.otherField = true
-				}
+				p.markField(v.Field)
 			}
 		}
 	}
 	return p
+}
+
+// markField records a BadRequest violation on field: message.token or another field.
+func (p *parsed) markField(field string) {
+	if field == fieldToken {
+		p.tokenField = true
+		return
+	}
+	p.otherField = true
 }
 
 // errorType returns the FCM error code when it is one of the table, else the status when it is
