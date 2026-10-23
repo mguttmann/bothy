@@ -66,7 +66,10 @@ var (
 	// _OTHER for every other method (platform/otel Middleware).
 	// scanOutcomes are bothy.outcome of bothy.file.scan and bothy.file.scan.duration.
 	scanOutcomes = []string{"clean", "infected", "error", "skipped"}
-	httpMethods  = []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH", "_OTHER"}
+	// searchOutcomes are bothy.outcome of bothy.search.duration (M3-14): ok, client_error for any
+	// 4xx, timeout for search.statement_timeout (503 search_timeout), server_error otherwise.
+	searchOutcomes = []string{"ok", "client_error", "timeout", "server_error"}
+	httpMethods    = []string{"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH", "_OTHER"}
 	// backupKinds are bothy.backup.kind of the last success: pg_full and pg_diff both record
 	// physical (M7-02).
 	backupKinds = []string{"physical", "logical", "objects"}
@@ -302,6 +305,15 @@ var (
 		Name: "bothy.push.send.duration", Kind: KindHistogram, Unit: "s",
 		Description: "Duration of one push request to a provider.",
 		Attrs:       []Attr{{Key: keyPushProvider, Values: pushProviders}},
+		Buckets:     BucketsSeconds,
+	}
+	// SearchDuration is bothy.search.duration (4.4, M3-14): one full-text search (operation search)
+	// from the start of the use case to its end, per outcome (docs/DECISIONS.md D-M3-14-13). The
+	// prefix search of the quick switcher is measured by http.server.request.duration only.
+	SearchDuration = Spec{
+		Name: "bothy.search.duration", Kind: KindHistogram, Unit: "s",
+		Description: "Duration of one full-text search.",
+		Attrs:       []Attr{{Key: keyOutcome, Values: searchOutcomes}},
 		Buckets:     BucketsSeconds,
 	}
 	// PushSkipped is bothy.push.skipped (4.4, M3-19): one per recipient and hint decided none and
@@ -580,7 +592,7 @@ func All() []Spec {
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
-		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch,
+		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,

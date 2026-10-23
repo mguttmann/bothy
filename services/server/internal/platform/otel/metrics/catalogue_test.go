@@ -284,6 +284,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.push.registrations.active", "bothy.push.send.duration", "bothy.push.sent", "bothy.push.skipped", "bothy.push.fetch",
 		// M7-17: the failed writes of gateway_presence (4.3).
 		"bothy.gateway.presence.write_failures",
+		// M3-14: the duration of the full-text search (4.4).
+		"bothy.search.duration",
 	}
 	slices.Sort(want)
 	var got []string
