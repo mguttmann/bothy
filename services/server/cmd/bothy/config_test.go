@@ -289,6 +289,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"client.recommended_version.macos =   # default\n" +
 		"client.recommended_version.windows =   # default\n" +
 		"cluster.mode = single  # default\n" +
+		"cluster.presence_flush_interval = 2s  # default\n" +
+		"cluster.presence_ttl = 10s  # default\n" +
 		"command.autocomplete_max_choices = 25  # default\n" +
 		"command.autocomplete_timeout = 2500ms  # default\n" +
 		"command.description_max_chars = 100  # default\n" +
