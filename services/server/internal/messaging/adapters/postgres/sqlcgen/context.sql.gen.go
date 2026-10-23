@@ -14,7 +14,7 @@ import (
 const listContextWindow = `-- name: ListContextWindow :many
 
 WITH page AS (
-    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, m.search_language, m.search_vector FROM messages m
+    SELECT m.id, m.thread_id, m.channel_id, m.thread_seq, m.author_principal_id, m.client_msg_id, m.client_payload_sha256, m.origin, m.kind, m.system_code, m.content_md, m.content_format, m.reply_to_message_id, m.run_id, m.trigger_state, m.trigger_state_reason, m.trigger_state_at, m.silent, m.import_item_id, m.version, m.edited_at, m.deleted_at, m.deleted_by, m.created_at, m.search_language, m.search_vector, m.has_attachments FROM messages m
     WHERE m.thread_id = $1 AND m.thread_seq > $2 AND m.thread_seq < $3
       AND m.deleted_at IS NULL
       AND ($4::uuid IS NULL OR m.author_principal_id <> $4::uuid)
