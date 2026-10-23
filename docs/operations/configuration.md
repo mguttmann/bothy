@@ -480,6 +480,7 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 | `sdk.retry_max_attempts` |  | SDK |  | `5` | attempts per idempotent operation |  |
 | `sdk.retry_backoff_base` |  | SDK |  | `500ms` | base of the backoff |  |
 | `sdk.retry_backoff_cap` |  | SDK |  | `30s` | largest interval |  |
+| `sdk.poll_interval` |  | SDK |  | `2s` | interval between calls of `pollAgentEvents` when the last page was empty; far below `ratelimit.rl.agent_runtime.per_minute` (M2-29) |  |
 
 ### 12 Files
 

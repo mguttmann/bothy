@@ -49,7 +49,7 @@ def repo_root() -> Path:
 @cache
 def chapter() -> str:
     """docs/spec/09-agents.md."""
-    return (repo_root() / "docs" / "spec" / "09-agenten.md").read_text(encoding="utf-8")
+    return (repo_root() / "docs" / "spec" / "09-agents.md").read_text(encoding="utf-8")
 
 
 def section(number: str) -> str:
@@ -261,7 +261,7 @@ def test_display_texts_refuse_control_and_bidi(text: str) -> None:
 
 def test_approval_card_matches_spec_table() -> None:
     rows = re.findall(
-        r"^\| [^|`]+ \| `([a-z]+)` \| (`[a-z_]+`|keine) \| `([a-z_]+)` \|$",
+        r"^\| [^|`]+ \| `([a-z]+)` \| (`[a-z_]+`|none) \| `([a-z_]+)` \|$",
         section("11.5"),
         re.MULTILINE,
     )
@@ -276,7 +276,7 @@ def test_approval_card_matches_spec_table() -> None:
         assert body["definition"]["value"] == value
         assert body["definition"]["label"]
         assert body.get("required_capability") == (
-            None if capability == "keine" else capability.strip("`")
+            None if capability == "none" else capability.strip("`")
         )
         assert body["restricted_to"] == restricted
         # One decision per card (09 11.3).
