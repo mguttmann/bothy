@@ -10,9 +10,11 @@ import (
 	"go/token"
 	"go/types"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"strings"
@@ -21,6 +23,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -47,33 +50,45 @@ type typedPackage struct {
 	TypesInfo *types.Info
 }
 
-// typeCheck loads patterns with their tests and type-checks every matched package (and test
-// variant) from source, one after the other, against the export data of its imports. It replaces
-// the parallel type check of packages.Load (NeedTypes): with Go 1.27 that check races inside
-// go/types when two packages expand the same imported generic instance (Named.unpack against
-// Checker.isComplete), and go test -race failed this file at random (docs/DECISIONS.md M1-18/17).
-// Every package gets its own importer, so no type object is shared between checks.
+// typeCheck loads patterns with their tests and type-checks every matched package of the module
+// (and test variant) from source, one after the other in import order, in one goroutine. Packages
+// of the module are never compiled for the scan: under go test -race -coverpkg the build cache
+// holds only their instrumented objects, so the former go list -export compiled the whole module
+// a second time, and with the type check under the race detector the test ran up to 850 s and
+// pushed the package past its timeout (PL/30). Packages outside the module (standard library and
+// dependencies) come from their export data, built with the race and tag settings of the running
+// test binary, so the build of the test has already cached them. Checking one package at a time
+// keeps the go/types race of a parallel check away (Named.unpack against Checker.isComplete when
+// two packages expand the same imported generic instance, docs/DECISIONS.md M1-18/17); the
+// checked packages and the imported ones are shared, so every package is checked once.
 func typeCheck(t *testing.T, patterns ...string) []typedPackage {
 	t.Helper()
+	flags := testBuildFlags()
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedDeps |
-			packages.NeedExportFile | packages.NeedModule,
-		Dir:   moduleDir(t),
-		Tests: true,
+		Mode:       packages.NeedName | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule,
+		Dir:        moduleDir(t),
+		Tests:      true,
+		BuildFlags: flags,
 	}
-	pkgs, err := packages.Load(cfg, patterns...)
+	roots, err := packages.Load(cfg, patterns...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := make([]typedPackage, 0, len(pkgs))
-	for _, p := range pkgs {
+	order := moduleOrder(roots)
+	for _, p := range order {
 		for _, e := range p.Errors {
 			t.Fatalf("load %s: %v", p.PkgPath, e)
 		}
-		if len(p.CompiledGoFiles) == 0 {
-			continue
-		}
-		fset := token.NewFileSet()
+	}
+	fset := token.NewFileSet()
+	ext := exportImporter(t, fset, flags, externalImports(order))
+	matched := map[string]bool{}
+	for _, p := range roots {
+		matched[p.ID] = true
+	}
+	checked := map[string]*types.Package{}
+	out := make([]typedPackage, 0, len(roots))
+	for _, p := range order {
 		files := make([]*ast.File, 0, len(p.CompiledGoFiles))
 		for _, name := range p.CompiledGoFiles {
 			f, err := parser.ParseFile(fset, name, nil, parser.SkipObjectResolution)
@@ -83,7 +98,7 @@ func typeCheck(t *testing.T, patterns ...string) []typedPackage {
 			files = append(files, f)
 		}
 		// Language version and sizes as packages.Load sets them for its own type check.
-		conf := types.Config{Importer: exportImporter(fset, p), Sizes: types.SizesFor("gc", runtime.GOARCH)}
+		conf := types.Config{Importer: graphImporter{p: p, checked: checked, ext: ext}, Sizes: types.SizesFor("gc", runtime.GOARCH)}
 		if p.Module != nil && p.Module.GoVersion != "" {
 			conf.GoVersion = "go" + p.Module.GoVersion
 		}
@@ -92,24 +107,141 @@ func typeCheck(t *testing.T, patterns ...string) []typedPackage {
 			Uses:      map[*ast.Ident]types.Object{},
 			Instances: map[*ast.Ident]types.Instance{},
 		}
-		if _, err := conf.Check(p.PkgPath, fset, files, info); err != nil {
+		tp, err := conf.Check(p.PkgPath, fset, files, info)
+		if err != nil {
 			t.Fatalf("type-check %s: %v", p.ID, err)
 		}
-		out = append(out, typedPackage{PkgPath: p.PkgPath, Fset: fset, TypesInfo: info})
+		checked[p.ID] = tp
+		if matched[p.ID] && len(files) > 0 {
+			out = append(out, typedPackage{PkgPath: p.PkgPath, Fset: fset, TypesInfo: info})
+		}
 	}
 	return out
 }
 
-// exportImporter imports the dependencies of p from their export data (go list -export) with
-// the importer of the standard library; every call returns a fresh importer.
-func exportImporter(fset *token.FileSet, p *packages.Package) types.Importer {
-	return importer.ForCompiler(fset, "gc", func(path string) (io.ReadCloser, error) {
-		dep, ok := p.Imports[path]
-		if !ok || dep.ExportFile == "" {
-			return nil, fmt.Errorf("%s: no export data for import %q", p.ID, path)
+// testBuildFlags returns the -race and -tags settings the running test binary was built with, so
+// the export data of the packages outside the module is the one the build of the test cached.
+func testBuildFlags() []string {
+	var flags []string
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return nil
+	}
+	for _, s := range bi.Settings {
+		switch {
+		case s.Key == "-race" && s.Value == "true":
+			flags = append(flags, "-race")
+		case s.Key == "-tags" && s.Value != "":
+			flags = append(flags, "-tags="+s.Value)
 		}
-		return os.Open(dep.ExportFile)
+	}
+	return flags
+}
+
+// inModule reports whether p belongs to services/server.
+func inModule(p *packages.Package) bool {
+	return p.Module != nil && p.Module.Path == serverModule
+}
+
+// moduleOrder returns the packages of the module reachable from roots (test variants and the
+// generated test mains excluded) with every package after the packages it imports.
+func moduleOrder(roots []*packages.Package) []*packages.Package {
+	var order []*packages.Package
+	seen := map[string]bool{}
+	var visit func(p *packages.Package)
+	visit = func(p *packages.Package) {
+		if seen[p.ID] || !inModule(p) || strings.HasSuffix(p.ID, ".test") {
+			return
+		}
+		seen[p.ID] = true
+		paths := make([]string, 0, len(p.Imports))
+		for path := range p.Imports {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
+		for _, path := range paths {
+			visit(p.Imports[path])
+		}
+		order = append(order, p)
+	}
+	for _, p := range roots {
+		visit(p)
+	}
+	return order
+}
+
+// externalImports returns the sorted import paths outside the module that the packages of order
+// import directly.
+func externalImports(order []*packages.Package) []string {
+	set := map[string]bool{}
+	for _, p := range order {
+		for path, dep := range p.Imports {
+			if !inModule(dep) && path != "unsafe" {
+				set[path] = true
+			}
+		}
+	}
+	return slices.Sorted(maps.Keys(set))
+}
+
+// exportImporter imports the packages outside the module from their export data (go list -export
+// of exactly those packages and their dependencies, never a package of the module); one importer
+// serves the whole check, so each of them is read once.
+func exportImporter(t *testing.T, fset *token.FileSet, flags, paths []string) types.Importer {
+	t.Helper()
+	exports := map[string]string{}
+	if len(paths) > 0 {
+		cfg := &packages.Config{
+			Mode:       packages.NeedName | packages.NeedExportFile | packages.NeedDeps | packages.NeedImports | packages.NeedModule,
+			Dir:        moduleDir(t),
+			BuildFlags: flags,
+		}
+		pkgs, err := packages.Load(cfg, paths...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		packages.Visit(pkgs, nil, func(p *packages.Package) {
+			if inModule(p) {
+				t.Errorf("export data requested for %s of the module", p.ID)
+			}
+			for _, e := range p.Errors {
+				t.Errorf("load %s: %v", p.PkgPath, e)
+			}
+			exports[p.PkgPath] = p.ExportFile
+		})
+	}
+	return importer.ForCompiler(fset, "gc", func(path string) (io.ReadCloser, error) {
+		file := exports[path]
+		if file == "" {
+			return nil, fmt.Errorf("no export data for import %q", path)
+		}
+		return os.Open(file) //nolint:gosec // G304: the path is an export file go list reported for this build
 	})
+}
+
+// graphImporter resolves the imports of p: a package of the module (or its test variant) to the
+// package checked before it, every other one through the shared export data importer.
+type graphImporter struct {
+	p       *packages.Package
+	checked map[string]*types.Package
+	ext     types.Importer
+}
+
+func (g graphImporter) Import(path string) (*types.Package, error) {
+	if path == "unsafe" {
+		return types.Unsafe, nil
+	}
+	dep, ok := g.p.Imports[path]
+	if !ok {
+		return nil, fmt.Errorf("%s: unknown import %q", g.p.ID, path)
+	}
+	if !inModule(dep) {
+		return g.ext.Import(path)
+	}
+	if tp := g.checked[dep.ID]; tp != nil {
+		return tp, nil
+	}
+	return nil, fmt.Errorf("%s: import %s not checked before it", g.p.ID, dep.ID)
 }
 
 // countersRefs type-checks patterns with their tests (typeCheck) and returns, per package path
@@ -329,5 +461,51 @@ func TestHandlerPackage(t *testing.T) {
 		if got := handlerPackage(name); got != want {
 			t.Errorf("handlerPackage(%q) = %q, want %q", name, got, want)
 		}
+	}
+}
+
+// TestCountersScanBuildsNothingOfTheModule holds the cost of the scan (PL/30): the packages of the
+// module, test variants included, are checked from source in import order and only packages
+// outside the module come from export data, built with the race setting of the test binary, so
+// the scan never compiles the module a second time.
+func TestCountersScanBuildsNothingOfTheModule(t *testing.T) {
+	t.Parallel()
+	if got := slices.Contains(testBuildFlags(), "-race"); got != testkit.RaceEnabled {
+		t.Fatalf("testBuildFlags() = %v, race detector %v", testBuildFlags(), testkit.RaceEnabled)
+	}
+	cfg := &packages.Config{
+		Mode:  packages.NeedName | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule,
+		Dir:   moduleDir(t),
+		Tests: true,
+	}
+	roots, err := packages.Load(cfg, "./internal/instance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	order := moduleOrder(roots)
+	pos := map[string]int{}
+	for i, p := range order {
+		pos[p.ID] = i
+	}
+	for _, id := range []string{instancePkg, instancePkg + "_test [" + instancePkg + ".test]"} {
+		if _, ok := pos[id]; !ok {
+			t.Errorf("order misses %s", id)
+		}
+	}
+	for _, p := range order {
+		for _, dep := range p.Imports {
+			if j, ok := pos[dep.ID]; ok && j > pos[p.ID] {
+				t.Errorf("%s comes before its import %s", p.ID, dep.ID)
+			}
+		}
+	}
+	ext := externalImports(order)
+	for _, path := range ext {
+		if path == serverModule || strings.HasPrefix(path, serverModule+"/") {
+			t.Errorf("export data requested for %s of the module", path)
+		}
+	}
+	if !slices.Contains(ext, "context") {
+		t.Errorf("externalImports = %v, want the standard library imports of instance", ext)
 	}
 }
