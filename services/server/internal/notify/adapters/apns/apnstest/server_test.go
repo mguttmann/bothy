@@ -206,3 +206,30 @@ func TestFakeNotInBinary(t *testing.T) {
 		t.Fatal("cmd/bothy depends on apnstest")
 	}
 }
+
+// TestFakeStampsAcceptedAt (brief M3-24, t1 of 13 section 9): a request answered with 200 carries
+// AcceptedAt between the moment the client sent it and the moment the client read the 200; a
+// request rejected with 403 carries none.
+func TestFakeStampsAcceptedAt(t *testing.T) {
+	t.Parallel()
+	srv, key := fake(t)
+	path := "/3/device/" + token
+	before := time.Now()
+	if a := send(t, srv, http.MethodPost, path, jwt(t, key, kid, team)); a.status != http.StatusOK {
+		t.Fatalf("valid JWT: %+v", a)
+	}
+	after := time.Now()
+	if a := send(t, srv, http.MethodPost, path, jwt(t, newKey(t), kid, team)); a.status != http.StatusForbidden {
+		t.Fatalf("other key: %+v", a)
+	}
+	reqs := srv.Requests()
+	if len(reqs) != 2 {
+		t.Fatalf("%d requests recorded, want 2", len(reqs))
+	}
+	if at := reqs[0].AcceptedAt; at.Before(before) || at.After(after) {
+		t.Errorf("AcceptedAt %s outside [%s, %s]", at, before, after)
+	}
+	if !reqs[1].AcceptedAt.IsZero() {
+		t.Errorf("a 403 carries AcceptedAt %s, want zero", reqs[1].AcceptedAt)
+	}
+}

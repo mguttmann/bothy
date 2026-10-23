@@ -160,6 +160,13 @@ type Deps struct {
 	// (authzapp.Authorizer.SetScopeObserver, M2-14): the test of SR9 records which operation lists
 	// through Scope. nil in production.
 	ScopeObserver func(ctx context.Context, act authorize.Action)
+	// APNsEndpoints maps an APNs environment (production, sandbox) to the base URL the APNs
+	// adapter sends to (apns.Deps.Endpoints), and APNsRootCAs are the trusted TLS roots of its
+	// egress client (egress.Deps.RootCAs). They exist for in-process tests against Fake-APNs (the
+	// push handoff measurement of M3-24); no configuration key, flag or environment variable
+	// reaches them, and nil means the two Apple hosts and the system roots, as in production.
+	APNsEndpoints map[string]string
+	APNsRootCAs   *x509.CertPool
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.

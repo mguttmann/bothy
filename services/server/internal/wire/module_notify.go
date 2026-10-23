@@ -11,6 +11,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	gatewayapp "github.com/OWNER/bothy/services/server/internal/gateway/app"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
@@ -128,9 +129,7 @@ func (s *server) startAPNs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	providers, err := APNsProviders(ctx, s.values, s.role, APNsDeps{
-		Secrets: s.sp, Egress: eg, EgressDeps: s.egressDeps(), Clock: s.deps.Clock, Logger: s.logger(),
-	})
+	providers, err := APNsProviders(ctx, s.values, s.role, s.apnsDeps(eg))
 	if err != nil {
 		return err
 	}
@@ -138,6 +137,15 @@ func (s *server) startAPNs(ctx context.Context) error {
 	s.apnsProviders = providers
 	s.mu.Unlock()
 	return nil
+}
+
+// apnsDeps returns the collaborators of the APNs adapter of the process for the egress
+// configuration eg: the secret provider, the egress dependencies of the process and the test
+// overrides Deps.APNsEndpoints and Deps.APNsRootCAs, which production leaves nil.
+func (s *server) apnsDeps(eg egress.Config) APNsDeps {
+	ed := s.egressDeps()
+	ed.RootCAs = s.deps.APNsRootCAs
+	return APNsDeps{Secrets: s.sp, Egress: eg, EgressDeps: ed, Endpoints: s.deps.APNsEndpoints, Clock: s.deps.Clock, Logger: s.logger()}
 }
 
 // startNotify builds the notify module (M3-18) in the chat step over the chat service, the
