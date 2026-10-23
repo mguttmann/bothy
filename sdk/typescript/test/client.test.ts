@@ -36,6 +36,7 @@ import {
   UseDpopNonce,
 } from "../src/errors.js";
 import { defaultLogger, silentLogger, type Logger } from "../src/logger.js";
+import { eventually as patiently } from "../src/testing/patience.js";
 
 const BASE = "https://example.com/api/v1";
 const CANARY = "canary-secret-token-777";
@@ -588,6 +589,47 @@ describe("retries", () => {
     const err: unknown = await getRun(api).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TimeoutError);
     expect(calls).toBe(2);
+  });
+
+  it("cancels a late response whose body the timeout errored, without an unhandled rejection", async () => {
+    // A fetch that honours the signal but resolves after the timer (for example a wrapper with
+    // an async step after the real fetch): cancelling the errored body must not reject unseen.
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", record);
+    let late: Promise<void> | undefined;
+    try {
+      const api = createApiClient({
+        baseUrl: BASE,
+        timeoutMs: 20,
+        retry: recordedRetry({ maxAttempts: 1 }).retry,
+        fetch: (request: Request) =>
+          new Promise<Response>((resolve) => {
+            const body = new ReadableStream<Uint8Array>({
+              start(controller) {
+                request.signal.addEventListener("abort", () => {
+                  controller.error(request.signal.reason);
+                  late = new Promise<void>((done) => setImmediate(done)).then(
+                    () => resolve(new Response(body)),
+                  );
+                });
+              },
+            });
+          }),
+      });
+      const err: unknown = await getRun(api).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(TimeoutError);
+      await patiently(() => late !== undefined, "the late response");
+      await late;
+      // Two turns for the cancel and a possible rejection report.
+      await new Promise<void>((done) => setImmediate(done));
+      await new Promise<void>((done) => setImmediate(done));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", record);
+    }
   });
 
   it("an abort by the caller is not repeated", async () => {

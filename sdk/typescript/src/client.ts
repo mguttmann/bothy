@@ -211,8 +211,6 @@ async function problemCode(response: Response): Promise<string | undefined> {
   return undefined;
 }
 
-/** The wrapped `fetch` of one client with its state (nonce, bindings, warned operations). */
-
 /**
  * The signal of one attempt: aborted by the caller's signal or after `timeoutMs`.
  *
@@ -252,7 +250,7 @@ function untilAborted(
 ): Promise<Response> {
   if (signal.aborted) {
     void pending.then(
-      (late) => late.body?.cancel(),
+      (late) => late.body?.cancel().catch(() => undefined),
       () => undefined,
     );
     return Promise.reject(signal.reason as Error);
@@ -260,7 +258,7 @@ function untilAborted(
   return new Promise<Response>((resolve, reject) => {
     const onAbort = (): void => {
       void pending.then(
-        (late) => late.body?.cancel(),
+        (late) => late.body?.cancel().catch(() => undefined),
         () => undefined,
       );
       reject(signal.reason as Error);
@@ -279,6 +277,7 @@ function untilAborted(
   });
 }
 
+/** The wrapped `fetch` of one client with its state (nonce, bindings, warned operations). */
 class Transport {
   readonly bindings = new Map<string, Binding>();
   readonly storage = new AsyncLocalStorage<Binding | undefined>();
