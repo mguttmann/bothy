@@ -104,8 +104,8 @@ type Deps struct {
 	// handlers here.
 	ConsumerHandlers map[sync.ConsumerName]sync.ConsumerHandler
 	// PushProviders are additional push providers of the push path (M3-19); production adds
-	// none, the APNs adapter comes from the configuration (M3-20). Tests register fakepush
-	// providers here.
+	// none, the APNs and FCM adapters come from the configuration (M3-20, M3-21). Tests register
+	// fakepush providers here.
 	PushProviders []notifyapp.PushProvider
 	// ConsumerGauges registers the lag gauges of the worker consumers in every role; nil means
 	// otelmetrics.RegisterConsumerGauges on the global meter provider of otel.Setup. Tests read

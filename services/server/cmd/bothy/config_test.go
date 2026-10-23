@@ -418,6 +418,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"push.apns.team_id =   # default\n" +
 		"push.apns.time_sensitive_enabled = false  # default\n" +
 		"push.apns.topics =   # default\n" +
+		"push.fcm.project_id =   # default\n" +
+		"push.fcm.service_account_ref = file:/run/bothy/secrets/fcm_service_account.json  # default\n" +
 		"push.max_age = 1h  # default\n" +
 		"push.max_concurrent_requests = 32  # default\n" +
 		"push.max_consecutive_failures = 5  # default\n" +

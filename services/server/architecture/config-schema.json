@@ -2788,6 +2788,30 @@
       "doc": "Allowed bundle IDs (apns-topic) of the apps of this instance."
     },
     {
+      "name": "push.fcm.project_id",
+      "env": "BOTHY_PUSH__FCM__PROJECT_ID",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Firebase project of the FCM adapter; empty disables FCM."
+    },
+    {
+      "name": "push.fcm.service_account_ref",
+      "env": "BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/fcm_service_account.json",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Reference of the service account JSON of the FCM adapter; read only when push.fcm.project_id is set."
+    },
+    {
       "name": "push.max_age",
       "env": "BOTHY_PUSH__MAX_AGE",
       "kind": "duration",
@@ -2855,9 +2879,9 @@
       "required": false,
       "enum": [],
       "min": "1s",
-      "max": "",
+      "max": "672h",
       "chapter": "13-push-notifications.md",
-      "doc": "Lifetime of a push at the provider (apns-expiration, android.ttl)."
+      "doc": "Lifetime of a push at the provider (APNs expiration, FCM android.ttl), between 1 second and 28 days."
     },
     {
       "name": "ratelimit.max_tracked_keys",

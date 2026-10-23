@@ -28,7 +28,8 @@
 //     the scheduler of the push path (Push.BindJobs);
 //   - a sync ConsumerService with the consumer push registered (wire.Push.Consumer), its cursor
 //     placed at the head after the build (Ensure), run deterministically through Round;
-//   - fakepush providers registered as apns and fcm (w.apns, w.fcm; withProviders narrows them);
+//   - fakepush providers registered as apns and fcm (w.apns, w.fcm; withProviders narrows them;
+//     withFCM puts the real FCM adapter against Fake-FCM in place of fcm, w.fcmReal);
 //   - the fake clock of the world in every module (w.clk), the configuration of the push keys with
 //     fixture values (pushEnv) loaded through the configuration schema of internal/wire;
 //   - a meter provider with an SDK manual reader in PushDeps.Metrics (w.skipped, w.sent) and the log
@@ -273,6 +274,9 @@ type options struct {
 	// live wires the push path as role all does (M3-23): the presence of w.live, the live routes
 	// and w.published as the publisher of notification.created (withLive).
 	live bool
+	// fcm registers the real FCM adapter against one Fake-FCM in place of the fakepush provider
+	// fcm (withFCM).
+	fcm bool
 }
 
 // option changes the variant of a world.
@@ -281,6 +285,12 @@ type option func(*options)
 // withProviders registers only the fakepush providers of names (default apns and fcm).
 func withProviders(names ...string) option {
 	return func(o *options) { o.providers = names }
+}
+
+// withFCM registers a real *fcm.Adapter against one Fake-FCM (w.fcmReal, built by newFCM) in
+// place of the fakepush provider fcm; the fakepush provider apns stays (brief M3-21 "Tests").
+func withFCM() option {
+	return func(o *options) { o.fcm = true }
 }
 
 // withVeto adds the vetoing MessagePosted subscriber after the subscriber of notify. The txn
@@ -343,6 +353,8 @@ type world struct {
 	// APNs adapter (withAPNs); apnsLog captures the records of the adapter.
 	apnsProd, apnsSand *apnstest.Server
 	apnsLog            *httpservertest.LogCapture
+	// fcmReal is the real FCM adapter with its Fake-FCM (withFCM; nil otherwise).
+	fcmReal *realFCM
 	// reader reads the push metrics of the meter provider of the push path.
 	reader *sdkmetric.ManualReader
 	// instanceID is the instance record's ID of every Notification.
@@ -546,6 +558,10 @@ func (w *world) buildPush(pool *pg.Pool, uow txn.UnitOfWork, syncRepo *syncpg.Re
 	for _, name := range o.providers {
 		if name == "apns" && o.apns {
 			providers = append(providers, w.newAPNs())
+			continue
+		}
+		if name == "fcm" && o.fcm {
+			providers = append(providers, w.newFCM(cfg.RetryCap))
 			continue
 		}
 		p := fakepush.New(name, w.clk)

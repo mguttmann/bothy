@@ -2,11 +2,14 @@
 
 package wire
 
-import "github.com/OWNER/bothy/services/server/internal/platform/config"
+import (
+	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fcm"
+	"github.com/OWNER/bothy/services/server/internal/platform/config"
+)
 
 // pushConfigKeys returns the keys of the job notify.push_send (13 "Configuration values of this
 // chapter", 03 section 9 for push.max_consecutive_failures; M3-19) and of the APNs adapter
-// (push.ttl and push.apns.*, M3-20). The keys push.fcm.* come with M3-21.
+// (push.ttl and push.apns.*, M3-20) and of the FCM adapter (push.fcm.*, M3-21).
 func pushConfigKeys() []config.Key {
 	return append([]config.Key{
 		{Name: "push.max_age", Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: chapter13,
@@ -19,6 +22,10 @@ func pushConfigKeys() []config.Key {
 			Doc: "Concurrent provider requests per process."},
 		{Name: "push.max_consecutive_failures", Kind: config.KindInt, Default: "5", Min: "1", Max: "100000", Chapter: chapter03,
 			Doc: "Consecutive transient failures after which a push registration is deactivated."},
+		{Name: fcm.KeyProjectID, Kind: config.KindString, Default: "", Chapter: chapter13,
+			Doc: "Firebase project of the FCM adapter; empty disables FCM."},
+		{Name: fcm.KeyServiceAccountRef, Kind: config.KindSecretRef, Default: "file:<secrets.dir>/fcm_service_account.json", Chapter: chapter13,
+			Doc: "Reference of the service account JSON of the FCM adapter; read only when push.fcm.project_id is set."},
 	}, apnsConfigKeys()...)
 }
 
@@ -28,8 +35,10 @@ func pushConfigKeys() []config.Key {
 // server does not start.
 func apnsConfigKeys() []config.Key {
 	return []config.Key{
-		{Name: "push.ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1s", Chapter: chapter13,
-			Doc: "Lifetime of a push at the provider (apns-expiration, android.ttl)."},
+		// The bounds of push.ttl hold in every role: Min makes android.ttl at least one whole
+		// second, Max is the FCM limit of 28 days (13 5.2 [Q11]; docs/DECISIONS.md D-M3-21-2).
+		{Name: "push.ttl", Kind: config.KindDuration, Default: defaultDay, Min: "1s", Max: "672h", Chapter: chapter13,
+			Doc: "Lifetime of a push at the provider (APNs expiration, FCM android.ttl), between 1 second and 28 days."},
 		{Name: "push.apns.team_id", Kind: config.KindString, Default: "", Chapter: chapter13,
 			Doc: "Apple team ID of the APNs key; APNs is enabled when team ID, key ID and topics are set."},
 		{Name: "push.apns.key_id", Kind: config.KindString, Default: "", Chapter: chapter13,

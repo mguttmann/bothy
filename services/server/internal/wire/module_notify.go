@@ -26,6 +26,9 @@ type notifyState struct {
 	// apnsProviders are the push providers of the APNs adapter (M3-20), built in the chat step
 	// in worker and all when APNs is enabled.
 	apnsProviders []notifyapp.PushProvider
+	// fcm holds the FCM adapter (M3-21) when FCM is enabled, built in the chat step of worker
+	// and all; nil otherwise.
+	fcm []notifyapp.PushProvider
 }
 
 // moduleNotify is the name of the module in architecture/modules.yaml and of its start step, where it has one.
@@ -40,6 +43,7 @@ func notifyWiring() moduleWiring {
 		parts: []part{
 			{order: 1360, step: moduleChat, start: (*server).startNotify},
 			{order: 1365, step: moduleChat, start: (*server).startAPNs},
+			{order: 1366, step: moduleChat, when: (*server).worker, start: (*server).startFCM},
 		},
 		handlers: func(s *server, h *Handlers) { s.notify.fillHandlers(h) },
 		jobs: func(s *server, m *JobModules) error {
@@ -65,12 +69,13 @@ func notifyWiring() moduleWiring {
 }
 
 // buildPush builds the push path of notify (M3-19) in the jobs step over the modules of the
-// earlier steps; the providers are Deps.PushProviders and the APNs adapter of startAPNs.
+// earlier steps; the providers are Deps.PushProviders, the APNs adapter of startAPNs and the FCM
+// adapter of startFCM.
 func (s *server) buildPush() (*Push, error) {
 	s.mu.Lock()
 	pool, a, sy := s.pool, s.audit, s.sync
 	n, c, m, p, id, az, rec := s.notify, s.chat, s.messaging, s.personal, s.identity, s.authorizer, s.instance
-	providers := append(slices.Clone(s.deps.PushProviders), s.apnsProviders...)
+	providers := slices.Concat(s.deps.PushProviders, s.apnsProviders, s.fcm)
 	s.mu.Unlock()
 	if a == nil || sy == nil || n == nil || c == nil || m == nil || p == nil || id == nil {
 		return nil, errors.New("wire: the push path needs the chat step and the identity step")
@@ -146,6 +151,29 @@ func (s *server) apnsDeps(eg egress.Config) APNsDeps {
 	ed := s.egressDeps()
 	ed.RootCAs = s.deps.APNsRootCAs
 	return APNsDeps{Secrets: s.sp, Egress: eg, EgressDeps: ed, Endpoints: s.deps.APNsEndpoints, Clock: s.deps.Clock, Logger: s.logger()}
+}
+
+// startFCM builds the FCM adapter (M3-21) in the chat step of worker and all when
+// push.fcm.project_id is set; a service account that cannot be used stops the start. The role
+// api runs no notify.push_send and reads no service account.
+func (s *server) startFCM(ctx context.Context) error {
+	cfg, err := FCMConfig(s.values)
+	if err != nil {
+		return err
+	}
+	eg, err := EgressConfig(s.values)
+	if err != nil {
+		return err
+	}
+	providers, err := FCMProviders(ctx, s.role, cfg, FCMDeps{Egress: eg, EgressDeps: s.egressDeps(), Secrets: s.sp,
+		Clock: s.deps.Clock, Logger: s.logger()})
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.fcm = providers
+	s.mu.Unlock()
+	return nil
 }
 
 // startNotify builds the notify module (M3-18) in the chat step over the chat service, the

@@ -49,8 +49,6 @@ rules:
     milestone: M6
   - match: privacy.stats_min_group_size  # M6-05
     milestone: M6
-  - match: "push."  # M3-20, M3-21
-    milestone: M3
   - match: "retention."  # M7-05
     milestone: M7
   - match: retention.stats_minutes  # M6-13
