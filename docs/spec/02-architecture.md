@@ -1152,7 +1152,7 @@ server loads.
    fires while a stalled worker consumer can still catch up. `webhook.retry_backoff_base` is at
    most `webhook.retry_backoff_cap` (cross-check `webhook_backoff_order`, M2-26), and
    `webhook.retry_max_age` is strictly below `sync.event_retention` (cross-check
-   `webhook_retry_within_retention`, M2-26), because a retry needs its event in the log. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
+   `webhook_retry_within_retention`, M2-26), because a retry needs its event in the log. `push.apns.team_id`, `push.apns.key_id` and `push.apns.topics` are set together or not at all, with `push.apns.private_key_ref` set when they are, and no topic is empty or repeated (cross-check `push_apns_complete`, M3-20), because a partial APNs configuration would start without sending to Apple. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
    clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
    M3-01), because a relative root would depend on the working directory of the process; with
    `s3` the root is not read. With `file.storage.driver = s3` the cross-check `file_s3` (M3-02)

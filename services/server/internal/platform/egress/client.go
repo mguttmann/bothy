@@ -86,6 +86,11 @@ type Options struct {
 	// MaxResponseBytes overrides Config.MaxResponseBytes when a chapter names its own size
 	// limit; 0 keeps Config.MaxResponseBytes.
 	MaxResponseBytes int64
+	// HTTP2 lets a TLS connection negotiate h2 by ALPN (the transport sets ForceAttemptHTTP2),
+	// for services that accept only HTTP/2 such as APNs (13 5.1, brief M3-20). Plain http (only
+	// with an allow_private rule) stays HTTP/1.1: there is no cleartext HTTP/2. Every check of
+	// the client applies unchanged.
+	HTTP2 bool
 }
 
 // Resolver resolves a host name to its addresses; *net.Resolver implements it. The client
@@ -206,8 +211,9 @@ func New(cfg Config, opts Options, deps Deps) (*Client, error) {
 	}
 	c.dial = connect
 	// Proxy stays nil: HTTP_PROXY and HTTPS_PROXY would make the address check see only the
-	// proxy (19 SEC-NET-2). HTTP/2 stays off because DialContext and TLSClientConfig are set
-	// and ForceAttemptHTTP2 is not.
+	// proxy (19 SEC-NET-2). Because DialContext and TLSClientConfig are set, net/http speaks
+	// HTTP/2 only when ForceAttemptHTTP2 is set, which Options.HTTP2 does; the dialer and its
+	// address check stay the same for both protocols.
 	transport := &http.Transport{ // nosemgrep: bothy-go-egress-only -- the egress package is the one place that builds transports (19 SEC-NET-1)
 		DialContext: c.dialContext,
 		TLSClientConfig: &tls.Config{
@@ -217,6 +223,7 @@ func New(cfg Config, opts Options, deps Deps) (*Client, error) {
 		TLSHandshakeTimeout:    c.timeout,
 		MaxResponseHeaderBytes: cfg.MaxResponseBytes,
 		IdleConnTimeout:        idleConnTimeout,
+		ForceAttemptHTTP2:      opts.HTTP2,
 	}
 	c.http = &http.Client{ // nosemgrep: bothy-go-egress-only -- the egress package is the one place that builds transports (19 SEC-NET-1)
 		Transport:     &checkingTransport{c: c, next: transport},

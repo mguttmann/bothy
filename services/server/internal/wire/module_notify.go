@@ -5,8 +5,10 @@ package wire
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
+	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	syncpg "github.com/OWNER/bothy/services/server/internal/sync/adapters/postgres"
 )
@@ -17,18 +19,24 @@ type notifyState struct {
 	notify *Notify
 	// push is the push path of notify (M3-19), built in the jobs step.
 	push *Push
+	// apnsProviders are the push providers of the APNs adapter (M3-20), built in the chat step
+	// in worker and all when APNs is enabled.
+	apnsProviders []notifyapp.PushProvider
 }
 
 // moduleNotify is the name of the module in architecture/modules.yaml and of its start step, where it has one.
 const moduleNotify = "notify"
 
 // notifyWiring wires the notify module into the start step chat, after catch-up and snapshot,
-// and its push path (M3-19) into the jobs step: the five jobs of notify on the queue delivery and
+// with the APNs adapter (M3-20) right after it, and its push path (M3-19) into the jobs step: the five jobs of notify on the queue delivery and
 // the consumer push (startEventConsumers reads s.push).
 func notifyWiring() moduleWiring {
 	return moduleWiring{
-		module:   moduleNotify,
-		parts:    []part{{order: 1360, step: moduleChat, start: (*server).startNotify}},
+		module: moduleNotify,
+		parts: []part{
+			{order: 1360, step: moduleChat, start: (*server).startNotify},
+			{order: 1365, step: moduleChat, start: (*server).startAPNs},
+		},
 		handlers: func(s *server, h *Handlers) { s.notify.fillHandlers(h) },
 		jobs: func(s *server, m *JobModules) error {
 			push, err := s.buildPush()
@@ -53,12 +61,12 @@ func notifyWiring() moduleWiring {
 }
 
 // buildPush builds the push path of notify (M3-19) in the jobs step over the modules of the
-// earlier steps; the providers come from Deps.PushProviders (none in production until M3-20 and
-// M3-21).
+// earlier steps; the providers are Deps.PushProviders and the APNs adapter of startAPNs.
 func (s *server) buildPush() (*Push, error) {
 	s.mu.Lock()
 	pool, a, sy := s.pool, s.audit, s.sync
 	n, c, m, p, id, az, rec := s.notify, s.chat, s.messaging, s.personal, s.identity, s.authorizer, s.instance
+	providers := append(slices.Clone(s.deps.PushProviders), s.apnsProviders...)
 	s.mu.Unlock()
 	if a == nil || sy == nil || n == nil || c == nil || m == nil || p == nil || id == nil {
 		return nil, errors.New("wire: the push path needs the chat step and the identity step")
@@ -74,8 +82,28 @@ func (s *server) buildPush() (*Push, error) {
 	return NewPush(cfg, pool, a.UoW(), PushDeps{
 		Notify: n, Authorizer: az, Recipients: recipients, Directory: id.Directory, Devices: id.Devices, Settings: p.Service.Settings(),
 		Chat: c.Service, Messaging: m.Service, History: sy.History(), Positions: syncpg.NewPersonalRepository(pool),
-		InstanceID: rec.InstanceID, Providers: s.deps.PushProviders,
+		InstanceID: rec.InstanceID, Providers: providers,
 	}, s.deps.Clock, s.logger())
+}
+
+// startAPNs builds the APNs adapter (M3-20) over the secret provider and the egress
+// configuration of the process: in worker and all with APNs enabled, otherwise none
+// (APNsProviders). An unusable APNs key ends the start here.
+func (s *server) startAPNs(ctx context.Context) error {
+	eg, err := EgressConfig(s.values)
+	if err != nil {
+		return err
+	}
+	providers, err := APNsProviders(ctx, s.values, s.role, APNsDeps{
+		Secrets: s.sp, Egress: eg, EgressDeps: s.egressDeps(), Clock: s.deps.Clock, Logger: s.logger(),
+	})
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.apnsProviders = providers
+	s.mu.Unlock()
+	return nil
 }
 
 // startNotify builds the notify module (M3-18) in the chat step over the chat service, the

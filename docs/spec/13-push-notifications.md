@@ -326,6 +326,20 @@ For every active device of r (`devices.state = 'active'`):
 - **No background push.** Apple throttles background pushes heavily and advises against more than two
   to three per hour [Q7, verified]. They are not suitable for chat.
 
+The adapter `notify/adapters/apns` (M3-20) connects only through the egress client of
+[19-security.md](19-security.md) SEC-NET-1 with HTTP/2 negotiated over TLS; its own targets
+are exactly `api.push.apple.com` and `api.sandbox.push.apple.com` on port 443, so an operator
+needs no `egress.allowed_hosts` entry. Each environment keeps its own JWT cache: the first send
+that needs a token creates it under the environment's lock, every other send reuses it, so an
+environment creates at most one JWT per `push.apns.jwt_refresh_interval`, and each creation
+reads `push.apns.private_key_ref` again, so a rotated key is used from the next JWT on. The one
+exception is `403 ExpiredProviderToken`: the adapter creates one replacement at once and repeats
+the request once; a second `ExpiredProviderToken` within the interval is a configuration error,
+because a fresh token does not help (the server clock or the key is wrong). A configuration
+error pauses that environment for one `push.apns.jwt_refresh_interval`: sends return without a
+request, then the first send probes once with a new JWT, and an answer other than a
+configuration error ends the pause (docs/DECISIONS.md D-M3-20-4, D-M3-20-5).
+
 ### 5.2 Android: FCM data message
 
 - **Sending.** `POST https://fcm.googleapis.com/v1/projects/{project_id}/messages:send` with an
@@ -407,6 +421,16 @@ decision logic.
 - `i` is the `instance_id`. It allows an app with several accounts to assign the notification.
 - Size: Apple rejects payloads over 4096 bytes [Q14, verified]. The payload here has a fixed
   structure and is far below that; a test holds the limit.
+
+Values (M3-20, docs/DECISIONS.md D-M3-20-6): `thread-id` and `b.t` are the thread ID and both are
+absent for a hint without thread (`security`, `admin`); `b.m` is absent without message; `badge`
+is written in every hint, also as `0`, which clears the badge; `Count` and the target of a hint
+are not carried, the app reads them through the preview and its sync. A quiet hint is `passive`
+and has no `sound`, also for `input_needed` with `push.apns.time_sensitive_enabled`: quiet wins.
+Before any request the adapter refuses an `app_id` outside `push.apns.topics` as
+`topic_mismatch`, a token that is empty or not hex as `token_invalid`, and a payload above
+Apple's limit as a program error; it never truncates. The badge sync of section 8 is exactly
+`{"aps":{"badge":<n>}}` with `apns-priority: 5` and without `apns-collapse-id`.
 
 ### 6.2 FCM
 
@@ -510,6 +534,20 @@ may be retried after 15 minutes, `TooManyRequests` with a delay [Q15, verified].
 | `429 TooManyRequests` | retry later (backoff), same device |
 | `413 PayloadTooLarge`, other `400` | bug: alert, no retry |
 | `500`, `503` | retry after `push.apns.retry_5xx_delay` |
+
+An answer the table does not list follows the listed answer of the same status, because Apple
+documents the status as the class and the reason as detail [Q15]: any other `410` deactivates
+like `Unregistered`, any other `403` is a configuration error, any other `429` is retried later,
+`404`, `405` and any other `4xx` are program errors, any other `5xx` is retried after
+`push.apns.retry_5xx_delay`, and a status outside these ranges is a program error. A repeated
+`ExpiredProviderToken` is a configuration error (5.1). No answer at all (name resolution,
+connection, TLS, HTTP/2, deadline, egress refusal) is a transient failure. "Alarm" means one
+Error record with `bothy.push.provider = apns` and `error.type` = the reason of the table or
+`other`, plus the outcome `rejected_other`, which the SLO `bothy-push/provider-acceptance` and
+`BothyPushAcceptanceBudgetBurn` already count; a pause logs when it begins and when a probe ends
+it. One `400 BadDeviceToken` cannot tell a wrong environment from a removed app, so the adapter
+writes one Warn record per answer that names the environment and raises no alarm; a mismatch
+shows as many such records (docs/DECISIONS.md D-M3-20-7, D-M3-20-8).
 
 ### 7.2 FCM
 
@@ -635,8 +673,11 @@ no person, device or thread IDs.
 
 - Push credentials are instance configuration of the instance operator: APNs team ID, key ID and `.p8` key
   (reference to the secret provider), allowed topics; FCM project ID and service account key
-  (reference). APNs keys can be separate per environment [Q3, verified]; the configuration
-  keeps sandbox and production separate.
+  (reference). One key set (`push.apns.team_id`, `push.apns.key_id`,
+  `push.apns.private_key_ref`) serves both environments; the JWT cache and the pause are kept per
+  environment, so a key that Apple restricts to one environment answers
+  `BadEnvironmentKeyIdInToken` in the other and pauses only that one [Q3] (docs/DECISIONS.md
+  D-M3-20-8).
 - Outbound connections: `api.push.apple.com`, `api.sandbox.push.apple.com`,
   `fcm.googleapis.com` and the token endpoint from the service account
   ([16-operations.md](16-operations.md), network rules).

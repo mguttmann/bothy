@@ -167,6 +167,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret migrate.monitor_password_ref" + skipped +
 		"secret migrate.owner_password_ref" + skipped +
 		"secret privacy.audit_ip_kek_ref: ok\n" +
+		// APNs is off without team ID, key ID and topics; its key is read only with APNs (M3-20).
+		"secret push.apns.private_key_ref: skipped (read only with APNs enabled)\n" +
 		// An optional reference without a value switches its feature off and reads nothing
 		// (docs/DECISIONS.md M1-21/1).
 		"secret server.tls_cert_ref: not set\n" +
@@ -191,6 +193,19 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		t.Errorf("check --secrets with driver s3: exit %d, stdout\n%s\nstderr %s", code, stdout, stderr)
 	}
 	noCanary(t, []string{"AKCHECKEXAMPLE", "CHECKSECRETEXAMPLE"}, stdout, stderr)
+	// push.apns.private_key_ref is read only when APNs is enabled (M3-20): set without team ID,
+	// key ID and topics it is skipped; with them a missing key file fails the check.
+	apnsRef := "BOTHY_PUSH__APNS__PRIVATE_KEY_REF=file:<secrets.dir>/apns_key.p8"
+	code, stdout, _ = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir, apnsRef}, "config", "check", "--secrets")
+	if code != 0 || !strings.Contains(stdout, "secret push.apns.private_key_ref: skipped (read only with APNs enabled)\n") {
+		t.Errorf("check --secrets with an APNs key but APNs off: exit %d, stdout\n%s", code, stdout)
+	}
+	apnsEnv := []string{"BOTHY_SECRETS__DIR=" + dir, apnsRef, "BOTHY_PUSH__APNS__TEAM_ID=EXAMPLETEAM",
+		"BOTHY_PUSH__APNS__KEY_ID=EXAMPLEKEY", "BOTHY_PUSH__APNS__TOPICS=com.example.chat"}
+	code, stdout, _ = runBothy(t, apnsEnv, "config", "check", "--secrets")
+	if code == 0 || !strings.Contains(stdout, "secret push.apns.private_key_ref: not_found\n") {
+		t.Errorf("check --secrets with APNs and no key file: exit %d, stdout\n%s", code, stdout)
+	}
 }
 
 // TestConfigCheckSecretsReportsInsecureFile is SEC-T11 seen from config check: a secret file
