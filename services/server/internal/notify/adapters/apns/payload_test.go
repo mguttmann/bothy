@@ -257,12 +257,10 @@ func chapterExample(t *testing.T) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
+	const name = "13-push-notifications.md"
 	for {
-		for _, name := range []string{"13-push-notifications.md", "13-push-benachrichtigungen.md"} {
-			b, err := os.ReadFile(filepath.Join(dir, "docs", "spec", name)) // #nosec G304 -- a chapter of the repository's specification
-			if err != nil {
-				continue
-			}
+		b, err := os.ReadFile(filepath.Join(dir, "docs", "spec", name)) // #nosec G304 -- a chapter of the repository's specification
+		if err == nil {
 			text := string(b)
 			i := strings.Index(text, "### 6.1 APNs")
 			if i < 0 {

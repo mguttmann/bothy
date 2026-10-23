@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package apns is the APNs adapter of notify: it implements the outgoing port app.PushProvider
-// (M3-19) for push registrations with provider = apns (docs/spec/13-push-benachrichtigungen.md
+// (M3-19) for push registrations with provider = apns (docs/spec/13-push-notifications.md
 // 5.1, 6.1, 7.1; brief M3-20).
 //
 // Connection: HTTP/2 over TLS to https://api.push.apple.com for environment production and

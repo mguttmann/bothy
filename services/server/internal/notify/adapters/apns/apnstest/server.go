@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package apnstest is Fake-APNs: an in-process HTTP/2 server with TLS on 127.0.0.1 that answers
-// like the Apple Push Notification service (docs/spec/13-push-benachrichtigungen.md 5.1 and 7.1;
+// like the Apple Push Notification service (docs/spec/13-push-notifications.md 5.1 and 7.1;
 // PLAN 5 row "Test doubles"). It checks the bearer JWT as APNs does, answers per device token
 // from a script, and records every request, so the tests of the adapter notify/adapters/apns
 // (M3-20) and the push handoff measurement (M3-24) never reach Apple. The package imports no
