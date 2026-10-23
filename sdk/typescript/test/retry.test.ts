@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Retry policy (docs/spec/11-erweiterungen.md 11.2 row `retry`, docs/DECISIONS.md D-M2-26-7,
+// Retry policy (docs/spec/11-extensions.md 11.2 row `retry`, docs/DECISIONS.md D-M2-26-7,
 // D-M2-29-4): the exempt table equals openapi.yaml, only idempotent requests repeat, the waits
 // stay inside their bounds and `Retry-After` reads both of its forms.
 

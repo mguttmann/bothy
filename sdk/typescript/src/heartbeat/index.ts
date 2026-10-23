@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The heartbeat building block for `agent_heartbeat.v1` (docs/spec/09-agenten.md 4.8;
- * docs/spec/11-erweiterungen.md 11.2 row `heartbeat`): {@link buildHeartbeat} refuses every
+ * The heartbeat building block for `agent_heartbeat.v1` (docs/spec/09-agents.md 4.8;
+ * docs/spec/11-extensions.md 11.2 row `heartbeat`): {@link buildHeartbeat} refuses every
  * field that could carry a secret, content or a path, and {@link HeartbeatSender} sends the
  * heartbeat through the gateway or `sendHeartbeat` at the interval the server asks for.
  *

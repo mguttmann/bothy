@@ -4,7 +4,7 @@
  * `bothy_sdk/testing/_fake_dpop.py`).
  *
  * The rules follow the server's verifier (docs/spec/06-api.md 3.1,
- * docs/spec/08-identitaet.md 7.3): one proof, `typ = dpop+jwt`, ES256 with a public `jwk` whose
+ * docs/spec/08-identity.md 7.3): one proof, `typ = dpop+jwt`, ES256 with a public `jwk` whose
  * thumbprint is the token's bound `jkt`, `htm`, normalized `htu`, `iat` within
  * `auth.dpop_proof_max_age` and `auth.clock_leeway`, `ath`, a current nonce (a missing or old
  * one answers `401 use_dpop_nonce`) and no reused `jti`. Nonces are windows of

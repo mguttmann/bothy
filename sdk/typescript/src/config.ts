@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Named values the hand layer works with (docs/spec/11-erweiterungen.md 16).
+ * Named values the hand layer works with (docs/spec/11-extensions.md 16).
  *
  * Every limit, window and wait of the SDK is a member of {@link SdkSettings}; each member names
  * its configuration key in {@link SETTING_KEYS} and its default in {@link DEFAULTS} is the

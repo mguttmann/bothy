@@ -3,7 +3,7 @@
  * The FakeServer's gateway for agents (private; port of `bothy_sdk/testing/_fake_gateway.py`).
  *
  * Frames are `{"op": ..., "d": ...}` (docs/api/asyncapi.yaml, channel `gateway`;
- * docs/spec/04-sync-protokoll.md 6): `hello`, `identify` or `resume` with the API token and a
+ * docs/spec/04-sync-protocol.md 6): `hello`, `identify` or `resume` with the API token and a
  * DPoP proof (`htm = GET`, `htu` the HTTPS form of the gateway URL as the server builds it from
  * its public URL, the nonce of `hello`), `ready`, the consumer's dispatches with
  * `invocation_token` and `redelivered`, `cursor`, `catchup.complete`, `heartbeat_ack`, `error`

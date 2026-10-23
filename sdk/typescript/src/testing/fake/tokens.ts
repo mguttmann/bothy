@@ -3,7 +3,7 @@
  * Invocation tokens of the FakeServer: issuer, server-side check and forgeries (private; port
  * of `bothy_sdk/testing/_fake_tokens.py`).
  *
- * The issuer follows M2-06 (docs/spec/05-aktionen.md 5, docs/spec/09-agenten.md 4.5): an
+ * The issuer follows M2-06 (docs/spec/05-actions.md 5, docs/spec/09-agents.md 4.5): an
  * Ed25519 JWS with `alg = EdDSA`, `typ = agent-invocation+jwt` and the RFC 7638 thumbprint as
  * `kid`. The check is the server's `Verify`: the first failing rule gives `invalid`; `expired`
  * only when every other rule holds. Signing uses `node:crypto` synchronously, so a delivery

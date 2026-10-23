@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Gateway connection of an agent after docs/spec/04-sync-protokoll.md 6 (port of
+ * Gateway connection of an agent after docs/spec/04-sync-protocol.md 6 (port of
  * `bothy_sdk/gateway.py`).
  *
  * {@link Gateway} opens the WebSocket of `Discovery.gateway.url`, answers `hello` with

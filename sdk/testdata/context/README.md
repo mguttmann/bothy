@@ -1,7 +1,7 @@
 # sdk/testdata/context
 
-Shared golden files of the run context rendering (docs/spec/09-agenten.md 4.6, ADR 0054,
-docs/DECISIONS.md D-M2-30-1): both SDKs render the same input with the same fixed block
+Shared golden files of the run context rendering (docs/spec/09-agents.md 4.6, ADR 0054,
+docs/decisions.d/M2-30.md D-M2-30-1): both SDKs render the same input with the same fixed block
 boundary and must produce the same bytes. Python renders with `bothy_sdk.context.render_context`
 (`sdk/python/tests/test_context_golden.py`), TypeScript with `renderContext` of `runs`
 (`sdk/typescript/test/context.test.ts`).

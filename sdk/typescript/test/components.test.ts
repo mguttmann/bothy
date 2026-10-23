@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Components of `component.v1` (docs/spec/09-agenten.md 11.1, 11.5 and 11.6); port of
+// Components of `component.v1` (docs/spec/09-agents.md 11.1, 11.5 and 11.6); port of
 // `sdk/python/tests/test_components.py`. The builders return generated `ComponentCreate`
 // objects and refuse, before anything is sent, what the server would refuse with
 // `400 validation_failed`: styles and field types outside the vocabularies, the limits
@@ -42,7 +42,7 @@ const SMALL = resolveSettings({
 });
 
 const CHAPTER = readFileSync(
-  new URL("../../../docs/spec/09-agenten.md", import.meta.url),
+  new URL("../../../docs/spec/09-agents.md", import.meta.url),
   "utf8",
 );
 

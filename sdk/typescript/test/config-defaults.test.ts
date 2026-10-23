@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The defaults of the SDK equal the configuration reference (docs/DECISIONS.md D-M2-30-14).
+ * The defaults of the SDK equal the configuration reference (docs/decisions.d/M2-30.md D-M2-30-14).
  *
  * Every member of `DEFAULTS` names its key in `SETTING_KEYS`; the "Default" column
  * (`Standard` in the German tables) of `docs/operations/configuration.md` holds the value of

@@ -9,7 +9,7 @@
  * scenario leaves `queued` never reaches another: a new consumer starts at `head_seq` (04 15.1
  * point 2).
  *
- * Scenarios (docs/spec/09-agenten.md 16.2, 07 AZ-P6, sdk/testdata/scenarios/README.md):
+ * Scenarios (docs/spec/09-agents.md 16.2, 07 AZ-P6, sdk/testdata/scenarios/README.md):
  * {@link ag08InvalidTokens}, {@link ag09DoubleDelivery}, {@link ag12PatchRules},
  * {@link ag28SlowStartAndRestart}, {@link azp6AdapterNeverStarts}. A failed check throws
  * {@link ScenarioFailed}; its message names the check and never contains a token.

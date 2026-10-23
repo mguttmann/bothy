@@ -2,10 +2,10 @@
 /**
  * The FakeServer's data and run rules (private; port of `bothy_sdk/testing/_fake_world.py`).
  *
- * One world after docs/spec/07-rechte.md "Examples": owner Robin, Alex who triggers, the agent
+ * One world after docs/spec/07-permissions.md "Examples": owner Robin, Alex who triggers, the agent
  * Lotse that operates the channel Allgemein of space Support, and the agent Texter. The run
- * rules follow the server code of M2-08 to M2-10 (docs/spec/09-agenten.md 4.5, 4.5.1, 5.1 and
- * 5.3, docs/spec/04-sync-protokoll.md 11.2 and 15.2 to 15.5): fresh tokens per delivery, the
+ * rules follow the server code of M2-08 to M2-10 (docs/spec/09-agents.md 4.5, 4.5.1, 5.1 and
+ * 5.3, docs/spec/04-sync-protocol.md 11.2 and 15.2 to 15.5): fresh tokens per delivery, the
  * start verdicts `superseded`, `expired` and `invalid`, consumed tokens, `already_started`,
  * mismatches that fail the run, renewals with `renewed_from_jti` and patches with
  * `base_version`. Every body is built with the generated types, so `tsc` holds its shape.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Which requests and answers are repeated, and how long the client waits
- * (docs/spec/11-erweiterungen.md 11.2 row `retry`, docs/DECISIONS.md D-M2-26-7, D-M2-30-3).
+ * (docs/spec/11-extensions.md 11.2 row `retry`, docs/DECISIONS.md D-M2-26-7, D-M2-30-3).
  *
  * @module
  */

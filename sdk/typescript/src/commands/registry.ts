@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The declared commands of an agent and their reconciliation (docs/spec/09-agenten.md 10.2;
+ * The declared commands of an agent and their reconciliation (docs/spec/09-agents.md 10.2;
  * port of `bothy_sdk/commands.py`).
  *
  * An adapter may declare its commands. When it does, it reconciles them after every `ready`

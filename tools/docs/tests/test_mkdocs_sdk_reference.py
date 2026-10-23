@@ -2,8 +2,8 @@
 """Tests for the MkDocs hook that mounts the typedoc reference of the TypeScript SDK.
 
 The hook adds every file of `sdk/typescript/build/reference/` to the site under
-`api/typescript-reference/` (docs/DECISIONS.md D-M2-30-13). `make linkcheck` checks the tracked
-Markdown files on disk, where that directory does not exist, so its lychee call excludes
+`api/typescript-reference/` (docs/decisions.d/M2-30.md D-M2-30-13). `make linkcheck` checks the
+tracked Markdown files on disk, where that directory does not exist, so its lychee call excludes
 exactly the reference's URL pattern; the last tests hold that pattern to the reference path.
 """
 

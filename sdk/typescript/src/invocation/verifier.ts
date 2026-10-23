@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The adapter's check of the invocation token (docs/spec/09-agenten.md 4.5 points 1 to 10).
+ * The adapter's check of the invocation token (docs/spec/09-agents.md 4.5 points 1 to 10).
  *
  * {@link InvocationVerifier.check} decides one verdict per token in the precedence of M2-06's
  * reference verifier (`services/server/internal/runs/adapters/runstest/refverifier.go`) and of
@@ -18,7 +18,7 @@
  * 5. Point 9: the allow list of 17.7 when configured; a `sub` still missing after the reload
  *    rules is `invalid` (docs/DECISIONS.md D-M2-29-8).
  * 6. Point 8: `billing_mode` equals the actual mode, and `unknown` never matches
- *    (docs/spec/10-backend-richtlinie.md 7). Failure: `billing_mode_mismatch`.
+ *    (docs/spec/10-backend-policy.md 7). Failure: `billing_mode_mismatch`.
  * 7. Point 10: the actual tool class is not above `tool_class` (`chat` < `scoped` < `host`).
  *    Failure: `tool_class_mismatch`.
  * 8. Point 5: `iat` after now plus `adapter.invocation_token_leeway`, or `exp` not after `iat`,
@@ -59,7 +59,7 @@ const ALG = "EdDSA";
 const TYP = "agent-invocation+jwt";
 const ED25519_KEY_BYTES = 32;
 const JTI_HASH_CHARS = 12;
-// Order of the tool classes, docs/spec/07-rechte.md 2.11.
+// Order of the tool classes, docs/spec/07-permissions.md 2.11.
 // A Map, not an object literal: a lookup must never find an inherited member such as
 // "constructor", which would make an unknown tool class pass point 10.
 const TOOL_CLASS_RANK: ReadonlyMap<string, number> = new Map([

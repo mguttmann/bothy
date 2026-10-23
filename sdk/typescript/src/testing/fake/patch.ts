@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Run patches of the FakeServer: the path table of docs/spec/09-agenten.md 5.3 (private; port
+ * Run patches of the FakeServer: the path table of docs/spec/09-agents.md 5.3 (private; port
  * of `bothy_sdk/testing/_fake_patch.py`).
  *
  * Static checks run over every op first (all field errors in one `400 validation_failed`),

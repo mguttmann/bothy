@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The heartbeat building block for `agent_heartbeat.v1` (docs/spec/09-agenten.md 4.8; port of
+ * The heartbeat building block for `agent_heartbeat.v1` (docs/spec/09-agents.md 4.8; port of
  * `bothy_sdk/heartbeat.py`).
  *
  * {@link buildHeartbeat} returns the generated `Heartbeat` with exactly the members and `details`

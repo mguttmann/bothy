@@ -9,7 +9,7 @@
  * `AbortSignal.timeout` of `sdk.http_timeout`. It keeps the newest `DPoP-Nonce` and repeats once
  * on `401 use_dpop_nonce` outside the retry count (06 3.1 point 2); it repeats idempotent requests
  * only (`./retry`) and warns once per operation on `Deprecation` or `Sunset` (11 12). Node.js only:
- * the run binding lives in an `AsyncLocalStorage` (docs/DECISIONS.md D-M2-30-3).
+ * the run binding lives in an `AsyncLocalStorage` (docs/decisions.d/M2-30.md D-M2-30-3).
  *
  * Logs carry the operation (`METHOD /path/template`), status, attempt and bound run; never a
  * URL, a header value, a body, a token or a proof (SEC-LOG-2).

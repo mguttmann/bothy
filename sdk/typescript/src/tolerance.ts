@@ -11,7 +11,7 @@
  *
  * Unlike the Python SDK, a page of events is passed through as received: the caller skips
  * unknown events with {@link knownEvents} or {@link decodeEvent} and still advances with
- * `next_cursor` (docs/spec/04-sync-protokoll.md 7.4).
+ * `next_cursor` (docs/spec/04-sync-protocol.md 7.4).
  *
  * @packageDocumentation
  */
@@ -112,7 +112,7 @@ export interface KnownEvent {
 
 /**
  * An event whose `type` this SDK version does not know, or a value that is no event object.
- * The caller skips it and keeps advancing its cursor (docs/spec/04-sync-protokoll.md 7.1).
+ * The caller skips it and keeps advancing its cursor (docs/spec/04-sync-protocol.md 7.1).
  */
 export interface UnknownEvent {
   /** Discriminator: the type is unknown. */

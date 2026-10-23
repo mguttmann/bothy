@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Outbox for replies and other writes that must never go out twice or get lost
- * (docs/spec/04-sync-protokoll.md 13.2, docs/spec/06-api.md 7; port of `bothy_sdk/outbox.py`).
+ * (docs/spec/04-sync-protocol.md 13.2, docs/spec/06-api.md 7; port of `bothy_sdk/outbox.py`).
  *
  * A reply gets its `client_msg_id` (UUIDv7) stored before the first send, and every retry sends
  * the same ID, so the server answers a repeat with the original (`Idempotent-Replay: true`).

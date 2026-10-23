@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The gateway client of an agent and its event sources (docs/spec/11-erweiterungen.md 11.2 row
+ * The gateway client of an agent and its event sources (docs/spec/11-extensions.md 11.2 row
  * `gateway`; 04 6, 09 4.2). {@link Gateway} speaks the WebSocket protocol with reconnects;
  * {@link GatewaySource} and {@link PollingSource} offer the same {@link EventSource} interface
  * over the gateway and over REST polling. Node.js only.

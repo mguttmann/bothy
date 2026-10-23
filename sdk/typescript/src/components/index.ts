@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Message components of `component.v1` (docs/spec/09-agenten.md 11; docs/spec/11-erweiterungen.md
+ * Message components of `component.v1` (docs/spec/09-agents.md 11; docs/spec/11-extensions.md
  * 11.2 row `components`): the builders {@link button}, {@link select}, {@link form},
  * {@link approvalCard} (09 11.5) and {@link questionCard} (09 11.6), the limit check
  * {@link checkComponents}, the card body {@link cardMessage}, and the agent's writes

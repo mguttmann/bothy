@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The shared context golden files of both SDKs (docs/DECISIONS.md D-M2-30-1, ADR 0054).
+"""The shared context golden files of both SDKs (docs/decisions.d/M2-30.md D-M2-30-1, ADR 0054).
 
 Every case directory of `sdk/testdata/context/` holds `input.json` (`boundary`, the `RunContext`
 body `context` and `file_texts` keyed by `file_id`) and the expected `system.txt` and

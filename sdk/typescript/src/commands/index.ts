@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Slash commands of an agent (docs/spec/09-agenten.md 10; docs/spec/11-erweiterungen.md 11.2 row
+ * Slash commands of an agent (docs/spec/09-agents.md 10; docs/spec/11-extensions.md 11.2 row
  * `commands`): a declared list of {@link CommandSpec}, its reconciliation
  * {@link reconcileCommands} after every `ready` with a replaceable {@link CommandStore}, and
  * autocomplete under the guard {@link guardedAutocomplete}, which never answers after the

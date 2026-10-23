@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * The operations of docs/api/openapi.yaml that write without `Idempotency-Key` and may still be
- * repeated (docs/spec/06-api.md 7 point 3, docs/DECISIONS.md D-M2-30-3).
+ * repeated (docs/spec/06-api.md 7 point 3, docs/decisions.d/M2-30.md D-M2-30-3).
  *
  * @module
  */

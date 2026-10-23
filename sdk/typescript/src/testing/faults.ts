@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Faults the FakeServer injects into one operation (docs/spec/09-agenten.md 16.1).
+ * Faults the FakeServer injects into one operation (docs/spec/09-agents.md 16.1).
  *
  * A {@link Fault} describes what goes wrong; `FakeServer.inject(target, fault, times)` applies it
  * to the next `times` calls of an `operationId` or a gateway op:

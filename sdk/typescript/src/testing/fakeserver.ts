@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * In-process FakeServer for adapter tests (docs/spec/09-agenten.md 16.1; port of
+ * In-process FakeServer for adapter tests (docs/spec/09-agents.md 16.1; port of
  * `bothy_sdk/testing/fakeserver.py`).
  *
  * {@link FakeServer} serves the REST operations an agent adapter uses and the gateway on one
  * `node:http` listener on `127.0.0.1` with port 0. It plays the server rules of
- * docs/spec/09-agenten.md 4.3 to 4.10, 5.1 and 5.3 and docs/spec/04-sync-protokoll.md 6, 11.2
+ * docs/spec/09-agents.md 4.3 to 4.10, 5.1 and 5.3 and docs/spec/04-sync-protocol.md 6, 11.2
  * and 15.1 to 15.5 as the server code builds them: DPoP with nonces, consumers with cursors, a
  * fresh invocation token per delivery, redelivery after `agent.ack_timeout`, the start, renew
  * and finish verdicts and the patch rules. Every time decision goes through the shared

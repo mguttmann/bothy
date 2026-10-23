@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The run context with trust marks for the agent runtime (docs/spec/09-agenten.md 4.6,
+ * The run context with trust marks for the agent runtime (docs/spec/09-agents.md 4.6,
  * ADR 0054; port of `bothy_sdk/context.py`).
  *
  * The server builds the context of a run and marks every message with its trust (`trigger`,
@@ -19,7 +19,7 @@
  * content and `<<<END DATA <boundary>>>>`. The boundary is 16 random hexadecimal characters per
  * call, chosen again when any rendered text contains it, so an author cannot close a block early
  * without knowing it (spotlighting, ADR 0054 Q2). Both SDKs render the shared golden files of
- * `sdk/testdata/context/` to the same bytes (docs/DECISIONS.md D-M2-30-1).
+ * `sdk/testdata/context/` to the same bytes (docs/decisions.d/M2-30.md D-M2-30-1).
  *
  * Browser-safe: no `node:` import; the boundary comes from Web Crypto `getRandomValues`, so the
  * entry `./core` may export this module.

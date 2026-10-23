@@ -8,7 +8,7 @@
  * `components`, `commands`, `outbox`, `heartbeat` and `webhooks`; {@link createApiClient} always
  * registers the tolerance layer of `./tolerance.ts` (gate G5). This entry handles tokens and keys
  * and is for Node.js only; `bothy-sdk/core` is the browser-safe subset and `bothy-sdk/testing`
- * holds the FakeServer and the shared scenarios (docs/DECISIONS.md D-M2-30-2).
+ * holds the FakeServer and the shared scenarios (docs/decisions.d/M2-30.md D-M2-30-2).
  *
  * @example
  * ```ts

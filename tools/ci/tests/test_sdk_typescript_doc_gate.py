@@ -2,7 +2,7 @@
 """The doc gate of the TypeScript SDK fails on an undocumented export (D-M2-30-12).
 
 `npm run lint` of `sdk/typescript` runs ESLint and then typedoc with `validation.notDocumented`
-as an error (docs/spec/23-qualitaet.md "Documentation in code", PLAN row M2-30: "test with a
+as an error (docs/spec/23-quality.md "Documentation in code", PLAN row M2-30: "test with a
 deliberately undocumented export"). Each test runs the script on a copy of the package without
 `node_modules`, `dist`, `build` and `coverage`, linked to the real `node_modules`, so the working
 tree stays untouched; the generated core `src/generated/` is outside the doc rule.

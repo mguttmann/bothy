@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The acceptance and run loop of an agent adapter (docs/spec/09-agenten.md 4.3, 4.5, 4.9, 15;
+ * The acceptance and run loop of an agent adapter (docs/spec/09-agents.md 4.3, 4.5, 4.9, 15;
  * port of `bothy_sdk/adapter.py`).
  *
  * {@link Adapter} connects as a consumer (gateway or REST polling), checks every invocation

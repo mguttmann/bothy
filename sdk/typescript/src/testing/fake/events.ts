@@ -3,8 +3,8 @@
  * Event log, consumer cursors and delivery windows of the FakeServer (private; port of
  * `bothy_sdk/testing/_fake_events.py`).
  *
- * The rules are those of docs/spec/04-sync-protokoll.md 15.1 and 15.2 and
- * docs/spec/09-agenten.md 4.3 as the server's consumer engine builds them: a cursor per consumer
+ * The rules are those of docs/spec/04-sync-protocol.md 15.1 and 15.2 and
+ * docs/spec/09-agents.md 4.3 as the server's consumer engine builds them: a cursor per consumer
  * name created at the head by the first takeover, delivery from `acked_seq + 1` in `seq` order,
  * at most `agent.max_inflight_events` unacknowledged, and after `agent.ack_timeout` (counted
  * from the oldest unacknowledged delivery) a new delivery from `acked_seq + 1` with

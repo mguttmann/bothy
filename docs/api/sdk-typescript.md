@@ -1,6 +1,6 @@
 # TypeScript SDK
 
-The TypeScript SDK `sdk/typescript` (docs/spec/11-erweiterungen.md section 11, ADR 0026) for
+The TypeScript SDK `sdk/typescript` (docs/spec/11-extensions.md section 11, ADR 0026) for
 agent adapters and apps on Node.js. Its [API reference](typescript-reference/index.html) is
 generated from the TSDoc comments of the source with typedoc in every `make docs`; status, layout
 and how to run the tests are in [sdk/typescript/README.md](../../sdk/typescript/README.md). The

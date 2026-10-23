@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The run context with trust marks (docs/spec/09-agenten.md 4.6, ADR 0054, AG-20 adapter part;
+// The run context with trust marks (docs/spec/09-agents.md 4.6, ADR 0054, AG-20 adapter part;
 // port of sdk/python/tests/test_context.py and test_context_golden.py).
 //
 // Every test builds a `RunContext` body as `getRunContext` returns it, renders it and checks
 // where each canary text ends up: inline in the system part, inside a marked data block, or in
 // the trigger part. The golden test renders every case of sdk/testdata/context/ with its fixed
-// boundary and compares byte for byte with the files Python wrote (docs/DECISIONS.md D-M2-30-1).
+// boundary and compares byte for byte with the files Python wrote (docs/decisions.d/M2-30.md D-M2-30-1).
 
 import { readdirSync, readFileSync } from "node:fs";
 import { inspect } from "node:util";

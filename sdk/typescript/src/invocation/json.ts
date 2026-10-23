@@ -2,7 +2,7 @@
 /**
  * Strict decoding of the token segments (private to `invocation`).
  *
- * The check of docs/spec/09-agenten.md 4.5 must read a token exactly as M2-06's reference
+ * The check of docs/spec/09-agents.md 4.5 must read a token exactly as M2-06's reference
  * verifier and the Python SDK do, so `JSON.parse` is not enough: it keeps the last of two equal
  * members (a parser keeping the first would read another header), and it cannot tell `1` from
  * `1.0` or `1e0`, which the reference refuses as a non-integer `iat`. This parser follows

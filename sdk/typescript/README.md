@@ -1,7 +1,7 @@
 # sdk/typescript
 
 Status: generated types, runtime client and tolerance layer (M2-23); the hand layer of
-docs/spec/11-erweiterungen.md 11.2 with the webhook verifier, the FakeServer, the shared scenarios
+docs/spec/11-extensions.md 11.2 with the webhook verifier, the FakeServer, the shared scenarios
 against the FakeServer and the real server, the typedoc reference and the build output `dist/`
 (M2-30). The package is private and not published (OQ-17).
 
@@ -9,7 +9,7 @@ against the FakeServer and the real server, the typedoc reference and the build 
 
 TypeScript SDK for apps, integrations and agent adapters in JavaScript environments. It has the
 modules and the behaviour of the Python SDK of M2-29 (`sdk/python`); class names are the Python
-class names, function names the camelCase form of the Python names (docs/DECISIONS.md D-M2-30-1).
+class names, function names the camelCase form of the Python names (docs/decisions.d/M2-30.md D-M2-30-1).
 
 ## Layout
 

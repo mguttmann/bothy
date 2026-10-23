@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * The hand layer declares no own type for an object the core generates (ADR 0026
- * "Confirmation", docs/spec/11-erweiterungen.md 11.1).
+ * "Confirmation", docs/spec/11-extensions.md 11.1).
  *
  * Every exported interface, type alias, class and enum of a `.ts` file under `src/` outside
  * `src/generated/` is read with the TypeScript compiler API; none may carry the name of a schema

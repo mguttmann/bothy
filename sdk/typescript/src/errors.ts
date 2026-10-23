@@ -6,7 +6,7 @@
  * and, below them, one class per code the hand layer reacts to. An unknown code keeps its
  * string and maps to the class of its status ("Clients treat unknown codes by HTTP status",
  * schema `Problem`, R-API-04). A `404` means "not there or not visible" and is never treated as
- * surely missing (docs/spec/11-erweiterungen.md 11.2). An error message shows the operation,
+ * surely missing (docs/spec/11-extensions.md 11.2). An error message shows the operation,
  * status, code, reason and `correlation_id`, never a body, a token, a proof or a message
  * content (SEC-LOG-2). Browser-safe: no `node:` import.
  *
@@ -224,7 +224,7 @@ export class ForbiddenError extends ProblemError {}
  * HTTP 404: the resource is not there or not visible.
  *
  * The server answers `404` for a target the caller may not see as for one that does not exist
- * (docs/spec/07-rechte.md), so this error never proves that a resource is missing.
+ * (docs/spec/07-permissions.md), so this error never proves that a resource is missing.
  */
 export class NotFoundError extends ProblemError {}
 
@@ -251,7 +251,7 @@ export class UseDpopNonce extends UnauthenticatedError {}
 
 /**
  * `403 invocation_token_invalid` with its {@link ProblemError.reason}: `expired`,
- * `superseded`, `invalid` or `run_inactive` (docs/spec/09-agenten.md 4.5, 07 SR9).
+ * `superseded`, `invalid` or `run_inactive` (docs/spec/09-agents.md 4.5, 07 SR9).
  */
 export class InvocationTokenInvalid extends ForbiddenError {}
 
@@ -287,7 +287,7 @@ export class RequestInProgress extends ConflictError {}
 export class Unavailable extends ServerError {}
 
 /**
- * An `error` frame of the gateway for one op (docs/spec/04-sync-protokoll.md 6.2).
+ * An `error` frame of the gateway for one op (docs/spec/04-sync-protocol.md 6.2).
  *
  * The status comes from {@link PROBLEM_STATUS}, `0` for an unknown code.
  */

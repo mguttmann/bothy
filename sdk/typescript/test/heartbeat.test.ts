@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The heartbeat building block for `agent_heartbeat.v1` (docs/spec/09-agenten.md 4.8); port of
+// The heartbeat building block for `agent_heartbeat.v1` (docs/spec/09-agents.md 4.8); port of
 // `sdk/python/tests/test_heartbeat.py`. The server's decoder (M2-20) refuses an unknown key and
 // a value outside its form; the SDK refuses the same before anything is sent, and its error
 // names the field, never the value. `HeartbeatSender` keeps the `interval_ms` of the answer.

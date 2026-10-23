@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Event sources of an agent adapter: the gateway or REST polling (docs/spec/09-agenten.md 4.2;
+ * Event sources of an agent adapter: the gateway or REST polling (docs/spec/09-agents.md 4.2;
  * port of `bothy_sdk/sources.py`).
  *
  * A source yields deliveries: {@link Envelope} (one event with its delivery fields),

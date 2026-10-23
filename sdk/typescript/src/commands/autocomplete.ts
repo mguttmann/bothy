@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Autocomplete of command options (docs/spec/09-agenten.md 10.5, R-AG-14; port of
+ * Autocomplete of command options (docs/spec/09-agents.md 10.5, R-AG-14; port of
  * `guarded_autocomplete` in `bothy_sdk/commands.py`).
  *
  * {@link guardedAutocomplete} runs the handler of a `command.autocomplete_requested` event under

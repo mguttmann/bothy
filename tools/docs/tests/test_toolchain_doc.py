@@ -75,7 +75,7 @@ def test_go_tools_are_read_from_go_mod() -> None:
 # lock that pins it. Only the generators are read from these locks; the other dev tools of the
 # SDKs share their versions with tools/ (M2-23/10).
 # Generators of the SDKs: their cores and, with typedoc, the TypeScript API reference of
-# `make docs` and the doc gate of `npm run lint` (docs/DECISIONS.md D-M2-30-12).
+# `make docs` and the doc gate of `npm run lint` (docs/decisions.d/M2-30.md D-M2-30-12).
 SDK_GENERATORS = {
     "openapi-python-client": "sdk/python/uv.lock",
     "openapi-typescript": "sdk/typescript/package-lock.json",

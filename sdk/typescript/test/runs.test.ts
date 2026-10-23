@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Run patcher and run handle: paths, throttle, coalescing, rebase, steps, follow-ups, finish
-// (docs/spec/09-agenten.md 5.3, docs/DECISIONS.md D-M2-29-9; port of
+// (docs/spec/09-agents.md 5.3, docs/DECISIONS.md D-M2-29-9; port of
 // sdk/python/tests/test_runs.py). The patches go to the FakeServer, which applies the path
 // table of 09 5.3 and `base_version`; a wrapped `fetch` records the request bodies so a test
 // can see what one patch carried. The few answers the FakeServer has no rule for (an agent
@@ -42,7 +42,7 @@ type S = components["schemas"];
 type Json = Record<string, unknown>;
 
 const SPEC = fileURLToPath(
-  new URL("../../../docs/spec/09-agenten.md", import.meta.url),
+  new URL("../../../docs/spec/09-agents.md", import.meta.url),
 );
 const CORR = "0192f4a0-7b1c-7000-8a00-000000000009";
 const UUID7 =

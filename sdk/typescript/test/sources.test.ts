@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Event sources: envelopes, the ack window, cursor frames, polling waits and the heartbeat (port
-// of sdk/python/tests/test_sources.py). docs/spec/09-agenten.md 4.2 and docs/DECISIONS.md
+// of sdk/python/tests/test_sources.py). docs/spec/09-agents.md 4.2 and docs/DECISIONS.md
 // D-M2-29-6: the acknowledged `seq` is the highest one up to which every delivered event is
 // settled; a cursor counts as delivered and settled; the polling source polls again at once
 // after a non-empty page and waits `sdk.poll_interval` after an empty one; it sends

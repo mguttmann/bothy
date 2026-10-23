@@ -3,7 +3,7 @@
  * The live-box patcher of a run (11 11.2 row `runs`; port of `RunPatcher` of
  * `bothy_sdk/runs.py`).
  *
- * {@link RunPatcher} keeps the desired state per path of docs/spec/09-agenten.md 5.3 and sends
+ * {@link RunPatcher} keeps the desired state per path of docs/spec/09-agents.md 5.3 and sends
  * at most one patch per `agent.run_update_min_interval`; a later value on the same path replaces
  * the earlier one in its place, and an {@link RunPatcher.addStep} followed by updates goes out as
  * one `add` (docs/DECISIONS.md D-M2-29-9). Its transport is REST `patchRun`, because the answer
@@ -86,7 +86,7 @@ function compile(pattern: string): RegExp {
   return new RegExp(`^${parts.join("/")}$`);
 }
 
-/** One row of the path table of docs/spec/09-agenten.md 5.3. */
+/** One row of the path table of docs/spec/09-agents.md 5.3. */
 export class PatchPath {
   /** The path with placeholders `<field>`, `<id>` and `<message_id>`. */
   readonly pattern: string;
@@ -192,7 +192,7 @@ function isTransient(error: ProblemError): boolean {
 
 /**
  * The gateway side of {@link RunPatcher.useGateway}: sends the op `run.update`
- * (docs/spec/04-sync-protokoll.md 6.2). The gateway consumer of `gateway` fits.
+ * (docs/spec/04-sync-protocol.md 6.2). The gateway consumer of `gateway` fits.
  */
 export interface RunUpdateGateway {
   /**

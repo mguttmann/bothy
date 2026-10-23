@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The invocation check of docs/spec/09-agenten.md 4.5 against the cases of M2-06's reference
+// The invocation check of docs/spec/09-agents.md 4.5 against the cases of M2-06's reference
 // verifier, ported from `sdk/python/tests/test_invocation.py` (the SDK verifiers must agree with
 // the reference on each case), plus the cases of the M2-30 brief and a cross-check against the
 // FakeServer's own issuer. Tokens are never printed: case names identify a failure.

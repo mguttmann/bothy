@@ -3,7 +3,7 @@
  * The adapter's inbox: accepted events, their newest tokens and the `jti` store.
  *
  * An event with an invocation token is acknowledged only after it passed the check and is stored
- * here (docs/spec/09-agenten.md 4.3, docs/spec/04-sync-protokoll.md 15.2); the start of its run
+ * here (docs/spec/09-agents.md 4.3, docs/spec/04-sync-protocol.md 15.2); the start of its run
  * follows from the inbox. Per event the store keeps the envelope without `invocation_token`, the
  * newest token with its `iat` and `jti`, a state and a delivery count; besides that the `jti`
  * values of passed tokens until `exp` plus `adapter.invocation_token_leeway` (09 4.5 point 7).

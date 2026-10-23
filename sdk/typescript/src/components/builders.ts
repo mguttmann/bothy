@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Builders of `component.v1` (docs/spec/09-agenten.md 11; port of `bothy_sdk/components.py`).
+ * Builders of `component.v1` (docs/spec/09-agents.md 11; port of `bothy_sdk/components.py`).
  *
  * {@link button}, {@link select} and {@link form} return generated `ComponentCreate` objects
  * for the `components` of a message with `kind = card`; {@link approvalCard} builds the approval

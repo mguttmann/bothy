@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Invocation (`invocation`, docs/spec/11-erweiterungen.md 11.2): the adapter's check of the
- * invocation token (docs/spec/09-agenten.md 4.5) and the inbox of accepted events (09 4.3).
+ * Invocation (`invocation`, docs/spec/11-extensions.md 11.2): the adapter's check of the
+ * invocation token (docs/spec/09-agents.md 4.5) and the inbox of accepted events (09 4.3).
  * Node.js only: it handles tokens.
  *
  * - {@link InvocationVerifier}: points 1 to 10 of 09 4.5 with a JWKS cache ({@link jwksFetcher})

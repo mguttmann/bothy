@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The FakeServer plays the server rules the SDK meets (docs/spec/09-agenten.md 16.1). Written
+// The FakeServer plays the server rules the SDK meets (docs/spec/09-agents.md 16.1). Written
 // with plain `fetch` and the `ws` client (not with the SDK's client modules), so the server is
 // proven on its own; the cases port `sdk/python/tests/test_fakeserver.py`. Tokens are compared
 // by `jti` or a fingerprint, never printed.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Sends the agent heartbeat at the interval the server asks for (docs/spec/09-agenten.md 4.8;
+ * Sends the agent heartbeat at the interval the server asks for (docs/spec/09-agents.md 4.8;
  * the heartbeat loop of `PollingSource` in `bothy_sdk/sources.py`).
  *
  * {@link HeartbeatSender} builds a heartbeat with its `build` callback and hands it to `send`:

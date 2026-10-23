@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Outbox: the ID is stored before the send, never twice, FIFO per thread, failures kept; port of
-// `sdk/python/tests/test_outbox.py`. docs/spec/04-sync-protokoll.md 13.2: a reply gets its
+// `sdk/python/tests/test_outbox.py`. docs/spec/04-sync-protocol.md 13.2: a reply gets its
 // `client_msg_id` and a write its `Idempotency-Key` stored before the first send, every repeat
 // sends the same one; `400`, `404`, `409`, `410`, `413` and `422` mark the entry failed with its
 // problem code; a transient failure leaves it pending for `Outbox.flush`. The faults

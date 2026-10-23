@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The build output `dist/` and the entry points of `package.json` (docs/DECISIONS.md D-M2-30-2,
- * docs/spec/11-erweiterungen.md 11.3).
+ * The build output `dist/` and the entry points of `package.json` (docs/decisions.d/M2-30.md D-M2-30-2,
+ * docs/spec/11-extensions.md 11.3).
  *
  * `npm run build` runs once before the checks. The three entries `.`, `./core` and `./testing`
  * load in a separate Node.js process through the package's own `exports` (self-reference), so

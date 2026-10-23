@@ -6,7 +6,7 @@
  * One holder per consumer (newest wins, `4015` for a replaced gateway connection), a cursor
  * created at the head by the first takeover, cumulative acknowledgements, and redelivery after
  * `agent.ack_timeout` through background loops on the shared FakeClock
- * (docs/spec/04-sync-protokoll.md 15.1 and 15.2, docs/spec/09-agenten.md 4.3).
+ * (docs/spec/04-sync-protocol.md 15.1 and 15.2, docs/spec/09-agents.md 4.3).
  *
  * @module
  */

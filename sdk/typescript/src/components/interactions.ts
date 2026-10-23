@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The agent's two writes on a card (docs/spec/09-agenten.md 11.4): {@link respond} answers an
+ * The agent's two writes on a card (docs/spec/09-agents.md 11.4): {@link respond} answers an
  * interaction (`respondToInteraction`), {@link update} disables or changes an own component
  * (`updateComponent`).
  *

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Browser-safe entry of the SDK (`bothy-sdk/core`, docs/spec/11-erweiterungen.md 11.3): only
+ * Browser-safe entry of the SDK (`bothy-sdk/core`, docs/spec/11-extensions.md 11.3): only
  * the parts without secrets: generated types, the tolerance layer, errors, settings, the
  * `components` builders, `renderContext`, `uuidv7` and `pages`. It imports no `node:` module and none of `auth`, `invocation`,
  * `gateway`, `webhooks` or `outbox` (`test/packaging.test.ts`).

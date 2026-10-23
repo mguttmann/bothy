@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Standard Webhooks verification for apps (docs/api/webhooks.md 3, docs/spec/11-erweiterungen.md
+ * Standard Webhooks verification for apps (docs/api/webhooks.md 3, docs/spec/11-extensions.md
  * 7 and 9, ADR 0016): outgoing webhooks and requests to `interactions_url` alike.
  *
  * @module
@@ -187,7 +187,7 @@ function decodeBody(body: Uint8Array): {
 /**
  * Verifies one delivery of an outgoing webhook or a request to `interactions_url`.
  *
- * Steps, each with its error code (docs/DECISIONS.md D-M2-30-9): the three headers present
+ * Steps, each with its error code (docs/decisions.d/M2-30.md D-M2-30-9): the three headers present
  * (`missing_header`); `webhook-timestamp` an integer of Unix seconds (`invalid_timestamp`);
  * its distance to `now()` at most `toleranceMs` in both directions
  * (`timestamp_out_of_tolerance`); at least one key or secret configured (`no_trusted_key`);

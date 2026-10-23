@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The scenario functions equal the shared list of both SDKs (docs/DECISIONS.md D-M2-30-1).
+"""The scenario functions equal the shared list of both SDKs (docs/decisions.d/M2-30.md D-M2-30-1).
 
 `sdk/testdata/scenarios/README.md` names every scenario under its Python name as a level-3
 heading (`### ag08_invalid_tokens`); the TypeScript SDK compares the camelCase form of the same

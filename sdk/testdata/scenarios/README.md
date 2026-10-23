@@ -1,6 +1,6 @@
 # sdk/testdata/scenarios
 
-The shared scenario list of both SDKs (docs/DECISIONS.md D-M2-30-1, ADR 0026 "Confirmation": the
+The shared scenario list of both SDKs (docs/decisions.d/M2-30.md D-M2-30-1, ADR 0026 "Confirmation": the
 same scenarios for both SDKs). Each scenario is one function of the SDK's `testing` module that
 runs unchanged against the SDK's in-process FakeServer and against the real server of
 `services/server/test/sdkserver`:
@@ -19,7 +19,7 @@ scenario added to one SDK only fails one of the two tests.
 Common setup of every scenario: Alex mentions the agent Lotse in a new thread (`trigger`), which
 queues a run with an invocation event; Texter is a second agent. Every scenario connects its
 adapters with its own consumer names, so a run that one scenario leaves `queued` never reaches
-another one (a new consumer starts at `head_seq`, docs/spec/04-sync-protokoll.md 15.1 point 2).
+another one (a new consumer starts at `head_seq`, docs/spec/04-sync-protocol.md 15.1 point 2).
 Times are named by their configuration keys (`agent.ack_timeout`,
 `agent.invocation_token_ttl`, `adapter.invocation_token_leeway`, `auth.clock_leeway`); the
 FakeServer lets them pass on its fake clock, the real server in real time. A failed check raises
@@ -30,7 +30,7 @@ check and never contains a token.
 
 ### ag08_invalid_tokens
 
-AG-08, adapter side (docs/spec/09-agenten.md 16.2): no start on a missing or forged token.
+AG-08, adapter side (docs/spec/09-agents.md 16.2): no start on a missing or forged token.
 
 Steps:
 
@@ -124,7 +124,7 @@ Expected outcomes:
 
 ### azp6_adapter_never_starts
 
-AZ-P6 for the SDK (docs/spec/07-rechte.md 11.2): the runtime never starts on a mismatching,
+AZ-P6 for the SDK (docs/spec/07-permissions.md 11.2): the runtime never starts on a mismatching,
 replayed or expired token. The missing and forged tokens are covered by `ag08_invalid_tokens`.
 
 Steps:

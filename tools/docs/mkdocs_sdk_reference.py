@@ -2,12 +2,12 @@
 """MkDocs hook: mount the typedoc reference of the TypeScript SDK into the site.
 
 The reference is generated from the TSDoc comments of `sdk/typescript/src`
-(docs/spec/23-qualitaet.md "Documentation in code", R-QA-14). The recipe `docs` of the root
+(docs/spec/23-quality.md "Documentation in code", R-QA-14). The recipe `docs` of the root
 Makefile runs `npm --prefix sdk/typescript run docs` before `mkdocs build`, which writes the HTML to
 `sdk/typescript/build/reference/`. This hook adds every file of that directory to the build as a
 generated static file under `api/typescript-reference/` (`File.generated` with `abs_src_path`),
 so the strict build validates the link of `docs/api/sdk-typescript.md` to
-`typescript-reference/index.html` like any other link (docs/DECISIONS.md D-M2-30-13).
+`typescript-reference/index.html` like any other link (docs/decisions.d/M2-30.md D-M2-30-13).
 
 - Package tracked (`git ls-files --error-unmatch sdk/typescript/package.json`, the same test as
   the Makefile) and the directory missing or empty: `PluginError` naming the npm command, so a

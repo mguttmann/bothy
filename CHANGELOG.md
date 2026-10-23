@@ -25,18 +25,6 @@ operated, and the order of the build.
 
 ### Added
 
-- TypeScript SDK hand layer (M2-30): the modules of chapter 11 11.2 with the behaviour of the
-  Python SDK, the Standard Webhooks verifier (`v1a` and `v1`) proven on the committed test
-  vectors, the FakeServer, the shared scenarios against the FakeServer and the real server, the
-  entry points `.`, `./core` and `./testing` with the build output `dist/`, the typedoc gate in
-  `npm run lint` and the typedoc reference in `make docs` (`docs/api/sdk-typescript.md`); shared
-  scenario list and context golden files under `sdk/testdata/` with Python tests for both;
-  chapter 11 11.2 and 11.3, chapter 23, webhooks.md section 3 and ADR 0026 updated.
-- Python SDK hand layer (M2-29): reference page `docs/sdk/python.md` rendered with mkdocstrings
-  (pinned in `tools/`), chapter 11 sections 11.2, 11.3 and 16 (`sdk.poll_interval`), the
-  inbox acknowledgement rules of chapters 04 and 09 ported from `main`, ADR 0026 and ADR 0054
-  confirmations, and the component `sdk-python` also owns `services/server/` so a server change
-  runs the SDK's real-server scenarios.
 - OpenTofu modules `hetzner`, `aws` and `azure` (M7-16): each creates a network whose security
   rules admit only the edge port 443 from the internet (and only with `edge_mode =
   reverse_proxy`) and SSH only from `ssh_allowed_cidrs`, one host with the user data of

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The webhook verifier (docs/api/webhooks.md 3, docs/spec/11-erweiterungen.md 7 and 9): header
+// The webhook verifier (docs/api/webhooks.md 3, docs/spec/11-extensions.md 7 and 9): header
 // and timestamp rules, signature entries, parsers, the Fetch API form for `interactions_url`,
 // the trust list cache and a seeded fuzz. Keys come from fixed seeds, secrets carry `EXAMPLE`;
 // no request leaves the process.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// AZ-P6 for the SDK (docs/spec/07-rechte.md 11.2; 09 4.5; T-TK-05): an adapter built on the SDK
+// AZ-P6 for the SDK (docs/spec/07-permissions.md 11.2; 09 4.5; T-TK-05): an adapter built on the SDK
 // never starts the runtime with a missing token, a wrong signature, a foreign `aud`, an expired
 // token, a repeated `jti`, a different `billing_mode` or a higher tool class. The events come
 // from the FakeServer; a tampering source in front of the adapter removes or replaces the

@@ -43,7 +43,7 @@ jobs:
           flutter-version-file: pubspec.yaml
           cache: true
       # `make docs` builds the typedoc reference of the TypeScript SDK first
-      # (docs/DECISIONS.md D-M2-30-13).
+      # (docs/decisions.d/M2-30.md D-M2-30-13).
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
