@@ -80,11 +80,11 @@ func (e env) registration(t *testing.T, user, device, session ids.ID, provider, 
 	id := ids.New()
 	if reason == "" {
 		e.exec(t, `INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id)
-			VALUES ($1, $2, $3, $4, $5, $6, 'com.example.bothy')`, id.String(), user.String(), device.String(), session.String(), provider, token)
+			VALUES ($1, $2, $3, $4, $5, $6, 'com.example.app')`, id.String(), user.String(), device.String(), session.String(), provider, token)
 		return id
 	}
 	e.exec(t, `INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id, disabled_at, disabled_reason)
-		VALUES ($1, $2, $3, $4, $5, $6, 'com.example.bothy', now(), $7)`, id.String(), user.String(), device.String(), session.String(), provider, token, reason)
+		VALUES ($1, $2, $3, $4, $5, $6, 'com.example.app', now(), $7)`, id.String(), user.String(), device.String(), session.String(), provider, token, reason)
 	return id
 }
 
@@ -133,7 +133,7 @@ func TestPushRegistrationsActive(t *testing.T) {
 	}
 	s := got[sam][0]
 	if s.UserID != sam || s.DeviceID != samPhone || s.Provider != "fcm" || s.Environment != "production" ||
-		s.AppID != "com.example.bothy" || s.CreatedAt.IsZero() || !s.LastSuccessAt.IsZero() || s.FailureCount != 0 {
+		s.AppID != "com.example.app" || s.CreatedAt.IsZero() || !s.LastSuccessAt.IsZero() || s.FailureCount != 0 {
 		t.Errorf("Sam's registration %+v", s)
 	}
 	if text := fmt.Sprintf("%+v", got); strings.Contains(text, "token-") {
@@ -157,7 +157,7 @@ func TestPushRegistrationsActive(t *testing.T) {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id)
-			VALUES ($1, $2, $3, $4, 'apns', 'token-robin-new', 'com.example.bothy')`, ids.New().String(), robin.String(), robinPhone.String(), robinSession.String()); err != nil {
+			VALUES ($1, $2, $3, $4, 'apns', 'token-robin-new', 'com.example.app')`, ids.New().String(), robin.String(), robinPhone.String(), robinSession.String()); err != nil {
 			return err
 		}
 		in, err := e.regs.Active(ctx, []ids.ID{robin})
@@ -187,7 +187,7 @@ func TestRegistrationStore_RoundTrip(t *testing.T) {
 		t.Fatalf("Load: found %v, %v", found, err)
 	}
 	if reg.ID != id || reg.UserID != alex || reg.DeviceID != phone || reg.Provider != "apns" || reg.Environment != "production" ||
-		reg.AppID != "com.example.bothy" || reg.Token != "token-alex" || reg.CreatedAt.IsZero() || !reg.CreatedAt.Equal(state.CreatedAt) {
+		reg.AppID != "com.example.app" || reg.Token != "token-alex" || reg.CreatedAt.IsZero() || !reg.CreatedAt.Equal(state.CreatedAt) {
 		t.Errorf("Load registration %+v", reg)
 	}
 	if !state.LastSuccessAt.IsZero() || state.FailureCount != 0 || !state.DisabledAt.IsZero() || state.DisabledReason != "" {

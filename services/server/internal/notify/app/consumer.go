@@ -184,7 +184,11 @@ var _ sync.ConsumerHandler = (*PushConsumer)(nil)
 // returns the same jobs for the same event when the round runs again. An error rolls the round
 // back.
 func (c *PushConsumer) HandleEvent(ctx context.Context, ev sync.Event) error {
-	switch authorize.EventType(ev.Type) {
+	typ, known := authorize.ParseEventType(ev.Type)
+	if !known {
+		return nil
+	}
+	switch typ {
 	case authorize.EventMessageCreated:
 		return c.p.onMessage(ctx, ev)
 	case authorize.EventRunStateChanged:

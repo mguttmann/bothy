@@ -169,10 +169,10 @@ func (w *pushWorld) addDevice(person ids.ID, platform, provider string) ids.ID {
 	dev, reg := ids.New(), ids.New()
 	w.devices[person] = append(w.devices[person], identity.DeviceRef{ID: dev, Platform: platform})
 	r := notify.PushRegistration{ID: reg, UserID: person, DeviceID: dev, Provider: provider, Environment: "production",
-		AppID: "com.example.bothy", CreatedAt: pushStart.Add(-24 * time.Hour)}
+		AppID: "com.example.app", CreatedAt: pushStart.Add(-24 * time.Hour)}
 	w.regs[person] = append(w.regs[person], r)
 	w.store.put(app.Registration{ID: reg, UserID: person, DeviceID: dev, Provider: provider, Environment: "production",
-		AppID: "com.example.bothy", Token: "token-" + reg.String()[:8], CreatedAt: r.CreatedAt})
+		AppID: "com.example.app", Token: "token-" + reg.String()[:8], CreatedAt: r.CreatedAt})
 	return reg
 }
 

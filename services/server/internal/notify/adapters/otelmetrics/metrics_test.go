@@ -175,11 +175,11 @@ func TestRegistrationsActiveGauge_PostgreSQL(t *testing.T) {
 		token := "token-" + string(rune('a'+i))
 		if row.reason == "" {
 			exec(`INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id)
-				VALUES ($1, $2, $3, $4, $5, $6, 'com.example.bothy')`, ids.New().String(), alex, phone, session, row.provider, token)
+				VALUES ($1, $2, $3, $4, $5, $6, 'com.example.app')`, ids.New().String(), alex, phone, session, row.provider, token)
 			continue
 		}
 		exec(`INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id, disabled_at, disabled_reason)
-			VALUES ($1, $2, $3, $4, $5, $6, 'com.example.bothy', now(), $7)`, ids.New().String(), alex, phone, session, row.provider, token, row.reason)
+			VALUES ($1, $2, $3, $4, $5, $6, 'com.example.app', now(), $7)`, ids.New().String(), alex, phone, session, row.provider, token, row.reason)
 	}
 	mp, reader := metricstest.Provider(t)
 	if _, err := otelmetrics.RegisterActiveGauge(mp, postgres.NewRegistrations(db.Pool(t, pg.RoleApp))); err != nil {

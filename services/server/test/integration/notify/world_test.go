@@ -610,7 +610,7 @@ func (w *world) phone(user ids.ID, platform, provider string) phone {
 	w.sql(`INSERT INTO auth_sessions (id, user_id, device_id, auth_method, expires_at) VALUES ($1, $2, $3, 'passkey', $4)`,
 		p.Session.String(), user.String(), p.Device.String(), start.Add(365*24*time.Hour))
 	w.sql(`INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, 'com.example.bothy', $7)`,
+		VALUES ($1, $2, $3, $4, $5, $6, 'com.example.app', $7)`,
 		p.Registration.String(), user.String(), p.Device.String(), p.Session.String(), provider, p.Token, w.clk.Now())
 	return p
 }

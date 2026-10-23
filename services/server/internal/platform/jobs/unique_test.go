@@ -163,18 +163,11 @@ func TestJobsUniqueInsertAndPending(t *testing.T) {
 // waitJobCompleted waits until the echo job of target is completed in River's table.
 func waitJobCompleted(t *testing.T, e *env, target ids.ID) {
 	t.Helper()
-	deadline := time.Now().Add(testkit.Patience)
-	for {
+	testkit.Until(t, "the job of "+target.String()+" completes", func() bool {
 		var n int
 		e.query(t, "SELECT count(*) FROM "+table("river_job")+" WHERE state = 'completed' AND args->>'target' = '"+target.String()+"'", &n)
-		if n == 1 {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the job of %s did not complete within %s", target, testkit.Patience)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return n == 1
+	})
 }
 
 // TestJobsUniqueRefusals: like InsertTx, both refuse the phase sync, an unregistered kind and

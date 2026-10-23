@@ -189,7 +189,7 @@ func TestSecurityHintFromDevicePending(t *testing.T) {
 	}
 	// A registration on the pending device, so a route to it would show as a job.
 	w.sql(`INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id, created_at)
-		VALUES ($1, $2, $3, $4, 'fcm', $5, 'com.example.bothy', $6)`,
+		VALUES ($1, $2, $3, $4, 'fcm', $5, 'com.example.app', $6)`,
 		ids.New().String(), w.alex.String(), pending.String(), res.Session.ID.String(), "device-token-"+ids.New().String(), w.clk.Now())
 
 	evs := w.devicePending(w.alex)

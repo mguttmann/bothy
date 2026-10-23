@@ -94,7 +94,7 @@ func TestMigrationPushRegistrations(t *testing.T) {
 	exec(`INSERT INTO auth_sessions (id, user_id, device_id, auth_method, expires_at) VALUES ($1, $2, $3, 'oidc', now() + interval '1 day')`,
 		session, person, phone)
 	ins := `INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id, preview_token_hash)
-		VALUES ($1, $2, $3, $4, $5, $6, 'com.example.bothy', $7)`
+		VALUES ($1, $2, $3, $4, $5, $6, 'com.example.app', $7)`
 	exec(ins, regPhone, person, phone, session, "apns", "token-phone", []byte{1})
 	exec(ins, regTablet, person, tablet, session, "fcm", "token-tablet", nil)
 

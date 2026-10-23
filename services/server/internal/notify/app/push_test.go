@@ -462,20 +462,11 @@ func TestSend_Steps(t *testing.T) {
 				_ = p.Send(context.Background(), job)
 			}()
 		}
-		deadline := time.Now().Add(testkit.Patience)
-		for {
+		testkit.Until(t, "three sends in flight", func() bool {
 			prov.mu.Lock()
-			running := prov.running
-			prov.mu.Unlock()
-			if running == 3 {
-				break
-			}
-			if time.Now().After(deadline) {
-				close(block)
-				t.Fatalf("%d sends in flight within %s, want 3", running, testkit.Patience)
-			}
-			time.Sleep(time.Millisecond)
-		}
+			defer prov.mu.Unlock()
+			return prov.running == 3
+		})
 		close(block)
 		wg.Wait()
 		if prov.maxRun != 3 || len(prov.calls) != 100 {

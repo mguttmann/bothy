@@ -25,7 +25,7 @@ var _ app.PushProvider = (*fakepush.FakeProvider)(nil)
 // registration is a registration of Alex's phone with the token secret.
 func registration(token string) app.Registration {
 	return app.Registration{ID: ids.New(), UserID: ids.New(), DeviceID: ids.New(), Provider: "apns", Environment: "production",
-		AppID: "com.example.bothy", Token: token}
+		AppID: "com.example.app", Token: token}
 }
 
 func TestFakeProvider_ResultsAndRecord(t *testing.T) {
