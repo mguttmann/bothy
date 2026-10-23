@@ -375,6 +375,53 @@ configuration error ends the pause (docs/DECISIONS.md D-M3-20-4, D-M3-20-5).
 - **Time budget.** `onMessageReceived` has only a few seconds; longer work runs as an
   expedited WorkManager job [Q10, verified]. The app fetches the preview (6.4) within this budget.
 
+The adapter `fcm` (`internal/notify/adapters/fcm`, M3-21) implements the port `PushProvider` for
+registrations with `provider = fcm`. It is built only when `push.fcm.project_id` is set, and only
+in the roles that run `notify.push_send` (`worker`, `all`); without it a send ends with
+`no_provider` (docs/DECISIONS.md D-M3-21-2).
+
+- **Connection.** Every request runs through the egress client (egress purpose `push_fcm`) over
+  HTTP/1.1 with keep-alive; the FCM HTTP v1 API accepts it [Q8, verified], and HTTP/2 is required
+  only for APNs (5.1). The adapter's own host policy allows exactly scheme `https`, port `443` and
+  the hosts `fcm.googleapis.com` and `oauth2.googleapis.com`, so an operator needs no
+  `egress.allowed_hosts` entry; no redirect is followed and TLS is always verified. Send and token
+  requests share one client. Deadline and answer size are `egress.timeout` and
+  `egress.max_response_bytes` (D-M3-21-1).
+- **OAuth flow.** The access token comes from the service account behind
+  `push.fcm.service_account_ref`: a JSON object with `type = service_account`, `client_email`,
+  `private_key_id`, `private_key` (one PKCS#8 PEM block holding an RSA key) and, optionally,
+  `token_uri`. The adapter signs an assertion with `RS256` (the signer `RS256Signer` of
+  `kernel/jose`, ADR 0067 item 2) with the header of exactly `alg = RS256`, `typ = JWT` and
+  `kid` = `private_key_id`, and the claims of exactly `iss` = `client_email`,
+  `scope = https://www.googleapis.com/auth/firebase.messaging`, `aud` = the token URL, `iat` =
+  now in Unix seconds and `exp` = `iat` plus one hour, the longest lifetime Google accepts for an
+  assertion [Q17, derived]. It posts it as `application/x-www-form-urlencoded` with exactly
+  `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` and `assertion` (the JWT bearer grant
+  of RFC 7523 2.1) [Q17, derived]. A `200` answer needs a non-empty `access_token`,
+  `token_type` `Bearer` (any case) and a positive `expires_in`. The token URL is fixed:
+  `https://oauth2.googleapis.com/token`; a service account whose `token_uri` is present and names
+  another URL is refused at start (11). Every token request resolves and parses the service
+  account again (the secret provider caches it for `secrets.cache_ttl`), so a rotated key is used
+  from the next token on without a restart (D-M3-21-3).
+- **Token cache.** The access token is reused while now is before the time it was obtained plus
+  half its `expires_in`; the first send after that requests a new one. One lock guards the cache
+  and the token request runs under it, so however many sends run in parallel, at most one token
+  request is in flight. A failed request stores nothing. A send answered `401` with the status
+  `UNAUTHENTICATED` (no `THIRD_PARTY_AUTH_ERROR`) drops that token, gets a new one (or the
+  replacement a parallel send already got) and sends the same message once more; a second `401`
+  for the replacement is a configuration error (D-M3-21-4).
+- **Pause.** A configuration error of the credentials (the rows of 7.2 that pause, a token request
+  the token endpoint refuses with a `4xx` answer, or a failed resolve or parse of the service
+  account at that time) drops the token, writes one Error record and pauses the adapter for
+  `push.retry_cap`: meanwhile every send returns `config_error` at once, without a request and
+  without a log record, and the job drops the hint (the unread counts carry the state, 7.3). The
+  first send at or after the end of the pause requests a new token, reading the key again, and so
+  probes once: any other result ends the pause with one Info record, a configuration error starts
+  the next pause. A token endpoint that answers `429`, `5xx` or not at all gives a transient
+  error and no pause. `SENDER_ID_MISMATCH` and `THIRD_PARTY_AUTH_ERROR` concern one registration
+  and never pause the adapter. The pause lives in the process; each worker probes for itself
+  (D-M3-21-5).
+
 ### 5.3 Windows and desktop through the gateway
 
 - The Windows app keeps running in the notification area, keeps its gateway connection and shows local
@@ -469,6 +516,40 @@ Apple's limit as a program error; it never truncates. The badge sync of section 
 
 Values in `data` are strings. In addition there is `k = "sync"` with `badge` and
 `cleared` (thread IDs, comma-separated) for section 8.
+
+The adapter `fcm` builds the message from fixed structures in this key order, so no other key can
+appear (docs/DECISIONS.md D-M3-21-6):
+
+| Key | Value |
+|---|---|
+| `message.token` | the token of the registration |
+| `message.android.priority` | `high`; `normal` for a quiet hint and for the sync form |
+| `message.android.ttl` | `push.ttl` in whole seconds plus `s` (`86400s` for `24h`) |
+| `data.v` | `1` |
+| `data.nid` | the `nid` of the hint |
+| `data.k` | the kind (2), or `sync` |
+| `data.i` | the `instance_id` |
+| `data.t` | the thread ID; absent when the hint has none (`security`, `admin`) |
+| `data.m` | the message ID; absent when the hint has none |
+| `data.badge` | the badge number of 8 in decimal; always present |
+| `data.quiet` | `1` for a quiet hint, else `0` |
+
+IDs are UUIDs in canonical lower-case form and every value in `data` is a JSON string. The count
+and the target of a hint are not carried: there is no key for them, and the app reads both through
+the preview (6.4) and its own sync, as on APNs (6.1). No `notification` block, no `collapse_key`
+(R-PN-08), no `apns`, `webpush` or `fcm_options` block exists anywhere in the message. Checks
+before any request (no token is requested): a registration of another provider, an unknown kind,
+a missing `nid`, instance ID or badge give `program_error`; an empty token or one with a byte
+outside printable ASCII or a space gives `disable` with `token_invalid`. `environment` and
+`app_id` are not read: FCM has no sandbox, and a token of another app answers
+`SENDER_ID_MISMATCH` (11). The serialized `data` stays under the FCM limit of 4096 bytes for data
+messages [Q9, verified]; a message above it gives `program_error` and is never truncated.
+
+The sync form of 8 has `data` of exactly `v`, `nid`, `k = "sync"`, `i`, `badge` and, when threads
+were read, `cleared` (their IDs, comma-separated, in the order given); `t`, `m` and `quiet` are
+absent and `android.priority` is `normal`. When `cleared` would push `data` over the 4096 byte
+limit it is left out entirely and the app keeps those notifications until it opens, the same known
+limit 8 states for iOS: the list is complete or absent, never partial.
 
 ### 6.3 Gateway event `notification.created`
 
@@ -583,6 +664,53 @@ shows as many such records (docs/DECISIONS.md D-M3-20-7, D-M3-20-8).
 | `429 QUOTA_EXCEEDED` | backoff, first wait at least one minute [Q16, verified] |
 | `503 UNAVAILABLE` | respect `Retry-After`, then exponential backoff with jitter [Q16, verified] |
 | `500 INTERNAL` | backoff between `push.retry_base` and `push.retry_cap` [Q16, verified] |
+
+The adapter `fcm` maps every answer onto one result class of 7.3 (docs/DECISIONS.md D-M3-21-7).
+The FCM error code is `errorCode` of the detail of type
+`type.googleapis.com/google.firebase.fcm.v1.FcmError`; an `INVALID_ARGUMENT` is caused by the token
+when the detail of type `type.googleapis.com/google.rpc.BadRequest` holds a `fieldViolations` entry
+with `field` `message.token` [Q16, verified]. A missing or broken body leaves the HTTP status and
+`error.status` to decide; `error.message` is never read into a log or an error text, because it
+may echo request values. Answers the table above does not list follow the nearest listed answer of
+the same status, because Google documents the status as the class and the error code as its
+detail [Q16, verified]:
+
+| Answer | Class |
+|---|---|
+| `200` | `accepted` |
+| `404 UNREGISTERED`; `400 INVALID_ARGUMENT` with a violation on `message.token` | `disable` with `token_invalid` |
+| `400 INVALID_ARGUMENT` otherwise, any other `400` | `program_error`, alert |
+| `403 SENDER_ID_MISMATCH` | `disable` with `sender_mismatch`, configuration alert |
+| `401 THIRD_PARTY_AUTH_ERROR` | `config_error`, configuration alert, no pause |
+| `401` otherwise (`UNAUTHENTICATED`) | renew the access token and send once more (5.2); a second `401` is `config_error`, alert, pause |
+| `403` otherwise (`PERMISSION_DENIED`) | `config_error`, alert, pause |
+| `404` otherwise (`NOT_FOUND`: unknown project) | `config_error`, alert, pause |
+| `429 QUOTA_EXCEEDED`, any other `429` | `throttled`, wait the `Retry-After` of the answer, at least one minute [Q16, verified] |
+| `503 UNAVAILABLE`, `500 INTERNAL`, any other `5xx` | `retry`, with the `Retry-After` of the answer when present |
+| any other `4xx`; any other status (`1xx`, `2xx` other than `200`, `3xx`) | `program_error`, alert |
+| no answer (DNS, connection, TLS, deadline, egress refusal, oversized body); a token request without answer or answered `429` or `5xx` | transient error, counted as `retry` (7.3) |
+
+`Retry-After` is read as delta seconds or as an HTTP date (RFC 9110 10.2.3) against the clock; a
+negative, unreadable or past value counts as absent. Without it the retry delay of 7.3 applies:
+its random factor between 0.5 and 1 puts the first retry between half of `push.retry_base` and
+`push.retry_base`, and every later one at most `push.retry_cap` after the previous; "backoff
+between `push.retry_base` and `push.retry_cap`" above is read with that factor. A `Retry-After`
+beyond `push.max_age` ends the hint as `expired`.
+
+"Alert" and "configuration alert" in the tables mean one Error record (`fcm configuration error`,
+`fcm program error` or `fcm sender mismatch`) with `bothy.push.provider = fcm` and `error.type` =
+the FCM error code when the table names it, else `error.status` when it is `UNAUTHENTICATED`,
+`PERMISSION_DENIED` or `NOT_FOUND`, else the OAuth `error` of a refused token request when it is
+`invalid_grant`, `invalid_client`, `unauthorized_client`, `invalid_scope` or `invalid_request`,
+else `other`; plus the outcome `rejected_other`, which the job records for `config_error` and
+`program_error` and which the SLO `bothy-push/provider-acceptance` counts against its budget, so
+`BothyPushAcceptanceBudgetBurn` fires. `SENDER_ID_MISMATCH` is `disable` with the outcome
+`rejected_token`, which burns no budget: the token belongs to the app of another project, not to a
+broken server; its Error record, one per answer, is the configuration alert. A pause logs once when
+it begins and once when a probe ends it, not per dropped hint. No log record, span, metric or error
+text carries the device token, the assertion, the access token, the `authorization` header, key
+material, the client e-mail, the project ID, an ID of the hint, `error.message`, a name or a text
+(D-M3-21-8).
 
 ### 7.3 Common
 
@@ -708,7 +836,10 @@ no person, device or thread IDs.
   D-M3-20-8).
 - Outbound connections: `api.push.apple.com`, `api.sandbox.push.apple.com`,
   `fcm.googleapis.com` and the token endpoint from the service account
-  ([16-operations.md](16-operations.md), network rules).
+  ([16-operations.md](16-operations.md), network rules). The token endpoint is
+  `https://oauth2.googleapis.com/token`; a service account whose `token_uri` names another URL is
+  refused at start, so a secret file never becomes a second egress configuration (5.2,
+  docs/DECISIONS.md D-M3-21-1).
 - **White label apps.** An APNs key is valid for the apps of the Apple team that owns it
   [Q3, verified]; an FCM token is valid only for the sender of its Firebase project [Q16, verified].
   An instance can therefore only push to apps whose keys it has. Every instance with its own
@@ -883,7 +1014,7 @@ Values from other chapters (reference only): `push.max_consecutive_failures`
 
 | Name | Default | Meaning |
 |---|---|---|
-| `push.ttl` | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`) |
+| `push.ttl` | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`), between 1 second and 28 days (FCM limit) |
 | `push.max_age` | `1h` | a notification not yet sent that is older than this is discarded |
 | `push.retry_base` | `2s` | base of the backoff |
 | `push.retry_cap` | `5m` | largest backoff interval |
@@ -896,7 +1027,7 @@ Values from other chapters (reference only): `push.max_consecutive_failures`
 | `push.apns.retry_5xx_delay` | `15m` | waiting time after `500` or `503` |
 | `push.apns.time_sensitive_enabled` | `false` | `time-sensitive` for `input_needed` |
 | `push.fcm.project_id` | empty | Firebase project |
-| `push.fcm.service_account_ref` | empty | reference to the service account key |
+| `push.fcm.service_account_ref` | `file:<secrets.dir>/fcm_service_account.json` | reference to the service account key |
 | `notify.user_default_level` | `mentions` | level without any setting |
 | `notify.default_preview_mode` | `full` | default for `notify.preview_mode` |
 | `notify.default_input_needed_breaks_quiet_hours` | `false` | default for the switch of the same name |
@@ -926,3 +1057,4 @@ All retrieved on 2026-10-10.
 - Q14 Apple, Generating a remote notification: https://developer.apple.com/documentation/usernotifications/generating-a-remote-notification [verified]
 - Q15 Apple, Handling notification responses from APNs: https://developer.apple.com/documentation/usernotifications/handling-notification-responses-from-apns [verified]
 - Q16 Firebase, FCM error codes: https://firebase.google.com/docs/cloud-messaging/error-codes [verified]
+- Q17 Google, Using OAuth 2.0 for Server to Server Applications: https://developers.google.com/identity/protocols/oauth2/service-account [derived; not retrieved: added by M3-21 in a build without network, the statements citing it follow the published OAuth 2.0 service account flow and are proven only against Fake-FCM]

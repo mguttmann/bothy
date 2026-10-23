@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package fcm is the FCM adapter of notify: it implements the outgoing port app.PushProvider
-// (M3-19) for push registrations with provider = fcm (docs/spec/13-push-benachrichtigungen.md
+// (M3-19) for push registrations with provider = fcm (docs/spec/13-push-notifications.md
 // 5.2, 6.2, 7.2; brief M3-21).
 //
 // Endpoints: one request POST https://fcm.googleapis.com/v1/projects/{push.fcm.project_id}/messages:send

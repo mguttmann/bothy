@@ -234,11 +234,7 @@ func chapterExample(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	for {
-		for _, name := range []string{"13-push-notifications.md", "13-push-benachrichtigungen.md"} {
-			raw, err := os.ReadFile(filepath.Join(dir, "docs", "spec", name)) // #nosec G304 -- a fixed file of the repository
-			if err != nil {
-				continue
-			}
+		if raw, err := os.ReadFile(filepath.Join(dir, "docs", "spec", "13-push-notifications.md")); err == nil { // #nosec G304 -- a fixed file of the repository
 			s := string(raw)
 			i := strings.Index(s, "### 6.2 FCM")
 			if i < 0 {

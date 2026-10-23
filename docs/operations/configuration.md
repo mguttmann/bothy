@@ -547,7 +547,7 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `push.ttl` | `BOTHY_PUSH__TTL` | Server | duration | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`) | active |
+| `push.ttl` | `BOTHY_PUSH__TTL` | Server | duration | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`), between 1 second and 28 days (FCM limit) | active |
 | `push.max_age` | `BOTHY_PUSH__MAX_AGE` | Server | duration | `1h` | a notification not yet sent that is older than this is discarded | active |
 | `push.retry_base` | `BOTHY_PUSH__RETRY_BASE` | Server | duration | `2s` | base of the backoff | active |
 | `push.retry_cap` | `BOTHY_PUSH__RETRY_CAP` | Server | duration | `5m` | largest backoff interval | active |
@@ -559,8 +559,8 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 | `push.apns.jwt_refresh_interval` | `BOTHY_PUSH__APNS__JWT_REFRESH_INTERVAL` | Server | duration | `40m` | renewal of the provider JWT, must be between 20 and 60 minutes | active |
 | `push.apns.retry_5xx_delay` | `BOTHY_PUSH__APNS__RETRY_5XX_DELAY` | Server | duration | `15m` | waiting time after `500` or `503` | active |
 | `push.apns.time_sensitive_enabled` | `BOTHY_PUSH__APNS__TIME_SENSITIVE_ENABLED` | Server | bool | `false` | `time-sensitive` for `input_needed` | active |
-| `push.fcm.project_id` | `BOTHY_PUSH__FCM__PROJECT_ID` | Server |  | empty | Firebase project | planned (M3) |
-| `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server |  | empty | reference to the service account key | planned (M3) |
+| `push.fcm.project_id` | `BOTHY_PUSH__FCM__PROJECT_ID` | Server | string | empty | Firebase project | active |
+| `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server | secret_ref | `file:<secrets.dir>/fcm_service_account.json` | reference to the service account key | active |
 | `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server | enum(all, mentions, mute) | `mentions` | level without any setting | active |
 | `notify.default_preview_mode` | `BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE` | Server |  | `full` | default for `notify.preview_mode` | planned (M3) |
 | `notify.default_input_needed_breaks_quiet_hours` | `BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS` | Server | bool | `false` | default for the switch of the same name | active |

@@ -1,6 +1,6 @@
 # Module `notify`
 
-Status: skeleton (M1-05), the decision per recipient as pure functions in `domain/` (M3-17), the notification levels and quiet hours with their tables, use cases, REST operations, archive cleanup and the reads of the push path (M3-18), and the push path (M3-19): the table `push_registrations` with its read port, the worker consumer `push`, the bundling window, the job `notify.push_send` with the provider port, automatic following, the badge and the badge sync. The provider adapters (M3-20, M3-21), registration and preview (M3-22), the gateway route and presence (M3-23) and the delivery measurement (M3-24) follow.
+Status: skeleton (M1-05), the decision per recipient as pure functions in `domain/` (M3-17), the notification levels and quiet hours with their tables, use cases, REST operations, archive cleanup and the reads of the push path (M3-18), and the push path (M3-19): the table `push_registrations` with its read port, the worker consumer `push`, the bundling window, the job `notify.push_send` with the provider port, automatic following, the badge and the badge sync, the APNs adapter `adapters/apns` (M3-20), the FCM adapter `adapters/fcm` with Fake-FCM (M3-21) and the desktop hints over the gateway (M3-23). Registration and preview (M3-22) and the delivery measurement (M3-24) follow.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -18,6 +18,7 @@ Notification levels, quiet hours, push registrations, push consumer and dispatch
 - `internal/notify/domain` (M3-19): `KindCode` and `KindFromCode` (`codes.go`), the result classes with `ApplyResult` and `RetryDelay` (`result.go`), `RunActive` (`runstate.go`).
 - `internal/notify/app` (M3-19): the push path `Push` (`consumer.go`) with the consumer `PushConsumer`, the event sources (`sources.go`), the run reads (`runs.go`), the facts per batch (`gather.go`), the window (`window.go`), the flush (`flush.go`), the send job (`send.go`), the badge and the badge sync (`badge.go`), the outgoing ports (`ports.go`) and the automatic following (`follow.go`).
 - `internal/notify/adapters/postgres` (M3-19, `registrations.go`): `PushRegistrations.Active` and the outgoing port `RegistrationStore` over `push_registrations`; `adapters/jobs`: the five job kinds, the `Scheduler` over `platform/jobs` and the span wrapper `Traced`; `adapters/otelmetrics`: the push instruments; `adapters/fakepush`: `FakeProvider`, the test double of `PushProvider` (only tests use it).
+- `internal/notify/adapters/fcm` (M3-21): the provider `fcm` of `PushProvider` (`Adapter`, `New`, `Deps`, `Endpoints`, `SecretResolver`, `Config`, `ServiceAccount`, `ParseServiceAccount`), with the access token cache and pause, the message builder and the answer table; `adapters/fcm/fcmtest`: Fake-FCM `Server`, the test double of both Google endpoints (only tests use it; `TestFakeNotInBinary` keeps it out of `cmd/bothy`).
 - `app/` and `adapters/<kind>/`: `tools/archgen` generates their components from `architecture/modules.yaml`; a package outside these layers fails `make arch`.
 
 ## Decision per recipient
@@ -250,6 +251,62 @@ start. Until M7-17 separate roles and several api nodes reach desktops only by p
 ### Rulings
 
 D-M3-23-1 to D-M3-23-12 in [docs/decisions.d/M3-23.md](../../../../docs/decisions.d/M3-23.md) ("M3-23 Desktop hints over the gateway").
+
+## Adapter `fcm` (M3-21)
+
+`internal/notify/adapters/fcm` implements `PushProvider` for registrations with `provider = fcm` (`Name()` returns `fcm`). It sends one FCM HTTP v1 data message per hint and returns a `domain.SendResult`; the job `notify.push_send` does the rest (13 5.2, 6.2, 7.2). It imports the own `app` and `domain`, `kernel` and the standard library, and `platform/egress` and `platform/secrets`; no Firebase SDK and no `golang.org/x/oauth2`, because both would open HTTP clients past the egress client.
+
+### Configuration
+
+- `push.fcm.project_id`: FCM is enabled exactly when it is set. The cross-check `push_fcm_project_id` refuses a value that is not only lower-case letters, digits and hyphens starting with a letter, because it becomes a path segment of the send URL.
+- `push.fcm.service_account_ref`: the service account JSON in the secret provider, default `file:<secrets.dir>/fcm_service_account.json`. `bothy config check --secrets` resolves it only when FCM is enabled.
+- `push.ttl` (bounded to between 1 second and the FCM limit of 28 days) becomes `android.ttl`; `push.retry_cap` is the length of the pause.
+- `internal/wire/push_fcm.go` builds the adapter only when FCM is enabled and only in the roles `worker` and `all` (the start part `startFCM` of `module_notify.go`), and adds it to the provider set of M3-19. `New` resolves and parses the service account (an error stops the start and names `push.fcm.service_account_ref`, never a value) and sends no request. Disabled: no adapter, no secret read, and jobs for `fcm` registrations end with `no_provider`.
+
+### Endpoints and connection
+
+One egress client per adapter, purpose `push_fcm`, HTTP/1.1 with keep-alive, `RedirectNever`. Its host policy allows exactly `https` on port `443` to `fcm.googleapis.com` and `oauth2.googleapis.com`, so no `egress.allowed_hosts` entry is needed; deadline and answer size are `egress.timeout` and `egress.max_response_bytes`. Sends go to `POST https://fcm.googleapis.com/v1/projects/<push.fcm.project_id>/messages:send` with `authorization: Bearer <access token>` and `content-type: application/json`. The token URL is fixed at `https://oauth2.googleapis.com/token`; a service account whose `token_uri` is present and differs is refused at start. `Deps.Endpoints` replaces both base URLs for tests only; `internal/wire` never sets it, and a test that sets it still runs every egress check.
+
+### Access token cache
+
+- The assertion is signed with `jose.RS256Signer` of `kernel/jose`: header `alg = RS256`, `typ = JWT`, `kid` = `private_key_id`; claims `iss` = `client_email`, `scope = https://www.googleapis.com/auth/firebase.messaging`, `aud` = the token URL, `iat` and `exp` = `iat` plus one hour (13 18 Q17). It is posted with the JWT bearer grant (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`, `assertion`).
+- Every token request resolves and parses the service account again, so a rotated key is used from the next token on without a restart (the secret provider caches for `secrets.cache_ttl`).
+- A token is reused while now is before its time of issue plus half its `expires_in`. One mutex guards the cache and the token request runs under it, so at most one token request is in flight; a failed request stores nothing.
+- A `401 UNAUTHENTICATED` from the send endpoint drops the token, gets a new one once and sends the same message once more; a second `401` is a configuration error.
+
+### Pause
+
+A configuration error of the credentials (`401` twice, `403 PERMISSION_DENIED`, `404 NOT_FOUND`, a token request refused with a `4xx`, a failed resolve or parse of the secret) drops the token, writes one Error record and pauses the adapter for `push.retry_cap`. During the pause `Send` returns `config_error` without a request and without a log record. The first send at or after its end probes once with a new token: any other result ends the pause with one Info record, a configuration error starts the next one. `SENDER_ID_MISMATCH` and `THIRD_PARTY_AUTH_ERROR` never pause; a token endpoint answering `429`, `5xx` or not at all gives a transient Go error and no pause. The pause lives in the process.
+
+### Answer table
+
+| Answer | Result |
+|---|---|
+| `200` | `accepted` |
+| `404 UNREGISTERED`, `400 INVALID_ARGUMENT` with a violation on `message.token` or with the `FcmError` code `INVALID_ARGUMENT` and no violation on another field | `disable`, `token_invalid` |
+| `400 INVALID_ARGUMENT` otherwise, any other `400` | `program_error`, Error record |
+| `403 SENDER_ID_MISMATCH` | `disable`, `sender_mismatch`, Error record (configuration alert) |
+| `401 THIRD_PARTY_AUTH_ERROR` | `config_error`, Error record, no pause |
+| `401` otherwise | renew and retry once; a second `401` is `config_error`, pause |
+| `403` otherwise, `404` otherwise | `config_error`, Error record, pause |
+| `429` | `throttled`, `RetryAfter` = `Retry-After`, at least one minute |
+| `5xx` | `retry`, `RetryAfter` = `Retry-After` when present, else zero (`domain.RetryDelay` applies) |
+| any other status | `program_error`, Error record |
+| no answer, egress refusal, oversized body, token request without answer or with `429` or `5xx` | Go error (transient) |
+
+`Retry-After` is read as delta seconds or as an HTTP date; negative, unreadable or past values count as absent. Error records are `fcm configuration error`, `fcm program error` and `fcm sender mismatch` and carry exactly `bothy.push.provider = fcm` and `error.type` (the FCM error code, else `error.status`, else the OAuth `error` of a refused token request, else `other`). No log, span, metric or error text carries the device token, the assertion, the access token, key material, the client e-mail, the project ID, an ID of the hint or Google's `error.message`.
+
+### Payload allow list
+
+The message is built from structs with JSON tags, never from a map: `message` holds only `token`, `android` (`priority`, `ttl`) and `data`. `data` holds only `v`, `nid`, `k`, `i`, `t`, `m`, `badge` and `quiet`, every value a string: `t` and `m` are absent without thread or message, `badge` is always present, `Count` and `TargetID` are not carried. `priority` is `high`, `normal` for quiet hints and the sync form; `ttl` is `push.ttl` in whole seconds plus `s`. The sync form (`KindSync`) has `v`, `nid`, `k = "sync"`, `i`, `badge` and `cleared` (comma-separated, complete or absent). No `notification`, `collapse_key`, `apns` or `webpush` key exists. Before any request, a wrong provider, an unknown kind, a zero `nid` or instance ID or a missing badge give `program_error`, and an empty or non-printable token gives `disable` with `token_invalid`; `data` above the FCM limit of 4096 bytes gives `program_error` and is never truncated. `TestPayloadMatchesChapterExample` compares the message with the JSON example of 13 6.2; `testdata/payload_message.golden` holds its exact bytes for the client tests of M5-05.
+
+### Fake-FCM
+
+`adapters/fcm/fcmtest` (no `testing` import) is an HTTP/1.1 server with TLS on `127.0.0.1:0` that serves both endpoints. The token handler verifies the assertion (header, claims, lifetime at most one hour, signature with `rsa.VerifyPKCS1v15`) and issues random tokens; the send handler checks method, path and bearer, records each request and answers a script per device token with the FCM error JSON. `Start`, `URL`, `TokenURL`, `RootCAs`, `EgressRule` (`127.0.0.1:<port>;allow_private`), `ServiceAccountJSON`, `Script`, `ScriptToken`, `Requests`, `TokenRequests`, `RevokeTokens`, `SetPublicKey` and `Close`; tests trust it through `egress.Deps.RootCAs` and never turn off certificate verification.
+
+### Rulings
+
+The rows `D-M3-21-<n>` in [docs/decisions.d/M3-21.md](../../../../docs/decisions.d/M3-21.md).
 
 ## Port (root package `internal/notify`)
 

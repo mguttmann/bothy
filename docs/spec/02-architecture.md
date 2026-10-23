@@ -1178,7 +1178,10 @@ server loads.
    [19-security.md](19-security.md) SEC-TLS-5, M3-04), and with `file.scan.mode = required`,
    `file.max_upload_bytes` is at most `file.scan.clamd_stream_max_bytes`, the mirror of the clamd
    option `StreamMaxLength` (cross-check `scan_stream_limit`, [12-files.md](12-files.md) 5.4,
-   M3-04). In addition the loader checks a rule for a single key that no type expresses:
+   M3-04). A non-empty `push.fcm.project_id` holds only lower-case letters, digits and hyphens
+   and starts with a letter (cross-check `push_fcm_project_id`,
+   [13-push-notifications.md](13-push-notifications.md) 5.2, M3-21), because the value becomes a
+   path segment of the FCM send URL; the message names the key. In addition the loader checks a rule for a single key that no type expresses:
    `secrets.dir` is an absolute path in clean form (no `.` or `..`, no double or trailing `/`),
    not `/`, without a NUL character and without `<`, as the secret provider requires; a wrong
    value is a problem of `secrets.dir` alone, not of the references that use `<secrets.dir>`.
@@ -1200,7 +1203,9 @@ server loads.
 7. `bothy config check` runs steps 2 to 4 without starting and writes, for every key `*_ref`
    whose effective reference uses `env:`, a warning to standard error; with `--secrets` it also
    resolves every reference `*_ref` through the secret provider (line `secret <key>: ok` or
-   `secret <key>: <error code>`, exit code 1 when one fails). `bothy config print` shows the
+   `secret <key>: <error code>`, exit code 1 when one fails). `push.fcm.service_account_ref` is
+   resolved only when `push.fcm.project_id` is set (FCM enabled), because its default points at a
+   file that an instance without FCM does not have (M3-21). `bothy config print` shows the
    effective values with the source per key.
 
 ## 14. Error and timeout strategy
