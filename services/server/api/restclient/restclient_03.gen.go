@@ -2276,12 +2276,16 @@ type ClientWithResponsesInterface interface {
 
 	// GetBrandingLogoWithResponse Download the instance logo
 	//
+	// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
 	GetBrandingLogoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetBrandingLogoResponse, error)
 
 	// UploadBrandingLogoWithBodyWithResponse Upload the logo
+	//
+	// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2359,6 +2363,8 @@ type ClientWithResponsesInterface interface {
 	DeleteMyAvatarWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteMyAvatarResponse, error)
 
 	// SetMyAvatarWithBodyWithResponse Upload own avatar
+	//
+	// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22719,66 +22725,4 @@ func (r RemoveGroupMemberResponse) GetApplicationproblemJSON400() *BadRequest {
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r RemoveGroupMemberResponse) GetApplicationproblemJSON401() *Unauthorized {
 	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
-}
-
-// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSONDefault() *Error {
-	return r.ApplicationproblemJSONDefault
-}
-
-// GetBody returns the raw response body bytes
-func (r RemoveGroupMemberResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r RemoveGroupMemberResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r RemoveGroupMemberResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r RemoveGroupMemberResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// PostIncomingWebhookWithBearerResponse200Headers the declared response headers of an HTTP 200 response for PostIncomingWebhookWithBearer
-type PostIncomingWebhookWithBearerResponse200Headers struct {
-	CorrelationId    *CorrelationId
-	IdempotentReplay *bool
-	RateLimit        *string
-	RateLimitPolicy  *string
 }

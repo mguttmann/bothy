@@ -29,24 +29,24 @@ func TestResourceFromEvent(t *testing.T) {
 		outcome authorize.Outcome
 	}{
 		{"message in a readable thread", authorize.ActionMessageRead,
-			authorize.ResourceFromEvent("message", ids.New(), w.support, w.allgemein, inAllgemein), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("message", ids.New(), w.support, w.allgemein, inAllgemein, ids.ID{}), authorize.OutcomeAllow},
 		{"message in a foreign thread", authorize.ActionMessageRead,
-			authorize.ResourceFromEvent("message", ids.New(), w.marketing, w.kampagnen, inKampagnen), authorize.OutcomeNotFound},
+			authorize.ResourceFromEvent("message", ids.New(), w.marketing, w.kampagnen, inKampagnen, ids.ID{}), authorize.OutcomeNotFound},
 		// The thread now lives in Allgemein; the event still names Kampagnen of Marketing.
 		{"thread moved after the event", authorize.ActionThreadRead,
-			authorize.ResourceFromEvent("thread", inAllgemein, w.marketing, w.kampagnen, inAllgemein), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("thread", inAllgemein, w.marketing, w.kampagnen, inAllgemein, ids.ID{}), authorize.OutcomeAllow},
 		{"message of a moved thread", authorize.ActionMessageRead,
-			authorize.ResourceFromEvent("message", ids.New(), w.marketing, w.kampagnen, inAllgemein), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("message", ids.New(), w.marketing, w.kampagnen, inAllgemein, ids.ID{}), authorize.OutcomeAllow},
 		{"channel", authorize.ActionChannelRead,
-			authorize.ResourceFromEvent("channel", w.eskalation, w.support, w.eskalation, ids.ID{}), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("channel", w.eskalation, w.support, w.eskalation, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
 		{"foreign channel", authorize.ActionChannelRead,
-			authorize.ResourceFromEvent("channel", w.kampagnen, w.marketing, w.kampagnen, ids.ID{}), authorize.OutcomeNotFound},
+			authorize.ResourceFromEvent("channel", w.kampagnen, w.marketing, w.kampagnen, ids.ID{}, ids.ID{}), authorize.OutcomeNotFound},
 		{"space", authorize.ActionSpaceRead,
-			authorize.ResourceFromEvent("space", w.support, w.support, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("space", w.support, w.support, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
 		{"foreign space", authorize.ActionSpaceRead,
-			authorize.ResourceFromEvent("space", w.marketing, w.marketing, ids.ID{}, ids.ID{}), authorize.OutcomeNotFound},
+			authorize.ResourceFromEvent("space", w.marketing, w.marketing, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeNotFound},
 		{"instance", authorize.ActionInstanceRead,
-			authorize.ResourceFromEvent("instance", ids.ID{}, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("instance", ids.ID{}, ids.ID{}, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
 	}
 	for _, c := range cases {
 		d, err := w.az.Authorize(ctx, alex, c.act, c.r)
@@ -79,17 +79,17 @@ func TestResourceFromEventOtherKinds(t *testing.T) {
 		outcome authorize.Outcome
 	}{
 		{"pin in a readable thread", w.user(w.alex), authorize.ActionThreadRead,
-			authorize.ResourceFromEvent("message", ids.New(), w.support, w.allgemein, inAllgemein), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("message", ids.New(), w.support, w.allgemein, inAllgemein, ids.ID{}), authorize.OutcomeAllow},
 		{"pin in a foreign thread", w.user(w.alex), authorize.ActionThreadRead,
-			authorize.ResourceFromEvent("message", ids.New(), w.marketing, w.kampagnen, inKampagnen), authorize.OutcomeNotFound},
+			authorize.ResourceFromEvent("message", ids.New(), w.marketing, w.kampagnen, inKampagnen, ids.ID{}), authorize.OutcomeNotFound},
 		{"command of a readable channel", w.user(w.alex), authorize.ActionCommandRead,
-			authorize.ResourceFromEvent("command", ids.New(), w.support, w.allgemein, ids.ID{}), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("command", ids.New(), w.support, w.allgemein, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
 		{"grant on a space for the owner", w.user(w.owner), authorize.ActionGrantRead,
-			authorize.ResourceFromEvent("grant", w.g1, w.support, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("grant", w.g1, w.support, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
 		{"grant on the instance for the owner", w.user(w.owner), authorize.ActionGrantRead,
-			authorize.ResourceFromEvent("grant", instanceGrant, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
+			authorize.ResourceFromEvent("grant", instanceGrant, ids.ID{}, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeAllow},
 		{"unknown grant", w.user(w.owner), authorize.ActionGrantRead,
-			authorize.ResourceFromEvent("grant", ids.New(), ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeNotFound},
+			authorize.ResourceFromEvent("grant", ids.New(), ids.ID{}, ids.ID{}, ids.ID{}, ids.ID{}), authorize.OutcomeNotFound},
 	}
 	for _, c := range cases {
 		d, err := w.az.Authorize(ctx, c.p, c.act, c.r)
@@ -103,7 +103,7 @@ func TestResourceFromEventOtherKinds(t *testing.T) {
 	}
 	// Alex reads Support but may not manage it: a denial, no error.
 	if d, err := w.az.Authorize(ctx, w.user(w.alex), authorize.ActionGrantRead,
-		authorize.ResourceFromEvent("grant", w.g1, w.support, ids.ID{}, ids.ID{})); err != nil || d.Allowed() {
+		authorize.ResourceFromEvent("grant", w.g1, w.support, ids.ID{}, ids.ID{}, ids.ID{})); err != nil || d.Allowed() {
 		t.Errorf("grant for Alex: %v %v", d, err)
 	}
 }
@@ -121,7 +121,7 @@ func TestResourceFromEventCatalogue(t *testing.T) {
 			continue
 		}
 		for _, act := range spec.MentionedActions {
-			r := authorize.ResourceFromEvent(spec.Resource, ids.New(), w.support, w.allgemein, w.mainThread[w.allgemein])
+			r := authorize.ResourceFromEvent(spec.Resource, ids.New(), w.support, w.allgemein, w.mainThread[w.allgemein], ids.ID{})
 			if _, err := w.az.Authorize(ctx, w.user(w.owner), authorize.Action(act), r); err != nil {
 				t.Errorf("%s with %s: %v", typ, act, err)
 			}

@@ -41,9 +41,10 @@ func pick(id, hint ids.ID, what string) (ids.ID, error) {
 func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r authorize.Resource) (resolved, bool, error) {
 	kind := string(r.Kind)
 	switch {
-	case r.Kind == authorize.ResourceFile && r.File != nil && r.File.Purpose != purposeAttachment:
-		// A file of another purpose has no channel path; its visibility rule and the file.read
-		// requirement by purpose decide it (M3-03, M3-05).
+	case r.Kind == authorize.ResourceFile && !fileOnPath(r):
+		// A file of another purpose, or an event row of kind file without any scope, has no channel
+		// path; the visibility and requirement of kind file decide it by purpose or by its owner
+		// (M3-03, brief M3-10 design notes 6 and 7).
 		return resolved{path: domain.Path{Kind: domain.PathNone}}, true, nil
 	case domain.IsChannelPathKind(kind):
 		threadID, channelID := r.ThreadID, r.ChannelID
@@ -545,6 +546,15 @@ func invocationFacts(f *authorize.TokenFacts) *domain.InvocationFacts {
 var invocationVerdicts = map[authorize.TokenVerdict]domain.InvocationVerdict{
 	authorize.TokenValid: domain.InvocationValid, authorize.TokenExpired: domain.InvocationExpired,
 	authorize.TokenSuperseded: domain.InvocationSuperseded, authorize.TokenInvalid: domain.InvocationInvalid,
+}
+
+// fileOnPath reports whether a file resource lives on a channel path: an attachment, or a file
+// without facts (an event row) that names a thread, channel or space.
+func fileOnPath(r authorize.Resource) bool {
+	if r.File != nil {
+		return r.File.Purpose == purposeAttachment
+	}
+	return !r.ThreadID.IsZero() || !r.ChannelID.IsZero() || !r.SpaceID.IsZero()
 }
 
 // fileFacts converts the file facts of a resource; nil stays nil.

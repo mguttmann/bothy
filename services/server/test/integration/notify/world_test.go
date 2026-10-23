@@ -96,6 +96,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/searchlang"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	messagingapp "github.com/OWNER/bothy/services/server/internal/messaging/app"
+	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/fakepush"
 	notifymetrics "github.com/OWNER/bothy/services/server/internal/notify/adapters/otelmetrics"
 	notifyapp "github.com/OWNER/bothy/services/server/internal/notify/app"
@@ -265,6 +266,9 @@ type options struct {
 	// veto registers, after the subscriber of notify, a second MessagePosted subscriber that
 	// refuses every human message with clear_draft (withVeto).
 	veto bool
+	// apns registers the real APNs adapter against Fake-APNs instead of the fakepush provider
+	// apns (withAPNs, M3-20).
+	apns bool
 }
 
 // option changes the variant of a world.
@@ -326,6 +330,10 @@ type world struct {
 	consumerCfg syncapp.ConsumerConfig
 	// apns and fcm are the fakepush providers (nil when not registered).
 	apns, fcm *fakepush.FakeProvider
+	// apnsProd and apnsSand are Fake-APNs of production and sandbox when the world runs the real
+	// APNs adapter (withAPNs); apnsLog captures the records of the adapter.
+	apnsProd, apnsSand *apnstest.Server
+	apnsLog            *httpservertest.LogCapture
 	// reader reads the push metrics of the meter provider of the push path.
 	reader *sdkmetric.ManualReader
 	// instanceID is the instance record's ID of every Notification.
@@ -523,6 +531,10 @@ func (w *world) buildPush(pool *pg.Pool, uow txn.UnitOfWork, syncRepo *syncpg.Re
 	must(t, err)
 	var providers []notifyapp.PushProvider
 	for _, name := range o.providers {
+		if name == "apns" && o.apns {
+			providers = append(providers, w.newAPNs())
+			continue
+		}
 		p := fakepush.New(name, w.clk)
 		switch name {
 		case "apns":
@@ -608,12 +620,17 @@ func (w *world) build() {
 func (w *world) phone(user ids.ID, platform, provider string) phone {
 	w.t.Helper()
 	p := phone{Device: ids.New(), Session: ids.New(), Registration: ids.New(), Provider: provider, Token: "device-token-" + ids.New().String()}
+	appID := "com.example.app"
+	if provider == "apns" && w.apnsProd != nil {
+		// The real APNs adapter needs a hex token and a topic of push.apns.topics (M3-20).
+		p.Token, appID = apnsToken(), apnsTopicPhone
+	}
 	w.sql(`INSERT INTO devices (id, user_id, name, platform, state) VALUES ($1, $2, 'Phone', $3, 'active')`, p.Device.String(), user.String(), platform)
 	w.sql(`INSERT INTO auth_sessions (id, user_id, device_id, auth_method, expires_at) VALUES ($1, $2, $3, 'passkey', $4)`,
 		p.Session.String(), user.String(), p.Device.String(), start.Add(365*24*time.Hour))
 	w.sql(`INSERT INTO push_registrations (id, user_id, device_id, auth_session_id, provider, token, app_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, 'com.example.app', $7)`,
-		p.Registration.String(), user.String(), p.Device.String(), p.Session.String(), provider, p.Token, w.clk.Now())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		p.Registration.String(), user.String(), p.Device.String(), p.Session.String(), provider, p.Token, appID, w.clk.Now())
 	return p
 }
 

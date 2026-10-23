@@ -18,6 +18,7 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
+	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
@@ -1282,19 +1283,33 @@ func wantSchema(t *testing.T, name string, p []byte) {
 	}
 }
 
+// contractModel is the model of docs/api/openapi.yaml, built once per test binary: one build
+// takes most of a second of CPU under -race, and the suites of this package validate many payloads
+// while dozens of tests run in parallel (TestCommandAutocomplete built it for every answer it
+// checked). schemaMu serialises the validations, so no two of them
+// read the shared model at once.
+var (
+	contractModel = sync.OnceValues(func() (*libopenapi.DocumentModel[v3high.Document], error) {
+		doc, err := libopenapi.NewDocument(rest.Spec)
+		if err != nil {
+			return nil, err
+		}
+		return doc.BuildV3Model()
+	})
+	schemaMu sync.Mutex
+)
+
 // validateSchema validates p against the schema name of docs/api/openapi.yaml; null is refused.
 func validateSchema(name string, p []byte) error {
 	if bytes.Contains(p, []byte("null")) {
 		return errors.New("null in the payload")
 	}
-	doc, err := libopenapi.NewDocument(rest.Spec)
+	model, err := contractModel()
 	if err != nil {
 		return err
 	}
-	model, err := doc.BuildV3Model()
-	if err != nil {
-		return err
-	}
+	schemaMu.Lock()
+	defer schemaMu.Unlock()
 	proxy, ok := model.Model.Components.Schemas.Get(name)
 	if !ok {
 		return errors.New("no schema " + name)

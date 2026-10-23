@@ -93,7 +93,9 @@ func (s *server) startFiles(ctx context.Context) error {
 	}
 	s.mu.Lock()
 	s.files = f
+	id, st := s.identity, s.settings
 	s.mu.Unlock()
+	f.BindProfileImages(id, st)
 	return nil
 }
 

@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -108,11 +109,15 @@ type AdminDeps struct {
 
 // Admin implements instance.Admin (the six operations of M1-46), instance.Settings (the read
 // port of the other modules), and the feature flags of M1-47: instance.Flags (the evaluation) and
-// instance.FlagAdmin (listFeatureFlags, putFeatureFlag). It is safe for concurrent use.
+// instance.FlagAdmin (listFeatureFlags, putFeatureFlag), and the logo operations of M3-10:
+// instance.Logos (logo.go). It is safe for concurrent use.
 type Admin struct {
 	cfg Config
 	reg *domain.Registry
 	d   AdminDeps
+	// logos is the source port of the module files, bound after construction by BindLogoFiles
+	// because internal/wire builds files after instance (logo.go).
+	logos atomic.Pointer[instance.LogoFiles]
 }
 
 // Compile-time checks: the incoming port and the read port.
@@ -263,20 +268,14 @@ func (v view) branding() (instance.Branding, error) {
 	if err != nil {
 		return instance.Branding{}, err
 	}
-	logo, err := v.str(domain.KeyLogoFileID)
+	logo, err := v.logo()
 	if err != nil {
 		return instance.Branding{}, err
 	}
-	b := instance.Branding{
-		ProductName: name, AccentColor: accent,
+	return instance.Branding{
+		ProductName: name, AccentColor: accent, LogoFileID: logo,
 		Version: domain.BrandingVersion(v.version(domain.KeyProductName), v.version(domain.KeyAccentColor), v.version(domain.KeyLogoFileID)),
-	}
-	if logo != "" {
-		if b.LogoFileID, err = ids.Parse(logo); err != nil {
-			return instance.Branding{}, errs.Wrap(errs.CodeInternalError, err, "instance: the stored logo file id is not a UUID")
-		}
-	}
-	return b, nil
+	}, nil
 }
 
 // load reads every stored setting.
@@ -358,12 +357,10 @@ func (s *Admin) Discovery(ctx context.Context) (instance.Discovery, error) {
 		GatewayVersions: slices.Clone(s.d.Contract.GatewayVersions), ProductName: b.ProductName, AccentColor: b.AccentColor,
 		Providers: providers, LocalPasswordEnabled: domain.LocalPasswordEnabled(opts.LocalPasswordEnabled, kinds),
 		JWKSURI: domain.JWKSURI, WebhookKeysURI: domain.WebhookKeysURI, MinClientVersions: []instance.ClientVersion{},
+		LogoURL: domain.DiscoveryLogoURL(b.LogoFileID),
 	}
 	if out.GatewayVersions == nil {
 		out.GatewayVersions = []int{}
-	}
-	if !b.LogoFileID.IsZero() {
-		out.LogoURL = domain.LogoURL
 	}
 	for _, cv := range domain.MinClientVersions(s.cfg.versionConfig()) {
 		out.MinClientVersions = append(out.MinClientVersions, instance.ClientVersion{

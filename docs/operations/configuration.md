@@ -546,18 +546,18 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `push.ttl` | `BOTHY_PUSH__TTL` | Server |  | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`) | planned (M3) |
+| `push.ttl` | `BOTHY_PUSH__TTL` | Server | duration | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`) | active |
 | `push.max_age` | `BOTHY_PUSH__MAX_AGE` | Server | duration | `1h` | a notification not yet sent that is older than this is discarded | active |
 | `push.retry_base` | `BOTHY_PUSH__RETRY_BASE` | Server | duration | `2s` | base of the backoff | active |
 | `push.retry_cap` | `BOTHY_PUSH__RETRY_CAP` | Server | duration | `5m` | largest backoff interval | active |
 | `push.max_concurrent_requests` | `BOTHY_PUSH__MAX_CONCURRENT_REQUESTS` | Server | int | `32` | concurrent requests to providers per process | active |
-| `push.apns.team_id` | `BOTHY_PUSH__APNS__TEAM_ID` | Server |  | empty | Apple team ID | planned (M3) |
-| `push.apns.key_id` | `BOTHY_PUSH__APNS__KEY_ID` | Server |  | empty | key ID of the `.p8` key | planned (M3) |
-| `push.apns.private_key_ref` | `BOTHY_PUSH__APNS__PRIVATE_KEY_REF` | Server |  | empty | reference to the key in the secret provider | planned (M3) |
-| `push.apns.topics` | `BOTHY_PUSH__APNS__TOPICS` | Server |  | empty | allowed bundle IDs | planned (M3) |
-| `push.apns.jwt_refresh_interval` | `BOTHY_PUSH__APNS__JWT_REFRESH_INTERVAL` | Server |  | `40m` | renewal of the provider JWT, must be between 20 and 60 minutes | planned (M3) |
-| `push.apns.retry_5xx_delay` | `BOTHY_PUSH__APNS__RETRY_5XX_DELAY` | Server |  | `15m` | waiting time after `500` or `503` | planned (M3) |
-| `push.apns.time_sensitive_enabled` | `BOTHY_PUSH__APNS__TIME_SENSITIVE_ENABLED` | Server |  | `false` | `time-sensitive` for `input_needed` | planned (M3) |
+| `push.apns.team_id` | `BOTHY_PUSH__APNS__TEAM_ID` | Server | string | empty | Apple team ID | active |
+| `push.apns.key_id` | `BOTHY_PUSH__APNS__KEY_ID` | Server | string | empty | key ID of the `.p8` key | active |
+| `push.apns.private_key_ref` | `BOTHY_PUSH__APNS__PRIVATE_KEY_REF` | Server | secret_ref | empty | reference to the key in the secret provider | active |
+| `push.apns.topics` | `BOTHY_PUSH__APNS__TOPICS` | Server | list(string) | empty | allowed bundle IDs | active |
+| `push.apns.jwt_refresh_interval` | `BOTHY_PUSH__APNS__JWT_REFRESH_INTERVAL` | Server | duration | `40m` | renewal of the provider JWT, must be between 20 and 60 minutes | active |
+| `push.apns.retry_5xx_delay` | `BOTHY_PUSH__APNS__RETRY_5XX_DELAY` | Server | duration | `15m` | waiting time after `500` or `503` | active |
+| `push.apns.time_sensitive_enabled` | `BOTHY_PUSH__APNS__TIME_SENSITIVE_ENABLED` | Server | bool | `false` | `time-sensitive` for `input_needed` | active |
 | `push.fcm.project_id` | `BOTHY_PUSH__FCM__PROJECT_ID` | Server |  | empty | Firebase project | planned (M3) |
 | `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server |  | empty | reference to the service account key | planned (M3) |
 | `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server | enum(all, mentions, mute) | `mentions` | level without any setting | active |

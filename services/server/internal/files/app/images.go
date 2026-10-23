@@ -232,12 +232,19 @@ func (p *ImageProcessor) originalPhase(ctx context.Context, f FileRecord) (*File
 	switch {
 	case err == nil:
 	case stripPlan(plan) && errors.Is(err, ErrImageMalformed):
-		return nil, p.failMalformed(ctx, f, next)
+		return nil, p.failImage(ctx, f, ReasonImageMalformed, next)
+	case !stripPlan(plan) && permanent(err) && !domain.StoredOriginalAllowed(domain.Purpose(f.Purpose), domain.OriginalUnchanged):
+		// An avatar or logo is never stored unchanged (brief M3-10 design note 4).
+		return nil, p.failImage(ctx, f, domain.ReasonFileTypeDenied, next)
 	case !stripPlan(plan) && permanent(err):
 		p.d.Log.InfoContext(ctx, msgImageUnchanged, p.logAttrs(f.ID, err)...)
 		return p.keepOriginal(ctx, f)
 	default:
 		return nil, err
+	}
+	if !domain.StoredOriginalAllowed(domain.Purpose(f.Purpose), domain.PlannedOriginal(plan)) {
+		// The scan pass refuses these already; this keeps the rule where the original is decided.
+		return nil, p.failImage(ctx, f, domain.ReasonFileTypeDenied, next)
 	}
 	if err := p.putCleaned(ctx, next, c); err != nil {
 		return nil, err
@@ -433,17 +440,18 @@ func (p *ImageProcessor) beforeCommit(ctx context.Context, fileID ids.ID) error 
 	return nil
 }
 
-// failMalformed is the failure transaction of a JPEG or PNG the filter refused (design note
-// 10b): failed with image_malformed, file.updated and FileFinalized, no audit entry; after the
-// commit the original and any next revision go (12 12).
-func (p *ImageProcessor) failMalformed(ctx context.Context, f FileRecord, next string) error {
+// failImage is the failure transaction of an image whose original cannot be stored: a JPEG or PNG
+// the filter refused (design note 10b, image_malformed) or an avatar or logo the purpose rule
+// refused (brief M3-10 design note 4, file_type_denied): failed with reason, file.updated and
+// FileFinalized, no audit entry; after the commit the original and any next revision go (12 12).
+func (p *ImageProcessor) failImage(ctx context.Context, f FileRecord, reason, next string) error {
 	failed := false
 	err := p.d.UoW.Do(ctx, func(ctx context.Context) error {
 		cur, found, err := p.d.Repo.LockImageFile(ctx, f.ID)
 		if err != nil || !found || !awaitingOriginal(cur, f.ObjectKey) {
 			return err
 		}
-		if err := p.d.Repo.FailImage(ctx, f.ID, ReasonImageMalformed); err != nil {
+		if err := p.d.Repo.FailImage(ctx, f.ID, reason); err != nil {
 			return err
 		}
 		cur.UploadState = domain.UploadFailed
@@ -462,7 +470,7 @@ func (p *ImageProcessor) failMalformed(ctx context.Context, f FileRecord, next s
 // deleteFailedOriginals removes the original of a failed image and its next revision again, for
 // a retry after a failed deletion (design note 10e); a missing object counts as deleted.
 func (p *ImageProcessor) deleteFailedOriginals(ctx context.Context, f FileRecord) error {
-	if !stripPlan(domain.OriginalPlanFor(f.MIMEType)) {
+	if !stripPlan(domain.OriginalPlanFor(f.MIMEType)) && !domain.Purpose(f.Purpose).Image() {
 		return nil
 	}
 	rev, err := revision(f)

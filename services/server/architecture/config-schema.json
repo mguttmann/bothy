@@ -2692,6 +2692,90 @@
       "doc": "Longest workspace_ref, repository_url, default_branch, model and tool name of a project binding in Unicode characters (M2-03)."
     },
     {
+      "name": "push.apns.jwt_refresh_interval",
+      "env": "BOTHY_PUSH__APNS__JWT_REFRESH_INTERVAL",
+      "kind": "duration",
+      "default": "40m",
+      "required": false,
+      "enum": [],
+      "min": "20m",
+      "max": "60m",
+      "chapter": "13-push-notifications.md",
+      "doc": "Renewal interval of the APNs provider JWT; Apple requires 20 to 60 minutes."
+    },
+    {
+      "name": "push.apns.key_id",
+      "env": "BOTHY_PUSH__APNS__KEY_ID",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Key ID of the APNs .p8 key."
+    },
+    {
+      "name": "push.apns.private_key_ref",
+      "env": "BOTHY_PUSH__APNS__PRIVATE_KEY_REF",
+      "kind": "secret_ref",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Reference to the APNs .p8 key in the secret provider; required when APNs is enabled."
+    },
+    {
+      "name": "push.apns.retry_5xx_delay",
+      "env": "BOTHY_PUSH__APNS__RETRY_5XX_DELAY",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Wait before a push is retried after an APNs 500 or 503."
+    },
+    {
+      "name": "push.apns.team_id",
+      "env": "BOTHY_PUSH__APNS__TEAM_ID",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Apple team ID of the APNs key; APNs is enabled when team ID, key ID and topics are set."
+    },
+    {
+      "name": "push.apns.time_sensitive_enabled",
+      "env": "BOTHY_PUSH__APNS__TIME_SENSITIVE_ENABLED",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Send input_needed hints with interruption-level time-sensitive."
+    },
+    {
+      "name": "push.apns.topics",
+      "env": "BOTHY_PUSH__APNS__TOPICS",
+      "kind": "list(string)",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Allowed bundle IDs (apns-topic) of the apps of this instance."
+    },
+    {
       "name": "push.max_age",
       "env": "BOTHY_PUSH__MAX_AGE",
       "kind": "duration",
@@ -2750,6 +2834,18 @@
       "max": "",
       "chapter": "13-push-notifications.md",
       "doc": "Largest retry backoff of a push."
+    },
+    {
+      "name": "push.ttl",
+      "env": "BOTHY_PUSH__TTL",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Lifetime of a push at the provider (apns-expiration, android.ttl)."
     },
     {
       "name": "ratelimit.max_tracked_keys",

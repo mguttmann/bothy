@@ -132,6 +132,7 @@ func (s *server) authenticator() actor.Authenticator {
 func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.Devices, id.Handlers)
 	fill(&h.People, id.PeopleHandlers)
+	fill(&h.Avatars, id.AvatarHandlers)
 	fill(&h.Sessions, id.SessionHandlers)
 	fill(&h.StepUps, id.StepUpHandlers)
 	fill(&h.Providers, id.ProviderHandlers)

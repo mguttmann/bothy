@@ -686,14 +686,7 @@ func TestCommandAutocomplete(t *testing.T) {
 				t.Fatalf("404 differs: %d %s against %s", r.code, r.body, outsider.body)
 			}
 		}
-		// AZ-P4: the invisible and the unknown case take the same time within
-		// authz.not_found_timing_tolerance (its documented default; the key is not registered yet),
-		// compared by testkit.TimingSame, which a loaded machine cannot fail.
-		invisible := func() time.Duration { return w.askNow(w.outsider, w.allgemein.id, w.ticket, q47).took }
-		unknown := func() time.Duration { return w.askNow(w.outsider, ids.New().String(), w.ticket, q47).took }
-		if d, same := testkit.TimingSame(notFoundTimingTolerance, invisible, unknown); !same {
-			t.Fatalf("the times differ by %s in every round", d)
-		}
+		// The times of AZ-P4 are compared in TestCommandAutocompleteNotFoundTiming.
 		r := w.askNow(w.robin, w.eskalation.id, w.ticket, q47)
 		wantProblem(t, r.code, r.body, http.StatusForbidden, "agent_invocation_denied", "level_insufficient", "", "")
 		// An agent never triggers (SR4).
@@ -947,6 +940,23 @@ func TestCommandAutocompleteTimeout(t *testing.T) {
 		t.Fatalf("after the error frame: %d %s", r.code, r.body)
 	}
 	noViolations(t, c)
+}
+
+// TestCommandAutocompleteNotFoundTiming is the time part of AZ-P4 for autocompleteCommand: the
+// invisible and the unknown channel take the same time within authz.not_found_timing_tolerance (its
+// documented default; the key is not registered yet), compared by testkit.TimingSame. The test
+// does not call t.Parallel, so the parallel tests of the package wait until it is done: their
+// load lengthens every request many times over, and the invisible case, which also decides and
+// audits, then differed beyond the bound in every round (Semgrep rule
+// bothy-go-test-timing-parallel).
+func TestCommandAutocompleteNotFoundTiming(t *testing.T) {
+	w := newACWorld(t)
+	q47 := map[string]any{"option": "ticket", "value": "47"}
+	invisible := func() time.Duration { return w.askNow(w.outsider, w.allgemein.id, w.ticket, q47).took }
+	unknown := func() time.Duration { return w.askNow(w.outsider, ids.New().String(), w.ticket, q47).took }
+	if d, same := testkit.TimingSame(notFoundTimingTolerance, invisible, unknown); !same {
+		t.Fatalf("the times differ by %s in every round", d)
+	}
 }
 
 // notFoundTimingTolerance is the documented default of authz.not_found_timing_tolerance (07

@@ -482,6 +482,9 @@ the details; a test of the use case finds exactly one entry.
 - The resource belongs to `p` itself (own device, own session, own setting, own
   privacy request), or `p` is an owner and the action allows `owner`.
 - DM channel or content in it: `p` is a participant.
+- File with `purpose = 'avatar'` or `'branding'`: `p` is logged in (05, 2.2); `gdpr_export` never
+  through `file.read`. A `file` built from an event row without scope is visible only to its
+  audience (`audience_principal_id`).
 - The resource is a host and 2.12, item 5 holds; for a terminal session: `p` is its person
   or an owner.
 - Command (M2-16, 09 section 10.3): `p` is its owner or an effective owner, or sees its scope

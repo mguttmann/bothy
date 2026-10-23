@@ -34,8 +34,8 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   `owners` as 03 section 4.2 states them, with the triggers `identity_users_kind_check` (a users
   row only for a principal of kind `user`) and `identity_principals_kind_immutable` (the kind
   never changes), both SQLSTATE `23514`. `bothy_app` may read, insert and update the three
-  tables, not delete. Deviation from 03: `principals.avatar_file_id` has no foreign key yet;
-  the migration of M3-03 that creates `files` adds it with `ON DELETE SET NULL`.
+  tables, not delete. The foreign key of `principals.avatar_file_id` to `files` (`ON DELETE SET
+  NULL`) came with the migrations of M3-03 that create `files`.
 
 ### Devices and DPoP (M1-33)
 
@@ -129,6 +129,39 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   hooks, sync and audit, the test authenticator `httpservertest.Actors` and the fakes of
   credentials, structure and agent policy; every response is validated against
   `docs/api/openapi.yaml` (`httpservertest.ResponseValidator`). Rulings: docs/DECISIONS.md M1-31.
+
+### Own avatar (M3-10)
+
+- Port (`avatar.go`): incoming `Avatars` (`SetMyAvatar`, `DeleteMyAvatar`), implemented by
+  `app.People`; the DTOs `AvatarImage` and `AvatarOpener`; the source port `AvatarFiles`
+  (`Stage`, `Attach`, `Release`), implemented by the module `files` (`adapters/profileimages`)
+  and bound by `internal/wire` through `People.BindAvatarFiles` once at start, because `files` is
+  built after `identity`. Without a bound `AvatarFiles` `setMyAvatar` answers `503 unavailable`,
+  and so does `deleteMyAvatar` when there is an avatar to release.
+- Operations (`adapters/httpapi/avatar.go`, type `Avatars`, mapping only):
+
+  | Operation | Action and resource | Rights change | Event | Audit details |
+  |---|---|---|---|---|
+  | `setMyAvatar` | `self.profile.update` on the caller | no | `user.updated` | none (05: Audit no) |
+  | `deleteMyAvatar` | `self.profile.update` on the caller | no | `user.updated` when an avatar was set | none |
+
+- Order (`app/avatar.go`, brief M3-10 design notes 3 and 5): `authorize` first, outside any unit of
+  work, so the check log of the request satisfies the proof stage of the chain; an agent or app
+  then gets `403 forbidden` with reason `subject_kind_not_allowed` like `updateMyProfile`. Only
+  after that the handler's opener reads the multipart part `file`
+  (`platform/httpserver.ImagePart`), so an anonymous caller or an agent costs no byte of the body.
+  `AvatarFiles.Stage` stores the file outside any unit of work (02 8.5). One unit of work then
+  locks the person row (`LockUser`, 03 6.3: the anchor row before the `files` rows), calls
+  `Attach`, sets `principals.avatar_file_id` (`queries/avatar.sql`, `SetPrincipalAvatar`),
+  releases the previous avatar file with `Release` and appends `user.updated` with the person
+  after the change (`avatar_file_id` present when set). `deleteMyAvatar` locks the person; without
+  an avatar it writes nothing and emits nothing (`204`, 06 7), otherwise it clears the column,
+  releases the file and appends `user.updated`. Errors of the opener and of `AvatarFiles` reach
+  the problem writer unchanged.
+- Tests: `app/avatar_test.go` (order of the steps, refused callers never open the body, failures
+  write nothing, idempotent delete, unbound port) over PostgreSQL 18 with a fake `AvatarFiles`;
+  `adapters/postgres/avatar_test.go` (`SetAvatar`); `adapters/httpapi/avatar_test.go` (opener
+  over the part `file`, `avatar_file_id` present only when set, `204`).
 
 ### Sessions, access tokens and refresh families (M1-34)
 
@@ -1030,7 +1063,7 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
 
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24); declares `AvatarFiles`, `AppInstallations` (M2-24).
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24).
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (with `HasActivePasskey`, M1-40), `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `authz.TokenExpirySource` (`app.TokenExpiry`: the agent and app tokens expiring within a window for "Expiring soon", ids and expiry only, never personal tokens or token values, M6-07), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
