@@ -831,6 +831,14 @@ type Run struct {
 	DurationMs              pgtype.Int8
 }
 
+type RunFollowup struct {
+	RunID     pgtype.UUID
+	MessageID pgtype.UUID
+	State     string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
 type RunStep struct {
 	ID           pgtype.UUID
 	RunID        pgtype.UUID
