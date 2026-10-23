@@ -838,6 +838,8 @@ type world struct {
 	payloadMax          int
 	uow                 txn.UnitOfWork
 	fus                 *followupRepo
+	// gate, when set, makes the ports of the next build fail at its armed call (faults_test.go).
+	gate *faultGate
 }
 
 // newWorld builds the world.
@@ -874,14 +876,10 @@ func newWorld(t *testing.T) *world {
 
 // build (re)creates the use cases over the fakes of w.
 func (w *world) build() {
+	d := w.deps()
 	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
-		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax}, app.Deps{
-		Repo: w.repo, UoW: cmp.Or[txn.UnitOfWork](w.uow, uow{}), Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
-		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
-		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
-		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus,
-	})
+		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax}, d)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -890,6 +888,21 @@ func (w *world) build() {
 	if err := w.acc.Bind(svc); err != nil {
 		w.t.Fatal(err)
 	}
+}
+
+// deps are the collaborators of the use cases over the fakes of w, behind the fault gate when
+// w.gate is set.
+func (w *world) deps() app.Deps {
+	d := app.Deps{
+		Repo: w.repo, UoW: cmp.Or[txn.UnitOfWork](w.uow, uow{}), Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
+		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
+		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
+		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus,
+	}
+	if w.gate != nil {
+		d = w.gate.wrap(d)
+	}
+	return d
 }
 
 // posted returns a MessagePosted of a text message of Alex in thread.
