@@ -309,6 +309,9 @@ type ServerInterface interface {
 	// PutFeatureFlag Set a feature flag
 	// (PUT /feature-flags/{key})
 	PutFeatureFlag(w http.ResponseWriter, r *http.Request, key KeyPath, params PutFeatureFlagParams)
+	// DeleteFile Delete an unattached file
+	// (DELETE /files/{file_id})
+	DeleteFile(w http.ResponseWriter, r *http.Request, fileId FileIdPath)
 	// GetFile Read file metadata
 	// (GET /files/{file_id})
 	GetFile(w http.ResponseWriter, r *http.Request, fileId FileIdPath)
@@ -4859,6 +4862,32 @@ func (siw *ServerInterfaceWrapper) PutFeatureFlag(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutFeatureFlag(w, r, key, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteFile operation middleware
+func (siw *ServerInterfaceWrapper) DeleteFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "file_id" -------------
+	var fileId FileIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "file_id", r.PathValue("file_id"), &fileId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "file_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteFile(w, r, fileId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -12369,6 +12398,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/uploads/{file_id}/complete", wrapper.CompleteUpload)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/uploads/{file_id}", wrapper.AbortUpload)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/uploads/{file_id}", wrapper.GetUpload)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/files/{file_id}", wrapper.DeleteFile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}", wrapper.GetFile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}/content", wrapper.DownloadFile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/files/{file_id}/thumbnails/{variant}", wrapper.DownloadThumbnail)
@@ -12944,6 +12974,9 @@ type StrictServerInterface interface {
 	// PutFeatureFlag Set a feature flag
 	// (PUT /feature-flags/{key})
 	PutFeatureFlag(ctx context.Context, request PutFeatureFlagRequestObject) (PutFeatureFlagResponseObject, error)
+	// DeleteFile Delete an unattached file
+	// (DELETE /files/{file_id})
+	DeleteFile(ctx context.Context, request DeleteFileRequestObject) (DeleteFileResponseObject, error)
 	// GetFile Read file metadata
 	// (GET /files/{file_id})
 	GetFile(ctx context.Context, request GetFileRequestObject) (GetFileResponseObject, error)
@@ -16502,6 +16535,32 @@ func (sh *strictHandler) PutFeatureFlag(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutFeatureFlagResponseObject); ok {
 		if err := validResponse.VisitPutFeatureFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteFile operation middleware
+func (sh *strictHandler) DeleteFile(w http.ResponseWriter, r *http.Request, fileId FileIdPath) {
+	var request DeleteFileRequestObject
+
+	request.FileId = fileId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteFile(ctx, request.(DeleteFileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteFile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFileResponseObject); ok {
+		if err := validResponse.VisitDeleteFileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
