@@ -5,13 +5,13 @@
 // plain HTTP on 127.0.0.1 with a port the system assigns and serves beginPairing,
 // completePairing (202 until the test approves, then 201; 410 after a rejection or expiry),
 // refreshToken (rotation with a family and reuse detection: a reuse revokes the session), logout,
-// getMe and getInstance. It verifies every DPoP proof (signature, typ, htm, htu, ath, iat, jti
-// replay, nonce and the key binding), answers use_dpop_nonce to the first request and after
+// getMe and getInstance, and the import interface of imports.go. It verifies every DPoP proof
+// (signature, typ, htm, htu, ath, iat, jti replay, nonce and the key binding), answers use_dpop_nonce to the first request and after
 // RotateNonce, counts requests per method and path, injects 429 with Retry-After and redirects,
 // and can echo the presented tokens into error bodies for the leak test.
 //
 // Only _test.go files import this package; a test in package bothyapi holds that it never
-// reaches the binary bothy. M8-04 extends it with the import routes.
+// reaches the binary bothy.
 //
 // Example:
 //
@@ -157,6 +157,8 @@ type Server struct {
 	rotations  int
 	onProtect  func(token string)
 	registered chan struct{}
+	// imp is the import interface of imports.go.
+	imp *imports
 }
 
 // New starts a fake on 127.0.0.1 and closes it in tb.Cleanup.
@@ -167,6 +169,7 @@ func New(tb testing.TB, opts Options) *Server {
 	if s.clk == nil {
 		s.clk = clock.System()
 	}
+	s.imp = newImports(s.clk.Now())
 	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
 	s.URL = s.srv.URL
 	tb.Cleanup(s.srv.Close)
@@ -320,6 +323,15 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		s.problem(w, r, f.status, "fault", body)
 		return
 	}
+	if f := s.afterStoreFault(r); f != nil {
+		s.serveAfterStore(w, r, body, f)
+		return
+	}
+	s.route(w, r, body)
+}
+
+// route answers one request after the injected faults.
+func (s *Server) route(w http.ResponseWriter, r *http.Request, body []byte) {
 	switch r.Method + " " + r.URL.Path {
 	case http.MethodPost + " " + PathBeginPairing:
 		s.beginPairing(w, r, body)
@@ -336,7 +348,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		if a := s.protect(w, r, body); a != nil {
 			writeJSON(w, http.StatusOK, map[string]any{
 				"principal": map[string]any{"id": UserID, "kind": "user", "handle": "alex", "display_name": "Alex"},
-				"is_owner":  true, "permission_version": 1, "device_id": a.s.deviceID, "session_id": a.s.id,
+				"is_owner":  s.imp.me.owner, "permission_version": 1, "device_id": a.s.deviceID, "session_id": a.s.id,
 			})
 		}
 	case http.MethodGet + " " + PathInstance:
@@ -350,7 +362,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	default:
-		s.problem(w, r, http.StatusNotFound, "not_found", body)
+		if !s.serveImports(w, r, body) {
+			s.problem(w, r, http.StatusNotFound, "not_found", body)
+		}
 	}
 }
 

@@ -72,10 +72,13 @@ var commands = []command{
 	},
 	{
 		name:    "import",
-		summary: "Log the import tool in or out (device pairing as a cli device)",
-		// The tool reads no server configuration; M8-04 adds its own loader (22 19).
-		run: func(ctx context.Context, args, _ []string, stdout, stderr io.Writer) int {
-			return importCommand(ctx, args, stdout, stderr, defaultImportDeps())
+		summary: "Import a Discord server; log the import tool in or out (device pairing as a cli device)",
+		// The tool reads no server configuration: its own loader takes only BOTHY_IMPORT__ variables
+		// and --config (22 19, D-W-51).
+		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {
+			deps := defaultImportDeps()
+			deps.environ = func() []string { return env }
+			return importCommand(ctx, args, stdout, stderr, deps)
 		},
 	},
 	{

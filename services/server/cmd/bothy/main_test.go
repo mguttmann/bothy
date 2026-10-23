@@ -27,7 +27,7 @@ func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 	want := usageHeader +
 		"  config       Check or print the configuration without starting the server\n" +
 		"  healthcheck  Probe a loopback health endpoint for a container without shell\n" +
-		"  import       Log the import tool in or out (device pairing as a cli device)\n" +
+		"  import       Import a Discord server; log the import tool in or out (device pairing as a cli device)\n" +
 		"  migrate      Apply, list or validate the database migrations\n" +
 		"  restore      Finish a restore or a relocation before api and worker start\n" +
 		"  secrets      Create the secrets of the Compose stack or export them encrypted\n" +
