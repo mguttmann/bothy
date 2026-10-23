@@ -41,6 +41,12 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 - `NewSchemaValidator(spec, names)` and `SchemaValidator.Validate(name, body)`: a JSON value
   against one named schema of the contract with the field codes of the request validator; the
   gateway checks the body of every client frame with it (M1-64).
+- Invocation token (M2-14, 07 guard rule SR9): `StageAuthenticate` reads every value of the
+  `Invocation-Token` header into `actor.Credentials.InvocationTokens`; the Authenticator decides
+  what they mean (more than one is invalid). Like `Authorization` the header is a credential: no
+  stage, log record, span attribute or problem body carries it, and the attribute allowlist of
+  `platform/otel` names no request header except the user agent. Test:
+  `TestAuth_InvocationTokenHeader`.
 - Console cookie (M6-01): `StageAuthenticate` reads `__Host-console_session` into
   `actor.Credentials.ConsoleCookie`; a request the cookie authenticated then passes ConsoleGuard
   before every later stage: methods other than `GET`, `HEAD` and `OPTIONS` need
@@ -89,7 +95,7 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 4 | mux | routing; no pattern: `404 not_found`, wrong method: `405 method_not_allowed` with `Allow` |
 | 5 | `StageRoute` | operation into the context, `Cache-Control: no-store`, CORP, body limit (a declared `Content-Length` above it: `413`, except for an operation with `BodyLimit`, see step 12), deadline, response writer |
 | 6 | `StageCORS` | none by default; `*` for `instance.discovery.read`; exact origins of `api.cors_allowed_origins` |
-| 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP; `reqmeta.Transport` (TCP peer from `RemoteAddr`, header, action) into the context for the trusted header driver (M1-43); failed-credentials hook; an operation with `AnonymousCredentials` skips precheck and `Authenticator` and stays anonymous (M2-27) |
+| 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, every value of `Invocation-Token` in order (SR9, M2-14), client IP; `reqmeta.Transport` (TCP peer from `RemoteAddr`, header, action) into the context for the trusted header driver (M1-43); failed-credentials hook; an operation with `AnonymousCredentials` skips precheck and `Authenticator` and stays anonymous (M2-27) |
 | 8 | `StageRateLimit` | token bucket of the operation's class (`platform/ratelimit`, M1-19): `RateLimit-Policy`, `RateLimit`; exhausted: `429 rate_limited` with `Retry-After` |
 | 9 | `StageWebhookToken` | slot (M2-27): the token check of the incoming webhooks (`apps/adapters/httpapi.TokenStage`, installed by `wire.InstallWebhookToken`), after `rl.webhook_in` and before any body stage |
 | 10 | `StageMaintenance` | slot (M7-08) |

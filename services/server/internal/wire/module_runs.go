@@ -23,12 +23,16 @@ type runsState struct {
 // moduleRuns is the name of the module in architecture/modules.yaml and of its start step, where it has one.
 const moduleRuns = "runs"
 
-// runsWiring wires the runs module into the start step chat, after messaging, and its jobs
+// runsWiring wires the runs module into the start step chat, after messaging, binds its
+// acting-for source into identity at the start of step sessions (SR9, M2-14), and wires its jobs
 // runs.queued_expiry (M2-08), runs.cancel_timeout and runs.stall_check (M2-09).
 func runsWiring() moduleWiring {
 	return moduleWiring{
-		module:   moduleRuns,
-		parts:    []part{{order: 1320, step: moduleChat, start: (*server).startRuns}},
+		module: moduleRuns,
+		parts: []part{
+			{order: 1320, step: moduleChat, start: (*server).startRuns},
+			{order: 1890, step: "sessions", start: (*server).bindActingFor},
+		},
 		handlers: func(s *server, h *Handlers) { s.runs.fillHandlers(h) },
 		jobs: func(s *server, m *JobModules) error {
 			s.mu.Lock()
@@ -112,4 +116,26 @@ func (s *server) bindCommands(pool *pg.Pool, a *Audit, az authorize.Authorizer, 
 		return err
 	}
 	return rn.Service.BindCommands(ag.Commands)
+}
+
+// bindActingFor binds the acting-for source of runs (07 guard rule SR9, M2-14) into identity at
+// the start of step sessions, before startSessions builds the Authenticator: the Invocation-Token
+// header of an agent's request resolves through runs. The signing keys step bound the invocation
+// tokens before this step. Without runs the header stays invalid (identity.NoActingForSource).
+func (s *server) bindActingFor(context.Context) error {
+	s.mu.Lock()
+	id, rn, pool := s.identity, s.runs, s.pool
+	s.mu.Unlock()
+	if id == nil {
+		return errors.New("wire: the acting-for binding needs the identity step")
+	}
+	if rn == nil {
+		return nil
+	}
+	src, err := rn.ActingForSource(pool)
+	if err != nil {
+		return err
+	}
+	id.BindActingFor(src)
+	return nil
 }

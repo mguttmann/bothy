@@ -507,7 +507,7 @@ It is not changed by hand. Gateway messages take their types from the schemas of
 | `auth` | token, optionally DPoP proofs with a key from a file or a key store, nonce handling |
 | `gateway` | connection according to 04: `hello`, `identify`, `resume`, heartbeat with random offset, `ack` window, reconnect with full jitter, reaction per close code (on `4015` stop, do not reconnect) |
 | `invocation` | check of the invocation token according to [09-agents.md](09-agents.md) 4.5: JWKS cache with throttled reloading, allow list `EdDSA`, `typ`, `iss`, `aud`, time with tolerance, `jti` store, callback for the reported mode |
-| `runs` | run helpers: `run.start`, fetch the context, collect and throttle patches (`agent.run_update_min_interval`), track `base_version`, start over on `409`, steps, follow-up states, `run.finish` with `usage`, cancel callback |
+| `runs` | run helpers: `run.start`, fetch the context, collect and throttle patches (`agent.run_update_min_interval`), track `base_version`, start over on `409`, steps, follow-up states, `run.finish` with `usage`, cancel callback; sets `Invocation-Token` on every request during a run (07 SR9); `403 invocation_token_invalid` with `reason: run_inactive` ends the work on the run |
 | `components` | building blocks for button, select, form with the limits from 09; ready-made approval card (09 section 11.5) and question |
 | `commands` | declarative command list with sync on connect; autocomplete with a time guard |
 | `outbox` | sending with `client_msg_id`, which is stored before sending (exchangeable store); `Idempotency-Key` for other writes |

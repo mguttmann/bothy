@@ -155,6 +155,10 @@ type Deps struct {
 	// sessions.active, hosts.connected), so a test counts them per process. nil creates the
 	// OpenTelemetry adapter.
 	TerminalSessionMetrics terminalapp.SessionMetrics
+	// ScopeObserver sees every Scope call of the process's Authorizer with its context and action
+	// (authzapp.Authorizer.SetScopeObserver, M2-14): the test of SR9 records which operation lists
+	// through Scope. nil in production.
+	ScopeObserver func(ctx context.Context, act authorize.Action)
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
