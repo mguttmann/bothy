@@ -199,6 +199,14 @@ sql:
       go:
         package: sqlcgen
         out: internal/gateway/adapters/postgres/sqlcgen
+  # billing (M2-22): price_table and cost_entries.
+  - engine: postgresql
+    schema: migrations
+    queries: internal/billing/adapters/postgres/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/billing/adapters/postgres/sqlcgen
         sql_package: pgx/v5
         output_db_file_name: db.gen.go
         output_models_file_name: models.gen.go

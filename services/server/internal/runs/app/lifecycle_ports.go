@@ -62,9 +62,3 @@ func (s *Service) verifier() (TokenVerifier, error) {
 func fieldError(pointer, code, detail string) error {
 	return errs.New(errs.CodeValidationFailed, detail).WithFields(errs.FieldError{Pointer: pointer, Code: code, Detail: detail})
 }
-
-// notEnabled is 400 validation_failed with errors[].code not_enabled for a member a later ticket
-// enables (06 section 5 point 3).
-func notEnabled(pointer string) error {
-	return fieldError(pointer, "not_enabled", "this member is not enabled yet")
-}

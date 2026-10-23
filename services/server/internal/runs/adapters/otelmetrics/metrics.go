@@ -13,6 +13,7 @@ package otelmetrics
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"go.opentelemetry.io/otel/metric"
 
@@ -21,10 +22,10 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
 
-// Metrics holds the instruments of the committed run transitions.
+// Metrics holds the instruments of the committed run transitions and booked costs.
 type Metrics struct {
 	startLatency, duration *metrics.Histogram
-	finished, steps        *metrics.Counter
+	finished, steps, cost  *metrics.Counter
 }
 
 // Compile-time check: Metrics is the outgoing port of app.
@@ -35,7 +36,8 @@ var _ app.StepMetrics = (*Metrics)(nil)
 
 // New creates the instruments on mp; nil means the global provider that platform/otel installs
 // in otel.Setup. bothy.agent.handle needs no values: its set is the handle pattern
-// (metrics.SourceAgentHandles). The error comes from the meter provider.
+// (metrics.SourceAgentHandles), and neither does bothy.currency (metrics.SourceCurrencies). The
+// error comes from the meter provider.
 func New(mp metric.MeterProvider) (*Metrics, error) {
 	start, err := metrics.NewHistogram(mp, metrics.RunStartLatency, nil)
 	if err != nil {
@@ -53,7 +55,11 @@ func New(mp metric.MeterProvider) (*Metrics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
-	return &Metrics{startLatency: start, duration: dur, finished: fin, steps: steps}, nil
+	cost, err := metrics.NewCounter(mp, metrics.RunCost, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	return &Metrics{startLatency: start, duration: dur, finished: fin, steps: steps, cost: cost}, nil
 }
 
 // outcomes maps the target of a transition out of queued to bothy.outcome.
@@ -93,6 +99,13 @@ func (m *Metrics) RunTransitioned(ctx context.Context, t app.Transitioned) {
 // bothy.step.kind, never an id, a value or a text (M2-10 design note 13).
 func (m *Metrics) StepAdded(ctx context.Context, agentHandle, kind string) {
 	m.steps.Add(ctx, 1, agentHandle, kind)
+}
+
+// CostBooked implements app.Metrics: bothy.run.cost grows by the entry's amount in currency units
+// (AmountMicros divided by one million), with the handle, billing mode, currency and
+// bothy.cost.estimate "true" or "false".
+func (m *Metrics) CostBooked(ctx context.Context, c app.BookedCost) {
+	m.cost.AddFloat(ctx, float64(c.AmountMicros)/1_000_000, c.AgentHandle, c.BillingMode, c.Currency, strconv.FormatBool(c.IsEstimate))
 }
 
 // ActiveSource reads the active runs grouped by agent handle and state, the data points of

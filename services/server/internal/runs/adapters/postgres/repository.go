@@ -112,12 +112,18 @@ func (r *Repository) TransitionRun(ctx context.Context, w app.TransitionWrite) (
 	if err != nil {
 		return app.RunRow{}, false, err
 	}
-	row, err := q.TransitionRun(ctx, sqlcgen.TransitionRunParams{
+	p := sqlcgen.TransitionRunParams{
 		ToState: string(w.To), Reason: w.Reason, At: ts(w.At), ID: uuid(w.ID),
 		FromState: string(w.From), Version: w.Version, StartedJti: optionalUUID(w.StartedJTI),
 		BillingModeUsed: optionalText(w.BillingModeUsed), BillingEvidence: w.BillingEvidence, Model: optionalText(w.Model),
 		StatusLine: optionalText(w.StatusLine), Metrics: w.Metrics, Summary: optionalText(w.Summary),
-	})
+	}
+	if w.Cost != nil {
+		p.CostMicros = pgtype.Int8{Int64: w.Cost.Micros, Valid: true}
+		p.Currency = pgtype.Text{String: w.Cost.Currency, Valid: true}
+		p.CostIsEstimate = pgtype.Bool{Bool: w.Cost.IsEstimate, Valid: true}
+	}
+	row, err := q.TransitionRun(ctx, p)
 	return one(row, err, "changing the state of a run")
 }
 

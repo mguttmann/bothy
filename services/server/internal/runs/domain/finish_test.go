@@ -68,9 +68,7 @@ func TestFinishDecision(t *testing.T) {
 		{name: "cancelled cancel_timeout", current: r, req: domain.FinishRequest{Target: x, Reason: "cancel_timeout"}, wantErr: domain.ErrCancelReason},
 		{name: "cancelled runtime_error", current: r, req: domain.FinishRequest{Target: x, Reason: "runtime_error"}, wantErr: domain.ErrCancelReason},
 		{name: "cancelled unknown", current: x, req: domain.FinishRequest{Target: x, Reason: "nope"}, wantErr: domain.ErrCancelReason},
-		// Costs and targets come first.
-		{name: "costs", current: r, req: domain.FinishRequest{Target: c, CostsPresent: true}, wantErr: domain.ErrCostsNotEnabled},
-		{name: "costs before the target", current: r, req: domain.FinishRequest{Target: q, CostsPresent: true}, wantErr: domain.ErrCostsNotEnabled},
+		// Targets come first.
 		{name: "target queued", current: r, req: domain.FinishRequest{Target: q}, wantErr: domain.ErrFinishTarget},
 		{name: "target running", current: q, req: domain.FinishRequest{Target: r}, wantErr: domain.ErrFinishTarget},
 		{name: "target waiting_input", current: r, req: domain.FinishRequest{Target: w}, wantErr: domain.ErrFinishTarget},

@@ -21,6 +21,22 @@ func (stubServer) ListGroups(context.Context, rest.ListGroupsRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) GetThreadCosts(context.Context, rest.GetThreadCostsRequestObject) (rest.GetThreadCostsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListPrices(context.Context, rest.ListPricesRequestObject) (rest.ListPricesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreatePrice(context.Context, rest.CreatePriceRequestObject) (rest.CreatePriceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ClosePrice(context.Context, rest.ClosePriceRequestObject) (rest.ClosePriceResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateGroup(context.Context, rest.CreateGroupRequestObject) (rest.CreateGroupResponseObject, error) {
 	return nil, nil
 }
@@ -1443,6 +1459,11 @@ func TestRealTable_Enabled(t *testing.T) {
 			"rl.agent_runtime"},
 		// M3-11
 		"exportChannel": {"GET /api/v1/channels/{channel_id}/export", "export.channel", "rl.export"},
+		// M2-22
+		"getThreadCosts": {"GET /api/v1/threads/{thread_id}/costs", "cost.read.thread", "rl.read"},
+		"listPrices":     {"GET /api/v1/prices", "price.read", "rl.read"},
+		"createPrice":    {"POST /api/v1/prices", "price.manage", "rl.admin"},
+		"closePrice":     {"POST /api/v1/prices/{price_id}/close", "price.manage", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

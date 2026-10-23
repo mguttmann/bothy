@@ -18,7 +18,7 @@ import (
 
 // notWiredYet are the modules of architecture/modules.yaml that `bothy serve` does not wire yet.
 // The ticket that wires one removes it here and adds its module_<name>.go.
-var notWiredYet = []string{"billing", "privacy", "search", "status"}
+var notWiredYet = []string{"privacy", "search", "status"}
 
 // registerModules returns the module names of architecture/modules.yaml, the module register
 // (ADR 0050).
@@ -168,7 +168,7 @@ func TestChatStepParts(t *testing.T) {
 			got = append(got, p.module)
 		}
 	}
-	want := []string{"chat", "messaging", "runs", "sync", "agents", "sync", "notify", "notify", "notify", "stats", "importer"}
+	want := []string{"chat", "messaging", "billing", "runs", "sync", "agents", "sync", "notify", "notify", "notify", "stats", "importer"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("parts of step chat by module: %v, want %v", got, want)
 	}
@@ -206,7 +206,7 @@ func TestModulePartsRefuseMissingDependencies(t *testing.T) {
 	t.Parallel()
 	values := loadValues(t)
 	parts := map[string]func(*server, context.Context) error{
-		"agents": (*server).startAgents, "audit_log": (*server).startAuditLog, "chat": (*server).startChat,
+		"agents": (*server).startAgents, "billing": (*server).startBilling, "audit_log": (*server).startAuditLog, "chat": (*server).startChat,
 		"files": (*server).startFiles, "messaging": (*server).startMessaging, "notify": (*server).startNotify,
 		"personal": (*server).startPersonal, "runs": (*server).startRuns, "scan_health": (*server).startScanHealth,
 		"sessions": (*server).startSessions, "settings": (*server).startSettings, "stats": (*server).startStats,

@@ -11,6 +11,7 @@ import (
 	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
 	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
+	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/autocompleterelay"
@@ -121,6 +122,9 @@ type RunsDeps struct {
 	// (agents, M2-12); nil gives every operator run session_mode new without a row (a test world
 	// without the sessions). The process always sets it (buildRuns).
 	Sessions agents.Sessions
+	// Costs books the cost reports of finishRun (billing, M2-22); nil makes a finish with costs an
+	// internal error (a test world without billing). The process always sets it (startRuns).
+	Costs billing.Costs
 }
 
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
@@ -178,7 +182,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Repo: repo, UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
-		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions,
+		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions, Costs: d.Costs,
 		Files: d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)

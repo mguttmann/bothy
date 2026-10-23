@@ -840,16 +840,23 @@ func (e *errCounter) CountError(_ context.Context, reason string) {
 	e.n[reason]++
 }
 
-// metricsRecorder records the committed transitions.
+// metricsRecorder records the committed transitions and the booked costs.
 type metricsRecorder struct {
-	mu   sync.Mutex
-	list []app.Transitioned
+	mu    sync.Mutex
+	list  []app.Transitioned
+	costs []app.BookedCost
 }
 
 func (m *metricsRecorder) RunTransitioned(_ context.Context, t app.Transitioned) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.list = append(m.list, t)
+}
+
+func (m *metricsRecorder) CostBooked(_ context.Context, c app.BookedCost) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.costs = append(m.costs, c)
 }
 
 // logBuffer is a JSON log for the assertions on the log lines.

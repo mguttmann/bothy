@@ -14,6 +14,7 @@ import (
 	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
+	billinghttp "github.com/OWNER/bothy/services/server/internal/billing/adapters/httpapi"
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
@@ -97,6 +98,8 @@ type Handlers struct {
 	// Runs implements getRun, listThreadRuns, listRunSteps and listActiveRuns (runs, M2-05), the
 	// adapter operations of M2-09 and patchRun (M2-10).
 	*runshttp.Runs
+	// Billing implements getThreadCosts, listPrices, createPrice and closePrice (billing, M2-22).
+	*billinghttp.Billing
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).

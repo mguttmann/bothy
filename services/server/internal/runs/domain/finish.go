@@ -13,9 +13,6 @@ import (
 // validation_failed with the pointer named here. A missing reason of failed or cancelled is
 // ErrReasonRequired (pointer /reason, errors[].code required).
 var (
-	// ErrCostsNotEnabled: the body carries costs, which M2-22 books; until then pointer /costs
-	// with errors[].code not_enabled (06 5 point 3).
-	ErrCostsNotEnabled = errors.New("runs: costs are not enabled")
 	// ErrCancelReason: cancelled with a reason outside CancelReasons; pointer /reason.
 	ErrCancelReason = errors.New("runs: the reason is not a reason of a cancel request")
 	// ErrFinishTarget: the target is not completed, failed or cancelled; pointer /state.
@@ -40,8 +37,6 @@ type FinishRequest struct {
 	Target State
 	// Reason is the reported reason; "" when absent.
 	Reason string
-	// CostsPresent reports that the body carries costs.
-	CostsPresent bool
 }
 
 // FinishKind is the kind of a FinishOutcome.
@@ -70,12 +65,11 @@ type FinishOutcome struct {
 // FinishDecision decides finishRun on a run in state current (brief M2-09 notes 6b and 6c). The
 // checks run in this order, so a malformed body is refused before any state is read:
 //
-//  1. CostsPresent: ErrCostsNotEnabled.
-//  2. a target other than completed, failed or cancelled: ErrFinishTarget.
-//  3. failed or cancelled without a reason: ErrReasonRequired.
-//  4. cancelled with a reason outside CancelReasons: ErrCancelReason.
-//  5. current equals the target: FinishNoChange.
-//  6. an ended run, or completed from anything but running: an *errs.Error with
+//  1. a target other than completed, failed or cancelled: ErrFinishTarget.
+//  2. failed or cancelled without a reason: ErrReasonRequired.
+//  3. cancelled with a reason outside CancelReasons: ErrCancelReason.
+//  4. current equals the target: FinishNoChange.
+//  5. an ended run, or completed from anything but running: an *errs.Error with
 //     errs.CodeInvalidStateTransition (409).
 //
 // Then FinishTransition: failed stores the reason through NormalizeAdapterReason (an adapter
@@ -87,9 +81,6 @@ type FinishOutcome struct {
 //	out, err := domain.FinishDecision(domain.StateRunning, domain.FinishRequest{Target: domain.StateFailed, Reason: "stale"})
 //	// out.Reason == "adapter_error", out.Original == "stale"
 func FinishDecision(current State, req FinishRequest) (FinishOutcome, error) {
-	if req.CostsPresent {
-		return FinishOutcome{}, ErrCostsNotEnabled
-	}
 	if !req.Target.Ended() {
 		return FinishOutcome{}, ErrFinishTarget
 	}

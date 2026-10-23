@@ -77,14 +77,17 @@ func (h *Runs) AwaitRunInput(ctx context.Context, req rest.AwaitRunInputRequestO
 	return rest.AwaitRunInput200JSONResponse{Body: body}, nil
 }
 
-// FinishRun implements rest.StrictServerInterface (POST /runs/{run_id}/finish, finishRun, M2-09).
+// FinishRun implements rest.StrictServerInterface (POST /runs/{run_id}/finish, finishRun, M2-09);
+// the cost reports of costs go to the booking of M2-22.
 func (h *Runs) FinishRun(ctx context.Context, req rest.FinishRunRequestObject) (rest.FinishRunResponseObject, error) {
 	if req.Body == nil {
 		return nil, missingBody()
 	}
 	b := req.Body
-	cmd := runs.FinishRun{RunID: ids.ID(req.RunId), State: string(b.State), Reason: deref(b.Reason), Summary: deref(b.Summary),
-		CostsPresent: b.Costs != nil}
+	cmd := runs.FinishRun{RunID: ids.ID(req.RunId), State: string(b.State), Reason: deref(b.Reason), Summary: deref(b.Summary)}
+	if b.Costs != nil {
+		cmd.Costs = costReports(*b.Costs)
+	}
 	if b.Metrics != nil {
 		m, err := toObject(b.Metrics)
 		if err != nil {
@@ -159,4 +162,23 @@ func toObject(v any) (map[string]any, error) {
 		return nil, errs.Wrap(errs.CodeInternalError, err, "runs: decoding a request member")
 	}
 	return m, nil
+}
+
+// costReports converts RunFinish.costs; absent token counts are 0.
+func costReports(cs []rest.CostReport) []runs.CostReport {
+	out := make([]runs.CostReport, len(cs))
+	for i, c := range cs {
+		out[i] = runs.CostReport{Provider: c.Provider, Model: c.Model, AmountMicros: c.AmountMicros, Currency: c.Currency,
+			TokensIn: derefInt64(c.TokensIn), TokensOut: derefInt64(c.TokensOut), TokensCacheRead: derefInt64(c.TokensCacheRead),
+			TokensCacheWrite: derefInt64(c.TokensCacheWrite), TokensCacheWrite1h: derefInt64(c.TokensCacheWrite1h)}
+	}
+	return out
+}
+
+// derefInt64 is *p, 0 for nil.
+func derefInt64(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }

@@ -67,6 +67,9 @@ func (r *transitions) RunTransitioned(_ context.Context, t runsapp.Transitioned)
 	r.list = append(r.list, t)
 }
 
+// CostBooked implements runsapp.Metrics; these tests book no costs.
+func (r *transitions) CostBooked(context.Context, runsapp.BookedCost) {}
+
 // start is the clock of the world.
 var start = time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
 

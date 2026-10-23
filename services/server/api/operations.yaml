@@ -32,6 +32,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - bindAgentSession
   - cancelImport
   - cancelRun
+  - closePrice
   - closeTerminalSession
   - closeThread
   - completeEnrollment
@@ -64,6 +65,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createInteraction
   - createMessage
   - createPersonalTemplate
+  - createPrice
   - createQuietHoursRule
   - createSpace
   - createStepUpChallenge
@@ -128,6 +130,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getSpace
   - getTerminalSession
   - getThread
+  - getThreadCosts
   - getTranscript
   - getUpload
   - getUser
@@ -170,6 +173,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listOwners
   - listPermissionHints
   - listPins
+  - listPrices
   - listReactions
   - listRunSteps
   - listServedChannels
@@ -289,9 +293,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: addStatusIncidentUpdate
     milestone: M7
     ticket: M7-09
-  - operation_id: closePrice
-    milestone: M2
-    ticket: M2-22
   - operation_id: createAgentWebhookSubscription
     milestone: M2
   - operation_id: createDm
@@ -299,9 +300,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: V3-01
   - operation_id: createGdprRequest
     milestone: M7
-  - operation_id: createPrice
-    milestone: M2
-    ticket: M2-22
   - operation_id: createStatusComponent
     milestone: M7
     ticket: M7-09
@@ -352,9 +350,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getStatus
     milestone: M7
     ticket: M7-09
-  - operation_id: getThreadCosts
-    milestone: M2
-    ticket: M2-22
   - operation_id: getToolCallStats
     milestone: M6
     ticket: M6-05
@@ -374,9 +369,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
-  - operation_id: listPrices
-    milestone: M2
-    ticket: M2-22
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28

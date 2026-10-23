@@ -5,13 +5,17 @@ package app
 import (
 	"context"
 	"errors"
+	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
+	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/runs"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
@@ -61,12 +65,20 @@ func (s *Service) AwaitInput(ctx context.Context, cmd runs.AwaitInput) (runs.Run
 	return doc, nil
 }
 
-// Finish implements runs.Runs (finishRun, run.finish; M2-09 design note 6 b to e): the reason
-// rules of FinishDecision, the same end state again without change, otherwise the end of the run
-// through endRun with the metrics and the summary. An adapter that reports an I3 mismatch writes
-// one audit entry in the same unit of work and counts bothy.agent.billing_mode_mismatch.
+// Finish implements runs.Runs (finishRun, run.finish; M2-09 design note 6 b to e, M2-22 design
+// note 5): the reason rules of FinishDecision and the cost reports are checked before the run is
+// read (billing.Costs.ValidateReports, pointers under /costs); the same end state again answers
+// without change and books nothing (06 section 2 "No effect"), otherwise one unit of work ends the
+// run through endRun with the metrics, the summary and, for a non-empty costs, the booking: one
+// clock reading is finished_at and occurred_at of every entry, billing books one entry per report
+// with the copies of the run, the cost columns of the run take the sum in the currency of the
+// first entry in the same update as the transition, and the session of the run adds the sums
+// (agents.Sessions.AddCost). A run without billing_mode_used (it never started) and a non-empty
+// costs is 400 validation_failed (invalid, /costs). An adapter that reports an I3 mismatch writes
+// one audit entry in the same unit of work and counts bothy.agent.billing_mode_mismatch. After the
+// commit every entry counts bothy.run.cost.
 func (s *Service) Finish(ctx context.Context, cmd runs.FinishRun) (runs.Run, error) {
-	req := domain.FinishRequest{Target: domain.State(cmd.State), Reason: cmd.Reason, CostsPresent: cmd.CostsPresent}
+	req := domain.FinishRequest{Target: domain.State(cmd.State), Reason: cmd.Reason}
 	// The request rules come before the run is read: a bad body is 400 for every run.
 	if _, err := domain.FinishDecision(domain.StateRunning, req); err != nil && errs.KindOf(err) != errs.KindConflict {
 		return runs.Run{}, finishError(err)
@@ -78,72 +90,182 @@ func (s *Service) Finish(ctx context.Context, cmd runs.FinishRun) (runs.Run, err
 	if err != nil {
 		return runs.Run{}, err
 	}
+	reports := costReports(cmd.Costs)
+	if len(reports) > 0 {
+		if s.d.Costs == nil {
+			return runs.Run{}, errs.New(errs.CodeInternalError, "runs: a finish with costs needs the billing module")
+		}
+		if err := s.d.Costs.ValidateReports(reports); err != nil {
+			return runs.Run{}, underCosts(err)
+		}
+	}
 	a := caller(ctx)
-	var f finished
+	var res finishResult
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		f, err = s.finishLocked(ctx, a, cmd, req, metrics)
+		res, err = s.finishInUnit(ctx, a, cmd, req, TransitionStore{Metrics: metrics, Summary: cmd.Summary}, reports)
 		return err
 	})
 	if err != nil {
 		return runs.Run{}, err
 	}
-	if f.mismatch {
-		s.d.Mismatches.BillingModeMismatch(context.WithoutCancel(ctx), f.mismatchHandle)
+	if res.mismatch {
+		s.d.Mismatches.BillingModeMismatch(context.WithoutCancel(ctx), res.handle)
 	}
-	return f.doc, nil
+	return res.doc, nil
 }
 
-// finished is the result of finishLocked: the run document and, for an adapter-reported I3
-// mismatch, the handle of the agent whose counter Finish raises after the commit.
-type finished struct {
-	doc            runs.Run
-	mismatch       bool
-	mismatchHandle string
+// finishResult is the outcome of finishInUnit: the run document and, for an I3 mismatch the
+// adapter reported, the agent handle of the counter.
+type finishResult struct {
+	doc      runs.Run
+	mismatch bool
+	handle   string
 }
 
-// finishLocked is the unit of work of Finish: it locks and authorizes the run, applies
-// FinishDecision and ends the run, with the audit entry of a reported I3 mismatch.
-func (s *Service) finishLocked(ctx context.Context, a actor.Actor, cmd runs.FinishRun, req domain.FinishRequest,
-	metrics []byte) (finished, error) {
+// finishInUnit is the unit of work of Finish: lock and decide, then book, end the run with the
+// cost columns, add the session sums, register the cost metric and audit a reported mismatch.
+func (s *Service) finishInUnit(ctx context.Context, a actor.Actor, cmd runs.FinishRun, req domain.FinishRequest, store TransitionStore,
+	reports []billing.CostReport) (finishResult, error) {
 	row, err := s.lockAgentRun(ctx, a, cmd.RunID)
 	if err != nil {
-		return finished{}, err
+		return finishResult{}, err
 	}
 	out, err := domain.FinishDecision(row.State, req)
 	if err != nil {
-		return finished{}, finishError(err)
+		return finishResult{}, finishError(err)
 	}
 	if out.Kind == domain.FinishNoChange {
 		doc, err := s.documentOf(ctx, row)
-		return finished{doc: doc}, err
+		return finishResult{doc: doc}, err
 	}
 	reason := cmd.Reason
 	if req.Target == domain.StateCompleted {
 		reason = ""
 	}
-	t, err := s.endRun(ctx, row, req.Target, reason, domain.SetterAdapter, TransitionStore{Metrics: metrics, Summary: cmd.Summary})
+	store.At = s.now()
+	booking, err := s.book(ctx, row, store.At, reports)
 	if err != nil {
-		return finished{}, err
+		return finishResult{}, err
 	}
-	var f finished
+	if len(booking.Sums) > 0 {
+		first := booking.Sums[0]
+		store.Cost = &CostColumns{Micros: first.AmountMicros, Currency: first.Currency, IsEstimate: true}
+	}
+	t, err := s.endRun(ctx, row, req.Target, reason, domain.SetterAdapter, store)
+	if err != nil {
+		return finishResult{}, err
+	}
+	if err := s.addSessionCosts(ctx, row, booking); err != nil {
+		return finishResult{}, err
+	}
+	s.countCosts(ctx, t.AgentHandle, row.BillingModeUsed, booking)
+	var res finishResult
 	if out.Reason == domain.RunReasonBillingModeMismatch || out.Reason == domain.RunReasonToolClassMismatch {
 		if err := s.auditReportedMismatch(ctx, a, row, out.Reason); err != nil {
-			return finished{}, err
+			return finishResult{}, err
 		}
-		f.mismatch, f.mismatchHandle = true, t.AgentHandle
+		res.mismatch, res.handle = true, t.AgentHandle
 	}
-	f.doc, err = s.documentByID(ctx, row.ID)
-	return f, err
+	res.doc, err = s.documentByID(ctx, row.ID)
+	return res, err
+}
+
+// book books the reports of a finishing run at time at inside its unit of work (M2-22 design note
+// 5 b, d and e): nothing without reports; a run without billing_mode_used is 400 invalid on
+// /costs, because a runtime starts only after run.start and cost_entries.billing_mode needs the
+// actual mode (ruling D-M2-22-5); otherwise billing books with the copies of the run and the
+// channel and space of its thread now.
+func (s *Service) book(ctx context.Context, row RunRow, at time.Time, reports []billing.CostReport) (billing.Booking, error) {
+	if len(reports) == 0 {
+		return billing.Booking{}, nil
+	}
+	if row.BillingModeUsed == "" {
+		return billing.Booking{}, fieldError("/costs", "invalid", "a run that never started reports no costs")
+	}
+	info, err := s.d.Threads.Info(ctx, row.ThreadID)
+	if err != nil {
+		return billing.Booking{}, err
+	}
+	b, err := s.d.Costs.BookRun(ctx, billing.BookRun{
+		RunID: row.ID, AgentID: row.AgentID, ThreadID: row.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID,
+		AgentSessionID: row.AgentSessionID, BillingMode: row.BillingModeUsed, OccurredAt: at, Reports: reports,
+	})
+	if err != nil {
+		return billing.Booking{}, underCosts(err)
+	}
+	return b, nil
+}
+
+// addSessionCosts adds the sums of a booking to the session of the run, one call per currency,
+// in the unit of work after the run row (03 section 6.3; M2-22 design note 5 g).
+func (s *Service) addSessionCosts(ctx context.Context, row RunRow, b billing.Booking) error {
+	if row.AgentSessionID.IsZero() || len(b.Sums) == 0 {
+		return nil
+	}
+	if s.d.Sessions == nil {
+		return errs.New(errs.CodeInternalError, "runs: a run with a session books without the sessions of agents")
+	}
+	for _, sum := range b.Sums {
+		if err := s.d.Sessions.AddCost(ctx, agents.AddSessionCost{SessionID: row.AgentSessionID, AmountMicros: sum.AmountMicros,
+			Currency: sum.Currency}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// countCosts registers bothy.run.cost per booked entry for after the commit, never inside: a
+// retried unit would count twice (M2-22 design note 5 h).
+func (s *Service) countCosts(ctx context.Context, handle, mode string, b billing.Booking) {
+	if len(b.Entries) == 0 {
+		return
+	}
+	metrics := s.d.Metrics
+	costs := make([]BookedCost, len(b.Entries))
+	for i, e := range b.Entries {
+		costs[i] = BookedCost{AgentHandle: handle, BillingMode: mode, Currency: e.Currency, AmountMicros: e.AmountMicros, IsEstimate: e.IsEstimate}
+	}
+	txn.AfterCommit(ctx, func() {
+		for _, c := range costs {
+			metrics.CostBooked(context.WithoutCancel(ctx), c)
+		}
+	})
+}
+
+// costReports maps the reports of the runs port to billing.
+func costReports(cs []runs.CostReport) []billing.CostReport {
+	if len(cs) == 0 {
+		return nil
+	}
+	out := make([]billing.CostReport, len(cs))
+	for i, c := range cs {
+		out[i] = billing.CostReport{Provider: c.Provider, Model: c.Model, AmountMicros: c.AmountMicros, Currency: c.Currency,
+			Tokens: billing.TokenCounts{In: c.TokensIn, Out: c.TokensOut, CacheRead: c.TokensCacheRead, CacheWrite: c.TokensCacheWrite,
+				CacheWrite1h: c.TokensCacheWrite1h}}
+	}
+	return out
+}
+
+// underCosts prefixes the pointers of a validation error of billing with /costs, the member of
+// RunFinish; other errors pass unchanged.
+func underCosts(err error) error {
+	e, ok := errs.As(err)
+	if !ok || e.Code != errs.CodeValidationFailed || len(e.Fields) == 0 {
+		return err
+	}
+	fields := make([]errs.FieldError, len(e.Fields))
+	for i, f := range e.Fields {
+		f.Pointer = "/costs" + f.Pointer
+		fields[i] = f
+	}
+	return errs.New(errs.CodeValidationFailed, e.Detail).WithFields(fields...)
 }
 
 // finishError maps the request errors of FinishDecision to 400 validation_failed with the field
 // of 06 section 5; the 409 of a transition passes unchanged.
 func finishError(err error) error {
 	switch {
-	case errors.Is(err, domain.ErrCostsNotEnabled):
-		// Costs are booked into cost_entries from M2-22 (ruling D-M2-09-14).
-		return notEnabled("/costs")
 	case errors.Is(err, domain.ErrReasonRequired):
 		return fieldError("/reason", "required", "failed and cancelled need a reason")
 	case errors.Is(err, domain.ErrCancelReason):
@@ -179,28 +301,15 @@ func (s *Service) lockAgentRun(ctx context.Context, a actor.Actor, id ids.ID) (R
 //
 // Extension point: M2-11 (follow-ups deferred or discarded at the end of a run) and M2-15
 // (components disabled at the end) add their steps here, after the transition and in the same
-// unit of work, so they see the ended run and commit with it: M2-15 disables the open components
-// of the run at every end state (DisableRunComponents, ruling D-M2-15-21), then the follow-ups are
-// settled by Followups.OnRunEnded (M2-11 design note 7); the delivery's denial of a queued
-// invocation and runs.queued_expiry end their runs here as well.
+// unit of work, so they see the ended run and commit with it.
 func (s *Service) endRun(ctx context.Context, row RunRow, to domain.State, reason string, setBy domain.Setter,
 	store TransitionStore) (Transitioned, error) {
 	if !to.Ended() {
 		return Transitioned{}, errs.New(errs.CodeInternalError, "runs: endRun needs an end state")
 	}
-	t, err := s.Transition(ctx, TransitionCmd{
+	return s.Transition(ctx, TransitionCmd{
 		RunID: row.ID, From: row.State, Version: row.Version, To: to, Reason: reason, SetBy: setBy, Store: store,
 	})
-	if err != nil {
-		return Transitioned{}, err
-	}
-	if err := s.DisableRunComponents(ctx, row.ID); err != nil {
-		return Transitioned{}, err
-	}
-	if s.fu == nil {
-		return t, nil
-	}
-	return t, s.fu.OnRunEnded(ctx, t)
 }
 
 // auditReportedMismatch writes the audit entry of an I3 mismatch the adapter reported (design note

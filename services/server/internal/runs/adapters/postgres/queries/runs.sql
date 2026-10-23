@@ -49,7 +49,12 @@ SET state = sqlc.arg(to_state)::text,
     model = COALESCE(sqlc.narg(model)::text, model),
     status_line = COALESCE(sqlc.narg(status_line)::text, status_line),
     metrics = COALESCE(sqlc.narg(metrics)::jsonb, metrics),
-    summary = COALESCE(sqlc.narg(summary)::text, summary)
+    summary = COALESCE(sqlc.narg(summary)::text, summary),
+    -- The cost columns of a finish that booked costs (M2-22); NULL keeps them, so a finish
+    -- without costs leaves what the live /cost patches stored.
+    cost_micros = COALESCE(sqlc.narg(cost_micros)::bigint, cost_micros),
+    currency = COALESCE(sqlc.narg(currency)::text, currency),
+    cost_is_estimate = COALESCE(sqlc.narg(cost_is_estimate)::boolean, cost_is_estimate)
 WHERE id = sqlc.arg(id) AND state = sqlc.arg(from_state)::text AND version = sqlc.arg(version)
 RETURNING *;
 

@@ -223,3 +223,34 @@ func TestRecord_AgentHandlePattern(t *testing.T) {
 		}
 	}
 }
+
+// TestRecord_CurrencyPattern: bothy.currency of bothy.run.cost admits every ISO 4217 code without
+// values at construction and records anything else as "other" (the billing domain enforces the
+// same form, so "other" only shows a broken caller).
+func TestRecord_CurrencyPattern(t *testing.T) {
+	var reported []error
+	restore := metrics.SetStrict(func(err error) { reported = append(reported, err) })
+	defer restore()
+	mp, reader := metricstest.Provider(t)
+	c, err := metrics.NewCounter(mp, metrics.RunCost, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	c.AddFloat(ctx, 1.5, "alex-bot", "organization", "USD", "true")
+	if len(reported) != 0 {
+		t.Fatalf("a code of the pattern was reported: %v", reported)
+	}
+	for _, bad := range []string{"usd", "EURO", "US1"} {
+		c.AddFloat(ctx, 1, "alex-bot", "organization", bad, "true")
+	}
+	if len(reported) != 3 || !mentions(reported, "bothy.currency", `"EURO"`) {
+		t.Errorf("strict switch reported %v, want the three codes outside the pattern", reported)
+	}
+	m := metricstest.Find(t, reader, "bothy.run.cost")
+	for currency, want := range map[string]float64{"USD": 1.5, "other": 3} {
+		if got := metricstest.Sum(m, map[string]string{"bothy.currency": currency}); got != want {
+			t.Errorf("%s = %v, want %v", currency, got, want)
+		}
+	}
+}

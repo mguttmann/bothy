@@ -42,7 +42,7 @@ func (k Kind) String() string {
 
 // Source names a closed value set that comes from generated or registered code instead of a
 // literal list: the instrument's owner passes its values at construction (Values). A pattern
-// source (SourceAgentHandles) is the exception: the operator bounds its set at runtime, so the
+// source (SourceAgentHandles, SourceCurrencies) is the exception: its set grows at runtime, so the
 // binder checks each value against the pattern instead. A Source outside the constants below is
 // an open set and fails Check.
 type Source string
@@ -71,19 +71,28 @@ const (
 	// 1) that is not known when the instrument is built: the binder admits every value of the
 	// handle form instead of a list (docs/DECISIONS.md D-M2-20-13).
 	SourceAgentHandles Source = "agent_handles"
+	// SourceCurrencies are the currency codes of the booked costs (M2-22), the ISO 4217 form the
+	// billing domain enforces: the price table and the adapters' reports bring the codes at
+	// runtime, so the owner passes no values; every value of three upper-case letters belongs to
+	// the set and every other value records as "other". At most 26^3 values, in practice a few.
+	SourceCurrencies Source = "currencies"
 )
 
 // handleForm is the form of principals.handle (identity): lower-case letters, digits, '.', '_'
 // and '-'; the length is bounded by principal.handle_max_chars when the handle is created.
 var handleForm = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 
+// currencyForm is the ISO 4217 form of a currency code of the billing domain.
+var currencyForm = regexp.MustCompile(`^[A-Z]{3}$`)
+
 // formSources are the sources whose values the binder checks by a form instead of a list.
-var formSources = map[Source]*regexp.Regexp{SourceAgentHandles: handleForm}
+var formSources = map[Source]*regexp.Regexp{SourceAgentHandles: handleForm, SourceCurrencies: currencyForm}
 
 // knownSources is the set of Source constants.
 var knownSources = map[Source]bool{
 	SourceActions: true, SourceRateClasses: true, SourceEventTypes: true, SourceRoutes: true,
-	SourceHTTPStatus: true, SourceCloseCodes: true, SourceJobKinds: true, SourceTables: true, SourceAgentHandles: true,
+	SourceHTTPStatus: true, SourceCloseCodes: true, SourceJobKinds: true, SourceTables: true,
+	SourceAgentHandles: true, SourceCurrencies: true,
 }
 
 // Other is the value an attribute takes when the recorded value lies outside its closed set; it

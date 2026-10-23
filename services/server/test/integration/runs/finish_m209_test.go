@@ -91,10 +91,7 @@ func TestFinishRun(t *testing.T) {
 		t.Fatalf("problem %v", p)
 	}
 	w.want(w.finish("lotse", q.ID, `"state":"cancelled","reason":"stale"`), http.StatusBadRequest, "validation_failed")
-	p = w.want(w.finish("lotse", q.ID, `"state":"failed","reason":"runtime_error","costs":[]`), http.StatusBadRequest, "validation_failed")
-	if !strings.Contains(string(mustJSON(t, p)), "not_enabled") {
-		t.Fatalf("problem %v", p)
-	}
+	// costs is booked from M2-22 on (test/integration/costs); its not_enabled answer of M2-09 is gone.
 	w.wantOK(w.finish("lotse", q.ID, `"state":"failed","reason":"stale"`))
 	if got := w.lifecycle(q.ID); got.State != "failed" || got.Reason != "adapter_error" {
 		t.Fatalf("run %+v", got)

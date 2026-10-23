@@ -80,7 +80,9 @@ A flat object (19 SEC-AUD-5): the reserved members `ip_hmac` (the hex form of th
 `kernel/textcheck`; its length bound `audit.reason_max_chars` belongs to the request validation of
 the action) and `os_user` (M2-39: the name of a session user of a terminal host, only through
 `auditing.OSUserName`, only in the form `^[A-Za-z0-9_][A-Za-z0-9_.-]*$`, never a path; M2-43
-reuses it for `host.connect`). Callers may not set `ip_hmac`, `ip_key_id` or `aggregate`. Every other member has a
+reuses it for `host.connect`) and `source_url` (M2-22: the source of a price row, only through
+`auditing.SourceURL`, only as an absolute `https` URL with a host, without user info and without
+fragment). Callers may not set `ip_hmac`, `ip_key_id` or `aggregate`. Every other member has a
 key matching `^[a-z][a-z0-9_]*$` and a value that is a UUID, a code (`^[a-z0-9][a-z0-9_.:-]*$`, at
 most `domain.MaxCodeLen` bytes, never an IP address), an integer, a boolean, a canonical time or a flat list of one of
 these kinds. Anything else is refused when the entry is recorded (a programming error, kind

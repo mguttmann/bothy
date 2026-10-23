@@ -260,3 +260,25 @@ func TestRunActiveGauge(t *testing.T) {
 		t.Errorf("a failed read observed %v, want no points", got)
 	}
 }
+
+// TestCostBooked_RunCost: one booked entry is one data point of bothy.run.cost with the four
+// attributes of signals.md 4.3 and the amount in currency units (Design note 5 h of M2-22).
+func TestCostBooked_RunCost(t *testing.T) {
+	metricstest.Strict(t)
+	mp, reader := metricstest.Provider(t)
+	m, err := otelmetrics.New(mp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.CostBooked(context.Background(), app.BookedCost{
+		AgentHandle: "alex-bot", BillingMode: "organization", Currency: "USD", AmountMicros: 1_250_000, IsEstimate: true,
+	})
+	p := only(t, metricstest.Collect(t, reader), "bothy.run.cost")
+	want := map[string]string{
+		"bothy.agent.handle": "alex-bot", "bothy.billing_mode": "organization",
+		"bothy.currency": "USD", "bothy.cost.estimate": "true",
+	}
+	if !equalAttrs(p.Attrs, want) || p.Value != 1.25 {
+		t.Errorf("point %v = %v, want %v = 1.25", p.Attrs, p.Value, want)
+	}
+}

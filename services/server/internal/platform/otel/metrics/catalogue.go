@@ -506,6 +506,19 @@ var (
 		Description: "Relay connections whose counterpart did not arrive before terminal.open_timeout.",
 		Attrs:       []Attr{{Key: "bothy.terminal.side", Values: []string{"client", "host"}}},
 	}
+	// RunCost is bothy.run.cost (4.3, M2-22): the amount of each booked cost entry in currency
+	// units (amount_micros divided by one million), counted after the commit of the unit of work
+	// that booked it. bothy.currency is the ISO 4217 code of the entry (SourceCurrencies).
+	RunCost = Spec{
+		Name: "bothy.run.cost", Kind: KindCounter, Unit: "{currency_unit}", Float: true,
+		Description: "Booked run costs in units of the currency.",
+		Attrs: []Attr{
+			{Key: keyAgentHandle, Source: SourceAgentHandles},
+			{Key: "bothy.billing_mode", Values: []string{"personal", "organization"}},
+			{Key: "bothy.currency", Source: SourceCurrencies},
+			{Key: "bothy.cost.estimate", Values: []string{"true", "false"}},
+		},
+	}
 	// AgentBillingModeMismatch is bothy.agent.billing_mode_mismatch (4.3, M2-09): one per run that
 	// an I3 mismatch failed, found by the server at the start or reported by the adapter.
 	AgentBillingModeMismatch = Spec{
@@ -568,7 +581,7 @@ func All() []Spec {
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
 		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch,
-		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, AgentInvocationDenied, AgentBillingModeMismatch,
+		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,
 		BackupLastSuccess, BackupWALLastArchived, BackupDuration, BackupSize,
 		BackupRestoreTestLastSuccess, BackupRestoreTestDuration, BackupRestoreTestFailures,

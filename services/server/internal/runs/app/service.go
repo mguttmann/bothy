@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
+	"github.com/OWNER/bothy/services/server/internal/billing"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -256,6 +257,10 @@ type Deps struct {
 	// gives every operator run session_mode new without a row and ignores the reference of
 	// run.start, so test worlds without the sessions keep working; internal/wire always sets it.
 	Sessions agents.Sessions
+	// Costs books the cost reports of finishRun into cost_entries (billing, M2-22). nil makes a
+	// finish with a non-empty costs an internal error, so test worlds without billing keep
+	// working for every other finish; internal/wire always sets it.
+	Costs billing.Costs
 }
 
 // ChannelThreads is the part of chat.Structure the subscriber of chat.ChannelReadOnlySet uses: every

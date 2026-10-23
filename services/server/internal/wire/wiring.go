@@ -65,6 +65,7 @@ func moduleWirings() []moduleWiring {
 		appsWiring(),
 		auditWiring(),
 		authzWiring(),
+		billingWiring(),
 		chatWiring(),
 		filesWiring(),
 		gatewayWiring(),

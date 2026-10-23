@@ -503,6 +503,64 @@ change again (03, R-DM-23).
 All entries are estimates (`is_estimate = true`) until a reconciliation replaces them (12.4).
 Amounts in different currencies are never converted; sums are shown per currency.
 
+Booking details (M2-22):
+
+- **Price set and completeness.** The price set `S(provider, model, T)` is every row of
+  `price_table` with exactly equal `provider` and `model` (case-sensitive) and
+  `valid_from <= T < valid_to` (an absent `valid_to` is open). The units map to the counts:
+  `input_mtok` to `tokens_in`, `output_mtok` to `tokens_out`, `cache_read_mtok` to
+  `tokens_cache_read`, `cache_write_mtok` to `tokens_cache_write` (5 minutes or no stated
+  duration), `cache_write_1h_mtok` to `tokens_cache_write_1h`. A unit is needed when its count is
+  above `0`. A report is `computed` only when `S` is not empty, all rows of `S` have one currency
+  and every needed unit has its row in `S`; the entry then has the currency of the set, and the
+  adapter's amount is ignored. Otherwise it is `adapter_reported` with the amount and currency of
+  the report, or `unpriced` with `0` and the report's currency. The unit `request` is never used,
+  because neither `CostReport` nor `cost_entries` carry a request count (spec gap).
+- **Exact arithmetic.** The amount is the sum over the needed units of count times
+  `price_micros`, divided once by one million (prices are per million tokens), computed exactly
+  with integers and rounded half up once per entry. An amount, or the sum of one currency in a
+  booking, at or above `2^53` (the integer bound of [06-api.md](06-api.md) section 2) gives
+  `400 validation_failed` with code `too_large` on `/costs/<i>/amount_micros`. A booking is never
+  recomputed after it is written: an entry booked `adapter_reported` or `unpriced` stays so when a
+  price for its time is added later.
+- **Order in `finishRun`** (one unit of work):
+  1. Before the unit: the reports are validated (non-empty `provider` and `model` without control
+     or bidi characters, counts and `amount_micros` not negative and below `2^53`, `currency` of
+     the form `^[A-Z]{3}$`, no second report of the same `provider` and `model`); an error is
+     `400 validation_failed` with pointers `/costs/<i>/<field>` and changes nothing.
+  2. In the unit, after the run row is locked and the end decision is known: a repeat of the same
+     end state books nothing (06 section 2 "No effect"), so a retried `finishRun` never books twice;
+     only a real transition with a non-empty `costs` books. A run without `billing_mode_used` (it
+     never started) and a non-empty `costs` gives `400 validation_failed` with code `invalid` on
+     `/costs`, and the unit rolls back.
+  3. One clock reading is both `runs.finished_at` and `occurred_at` of every entry; the prices of
+     that time apply.
+  4. Copies: `agent_id` and `thread_id` of the run, `channel_id` and `space_id` of the thread at
+     this moment (no space in a DM channel), `agent_session_id` of the run when set,
+     `billing_mode = runs.billing_mode_used`.
+  5. Per report in order: the rows of `S` are read `FOR SHARE` in ascending `id` (03 section 6.3),
+     then one entry is inserted with `is_estimate = true` and without `reconciled_at` and
+     `supersedes_id`. Lock order of the unit: run row, price rows, session row.
+  6. The run columns take the booking in the same update as the transition, so `version` rises
+     once and the one `run.state_changed` carries the booked cost: `cost_micros` is the sum in the
+     currency of the first entry, `currency` that currency, `cost_is_estimate = true`; other
+     currencies stay only in `cost_entries` (spec gap: 03 `runs.currency` holds one currency). A
+     finish without `costs` or with an empty list leaves the cost columns as they were.
+  7. With a session, its sum grows per currency of the booking: a row with
+     `cumulative_cost_micros` and `cost_baseline_micros` both `0` first takes the booking's
+     currency; an amount in another currency is skipped (no conversion). `version` rises only when
+     a value changes; no `agent_session.changed` is written, because a booking is none of its
+     causes ([05-actions.md](05-actions.md) section 6).
+  8. After the commit, never inside, `bothy.run.cost` counts each entry.
+- **Server-ended runs** (`stale`, `interrupted`, `cancel_timeout`, `agent_disabled`,
+  `access_revoked` without a later `run.finish` transition) get no entry: `run.finish` is the only
+  source of the usage per model ([09-agents.md](09-agents.md) 4.10). The lost consumption is part
+  of the deviation from the invoice (RK-16).
+- **Per-run values, no baseline.** The server books the reported values as the consumption of this
+  run and never subtracts `agent_sessions.cost_baseline_micros`: the API cannot mark a report as a
+  session sum, and the adapter never sees the baseline. The cost baseline of imported sessions
+  belongs to M8-06 (spec gap, RK-75).
+
 ### 12.2 Display
 
 | Where | What | Action |
@@ -517,6 +575,24 @@ suffix "Estimate". In mode `personal` the interface shows the badge "Personal" a
 no amounts; there, amounts are only information, never an invoice (03). The switch
 `billing.show_personal_estimates` shows them anyway, labeled "Information, not
 billed".
+
+Server side of the display rule (M2-22):
+
+- `getThreadCosts` (`cost.read.thread`) reads the valid entries of the thread, whatever channel
+  they were booked in, and answers per run and per billing mode and currency. For a run in mode
+  `personal` the run's `costs` are absent and its amounts are left out of `totals`, unless
+  `billing.show_personal_estimates` is on; `billing_mode` and `tokens` are always present, and
+  `unpriced` marks a run with an `unpriced` entry ("Price missing"). Mode `organization` always has
+  amounts with `is_estimate`. Runs stand by `run_id` ascending; the list is not paginated (spec gap
+  for very long threads). A thread without entries answers `200` with empty lists. The answer
+  never names a person: in threads only costs per run ([20-privacy.md](20-privacy.md)
+  section 9).
+- `Run.cost`, `RunSummary.cost`, the member `/cost` of the run document and `AgentSession.cost`
+  carry the stored values in both modes. Clients show amounts from them only for `organization`
+  ([09-agents.md](09-agents.md) 5.4, row "Costs"). Amounts that the switch may reveal for
+  `personal` come only from `getThreadCosts` (later also `getCostStats`), where the server applies
+  the switch, because `billing.show_personal_estimates` is a server key that clients cannot read
+  (spec gap).
 
 ### 12.3 Price table
 
@@ -539,6 +615,50 @@ only the base prices per unit of these. From this follows [derived]:
   corrects it.
 - Surcharges, discounts and price tiers are missing from the estimate; the reconciliation (12.4)
   corrects them.
+
+Start file and price changes (M2-22):
+
+- **Start file.** `services/server/internal/billing/domain/startprices/start_prices.json`, schema
+  `start_prices.v1` (`{"schema", "rows": [{"provider", "model", "unit", "price_micros",
+  "currency", "valid_from", "source_url", "retrieved_at"}]}`, unknown members rejected), holds the
+  base prices of the five token units per model with the public pricing page as `source_url`, its
+  time of reading as `retrieved_at` and `valid_from = retrieved_at`. It is embedded in the binary
+  and checked by tests (every row has source and retrieval time, passes the rules of `createPrice`
+  below, one currency per provider and model, no overlap). The server never loads it: loading it
+  on the host needs a system action that [05-actions.md](05-actions.md) does not have (spec gap).
+  Until one exists the owner enters prices with `createPrice`.
+- **`listPrices`** (`price.read`, owner, no step-up, no audit) returns every row, closed ones
+  included, ordered by `provider`, `model`, `unit`, `valid_from`, `id`; it is a small unpaginated
+  list ([06-api.md](06-api.md) section 6 point 6).
+- **`createPrice`** (`price.manage`, owner with step-up, audited, `Idempotency-Key`) authorizes
+  before it validates or reads. Rules (`400 validation_failed`): `provider` and `model` non-empty
+  without control or bidi characters; `unit` one of the units of 03; `price_micros` not negative
+  and below `2^53`; `currency` of the form `^[A-Z]{3}$`; `valid_to`, when present, after
+  `valid_from` (`invalid`); `source_url` an absolute `https` URL with a host and without user info
+  or fragment (`invalid_format`), the form the audit accepts under `source_url`, so every valid row
+  can be audited; `retrieved_at` not after now (`invalid`), because a retrieval in the future is
+  not a fact. A row of the same `provider` and `model` (any unit) whose validity overlaps and whose
+  currency differs gives `409 conflict` with `reason` `price_currency_mismatch`; an overlap of the
+  same `provider`, `model` and `unit` (exclusion or unique constraint) gives `409 conflict` with
+  `reason` `price_overlap`. Two concurrent inserts of different units and currencies can both pass
+  the currency check; the price set is then incomplete (one currency per set, 12.1), so no wrong
+  `computed` amount results. A `valid_from` in the past is allowed: it cannot change a `computed`
+  booking, which had every needed unit, and a booking is never recomputed (12.1).
+- **`closePrice`** (`price.manage` as above, body `valid_to`) locks the row `FOR UPDATE`; an
+  unknown `price_id` gives `404 not_found` only for an owner with step-up, because authorization
+  comes first. `valid_to` not after `valid_from` gives `400 validation_failed` (`invalid`,
+  `/valid_to`). A closed row with the same end answers `200` with an audit entry `no_change`;
+  another end gives `409 conflict` with `reason` `price_closed`: a closed row is never reopened or
+  moved, a gap is filled by a new row. An end that would cut off a `computed` booking (an entry of
+  the same `provider` and `model` with `occurred_at` at or after the row's `valid_from` and at or
+  after the new end, with a count above `0` for the row's unit) gives `409 conflict` with `reason`
+  `price_in_use` (R-DM-23). A booking holds the rows of its price set `FOR SHARE`, so a close waits
+  for a running booking and then sees its entries, and a booking that waited for a close reads the
+  new end and leaves the row out. Otherwise only `valid_to` is set; the database grant allows no
+  other column.
+- **Audit** of both changes (section 14 row "Prices"): action `price.manage`, resource `instance`,
+  attributes `price_id`, `op` (`create` or `close`), `valid_from`, `valid_to` when set,
+  `retrieved_at`, `source_url` and, for a close without change, `no_change`.
 
 ### 12.4 Reconciliation with billing
 

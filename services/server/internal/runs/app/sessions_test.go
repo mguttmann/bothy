@@ -69,6 +69,8 @@ func (s *sessions) AttachOnStart(ctx context.Context, cmd agents.AttachOnStartCm
 
 func (s *sessions) CheckStartModel(string) error { return nil }
 
+func (s *sessions) AddCost(context.Context, agents.AddSessionCost) error { return nil }
+
 // sessionCall is the journaled input of a fake session call.
 type sessionCall struct {
 	q        agents.InvocationSessionQuery

@@ -199,6 +199,11 @@ var appPrivileges = map[string][]string{
 	// 03 gateway_presence (M7-17): every api node upserts and deletes the rows of its live
 	// connections and deletes the rows of nodes that stopped refreshing.
 	"gateway_presence": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 price_table and cost_entries (M2-22): a price row changes only its end, which the
+	// column grant UPDATE (valid_to) allows (TestMigration_PriceTable holds it); cost entries
+	// are append only (ruling D-M2-22-1).
+	"price_table":  {"SELECT", "INSERT"},
+	"cost_entries": {"SELECT", "INSERT"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

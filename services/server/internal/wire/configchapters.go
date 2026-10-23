@@ -33,6 +33,8 @@ const (
 const (
 	// defaultTrue is the default of a switch that is on.
 	defaultTrue = "true"
+	// defaultFalse is the default of a switch that is off.
+	defaultFalse = "false"
 	// defaultQuarterHour is a default of 15 minutes.
 	defaultQuarterHour = "15m"
 	// defaultTwoMinutes is a default of 120 seconds, written in seconds as the chapters give it.

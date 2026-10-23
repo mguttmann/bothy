@@ -61,3 +61,11 @@ UPDATE agent_sessions
 SET external_session_ref = @external_session_ref, model = sqlc.narg(model), started = @started, version = version + 1
 WHERE id = @id AND version = @version
 RETURNING *;
+
+-- name: SetSessionCost :one
+-- Writes the session sum and its currency at the row's version (the session sum of a booking,
+-- M2-22); no row comes back for another version.
+UPDATE agent_sessions
+SET cumulative_cost_micros = @cumulative_cost_micros, currency = @currency, version = version + 1
+WHERE id = @id AND version = @version
+RETURNING *;

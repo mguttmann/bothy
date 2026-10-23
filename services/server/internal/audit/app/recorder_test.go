@@ -438,3 +438,43 @@ func TestDetails_OSUserNames(t *testing.T) {
 		t.Error("a path in hd11_users validated")
 	}
 }
+
+// TestSourceURLValue (M2-22 Design note 14, 19 SEC-AUD-5): the source of a price row is accepted
+// only under the member source_url and only as an absolute https URL with a host, without user
+// info and without fragment; http, user info, a fragment, a relative URL, the value under another
+// key and another kind under source_url are refused at Record, and the stored row validates as
+// audit_details.v1.
+func TestSourceURLValue(t *testing.T) {
+	t.Parallel()
+	w := newWorld(t, time.Minute, 10)
+	ok := auditing.Entry{Action: "price.manage", Decision: auditing.DecisionAllow,
+		Attrs: auditing.Attrs{"source_url": auditing.SourceURL("https://provider.example.com/pricing"), "op": auditing.Code("create")}}
+	if err := w.uow.Do(as(alex), func(ctx context.Context) error { return w.rec.Record(ctx, ok) }); err != nil {
+		t.Fatalf("Record with source_url: %v", err)
+	}
+	got := w.store.committed()[0].Details
+	if got["source_url"] != "https://provider.example.com/pricing" {
+		t.Fatalf("source_url = %v", got["source_url"])
+	}
+	if err := domain.DetailsV1(got).Validate(); err != nil {
+		t.Fatalf("stored details: %v", err)
+	}
+	bad := map[string]auditing.Attrs{
+		"http":               {"source_url": auditing.SourceURL("http://provider.example.com/pricing")},
+		"user info":          {"source_url": auditing.SourceURL("https://sam@provider.example.com/pricing")},
+		"fragment":           {"source_url": auditing.SourceURL("https://provider.example.com/pricing#models")},
+		"relative":           {"source_url": auditing.SourceURL("/pricing")},
+		"under other key":    {"link": auditing.SourceURL("https://provider.example.com/pricing")},
+		"code as source_url": {"source_url": auditing.Code("pricing")},
+		"in a list":          {"links": auditing.List(auditing.SourceURL("https://provider.example.com/pricing"))},
+	}
+	for name, attrs := range bad {
+		e := auditing.Entry{Action: "price.manage", Decision: auditing.DecisionAllow, Attrs: attrs}
+		if err := w.uow.Do(as(alex), func(ctx context.Context) error { return w.rec.Record(ctx, e) }); errs.KindOf(err) != errs.KindInternal {
+			t.Errorf("%s: Record = %v, want kind internal", name, err)
+		}
+	}
+	if n := len(w.store.committed()); n != 1 {
+		t.Fatalf("%d entries written, want the one valid entry", n)
+	}
+}

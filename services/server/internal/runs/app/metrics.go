@@ -36,6 +36,25 @@ type Metrics interface {
 	// queued, bothy.run.duration when a started run ended and bothy.run.finished on every end
 	// state.
 	RunTransitioned(ctx context.Context, t Transitioned)
+	// CostBooked records one booked cost entry as bothy.run.cost. The caller registers it with
+	// txn.AfterCommit, never inside the unit of work, so a retried unit counts nothing twice.
+	CostBooked(ctx context.Context, c BookedCost)
+}
+
+// BookedCost is one booked cost entry as bothy.run.cost needs it (signals.md 4.3): recorded after
+// the commit of the unit of work that booked it, never inside, so a retried unit counts nothing
+// twice. It carries no ID (signals.md section 2).
+type BookedCost struct {
+	// AgentHandle is the handle of the run's agent for bothy.agent.handle; "" when unknown.
+	AgentHandle string
+	// BillingMode is the entry's billing_mode, personal or organization.
+	BillingMode string
+	// Currency is the entry's ISO 4217 currency code.
+	Currency string
+	// AmountMicros is the entry's amount in millionths of a currency unit.
+	AmountMicros int64
+	// IsEstimate is the entry's is_estimate, bothy.cost.estimate.
+	IsEstimate bool
 }
 
 // noMetrics records nothing; it is the Metrics of a Service built without one.
@@ -43,6 +62,9 @@ type noMetrics struct{}
 
 // RunTransitioned implements Metrics without effect.
 func (noMetrics) RunTransitioned(context.Context, Transitioned) {}
+
+// CostBooked implements Metrics without effect.
+func (noMetrics) CostBooked(context.Context, BookedCost) {}
 
 // ActiveGroup is one data point of the gauge bothy.run.active: the active runs of one agent handle
 // in one state.
