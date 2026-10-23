@@ -7,7 +7,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // snapshotFollowups decodes the follow-ups of a run.updated snapshot as message id to state.
@@ -82,7 +83,7 @@ func TestLiveBoxFollowups(t *testing.T) {
 		}
 		base := w.version(r.id)
 		runUpdate(t, r.conn, r.id, base, "fu-absorbed", op("replace", "/followups/"+m+"/state", "absorbed"))
-		eventually(t, 15*time.Second, "the absorbed follow-up", func() bool { return w.version(r.id) == base+1 })
+		testkit.Until(t, "the absorbed follow-up", func() bool { return w.version(r.id) == base+1 })
 		runUpdate(t, r.conn, r.id, base+1, "fu-back", op("replace", "/followups/"+m+"/state", "delivered"))
 		wantOpError(t, r.conn, "invalid_state_transition", "fu-back")
 		runUpdate(t, r.conn, r.id, base+1, "fu-missing", op("replace", "/followups/"+r.id+"/state", "delivered"))
@@ -92,6 +93,6 @@ func TestLiveBoxFollowups(t *testing.T) {
 		}
 		// The connection stays: the next op is stored.
 		runUpdate(t, r.conn, r.id, base+1, "", op("replace", "/status_line", "Still here"))
-		eventually(t, 15*time.Second, "the patch after the errors", func() bool { return w.version(r.id) == base+2 })
+		testkit.Until(t, "the patch after the errors", func() bool { return w.version(r.id) == base+2 })
 	})
 }
