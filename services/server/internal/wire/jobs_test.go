@@ -168,3 +168,19 @@ func TestWire_ComponentExpiryJob(t *testing.T) {
 		}
 	}
 }
+
+// TestJobRegistryHasNotifyJobs: the five jobs of notify are on the queue delivery in every role
+// (M3-19, 02 12.2).
+func TestJobRegistryHasNotifyJobs(t *testing.T) {
+	t.Parallel()
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"notify.push_send", "notify.coalesce_window", "notify.coalesce_flush", "notify.badge_sync", "notify.badge_sync_hold"} {
+		if q, ok := reg.Queue(kind); !ok || q != jobs.QueueDelivery {
+			t.Errorf("%s: queue %q, %v", kind, q, ok)
+		}
+	}
+}

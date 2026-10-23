@@ -1,6 +1,6 @@
 # Module `authz`
 
-Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M6-07 brings the lists "Permission hints" and "Expiring soon" (section "Permission hints and expiring access (M6-07)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below).
+Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M6-07 brings the lists "Permission hints" and "Expiring soon" (section "Permission hints and expiring access (M6-07)" below). M2-39 adds the target host and M2-40 the terminal rights (sections "Target host (M2-39)" and "Terminal rights (M2-40)" below). M3-19 brings `Recipients.Readers` and `push.deliver` for the principal of the check without a request (sections "Recipients of hints (M3-19)" and "Check without a request (M2-08, R-AZ-29)" below).
 
 Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the permission snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below). M1-65 brings `Observe` and the delivery mode (section "Delivery mode and Observe (M1-65)" below).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
@@ -28,7 +28,7 @@ The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-
 
 ## Port (root package `internal/authz`)
 
-- Inbound: `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person; `RevokeSubjectGrants` since M2-24), `AppScopes` (M2-24); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`, and since M6-07 `AgentDirectory` and `TokenExpirySource`; M6-07 adds `ListPermissionHints` and `ListExpiringAccess` to `Admin`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; M1-49 adds `ExplainAccess`, `PreviewGrant` and `ViewAs` to `Admin`, `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and `ChannelDetails` and `AgentPolicy.BillingModesSupported`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
+- Inbound: `Recipients` (`Readers`, M3-19), `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person; `RevokeSubjectGrants` since M2-24), `AppScopes` (M2-24); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`, and since M6-07 `AgentDirectory` and `TokenExpirySource`; M6-07 adds `ListPermissionHints` and `ListExpiringAccess` to `Admin`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; M1-49 adds `ExplainAccess`, `PreviewGrant` and `ViewAs` to `Admin`, `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and `ChannelDetails` and `AgentPolicy.BillingModesSupported`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
 - Emits in-tx events: kernel `authorize.AccessChanged` (with the triggering action; `runs` cancels with reason `user_disabled` on `user.disable`, otherwise with `access_revoked`).
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
@@ -134,8 +134,9 @@ Tests: `TestAuthzObserve_AccessChangedRaisesFloor`,
 
 `actor.Recheck(person)` builds the principal of a check the server runs for a person without the
 person's request: kind `user`, the marker `RecheckPrincipal` and nothing else. `Authorize` refuses
-the marker with an internal error for any action other than `agent.invoke` (M2-25 adds
-`command.invoke` and `interaction.create`) and when the principal carries a session, device,
+the marker with an internal error for any action other than `agent.invoke` and `push.deliver`
+(M3-19: the hint check of the worker consumer `push` and of the job `notify.push_send` is a check
+without a request, R-AZ-31; M2-25 adds `command.invoke` and `interaction.create`) and when the principal carries a session, device,
 token, installation, "view as" or acting-for binding. Liveness comes only from the principal status
 (`principal_inactive`, `principal_pending`); the owner status comes from the current owner list
 without a session (the exception to R-AZ-14 and 05 2.3 point 1). The snapshot has its own cache key
@@ -153,6 +154,27 @@ consumer engine (`sync.PageInput.AgentConsumer`), which pass every such event th
 `runs.Delivery`: sync then sets `EventScope.AudienceID` after it matched the audience with the
 receiver, and `eventTarget` adds the agent of the audience as the last candidate. The generic
 catch-up `listEvents` never sets it, so an agent never gets an invocation there (D-M2-08-14).
+
+`Scope(actor.Recheck(person), push.deliver)` lists the channels the person reads, with the owner
+status from the current owner list (the badge of M3-19 design note 16); a disabled or pending
+person gets the error of its liveness decision.
+
+## Recipients of hints (M3-19)
+
+`authz.Recipients.Readers(ctx, channelID)` (`recipients.go`) is implemented on the `Authorizer`
+that `internal/wire` builds (`app/recipients.go`), because it reuses the candidate reads of "who
+has access" (M1-49) without a copy of their SQL: the owners (`PrincipalSource.OwnerIDs`, not for a
+dm channel, SR6), the subjects of the grants not revoked on the instance, the space or the channel
+(`Store.ActiveGrantsOnTargets`) with the members of such groups (`Store.ActiveMembershipsOfGroups`),
+and the participants of a dm channel (the channel path, `DMParticipants`). Of these it keeps the
+active humans (`PrincipalSource.Profiles`: kind `user`, status `active`), ascending and unique. It
+applies no guard, validity or level: the answer is a superset that the consumer `push` decides per
+candidate with `authorize(actor.Recheck(r), push.deliver, thread)` in filter mode, so a candidate the
+guards exclude never gets a hint. An unknown channel is `not_found`. Tests:
+`TestReaders_Channel`, `TestReaders_OnlyActiveHumans`, `TestReaders_DM`,
+`TestReaders_UnknownChannel`, `TestRecheckPrincipal_PushDeliver`,
+`TestRecheckPrincipal_ScopePushDeliver` (`app/recipients_test.go`, test world of 07 sections 10 and
+11.1).
 
 ## Scope of agent.config.read (M2-02)
 

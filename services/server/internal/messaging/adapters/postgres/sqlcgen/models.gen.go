@@ -731,6 +731,23 @@ type ProjectBinding struct {
 	Version       int64
 }
 
+type PushRegistration struct {
+	ID               pgtype.UUID
+	UserID           pgtype.UUID
+	DeviceID         pgtype.UUID
+	AuthSessionID    pgtype.UUID
+	Provider         string
+	Token            string
+	Environment      string
+	AppID            string
+	PreviewTokenHash []byte
+	CreatedAt        pgtype.Timestamptz
+	LastSuccessAt    pgtype.Timestamptz
+	FailureCount     int32
+	DisabledAt       pgtype.Timestamptz
+	DisabledReason   pgtype.Text
+}
+
 type QuietHour struct {
 	ID         pgtype.UUID
 	UserID     pgtype.UUID

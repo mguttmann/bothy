@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -33,35 +35,50 @@ func insertPhase(p txn.Phase) bool {
 
 // InsertTx implements Inserter.
 func (i inserter) InsertTx(ctx context.Context, args Args, opts *InsertOptions) error {
-	if args == nil {
-		return errs.New(errs.CodeInternalError, "jobs: InsertTx without arguments")
-	}
-	kind := args.Kind()
-	if p := txn.CurrentPhase(ctx); !insertPhase(p) {
-		return errs.New(errs.CodeInternalError, fmt.Sprintf("jobs: InsertTx of %s in phase %s; jobs are inserted in the work phase of a unit of work", kind, p))
-	}
-	tx, err := pg.Tx(ctx)
+	tx, e, err := i.prepare(ctx, "InsertTx", args)
 	if err != nil {
 		return err
 	}
-	e, ok := i.rt.kinds[kind]
-	if !ok {
-		return errs.New(errs.CodeInternalError, fmt.Sprintf("jobs: InsertTx of the unregistered kind %s", kind))
-	}
-	if t := reflect.TypeOf(args); t != e.typ {
-		return errs.New(errs.CodeInternalError, fmt.Sprintf("jobs: InsertTx of %s with arguments of type %s, registered is %s", kind, t, e.typ))
-	}
-	if err := roundTrip(args, e.typ); err != nil {
-		return errs.Wrap(errs.CodeInternalError, err, fmt.Sprintf("jobs: InsertTx of %s with arguments that cannot be read back", kind))
-	}
-	var at time.Time
-	if opts != nil {
-		at = opts.ScheduledAt
-	}
-	if _, err := i.rt.client.InsertTx(ctx, tx, args, e.insertOpts(at)); err != nil {
-		return fmt.Errorf("jobs: insert %s: %w", kind, err)
+	if _, err := i.rt.client.InsertTx(ctx, tx, args, e.insertOpts(scheduledAt(opts))); err != nil {
+		return fmt.Errorf("jobs: insert %s: %w", args.Kind(), err)
 	}
 	return nil
+}
+
+// prepare runs the checks every operation of the inserter shares and returns the ambient
+// transaction and the registered entry of args: op is the operation name for the error texts.
+// The errors are those Inserter.InsertTx documents, all with code internal_error.
+func (i inserter) prepare(ctx context.Context, op string, args Args) (pgx.Tx, *entry, error) {
+	if args == nil {
+		return nil, nil, errs.New(errs.CodeInternalError, "jobs: "+op+" without arguments")
+	}
+	kind := args.Kind()
+	if p := txn.CurrentPhase(ctx); !insertPhase(p) {
+		return nil, nil, errs.New(errs.CodeInternalError, fmt.Sprintf("jobs: %s of %s in phase %s; jobs are inserted in the work phase of a unit of work", op, kind, p))
+	}
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	e, ok := i.rt.kinds[kind]
+	if !ok {
+		return nil, nil, errs.New(errs.CodeInternalError, fmt.Sprintf("jobs: %s of the unregistered kind %s", op, kind))
+	}
+	if t := reflect.TypeOf(args); t != e.typ {
+		return nil, nil, errs.New(errs.CodeInternalError, fmt.Sprintf("jobs: %s of %s with arguments of type %s, registered is %s", op, kind, t, e.typ))
+	}
+	if err := roundTrip(args, e.typ); err != nil {
+		return nil, nil, errs.Wrap(errs.CodeInternalError, err, fmt.Sprintf("jobs: %s of %s with arguments that cannot be read back", op, kind))
+	}
+	return tx, e, nil
+}
+
+// scheduledAt returns the time of opts; the zero time (now) for nil.
+func scheduledAt(opts *InsertOptions) time.Time {
+	if opts == nil {
+		return time.Time{}
+	}
+	return opts.ScheduledAt
 }
 
 // roundTrip encodes args as River stores them and decodes them into a fresh value of t, as the

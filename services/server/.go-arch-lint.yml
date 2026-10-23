@@ -62,7 +62,7 @@ components:
   kernel-core:
     in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs, internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose, internal/kernel/designkeys, internal/kernel/searchlang]
   kernel-ports:
-    in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn, internal/kernel/eventlog, internal/kernel/auditing, internal/kernel/idempotency, internal/kernel/personaldata, internal/kernel/measure]
+    in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn, internal/kernel/eventlog, internal/kernel/auditing, internal/kernel/idempotency, internal/kernel/personaldata, internal/kernel/measure, internal/kernel/presence]
   platform-buildinfo:
     in: [internal/platform/buildinfo, internal/platform/buildinfo/**]
   platform-config:
@@ -460,10 +460,10 @@ deps:
   notify-domain:
     mayDependOn: [notify-domain]
   notify-app:
-    mayDependOn: [notify-app, notify, notify-domain, kernel-ports, identity, chat, messaging, sync]
+    mayDependOn: [notify-app, notify, notify-domain, kernel-ports, identity, chat, messaging, sync, authz]
   notify-adapters:
-    mayDependOn: [notify-adapters, notify, notify-app, notify-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, identity, chat, messaging, sync]
-    canUse: [v-pgx]
+    mayDependOn: [notify-adapters, notify, notify-app, notify-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, identity, chat, messaging, sync, authz]
+    canUse: [v-pgx, v-otel]
   apps:
     mayDependOn: [apps, kernel-ports]
   apps-domain:

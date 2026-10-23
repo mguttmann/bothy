@@ -19,8 +19,9 @@ appears in the exported API, so a breaking change of River (0.x) touches this pa
 | `args.go` | `Args`, `Job`, `Handler`, `HandlerOptions`, the queue names, `ValidateArgsType` |
 | `registry.go` | `Registry`, `NewRegistry`, `Register`, `AddPeriodic`, `PeriodicJob`, `ArgTypes` |
 | `worker.go` | the wrapper around every handler: span, panic, cancellation, retry rule |
-| `runtime.go` | `Config`, `ValidateSchema`, `Role`, `Runtime` (`New`, `Inserter`, `Start`, `Stop`, `Failed`), `Inserter`, `InsertOptions` |
-| `insert.go` | `InsertTx` in the ambient transaction |
+| `runtime.go` | `Config`, `ValidateSchema`, `Role`, `Runtime` (`New`, `Inserter`, `Start`, `Stop`, `Failed`), `Inserter`, `InsertOptions`, `InsertResult` |
+| `insert.go` | `InsertTx` in the ambient transaction and the checks all three operations share |
+| `unique.go` | `InsertUniqueTx` (River unique jobs by args and state), `PendingTx` and `LatestPendingTx` |
 | `migrate.go` | `Migrate`, `MigrationStatus`, `ValidateMigrations`, `CheckEmbeddedMigrations` |
 | `jobstest/` | test helper: River's migrations on a `pgtest` database |
 | `internal/fakemodule/` | stand-in module with the test arguments and handlers |
@@ -70,17 +71,27 @@ delivers an error and `internal/wire` ends the process with exit code 1 (02 "Hea
    the job becomes visible with the commit and vanishes with a rollback. Outside a unit, in the
    phases `sync` and `audit`, for an unregistered kind or arguments of another type the insert is
    an internal error.
-4. `Work` is idempotent, passes its context on and returns `ctx.Err()` when the context ends.
+4. State that must exist once per key (an open window, a throttle) is a unique job (M3-19):
+   `Inserter.InsertUniqueTx` inserts unless a job of the same kind with equal arguments stands in
+   a state that is not finalized (`available`, `pending`, `retryable`, `running`, `scheduled`);
+   then it returns `Inserted = false` and the `ScheduledAt` of the standing job. Equal arguments
+   are the fields tagged `river:"unique"` when the argument type tags any field, else all fields
+   (River's unique jobs by args); queue and time do not count. `Inserter.PendingTx` reads that
+   standing job (its `ScheduledAt`, `ok = false` for none) in the ambient transaction with the
+   same comparison. `Inserter.LatestPendingTx` reads the latest such job compared on the named
+   JSON fields only, for marker jobs that carry their own end time (M3-19). All have the checks of
+   `InsertTx` (unit of work, phase, kind, type).
+5. `Work` is idempotent, passes its context on and returns `ctx.Err()` when the context ends.
    `nil` marks the job as done; the wrapper turns a `nil` after the end of the context into
    `ctx.Err()`, because a swallowed cancellation would mark an unfinished job as done.
-5. A panic is caught: the job is recorded with the error `jobs: job <kind> panicked` (never the
+6. A panic is caught: the job is recorded with the error `jobs: job <kind> panicked` (never the
    panic value or the arguments) and retried, the process keeps running. The log line
    `job panicked` carries `bothy.job.kind` and `error.type=panic`.
-6. Chapters with their own retry rule set `HandlerOptions.NextRetry` (pause after an attempt) and
+7. Chapters with their own retry rule set `HandlerOptions.NextRetry` (pause after an attempt) and
    `MaxAttempts`. `HandlerOptions.Timeout` sets River's job timeout of a kind: zero keeps the
    default below, a negative value means no River timeout, for a handler that bounds its own work
    (`files.scan`, M3-04).
-7. Periodic jobs (`Registry.AddPeriodic`) need a registered kind and a positive interval; only the
+8. Periodic jobs (`Registry.AddPeriodic`) need a registered kind and a positive interval; only the
    leader among the workers inserts them.
 
 ## Spans

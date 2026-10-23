@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45); groups from the OIDC group claim built (M1-42); local accounts with password and TOTP built (M1-39).
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45); groups from the OIDC group claim built (M1-42); local accounts with password and TOTP built (M1-39); the writer of `device.pending` and `Devices.ActiveForUsers` built (M3-19).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -966,6 +966,31 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
   from it, and the first request after `authz.view_as_max_duration` ends it (entry
   `access.view_as.end`, `ended_reason = expired`) and answers `401 step_up_required`. `endViewAs`
   ends it with `ended_reason = ended`.
+
+## Pending device events and active devices (M3-19)
+
+- Writer of `device.pending` (R-AZ-31, 05 section 6): every insert of a device row goes through one
+  function, `insertDevice` (`app/devicepending.go`), used by `Devices.Register`, `CompleteLogin`
+  (the only caller that registers a `pending` device, with `TrustUnconfirmed`), the pairing
+  approval and the console login. Exactly when the device is `pending` it appends one durable
+  event `device.pending` through `kernel/eventlog.Appender` in the same unit of work: resource
+  `{kind: device, id: device_id}`, audience the person of the device, receive action `self`, empty
+  scope, schema version 1, payload `DevicePendingPayload` with only `device_id` and `platform`
+  (never the name, a key or the app version, ADR 0031). An active device appends none, and a veto
+  later in the unit removes device and event together. The actor is the actor of the request for
+  `Register` and the person for a login (as in its audit entry). Without an appender
+  (`DevicesDeps.Events`, `ServiceDeps.Events`) a pending registration is an internal error and
+  stores nothing (fail closed). `Register` (`people.go`) declares the event for the start check.
+- Port: `Devices.ActiveForUsers(ctx, userIDs)` returns the devices with `devices.state = 'active'`
+  of many people in one read (`queries/device_routes.sql`, `ListActiveDevicesOfUsers`, index
+  `devices_user_id_state_idx`), grouped by person, each list ascending by id, as `DeviceRef{ID,
+  Platform}`. It does not authorize: the worker consumer `push` of `notify` selected the people and
+  decides every hint with `authorize` (M3-19 design note 8). A pending device is never in the
+  answer, so the security hint of its own `device.pending` never reaches it.
+- Tests: `TestRegister_PendingAppendsDevicePending`, `TestRegister_PendingWithoutAppenderFailsClosed`,
+  `TestActiveForUsers`, `TestCompleteLogin_DevicePending` (PostgreSQL: one committed event for a
+  login with `TrustUnconfirmed`, none for an active device, none after a veto) in
+  `app/devicepending_test.go`; `TestRegister` (root package).
 
 ## People by id list (M3-18)
 

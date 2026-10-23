@@ -8,6 +8,7 @@ import (
 	stdsync "sync"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -15,11 +16,13 @@ import (
 
 // Subscribers holds the in-transaction subscribers of notify (02 section 4.3): OnChannelArchived
 // and OnSpaceArchived remove the notification preferences of an archived target and of
-// everything below it (R-DM-16, docs/DECISIONS.md D-M3-18-5). internal/wire builds it with the
+// everything below it (R-DM-16, docs/DECISIONS.md D-M3-18-5), and OnMessagePosted is the
+// automatic following (M3-19). internal/wire builds it with the
 // module objects of the txn registry, before chat and the appender exist, so it opens no
 // connection and gets both later through Bind.
 type Subscribers struct {
 	store Store
+	clock clock.Clock
 
 	mu     stdsync.RWMutex
 	events eventlog.Appender
@@ -27,7 +30,18 @@ type Subscribers struct {
 }
 
 // NewSubscribers returns the subscribers over the store.
-func NewSubscribers(store Store) *Subscribers { return &Subscribers{store: store} }
+func NewSubscribers(store Store) *Subscribers {
+	return &Subscribers{store: store, clock: clock.System()}
+}
+
+// WithClock sets the clock of the automatic following (updated_at of an inserted row); tests
+// pass a fake clock. It returns s.
+func (s *Subscribers) WithClock(c clock.Clock) *Subscribers {
+	if c != nil {
+		s.clock = c
+	}
+	return s
+}
 
 // Bind sets the appender and the chat paths (start step of chat). Errors: a nil argument.
 func (s *Subscribers) Bind(events eventlog.Appender, paths PathSource) error {

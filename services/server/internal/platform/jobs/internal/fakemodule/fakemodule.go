@@ -25,6 +25,18 @@ type Echo struct {
 // Kind returns "fakemodule.echo".
 func (Echo) Kind() string { return "fakemodule.echo" }
 
+// Keyed is the argument of the test job fakemodule.keyed: only Key is tagged river:"unique", so
+// the unique insert and PendingTx compare Key alone and ignore Seq.
+type Keyed struct {
+	// Key is the only field of the uniqueness comparison.
+	Key ids.ID `json:"key" river:"unique"`
+	// Seq is ignored by the comparison; the test reads it back to see which job stands.
+	Seq int64 `json:"seq"`
+}
+
+// Kind returns "fakemodule.keyed".
+func (Keyed) Kind() string { return "fakemodule.keyed" }
+
 // Block is the argument of the test job fakemodule.block, whose handler waits for its context.
 type Block struct{}
 

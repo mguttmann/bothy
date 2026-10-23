@@ -60,6 +60,22 @@ triggering person, `message` to all others with level `all`; both point to the l
 If the agent mentions a person, `mention` goes out immediately. Reason: a run can write several
 intermediate messages; the person wants to know when it is finished.
 
+An agent message is during a run exactly when the newest run anchor before it in the thread
+belongs to a run of the same agent that was active (`queued`, `running` or `waiting_input`) at
+the message's commit: the consumer `push` reads the last `run.state_changed` of that run with a
+smaller log `seq` than the message, never the state of the moment it processes the event. The
+log order is the commit order and at most one run is active per thread (R-DM-14), so the newest
+anchor names the only candidate. Without an anchor, without a retained state event or with
+another agent the message gives the normal `message` hints. The last agent message of a run is
+the newest message of its agent after the anchor whose `message.created` was committed before
+the event that ended the run; messages written after the end do not move it
+(docs/DECISIONS.md D-M3-19-4). At `completed` the person who started the run gets `run_done` and
+the others with `all` get `message`; at `failed` the starter gets `run_failed` and the others
+`message`; at `cancelled` there is no run kind, so everyone with `all`, the starter included, gets
+`message`. In a DM channel this hint goes as `dm` to the participants instead of `message`. A
+run that wrote no agent message gives no `message` hint; `run_done`, `run_failed`
+and `input_needed` then point at the thread without a message (D-M3-19-3).
+
 `input_needed` ignores `mute`, but not quiet hours: the run waits until exactly this person
 answers, and that person started it. Muting should not leave a person's own runs stuck. Other
 authorized people (for example with `approve_actions`) see the question in the thread, but get
@@ -110,6 +126,10 @@ transaction `notification_preferences(user, 'thread', id, level = 'all')` and wr
 `notification_pref.updated`. The app shows this as "Following"; the person can change it. Reason:
 whoever writes in a thread or triggers an agent wants to see the answers. In the
 main thread this does not apply; otherwise one message would make a person follow the whole channel.
+
+Following only inserts: when the person already has an own row for the thread (`all`,
+`mentions` or `mute`), nothing changes and no event is written; agents, apps and messages of
+other origins never follow (docs/DECISIONS.md D-M3-19-14).
 
 ### 3.3 Personal switches
 
@@ -240,6 +260,20 @@ Notifications without thread (`security`, `admin`) open and use no window.
 
 Implementation: one unique, scheduled job per (recipient, thread) in River; River can make jobs
 unique by their arguments and run them at a point in time [Q1, verified].
+
+The window lives only in two unique scheduled jobs on the queue `delivery`
+([02-architecture.md](02-architecture.md), 12.3): `notify.coalesce_window`, unique per (recipient,
+thread, window end), marks an open window and is scheduled at its end, and its run does nothing;
+`notify.coalesce_flush`, unique per (recipient, thread, window end), exists exactly when a
+`message` hint was collected in that window and is scheduled at the same end. The
+end of the open window is the scheduled time of the latest pending marker of (recipient, thread)
+when that is after now. A hint that opens a window inserts the marker of the new end; because the
+end is part of the marker, a marker of the ending window that River still runs never keeps the
+flush or a hint from opening the next window. A collected hint inserts the flush; when one already stands,
+the window has already collected (docs/DECISIONS.md D-M3-19-7). The flush runs at the window end
+in one transaction: it reads the unread count with the formula of point 2, decides as point 5
+says, points at the newest message of the thread (no message ID if there is none), and its t0 of
+section 9 is the window end (D-M3-19-8).
 
 ### 4.6 Delivery path per device
 
@@ -499,6 +533,30 @@ may be retried after 15 minutes, `TooManyRequests` with a delay [Q15, verified].
 - Device revoked (`device.revoke`): all registrations `device_revoked`, immediately.
 - Device tokens never appear in logs, only a short hash prefix.
 
+The provider adapters map their answers of 7.1 and 7.2 onto one of the following result
+classes; the job `notify.push_send` applies the class to the registration row, locked for update
+(docs/DECISIONS.md D-M3-19-12):
+
+| Class | Registration | Hint | `bothy.outcome` |
+|---|---|---|---|
+| `accepted` | `last_success_at = now`, `failure_count = 0` | done | `accepted` |
+| `disable` | `disabled_at = now`, `disabled_reason` = `token_invalid`, `topic_mismatch` or `sender_mismatch`; unchanged when the provider names the time since which the token is invalid and the row was created after it (7.1 row `410`) | done | `rejected_token` |
+| `retry` | `failure_count + 1`; at `push.max_consecutive_failures` `disabled_at = now` with `repeated_failures` | retried unless deactivated or past `push.max_age` | `provider_error` |
+| `throttled` | unchanged (the limit is the server's, not the token's) | retried | `throttled` |
+| `config_error`, `program_error` | unchanged | dropped (a retry cannot help; the adapter raises its alert) | `rejected_other` |
+
+A Go error of the provider call counts as `retry`. The pause before the next attempt is
+`min(push.retry_cap, push.retry_base * 2^(attempt-1))`, scaled by a random factor between 0.5
+and 1 and never below the provider's `Retry-After`; a retry whose time would be later than t0
+plus `push.max_age` is dropped as `expired`.
+
+Delivery is at least once with one `nid`. The provider request cannot join a transaction, so the
+job reads and checks in one transaction, calls the provider outside any transaction, and records
+the result in a second one. A crash between the call and the record runs the job again, so a push
+may reach a device twice with the same `nid`; the app replaces it by thread (6.1, 5.2). The `nid`
+is one per hint and recipient and is shared by the jobs of that hint's registrations
+(D-M3-19-10).
+
 ## 8. Badge and sync
 
 Badge number for r = number of threads visible to r with at least one unread mention
@@ -511,6 +569,33 @@ text; the NSE then does not run [Q4, derived]; push type `alert` [assumed, to be
 device test]), Android `k = "sync"` with priority
 `normal`, which removes read threads from the notification drawer. On iOS, displayed
 notifications stay until the next opening of the app; this is a known limitation.
+
+Computation (docs/DECISIONS.md D-M3-19-15): the job `notify.push_send` counts the badge of the
+recipient at send time and sets it on every hint and every sync. A thread counts when the person
+can read it (the visible channels through `authz` for the action `push.deliver`, and each counted
+thread confirmed with `authorize(r, push.deliver, thread)` in filter mode) and it is unread
+(`threads.last_message_seq` above the greater of `read_states.last_read_seq`, 0 without a row,
+and `threads.unread_floor_seq`) and it holds an unread mention of r, or its effective level is
+`all`, or it lies in a DM channel. A thread the person cannot read never counts, also when a
+mention of r is stored there.
+
+The sync: the consumer `push` reads every `read_state.updated` of r. The read lowers the number
+exactly when its thread counts at the previous read position of r (the `last_read_seq` of the
+newest earlier `read_state.updated` of r for that thread, else 0) and does not count at the new
+one; marking a thread unread never lowers it. Then the consumer schedules the job
+`notify.badge_sync` of r, unique per person and time: nothing if a sync of r is pending and not
+yet due (it carries this read), else at the end of a pending `notify.badge_sync_hold` of r or
+now; when the pending sync is already due it may run and have read its events, so the follow-up
+goes no earlier than now plus `notify.badge_sync_min_interval`. A sync that finds a hold of an
+earlier sync still pending moves itself to the end of that hold. The sync job counts the badge,
+collects as `Cleared` the threads of the reads of r since the read that scheduled it that no
+longer count (distinct, in event order, the complete list), inserts `notify.badge_sync_hold` of r
+at now plus `notify.badge_sync_min_interval` (unique per person and end, so a hold that River
+still runs never stops the next one; the running interval is the latest pending hold), and inserts one `notify.push_send` of the kind
+`sync` with a new `nid` per active `apns` or `fcm` registration of an active `ios` or `android`
+device of r. The sync carries no thread, no message, no quiet flag and no count. So a person gets
+at most one sync per `notify.badge_sync_min_interval`, and a read that does not lower the number
+gives none.
 
 ## 9. Delivery measurement
 
@@ -577,20 +662,68 @@ no person, device or thread IDs.
    lost ([02-architecture.md](02-architecture.md), section 11.5,
    [ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md)). Producers do not know
    `notify`.
+
+   As built (M3-19, [ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md),
+   [02-architecture.md](02-architecture.md) 11.5): the hints arise in the worker consumer `push`.
+   It reads five durable event types from the log in `seq` order and inserts the hint jobs in the round that moves its cursor, so a restart in the
+   middle of a round neither doubles nor loses a hint; every other type moves the cursor without
+   effect. `message.created` gives `dm` in a DM channel, else `mention` to the mentioned people
+   and `message` to the other readers (one hint per person and event; precedence `dm`, `mention`,
+   `message`; nothing for a redacted event of a deleted message, for `silent`,
+   `origin IN ('import','system')` and the kinds `run` and `system`); `run.state_changed` gives the run kinds and the run's `message` hint of 2.1;
+   `access.expiring` gives `admin` to its audience; `device.pending`, which `identity` writes in
+   the transaction that registers a device with state `pending` (R-AZ-31), gives `security` to
+   the device's human, routed only to the other active devices of that human; and
+   `read_state.updated` gives no hint but triggers the badge sync of section 8. Only active
+   humans are recipients (docs/DECISIONS.md D-M3-19-2).
+
 2. The consumer `push` determines the candidates per event: people with read permission on the
    channel (from `authz`), mentioned people, the run's triggering person. A batched query on
    `notification_preferences` fetches the levels for all candidates and the three targets (thread, channel, space).
    `notify` gathers the facts for all candidates of a thread in one query and resolves the level
    with the pure function of point 3 (docs/DECISIONS.md D-M3-18-9).
+
+   As built (M3-19): the readers of a channel come from the port `authz.Recipients.Readers`, a
+   superset of the people who can read it; mentioned people and the run starter are candidates
+   by name. Every candidate is decided with `authorize(r, push.deliver, thread)` in filter mode,
+   with the principal of a check without a request (R-AZ-29: no session, no device, blocks only
+   from the person's status), so the superset never leaks; for `security` and `admin` the
+   recipient rule of R-AZ-30 decides (docs/DECISIONS.md D-M3-19-1, D-M3-19-5). The other facts
+   (levels, quiet hours, switches, devices, registrations, connections) are read in one call per
+   port for all candidates of an event; a stored switch that is no boolean counts as unset
+   (D-M3-19-6).
+
 3. The decision per recipient (section 4) is a pure function in the domain part of
    `notify`. It gets facts (level, quiet hours, activity, window state) and returns a
    decision. Tests check it as a table.
+
 4. `notify` queries activity and live connections from the gateway through the port `PresenceView`.
    With one `api` process this is memory in the process. With several `api` nodes the
    gateway needs a shared presence state; this belongs to the scaling path in
    [02-architecture.md](02-architecture.md), like the distribution of other ephemeral events.
+
+   As built (M3-19): the port is `presence.View` in `internal/kernel/presence`, because `notify`
+   and `gateway` are on the same layer of 02 4.4. Until M3-23 the push path falls back to
+   `presence.None`, which reports no connection, so no decision yields the routes over the gateway or the delayed
+   push; the default receiver of those routes fails closed and rolls the round back
+   (docs/DECISIONS.md D-M3-19-9).
+
 5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with
    retries according to section 7. HTTP/2 connections to APNs stay open and are shared; at most `push.max_concurrent_requests` at the same time.
+
+   As built (M3-19): the job is `notify.push_send` on the queue `delivery`, one per active
+   registration of a hint, with only IDs and numbers as arguments (the kind as a fixed code that
+   is never renumbered). Step 1, in one transaction: the registration is loaded; gone, deactivated
+   or on a device that is no longer active ends the job with `no_registration`; older than
+   `push.max_age` with `expired`; `push.deliver` with the rights of now (for `security` an active human and a registration not on
+   the pending device, for `admin` and a sync an active human, the recipient being the audience
+   of the event) denied with `no_access`; no provider
+   for the registration's `provider` with `no_provider`; then the badge of section 8. Step 2,
+   outside any transaction and under a process-wide limit of `push.max_concurrent_requests`: the
+   call of the port `PushProvider` of 5.4. Step 3, in one transaction: the result class of 7.3
+   and, for a retry, the same job with the next attempt. A job that skips ends without error. The
+   server registers no production provider before the adapters of APNs and FCM exist, so until
+   then every job ends with `no_provider` (docs/DECISIONS.md D-M3-19-10, D-M3-19-11).
 
 ## 13. Endpoints and actions
 

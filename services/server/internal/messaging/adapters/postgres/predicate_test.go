@@ -29,6 +29,16 @@ var visiblePredicateAllowlist = map[string]string{
 		"component.update on the card's path, or a job or the end of a run names the card; it returns facts, no content",
 	"RaiseMessageVersion": "the version of the card LockCardMessage locked in the same unit of work (M2-15, " +
 		"Messages.ComponentsChanged); the row goes only into message.updated, whose receive action message.read sync checks per reader",
+	// The reads of the consumer push of notify (M3-19 design notes 5 and 9 d): a worker without a
+	// principal that reads like the log tail; notify checks every hint with push.deliver.
+	"LastAnchorBefore": "the run anchor before a position for the consumer push (M3-19), a system job without a principal; " +
+		"it returns positions only and notify checks every hint with push.deliver",
+	"AnchorOfRun": "the anchor of a run for the consumer push (M3-19), a system job without a principal; it returns " +
+		"positions only and notify checks every hint with push.deliver",
+	"LastAgentMessageBefore": "the last agent message of a run for the consumer push (M3-19), a system job without a " +
+		"principal; it returns positions only and notify checks every hint with push.deliver",
+	"NewestMessage": "the newest message of a thread for the flush hint of notify (M3-19), a system job without a " +
+		"principal; it returns positions only and notify checks every hint with push.deliver",
 	// The template statements of M1-60 (INT-W22/5): personal templates belong to no channel, and the
 	// writes follow the locked visible read GetVisibleTemplate.
 	"ListPersonalTemplates": "the personal templates of the caller (owner_user_id), which belong to no channel; " +

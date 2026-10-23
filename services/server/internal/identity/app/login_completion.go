@@ -134,7 +134,9 @@ type ServiceDeps struct {
 	Pepper []byte
 	// TrustedHeader is the driver trusted_header (M1-43); nil keeps the header login off (404).
 	TrustedHeader *TrustedHeaderDriver
-	// Events appends user.updated for a person the header login provisions; nil appends nothing.
+	// Events appends user.updated for a person the header login provisions (nil appends nothing
+	// there) and device.pending for every device a login registers as pending (R-AZ-31; nil
+	// refuses such a login with an internal error, so no pending device lacks its event).
 	Events eventlog.Appender
 	// Random is the source of pairing codes (M1-38) and of the handle suffixes of people the header
 	// login provisions (M1-43); nil means domain.EnrollmentRandom (crypto/rand).
@@ -345,7 +347,8 @@ func (s *Service) loginDevice(ctx context.Context, in LoginCompletion) (identity
 		}
 		return known, false, nil
 	}
-	created, err := s.d.Devices.InsertDevice(ctx, d)
+	// The login is the person's action, as in its audit entry, though the request is anonymous.
+	created, err := insertDevice(ctx, s.d.Devices, s.d.Events, eventActorRef{kind: eventlog.ActorUser, id: in.UserID}, d)
 	return created, true, err
 }
 

@@ -38,11 +38,10 @@ type dlWorld struct {
 	owner gwPerson
 }
 
-// newDeliveryWorld starts the world with the environment entries extra.
-func newDeliveryWorld(t *testing.T, extra ...string) *dlWorld {
+// partitions creates the partitions of event_log as the migrate step does: the api role creates
+// none (M1-16), and a use case that appends an event needs them.
+func (w *gwWorld) partitions(t *testing.T) {
 	t.Helper()
-	w := newGatewayWorld(t, extra...)
-	// The api role creates no partitions of event_log; the migrate step does (M1-16).
 	cfg, err := wire.SyncConfigFrom(loadEnv(t, w.env))
 	if err != nil {
 		t.Fatal(err)
@@ -55,6 +54,13 @@ func newDeliveryWorld(t *testing.T, extra ...string) *dlWorld {
 	if err := opts.After[1].Run(context.Background(), nil); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// newDeliveryWorld starts the world with the environment entries extra.
+func newDeliveryWorld(t *testing.T, extra ...string) *dlWorld {
+	t.Helper()
+	w := newGatewayWorld(t, extra...)
+	w.partitions(t)
 	owner := w.newPerson("alex", identity.DeviceStateActive)
 	w.sql(`INSERT INTO owners (id, user_id, reason) VALUES ($1, $2, 'test')`, ids.New().String(), owner.user.String())
 	return &dlWorld{gwWorld: w, owner: owner}

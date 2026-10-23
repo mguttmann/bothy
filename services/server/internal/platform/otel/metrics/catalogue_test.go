@@ -244,10 +244,11 @@ func TestCatalogue_RegistryMatchesSignalsDoc(t *testing.T) {
 }
 
 // TestCatalogue_M1InstrumentSet: the registry holds exactly the instruments this build records
-// (brief M1-68 "Instruments", plus the gauges of M2-01 already on the base, the app metrics of
-// M4-31, bothy.file.upload.size of M3-03, the gauges of bothy-backupd of M7-02, the four run
-// instruments of M2-05, the relay counter of M2-44, the scan instruments of M3-04 and the restore
-// test instruments of M7-03).
+// (brief M1-68 "Instruments", plus the gauges of M2-01 already on the base,
+// bothy.file.upload.size of M3-03, the app metrics of M4-31, the scan instruments of M3-04, the
+// relay counter of M2-44, the gauges of bothy-backupd of M7-02, the restore test instruments of
+// M7-03, the counter bothy.console.csp_violations of M6-03, the four run instruments of M2-05 and
+// the four push instruments of M3-19).
 func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
@@ -277,6 +278,8 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.agent.heartbeat.age", "bothy.agent.billing_mode.mismatch_age",
 		// M2-10: the steps adapters add through live-box patches (4.3).
 		"bothy.run.steps",
+		// M3-19: the push instruments of 4.4 (bothy.push.fetch comes with M3-22).
+		"bothy.push.registrations.active", "bothy.push.send.duration", "bothy.push.sent", "bothy.push.skipped",
 	}
 	slices.Sort(want)
 	var got []string
@@ -296,4 +299,47 @@ func sortedCopy(s []string) []string {
 	c := slices.Clone(s)
 	slices.Sort(c)
 	return c
+}
+
+// TestCatalogue_PushInstruments holds the push instruments of signals.md 4.4 to brief M3-19
+// design notes 13 and 15: the closed sets of bothy.push.provider (signals.md 5.3), bothy.outcome
+// (the outcomes of the result classes) and bothy.reason (the seven skip reasons; quiet hours
+// never drop a hint, R-PN-05), the seconds buckets of the send duration and a gauge per provider.
+func TestCatalogue_PushInstruments(t *testing.T) {
+	providers := []string{"apns", "fcm", "unifiedpush", "wns"}
+	cases := []struct {
+		spec  Spec
+		kind  Kind
+		unit  string
+		attrs map[string][]string
+	}{
+		{PushSent, KindCounter, "{notification}", map[string][]string{
+			"bothy.push.provider": providers,
+			"bothy.outcome":       {"accepted", "rejected_token", "rejected_other", "throttled", "provider_error"},
+		}},
+		{PushSendDuration, KindHistogram, "s", map[string][]string{"bothy.push.provider": providers}},
+		{PushSkipped, KindCounter, "{notification}", map[string][]string{
+			"bothy.reason": {"no_access", "preference", "active_in_thread", "no_registration", "read", "expired", "no_provider"},
+		}},
+		{PushRegistrationsActive, KindGauge, "{registration}", map[string][]string{"bothy.push.provider": providers}},
+	}
+	for _, c := range cases {
+		if c.spec.Kind != c.kind || c.spec.Unit != c.unit || c.spec.Description == "" {
+			t.Errorf("%s: kind %s unit %s description %q, want %s %s and a description", c.spec.Name, c.spec.Kind, c.spec.Unit, c.spec.Description, c.kind, c.unit)
+		}
+		if len(c.spec.Attrs) != len(c.attrs) {
+			t.Errorf("%s: attributes %v, want %v", c.spec.Name, c.spec.Keys(), c.attrs)
+		}
+		for _, a := range c.spec.Attrs {
+			if want, ok := c.attrs[a.Key]; !ok || a.Source != "" || a.Optional || !slices.Equal(sortedCopy(a.Values), sortedCopy(want)) {
+				t.Errorf("%s: %s values %v (source %q, optional %v), want %v", c.spec.Name, a.Key, a.Values, a.Source, a.Optional, want)
+			}
+		}
+	}
+	if !slices.Equal(PushSendDuration.Buckets, BucketsSeconds) {
+		t.Errorf("bothy.push.send.duration bounds %v, want BucketsSeconds", PushSendDuration.Buckets)
+	}
+	if problems := Check([]Spec{PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive}); len(problems) > 0 {
+		t.Errorf("the push instruments fail Check: %v", problems)
+	}
 }

@@ -32,7 +32,7 @@ func (allowAll) Observe(context.Context, authorize.LogEvent) {}
 func devicesWith(t *testing.T, f *fixture, az authorize.Authorizer) *app.Devices {
 	t.Helper()
 	d, err := app.NewDevices(app.Config{PageSizeDefault: 50, PageSizeMax: 200}, app.DevicesDeps{
-		Store: f.repo, People: f.repo, UoW: f.uow, Authorizer: az, Cursors: nopCursors{},
+		Store: f.repo, People: f.repo, UoW: f.uow, Authorizer: az, Cursors: nopCursors{}, Events: &events{},
 	})
 	if err != nil {
 		t.Fatal(err)

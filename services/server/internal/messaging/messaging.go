@@ -111,6 +111,14 @@ type MessagePosted struct {
 	CreatedAt time.Time
 }
 
+// MessageRef names one message by ID and position in its thread.
+type MessageRef struct {
+	// ID is the message.
+	ID ids.ID
+	// ThreadSeq is its position in the thread.
+	ThreadSeq int64
+}
+
 // PrincipalRef is the minimal public view of a principal (schema PrincipalRef).
 type PrincipalRef struct {
 	ID ids.ID
@@ -297,11 +305,15 @@ type TriggerMessage struct {
 	TriggerState, TriggerStateReason string
 }
 
-// AnchorRef names a written live box anchor.
+// AnchorRef names a live box anchor of a run (09 section 5.4: the only message with run_id, kind
+// run, silent).
 type AnchorRef struct {
 	// MessageID is the anchor; ThreadSeq its position in the thread.
 	MessageID ids.ID
 	ThreadSeq int64
+	// RunID is the run of the anchor; the reads of the consumer push (M3-19) set it,
+	// CreateRunAnchor leaves it zero because its caller knows the run.
+	RunID ids.ID
 }
 
 // Messages is the incoming port of sending (M1-56) and reading (M1-57). The caller a is the principal of the request;
@@ -414,4 +426,41 @@ type Messages interface {
 	// the author of a message (M2-15 design note 11 c: triggered_by of a run an interaction
 	// opened). It never authorizes. Errors: internal for an unknown principal.
 	PrincipalOf(ctx context.Context, principalID ids.ID) (PrincipalRef, error)
+
+	// The reads of the consumer push of notify (M3-19 design notes 5 and 9 d). None authorizes and
+	// none applies a visibility predicate: the consumer has no principal and reads like the log
+	// tail, and notify checks every hint with push.deliver before it decides and again before it
+	// sends (07 section 7.4 rule 1). They return positions only, never content; found is false
+	// when no message matches, never an error. Errors: the database error.
+
+	// LastAnchorBefore returns the newest run anchor (kind run, run_id set; 09 section 5.4) in
+	// threadID with thread_seq below beforeThreadSeq, with its message, run and position. The
+	// consumer uses it to tell whether an agent message was written during a run.
+	//
+	// Example:
+	//
+	//	anchor, found, err := msgs.LastAnchorBefore(ctx, ev.ThreadID, ev.ThreadSeq)
+	LastAnchorBefore(ctx context.Context, threadID ids.ID, beforeThreadSeq int64) (AnchorRef, bool, error)
+	// AnchorOf returns the anchor message of runID with its run and position.
+	//
+	// Example:
+	//
+	//	anchor, found, err := msgs.AnchorOf(ctx, runID)
+	AnchorOf(ctx context.Context, runID ids.ID) (AnchorRef, bool, error)
+	// LastAgentMessageBefore returns the newest message of the author agentID in threadID with
+	// afterThreadSeq < thread_seq < beforeThreadSeq, origin agent, kind text, voice or card (the
+	// kinds the messages check of 03 allows for an answer) and not deleted: the last answer of a
+	// run between its anchor and a bound.
+	//
+	// Example:
+	//
+	//	last, found, err := msgs.LastAgentMessageBefore(ctx, thread, agent, anchor.ThreadSeq, math.MaxInt64)
+	LastAgentMessageBefore(ctx context.Context, threadID, agentID ids.ID, afterThreadSeq, beforeThreadSeq int64) (MessageRef, bool, error)
+	// Newest returns the newest message of threadID that is not deleted and whose kind is neither
+	// run nor system: the message a bundled hint points at.
+	//
+	// Example:
+	//
+	//	newest, found, err := msgs.Newest(ctx, thread)
+	Newest(ctx context.Context, threadID ids.ID) (MessageRef, bool, error)
 }

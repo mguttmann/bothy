@@ -106,6 +106,47 @@ func (q *Queries) GetPreference(ctx context.Context, arg GetPreferenceParams) (N
 	return i, err
 }
 
+const insertPreferenceIfAbsent = `-- name: InsertPreferenceIfAbsent :one
+INSERT INTO notification_preferences (user_id, target_kind, target_id, level, muted_until, version, updated_at)
+VALUES ($1, $2, $3, $4, $5, 1, $6)
+ON CONFLICT (user_id, target_kind, target_id) DO NOTHING
+RETURNING user_id, target_kind, target_id, level, muted_until, version, updated_at
+`
+
+type InsertPreferenceIfAbsentParams struct {
+	UserID     pgtype.UUID
+	TargetKind string
+	TargetID   pgtype.UUID
+	Level      string
+	MutedUntil pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
+// Automatic following (13 section 3.2, M3-19 design note 17): inserts the row with version 1
+// only when the person has no own row for the target yet; an existing level is never
+// overwritten. No row is returned when one existed.
+func (q *Queries) InsertPreferenceIfAbsent(ctx context.Context, arg InsertPreferenceIfAbsentParams) (NotificationPreference, error) {
+	row := q.db.QueryRow(ctx, insertPreferenceIfAbsent,
+		arg.UserID,
+		arg.TargetKind,
+		arg.TargetID,
+		arg.Level,
+		arg.MutedUntil,
+		arg.UpdatedAt,
+	)
+	var i NotificationPreference
+	err := row.Scan(
+		&i.UserID,
+		&i.TargetKind,
+		&i.TargetID,
+		&i.Level,
+		&i.MutedUntil,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const levelRows = `-- name: LevelRows :many
 SELECT user_id, target_kind, target_id, level, muted_until, version, updated_at FROM notification_preferences
 WHERE user_id = ANY ($1::uuid[])

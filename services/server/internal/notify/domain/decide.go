@@ -216,6 +216,9 @@ func (in RecipientFacts) recipient() bool {
 		return in.RunStarter
 	case KindSecurity, KindAdmin:
 		return true
+	case KindSync:
+		// A badge sync is no hint and has no recipient column (13 8).
+		return false
 	}
 	return false
 }

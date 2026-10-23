@@ -343,6 +343,17 @@ func TestConfigSchemaBuilds(t *testing.T) {
 			Chapter: "11-extensions.md"},
 		// M3-18
 		"notify.user_default_level": {Kind: config.KindEnum, Default: "mentions", Enum: []string{"all", "mentions", "mute"}, Chapter: "13-push-notifications.md"},
+		// M3-19
+		"notify.coalesce_window":                         {Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: "13-push-notifications.md"},
+		"notify.mobile_delay_when_desktop_active":        {Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: "13-push-notifications.md"},
+		"notify.default_admin_enabled":                   {Kind: config.KindBool, Default: "true", Chapter: "13-push-notifications.md"},
+		"notify.default_input_needed_breaks_quiet_hours": {Kind: config.KindBool, Default: "false", Chapter: "13-push-notifications.md"},
+		"notify.badge_sync_min_interval":                 {Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: "13-push-notifications.md"},
+		"push.max_age":                                   {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "13-push-notifications.md"},
+		"push.retry_base":                                {Kind: config.KindDuration, Default: "2s", Min: "1ms", Chapter: "13-push-notifications.md"},
+		"push.retry_cap":                                 {Kind: config.KindDuration, Default: "5m", Min: "1ms", Chapter: "13-push-notifications.md"},
+		"push.max_concurrent_requests":                   {Kind: config.KindInt, Default: "32", Min: "1", Max: "100000", Chapter: "13-push-notifications.md"},
+		"push.max_consecutive_failures":                  {Kind: config.KindInt, Default: "5", Min: "1", Max: "100000", Chapter: "03-data-model.md"},
 		// The agent consumers (M2-07, 04 "Configuration values of this chapter").
 		"agent.ack_timeout":          {Kind: config.KindDuration, Default: "30s", Min: "1ms", Chapter: "04-sync-protocol.md"},
 		"agent.ack_persist_interval": {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "04-sync-protocol.md"},
