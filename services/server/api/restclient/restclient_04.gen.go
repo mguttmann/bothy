@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// PostIncomingWebhookWithBearerResponse413Headers the declared response headers of an HTTP 413 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse413Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // PostIncomingWebhookWithBearerResponse422Headers the declared response headers of an HTTP 422 response for PostIncomingWebhookWithBearer
 type PostIncomingWebhookWithBearerResponse422Headers struct {
 	CorrelationId *CorrelationId
@@ -26049,11 +26054,4 @@ func (r UpdateWebhookSubscriptionResponse) ContentType() string {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
-}
-
-// ListWebhookDeliveriesResponse200Headers the declared response headers of an HTTP 200 response for ListWebhookDeliveries
-type ListWebhookDeliveriesResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
 }
