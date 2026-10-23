@@ -87,6 +87,7 @@ max-args = 7
 [tool.ruff.lint.per-file-ignores]
 "tests/**/test_*.py" = ["D", "S101", "S105", "S106", "S108", "PLR0913", "PLR0915", "PLC0415", "B023"]
 "tests/adapter_kit.py" = ["D101", "D102", "D103", "D105", "D107", "S101", "PLR0913"]
+"tests/fake_hermes_kit.py" = ["D101", "D102", "D103", "D105", "D107", "S101", "S603", "PLR0913", "SLF001"]
 "tests/**/conftest.py" = ["D", "S101", "PLC0415"]
 "tests/fake_hermes/*.py" = ["D", "S101", "PLC0415"]
 "typings/**" = ["D", "N", "PLR0913", "E501", "PYI"]

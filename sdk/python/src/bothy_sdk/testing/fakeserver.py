@@ -242,6 +242,7 @@ class FakeServer:
         self._deprecated: dict[str, str] = {}
         self._idempotency: dict[tuple[str, str], tuple[str, _Answer | None]] = {}
         self._fixed_tokens: dict[int, str] = {}
+        self._forged: dict[UUID, str | None] = {}
         self._tasks: set[asyncio.Task[None]] = set()
         self.hub = Hub(self.clock, self.timings, self._deliver)
         self.world = World(
@@ -377,6 +378,7 @@ class FakeServer:
         history: tuple[ContextMessage, ...] = (),
         files: tuple[ContextFile, ...] = (),
         session_mode: str | object | None = AUTO_SESSION,
+        forged: str | None = None,
     ) -> Triggered:
         """A person posts ``text``: a queued run and its ``agent.invocation``.
 
@@ -397,10 +399,19 @@ class FakeServer:
             session_mode: Left out, the payload carries the thread's current session (``resume``
                 when started, else ``new``); ``None`` makes a guest run without a session (09
                 3.6); ``new``, ``resume`` or ``bind`` send that mode for an operator run (09 9.1).
+            forged: Every delivery of the run's ``agent.invocation`` carries a token of this
+                kind instead of a fresh one, and nothing is recorded on the run (AG-08 and
+                AZ-P6 against an adapter in another process): ``missing`` (no token), a forge
+                variant of `forge_token`, or ``expired`` (well formed, ``exp`` in the past).
 
         Returns:
             The run, thread and message.
+
+        Raises:
+            ValueError: An unknown ``forged`` kind.
         """
+        if forged is not None and forged not in ("missing", "expired", *FORGE_VARIANTS):
+            raise ValueError(f"unknown token kind: {forged}")
         run = self.world.trigger(
             text,
             channel_id=channel_id,
@@ -413,6 +424,9 @@ class FakeServer:
             files=files,
             session_mode=session_mode,
         )
+        if forged is not None:
+            # Set before the first delivery: the deliverers run only after the next await.
+            self._forged[run.id] = self._forged_token(run.id, forged)
         await _settle()
         return Triggered(run.id, run.thread_id, run.triggering_message_id)
 
@@ -523,6 +537,19 @@ class FakeServer:
             The rows, oldest first.
         """
         return [dict(r) for r in self.world.sessions.get(thread_id, [])]
+
+    def _forged_token(self, run_id: UUID, kind: str) -> str | None:
+        if kind == "missing":
+            return None
+        if kind != "expired":
+            return self.forge_token(run_id, kind).reveal()
+        claims = self.world.invocation_claims(self.world.runs[run_id])
+        back = int(self.timings["agent.invocation_token_ttl"] + self.timings["auth.clock_leeway"])
+        claims["iat"] -= 2 * back
+        claims["exp"] -= 2 * back
+        claims = {k: v for k, v in claims.items() if k not in ("iss", "jti")}
+        token, _ = self.world.issuer.issue(claims)
+        return token
 
     def set_channel(self, prompt: str = "", skills: tuple[str, ...] = ()) -> None:
         """Change the channel prompt and skills of Allgemein (``settings_version`` + 1).
@@ -949,6 +976,13 @@ class FakeServer:
         fixed = self._fixed_tokens.get(entry.seq)
         if fixed is not None:
             return {**entry.envelope, "invocation_token": fixed}
+        run_id = entry.envelope.get("payload", {}).get("run_id")
+        if entry.type == "agent.invocation" and run_id and UUID(run_id) in self._forged:
+            forged = self._forged[UUID(run_id)]
+            envelope = {k: v for k, v in entry.envelope.items() if k != "invocation_token"}
+            if forged is not None:
+                envelope["invocation_token"] = forged
+            return envelope
         return self.world.deliver(entry)
 
     def _take_gateway_fault(self, op: str) -> bool:

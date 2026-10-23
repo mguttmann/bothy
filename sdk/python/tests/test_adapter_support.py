@@ -388,3 +388,38 @@ async def test_rebind_binds_a_callback_task_to_the_run(fake: FakeServer) -> None
     reads = [r for r in fake.requests if r.operation_id == "getRunContext"]
     assert reads
     assert "invocation-token" in reads[-1].headers
+
+
+@pytest.mark.parametrize(
+    ("kind", "reason"),
+    [
+        ("missing", "invalid_invocation_token"),
+        ("bad_signature", "invalid_invocation_token"),
+        ("alg_hs256", "invalid_invocation_token"),
+        ("typ_access", "invalid_invocation_token"),
+        ("aud_other_agent", "invalid_invocation_token"),
+    ],
+)
+async def test_trigger_with_a_forged_token(fake: FakeServer, kind: str, reason: str) -> None:
+    handler = RecordingHandler()
+    adapter = _adapter(fake, handler, f"forged-{kind}")
+    async with _running(fake, adapter):
+        triggered = await fake.trigger(forged=kind)
+        await _until(fake, lambda: fake.run_state(triggered.run_id).state == "failed")
+    assert fake.run_state(triggered.run_id).state_reason == reason
+    assert handler.count("prepare") == 0
+    with pytest.raises(ValueError, match="unknown token kind"):
+        await fake.trigger(forged="nonsense")
+
+
+async def test_trigger_with_an_expired_token(fake: FakeServer) -> None:
+    handler = RecordingHandler()
+    adapter = _adapter(fake, handler, "expired")
+    fake.inject("renewInvocationToken", Fault.problem("agent_invocation_denied"))
+    async with _running(fake, adapter):
+        triggered = await fake.trigger(forged="expired")
+        await _until(fake, lambda: fake.requests[-1].operation_id == "renewInvocationToken")
+        await fake.pass_time(0.5)
+    assert handler.count("execute") == 0
+    assert [r for r in fake.requests if r.operation_id == "startRun"] == []
+    assert fake.run_state(triggered.run_id).starts == 0

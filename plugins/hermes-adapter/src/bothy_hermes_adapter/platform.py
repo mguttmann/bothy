@@ -85,6 +85,9 @@ _OUTCOMES: Final = {
     ProcessingOutcome.CANCELLED: TurnOutcome.CANCELLED,
 }
 _NOT_BUILT: Final = "not supported by this server adapter yet"
+# How often the adapter looks at the gateway's startup restore before it connects; a poll of a
+# flag, not a deadline (the wait ends when Hermes is ready).
+_READY_POLL_S: Final = 0.1
 _PLATFORMS: dict[str, BothyPlatform] = {}
 
 
@@ -193,11 +196,25 @@ class BothyPlatform(BasePlatformAdapter):
         kind = str(me.principal.kind)
         return me.principal.id if kind == "agent" else None
 
+    async def _hermes_ready(self) -> None:
+        """Wait until the gateway finished its startup restore (17.10 record, harness note).
+
+        While Hermes restores sessions after a start it queues every inbound message and reports
+        the queued event as processed; a run started then would end without a turn. The adapter
+        therefore connects to the server only after the restore, so nothing is delivered before.
+        """
+        while True:
+            runner = getattr(self, "gateway_runner", None)
+            if runner is not None and not getattr(runner, "_startup_restore_in_progress", False):
+                return
+            await asyncio.sleep(_READY_POLL_S)
+
     async def _serve(self, store: CallbackStore) -> None:
         loop = self._sdk
         if loop is None:
             return
         try:
+            await self._hermes_ready()
             reason = await loop.run()
             if reason.code == 4015:
                 _LOG.warning("another process took the consumer over; disconnected")

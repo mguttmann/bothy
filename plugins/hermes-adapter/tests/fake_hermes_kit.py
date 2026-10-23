@@ -33,6 +33,7 @@ import yaml
 from bothy_sdk.testing._patience import eventually
 from bothy_sdk.testing.doubles import FakeClock
 from bothy_sdk.testing.fakeserver import FakeServer
+from hermes_harness import fake_model as _fake_model
 from hermes_harness.egress import EgressRecorder
 from hermes_harness.environment import ThrowawayHomes, build_environment, interpreter_dirs
 from hermes_harness.fake_model import (
@@ -198,6 +199,31 @@ def collect_coverage(world: HermesWorld) -> None:
         shutil.move(str(data), str(COMPONENT / f".coverage.hermes.{data.name.split('.', 2)[2]}"))
 
 
+class _RawHandler(_fake_model._Handler):
+    """The fake model's handler that also keeps the raw JSON body of every model request.
+
+    The bodies stay in this process (fake credentials never reach a body: they travel in
+    headers); the AG-20 test reads the system part and the messages Hermes sent.
+    """
+
+    def read_body(self) -> bytes:
+        raw = super().read_body()
+        owner: RawFakeModel = self.server.owner  # type: ignore[attr-defined]
+        if raw:
+            with contextlib.suppress(ValueError):
+                owner.raw.append(json.loads(raw))
+        return raw
+
+
+class RawFakeModel(FakeModel):
+    """`FakeModel` of M2-32 plus the raw request bodies (``raw``)."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.raw: list[dict[str, Any]] = []
+        self._server.RequestHandlerClass = _RawHandler
+
+
 @dataclass
 class Profile:
     """How one throwaway Hermes home is configured."""
@@ -216,7 +242,7 @@ class HermesRig:
 
     world: HermesWorld
     fake: FakeServer
-    model: FakeModel
+    model: RawFakeModel
     creds: FakeCredentials
     homes: ThrowawayHomes
     home: Path
@@ -317,7 +343,7 @@ async def hermes_rig(
     """Start the fake model, the FakeServer and (with ``start``) the gateway with the adapter."""
     profile = profile or Profile()
     creds = FakeCredentials.generate()
-    model = FakeModel(script, creds, scenario_texts=list(texts))
+    model = RawFakeModel(script, creds, scenario_texts=list(texts))
     egress = EgressRecorder()
     fake = FakeServer(
         clock=WallClock(),
@@ -413,9 +439,13 @@ async def _start_gateway(rig: HermesRig) -> None:
         command, env=rig.env, cwd=rig.homes.work, log=rig.homes.root / "gateway.log"
     )
     rig.gateway.start()
-    await rig.until(
-        lambda: any(f.get("op") == "identify" for f in rig.fake.frames), "the adapter's identify"
-    )
+    try:
+        await rig.until(
+            lambda: any(f.get("op") == "identify" for f in rig.fake.frames),
+            "the adapter's identify",
+        )
+    except AssertionError as exc:
+        raise AssertionError(f"{exc}\n{gateway_log(rig)}") from None
     await rig.until(
         lambda: rig.fake.heartbeats or any(f.get("op") == "heartbeat" for f in rig.fake.frames),
         "the first heartbeat",
