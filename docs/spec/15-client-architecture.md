@@ -632,9 +632,13 @@ of `flutter_local_notifications` and opens the thread at the message (section 11
 `getActiveNotifications` need package identity and are skipped with a log line without content;
 a thread's notification is replaced by showing the next one under the same notification ID.
 "Start at login" is the value `<app name>` under
-`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` on Windows and the login item
-(`SMAppService.mainApp`, macOS 13 and later) on macOS, kept only by the system and off until the
-person turns it on (D-M4-30-4).
+`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` on Windows (the `Run` key starts the
+program every time the user logs on,
+https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys, retrieved
+2026-10-23 [verified]) and the login item `SMAppService.mainApp` on macOS ("the main application
+as a login item", macOS 13.0 and later,
+https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp, retrieved
+2026-10-23 [verified]), kept only by the system and off until the person turns it on (D-M4-30-4).
 
 ## 11. Deep links and navigation
 

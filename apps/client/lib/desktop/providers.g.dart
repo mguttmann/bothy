@@ -99,7 +99,7 @@ final class DesktopShellProvider
   }
 }
 
-String _$desktopShellHash() => r'8f55db17e2581d9d4a698b637e45c1ebb5bd7f04';
+String _$desktopShellHash() => r'0594ce3f37e85d083cb6fb4ba0242ce479ba3e41';
 
 /// "Start at login", read from and written to the system (D-M4-30-4); off until the person
 /// turns it on.

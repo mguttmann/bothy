@@ -38,9 +38,11 @@ WindowBehavior windowBehavior(Ref ref) {
 Future<void> desktopShell(Ref ref) async {
   final ports = ref.watch(appPortsProvider);
   final behavior = ref.watch(windowBehaviorProvider);
-  await behavior.start();
   // D-M4-30-5: the notification area is the Windows path; macOS keeps its window behavior.
-  if (ports.platform != 'windows') return;
+  if (ports.platform != 'windows') {
+    await behavior.start();
+    return;
+  }
   final tray = DesktopTray(port: ports.tray, behavior: behavior);
   ref.onDispose(tray.dispose);
   final l = lookupAppLocalizations(
@@ -53,6 +55,9 @@ Future<void> desktopShell(Ref ref) async {
     openLabel: l.trayOpen,
     quitLabel: l.trayQuit,
   );
+  // Hide on close only once the tray icon exists: a failed tray start leaves the window
+  // closing normally instead of hiding it where nothing can bring it back.
+  await behavior.start();
 }
 
 /// The state of "Start at login": whether the system offers it and whether it is on.

@@ -111,9 +111,16 @@ final class NotificationRouter {
       _log('notification ${n.nid} dropped: kind ${n.kind.code} without target');
       return;
     }
-    final local = thread != null && n.channelName == null
-        ? await _localChannelName(thread)
-        : null;
+    String? local;
+    if (thread != null && n.channelName == null) {
+      try {
+        local = await _localChannelName(thread);
+      } on Object catch (e) {
+        // The name is only the fallback of the placeholder; a closed database (Quit, sign-out)
+        // must not drop the toast. The line names no content.
+        _log('notification ${n.nid}: no local channel name (${e.runtimeType})');
+      }
+    }
     await presenter.show(
       toastContentFor(
         n,

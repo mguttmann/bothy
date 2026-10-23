@@ -147,4 +147,28 @@ void main() {
       expect(line, isNot(contains('general')));
     }
   });
+
+  test('a failed lookup of the local channel name still shows the placeholder toast', () async {
+    final failing = NotificationRouter(
+      presenter: presenter,
+      texts: () => en,
+      appName: () => 'ExampleChat',
+      isOpenAndFocused: openFocused.contains,
+      navigate: paths.add,
+      localChannelName: (_) async => throw StateError('database closed'),
+      log: logs.add,
+    );
+    await failing.onEvent(
+      NotificationCreated(
+        nid: '01890a5d-ac96-774b-bcce-b302099a8059',
+        kind: HintKind.message,
+        threadId: ThreadId.parse(t1),
+        messageId: MessageId.parse(m1),
+        quiet: false,
+        count: 1,
+      ),
+    );
+    expect(presenter.shown, hasLength(1));
+    expect(logs.last, contains('no local channel name'));
+  });
 }
