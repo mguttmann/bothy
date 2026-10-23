@@ -153,9 +153,6 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err != nil {
 		return prepared{}, err
 	}
-	if err := domain.CheckRunID(string(a.Kind), cmd.RunID); err != nil {
-		return prepared{}, err
-	}
 	content := ""
 	if cmd.ContentMD != nil {
 		content = *cmd.ContentMD
@@ -195,8 +192,9 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 }
 
 // kindOf returns the kind of a new message (text without a kind member) and whether it is a card:
-// voice and every other kind are not enabled, attachments neither (M3-07), and the card rules of
-// M2-15 apply. Errors: 400 validation_failed.
+// voice and every other kind are not enabled, attachments neither (M3-07), the card rules of
+// M2-15 apply, and run_id is refused for every principal but an agent (M2-19). Errors: 400
+// validation_failed.
 func kindOf(a actor.Actor, cmd messaging.CreateMessageCmd) (string, bool, error) {
 	kind := string(domain.KindText)
 	if cmd.Kind != nil {
@@ -209,7 +207,10 @@ func kindOf(a actor.Actor, cmd messaging.CreateMessageCmd) (string, bool, error)
 		return "", false, domain.NotEnabled("/attachment_file_ids")
 	}
 	isCard, err := cardRules(a, kind, cmd)
-	return kind, isCard, err
+	if err != nil {
+		return "", false, err
+	}
+	return kind, isCard, domain.CheckRunID(string(a.Kind), cmd.RunID)
 }
 
 // runIDText is the run_id of the request hash, "" when absent.
