@@ -273,6 +273,10 @@ Future<void> _settleStepUp(PatrolIntegrationTester $) async {
   await waitGone($, dialog);
 }
 
+/// A failure with [message] that the runner prints (a PATROL_LOG line), for a check whose plain
+/// `expect` would fail without details in the web runner.
+TestFailure e2eFailure(String message) => _failure(message);
+
 /// Fails unless the flow confirmed at least one step-up through the console's adapter.
 void expectStepUp() =>
     expect(stepUps, greaterThan(0), reason: 'no step-up was asked');

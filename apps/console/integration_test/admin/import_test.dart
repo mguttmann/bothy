@@ -103,8 +103,9 @@ void main() {
   ) async {
     final id = await _sourceId(_name);
     await openConsole($, '/import/$id');
+    // The step-up of import.manage may still be fresh from adding the source (auth.step_up_max_age),
+    // so this flow does not count it; the first flow proves the step-up of import.manage.
     await _step($, 'start', '$_name is started.');
-    expectStepUp();
 
     // The import tool's part, with the owner's session: structure, then cursor and counters.
     final batch = await consoleApi(
@@ -140,7 +141,11 @@ void main() {
         ],
       },
     );
-    expect(batch.status, inInclusiveRange(200, 201), reason: '${batch.json}');
+    if (batch.status != 200 && batch.status != 201) {
+      throw e2eFailure(
+        'applyImportBatch answered ${batch.status}: ${batch.json}',
+      );
+    }
     final cursor = await consoleApi(
       'PUT',
       '/imports/$id/cursor',
@@ -151,12 +156,16 @@ void main() {
         },
       },
     );
-    expect(cursor.status, 200, reason: '${cursor.json}');
+    if (cursor.status != 200) {
+      throw e2eFailure(
+        'setImportCursor answered ${cursor.status}: ${cursor.json}',
+      );
+    }
 
     await tapKey($, 'import.refresh');
-    await waitFor($, byKey('import.counter.server.channel.posted'));
-    expect(find.text('channel.posted: 2'), findsOneWidget);
-    expect(find.text('threads.done: 5'), findsOneWidget);
+    await waitFor($, find.text('channel.posted: 2'));
+    await waitFor($, find.text('threads.done: 5'));
+    await waitFor($, find.text('Mirror, read-only'));
     expect(_phase($, '91800'), 'Mirror, read-only');
     expect(_phase($, '92800'), 'Mirror, read-only');
   });
