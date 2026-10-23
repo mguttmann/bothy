@@ -25,11 +25,15 @@ import '../settings/settings_providers.dart';
 /// Wraps [child] so that a right click, the menu key or Shift+F10 on it opens a menu of
 /// [menuChildren] at the pointer (or at the top left of [child] for the keyboard).
 ///
+/// The entries are built only while the menu is open, inside a [Consumer] that watches the
+/// [levelContextProvider]: the row itself needs no provider (the sidebar and the post list
+/// stay plain views), and the open menu follows a change of the rows.
+///
 /// Example:
 /// ```dart
 /// TargetMenuRegion(
 ///   label: l.notifyMenuOf('general'),
-///   menuChildren: (context) => [...],
+///   menuChildren: (context, ref) => [...],
 ///   child: row,
 /// );
 /// ```
@@ -46,7 +50,7 @@ class TargetMenuRegion extends StatefulWidget {
   final String label;
 
   /// Builds the entries when the menu opens.
-  final List<Widget> Function(BuildContext context) menuChildren;
+  final List<Widget> Function(BuildContext context, WidgetRef ref) menuChildren;
 
   /// The row the menu belongs to.
   final Widget child;
@@ -68,10 +72,15 @@ class _TargetMenuRegionState extends State<TargetMenuRegion> {
         container: true,
         label: widget.label,
         explicitChildNodes: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: widget.menuChildren(context),
+        child: Consumer(
+          builder: (context, ref, _) {
+            ref.watch(levelContextProvider);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: widget.menuChildren(context, ref),
+            );
+          },
         ),
       ),
     ],
@@ -234,6 +243,30 @@ List<Widget> levelMenuItems(
   LevelMenuTarget target,
 ) {
   final l = AppLocalizations.of(context);
+  final sections = levelMenuSections(context, ref, target);
+  return [
+    SubmenuButton(
+      key: const ValueKey('menu.notifications'),
+      menuChildren: sections.levels,
+      child: Text(l.notifyMenuNotifications),
+    ),
+    SubmenuButton(
+      key: const ValueKey('menu.muteUntil'),
+      menuChildren: sections.mute,
+      child: Text(l.notifyMenuMuteUntil),
+    ),
+  ];
+}
+
+/// The entries of the two submenus of [target]: [levels] holds the state ("Following",
+/// "inherits: ...", "muted until ..."), the three levels and "Inherit"; [mute] the fixed
+/// choices of "Mute until".
+({List<Widget> levels, List<Widget> mute}) levelMenuSections(
+  BuildContext context,
+  WidgetRef ref,
+  LevelMenuTarget target,
+) {
+  final l = AppLocalizations.of(context);
   final writer = ref.read(notifyWriterProvider);
   final zone = ref.read(personTimeZoneProvider);
   final now = ref.read(appPortsProvider).clock.now();
@@ -263,74 +296,64 @@ List<Widget> levelMenuItems(
     set(target.levelAfterMute, until: instantIn(zone, day, time));
   }
 
-  return [
-    SubmenuButton(
-      key: const ValueKey('menu.notifications'),
-      menuChildren: [
+  return (
+    levels: [
+      MenuItemButton(
+        key: const ValueKey('menu.state'),
+        child: Text(levelStateLabel(l, target, when: when)),
+      ),
+      for (final level in const [
+        NotificationLevel.all,
+        NotificationLevel.mentions,
+        NotificationLevel.mute,
+      ])
         MenuItemButton(
-          key: const ValueKey('menu.state'),
-          child: Text(levelStateLabel(l, target, when: when)),
-        ),
-        for (final level in const [
-          NotificationLevel.all,
-          NotificationLevel.mentions,
-          NotificationLevel.mute,
-        ])
-          MenuItemButton(
-            key: ValueKey('menu.level.${level.code}'),
-            leadingIcon: Icon(
-              own?.level == level && own?.mutedUntil == null
-                  ? Icons.check
-                  : null,
-              size: 16,
-            ),
-            onPressed: writer == null ? null : () => set(level),
-            child: Text(levelLabel(l, level)),
+          key: ValueKey('menu.level.${level.code}'),
+          leadingIcon: Icon(
+            own?.level == level && own?.mutedUntil == null ? Icons.check : null,
+            size: 16,
           ),
-        MenuItemButton(
-          key: const ValueKey('menu.inherit'),
-          onPressed: writer == null || own == null
-              ? null
-              : () => unawaited(writer.inherit(target.kind, target.id)),
-          child: Text(
-            l.notifyInheritFrom(
-              levelLabel(l, target.inherited.level),
-              levelSourceLabel(l, target.inherited.source),
-            ),
+          onPressed: writer == null ? null : () => set(level),
+          child: Text(levelLabel(l, level)),
+        ),
+      MenuItemButton(
+        key: const ValueKey('menu.inherit'),
+        onPressed: writer == null || own == null
+            ? null
+            : () => unawaited(writer.inherit(target.kind, target.id)),
+        child: Text(
+          l.notifyInheritFrom(
+            levelLabel(l, target.inherited.level),
+            levelSourceLabel(l, target.inherited.source),
           ),
         ),
-      ],
-      child: Text(l.notifyMenuNotifications),
-    ),
-    SubmenuButton(
-      key: const ValueKey('menu.muteUntil'),
-      menuChildren: [
-        MenuItemButton(
-          key: const ValueKey('menu.mute.hour'),
-          onPressed: writer == null
-              ? null
-              : () => set(target.levelAfterMute, until: choices.oneHour),
-          child: Text(l.notifyMuteOneHour),
-        ),
-        MenuItemButton(
-          key: const ValueKey('menu.mute.tomorrow'),
-          onPressed: writer == null
-              ? null
-              : () => set(target.levelAfterMute, until: choices.tomorrow),
-          child: Text(
-            l.notifyMuteTomorrow(
-              L10nFormat(Localizations.localeOf(context))
-                  .time(choices.tomorrow, timeZone: zone),
-            ),
+      ),
+    ],
+    mute: [
+      MenuItemButton(
+        key: const ValueKey('menu.mute.hour'),
+        onPressed: writer == null
+            ? null
+            : () => set(target.levelAfterMute, until: choices.oneHour),
+        child: Text(l.notifyMuteOneHour),
+      ),
+      MenuItemButton(
+        key: const ValueKey('menu.mute.tomorrow'),
+        onPressed: writer == null
+            ? null
+            : () => set(target.levelAfterMute, until: choices.tomorrow),
+        child: Text(
+          l.notifyMuteTomorrow(
+            L10nFormat(Localizations.localeOf(context))
+                .time(choices.tomorrow, timeZone: zone),
           ),
         ),
-        MenuItemButton(
-          key: const ValueKey('menu.mute.date'),
-          onPressed: writer == null ? null : () => unawaited(chooseDate()),
-          child: Text(l.notifyMuteChooseDate),
-        ),
-      ],
-      child: Text(l.notifyMenuMuteUntil),
-    ),
-  ];
+      ),
+      MenuItemButton(
+        key: const ValueKey('menu.mute.date'),
+        onPressed: writer == null ? null : () => unawaited(chooseDate()),
+        child: Text(l.notifyMuteChooseDate),
+      ),
+    ],
+  );
 }

@@ -378,8 +378,9 @@ class QuietHoursList extends ConsumerWidget {
                 .copyWith(color: colors.textSecondary),
           ),
         for (final r in rules)
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          Wrap(
+            spacing: DsSpace.s8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
                 quietHoursSummary(l, r),
@@ -387,7 +388,6 @@ class QuietHoursList extends ConsumerWidget {
                 style: dsTextStyle(DsType.body)
                     .copyWith(color: colors.textPrimary),
               ),
-              const SizedBox(width: DsSpace.s8),
               TextButton(
                 key: ValueKey('quiet.edit.${r.id.value}'),
                 onPressed: writer == null ? null : () => unawaited(edit(r)),

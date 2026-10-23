@@ -18,7 +18,7 @@ import '../thread/providers.dart';
 import 'level_menu.dart';
 
 /// The menu of [channel] around [child].
-class ChannelMenu extends ConsumerWidget {
+class ChannelMenu extends StatelessWidget {
   /// Creates the menu of [channel].
   const ChannelMenu({super.key, required this.channel, required this.child});
 
@@ -29,18 +29,15 @@ class ChannelMenu extends ConsumerWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watched, so the menu reads current rows (the providers stay alive) and the export
-    // entry follows a capability the server reports later.
-    ref
-      ..watch(levelContextProvider)
-      ..watch(channelAccessProvider(channel.id.value));
-    return TargetMenuRegion(
-      label: AppLocalizations.of(context).notifyMenuOf(channel.name),
-      menuChildren: (context) => channelMenuItems(context, ref, channel),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => TargetMenuRegion(
+    label: AppLocalizations.of(context).notifyMenuOf(channel.name),
+    menuChildren: (context, ref) {
+      // Watched, so the open menu follows a capability the server reports later.
+      ref.watch(channelAccessProvider(channel.id.value));
+      return channelMenuItems(context, ref, channel);
+    },
+    child: child,
+  );
 }
 
 /// The entries of the menu of [channel]: the level submenus and, with the capability

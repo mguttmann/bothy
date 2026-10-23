@@ -35,7 +35,7 @@ LevelMenuTarget threadMenuTarget(
 }
 
 /// The menu of [thread] (titled [title]) in [channel] around [child].
-class ThreadMenu extends ConsumerWidget {
+class ThreadMenu extends StatelessWidget {
   /// Creates the menu.
   const ThreadMenu({
     super.key,
@@ -58,15 +58,12 @@ class ThreadMenu extends ConsumerWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(levelContextProvider);
-    return TargetMenuRegion(
-      label: AppLocalizations.of(context).notifyMenuOf(title),
-      menuChildren: (context) =>
-          levelMenuItems(context, ref, threadMenuTarget(ref, thread, channel)),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => TargetMenuRegion(
+    label: AppLocalizations.of(context).notifyMenuOf(title),
+    menuChildren: (context, ref) =>
+        levelMenuItems(context, ref, threadMenuTarget(ref, thread, channel)),
+    child: child,
+  );
 }
 
 /// The button "More" of the thread header: opens the menu of [thread] in [channel], or the

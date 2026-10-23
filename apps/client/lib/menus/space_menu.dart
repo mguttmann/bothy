@@ -13,7 +13,7 @@ import '../notifications_settings/providers.dart';
 import 'level_menu.dart';
 
 /// The level menu of [space] around [child].
-class SpaceMenu extends ConsumerWidget {
+class SpaceMenu extends StatelessWidget {
   /// Creates the menu of [space].
   const SpaceMenu({super.key, required this.space, required this.child});
 
@@ -24,16 +24,12 @@ class SpaceMenu extends ConsumerWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watched, so the menu reads current rows when it opens.
-    ref.watch(levelContextProvider);
-    return TargetMenuRegion(
-      label: AppLocalizations.of(context).notifyMenuOf(space.name),
-      menuChildren: (context) =>
-          levelMenuItems(context, ref, spaceMenuTarget(ref, space)),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => TargetMenuRegion(
+    label: AppLocalizations.of(context).notifyMenuOf(space.name),
+    menuChildren: (context, ref) =>
+        levelMenuItems(context, ref, spaceMenuTarget(ref, space)),
+    child: child,
+  );
 }
 
 /// The level target of [space] from the current [LevelContext].

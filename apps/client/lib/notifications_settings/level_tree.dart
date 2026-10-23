@@ -137,15 +137,15 @@ class LevelTreeRow extends ConsumerWidget {
         top: DsSpace.s2,
         bottom: DsSpace.s2,
       ),
-      child: Row(
+      // A wrap, so the level control moves below a long name at a large text scale.
+      child: Wrap(
+        spacing: DsSpace.s8,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Expanded(
-            child: Text(
-              dsIsolate(name),
-              overflow: TextOverflow.ellipsis,
-              style: dsTextStyle(depth == 0 ? DsType.bodyStrong : DsType.body)
-                  .copyWith(color: colors.textPrimary),
-            ),
+          Text(
+            dsIsolate(name),
+            style: dsTextStyle(depth == 0 ? DsType.bodyStrong : DsType.body)
+                .copyWith(color: colors.textPrimary),
           ),
           DropdownButton<String>(
             key: const ValueKey('tree.level'),
@@ -188,8 +188,7 @@ class LevelTreeRow extends ConsumerWidget {
                 ),
             ],
           ),
-          if (until != null) ...[
-            const SizedBox(width: DsSpace.s8),
+          if (until != null)
             Text(
               l.notifyMutedUntil(
                 muteEndLabel(context, until, now: now, timeZone: zone),
@@ -198,7 +197,6 @@ class LevelTreeRow extends ConsumerWidget {
               style: dsTextStyle(DsType.bodySm)
                   .copyWith(color: colors.textSecondary),
             ),
-          ],
         ],
       ),
     );
