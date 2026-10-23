@@ -7,7 +7,7 @@ import "net/http"
 // imports drives the eleven import operations and setChannelReadOnly of M8-03 as the owner: it
 // lists the sources, creates one whose mapping creates a space and a text channel with canary
 // names of class content, reads it, starts it, applies one batch with the space and the channel,
-// lists its items, stores a cursor, hands the lead of the channel to Bothy, pauses and completes
+// lists its items, stores a cursor, hands the lead of the channel to this server, pauses and completes
 // it, and cancels a second source. The channel of the completed import is then switched read-only
 // and back with If-Match.
 func (sc *Scenario) imports() {

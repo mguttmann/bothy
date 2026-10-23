@@ -86,7 +86,7 @@ func TestNewChannelNoGrants(t *testing.T) {
 	if status != http.StatusOK || ch["read_only"] != true || op["mode"] != "none" {
 		t.Errorf("Robin: %d %v", status, ch)
 	}
-	if _, ch, _ := w.channel(w.robin, items["channel:"+chBothy].TargetID); ch["read_only"] != false {
+	if _, ch, _ := w.channel(w.robin, items["channel:"+chHere].TargetID); ch["read_only"] != false {
 		t.Errorf("a channel led here is writable: %v", ch)
 	}
 	if n := w.count(`SELECT count(*) FROM grants WHERE target_channel_id = $1`, text); n != 0 {
@@ -111,7 +111,7 @@ func TestReadOnlyRejectsOwner_ImportApplySucceeds(t *testing.T) {
 	}
 }
 
-// TestSetImportLead_ReadOnlyInSameTransaction (plan acceptance, 22 12.1, 13.3, 13.4): lead bothy
+// TestSetImportLead_ReadOnlyInSameTransaction (plan acceptance, 22 12.1, 13.3, 13.4): lead `bothy`
 // lifts read-only and lead discord sets it, each with channel.updated and import.progress in the
 // same commit; setting it cancels the active run of the channel with channel_read_only.
 func TestSetImportLead_ReadOnlyInSameTransaction(t *testing.T) {
@@ -142,7 +142,7 @@ func TestSetImportLead_ReadOnlyInSameTransaction(t *testing.T) {
 	ev := lead("bothy")
 	sameCommit(ev, "channel.updated", "import.progress")
 	if _, ch, _ := w.channel(w.robin, text); ch["read_only"] != false {
-		t.Fatalf("lead bothy keeps read-only: %v", ch)
+		t.Fatalf("lead here keeps read-only: %v", ch)
 	}
 	if s := w.get(id); s.Config["channels"].([]any)[0].(map[string]any)["lead"] != "bothy" {
 		t.Errorf("stored lead %v", s.Config["channels"])

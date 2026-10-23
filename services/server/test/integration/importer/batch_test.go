@@ -43,7 +43,7 @@ func TestApplyBatch_RepeatSameTargets(t *testing.T) {
 		t.Errorf("events of the first batch %v", types)
 	}
 	for key, want := range map[string]string{
-		"space:" + catNew: "posted", "channel:" + chText: "posted", "channel:" + chForum: "posted", "channel:" + chBothy: "posted",
+		"space:" + catNew: "posted", "channel:" + chText: "posted", "channel:" + chForum: "posted", "channel:" + chHere: "posted",
 		"forum_tag:" + chForum + ":9": "posted", "user:" + userAlex: "posted", "user:" + userBot: "posted", "user:" + userSam: "posted",
 		"user:" + userHook: "posted", "user:" + userOtherB: "skipped",
 	} {

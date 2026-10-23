@@ -46,7 +46,7 @@ var transitions = map[Op]map[string]string{
 var repeats = map[Op]string{OpStart: StateRunning, OpPause: StatePaused}
 
 // Transition returns the step of op on state. It does not judge the completion condition (every
-// imported channel has lead bothy); the use case checks it after an allowed complete.
+// imported channel has lead `bothy`); the use case checks it after an allowed complete.
 //
 // Example:
 //

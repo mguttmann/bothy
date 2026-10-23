@@ -25,9 +25,9 @@ const (
 	memberUnmappedBot   = "unmapped_bot"
 	memberUnmappedHuman = "unmapped_human"
 
-	// LeadDiscord and LeadBothy are the leads of a mapped channel (22 12.1).
+	// LeadDiscord and LeadHere are the leads of a mapped channel (22 12.1).
 	LeadDiscord = "discord"
-	LeadBothy   = "bothy"
+	LeadHere    = "bothy"
 	// DefaultPlaceholder and DefaultSkip are the values of defaults.unmapped_human and
 	// defaults.unmapped_bot.
 	DefaultPlaceholder = "placeholder"
@@ -356,8 +356,8 @@ func parseChannelOptions(e map[string]json.RawMessage, ptr string, entry *Channe
 		}
 	}
 	if s, present := str(e, "lead", ptr, false, p); present {
-		if s != LeadDiscord && s != LeadBothy {
-			p.Add(ptr+"/lead", FieldInvalid, "discord or bothy")
+		if s != LeadDiscord && s != LeadHere {
+			p.Add(ptr+"/lead", FieldInvalid, "discord or "+LeadHere)
 			ok = false
 		}
 		entry.Lead = s

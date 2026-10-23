@@ -47,15 +47,15 @@ const (
 // Leads of a mapped channel (22 12.1).
 const (
 	LeadDiscord = "discord"
-	LeadBothy   = "bothy"
+	LeadHere    = "bothy"
 )
 
 // Reasons of 409 conflict of the import operations (M8-03 design notes 3 to 5).
 const (
 	// ReasonImportState: the operation is not allowed in the current state of the source.
 	ReasonImportState = "import_state"
-	// ReasonLeadNotBothy: completeImport while an imported channel still has lead discord.
-	ReasonLeadNotBothy = "lead_not_bothy"
+	// ReasonLeadNotHere: completeImport while an imported channel still has lead discord.
+	ReasonLeadNotHere = "lead_not_" + LeadHere
 	// ReasonChannelNotImported: setImportLead for a mapped channel whose item is not posted.
 	ReasonChannelNotImported = "channel_not_imported"
 	// ReasonImportNotRunning: applyImportBatch or setImportCursor on a source that is not running.
@@ -133,7 +133,7 @@ type CreateSourceCmd struct {
 
 // LeadCmd is the body of setImportLead (schema ImportLeadSet).
 type LeadCmd struct {
-	// SourceChannel is the Discord channel ID; Lead is LeadDiscord or LeadBothy.
+	// SourceChannel is the Discord channel ID; Lead is LeadDiscord or LeadHere.
 	SourceChannel, Lead string
 }
 
@@ -205,7 +205,7 @@ type Imports interface {
 	Pause(ctx context.Context, a actor.Actor, id ids.ID) (Source, error)
 	// Cancel ends draft, running or paused as failed with server.cancelled (import.manage).
 	Cancel(ctx context.Context, a actor.Actor, id ids.ID) (Source, error)
-	// Complete ends running or paused as completed when every imported channel has lead bothy
+	// Complete ends running or paused as completed when every imported channel has lead `bothy`
 	// (import.manage).
 	Complete(ctx context.Context, a actor.Actor, id ids.ID) (Source, error)
 	// SetLead changes the lead of one mapped channel and the read-only flag of its target channel

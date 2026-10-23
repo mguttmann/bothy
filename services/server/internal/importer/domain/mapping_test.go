@@ -59,7 +59,7 @@ func TestMappingValidation_Valid(t *testing.T) {
 	if c := m.Channel("300"); c.Lead != domain.LeadDiscord || c.PlannedOperator != "lotse" {
 		t.Errorf("channel 300 %+v", c)
 	}
-	if c := m.Channel("301"); c.Lead != domain.LeadBothy || c.PlannedOperator != "" || !c.Target.Skip {
+	if c := m.Channel("301"); c.Lead != domain.LeadHere || c.PlannedOperator != "" || !c.Target.Skip {
 		t.Errorf("channel 301 %+v", c)
 	}
 	wantRefs := []domain.Ref{
@@ -162,7 +162,7 @@ func TestResolveUser(t *testing.T) {
 			t.Errorf("%s %s = %+v, want %+v", c.id, c.kind, got, c.want)
 		}
 	}
-	if !m.SetLead("300", domain.LeadBothy) || m.Channel("300").Lead != domain.LeadBothy || m.SetLead("999", domain.LeadBothy) {
+	if !m.SetLead("300", domain.LeadHere) || m.Channel("300").Lead != domain.LeadHere || m.SetLead("999", domain.LeadHere) {
 		t.Error("SetLead")
 	}
 }

@@ -20,7 +20,7 @@ const (
 	catSkip     = "203" // category mapped to skip
 	chText      = "300" // new text channel, lead discord, planned operator Lotse
 	chForum     = "301" // new forum channel, lead discord
-	chBothy     = "302" // new text channel, lead bothy
+	chHere      = "302" // new text channel, lead `bothy`
 	chExisting  = "303" // the existing channel
 	chSkip      = "304" // skipped channel
 	chCollide   = "305" // new channel named like the existing channel in the existing space
@@ -105,7 +105,7 @@ func (w *iw) mapping() map[string]any {
 		"channels": []any{
 			map[string]any{"discord_channel": chText, "target": create("tickets"), "planned_operator": "agent:lotse"},
 			map[string]any{"discord_channel": chForum, "target": create("forum")},
-			map[string]any{"discord_channel": chBothy, "target": create("led-here"), "lead": "bothy"},
+			map[string]any{"discord_channel": chHere, "target": create("led-here"), "lead": "bothy"},
 			map[string]any{"discord_channel": chExisting, "target": map[string]any{"existing": w.existingChannel}},
 			map[string]any{"discord_channel": chSkip, "target": "skip"},
 			map[string]any{"discord_channel": chCollide, "target": create("OLD")},
@@ -194,7 +194,7 @@ func structure() []map[string]any {
 		obj("space:"+catNew, "space", map[string]any{"name": "Imported", "sort_key": "a0"}),
 		obj("channel:"+chText, "channel", map[string]any{"space_origin_key": "space:" + catNew, "name": "tickets", "kind": "text", "sort_key": "a0"}),
 		obj("channel:"+chForum, "channel", map[string]any{"space_origin_key": "space:" + catNew, "name": "forum", "kind": "forum", "sort_key": "a1"}),
-		obj("channel:"+chBothy, "channel", map[string]any{"name": "led-here", "kind": "text", "sort_key": "a2"}),
+		obj("channel:"+chHere, "channel", map[string]any{"name": "led-here", "kind": "text", "sort_key": "a2"}),
 		obj("forum_tag:"+chForum+":9", "forum_tag", map[string]any{"channel_origin_key": "channel:" + chForum, "name": "bug", "emoji": "x"}),
 		obj("user:"+userAlex, "user", map[string]any{"discord_kind": "user", "username": "alex"}),
 		obj("user:"+userBot, "user", map[string]any{"discord_kind": "bot", "username": "lotse"}),

@@ -169,7 +169,7 @@ func TestTransitions(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = e.svc.Complete(ctx, e.owner, s.ID)
-	wantErr(t, err, errs.CodeConflict, importer.ReasonLeadNotBothy)
+	wantErr(t, err, errs.CodeConflict, importer.ReasonLeadNotHere)
 	if _, err = e.svc.SetLead(ctx, e.owner, s.ID, importer.LeadCmd{SourceChannel: "20", Lead: "bothy"}); err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestSetLeadAndCursor(t *testing.T) {
 	}
 	target := byKey(res.Items)["channel:20"].TargetID
 	if _, err := e.svc.SetLead(ctx, e.owner, s.ID, importer.LeadCmd{SourceChannel: "20", Lead: "bothy"}); err != nil || e.structure.readOnly[target] {
-		t.Fatalf("lead bothy %v %v", err, e.structure.readOnly[target])
+		t.Fatalf("lead here %v %v", err, e.structure.readOnly[target])
 	}
 	evs := len(e.events.evs)
 	if _, err := e.svc.SetLead(ctx, e.owner, s.ID, importer.LeadCmd{SourceChannel: "20", Lead: "bothy"}); err != nil || len(e.events.evs) != evs {

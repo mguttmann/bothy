@@ -249,14 +249,14 @@ func (s *Service) Cancel(ctx context.Context, a actor.Actor, id ids.ID) (importe
 }
 
 // Complete implements importer.Imports (design note 3, 22 13.5): only when every imported
-// channel of the mapping has lead bothy.
+// channel of the mapping has lead `bothy`.
 func (s *Service) Complete(ctx context.Context, a actor.Actor, id ids.ID) (importer.Source, error) {
-	return s.transition(ctx, a, id, domain.OpComplete, s.leadsBothy)
+	return s.transition(ctx, a, id, domain.OpComplete, s.leadsHere)
 }
 
-// leadsBothy refuses the completion while a mapped channel whose target is not skip and whose
+// leadsHere refuses the completion while a mapped channel whose target is not skip and whose
 // channel item is posted still has lead discord.
-func (s *Service) leadsBothy(ctx context.Context, src importer.Source) error {
+func (s *Service) leadsHere(ctx context.Context, src importer.Source) error {
 	m, ok := domain.StoredMapping(src.Config)
 	if !ok {
 		return errs.New(errs.CodeInternalError, "importer: the stored mapping does not parse")
@@ -270,8 +270,8 @@ func (s *Service) leadsBothy(ctx context.Context, src importer.Source) error {
 		if code != "" {
 			continue
 		}
-		if e := m.Channel(k.IDs[0]); e != nil && !e.Target.Skip && e.Lead != domain.LeadBothy {
-			return conflict(importer.ReasonLeadNotBothy, "an imported channel is still led by the source")
+		if e := m.Channel(k.IDs[0]); e != nil && !e.Target.Skip && e.Lead != domain.LeadHere {
+			return conflict(importer.ReasonLeadNotHere, "an imported channel is still led by the source")
 		}
 	}
 	return nil

@@ -131,7 +131,7 @@ func TestCreateImport_StepUpAndAudit(t *testing.T) {
 }
 
 // TestStateTransitions (design note 3): every allowed change, the no-effect repeats without an
-// event, import_state for a refused change and lead_not_bothy for an early completion.
+// event, import_state for a refused change and the lead reason for an early completion.
 func TestStateTransitions(t *testing.T) {
 	t.Parallel()
 	w := newIW(t)
@@ -155,7 +155,7 @@ func TestStateTransitions(t *testing.T) {
 	}
 	w.must(w.robin, http.MethodPost, "/imports/"+id+"/start", nil, nil, http.StatusAccepted)
 	w.mustBatch(id, structure()...)
-	w.wantProblem(w.must(w.robin, http.MethodPost, "/imports/"+id+"/complete", nil, nil, http.StatusConflict), http.StatusConflict, "conflict", "lead_not_bothy")
+	w.wantProblem(w.must(w.robin, http.MethodPost, "/imports/"+id+"/complete", nil, nil, http.StatusConflict), http.StatusConflict, "conflict", "lead_not_"+"bothy")
 	for _, ch := range []string{chText, chForum} {
 		w.must(w.robin, http.MethodPut, "/imports/"+id+"/leads", map[string]any{"source_channel": ch, "lead": "bothy"}, nil, http.StatusOK)
 	}
