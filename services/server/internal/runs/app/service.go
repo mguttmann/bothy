@@ -217,6 +217,16 @@ type Deps struct {
 	FollowupRows FollowupRepository
 	// Steps counts bothy.run.steps for the steps an adapter adds; nil counts nothing.
 	Steps StepMetrics
+	// ChannelThreads names the threads of a channel that became read-only (chat, M8-03); nil means
+	// Threads when it implements ChannelThreads. Without one the subscriber of
+	// chat.ChannelReadOnlySet answers internal.
+	ChannelThreads ChannelThreads
+}
+
+// ChannelThreads is the part of chat.Structure the subscriber of chat.ChannelReadOnlySet uses: every
+// thread of the channels, ascending.
+type ChannelThreads interface {
+	ThreadIDsOfChannels(ctx context.Context, channelIDs []ids.ID) ([]ids.ID, error)
 }
 
 // Service implements runs.Runs (the reads), runs.Delivery (M2-08), the lifecycle Open and
@@ -274,6 +284,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.Mismatches == nil {
 		d.Mismatches = noMismatches{}
+	}
+	if d.ChannelThreads == nil {
+		d.ChannelThreads, _ = d.Threads.(ChannelThreads)
 	}
 	svc := &Service{cfg: cfg, d: d}
 	if d.FollowupRows != nil {

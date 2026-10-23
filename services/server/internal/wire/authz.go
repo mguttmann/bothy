@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	"github.com/OWNER/bothy/services/server/internal/importer"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
@@ -50,7 +51,7 @@ const msgRegistrationCheckFailed = "registration check failed"
 // each module's ticket
 // appends its function here.
 var moduleRegistrations = []func(*authorize.Registry){instance.Register, identity.Register, authz.Register, agents.Register, chat.Register,
-	files.Register, messaging.Register, terminal.Register, runs.Register, sync.Register, gateway.Register}
+	files.Register, messaging.Register, terminal.Register, runs.Register, importer.Register, sync.Register, gateway.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
 // production list of the module ports.

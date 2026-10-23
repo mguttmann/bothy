@@ -13,6 +13,67 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteWebhookSubscriptionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateWebhookSubscriptionResponse200Headers the declared response headers of an HTTP 200 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse200Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// UpdateWebhookSubscriptionResponse400Headers the declared response headers of an HTTP 400 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateWebhookSubscriptionResponse401Headers the declared response headers of an HTTP 401 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// UpdateWebhookSubscriptionResponse403Headers the declared response headers of an HTTP 403 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateWebhookSubscriptionResponse404Headers the declared response headers of an HTTP 404 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateWebhookSubscriptionResponse409Headers the declared response headers of an HTTP 409 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateWebhookSubscriptionResponse422Headers the declared response headers of an HTTP 422 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse422Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// UpdateWebhookSubscriptionResponse429Headers the declared response headers of an HTTP 429 response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// UpdateWebhookSubscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for UpdateWebhookSubscription
+type UpdateWebhookSubscriptionResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
 type UpdateWebhookSubscriptionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1957,6 +2018,7 @@ func (c *ClientWithResponses) PutProjectBindingWithResponse(ctx context.Context,
 // SetChannelReadOnlyWithBodyWithResponse Switch the read-only state of a channel
 //
 // Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -1972,6 +2034,7 @@ func (c *ClientWithResponses) SetChannelReadOnlyWithBodyWithResponse(ctx context
 // SetChannelReadOnlyWithResponse Switch the read-only state of a channel
 //
 // Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3803,6 +3866,7 @@ func (c *ClientWithResponses) GetImportWithResponse(ctx context.Context, importI
 // ApplyImportBatchWithBodyWithResponse Write a batch of imported objects
 //
 // One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3818,6 +3882,7 @@ func (c *ClientWithResponses) ApplyImportBatchWithBodyWithResponse(ctx context.C
 // ApplyImportBatchWithResponse Write a batch of imported objects
 //
 // One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3831,6 +3896,8 @@ func (c *ClientWithResponses) ApplyImportBatchWithResponse(ctx context.Context, 
 }
 
 // CancelImportWithResponse Cancel an import
+//
+// Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3846,6 +3913,7 @@ func (c *ClientWithResponses) CancelImportWithResponse(ctx context.Context, impo
 // CompleteImportWithResponse Complete an import
 //
 // When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3861,6 +3929,7 @@ func (c *ClientWithResponses) CompleteImportWithResponse(ctx context.Context, im
 // SetImportCursorWithBodyWithResponse Advance the import cursor
 //
 // Only after a successful batch (22, 7.3).
+// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3876,6 +3945,7 @@ func (c *ClientWithResponses) SetImportCursorWithBodyWithResponse(ctx context.Co
 // SetImportCursorWithResponse Advance the import cursor
 //
 // Only after a successful batch (22, 7.3).
+// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3934,6 +4004,7 @@ func (c *ClientWithResponses) ListImportItemsWithResponse(ctx context.Context, i
 // SetImportLeadWithBodyWithResponse Set the leading side of a channel
 //
 // Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3949,6 +4020,7 @@ func (c *ClientWithResponses) SetImportLeadWithBodyWithResponse(ctx context.Cont
 // SetImportLeadWithResponse Set the leading side of a channel
 //
 // Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3963,6 +4035,8 @@ func (c *ClientWithResponses) SetImportLeadWithResponse(ctx context.Context, imp
 
 // PauseImportWithResponse Pause an import
 //
+// Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /imports/{import_id}/pause (the `PauseImport` operationId).
@@ -3975,6 +4049,8 @@ func (c *ClientWithResponses) PauseImportWithResponse(ctx context.Context, impor
 }
 
 // StartImportWithResponse Start or continue an import
+//
+// Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -21143,244 +21219,6 @@ func ParseDeleteProjectBindingResponse(rsp *http.Response) (*DeleteProjectBindin
 		response.Headers429 = &headers
 	case true:
 		var headers DeleteProjectBindingResponseDefaultHeaders
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.HeadersDefault = &headers
-	}
-
-	return response, nil
-}
-
-// ParsePutProjectBindingResponse parses an HTTP response from a PutProjectBindingWithResponse call
-func ParsePutProjectBindingResponse(rsp *http.Response) (*PutProjectBindingResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PutProjectBindingResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ProjectBinding
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest NotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Conflict
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
-		var dest PreconditionFailed
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON412 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest TooManyRequests
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSONDefault = &dest
-
-	}
-
-	switch {
-	case rsp.StatusCode == 200:
-		var headers PutProjectBindingResponse200Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("ETag"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ETag = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		response.Headers200 = &headers
-	case rsp.StatusCode == 400:
-		var headers PutProjectBindingResponse400Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers400 = &headers
-	case rsp.StatusCode == 401:
-		var headers PutProjectBindingResponse401Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("DPoP-Nonce"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "DPoP-Nonce", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.DPoPNonce = &value
-		}
-		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.SetCookie = &value
-		}
-		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.WWWAuthenticate = &value
-		}
-		response.Headers401 = &headers
-	case rsp.StatusCode == 403:
-		var headers PutProjectBindingResponse403Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers403 = &headers
-	case rsp.StatusCode == 404:
-		var headers PutProjectBindingResponse404Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers404 = &headers
-	case rsp.StatusCode == 409:
-		var headers PutProjectBindingResponse409Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers409 = &headers
-	case rsp.StatusCode == 412:
-		var headers PutProjectBindingResponse412Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		response.Headers412 = &headers
-	case rsp.StatusCode == 429:
-		var headers PutProjectBindingResponse429Headers
-		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
-			var value CorrelationId
-			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {
-				return nil, err
-			}
-			headers.CorrelationId = &value
-		}
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = &value
-		}
-		response.Headers429 = &headers
-	case true:
-		var headers PutProjectBindingResponseDefaultHeaders
 		if values := rsp.Header.Values("Correlation-Id"); len(values) > 0 {
 			var value CorrelationId
 			if err := runtime.BindStyledParameterWithOptions("simple", "Correlation-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"}); err != nil {

@@ -3,4 +3,3 @@
 agent_session.bind
 agent_session.reset
 file.transcript.submit
-import.apply

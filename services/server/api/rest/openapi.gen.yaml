@@ -6655,6 +6655,7 @@ paths:
       tags: [Channels]
       description: |-
         Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+        The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
       x-authz-action: channel.read_only.set
       x-rate-limit-class: rl.admin
       parameters:
@@ -17131,6 +17132,8 @@ paths:
       operationId: startImport
       summary: Start or continue an import
       tags: [Import]
+      description: |-
+        Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
       x-authz-action: import.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17183,6 +17186,8 @@ paths:
       operationId: pauseImport
       summary: Pause an import
       tags: [Import]
+      description: |-
+        Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
       x-authz-action: import.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17235,6 +17240,8 @@ paths:
       operationId: cancelImport
       summary: Cancel an import
       tags: [Import]
+      description: |-
+        Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
       x-authz-action: import.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17289,6 +17296,7 @@ paths:
       tags: [Import]
       description: |-
         When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+        Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
       x-authz-action: import.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17341,6 +17349,7 @@ paths:
       tags: [Import]
       description: |-
         Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+        The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
       x-authz-action: import.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17404,6 +17413,7 @@ paths:
       tags: [Import]
       description: |-
         One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+        A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
       x-authz-action: import.apply
       x-rate-limit-class: rl.import
       x-idempotency-exempt: origin_key
@@ -17536,6 +17546,7 @@ paths:
       tags: [Import]
       description: |-
         Only after a successful batch (22, 7.3).
+        Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
       x-authz-action: import.apply
       x-rate-limit-class: rl.import
       parameters:
@@ -27582,7 +27593,10 @@ components:
           description: A dry run writes nothing and keeps the state.
         stats:
           $ref: '#/components/schemas/JsonObject'
-          description: Counters per item kind and state, without content.
+          description: Counters without content. The server's counters per item kind and state are under `server` (`server.<item_kind>.<state>`, `server.source_changed`, `server.cancelled`); the counters of the import tool from `setImportCursor` are under `tool`.
+        cursor:
+          $ref: '#/components/schemas/JsonObject'
+          description: The object last stored by `setImportCursor` (progress and the run lease of the import tool, 22 7.3 and 7.4); `{}` before the first one. The server never interprets it.
         created_at:
           $ref: '#/components/schemas/Timestamp'
         started_at:
@@ -27601,6 +27615,7 @@ components:
           examples: [Old community server]
         config:
           $ref: '#/components/schemas/JsonObject'
+          description: For `kind = discord` the mapping of schema `import_source.discord.v1`, see `ImportSourceDiscordConfig` (22, 5.2); every violation is one error of `400 validation_failed` with its JSON pointer, all reported at once. `kind = archive` is `400 validation_failed` with the code `not_enabled`.
     ImportItem:
       type: object
       required: [id, origin_key, item_kind, state, created_at]
@@ -27630,6 +27645,9 @@ components:
           $ref: '#/components/schemas/ImportItemState'
         error:
           type: string
+        source_changed:
+          type: boolean
+          description: Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
         created_at:
           $ref: '#/components/schemas/Timestamp'
     GdprRequest:
@@ -29119,7 +29137,7 @@ components:
           description: Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
         data:
           $ref: '#/components/schemas/JsonObject'
-          description: Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6).
+          description: Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
     ImportBatch:
       type: object
       additionalProperties: false
@@ -29203,6 +29221,146 @@ components:
           type: string
           enum: [discord, bothy]
           description: '`discord`: the source leads, the channel here is read-only and mirrored; `bothy`: this server leads (22, 12.1).'
+    ImportSourceDiscordConfig:
+      type: object
+      additionalProperties: false
+      description: Mapping file of schema `import_source.discord.v1` as JSON (22, 5.2); the web console converts the YAML of the owner. It holds no secret.
+      required: [version, guild_id, defaults]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        guild_id:
+          $ref: '#/components/schemas/ImportDiscordId'
+        defaults:
+          type: object
+          additionalProperties: false
+          required: [unmapped_human, unmapped_bot, uncategorized_space]
+          properties:
+            unmapped_human:
+              type: string
+              enum: [placeholder, skip]
+            unmapped_bot:
+              type: string
+              enum: [placeholder, skip]
+            uncategorized_space:
+              type: string
+              description: '`skip` or the `discord_category` of an entry in `spaces`.'
+              examples: [skip]
+        spaces:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [discord_category, target]
+            properties:
+              discord_category:
+                $ref: '#/components/schemas/ImportDiscordId'
+              target:
+                $ref: '#/components/schemas/ImportMappingTarget'
+        channels:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [discord_channel, target]
+            properties:
+              discord_channel:
+                $ref: '#/components/schemas/ImportDiscordId'
+              target:
+                $ref: '#/components/schemas/ImportMappingTarget'
+              planned_operator:
+                type: string
+                description: '`agent:<handle>` of an active agent or `none` (default).'
+                examples: ['agent:lotse']
+              lead:
+                type: string
+                enum: [discord, bothy]
+                default: discord
+        users:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [discord_user, target]
+            properties:
+              discord_user:
+                $ref: '#/components/schemas/ImportDiscordId'
+              target:
+                type: string
+                description: '`user:<handle>`, `agent:<handle>` or `placeholder`.'
+                examples: ['user:alex']
+    ImportDiscordId:
+      type: string
+      pattern: '^[0-9]+$'
+      description: A Discord snowflake as a string of digits.
+      examples: ['1029384000']
+    ImportMappingTarget:
+      description: 'Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.'
+    ImportSpaceData:
+      type: object
+      additionalProperties: false
+      description: '`data` of a `space` item (origin key `space:<category_id>`). Exactly one of `name` (a new space as the mapping says `create`) and `existing_space_id` (equal to the mapping''s `existing`).'
+      required: [sort_key]
+      properties:
+        name:
+          type: string
+        sort_key:
+          type: string
+          description: Fractional index key of the space order, derived by the tool from the Discord `position`.
+          examples: [a0]
+        existing_space_id:
+          $ref: '#/components/schemas/Uuid'
+    ImportChannelData:
+      type: object
+      additionalProperties: false
+      description: '`data` of a `channel` item (origin key `channel:<channel_id>`). The space is the target of the posted item `space_origin_key` or, without it, of the category named in `defaults.uncategorized_space`; `existing_space_id` and `existing_channel_id` must equal the stored mapping. `read_only` is not a member: the server derives it from the stored `lead`.'
+      required: [kind, sort_key]
+      properties:
+        space_origin_key:
+          type: string
+          examples: ['space:1029384001']
+        existing_space_id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [text, forum]
+        topic:
+          type: string
+        sort_key:
+          type: string
+          description: Fractional index key of the order in the space.
+          examples: [a0]
+        existing_channel_id:
+          $ref: '#/components/schemas/Uuid'
+    ImportForumTagData:
+      type: object
+      additionalProperties: false
+      description: '`data` of a `forum_tag` item (origin key `forum_tag:<channel_id>:<tag_id>`). A tag with the same name, without regard to case, is adopted (22, 6.6). `emoji` is accepted and not stored (forum tags have no emoji).'
+      required: [channel_origin_key, name]
+      properties:
+        channel_origin_key:
+          type: string
+          examples: ['channel:1029384000']
+        name:
+          type: string
+        emoji:
+          type: string
+    ImportUserData:
+      type: object
+      additionalProperties: false
+      description: '`data` of a `user` item (origin key `user:<user_id>`). The target comes from the stored mapping and its `defaults`; a webhook author is always a placeholder (22, 5.3).'
+      required: [discord_kind, username]
+      properties:
+        discord_kind:
+          type: string
+          enum: [user, bot, webhook]
+        username:
+          type: string
+        global_name:
+          type: string
     GdprRequestKind:
       type: string
       enum: [export, deletion, rectification]

@@ -113,7 +113,8 @@ type Store interface {
 	// AllChannels returns every channel that is not a dm channel, archived ones included,
 	// ascending by id.
 	AllChannels(ctx context.Context) ([]ChannelRow, error)
-	// InsertChannel inserts c. Errors: conflict on /name for a name taken in the space.
+	// InsertChannel inserts c with read_only and the operator columns as given (M8-03). Errors:
+	// conflict on /name for a name taken in the space.
 	InsertChannel(ctx context.Context, c domain.Channel) error
 	// SaveChannel writes name, topic, forum sort, notification default, sort key, archive time
 	// and version of c, exactly one row. Errors: conflict on /name.
@@ -132,6 +133,9 @@ type Store interface {
 
 	// SaveSpaceOperator writes the default operator and the version of s (M1-54).
 	SaveSpaceOperator(ctx context.Context, s domain.Space) error
+	// SaveChannelReadOnly writes read_only and the version of c (channel.read_only.set and the
+	// ownership list of an import, M8-03).
+	SaveChannelReadOnly(ctx context.Context, c domain.Channel) error
 	// SaveChannelOperator writes the operator columns and the version of c (M1-54).
 	SaveChannelOperator(ctx context.Context, c domain.Channel) error
 	// TouchChannel writes only the version of c: an inheriting channel whose space got a new

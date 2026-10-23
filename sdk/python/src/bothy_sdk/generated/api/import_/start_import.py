@@ -98,6 +98,10 @@ def sync_detailed(
 ) -> Response[ImportSource | Problem]:
     """Start or continue an import
 
+     Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start.
+    Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason`
+    `import_state`.
+
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -130,6 +134,10 @@ def sync(
 ) -> ImportSource | Problem | None:
     """Start or continue an import
 
+     Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start.
+    Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason`
+    `import_state`.
+
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -156,6 +164,10 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[ImportSource | Problem]:
     """Start or continue an import
+
+     Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start.
+    Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason`
+    `import_state`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -186,6 +198,10 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> ImportSource | Problem | None:
     """Start or continue an import
+
+     Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start.
+    Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason`
+    `import_state`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

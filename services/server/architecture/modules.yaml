@@ -225,7 +225,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, chat, agents, messaging, files]
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code and the repository of import_sources and import_items (M8-03)
   privacy:
     tables: [gdpr_requests, deletion_journal_state]
     actions: [gdpr.request.create, gdpr.request.read, gdpr.request.decide, gdpr.export.download]

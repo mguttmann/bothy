@@ -97,6 +97,9 @@ def sync_detailed(
     """Advance the import cursor
 
      Only after a successful batch (22, 7.3).
+    Replaces `cursor` with the given object and merges the top-level members of `stats` into the member
+    `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running`
+    source, else `409 conflict` with `reason` `import_not_running`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -131,6 +134,9 @@ def sync(
     """Advance the import cursor
 
      Only after a successful batch (22, 7.3).
+    Replaces `cursor` with the given object and merges the top-level members of `stats` into the member
+    `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running`
+    source, else `409 conflict` with `reason` `import_not_running`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -160,6 +166,9 @@ async def asyncio_detailed(
     """Advance the import cursor
 
      Only after a successful batch (22, 7.3).
+    Replaces `cursor` with the given object and merges the top-level members of `stats` into the member
+    `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running`
+    source, else `409 conflict` with `reason` `import_not_running`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -192,6 +201,9 @@ async def asyncio(
     """Advance the import cursor
 
      Only after a successful batch (22, 7.3).
+    Replaces `cursor` with the given object and merges the top-level members of `stats` into the member
+    `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running`
+    source, else `409 conflict` with `reason` `import_not_running`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

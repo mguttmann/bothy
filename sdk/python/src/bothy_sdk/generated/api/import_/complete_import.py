@@ -94,6 +94,10 @@ def sync_detailed(
     """Complete an import
 
      When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+    Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
+    the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
+    else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
+    block it.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -128,6 +132,10 @@ def sync(
     """Complete an import
 
      When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+    Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
+    the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
+    else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
+    block it.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -157,6 +165,10 @@ async def asyncio_detailed(
     """Complete an import
 
      When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+    Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
+    the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
+    else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
+    block it.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -189,6 +201,10 @@ async def asyncio(
     """Complete an import
 
      When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+    Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of
+    the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`,
+    else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not
+    block it.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

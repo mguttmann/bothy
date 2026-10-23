@@ -89,7 +89,7 @@ func (r *Repository) InsertChannel(ctx context.Context, c domain.Channel) error 
 		ID: uuid(c.ID), SpaceID: optionalUUID(c.SpaceID), Kind: string(c.Kind), Name: c.Name, Topic: c.Topic, SortKey: c.SortKey,
 		OperatorInherit: c.OperatorInherit, RequireMention: c.RequireMention, ThreadRequireMention: c.ThreadRequireMention,
 		FreeResponse: c.FreeResponse, AutoThread: c.AutoThread, AllowMentionedAgents: c.AllowMentionedAgents,
-		HistoryBackfillLimit: limit, ForumDefaultSort: optionalText(c.ForumDefaultSort),
+		HistoryBackfillLimit: limit, ForumDefaultSort: optionalText(c.ForumDefaultSort), ReadOnly: c.ReadOnly,
 		CreatedBy: uuid(c.CreatedBy), CreatedAt: pgtype.Timestamptz{Time: c.CreatedAt, Valid: true}, Version: c.Version,
 		SettingsVersion: c.SettingsVersion,
 	})

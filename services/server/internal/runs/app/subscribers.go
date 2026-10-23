@@ -6,7 +6,9 @@ import (
 	"context"
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
+	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
@@ -116,6 +118,41 @@ func (s *Service) onAgentDisabled(ctx context.Context, ev agents.AgentDisabled) 
 	}
 	for _, row := range rows {
 		if err := s.requestCancel(ctx, row, domain.RunReasonAgentDisabled, ids.ID{}, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// OnChannelReadOnlySet is the in-transaction subscriber of chat.ChannelReadOnlySet (M8-03, M2-09
+// design note 7 g; 05 channel.read_only.set, 22 13.4): when the channel becomes read-only, every
+// active run in its threads is locked in ascending id and gets run.cancel_requested with reason
+// channel_read_only and the job runs.cancel_timeout through requestCancel; lifting read-only does
+// nothing. Until Bind it does nothing. Errors: those of the database and the scheduler, which roll
+// the change of the flag back.
+func (a *Acceptor) OnChannelReadOnlySet(ctx context.Context, ev chat.ChannelReadOnlySet) error {
+	s := a.svc.Load()
+	if s == nil || !ev.ReadOnly {
+		return nil
+	}
+	return s.onChannelReadOnly(ctx, ev.ChannelID)
+}
+
+// onChannelReadOnly requests the cancellation of the active runs of the channel.
+func (s *Service) onChannelReadOnly(ctx context.Context, channelID ids.ID) error {
+	if s.d.ChannelThreads == nil {
+		return errs.New(errs.CodeInternalError, "runs: the subscriber of chat.ChannelReadOnlySet needs the threads of chat")
+	}
+	threads, err := s.d.ChannelThreads.ThreadIDsOfChannels(ctx, []ids.ID{channelID})
+	if err != nil || len(threads) == 0 {
+		return err
+	}
+	rows, err := s.d.Repo.LockActiveRunsByThreads(ctx, threads)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := s.requestCancel(ctx, row, domain.RunReasonChannelReadOnly, ids.ID{}, false); err != nil {
 			return err
 		}
 	}

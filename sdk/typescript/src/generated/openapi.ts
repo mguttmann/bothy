@@ -1884,6 +1884,7 @@ export interface paths {
         /**
          * Switch the read-only state of a channel
          * @description Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+         *     The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
          */
         put: operations["setChannelReadOnly"];
         post?: never;
@@ -4540,7 +4541,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start or continue an import */
+        /**
+         * Start or continue an import
+         * @description Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+         */
         post: operations["startImport"];
         delete?: never;
         options?: never;
@@ -4557,7 +4561,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Pause an import */
+        /**
+         * Pause an import
+         * @description Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+         */
         post: operations["pauseImport"];
         delete?: never;
         options?: never;
@@ -4574,7 +4581,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel an import */
+        /**
+         * Cancel an import
+         * @description Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
+         */
         post: operations["cancelImport"];
         delete?: never;
         options?: never;
@@ -4594,6 +4604,7 @@ export interface paths {
         /**
          * Complete an import
          * @description When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+         *     Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
          */
         post: operations["completeImport"];
         delete?: never;
@@ -4613,6 +4624,7 @@ export interface paths {
         /**
          * Set the leading side of a channel
          * @description Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+         *     The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
          */
         put: operations["setImportLead"];
         post?: never;
@@ -4634,6 +4646,7 @@ export interface paths {
         /**
          * Write a batch of imported objects
          * @description One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+         *     A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
          */
         post: operations["applyImportBatch"];
         delete?: never;
@@ -4673,6 +4686,7 @@ export interface paths {
         /**
          * Advance the import cursor
          * @description Only after a successful batch (22, 7.3).
+         *     Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
          */
         put: operations["setImportCursor"];
         post?: never;
@@ -8793,8 +8807,10 @@ export interface components {
              * @enum {string}
              */
             state: "draft" | "running" | "paused" | "completed" | "failed";
-            /** @description Counters per item kind and state, without content. */
+            /** @description Counters without content. The server's counters per item kind and state are under `server` (`server.<item_kind>.<state>`, `server.source_changed`, `server.cancelled`); the counters of the import tool from `setImportCursor` are under `tool`. */
             stats: components["schemas"]["JsonObject"];
+            /** @description The object last stored by `setImportCursor` (progress and the run lease of the import tool, 22 7.3 and 7.4); `{}` before the first one. The server never interprets it. */
+            cursor?: components["schemas"]["JsonObject"];
             created_at: components["schemas"]["Timestamp"];
             started_at?: components["schemas"]["Timestamp"];
             finished_at?: components["schemas"]["Timestamp"];
@@ -8803,6 +8819,7 @@ export interface components {
             kind: components["schemas"]["ImportKind"];
             /** @example Old community server */
             name: string;
+            /** @description For `kind = discord` the mapping of schema `import_source.discord.v1`, see `ImportSourceDiscordConfig` (22, 5.2); every violation is one error of `400 validation_failed` with its JSON pointer, all reported at once. `kind = archive` is `400 validation_failed` with the code `not_enabled`. */
             config: components["schemas"]["JsonObject"];
         };
         ImportItem: {
@@ -8815,6 +8832,8 @@ export interface components {
             target_id?: components["schemas"]["Uuid"];
             state: components["schemas"]["ImportItemState"];
             error?: string;
+            /** @description Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4). */
+            source_changed?: boolean;
             created_at: components["schemas"]["Timestamp"];
         };
         GdprRequest: {
@@ -9651,7 +9670,7 @@ export interface components {
             item_kind: "space" | "channel" | "forum_tag" | "thread" | "message" | "user" | "pin";
             /** @description Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source. */
             content_sha256?: string;
-            /** @description Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). */
+            /** @description Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`). */
             data: components["schemas"]["JsonObject"];
         };
         /** @description One transaction. Objects of one thread, in source order; structure objects (space, channel, forum tag, person) come in batches without `thread_origin_key`. */
@@ -9703,6 +9722,96 @@ export interface components {
              * @enum {string}
              */
             lead: "discord" | "bothy";
+        };
+        /** @description Mapping file of schema `import_source.discord.v1` as JSON (22, 5.2); the web console converts the YAML of the owner. It holds no secret. */
+        ImportSourceDiscordConfig: {
+            /** @enum {integer} */
+            version: 1;
+            guild_id: components["schemas"]["ImportDiscordId"];
+            defaults: {
+                /** @enum {string} */
+                unmapped_human: "placeholder" | "skip";
+                /** @enum {string} */
+                unmapped_bot: "placeholder" | "skip";
+                /**
+                 * @description `skip` or the `discord_category` of an entry in `spaces`.
+                 * @example skip
+                 */
+                uncategorized_space: string;
+            };
+            spaces?: {
+                discord_category: components["schemas"]["ImportDiscordId"];
+                target: components["schemas"]["ImportMappingTarget"];
+            }[];
+            channels?: {
+                discord_channel: components["schemas"]["ImportDiscordId"];
+                target: components["schemas"]["ImportMappingTarget"];
+                /**
+                 * @description `agent:<handle>` of an active agent or `none` (default).
+                 * @example agent:lotse
+                 */
+                planned_operator?: string;
+                /**
+                 * @default discord
+                 * @enum {string}
+                 */
+                lead: "discord" | "bothy";
+            }[];
+            users?: {
+                discord_user: components["schemas"]["ImportDiscordId"];
+                /**
+                 * @description `user:<handle>`, `agent:<handle>` or `placeholder`.
+                 * @example user:alex
+                 */
+                target: string;
+            }[];
+        };
+        /**
+         * @description A Discord snowflake as a string of digits.
+         * @example 1029384000
+         */
+        ImportDiscordId: string;
+        /** @description Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member. */
+        ImportMappingTarget: unknown;
+        /** @description `data` of a `space` item (origin key `space:<category_id>`). Exactly one of `name` (a new space as the mapping says `create`) and `existing_space_id` (equal to the mapping's `existing`). */
+        ImportSpaceData: {
+            name?: string;
+            /**
+             * @description Fractional index key of the space order, derived by the tool from the Discord `position`.
+             * @example a0
+             */
+            sort_key: string;
+            existing_space_id?: components["schemas"]["Uuid"];
+        };
+        /** @description `data` of a `channel` item (origin key `channel:<channel_id>`). The space is the target of the posted item `space_origin_key` or, without it, of the category named in `defaults.uncategorized_space`; `existing_space_id` and `existing_channel_id` must equal the stored mapping. `read_only` is not a member: the server derives it from the stored `lead`. */
+        ImportChannelData: {
+            /** @example space:1029384001 */
+            space_origin_key?: string;
+            existing_space_id?: components["schemas"]["Uuid"];
+            name?: string;
+            /** @enum {string} */
+            kind: "text" | "forum";
+            topic?: string;
+            /**
+             * @description Fractional index key of the order in the space.
+             * @example a0
+             */
+            sort_key: string;
+            existing_channel_id?: components["schemas"]["Uuid"];
+        };
+        /** @description `data` of a `forum_tag` item (origin key `forum_tag:<channel_id>:<tag_id>`). A tag with the same name, without regard to case, is adopted (22, 6.6). `emoji` is accepted and not stored (forum tags have no emoji). */
+        ImportForumTagData: {
+            /** @example channel:1029384000 */
+            channel_origin_key: string;
+            name: string;
+            emoji?: string;
+        };
+        /** @description `data` of a `user` item (origin key `user:<user_id>`). The target comes from the stored mapping and its `defaults`; a webhook author is always a placeholder (22, 5.3). */
+        ImportUserData: {
+            /** @enum {string} */
+            discord_kind: "user" | "bot" | "webhook";
+            username: string;
+            global_name?: string;
         };
         /** @enum {string} */
         GdprRequestKind: "export" | "deletion" | "rectification";

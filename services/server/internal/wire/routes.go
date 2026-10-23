@@ -17,6 +17,7 @@ import (
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	fileshttp "github.com/OWNER/bothy/services/server/internal/files/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
+	importerhttp "github.com/OWNER/bothy/services/server/internal/importer/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	notifyhttp "github.com/OWNER/bothy/services/server/internal/notify/adapters/httpapi"
@@ -81,6 +82,12 @@ type Handlers struct {
 	// Behavior implements getChannelBehavior, putChannelBehavior, listServedChannels and
 	// getServedChannelConfig (chat, M2-02).
 	*chathttp.Behavior
+	// ReadOnly implements setChannelReadOnly (chat, M8-03).
+	*chathttp.ReadOnly
+	// Imports implements listImports, createImport, getImport, listImportItems, startImport,
+	// pauseImport, cancelImport, completeImport, setImportLead, applyImportBatch and
+	// setImportCursor (importer, M8-03).
+	*importerhttp.Imports
 	// Messages implements createMessage and createThread (messaging, M1-56), listThreadMessages
 	// and getMessage (M1-57), listMyMentions and the template operations (M1-60).
 	*messaginghttp.Messages

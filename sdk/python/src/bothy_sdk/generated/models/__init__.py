@@ -368,9 +368,12 @@ from .identity_provider_update import IdentityProviderUpdate
 from .image_upload import ImageUpload
 from .import_batch import ImportBatch
 from .import_batch_result import ImportBatchResult
+from .import_channel_data import ImportChannelData
+from .import_channel_data_kind import ImportChannelDataKind
 from .import_cursor_set import ImportCursorSet
 from .import_file_create import ImportFileCreate
 from .import_file_slot import ImportFileSlot
+from .import_forum_tag_data import ImportForumTagData
 from .import_item import ImportItem
 from .import_item_item_kind import ImportItemItemKind
 from .import_item_page import ImportItemPage
@@ -385,8 +388,30 @@ from .import_progress_event_type import ImportProgressEventType
 from .import_progress_payload import ImportProgressPayload
 from .import_source import ImportSource
 from .import_source_create import ImportSourceCreate
+from .import_source_discord_config import ImportSourceDiscordConfig
+from .import_source_discord_config_channels_item import (
+    ImportSourceDiscordConfigChannelsItem,
+)
+from .import_source_discord_config_channels_item_lead import (
+    ImportSourceDiscordConfigChannelsItemLead,
+)
+from .import_source_discord_config_defaults import ImportSourceDiscordConfigDefaults
+from .import_source_discord_config_defaults_unmapped_bot import (
+    ImportSourceDiscordConfigDefaultsUnmappedBot,
+)
+from .import_source_discord_config_defaults_unmapped_human import (
+    ImportSourceDiscordConfigDefaultsUnmappedHuman,
+)
+from .import_source_discord_config_spaces_item import (
+    ImportSourceDiscordConfigSpacesItem,
+)
+from .import_source_discord_config_users_item import ImportSourceDiscordConfigUsersItem
+from .import_source_discord_config_version import ImportSourceDiscordConfigVersion
 from .import_source_page import ImportSourcePage
 from .import_source_state import ImportSourceState
+from .import_space_data import ImportSpaceData
+from .import_user_data import ImportUserData
+from .import_user_data_discord_kind import ImportUserDataDiscordKind
 from .incoming_webhook import IncomingWebhook
 from .incoming_webhook_create import IncomingWebhookCreate
 from .incoming_webhook_created import IncomingWebhookCreated
@@ -1127,9 +1152,12 @@ __all__ = (
     "ImageUpload",
     "ImportBatch",
     "ImportBatchResult",
+    "ImportChannelData",
+    "ImportChannelDataKind",
     "ImportCursorSet",
     "ImportFileCreate",
     "ImportFileSlot",
+    "ImportForumTagData",
     "ImportItem",
     "ImportItemItemKind",
     "ImportItemPage",
@@ -1144,8 +1172,20 @@ __all__ = (
     "ImportProgressPayload",
     "ImportSource",
     "ImportSourceCreate",
+    "ImportSourceDiscordConfig",
+    "ImportSourceDiscordConfigChannelsItem",
+    "ImportSourceDiscordConfigChannelsItemLead",
+    "ImportSourceDiscordConfigDefaults",
+    "ImportSourceDiscordConfigDefaultsUnmappedBot",
+    "ImportSourceDiscordConfigDefaultsUnmappedHuman",
+    "ImportSourceDiscordConfigSpacesItem",
+    "ImportSourceDiscordConfigUsersItem",
+    "ImportSourceDiscordConfigVersion",
     "ImportSourcePage",
     "ImportSourceState",
+    "ImportSpaceData",
+    "ImportUserData",
+    "ImportUserDataDiscordKind",
     "IncomingWebhook",
     "IncomingWebhookCreate",
     "IncomingWebhookCreated",

@@ -194,6 +194,31 @@ func (r *Repository) InsertPrincipal(ctx context.Context, p *domain.Principal) e
 	return nil
 }
 
+// InsertPrincipalIfAbsent implements app.ImportPeopleStore: like InsertPrincipal, but a unique
+// conflict (a taken handle) inserts nothing and reports false without aborting the transaction.
+func (r *Repository) InsertPrincipalIfAbsent(ctx context.Context, p *domain.Principal) (bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return false, err
+	}
+	created, err := q.InsertPrincipalIfAbsent(ctx, sqlcgen.InsertPrincipalIfAbsentParams{
+		ID:           uuid(p.ID),
+		Kind:         string(p.Kind),
+		Status:       string(p.Status),
+		Handle:       p.Handle.String(),
+		DisplayName:  p.DisplayName.String(),
+		AvatarFileID: optionalUUID(p.AvatarFileID),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, mapError(err, "inserting a principal")
+	}
+	p.CreatedAt = timeOf(created)
+	return true, nil
+}
+
 // SetBotPrincipalStatus implements app.Store.
 func (r *Repository) SetBotPrincipalStatus(ctx context.Context, id ids.ID, status domain.Status, disabledAt time.Time) (bool, error) {
 	q, err := r.write(ctx)

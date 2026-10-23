@@ -999,6 +999,7 @@ type ClientWithResponsesInterface interface {
 	// SetChannelReadOnlyWithBodyWithResponse Switch the read-only state of a channel
 	//
 	// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+	// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1008,6 +1009,7 @@ type ClientWithResponsesInterface interface {
 	// SetChannelReadOnlyWithResponse Switch the read-only state of a channel
 	//
 	// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+	// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2119,6 +2121,7 @@ type ClientWithResponsesInterface interface {
 	// ApplyImportBatchWithBodyWithResponse Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2128,6 +2131,7 @@ type ClientWithResponsesInterface interface {
 	// ApplyImportBatchWithResponse Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2135,6 +2139,8 @@ type ClientWithResponsesInterface interface {
 	ApplyImportBatchWithResponse(ctx context.Context, importId ImportIdPath, body ApplyImportBatchJSONRequestBody, reqEditors ...RequestEditorFn) (*ApplyImportBatchResponse, error)
 
 	// CancelImportWithResponse Cancel an import
+	//
+	// Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2144,6 +2150,7 @@ type ClientWithResponsesInterface interface {
 	// CompleteImportWithResponse Complete an import
 	//
 	// When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+	// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2153,6 +2160,7 @@ type ClientWithResponsesInterface interface {
 	// SetImportCursorWithBodyWithResponse Advance the import cursor
 	//
 	// Only after a successful batch (22, 7.3).
+	// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2162,6 +2170,7 @@ type ClientWithResponsesInterface interface {
 	// SetImportCursorWithResponse Advance the import cursor
 	//
 	// Only after a successful batch (22, 7.3).
+	// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2196,6 +2205,7 @@ type ClientWithResponsesInterface interface {
 	// SetImportLeadWithBodyWithResponse Set the leading side of a channel
 	//
 	// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+	// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2205,6 +2215,7 @@ type ClientWithResponsesInterface interface {
 	// SetImportLeadWithResponse Set the leading side of a channel
 	//
 	// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+	// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2213,12 +2224,16 @@ type ClientWithResponsesInterface interface {
 
 	// PauseImportWithResponse Pause an import
 	//
+	// Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /imports/{import_id}/pause (the `PauseImport` operationId).
 	PauseImportWithResponse(ctx context.Context, importId ImportIdPath, params *PauseImportParams, reqEditors ...RequestEditorFn) (*PauseImportResponse, error)
 
 	// StartImportWithResponse Start or continue an import
+	//
+	// Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -22636,92 +22651,4 @@ func (r AddGroupMemberResponse) ContentType() string {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
-}
-
-// RemoveGroupMemberResponse204Headers the declared response headers of an HTTP 204 response for RemoveGroupMember
-type RemoveGroupMemberResponse204Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// RemoveGroupMemberResponse400Headers the declared response headers of an HTTP 400 response for RemoveGroupMember
-type RemoveGroupMemberResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RemoveGroupMemberResponse401Headers the declared response headers of an HTTP 401 response for RemoveGroupMember
-type RemoveGroupMemberResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// RemoveGroupMemberResponse403Headers the declared response headers of an HTTP 403 response for RemoveGroupMember
-type RemoveGroupMemberResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RemoveGroupMemberResponse404Headers the declared response headers of an HTTP 404 response for RemoveGroupMember
-type RemoveGroupMemberResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RemoveGroupMemberResponse409Headers the declared response headers of an HTTP 409 response for RemoveGroupMember
-type RemoveGroupMemberResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// RemoveGroupMemberResponse429Headers the declared response headers of an HTTP 429 response for RemoveGroupMember
-type RemoveGroupMemberResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// RemoveGroupMemberResponseDefaultHeaders the declared response headers of an HTTP default response for RemoveGroupMember
-type RemoveGroupMemberResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type RemoveGroupMemberResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers204 the parsed response headers for an HTTP 204 response
-	Headers204 *RemoveGroupMemberResponse204Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *RemoveGroupMemberResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *RemoveGroupMemberResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *RemoveGroupMemberResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *RemoveGroupMemberResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *RemoveGroupMemberResponse409Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *RemoveGroupMemberResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *RemoveGroupMemberResponseDefaultHeaders
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
 }

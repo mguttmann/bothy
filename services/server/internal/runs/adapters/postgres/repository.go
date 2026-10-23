@@ -181,6 +181,20 @@ func (r *Repository) LockActiveRunsByStarter(ctx context.Context, principalIDs [
 	return runs(rows, err, "locking the active runs of starters")
 }
 
+// LockActiveRunsByThreads implements app.Repository. Errors: internal outside a unit of work.
+func (r *Repository) LockActiveRunsByThreads(ctx context.Context, threadIDs []ids.ID) ([]app.RunRow, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return nil, err
+	}
+	in := make([]pgtype.UUID, 0, len(threadIDs))
+	for _, id := range threadIDs {
+		in = append(in, uuid(id))
+	}
+	rows, err := q.LockActiveRunsByThreads(ctx, in)
+	return runs(rows, err, "locking the active runs of threads")
+}
+
 // LockActiveRunsByAgent implements app.Repository. Errors: internal outside a unit of work.
 func (r *Repository) LockActiveRunsByAgent(ctx context.Context, agentID ids.ID) ([]app.RunRow, error) {
 	q, err := r.write(ctx)

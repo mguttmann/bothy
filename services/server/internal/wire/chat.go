@@ -12,6 +12,8 @@ import (
 	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	importerpg "github.com/OWNER/bothy/services/server/internal/importer/adapters/postgres"
+	importerapp "github.com/OWNER/bothy/services/server/internal/importer/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -78,6 +80,8 @@ type Chat struct {
 	// BehaviorHandlers are the REST handlers of channel behaviour and agent configuration
 	// (M2-02).
 	BehaviorHandlers *chathttp.Behavior
+	// ReadOnlyHandlers are the REST handler of setChannelReadOnly (M8-03).
+	ReadOnlyHandlers *chathttp.ReadOnly
 }
 
 // NewChat builds the chat module over pool with the unit of work uow, the Authorizer az (also the
@@ -100,16 +104,20 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		return nil, err
 	}
 	repo := chatpg.NewRepository(pool)
+	guard, err := importerapp.NewGuard(importerpg.NewRepository(pool))
+	if err != nil {
+		return nil, err
+	}
 	svc, err := chatapp.New(cfg, chatapp.Deps{
 		Store: repo, UoW: uow, Authorizer: az, Rights: rights, Audit: w.Audit, Events: w.Events,
 		RightsChanges: w.Rights, Directory: w.Directory,
-		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk, Behaviors: repo, Errors: counter, Resolver: w.Resolver,
+		Policies: policies, Cursors: chathttp.Cursors{}, Clock: clk, Behaviors: repo, Errors: counter, Resolver: w.Resolver, Guard: guard,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &Chat{Service: svc, Handlers: chathttp.New(svc), ChannelHandlers: chathttp.NewChannels(svc), ThreadHandlers: chathttp.NewThreads(svc),
-		BehaviorHandlers: chathttp.NewBehavior(svc, svc)}, nil
+		BehaviorHandlers: chathttp.NewBehavior(svc, svc), ReadOnlyHandlers: chathttp.NewReadOnly(svc)}, nil
 }
 
 // fillHandlers sets the nil chat handlers of h to the ones c built: spaces and the sidebar
@@ -127,5 +135,8 @@ func (c *Chat) fillHandlers(h *Handlers) {
 	}
 	if h.Behavior == nil {
 		h.Behavior = c.BehaviorHandlers
+	}
+	if h.ReadOnly == nil {
+		h.ReadOnly = c.ReadOnlyHandlers
 	}
 }

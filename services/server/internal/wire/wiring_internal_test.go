@@ -18,7 +18,7 @@ import (
 
 // notWiredYet are the modules of architecture/modules.yaml that `bothy serve` does not wire yet.
 // The ticket that wires one removes it here and adds its module_<name>.go.
-var notWiredYet = []string{"billing", "importer", "privacy", "search", "status"}
+var notWiredYet = []string{"billing", "privacy", "search", "status"}
 
 // registerModules returns the module names of architecture/modules.yaml, the module register
 // (ADR 0050).
@@ -155,8 +155,9 @@ func TestStartSequenceUnchanged(t *testing.T) {
 }
 
 // TestChatStepParts: the step chat runs the parts of chat, messaging, runs, the personal data of
-// sync, the readiness of agents, catch-up and snapshot, notify, the APNs adapter of notify (M3-20)
-// and stats in this order, as the single start function did before the module files.
+// sync, the readiness of agents, catch-up and snapshot, notify, the APNs adapter of notify (M3-20),
+// stats and the importer (M8-03) in this order, as the single start function did before the module
+// files.
 func TestChatStepParts(t *testing.T) {
 	t.Parallel()
 	var got []string
@@ -165,7 +166,7 @@ func TestChatStepParts(t *testing.T) {
 			got = append(got, p.module)
 		}
 	}
-	want := []string{"chat", "messaging", "runs", "sync", "agents", "sync", "notify", "notify", "stats"}
+	want := []string{"chat", "messaging", "runs", "sync", "agents", "sync", "notify", "notify", "stats", "importer"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("parts of step chat by module: %v, want %v", got, want)
 	}

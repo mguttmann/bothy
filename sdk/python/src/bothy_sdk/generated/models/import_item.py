@@ -27,6 +27,8 @@ class ImportItem:
         target_kind (str | Unset):
         target_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         error (str | Unset):
+        source_changed (bool | Unset): Present and `true` when a repeated key came with a `content_sha256` different
+            from the stored one; nothing was changed (22, 7.2 item 4).
     """
 
     id: UUID
@@ -37,6 +39,7 @@ class ImportItem:
     target_kind: str | Unset = UNSET
     target_id: UUID | Unset = UNSET
     error: str | Unset = UNSET
+    source_changed: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,6 +61,8 @@ class ImportItem:
 
         error = self.error
 
+        source_changed = self.source_changed
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -75,6 +80,8 @@ class ImportItem:
             field_dict["target_id"] = target_id
         if error is not UNSET:
             field_dict["error"] = error
+        if source_changed is not UNSET:
+            field_dict["source_changed"] = source_changed
 
         return field_dict
 
@@ -102,6 +109,8 @@ class ImportItem:
 
         error = d.pop("error", UNSET)
 
+        source_changed = d.pop("source_changed", UNSET)
+
         import_item = cls(
             id=id,
             origin_key=origin_key,
@@ -111,6 +120,7 @@ class ImportItem:
             target_kind=target_kind,
             target_id=target_id,
             error=error,
+            source_changed=source_changed,
         )
 
         import_item.additional_properties = d

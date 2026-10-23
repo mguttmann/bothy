@@ -530,6 +530,34 @@ type IdentityProvider struct {
 	UpdatedAt         pgtype.Timestamptz
 }
 
+type ImportItem struct {
+	ID            pgtype.UUID
+	SourceID      pgtype.UUID
+	OriginKey     string
+	ItemKind      string
+	TargetKind    pgtype.Text
+	TargetID      pgtype.UUID
+	State         string
+	ContentSha256 []byte
+	Error         pgtype.Text
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+type ImportSource struct {
+	ID         pgtype.UUID
+	Kind       string
+	Name       string
+	Config     []byte
+	State      string
+	Cursor     []byte
+	Stats      []byte
+	CreatedBy  pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	StartedAt  pgtype.Timestamptz
+	FinishedAt pgtype.Timestamptz
+}
+
 type IncomingWebhook struct {
 	ID         pgtype.UUID
 	AppID      pgtype.UUID

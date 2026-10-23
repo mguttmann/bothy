@@ -145,10 +145,11 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18) and, after the
 // existing subscribers, messaging.MessagePosted -> runs (the acceptance of a triggering message,
 // M2-05), chat.ChannelArchived -> apps (M2-27), authorize.AccessChanged, published by authz, and
-// agents.AgentDisabled -> runs (M2-09, 02 section 4.3), messaging.MessageDeleted -> runs after
-// them (the components of a deleted card, M2-15) and kernel.AccessChanged,
-// identity.DeviceRevoked and identity.SessionEnded -> terminal (the end of terminal sessions at
-// every revocation, M2-46).
+// agents.AgentDisabled -> runs (M2-09, 02 section 4.3), chat.ChannelReadOnlySet -> runs (the
+// cancellation of the active runs of a channel that becomes read-only, M8-03),
+// kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (the end of
+// terminal sessions at every revocation, M2-46) and messaging.MessageDeleted -> runs (the
+// components of a deleted card, M2-15).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -236,6 +237,11 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 		return err
 	}
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnAgentDisabled); err != nil {
+		return err
+	}
+	// A channel that becomes read-only cancels its active runs in the same transaction (05
+	// channel.read_only.set, 22 13.4; M8-03).
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnChannelReadOnlySet); err != nil {
 		return err
 	}
 	if m.TerminalSubscribers == nil {

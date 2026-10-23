@@ -106,6 +106,8 @@ def sync_detailed(
 
      Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
     Switching on cancels active runs in the channel.
+    The imported channel of a source that is neither `completed` nor `failed` is controlled by its
+    ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -144,6 +146,8 @@ def sync(
 
      Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
     Switching on cancels active runs in the channel.
+    The imported channel of a source that is neither `completed` nor `failed` is controlled by its
+    ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -177,6 +181,8 @@ async def asyncio_detailed(
 
      Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
     Switching on cancels active runs in the channel.
+    The imported channel of a source that is neither `completed` nor `failed` is controlled by its
+    ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -213,6 +219,8 @@ async def asyncio(
 
      Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
     Switching on cancels active runs in the channel.
+    The imported channel of a source that is neither `completed` nor `failed` is controlled by its
+    ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 
     Args:
         channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -16,7 +16,7 @@ part 'import_source_create.g.dart';
 /// Properties:
 /// * [kind]
 /// * [name]
-/// * [config] - Free-form JSON object whose schema is named in the field description.
+/// * [config] - For `kind = discord` the mapping of schema `import_source.discord.v1`, see `ImportSourceDiscordConfig` (22, 5.2); every violation is one error of `400 validation_failed` with its JSON pointer, all reported at once. `kind = archive` is `400 validation_failed` with the code `not_enabled`.
 @BuiltValue()
 abstract class ImportSourceCreate
     implements Built<ImportSourceCreate, ImportSourceCreateBuilder> {
@@ -27,7 +27,7 @@ abstract class ImportSourceCreate
   @BuiltValueField(wireName: r'name')
   String get name;
 
-  /// Free-form JSON object whose schema is named in the field description.
+  /// For `kind = discord` the mapping of schema `import_source.discord.v1`, see `ImportSourceDiscordConfig` (22, 5.2); every violation is one error of `400 validation_failed` with its JSON pointer, all reported at once. `kind = archive` is `400 validation_failed` with the code `not_enabled`.
   @BuiltValueField(wireName: r'config')
   BuiltMap<String, JsonObject?> get config;
 

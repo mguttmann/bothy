@@ -132,11 +132,11 @@ func (q *Queries) GetChannel(ctx context.Context, id pgtype.UUID) (GetChannelRow
 
 const insertChannel = `-- name: InsertChannel :exec
 INSERT INTO channels (id, space_id, kind, name, topic, sort_key, operator_inherit, require_mention, thread_require_mention,
-    free_response, auto_thread, allow_mentioned_agents, history_backfill_limit, forum_default_sort, created_by, created_at,
-    version, settings_version)
+    free_response, auto_thread, allow_mentioned_agents, history_backfill_limit, forum_default_sort, read_only, created_by,
+    created_at, version, settings_version)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
     $10, $11, $12, $13, $14, $15,
-    $16, $17, $18)
+    $16, $17, $18, $19)
 `
 
 type InsertChannelParams struct {
@@ -154,6 +154,7 @@ type InsertChannelParams struct {
 	AllowMentionedAgents bool
 	HistoryBackfillLimit int32
 	ForumDefaultSort     pgtype.Text
+	ReadOnly             bool
 	CreatedBy            pgtype.UUID
 	CreatedAt            pgtype.Timestamptz
 	Version              int64
@@ -176,6 +177,7 @@ func (q *Queries) InsertChannel(ctx context.Context, arg InsertChannelParams) er
 		arg.AllowMentionedAgents,
 		arg.HistoryBackfillLimit,
 		arg.ForumDefaultSort,
+		arg.ReadOnly,
 		arg.CreatedBy,
 		arg.CreatedAt,
 		arg.Version,

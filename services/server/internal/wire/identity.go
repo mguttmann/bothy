@@ -175,15 +175,18 @@ type Identity struct {
 	// for the principals of apps (M2-24).
 	Directory       *app.Directory
 	PrincipalWrites *app.PrincipalWrites
-	cfg             app.Config
-	state           instance.State
-	repo            *identitypg.Repository
-	uow             txn.UnitOfWork
-	az              authorize.Authorizer
-	writes          IdentityWrites
-	pepper          []byte
-	clk             clock.Clock
-	log             *slog.Logger
+	// ImportPeople is the port identity.ImportPeople: the people and placeholders of an import
+	// (M8-03).
+	ImportPeople *app.ImportPeople
+	cfg          app.Config
+	state        instance.State
+	repo         *identitypg.Repository
+	uow          txn.UnitOfWork
+	az           authorize.Authorizer
+	writes       IdentityWrites
+	pepper       []byte
+	clk          clock.Clock
+	log          *slog.Logger
 	// actingFor resolves the Invocation-Token header (BindActingFor, M2-14); nil until bound.
 	actingFor identity.ActingForSource
 }
@@ -281,11 +284,15 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
+	importPeople, err := app.NewImportPeople(cfg, repo, w.Settings, w.Events)
+	if err != nil {
+		return nil, err
+	}
 	return &Identity{
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), AvatarHandlers: identityhttp.NewAvatars(people), DPoP: verifier, Replay: store,
 		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
 		Enrollment: enrollment, TrustedHeader: driver, Principals: principals,
-		Directory: NewSearchDirectory(pool, w.Search, w.Settings), PrincipalWrites: writes, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
+		Directory: NewSearchDirectory(pool, w.Search, w.Settings), PrincipalWrites: writes, ImportPeople: importPeople, cfg: cfg, state: instanceapp.NewState(instanceRepo, uow),
 		repo: repo, uow: uow, az: az, writes: w, pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
 }

@@ -13,6 +13,15 @@ WHERE state IN ('queued', 'running', 'waiting_input') AND triggered_by = ANY (sq
 ORDER BY id
 FOR UPDATE;
 
+-- name: LockActiveRunsByThreads :many
+-- The active runs of the threads of a channel that became read-only (M8-03, 05
+-- channel.read_only.set), locked in ascending id; the partial unique index runs_thread_active_key
+-- serves it. chat names the threads, because runs has no channel_id.
+SELECT * FROM runs
+WHERE state IN ('queued', 'running', 'waiting_input') AND thread_id = ANY (sqlc.arg(thread_ids)::uuid[])
+ORDER BY id
+FOR UPDATE;
+
 -- name: LockActiveRunsByAgent :many
 -- The active runs of a disabled agent, locked in ascending id (09 2.1); the index
 -- runs_state_agent_active_idx serves it.

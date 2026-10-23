@@ -137,6 +137,39 @@ func (q *Queries) InsertPrincipal(ctx context.Context, arg InsertPrincipalParams
 	return created_at, err
 }
 
+const insertPrincipalIfAbsent = `-- name: InsertPrincipalIfAbsent :one
+INSERT INTO principals (id, kind, status, handle, display_name, avatar_file_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT DO NOTHING
+RETURNING created_at
+`
+
+type InsertPrincipalIfAbsentParams struct {
+	ID           pgtype.UUID
+	Kind         string
+	Status       string
+	Handle       string
+	DisplayName  string
+	AvatarFileID pgtype.UUID
+}
+
+// A placeholder person of an import (M8-03): a handle that is taken, also by a concurrent unit
+// that commits first, inserts nothing and returns no row, so the unit stays usable and the
+// importer takes the next counter.
+func (q *Queries) InsertPrincipalIfAbsent(ctx context.Context, arg InsertPrincipalIfAbsentParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, insertPrincipalIfAbsent,
+		arg.ID,
+		arg.Kind,
+		arg.Status,
+		arg.Handle,
+		arg.DisplayName,
+		arg.AvatarFileID,
+	)
+	var created_at pgtype.Timestamptz
+	err := row.Scan(&created_at)
+	return created_at, err
+}
+
 const insertUser = `-- name: InsertUser :exec
 INSERT INTO users (principal_id, email, locale, time_zone)
 VALUES ($1, $2, $3, $4)

@@ -1061,9 +1061,22 @@ cookie writer and the handlers of `getConsoleSession`, `endViewAs`, `stepUpWithP
 - Port: `Auth.EndedSessions(ctx, sessionIDs, at)` returns those of the sessions that are revoked (`revoked_at` set) or whose `expires_at` is not after `at`, ascending, in one read (`SessionStore.EndedSessions`, query `EndedAuthSessions`); unknown ids are absent, an empty list gives nil without a query. A system read for the job `terminal.sweep` that authorizes nothing and joins the ambient transaction. It follows the columns only: revoking a parent revokes its children in the same step.
 - Test: `TestEndedSessions_RevokedAndExpiredAscending` (`adapters/postgres/ended_test.go` and `app/ended_test.go`, PostgreSQL 18).
 
+## People of an import (M8-03)
+
+`identity.ImportPeople` (`app/importpeople.go`) serves the importer: `Resolve` returns the active
+person or agent of a mapped handle (`not_found` for an unknown handle or one of the other kind,
+`409 conflict` with `reason` `principal_inactive` for one that is not active), `HandleFree` checks a
+candidate handle, and `Placeholder` creates a placeholder person: the principal with the handle and
+display name the importer derived (the identity rules check them again), the `users` row with
+`locale.default`, then status `disabled` with `disabled_at`, and `user.updated`. A placeholder has
+no `user_identities`, no `local_credentials`, no grant, no group membership and no owner row, so it
+can never sign in and authorize refuses it every action with `principal_inactive` (R-IM-06).
+Placeholders are personal data of class `account` (22 14): M7-06 must include them in the export
+and the deletion through `personaldata`.
+
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24).
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24), `Avatars` (M3-10), `ImportPeople` (M8-03); declares `AvatarFiles` (implemented by `files`, bound by `internal/wire`, M3-10), `AppInstallations` (M2-24).
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (with `HasActivePasskey`, M1-40), `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `authz.TokenExpirySource` (`app.TokenExpiry`: the agent and app tokens expiring within a window for "Expiring soon", ids and expiry only, never personal tokens or token values, M6-07), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

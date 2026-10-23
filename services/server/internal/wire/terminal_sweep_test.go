@@ -25,10 +25,11 @@ func TestWire_TerminalSubscriptionsAndSweep(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(golden)), "\n")
-	// The terminal subscriptions follow the runs subscribers of M2-09; later modules (M2-11) may
-	// register after them.
+	// The terminal subscriptions follow the runs subscribers of M2-09 and M8-03
+	// (chat.ChannelReadOnlySet -> runs); later modules (M2-11) may register after them.
 	first := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, "internal/terminal/app.(*Subscribers).") })
-	if first < 1 || first+3 > len(lines) || !strings.HasPrefix(lines[first-1], "subscribe agents.AgentDisabled -> runs ") {
+	if first < 1 || first+3 > len(lines) || !strings.HasPrefix(lines[first-1], "subscribe chat.ChannelReadOnlySet -> runs ") ||
+		!slices.ContainsFunc(lines[:first], func(l string) bool { return strings.HasPrefix(l, "subscribe agents.AgentDisabled -> runs ") }) {
 		t.Fatalf("terminal subscriptions at %d, not after the runs subscribers of M2-09", first)
 	}
 	tail := lines[first : first+3]

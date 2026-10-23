@@ -14,6 +14,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
   - addReaction
   - answerAutocomplete
+  - applyImportBatch
   - approveDevice
   - approvePairing
   - archiveChannel
@@ -28,11 +29,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPasskeyLogin
   - beginPasskeyRegistration
   - beginStepUpOidcReauth
+  - cancelImport
   - cancelRun
   - closeTerminalSession
   - closeThread
   - completeEnrollment
   - completeIdentityLink
+  - completeImport
   - completeOidcLogin
   - completePairing
   - completePasskeyLogin
@@ -53,6 +56,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createGroup
   - createHost
   - createIdentityProvider
+  - createImport
   - createIncomingWebhook
   - createInteraction
   - createMessage
@@ -106,6 +110,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getGroup
   - getHost
   - getIdentityProvider
+  - getImport
   - getInstance
   - getJwks
   - getMe
@@ -143,6 +148,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listGroups
   - listHosts
   - listIdentityProviders
+  - listImportItems
+  - listImports
   - listIncomingWebhooks
   - listInstanceSettings
   - listMessageRevisions
@@ -184,6 +191,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - openTerminalSession
   - pairHost
   - patchRun
+  - pauseImport
   - pinMessage
   - pollAgentEvents
   - postIncomingWebhook
@@ -226,14 +234,18 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAllAgentsBillingMode
   - setAppScopes
   - setChannelOperator
+  - setChannelReadOnly
   - setCredentialHolder
   - setHostLlmCredentials
   - setHostState
+  - setImportCursor
+  - setImportLead
   - setMyAvatar
   - setMyLocalCredential
   - setSpaceOperator
   - setThreadTags
   - setThreadTitle
+  - startImport
   - startRun
   - stepUpWithPassword
   - submitClientMetrics
@@ -267,21 +279,12 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: addStatusIncidentUpdate
     milestone: M7
     ticket: M7-09
-  - operation_id: applyImportBatch
-    milestone: M8
-    ticket: M8-03
   - operation_id: bindAgentSession
     milestone: M2
     ticket: M2-12
-  - operation_id: cancelImport
-    milestone: M8
-    ticket: M8-03
   - operation_id: closePrice
     milestone: M2
     ticket: M2-22
-  - operation_id: completeImport
-    milestone: M8
-    ticket: M8-03
   - operation_id: createAgentWebhookSubscription
     milestone: M2
   - operation_id: createDm
@@ -289,12 +292,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: V3-01
   - operation_id: createGdprRequest
     milestone: M7
-  - operation_id: createImport
-    milestone: M8
-    ticket: M8-03
   - operation_id: createImportFile
     milestone: M8
-    ticket: M8-03
+    ticket: M8-11
   - operation_id: createPrice
     milestone: M2
     ticket: M2-22
@@ -324,9 +324,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M6-05
   - operation_id: getGdprRequest
     milestone: M7
-  - operation_id: getImport
-    milestone: M8
-    ticket: M8-03
   - operation_id: getPublicStatus
     milestone: M7
     ticket: M7-09
@@ -375,21 +372,12 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M2-28
   - operation_id: listGdprRequests
     milestone: M7
-  - operation_id: listImportItems
-    milestone: M8
-    ticket: M8-03
-  - operation_id: listImports
-    milestone: M8
-    ticket: M8-03
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
   - operation_id: listPrices
     milestone: M2
     ticket: M2-22
-  - operation_id: pauseImport
-    milestone: M8
-    ticket: M8-03
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28
@@ -411,18 +399,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: searchThreadTitles
     milestone: M3
     ticket: M3-14
-  - operation_id: setChannelReadOnly
-    milestone: M8
-    ticket: M8-05
-  - operation_id: setImportCursor
-    milestone: M8
-    ticket: M8-03
-  - operation_id: setImportLead
-    milestone: M8
-    ticket: M8-03
-  - operation_id: startImport
-    milestone: M8
-    ticket: M8-03
   - operation_id: submitCostReconciliation
     milestone: M2
     ticket: M2-28

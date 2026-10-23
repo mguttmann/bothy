@@ -210,6 +210,7 @@ type server struct {
 	filesState
 	gatewayState
 	identityState
+	importerState
 	instanceState
 	messagingState
 	notifyState

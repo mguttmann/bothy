@@ -71,6 +71,10 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   and resumes the run, answers with a canary `response.text`, relabels the button without
   `If-Match` (`428`) and with it (`200`) and finishes the run; the owner cancels the run of Lotse
   in Support/Eskalation.
+  `scenario_import.go` drives the import operations and `setChannelReadOnly` (M8-03): the owner creates
+  a source whose mapping creates a space and a channel with canary names, starts it, applies one batch,
+  lists its items, stores a cursor, hands the lead to this server, pauses and completes it, cancels a second
+  source, and switches the imported channel read-only and back.
 
 ## Sinks
 

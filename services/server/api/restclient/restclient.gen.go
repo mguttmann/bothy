@@ -550,16 +550,16 @@ func (e AppManifestComponents) Valid() bool {
 
 // Defines values for AppManifestDeliveryMode.
 const (
-	Gateway AppManifestDeliveryMode = "gateway"
-	Webhook AppManifestDeliveryMode = "webhook"
+	AppManifestDeliveryModeGateway AppManifestDeliveryMode = "gateway"
+	AppManifestDeliveryModeWebhook AppManifestDeliveryMode = "webhook"
 )
 
 // Valid indicates whether the value is a known member of the AppManifestDeliveryMode enum.
 func (e AppManifestDeliveryMode) Valid() bool {
 	switch e {
-	case Gateway:
+	case AppManifestDeliveryModeGateway:
 		return true
-	case Webhook:
+	case AppManifestDeliveryModeWebhook:
 		return true
 	default:
 		return false
@@ -2297,6 +2297,24 @@ func (e IdentityProviderKind) Valid() bool {
 	}
 }
 
+// Defines values for ImportChannelDataKind.
+const (
+	ImportChannelDataKindForum ImportChannelDataKind = "forum"
+	ImportChannelDataKindText  ImportChannelDataKind = "text"
+)
+
+// Valid indicates whether the value is a known member of the ImportChannelDataKind enum.
+func (e ImportChannelDataKind) Valid() bool {
+	switch e {
+	case ImportChannelDataKindForum:
+		return true
+	case ImportChannelDataKindText:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImportItemItemKind.
 const (
 	ImportItemItemKindChannel  ImportItemItemKind = "channel"
@@ -2480,6 +2498,96 @@ func (e ImportSourceState) Valid() bool {
 	case ImportSourceStatePaused:
 		return true
 	case ImportSourceStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigChannelsLead.
+const (
+	ImportSourceDiscordConfigChannelsLeadBothy   ImportSourceDiscordConfigChannelsLead = "bothy"
+	ImportSourceDiscordConfigChannelsLeadDiscord ImportSourceDiscordConfigChannelsLead = "discord"
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigChannelsLead enum.
+func (e ImportSourceDiscordConfigChannelsLead) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigChannelsLeadBothy:
+		return true
+	case ImportSourceDiscordConfigChannelsLeadDiscord:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigDefaultsUnmappedBot.
+const (
+	ImportSourceDiscordConfigDefaultsUnmappedBotPlaceholder ImportSourceDiscordConfigDefaultsUnmappedBot = "placeholder"
+	ImportSourceDiscordConfigDefaultsUnmappedBotSkip        ImportSourceDiscordConfigDefaultsUnmappedBot = "skip"
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigDefaultsUnmappedBot enum.
+func (e ImportSourceDiscordConfigDefaultsUnmappedBot) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigDefaultsUnmappedBotPlaceholder:
+		return true
+	case ImportSourceDiscordConfigDefaultsUnmappedBotSkip:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigDefaultsUnmappedHuman.
+const (
+	ImportSourceDiscordConfigDefaultsUnmappedHumanPlaceholder ImportSourceDiscordConfigDefaultsUnmappedHuman = "placeholder"
+	ImportSourceDiscordConfigDefaultsUnmappedHumanSkip        ImportSourceDiscordConfigDefaultsUnmappedHuman = "skip"
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigDefaultsUnmappedHuman enum.
+func (e ImportSourceDiscordConfigDefaultsUnmappedHuman) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigDefaultsUnmappedHumanPlaceholder:
+		return true
+	case ImportSourceDiscordConfigDefaultsUnmappedHumanSkip:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigVersion.
+const (
+	ImportSourceDiscordConfigVersionN1 ImportSourceDiscordConfigVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigVersion enum.
+func (e ImportSourceDiscordConfigVersion) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportUserDataDiscordKind.
+const (
+	ImportUserDataDiscordKindBot     ImportUserDataDiscordKind = "bot"
+	ImportUserDataDiscordKindUser    ImportUserDataDiscordKind = "user"
+	ImportUserDataDiscordKindWebhook ImportUserDataDiscordKind = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the ImportUserDataDiscordKind enum.
+func (e ImportUserDataDiscordKind) Valid() bool {
+	switch e {
+	case ImportUserDataDiscordKindBot:
+		return true
+	case ImportUserDataDiscordKindUser:
+		return true
+	case ImportUserDataDiscordKindWebhook:
 		return true
 	default:
 		return false
@@ -10460,6 +10568,29 @@ type ImportBatchResult struct {
 	UnreadFloorSeq *int64 `json:"unread_floor_seq,omitempty"`
 }
 
+// ImportChannelData `data` of a `channel` item (origin key `channel:<channel_id>`). The space is the target of the posted item `space_origin_key` or, without it, of the category named in `defaults.uncategorized_space`; `existing_space_id` and `existing_channel_id` must equal the stored mapping. `read_only` is not a member: the server derives it from the stored `lead`.
+type ImportChannelData struct {
+	// ExistingChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ExistingChannelId *Uuid `json:"existing_channel_id,omitempty"`
+
+	// ExistingSpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	ExistingSpaceId *Uuid                 `json:"existing_space_id,omitempty"`
+	Kind            ImportChannelDataKind `json:"kind"`
+	Name            *string               `json:"name,omitempty"`
+
+	// SortKey Fractional index key of the order in the space.
+	//
+	// Examples: a0
+	SortKey string `json:"sort_key"`
+
+	// SpaceOriginKey Examples: space:1029384001
+	SpaceOriginKey *string `json:"space_origin_key,omitempty"`
+	Topic          *string `json:"topic,omitempty"`
+}
+
+// ImportChannelDataKind defines model for ImportChannelData.Kind.
+type ImportChannelDataKind string
+
 // ImportCursorSet defines model for ImportCursorSet.
 type ImportCursorSet struct {
 	// Cursor Progress per source channel and thread; only after a successful batch.
@@ -10468,6 +10599,11 @@ type ImportCursorSet struct {
 	// Stats Free-form JSON object whose schema is named in the field description.
 	Stats *JsonObject `json:"stats,omitempty"`
 }
+
+// ImportDiscordId A Discord snowflake as a string of digits.
+//
+// Examples: 1029384000
+type ImportDiscordId = string
 
 // ImportFileCreate defines model for ImportFileCreate.
 type ImportFileCreate struct {
@@ -10496,6 +10632,14 @@ type ImportFileSlot struct {
 	Upload *UploadSession `json:"upload,omitempty"`
 }
 
+// ImportForumTagData `data` of a `forum_tag` item (origin key `forum_tag:<channel_id>:<tag_id>`). A tag with the same name, without regard to case, is adopted (22, 6.6). `emoji` is accepted and not stored (forum tags have no emoji).
+type ImportForumTagData struct {
+	// ChannelOriginKey Examples: channel:1029384000
+	ChannelOriginKey string  `json:"channel_origin_key"`
+	Emoji            *string `json:"emoji,omitempty"`
+	Name             string  `json:"name"`
+}
+
 // ImportItem defines model for ImportItem.
 type ImportItem struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -10507,8 +10651,11 @@ type ImportItem struct {
 	ItemKind ImportItemItemKind `json:"item_kind"`
 
 	// OriginKey Examples: message:1029384756:0
-	OriginKey string          `json:"origin_key"`
-	State     ImportItemState `json:"state"`
+	OriginKey string `json:"origin_key"`
+
+	// SourceChanged Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
+	SourceChanged *bool           `json:"source_changed,omitempty"`
+	State         ImportItemState `json:"state"`
 
 	// TargetId UUIDv7 (RFC 9562), lowercase canonical form.
 	TargetId   *Uuid   `json:"target_id,omitempty"`
@@ -10548,12 +10695,15 @@ type ImportLeadSet struct {
 // ImportLeadSetLead `discord`: the source leads, the channel here is read-only and mirrored; `bothy`: this server leads (22, 12.1).
 type ImportLeadSetLead string
 
+// ImportMappingTarget Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
+type ImportMappingTarget = interface{}
+
 // ImportObject defines model for ImportObject.
 type ImportObject struct {
 	// ContentSha256 Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
 	ContentSha256 *string `json:"content_sha256,omitempty"`
 
-	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6).
+	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
 	Data     JsonObject           `json:"data"`
 	ItemKind ImportObjectItemKind `json:"item_kind"`
 
@@ -10636,6 +10786,9 @@ type ImportSource struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	CreatedAt Timestamp `json:"created_at"`
 
+	// Cursor The object last stored by `setImportCursor` (progress and the run lease of the import tool, 22 7.3 and 7.4); `{}` before the first one. The server never interprets it.
+	Cursor *JsonObject `json:"cursor,omitempty"`
+
 	// FinishedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	FinishedAt *Timestamp `json:"finished_at,omitempty"`
 
@@ -10652,7 +10805,7 @@ type ImportSource struct {
 	// State A dry run writes nothing and keeps the state.
 	State ImportSourceState `json:"state"`
 
-	// Stats Counters per item kind and state, without content.
+	// Stats Counters without content. The server's counters per item kind and state are under `server` (`server.<item_kind>.<state>`, `server.source_changed`, `server.cancelled`); the counters of the import tool from `setImportCursor` are under `tool`.
 	Stats JsonObject `json:"stats"`
 }
 
@@ -10661,13 +10814,78 @@ type ImportSourceState string
 
 // ImportSourceCreate defines model for ImportSourceCreate.
 type ImportSourceCreate struct {
-	// Config Free-form JSON object whose schema is named in the field description.
+	// Config For `kind = discord` the mapping of schema `import_source.discord.v1`, see `ImportSourceDiscordConfig` (22, 5.2); every violation is one error of `400 validation_failed` with its JSON pointer, all reported at once. `kind = archive` is `400 validation_failed` with the code `not_enabled`.
 	Config JsonObject `json:"config"`
 	Kind   ImportKind `json:"kind"`
 
 	// Name Examples: Old community server
 	Name string `json:"name"`
 }
+
+// ImportSourceDiscordConfig Mapping file of schema `import_source.discord.v1` as JSON (22, 5.2); the web console converts the YAML of the owner. It holds no secret.
+type ImportSourceDiscordConfig struct {
+	Channels *[]struct {
+		// DiscordChannel A Discord snowflake as a string of digits.
+		//
+		// Examples: 1029384000
+		DiscordChannel ImportDiscordId                        `json:"discord_channel"`
+		Lead           *ImportSourceDiscordConfigChannelsLead `json:"lead,omitempty"`
+
+		// PlannedOperator `agent:<handle>` of an active agent or `none` (default).
+		//
+		// Examples: agent:lotse
+		PlannedOperator *string `json:"planned_operator,omitempty"`
+
+		// Target Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
+		Target ImportMappingTarget `json:"target"`
+	} `json:"channels,omitempty"`
+	Defaults struct {
+		// UncategorizedSpace `skip` or the `discord_category` of an entry in `spaces`.
+		//
+		// Examples: skip
+		UncategorizedSpace string                                         `json:"uncategorized_space"`
+		UnmappedBot        ImportSourceDiscordConfigDefaultsUnmappedBot   `json:"unmapped_bot"`
+		UnmappedHuman      ImportSourceDiscordConfigDefaultsUnmappedHuman `json:"unmapped_human"`
+	} `json:"defaults"`
+
+	// GuildId A Discord snowflake as a string of digits.
+	//
+	// Examples: 1029384000
+	GuildId ImportDiscordId `json:"guild_id"`
+	Spaces  *[]struct {
+		// DiscordCategory A Discord snowflake as a string of digits.
+		//
+		// Examples: 1029384000
+		DiscordCategory ImportDiscordId `json:"discord_category"`
+
+		// Target Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
+		Target ImportMappingTarget `json:"target"`
+	} `json:"spaces,omitempty"`
+	Users *[]struct {
+		// DiscordUser A Discord snowflake as a string of digits.
+		//
+		// Examples: 1029384000
+		DiscordUser ImportDiscordId `json:"discord_user"`
+
+		// Target `user:<handle>`, `agent:<handle>` or `placeholder`.
+		//
+		// Examples: user:alex
+		Target string `json:"target"`
+	} `json:"users,omitempty"`
+	Version ImportSourceDiscordConfigVersion `json:"version"`
+}
+
+// ImportSourceDiscordConfigChannelsLead defines model for ImportSourceDiscordConfig.Channels.Lead.
+type ImportSourceDiscordConfigChannelsLead string
+
+// ImportSourceDiscordConfigDefaultsUnmappedBot defines model for ImportSourceDiscordConfig.Defaults.UnmappedBot.
+type ImportSourceDiscordConfigDefaultsUnmappedBot string
+
+// ImportSourceDiscordConfigDefaultsUnmappedHuman defines model for ImportSourceDiscordConfig.Defaults.UnmappedHuman.
+type ImportSourceDiscordConfigDefaultsUnmappedHuman string
+
+// ImportSourceDiscordConfigVersion defines model for ImportSourceDiscordConfig.Version.
+type ImportSourceDiscordConfigVersion int
 
 // ImportSourcePage One page. `next_cursor` is absent on the last page.
 type ImportSourcePage struct {
@@ -10678,6 +10896,28 @@ type ImportSourcePage struct {
 	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
 	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
+
+// ImportSpaceData `data` of a `space` item (origin key `space:<category_id>`). Exactly one of `name` (a new space as the mapping says `create`) and `existing_space_id` (equal to the mapping's `existing`).
+type ImportSpaceData struct {
+	// ExistingSpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	ExistingSpaceId *Uuid   `json:"existing_space_id,omitempty"`
+	Name            *string `json:"name,omitempty"`
+
+	// SortKey Fractional index key of the space order, derived by the tool from the Discord `position`.
+	//
+	// Examples: a0
+	SortKey string `json:"sort_key"`
+}
+
+// ImportUserData `data` of a `user` item (origin key `user:<user_id>`). The target comes from the stored mapping and its `defaults`; a webhook author is always a placeholder (22, 5.3).
+type ImportUserData struct {
+	DiscordKind ImportUserDataDiscordKind `json:"discord_kind"`
+	GlobalName  *string                   `json:"global_name,omitempty"`
+	Username    string                    `json:"username"`
+}
+
+// ImportUserDataDiscordKind defines model for ImportUserData.DiscordKind.
+type ImportUserDataDiscordKind string
 
 // IncomingWebhook defines model for IncomingWebhook.
 type IncomingWebhook struct {
@@ -21925,6 +22165,7 @@ type ClientInterface interface {
 	// SetChannelReadOnlyWithBody Switch the read-only state of a channel
 	//
 	// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+	// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -21934,6 +22175,7 @@ type ClientInterface interface {
 	// SetChannelReadOnly Switch the read-only state of a channel
 	//
 	// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+	// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -22975,6 +23217,7 @@ type ClientInterface interface {
 	// ApplyImportBatchWithBody Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -22984,6 +23227,7 @@ type ClientInterface interface {
 	// ApplyImportBatch Write a batch of imported objects
 	//
 	// One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+	// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -22992,12 +23236,15 @@ type ClientInterface interface {
 
 	// CancelImport Cancel an import
 	//
+	// Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
+	//
 	// Corresponds with POST /imports/{import_id}/cancel (the `CancelImport` operationId).
 	CancelImport(ctx context.Context, importId ImportIdPath, params *CancelImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CompleteImport Complete an import
 	//
 	// When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+	// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
 	//
 	// Corresponds with POST /imports/{import_id}/complete (the `CompleteImport` operationId).
 	CompleteImport(ctx context.Context, importId ImportIdPath, params *CompleteImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -23005,6 +23252,7 @@ type ClientInterface interface {
 	// SetImportCursorWithBody Advance the import cursor
 	//
 	// Only after a successful batch (22, 7.3).
+	// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23014,6 +23262,7 @@ type ClientInterface interface {
 	// SetImportCursor Advance the import cursor
 	//
 	// Only after a successful batch (22, 7.3).
+	// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23046,6 +23295,7 @@ type ClientInterface interface {
 	// SetImportLeadWithBody Set the leading side of a channel
 	//
 	// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+	// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23055,6 +23305,7 @@ type ClientInterface interface {
 	// SetImportLead Set the leading side of a channel
 	//
 	// Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+	// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -23063,10 +23314,14 @@ type ClientInterface interface {
 
 	// PauseImport Pause an import
 	//
+	// Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+	//
 	// Corresponds with POST /imports/{import_id}/pause (the `PauseImport` operationId).
 	PauseImport(ctx context.Context, importId ImportIdPath, params *PauseImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StartImport Start or continue an import
+	//
+	// Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
 	//
 	// Corresponds with POST /imports/{import_id}/start (the `StartImport` operationId).
 	StartImport(ctx context.Context, importId ImportIdPath, params *StartImportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -25122,288 +25377,6 @@ func (c *Client) ListAgentWebhookSubscriptions(ctx context.Context, agentId Agen
 // Corresponds with POST /agents/{agent_id}/webhooks (the `CreateAgentWebhookSubscription` operationId).
 func (c *Client) CreateAgentWebhookSubscriptionWithBody(ctx context.Context, agentId AgentIdPath, params *CreateAgentWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateAgentWebhookSubscriptionRequestWithBody(c.Server, agentId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateAgentWebhookSubscription Subscribe an agent to webhooks
-//
-// Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /agents/{agent_id}/webhooks (the `CreateAgentWebhookSubscription` operationId).
-func (c *Client) CreateAgentWebhookSubscription(ctx context.Context, agentId AgentIdPath, params *CreateAgentWebhookSubscriptionParams, body CreateAgentWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateAgentWebhookSubscriptionRequest(c.Server, agentId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ValidateManifestWithBody Validate a manifest without installing
-//
-// Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /app-manifests/validate (the `ValidateManifest` operationId).
-func (c *Client) ValidateManifestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewValidateManifestRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ValidateManifest Validate a manifest without installing
-//
-// Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /app-manifests/validate (the `ValidateManifest` operationId).
-func (c *Client) ValidateManifest(ctx context.Context, body ValidateManifestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewValidateManifestRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListApps List installed apps
-//
-// Corresponds with GET /apps (the `ListApps` operationId).
-func (c *Client) ListApps(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAppsRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// InstallAppWithBody Install an app from its manifest
-//
-// Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /apps (the `InstallApp` operationId).
-func (c *Client) InstallAppWithBody(ctx context.Context, params *InstallAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewInstallAppRequestWithBody(c.Server, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// InstallApp Install an app from its manifest
-//
-// Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /apps (the `InstallApp` operationId).
-func (c *Client) InstallApp(ctx context.Context, params *InstallAppParams, body InstallAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewInstallAppRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetApp Read an app
-//
-// Corresponds with GET /apps/{app_id} (the `GetApp` operationId).
-func (c *Client) GetApp(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetAppRequest(c.Server, appId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpgradeAppManifestWithBody Install a new manifest version
-//
-// Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /apps/{app_id}/manifest (the `UpgradeAppManifest` operationId).
-func (c *Client) UpgradeAppManifestWithBody(ctx context.Context, appId AppIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpgradeAppManifestRequestWithBody(c.Server, appId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UpgradeAppManifest Install a new manifest version
-//
-// Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /apps/{app_id}/manifest (the `UpgradeAppManifest` operationId).
-func (c *Client) UpgradeAppManifest(ctx context.Context, appId AppIdPath, body UpgradeAppManifestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpgradeAppManifestRequest(c.Server, appId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ResumeApp Resume a suspended app
-//
-// Corresponds with POST /apps/{app_id}/resume (the `ResumeApp` operationId).
-func (c *Client) ResumeApp(ctx context.Context, appId AppIdPath, params *ResumeAppParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewResumeAppRequest(c.Server, appId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetAppScopesWithBody Change granted scopes and subscriptions
-//
-// Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /apps/{app_id}/scopes (the `SetAppScopes` operationId).
-func (c *Client) SetAppScopesWithBody(ctx context.Context, appId AppIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAppScopesRequestWithBody(c.Server, appId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetAppScopes Change granted scopes and subscriptions
-//
-// Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /apps/{app_id}/scopes (the `SetAppScopes` operationId).
-func (c *Client) SetAppScopes(ctx context.Context, appId AppIdPath, body SetAppScopesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAppScopesRequest(c.Server, appId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SuspendApp Suspend an app
-//
-// Emergency stop without losing grants: tokens blocked, deliveries paused, commands hidden, components disabled (11, 6).
-//
-// Corresponds with POST /apps/{app_id}/suspend (the `SuspendApp` operationId).
-func (c *Client) SuspendApp(ctx context.Context, appId AppIdPath, params *SuspendAppParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSuspendAppRequest(c.Server, appId, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UninstallAppWithBody Uninstall an app
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /apps/{app_id}/uninstall (the `UninstallApp` operationId).
-func (c *Client) UninstallAppWithBody(ctx context.Context, appId AppIdPath, params *UninstallAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUninstallAppRequestWithBody(c.Server, appId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// UninstallApp Uninstall an app
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /apps/{app_id}/uninstall (the `UninstallApp` operationId).
-func (c *Client) UninstallApp(ctx context.Context, appId AppIdPath, params *UninstallAppParams, body UninstallAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUninstallAppRequest(c.Server, appId, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ListWebhookSubscriptions List outgoing webhook subscriptions
-//
-// Corresponds with GET /apps/{app_id}/webhooks (the `ListWebhookSubscriptions` operationId).
-func (c *Client) ListWebhookSubscriptions(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListWebhookSubscriptionsRequest(c.Server, appId)
 	if err != nil {
 		return nil, err
 	}

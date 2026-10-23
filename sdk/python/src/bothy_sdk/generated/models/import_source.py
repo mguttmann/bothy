@@ -30,6 +30,7 @@ class ImportSource:
         state (ImportSourceState): A dry run writes nothing and keeps the state.
         stats (JsonObject): Free-form JSON object whose schema is named in the field description.
         created_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+        cursor (JsonObject | Unset): Free-form JSON object whose schema is named in the field description.
         started_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
         finished_at (datetime.datetime | Unset): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
     """
@@ -41,6 +42,7 @@ class ImportSource:
     state: ImportSourceState
     stats: JsonObject
     created_at: datetime.datetime
+    cursor: JsonObject | Unset = UNSET
     started_at: datetime.datetime | Unset = UNSET
     finished_at: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -59,6 +61,10 @@ class ImportSource:
         stats = self.stats.to_dict()
 
         created_at = self.created_at.isoformat()
+
+        cursor: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.cursor, Unset):
+            cursor = self.cursor.to_dict()
 
         started_at: str | Unset = UNSET
         if not isinstance(self.started_at, Unset):
@@ -81,6 +87,8 @@ class ImportSource:
                 "created_at": created_at,
             }
         )
+        if cursor is not UNSET:
+            field_dict["cursor"] = cursor
         if started_at is not UNSET:
             field_dict["started_at"] = started_at
         if finished_at is not UNSET:
@@ -107,6 +115,13 @@ class ImportSource:
 
         created_at = datetime.datetime.fromisoformat(d.pop("created_at"))
 
+        _cursor = d.pop("cursor", UNSET)
+        cursor: JsonObject | Unset
+        if isinstance(_cursor, Unset):
+            cursor = UNSET
+        else:
+            cursor = JsonObject.from_dict(_cursor)
+
         _started_at = d.pop("started_at", UNSET)
         started_at: datetime.datetime | Unset
         if isinstance(_started_at, Unset):
@@ -129,6 +144,7 @@ class ImportSource:
             state=state,
             stats=stats,
             created_at=created_at,
+            cursor=cursor,
             started_at=started_at,
             finished_at=finished_at,
         )

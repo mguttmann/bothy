@@ -98,6 +98,11 @@ def sync_detailed(
 
      Switches `lead` of one mapped channel and the read-only state of its target channel in one
     transaction (22, 12.1 and 13).
+    The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item
+    must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets
+    the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A
+    `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the
+    current one changes nothing.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -133,6 +138,11 @@ def sync(
 
      Switches `lead` of one mapped channel and the read-only state of its target channel in one
     transaction (22, 12.1 and 13).
+    The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item
+    must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets
+    the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A
+    `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the
+    current one changes nothing.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -163,6 +173,11 @@ async def asyncio_detailed(
 
      Switches `lead` of one mapped channel and the read-only state of its target channel in one
     transaction (22, 12.1 and 13).
+    The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item
+    must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets
+    the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A
+    `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the
+    current one changes nothing.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -196,6 +211,11 @@ async def asyncio(
 
      Switches `lead` of one mapped channel and the read-only state of its target channel in one
     transaction (22, 12.1 and 13).
+    The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item
+    must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets
+    the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A
+    `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the
+    current one changes nothing.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
