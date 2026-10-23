@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Order of the tool classes (docs/spec/09-agenten.md 2.4 and 4.5 point 10, 07 2.11).
+"""Order of the tool classes (docs/spec/09-agents.md 2.4 and 4.5 point 10, 07 2.11).
 
 Examples:
     >>> exceeds("host", "scoped"), exceeds("chat", "scoped")

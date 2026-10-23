@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-r"""The live box from the stream of a turn (docs/spec/09-agenten.md 18.4, design note 12).
+r"""The live box from the stream of a turn (docs/spec/09-agents.md 18.4, design note 12).
 
 `LiveBox.apply` maps one stream message to changes of the SDK's run patcher, which throttles
 them to ``agent.run_update_min_interval`` and rebases on version conflicts. Read fields

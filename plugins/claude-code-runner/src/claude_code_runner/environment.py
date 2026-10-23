@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The environment of a turn, built as an allow list (docs/spec/09-agenten.md 18.2, 18.3).
+"""The environment of a turn, built as an allow list (docs/spec/09-agents.md 18.2, 18.3).
 
 The environment is built from scratch and never by removing names from ``os.environ``: a deny
 list lets every new secret through. Kept from the runner's own environment: ``HOME``,

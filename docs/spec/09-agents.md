@@ -2096,59 +2096,81 @@ every row from the facts, and a test keeps table and evidence equal.
 
 ### 18.1 Project and thread
 
-- A project is a forum with a project binding (`project_bindings`). `workspace_ref` is an
-  opaque name; the runner resolves it to a folder under `runner.projects_root`. A
-  path outside this folder is rejected, also via symbolic links.
+- A project is a forum with a project binding (`project_bindings`). `workspace_ref` is an opaque
+  name; the runner resolves it to a folder under `runner.projects_root`. A path outside this
+  folder is rejected, also via symbolic links: the runner refuses an empty reference, one that is
+  absolute, starts with `~` or `-`, contains `\`, a drive letter with colon or a `..` segment,
+  joins the rest with the real path of the root, resolves symbolic links and requires a strict
+  descendant of the root (the root itself is refused). The resolved real path is the working
+  folder of every turn (D-M2-34-5).
 - Readiness: the runner reports `ready` per bound forum in the heartbeat member
-  `project_readiness` (`channel_id`, `ready`; section 4.8): folder exists, Git working tree,
-  permissions fit. The server sets `project_bindings.ready`; without `ready`,
-  `agent.invoke` rejects with `project_not_ready`.
+  `project_readiness` (`channel_id`, `ready`; section 4.8): the reference resolves, the target is
+  a folder, `.git` exists in it (a folder or a file, so linked work trees count) and the runner
+  user may read, write and search it. A forum that is not ready carries a log code of the runner:
+  `outside_root`, `workspace_missing`, `not_a_git_worktree` or `not_writable`. The runner
+  computes readiness at start, after every change of its channel cache and before every
+  heartbeat, and sends a heartbeat at once when `agent.config_changed` changed a readiness. The
+  server sets `project_bindings.ready`; without `ready`, `agent.invoke` rejects with
+  `project_not_ready`.
 - Schema `project_runner_config.v1` (`project_bindings.runner_config`, OpenAPI
   `ProjectRunnerConfig`, M2-03): a closed JSON object (unknown members are rejected) with the
   optional members `model` (string, not empty, not starting with `-`; the runner passes it as
   `--model`) and `allowed_tools` (array of distinct strings, each not empty and not starting with
   `-`). It holds no secrets. The server checks only this shape and the length limit
   `project.binding_text_max_chars`; it never interprets a tool name. The runner never widens its
-  configured tool class with this list: it derives its flags from `agents.tool_class` (18.2) and
+  configured tool class with this list: it derives its flags from its configured class (18.2) and
   only narrows them by `allowed_tools`, so the rule "within `agents.tool_class`" of 03 is enforced
-  by the runner.
+  by the runner. `allowed_tools` acts only under `scoped`: the tools of the class are the entries
+  of `runner.scoped_allowed_tools` that also appear in `allowed_tools`, in the order of the runner
+  key (all of them when the binding has no `allowed_tools`); under `chat` there are no tools and
+  `bypassPermissions` of `host` honours no allow list (D-M2-34-8).
 - Binding changes (`putProjectBinding`, `deleteProjectBinding`, M2-03): every effective change of
   the binding and every change of the effective operator of the forum sets `ready` to `false`; an
   identical PUT changes nothing. Only reports of the effective operator for a bound forum that is
   not archived and not in an archived space are applied; a readiness change writes no event, no audit entry and no new
   `settings_version`.
-- A thread is a Claude Code session. The runner assigns the session ID in advance as a UUID; the
-  first turn starts with `--session-id <uuid>`, every further one with `--resume <uuid>` (chosen via
-  `agent_sessions.started`, 9.1).
+- A thread is one Claude Code session. The runner assigns the session ID in advance as a UUID
+  (version 4); a turn starts with `--session-id <uuid>` while the payload has no `agent_session`
+  or one with `started = false` (its `external_session_ref`), and with `--resume <uuid>` once
+  `agent_session.started` is true (9.1; `resume` and `bind` both mean `--resume` for this
+  runtime, 9.5). A reference that is not a UUID ends the run `failed` with `adapter_error`.
+  `startRun` carries the reference in `external_session_ref`; after `system/init` with this
+  `session_id` the runner reports `started = true` once (18.4).
 
 ### 18.2 Process contract
 
-A turn is a process:
+A turn is one process with exactly this argument list, in this order (no shell):
 
 ```text
 <runner.claude_bin> -p --input-format stream-json --output-format stream-json --verbose
-  --replay-user-messages --model <model>
-  (--session-id <uuid> | --resume <uuid>)
-  --permission-mode <from the tool class> --permission-prompts none
-  [--tools <list>] [--allowedTools ...] [--disallowedTools ...]   (from the tool class, table below)
-  --append-system-prompt-file <runner-prompt>
+  --replay-user-messages --model <model> (--session-id <uuid> | --resume <uuid>)
+  <flags of the tool class> --permission-prompts none [--add-dir <incoming folder of the thread>]
+  --append-system-prompt-file <system prompt file>
 ```
 
 All flags are described in the CLI reference (https://code.claude.com/docs/en/cli-reference,
 retrieved 2026-10-10, [verified]); according to this source, `--permission-prompts none` needs
-Claude Code v2.1.259 or later [verified].
+Claude Code v2.1.259 or later [verified]. The order has no meaning to the CLI; it is fixed so that
+a test compares the whole list. `runner.claude_bin` is looked up in the cleaned `PATH` and its
+absolute path is used. Model: the binding's `runner_config.model`, else `runner.default_model`.
+`--add-dir` names `<runner.state_dir>/files/<thread_id>` only for `scoped` and `host` and only
+when at least one attachment was stored, because `dontAsk` reads only in the working folder and
+the incoming folder of the thread lies outside it (18.10). Every model and tool value becomes a
+process argument only when it is not empty, does not start with `-` and holds no control or bidi
+character (D-M2-34-8).
 
 | Rule | Content | Reason |
 |---|---|---|
-| Working folder | resolved project folder | project context (CLAUDE.md) applies |
-| Environment | allowlist, never denylist: `HOME`, `USER`, `LOGNAME`, `SHELL`, cleaned `PATH`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, optional `SSH_AUTH_SOCK`, plus the variables of the mode (18.3) | a denylist lets new secrets through |
+| Working folder | resolved project folder (18.1) | project context (CLAUDE.md) applies |
+| Environment | allowlist, never denylist: `HOME`, `USER`, `LOGNAME`, `SHELL`, cleaned `PATH`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `SSH_AUTH_SOCK` only with `runner.forward_ssh_agent`, plus the variables of the mode (18.3); the cleaned `PATH` keeps, in order and once each, only absolute, existing folders that neither group nor others may write | a denylist lets new secrets through; a writable folder on the path lets another account plant a program; an agent socket gives the turn the keys of the runner user (T-DEV-01) |
 | Process group | own (`start_new_session`) | stop and cleanup hit all children |
-| Detachment | turns survive a restart of the runner; the new runner finds running turns via the stored PID and group and ends orphaned ones | a restart never silently kills a turn |
-| Locks | file lock per session and per thread; wait at most `runner.session_lock_wait` | a session never runs twice at the same time |
+| Detachment | stdout and stderr go to the files `<run_id>.stream.jsonl` and `<run_id>.stderr.log` under `<runner.state_dir>/sessions/<session>/` (mode `0600`), not to pipes; the runner reads the stream file every `runner.poll_interval`; the turn record `<runner.state_dir>/turns/<run_id>.json` holds run, thread, channel, session, PID, group, start time and file paths, never a token; turns survive a restart of the runner, and the new runner finds running turns via the record and ends orphaned ones (M2-35) | a restart never silently kills a turn |
+| Locks | `flock` per thread and per session (`<runner.state_dir>/locks/`), taken in this order with attempts every `runner.poll_interval`; wait at most `runner.session_lock_wait`, then the run ends `failed` with `adapter_error`; the turn inherits the descriptors, so a lock lives as long as the turn, also when the runner dies | a session never runs twice at the same time |
 | Parallelism | at most `runner.max_parallel_runs` turns | host and rate limits |
-| Input | prompt as the first JSON line on stdin, attachments as paths in the prompt | follow-ups through the same pipe (18.5) |
-| Recording | stream and stderr per session in `runner.state_dir`, kept for `runner.stream_log_retention` | troubleshooting, fixtures |
+| Input | the system prompt file (`--append-system-prompt-file`, `<run_id>.system-prompt.md`) holds only the fixed runner instructions (the `TITLE:` request only for a new or unstarted session) and, in an own section, the channel prompt `behavior.prompt`; the first stdin line is one `user` message with two text items: first the context of 4.6 with trust marks, every `unverified` content and every file entry in marked data blocks, the attachments of the triggering message as local paths inside those blocks; second the text of the triggering message with the transcripts of its attachments; the line is stored as `<run_id>.input.jsonl` | the context becomes part of the session history, so a `--resume` turn still knows what `context_floor_seq` no longer sends; files are data, never instructions (ADR 0054); follow-ups through the same pipe (18.5) |
+| Recording | stream and stderr per session in `runner.state_dir`, prompt files and downloaded attachments too, kept for `runner.stream_log_retention` (swept at start and after every turn; the usage of a session, `usage.json`, is state and never swept) | troubleshooting, fixtures |
 | Permission prompts | `--permission-prompts none`: actions that are not allowed are rejected instead of waiting | an unattended turn never hangs on a question |
+| Version | `claude --version` is probed at start and before heartbeats within `runner.cli_probe_timeout`; the runner reports `degraded` with `runtime_unreachable` (no answer), `runtime_version_unsupported` (below the version named above for `--permission-prompts none`, or unreadable) or `runtime_version_untested` (another version than the pinned one, `PINNED_CLAUDE_CODE_VERSION` of the runner, equal to that version in M2-34); the first two end every run in prepare with `runtime_error`, the third only warns | the fixtures and the stream table of 18.4 hold for the pinned version (RK-14) |
 
 Tool class and flags: the runner derives the flags from its configured tool class. It
 reports this class in the heartbeat (`reported_tool_class`) and in `run.start`
@@ -2160,6 +2182,9 @@ reports this class in the heartbeat (`reported_tool_class`) and in `run.start`
 | `chat` | `--permission-mode dontAsk --tools "" --disallowedTools "mcp__*"` | no tools; replies only |
 | `scoped` | `--permission-mode dontAsk --allowedTools <named tools of the runner configuration>` | reading in the working folder, only read-only shell commands and the named tools; everything else is rejected |
 | `host` | `--permission-mode bypassPermissions` | every action without a confirmation prompt |
+
+Under `scoped`, `--allowedTools` is followed by one argument per tool (18.1) and is left out when
+no tool remains.
 
 Evidence (https://code.claude.com/docs/en/cli-reference and
 https://code.claude.com/docs/en/permission-modes, retrieved 2026-10-10 [verified]): `--tools ""`
@@ -2174,13 +2199,13 @@ line against this table, with fake Claude.
 
 ### 18.3 Reported mode per run
 
-The runner builds the environment for each run according to the configured mode of the token.
-The server decides, the runner never does.
+The runner builds the environment for each run according to the desired mode of the token (the
+claim `billing_mode`). The server decides, the runner never does.
 
-| Configured mode | Environment | Pre-check `claude auth status` | Cross-check `system/init.apiKeySource` |
+| Desired mode | Environment | Pre-check `claude auth status` | Cross-check `system/init.apiKeySource` |
 |---|---|---|---|
-| `organization` | `ANTHROPIC_API_KEY` from the runner's secret provider; the runner's own `CLAUDE_CONFIG_DIR` without a subscription login; `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_PROFILE`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY` not set | `authMethod = api_key` | `ANTHROPIC_API_KEY` |
-| `personal` | `HOME` of the person, no API key, none of the variables above | `authMethod` is `claude.ai` or `oauth_token` | `none` |
+| `organization` | `ANTHROPIC_API_KEY` read for this run from `runner.anthropic_api_key_ref`; the runner's own `CLAUDE_CONFIG_DIR` `<runner.state_dir>/claude-config/organization` (created empty with mode `0700`, never written by the runner) without a subscription login; `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_PROFILE`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY` never set | `authMethod = api_key` | `ANTHROPIC_API_KEY` |
+| `personal` | `HOME` of the runner user, which is the person's own account (only with `runner.allow_personal`), no API key, no own configuration folder, none of the variables above | `authMethod` is `claude.ai` or `oauth_token` | `none` |
 
 Evidence (retrieved 2026-10-10): login order and "In non-interactive mode (`-p`), the key
 is always used when present" at https://code.claude.com/docs/en/authentication [verified];
@@ -2191,41 +2216,87 @@ at https://code.claude.com/docs/en/agent-sdk/typescript [verified]. `apiKeySourc
 does not distinguish subscription, bearer token and cloud provider [verified, same source];
 therefore the pre-check with a controlled environment is the actual evidence.
 
-If one of the two checks does not match, the runner does not start a turn or aborts it with
-SIGINT and reports `billing_mode_mismatch`. Whether `system/init` arrives before the first model
-request of a turn with `--input-format stream-json` must be checked before building; until then
-the pre-check is binding. The own `CLAUDE_CONFIG_DIR` in mode `organization` enforces the
-condition: if the key is missing, there is no subscription login that Claude Code could fall back
-to. The runner never reads or copies login files.
+The pre-check runs `<runner.claude_bin> auth status` right before `startRun` in the run
+environment, in the project folder, with stdin closed and within `runner.cli_probe_timeout`; the
+runner reads `authMethod` from stdout as one JSON object and ignores the exit code (`none` may
+come with a non-zero exit). Anything else (no JSON, member missing, unknown value, start failure,
+time limit) counts as `unknown`. Outcome, first match wins (D-M2-34-7):
+
+| Desired | `authMethod` | Outcome |
+|---|---|---|
+| `organization` | `api_key` | start |
+| `personal` | `claude.ai` or `oauth_token` | start |
+| any | `none` | `runtime_not_authenticated` |
+| any | every other value, and `unknown` | `billing_mode_mismatch` |
+
+`billing_evidence` of `run.start` is `{provider: anthropic, key_type, method: claude_auth_status}`
+with `key_type` from `authMethod` alone: `api_key` and `api_key_helper` give `api_key`,
+`claude.ai` and `oauth_token` give `oauth`, `third_party` gives `cloud`, `none` gives `none`,
+everything else `unknown`; never a value or prefix of a key. A non-start ends the run with
+`run.finish` `failed` and the reason, without `run.start` and without a turn. For
+`organization` without a key (`runner.anthropic_api_key_ref` empty, missing or empty), the runner
+calls no CLI at all and ends the run `failed` with `runtime_not_authenticated` (BR-12).
+
+If the cross-check at `system/init` does not match, the runner interrupts the turn with SIGINT to
+its group (18.6), sends no reply and reports `billing_mode_mismatch`. Whether `system/init`
+arrives before the first model request of a turn with `--input-format stream-json` must be
+checked before building; until then the pre-check is binding. The own `CLAUDE_CONFIG_DIR` in mode
+`organization` enforces the condition: if the key is missing, there is no subscription login that
+Claude Code could fall back to. The runner never reads, copies or writes login files. Sessions of
+`organization` live in the runner's own configuration folder and sessions of `personal` under
+`HOME`, so after a switch of the mode (I4) `--resume` does not find the earlier session (M2-35:
+fail open, 18.9).
 
 If a runner can provide evidence for both modes, it omits `reported_billing_mode` and reports
-`billing_modes_supported` with both values.
+`billing_modes_supported` with both values; the reference runner always omits
+`reported_billing_mode` and reports `organization` when `runner.anthropic_api_key_ref` is set and
+`personal` when `runner.allow_personal` is true (D-L8).
 
 ### 18.4 Live box from the stream
 
-Message types according to the Agent SDK reference (https://code.claude.com/docs/en/agent-sdk/typescript,
-retrieved 2026-10-10, [verified]); mapping [derived]:
+Message types according to the Agent SDK reference
+(https://code.claude.com/docs/en/agent-sdk/typescript, retrieved 2026-10-10, [verified]); fields
+read and mapping [derived]. The runner keeps a partial last line until it is complete and
+skips lines that are not JSON objects and messages of other types (counted per type in a debug
+log line without content); all changes go through the throttled patch of the SDK
+(`agent.run_update_min_interval`, `base_version`, rebase after `409 base_version_conflict`).
 
-| Stream | Run document |
-|---|---|
-| `system/init` | `model`; cross-check of the reported mode; `agent_session.report` with `started = true` |
-| `assistant` with text | `last_text_excerpt` |
-| `assistant` with `tool_use` | step `tool_call` (`name`, `title` = first line of the input), `running` |
-| `user` with `tool_result` | complete the step (`completed` or `failed`) |
-| `tool_progress` with `heartbeat` | no change to the box; counts as progress against `run.stall_after` |
-| `system/task_started`, `task_progress`, `task_updated`, `task_notification` | step `subagent` (type `local_agent`) or `background_job`; do not show tasks with `ambient = true` |
-| `system/background_tasks_changed` | replace the set of open background jobs |
-| `system/status` with `compacting` | status line "compacting" |
-| `system/api_retry` | `metrics.api_retries`, `metrics.last_api_retry` |
-| `user` with `isReplay` | follow-up `absorbed` (18.5) |
-| `result` | end of the run, costs (18.7) |
+| Message | Fields | Live box |
+|---|---|---|
+| `system` `init` | `session_id`, `model`, `apiKeySource` | replace `/model`; cross-check (18.3); `agent_session.report` with `started = true` once, when `session_id` is the turn's session and the payload's session was absent or not started (`If-Match` of its version, or `"1"` when `run.start` created the row; on `412 version_conflict` with the same reference one retry with the current version) |
+| `assistant` | `message.content[]` with `text` items and `tool_use` items (`id`, `name`, `input`); `message.usage`; `parent_tool_use_id` | `/last_text_excerpt` from the text items of the newest message; `add` on `/steps/<id>` with kind `tool_call`, `name`, `title`, status `running`, `parent_step_id` of the step of `parent_tool_use_id` |
+| `user` | `message.content[]` with `tool_result` items (`tool_use_id`, `is_error`); `isReplay`, `uuid` | step `completed` or `failed` with `finished_at`; the echo of the own prompt (its `uuid`) is ignored; `isReplay` of a follow-up sets `absorbed` (18.5, M2-35) |
+| `tool_progress` | none | no change to the box; counts as progress against `run.stall_after` |
+| `system` `task_started`, `task_progress`, `task_updated`, `task_notification` | `task_id`, `description`, `task_type`, `ambient`, `status` | step kind `subagent` with detail `{"type":"local_agent"}` when `task_type` is `local_agent`, else `background_job`; tasks with `ambient = true` get no step; `status` `completed`, `failed`, `stopped` end the step as `completed`, `failed`, `cancelled` |
+| `system` `background_tasks_changed` | `tasks[]` with `task_id`, `description` | open background steps outside the set end `completed`; `/metrics/background_jobs` is the size of the set |
+| `system` `status` | `status` | `compacting` sets `/status_line` to `compacting`, its absence removes it |
+| `system` `api_retry` | `attempt`, `max_retries`, `retry_delay_ms`, `error` | `/metrics/api_retries` and `/metrics/last_api_retry` |
+| `result` | `subtype`, `is_error`, `result`, `modelUsage` (`inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`, `costUSD`, `contextWindow` per model) | end of the turn, reply, costs (18.7) |
 
-Context in percent: input plus cache tokens of the last model call divided by
-`contextWindow` from `modelUsage`.
+Step title: the first non-empty line of the first string member of `input` in the order
+`command`, `file_path`, `path`, `pattern`, `url`, `query`, `description`, `prompt`, else of the
+first string member, else empty; no further step `detail` (data economy). Step IDs are UUIDv7
+(4.7). Context in percent: input plus cache tokens of an `assistant` message divided by the
+`contextWindow` of the model stored from the last `result` of the session, left out while
+unknown. `/metrics/subagents` counts the subagent steps.
 
-Title: the runner prompt asks for a line `TITLE: <title>` in the first reply of a new
-session. The runner removes the line from the reply and suggests the title
-(section 12).
+End of the turn: after `result` the runner closes stdin, waits `runner.stop_grace` for the exit
+and then ends the group (18.6), also when the leader exited and a child it started still runs. A turn that exits without `result`, or a `result` with `is_error`
+or a `subtype` other than `success`, ends `failed` with `runtime_error`: one step of kind
+`status`, `name` `runtime_error`, empty `title`, status `failed` and `detail`
+`{"exit": "<exit code or signal name>"}` (no error text and no stderr), no reply, no title
+(M2-35 adds the recognised error texts of 18.9). Otherwise the reply is `result.result` without
+the `TITLE:` line; an empty reply sends nothing; a reply still pending after the SDK's retries is
+sent again with the same `client_msg_id` up to `sdk.retry_max_attempts` times; a refused or
+undelivered reply (for example `400 validation_failed` on `message.create`) ends the run `failed`
+with `adapter_error`.
+
+Title: the runner prompt asks for a line `TITLE: <title>` in the first reply of a new or
+unstarted session. The runner removes the line from the excerpt and the reply and, after the
+first completed run of such a session and only when the line was present and not empty, reads the
+thread and, when `title_source` is `auto`, proposes the title with `If-Match` (section 12);
+`409 title_manual`, `412 version_conflict` and every other failure are logged by code and never
+retried, and the run still completes (AG-19).
 
 ### 18.5 Follow-ups via stdin
 
@@ -2247,9 +2318,20 @@ with code 143 without `result` for the running turn; SIGINT ends the turn
 
 `result.modelUsage` counts per model including subagents; with `--resume`,
 `total_cost_usd` and the values of the session are cumulative (sources 18.4 and headless,
-[verified]). The runner stores the last state per session and reports the difference as `usage`
-(4.10). The amounts are estimates of the CLI ("client-side estimates", [verified]); the server
-marks them as an estimate.
+[verified]). The runner stores the last state per session in
+`<runner.state_dir>/sessions/<session>/usage.json` and reports the difference as `usage` (4.10),
+per model: `inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens` and
+`costUSD` against the stored values (zero for a new session); a negative difference of any value
+means the runtime started counting again, and the current values count as this run's. Each
+model gives one `CostReport` (`provider` `anthropic`, `model`, `tokens_in`, `tokens_out`,
+`tokens_cache_read`, `tokens_cache_write` with cache writes counted as 5 minutes (10 12.3),
+`amount_micros` from the decimal value of `costUSD` with half-even rounding, `currency` `USD`);
+`run.finish` carries them as `costs` and the token sums in `metrics`, also when a turn with a
+`result` ends `failed`, so its usage is never billed to the next run of the session. Before `run.finish` the
+runner writes the new values and a pending record (`run_id`, the reports) atomically, so a
+repeated `run.finish` of the same run sends the stored reports and a delta is reported at most
+once (D-M2-34-11). The amounts are estimates of the CLI ("client-side estimates", [verified]); the
+server marks them as an estimate.
 
 ### 18.8 Done
 
@@ -2403,6 +2485,19 @@ configuration of the respective program outside the server.
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | reload JWKS at most this often |
 | `hermes_adapter.platform_key` | Hermes adapter | `bothy` | platform name in Hermes; never change after commissioning |
 | `hermes_adapter.consumer` | Hermes adapter | `default` | consumer name at the gateway |
+| `runner.server_url` | Runner | no default, required | base URL of the server; only `https`, `http` only for the host `127.0.0.1` |
+| `runner.instance_id` | Runner | no default, required | instance ID of the server; `iss` of every invocation token must be equal to it (4.5 item 4), the discovery is compared with it at start |
+| `runner.agent_token_ref` | Runner | no default, required | `secret_ref` of the agent token in the secret provider of the runner |
+| `runner.dpop_key_ref` | Runner | empty | `secret_ref` of the DPoP key; empty means: token without `dpop_jkt` |
+| `runner.consumer` | Runner | `default` | consumer name at the gateway |
+| `runner.tool_class` | Runner | `chat` | loaded tool class; determines flags (18.2), `reported_tool_class` and `tool_class_used` |
+| `runner.scoped_allowed_tools` | Runner | empty | named tools of the class `scoped` (`--allowedTools`) |
+| `runner.default_model` | Runner | no default, required | model when the project binding names none |
+| `runner.anthropic_api_key_ref` | Runner | empty | `secret_ref` of the API key for `organization`; empty means: `organization` cannot be proven |
+| `runner.allow_personal` | Runner | `false` | runs in mode `personal` with the login of the runner user allowed |
+| `runner.forward_ssh_agent` | Runner | `false` | pass `SSH_AUTH_SOCK` on to the turn |
+| `runner.cli_probe_timeout` | Runner | `30s` | time limit for `claude auth status` and `claude --version` |
+| `runner.poll_interval` | Runner | `200ms` | interval at which the runner checks the recording for new lines and a held lock again |
 | `runner.claude_bin` | Runner | `claude` | program, searched in the cleaned `PATH` |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |

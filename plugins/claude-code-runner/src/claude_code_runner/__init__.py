@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Claude Code runner: the reference adapter of development forums (docs/spec/09-agenten.md 18).
+"""Claude Code runner: the reference adapter of development forums (docs/spec/09-agents.md 18).
 
 One process per agent token serves the forums with a project binding; every run is one
 ``claude -p`` turn in the resolved project directory. The package name avoids the product name
-(docs/spec/02-architektur.md 6; docs/DECISIONS.md D-M2-34-1).
+(docs/spec/02-architecture.md 6; docs/decisions.d/M2-34.md D-M2-34-1).
 
 Examples:
     >>> ADAPTER_NAME, RUNTIME_NAME

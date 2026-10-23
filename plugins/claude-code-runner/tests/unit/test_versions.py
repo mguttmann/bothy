@@ -12,7 +12,7 @@ import claude_code_runner
 from claude_code_runner.heartbeat import MIN_CLAUDE_CODE_VERSION, PINNED_CLAUDE_CODE_VERSION
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = ROOT.parents[1] / "docs" / "spec" / "09-agenten.md"
+SPEC = ROOT.parents[1] / "docs" / "spec" / "09-agents.md"
 
 
 def test_pyproject_version_equals_version_file() -> None:

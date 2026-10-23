@@ -17,8 +17,8 @@ the title once per new session and reports the cost of the run.
   trust marks, heartbeat); the SDK (`sdk/python`) builds them and the runner is its handler.
 - Runner: docs/spec/09-agents.md section 18 (project and thread, process contract with the tool
   class table, mode per run, live box, costs) and section 21 (configuration keys).
-- Backend policy per run: docs/spec/10-backend-richtlinie.md 7 and 10.2.
-- Rulings: docs/DECISIONS.md, rows `D-M2-34-0` to `D-M2-34-12`.
+- Backend policy per run: docs/spec/10-backend-policy.md 7 and 10.2.
+- Rulings: docs/decisions.d/M2-34.md, rows `D-M2-34-0` to `D-M2-34-12`.
 
 ## Layout
 

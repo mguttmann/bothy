@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Claude Code runner, the reference adapter of development forums (docs/spec/09-agenten.md
+# Claude Code runner, the reference adapter of development forums (docs/spec/09-agents.md
 # section 18). One process per agent token on the Python SDK (sdk/python); every turn is one
 # `claude -p` process. The package is private (OQ-17); the classifier "Private :: Do Not Upload"
 # makes an index refuse an accidental upload. Tool versions equal sdk/python/pyproject.toml.
@@ -69,7 +69,7 @@ source = ["claude_code_runner"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-# Named value `quality.coverage.python_min_percent` (docs/spec/23-qualitaet.md section 11);
+# Named value `quality.coverage.python_min_percent` (docs/spec/23-quality.md section 11);
 # tools/docs/tests/test_config_values.py holds both equal.
 fail_under = 80
 

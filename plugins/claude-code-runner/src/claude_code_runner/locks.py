@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""File locks per thread and per session (docs/spec/09-agenten.md 18.2 "Locks", note 11).
+"""File locks per thread and per session (docs/spec/09-agents.md 18.2 "Locks", note 11).
 
 A lock is ``fcntl.flock`` on ``<runner.state_dir>/locks/<name>.lock``. The descriptor is
 inherited by the turn (``pass_fds``), so the lock lives as long as the turn, also when the

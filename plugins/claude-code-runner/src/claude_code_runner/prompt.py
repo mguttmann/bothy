@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The two inputs of a turn (docs/spec/09-agenten.md 4.6 and 18.2 "Input", ADR 0054, note 10).
+"""The two inputs of a turn (docs/spec/09-agents.md 4.6 and 18.2 "Input", ADR 0054, note 10).
 
 * The system prompt file (``--append-system-prompt-file``) holds only the fixed runner
   instructions of ``prompts/runner_prompt.md`` (the TITLE request only for a new or unstarted

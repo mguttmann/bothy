@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The runtime part of the runner's heartbeat (docs/spec/09-agenten.md 4.8, note 15).
+"""The runtime part of the runner's heartbeat (docs/spec/09-agents.md 4.8, note 15).
 
 `probe_version` runs ``claude --version`` within ``runner.cli_probe_timeout``; its outcome gives
 the degraded reasons ``runtime_unreachable`` (no answer), ``runtime_version_unsupported``

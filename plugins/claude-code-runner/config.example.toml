@@ -1,4 +1,4 @@
-# Example configuration of claude-code-runner (docs/spec/09-agenten.md 21). Keys are nested by
+# Example configuration of claude-code-runner (docs/spec/09-agents.md 21). Keys are nested by
 # their dots: runner.stop_grace is stop_grace in [runner]. Defaults are shown; required keys
 # have no default.
 

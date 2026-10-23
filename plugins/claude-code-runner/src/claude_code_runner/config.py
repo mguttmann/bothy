@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The runner configuration: one TOML file (design note 2, docs/spec/09-agenten.md 21).
+"""The runner configuration: one TOML file (design note 2, docs/spec/09-agents.md 21).
 
 Keys are nested by their dots: ``runner.stop_grace`` is ``stop_grace`` in the table
 ``[runner]``; the SDK keys ``adapter.invocation_token_leeway``,

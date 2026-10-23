@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``secret_ref`` values of the runner (docs/spec/16-betrieb.md 5.2, schemes ``file``, ``env``).
+"""``secret_ref`` values of the runner (docs/spec/16-operations.md 5.2, schemes ``file``, ``env``).
 
 A value is read fresh for every use and handed out only as `bothy_sdk.auth.Secret`, whose
 ``repr`` and ``str`` are ``[redacted]``. Errors carry a code and never the value or the target

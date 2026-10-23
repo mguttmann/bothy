@@ -3,7 +3,7 @@
 
 The tests against the installed Claude Code CLI (``tests/real_cli``) are collected only with
 ``CLAUDE_CODE_RUNNER_REAL_CLI=1``: a real turn costs money and uses the operator's login, so
-nothing in ``make check`` depends on them (docs/spec/09-agenten.md 16.1, design note 17).
+nothing in ``make check`` depends on them (docs/spec/09-agents.md 16.1, design note 17).
 """
 
 from __future__ import annotations

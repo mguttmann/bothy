@@ -21,7 +21,7 @@ from claude_code_runner.commandline import (
     scoped_tools,
 )
 
-SPEC = Path(__file__).resolve().parents[4] / "docs" / "spec" / "09-agenten.md"
+SPEC = Path(__file__).resolve().parents[4] / "docs" / "spec" / "09-agents.md"
 PROMPT = Path("/var/lib/claude-code-runner/sessions/s/r.system-prompt.md")
 SESSION = SessionChoice(ref="0192d3a0-0000-4000-8000-000000000001", resume=False, new=True)
 BASE = [

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The command line of one turn (docs/spec/09-agenten.md 18.2, design note 9).
+"""The command line of one turn (docs/spec/09-agents.md 18.2, design note 9).
 
 `build_argv` is a pure function from the run's choices to an exact argument list; no shell ever
 sees it. `class_flags` returns exactly the cell of the class in the table "Class | Flags |
