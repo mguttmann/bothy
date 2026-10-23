@@ -3,12 +3,14 @@
 package wire
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 
 	authztelemetry "github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -62,6 +64,10 @@ type MessagingWrites struct {
 	// Metrics counts the created messages; nil means bothy.message.created of
 	// messaging/adapters/otelmetrics on the global meter provider of platform/otel (M1-68).
 	Metrics messagingapp.Metrics
+	// Credentials checks the principal of a channel export again before every batch (M3-11): the
+	// server passes identity's Authenticator, bound when the session step has run; nil leaves the
+	// export refusing to start (a role or a test without it).
+	Credentials messagingapp.CredentialCheck
 	// Components is the source of the components of cards that runs implements (M2-15,
 	// runs/adapters/messagingsource), bound to the runs use cases once they exist (NewRuns); nil
 	// shows every message without components and answers a card with not_enabled (a role or a
@@ -73,6 +79,15 @@ type MessagingWrites struct {
 type ComponentSource interface {
 	messaging.ComponentReader
 	messaging.ComponentWriter
+}
+
+// lazyCredentials is the credential check of the export over the Authenticator of the HTTP chain,
+// looked up per call, because the session step that builds it runs after the chat step.
+type lazyCredentials func() actor.Authenticator
+
+// Revalidate implements messagingapp.CredentialCheck.
+func (f lazyCredentials) Revalidate(ctx context.Context, a actor.Actor) error {
+	return f().Revalidate(ctx, a)
 }
 
 // NewMessaging builds the messaging module over pool with the unit of work uow, the Authorizer
@@ -101,7 +116,7 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	d := messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
-		Metrics: w.Metrics,
+		Metrics: w.Metrics, Credentials: w.Credentials,
 	}
 	if w.Components != nil {
 		d.Components, d.Cards = w.Components, w.Components
@@ -110,7 +125,7 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 	if err != nil {
 		return nil, err
 	}
-	return &Messaging{Service: svc, Handlers: messaginghttp.New(svc, svc.Mentions(), svc.Templates(), svc.Reactions(), svc.Pins(), threads)}, nil
+	return &Messaging{Service: svc, Handlers: messaginghttp.New(svc, svc.Mentions(), svc.Templates(), svc.Reactions(), svc.Pins(), svc.Export(), threads, log)}, nil
 }
 
 // fillHandlers sets the nil messaging handler of h to the one m built; a nil m (a role or a test

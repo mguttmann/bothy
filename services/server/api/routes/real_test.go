@@ -125,6 +125,10 @@ func (stubServer) ExportAuditEvents(context.Context, rest.ExportAuditEventsReque
 	return nil, nil
 }
 
+func (stubServer) ExportChannel(context.Context, rest.ExportChannelRequestObject) (rest.ExportChannelResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) VerifyAuditChain(context.Context, rest.VerifyAuditChainRequestObject) (rest.VerifyAuditChainResponseObject, error) {
 	return nil, nil
 }
@@ -1280,6 +1284,8 @@ func TestRealTable_Enabled(t *testing.T) {
 		"autocompleteCommand": {"POST /api/v1/channels/{channel_id}/commands/{command_id}/autocomplete", "command.autocomplete", "rl.trigger"},
 		"answerAutocomplete": {"POST /api/v1/command-autocompletions/{request_id}/answer", "command.autocomplete.respond",
 			"rl.agent_runtime"},
+		// M3-11
+		"exportChannel": {"GET /api/v1/channels/{channel_id}/export", "export.channel", "rl.export"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
@@ -1289,9 +1295,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		if w := want[op.ID]; w.pattern != op.Pattern || op.Action != w.action || op.RateLimitClass != w.class {
 			t.Errorf("operation %+v, want %+v", op, w)
 		}
-		// Only the export and the file downloads stream a body that is not JSON (route class of
-		// downloads, M1-50, M3-05).
-		if op.Download != (op.ID == "exportAuditEvents" || op.ID == "downloadFile" || op.ID == "downloadThumbnail") {
+		// Only the exports (M1-50, M3-11) and the file downloads (M3-05) stream a body that is not
+		// JSON (route class of downloads).
+		if op.Download != (op.ID == "exportAuditEvents" || op.ID == "exportChannel" || op.ID == "downloadFile" ||
+			op.ID == "downloadThumbnail") {
 			t.Errorf("%s: Download = %v", op.ID, op.Download)
 		}
 		if got, ok := routes.ByPattern(op.Pattern); !ok || got.ID != op.ID {
@@ -1316,12 +1323,13 @@ func TestRealTable_Enabled(t *testing.T) {
 	}
 }
 
-// TestRealTable_PathsBelowBaseURL holds W6 for every enabled operation.
 // TestOperations_BinaryResponseFlag: the route flag Download marks the operations whose success
-// streams bytes (downloadFile, downloadThumbnail; M3-05), so StageRoute gives them
+// streams bytes (downloadFile, downloadThumbnail; M3-05) or NDJSON lines (exportChannel, M3-11;
+// exportAuditEvents, M1-50), so StageRoute gives them
 // http.transfer_timeout (02 14.2); getTranscript answers JSON and keeps http.request_timeout.
 func TestOperations_BinaryResponseFlag(t *testing.T) {
-	for id, want := range map[string]bool{"downloadFile": true, "downloadThumbnail": true, "getTranscript": false, "createFileTicket": false, "getFile": false} {
+	for id, want := range map[string]bool{"downloadFile": true, "downloadThumbnail": true, "getTranscript": false, "createFileTicket": false, "getFile": false,
+		"exportChannel": true, "exportAuditEvents": true} {
 		op, ok := routes.ByID(id)
 		if !ok || op.Download != want {
 			t.Errorf("%s: found %v, Download %v, want %v", id, ok, op.Download, want)
@@ -1329,6 +1337,7 @@ func TestOperations_BinaryResponseFlag(t *testing.T) {
 	}
 }
 
+// TestRealTable_PathsBelowBaseURL holds W6 for every enabled operation.
 func TestRealTable_PathsBelowBaseURL(t *testing.T) {
 	for _, op := range routes.Enabled() {
 		if !strings.HasPrefix(op.Path, routes.BaseURL+"/") || !strings.Contains(op.Pattern, " "+routes.BaseURL+"/") {

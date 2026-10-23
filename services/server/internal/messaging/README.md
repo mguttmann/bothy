@@ -1,6 +1,6 @@
 # Module `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message. The export follows with its ticket.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -481,6 +481,52 @@ list, the message and the filter; the principals come from one directory read. `
 checks each with `message.read` in filter mode (a mismatch is dropped, logged and counted as
 `filter_mismatch`).
 
+## Channel export (M3-11)
+
+`exportChannel` (`GET /api/v1/channels/{channel_id}/export?from=...&to=...`, `export.channel`,
+`rl.export`) streams one `Message` per line as `application/x-ndjson`. The checks run in this
+order, and nothing reaches the client before the last one:
+
+1. The range rule without any lookup: `from` strictly before `to`, else `400 validation_failed`
+   with one entry at `#query/to` and code `invalid`; no upper bound on the length
+   (D-M3-11-1).
+2. `authorize(export.channel)` on the channel in request mode: an unknown and an invisible
+   channel give the same `404`; read without `export` `403 forbidden` with reason
+   `capability_missing`, a principal without a session of a human `403 forbidden` with reason
+   `step_up_not_possible`, no fresh step-up `401 step_up_required`. `authz` records the denials.
+3. `Authorizer.Scope(message.read)`, then exactly one allow entry `export.channel` with only
+   `from` and `to`, recorded with `auditing.Recorder.Record` in its own unit of work and committed
+   before the status line (D-M3-11-4).
+
+The stream walks thread pages (`ListExportThreadIDs`) and message pages
+(`ListExportThreadMessages`), both of `api.page_size_max` rows and both with
+`m.channel_id = @channel_id AND m.channel_id = ANY(@visible_channel_ids)`: threads ascending by
+their UUIDv7 id, the messages of a thread ascending by `thread_seq`, so `(thread_id, thread_seq)`
+is a total, resumable keyset (D-M3-11-3). A batch is one message page. Each line is the shared
+representation with the full `content_md`, without `content_truncated` and `my_reactions`, and a
+tombstone at its `thread_seq` (D-M3-11-2).
+
+Re-check per batch (07 section 8.2 item 2; D-M3-11-5, D-M3-11-9): there is no snapshot across
+batches. Before every page the stream starts a fresh request memo
+(`authorize.WithoutRequestScope`, then `authorize.WithRequestScope`), checks the credentials
+through `CredentialCheck` (`kernel/actor.Authenticator.Revalidate`; a revoked session or device
+raises no rights version), checks `channel.read` in filter mode and takes `Scope(message.read)`
+again; a refusal ends the stream with `ErrExportAborted`. The page is read and built in a short
+read-only unit of work that ends before its lines are written. Every row passes `message.read` in
+filter mode on the same memo; a refused row is dropped, logged with only the action and the
+reason and counted in `bothy.authz.errors` as `filter_mismatch`. The capability `export`
+and the step-up are checked only at the start. `internal/wire` binds `CredentialCheck` lazily
+(`lazyCredentials`), because the session step that builds the Authenticator runs after the chat
+step.
+
+Abort (D-M3-11-6): the handler writes `200` with only `Content-Type`; the other headers come from
+the chain. After the first byte an aborted stream, a read error, the deadline or a shutdown logs
+only a cause code and the route pattern and panics with `http.ErrAbortHandler`, so HTTP/1.1 ends
+without the final chunk and a client never takes a cut export for a complete one. A write error
+(client gone) ends the stream quietly; a range without messages gives `200` with an empty body.
+The route flag `Download` gives the response `http.transfer_timeout` (D-M3-11-7). Nothing is
+stored in `files` (D-M3-11-8).
+
 ## Incoming webhooks (M2-27)
 
 `CreateMessageCmd` has two fields for the posts of incoming webhooks (module apps); a thread with
@@ -503,7 +549,7 @@ Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContex
 - Deletion empties the content and redacts the payload of the events in the same transaction (03, 6.5).
 - A mention of a principal without read permission is stored but triggers nothing (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59, M1-60 and D-M2-15-1 to D-M2-15-25.
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md and D-M2-15-1 to D-M2-15-28 in docs/decisions.d/M2-15.md.
 
 ## Chapters
 

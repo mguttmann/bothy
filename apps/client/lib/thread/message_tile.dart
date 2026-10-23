@@ -94,6 +94,8 @@ class MessageTile extends StatelessWidget {
     this.highlighted = false,
     this.editing,
     this.started = const [],
+    this.attachments,
+    this.resolver,
   });
 
   /// The message.
@@ -123,6 +125,13 @@ class MessageTile extends StatelessWidget {
   /// The starter lines of the threads started here.
   final List<Widget> started;
 
+  /// The files of the message (M4-22), below its content.
+  final Widget? attachments;
+
+  /// Resolves the internal references of images in the content to the message's own files
+  /// (M4-07 Design note 2, D-M4-22-7); null leaves every image as text.
+  final DsAttachmentResolver? resolver;
+
   Future<void> _menu(BuildContext context, Offset at) async {
     if (actions.isEmpty) return;
     final chosen = await showMessageMenu(context, at, actions);
@@ -147,6 +156,7 @@ class MessageTile extends StatelessWidget {
           collapseLines: collapseLines,
           isContinuation: continuation,
           onOpenLink: onOpenLink,
+          attachments: resolver,
           actions: [
             for (final a in actions)
               if (messageActionGlyph(a) case final glyph?)
@@ -198,7 +208,19 @@ class MessageTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
-          children: [body, ...started],
+          children: [
+            body,
+            if (attachments case final files? when editing == null)
+              Padding(
+                // Under the content, beside the avatar like the content itself.
+                padding: const EdgeInsets.only(
+                  left: DsSize.avatarMd + DsSpace.s12 + DsSpace.s8,
+                  right: DsSpace.s8,
+                ),
+                child: files,
+              ),
+            ...started,
+          ],
         ),
       ),
     );

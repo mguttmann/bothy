@@ -198,6 +198,9 @@ type ServerInterface interface {
 	// PutChannelDraft Save the draft of a new forum post
 	// (PUT /channels/{channel_id}/draft)
 	PutChannelDraft(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
+	// ExportChannel Export the history of a channel
+	// (GET /channels/{channel_id}/export)
+	ExportChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ExportChannelParams)
 	// ListIncomingWebhooks List incoming webhooks of a channel
 	// (GET /channels/{channel_id}/incoming-webhooks)
 	ListIncomingWebhooks(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath)
@@ -3146,6 +3149,61 @@ func (siw *ServerInterfaceWrapper) PutChannelDraft(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutChannelDraft(w, r, channelId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportChannel operation middleware
+func (siw *ServerInterfaceWrapper) ExportChannel(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "channel_id" -------------
+	var channelId ChannelIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "channel_id", r.PathValue("channel_id"), &channelId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "channel_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportChannelParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportChannel(w, r, channelId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10531,6 +10589,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/templates", wrapper.CreateChannelTemplate)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/templates/{template_id}", wrapper.DeleteTemplate)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/templates/{template_id}", wrapper.UpdateTemplate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/export", wrapper.ExportChannel)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/incoming-webhooks", wrapper.ListIncomingWebhooks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/incoming-webhooks", wrapper.CreateIncomingWebhook)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/incoming-webhooks/{webhook_id}", wrapper.RevokeIncomingWebhook)
@@ -11014,6 +11073,9 @@ type StrictServerInterface interface {
 	// PutChannelDraft Save the draft of a new forum post
 	// (PUT /channels/{channel_id}/draft)
 	PutChannelDraft(ctx context.Context, request PutChannelDraftRequestObject) (PutChannelDraftResponseObject, error)
+	// ExportChannel Export the history of a channel
+	// (GET /channels/{channel_id}/export)
+	ExportChannel(ctx context.Context, request ExportChannelRequestObject) (ExportChannelResponseObject, error)
 	// ListIncomingWebhooks List incoming webhooks of a channel
 	// (GET /channels/{channel_id}/incoming-webhooks)
 	ListIncomingWebhooks(ctx context.Context, request ListIncomingWebhooksRequestObject) (ListIncomingWebhooksResponseObject, error)
@@ -13440,6 +13502,33 @@ func (sh *strictHandler) PutChannelDraft(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutChannelDraftResponseObject); ok {
 		if err := validResponse.VisitPutChannelDraftResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExportChannel operation middleware
+func (sh *strictHandler) ExportChannel(w http.ResponseWriter, r *http.Request, channelId ChannelIdPath, params ExportChannelParams) {
+	var request ExportChannelRequestObject
+
+	request.ChannelId = channelId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExportChannel(ctx, request.(ExportChannelRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExportChannel")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExportChannelResponseObject); ok {
+		if err := validResponse.VisitExportChannelResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

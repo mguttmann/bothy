@@ -69,6 +69,13 @@ type Store interface {
 	// an unknown id and for a message in another channel alike.
 	VisibleMessage(ctx context.Context, id ids.ID, visible []ids.ID) (m domain.Message, found bool, err error)
 
+	// ExportThreads returns up to q.Limit thread ids of q.ChannelID after the thread after,
+	// ascending, that have a message in the range of q (ListExportThreadIDs, brief M3-11 note 5).
+	ExportThreads(ctx context.Context, q ExportRead, after ids.ID) ([]ids.ID, error)
+	// ExportMessages returns up to q.Limit messages of the thread of c in the range of q with
+	// thread_seq above c.ThreadSeq, ascending, tombstones included (ListExportThreadMessages).
+	ExportMessages(ctx context.Context, q ExportRead, c domain.ExportCursor) ([]domain.Message, error)
+
 	// The statements of editing and deleting (M1-58) carry the visible channels of the caller
 	// (07 section 7.4 rule 1): a message outside them reads like a missing one; they read with
 	// VisibleMessage above (INT-W22/4).
@@ -190,6 +197,18 @@ type HistoryRead struct {
 	Anchor  int64
 	// RowLimit is the most rows per side: the page size plus one.
 	RowLimit int
+}
+
+// ExportRead is the selection of a channel export (Store.ExportThreads, Store.ExportMessages).
+type ExportRead struct {
+	ChannelID ids.ID
+	// Visible are the visible channels of message.read (Authorizer.Scope); every read carries
+	// channel_id = ANY(Visible) besides the channel itself.
+	Visible []ids.ID
+	// From and To bound messages.created_at: From inclusive, To exclusive.
+	From, To time.Time
+	// Limit is the page size, api.page_size_max.
+	Limit int
 }
 
 // HistoryRows are the rows of one history statement, all from one snapshot.

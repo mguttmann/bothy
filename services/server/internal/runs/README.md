@@ -165,7 +165,7 @@ The port `runs.Runs` gains `Start`, `Resume`, `RenewToken`, `AwaitInput`, `Finis
 
 ## Components and interactions (M2-15)
 
-`runs` owns `message_components` and `interactions`; `messaging` owns `messages` and the request of `createMessage` and may not import `runs`. Rulings D-M2-15-1 to D-M2-15-25 in docs/DECISIONS.md; the behaviour is 09 section 11.
+`runs` owns `message_components` and `interactions`; `messaging` owns `messages` and the request of `createMessage` and may not import `runs`. Rulings D-M2-15-1 to D-M2-15-28 in docs/decisions.d/M2-15.md; the behaviour is 09 section 11.
 
 **Ports.** Incoming `runs.Interactions` (`Create`, `Respond`, `UpdateComponent`). The source ports of `messaging` are implemented in `adapters/messagingsource`: `Source.Check` and `Source.Attach` (`messaging.ComponentWriter`, over `app.Service.CheckCard` and `AttachCard`) and `Source.ForMessages` (`messaging.ComponentReader`, one statement for all messages of an answer or page, in the ambient transaction when there is one). `internal/wire` builds the `Source` before the messaging module, which receives it, and binds it in `NewRuns`; an unbound source fails closed with an internal error (D-M2-15-25). The outgoing ports are `ComponentRepository` (`app/component_ports.go`, implemented by `adapters/postgres`), `CardMessages` (`messaging.Messages`: `LockCard`, `ComponentsChanged`, `PrincipalOf`), `ThreadLocker` (`chat.Threads.LockForMessageChange`) and `ComponentExpiryScheduler` (`adapters/jobs.ComponentScheduler` over `jobs.Inserter.InsertTx`, bound by `Runs.BindJobs`). Without `Deps.Components` the components are off: a card is refused, `ForMessages` returns none.
 

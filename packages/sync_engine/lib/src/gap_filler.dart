@@ -61,15 +61,17 @@ final class GapFiller {
     final gap = _pending[threadId];
     if (gap == null) return;
     final bundles = await sync.fetcher.range(threadId, gap.from, gap.to);
+    final erased = <String>[];
     await sync.db.transaction(() async {
       for (final b in bundles) {
         // A removal during the fetch wins (04 8.3).
         final m = b.message;
         if (!await sync.holdsContent(sync.db, m.channelId, threadId)) return;
-        await storeMessage(sync.db, b, me: sync.me);
+        await storeMessage(sync.db, b, me: sync.me, onErased: erased.addAll);
       }
       await sync.db.messagesDao.addLoadedRange(threadId, gap.from, gap.to);
     });
+    if (erased.isNotEmpty) await sync.eraser.erase(erased);
     // A gap that grew while the fetch ran stays for the next fill.
     if (_pending[threadId] == gap) _pending.remove(threadId);
   }

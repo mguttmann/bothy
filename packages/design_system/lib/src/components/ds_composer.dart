@@ -51,6 +51,7 @@ class DsComposer extends StatefulWidget {
     this.onEditLast,
     this.onAttach,
     this.onVoice,
+    this.hasAttachments = false,
     this.command,
     this.offline = false,
     this.readOnly = false,
@@ -90,6 +91,9 @@ class DsComposer extends StatefulWidget {
 
   /// Starts a voice recording, or null to hide the button.
   final VoidCallback? onVoice;
+
+  /// Whether files are attached: then the message may be sent without text.
+  final bool hasAttachments;
 
   /// The chosen command, or null.
   final DsComposerCommand? command;
@@ -161,7 +165,9 @@ class DsComposerState extends State<DsComposer> {
     return null;
   }
 
-  bool get _canSend => _text.text.trim().isNotEmpty && _missingOption == null;
+  bool get _canSend =>
+      (_text.text.trim().isNotEmpty || widget.hasAttachments) &&
+      _missingOption == null;
 
   void _send() {
     if (!_canSend) return;

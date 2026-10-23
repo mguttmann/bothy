@@ -337,7 +337,7 @@ class PrivacyApi {
   }
 
   /// Export the history of a channel
-  /// Streams one &#x60;Message&#x60; per line in &#x60;thread_seq&#x60; order per thread. Requires step-up.
+  /// Streams one &#x60;Message&#x60; per line in &#x60;thread_seq&#x60; order per thread. Requires step-up.  &#x60;from&#x60; must be strictly before &#x60;to&#x60;, else &#x60;400 validation_failed&#x60; at &#x60;#query/to&#x60; with code &#x60;invalid&#x60;; the range has no upper bound, so clients split long ranges. Each line carries the full &#x60;content_md&#x60; without &#x60;content_truncated&#x60; and without &#x60;my_reactions&#x60;; deleted messages appear as tombstones at their &#x60;thread_seq&#x60;. Threads come ascending by id, the messages of a thread ascending by &#x60;thread_seq&#x60;. Read rights are checked again before every batch, so a revocation ends the stream. An export cut after the first byte ends without a complete response (no final chunk); a range without messages gives &#x60;200&#x60; with an empty body.
   ///
   /// Parameters:
   /// * [channelId]
