@@ -78,6 +78,27 @@ type Hint struct {
 	Count int64
 	// DueAt is t0 of 13 9: occurred_at of the triggering event, or the window end of a flush.
 	DueAt time.Time
+	// MessageSeq is the thread_seq of the message the hint points at (the payload's thread_seq of
+	// message.created, the last agent message of a run, the newest message of a flush); zero for
+	// a hint without a message. A delayed push carries it as PushJob.ReleaseSeq (M3-23).
+	MessageSeq int64
+}
+
+// GatewayJob is the content of one job notify.gateway_send (M3-23 design note 4): one per hint
+// and recipient, published as notification.created to every live connection of the recipient.
+// It holds only IDs, the kind, flags, a count and t0 (ADR 0031, T-PU-01).
+type GatewayJob struct {
+	// NotificationID is the nid, the same as that of the pushes of the hint; RecipientID the
+	// person; ThreadID, MessageID and TargetID are zero when absent.
+	NotificationID, RecipientID, ThreadID, MessageID, TargetID ids.ID
+	// Kind is the kind of the hint.
+	Kind domain.Kind
+	// Quiet delivers without sound.
+	Quiet bool
+	// Count is 1, or the unread count of a flush.
+	Count int64
+	// DueAt is t0 of 13 9.
+	DueAt time.Time
 }
 
 // LiveRoutes receives the routes gateway and push_delayed of a decision (13 4.6). The default of
@@ -108,6 +129,10 @@ type PushJob struct {
 	DueAt time.Time
 	// Attempt counts the sends of this hint to this registration, from 1.
 	Attempt int64
+	// ReleaseSeq is zero for an immediate push and Hint.MessageSeq for a push delayed while a
+	// desktop is active: the send drops it with the skip reason read when the recipient's read
+	// position reached it (13 4.4, M3-23 design note 5).
+	ReleaseSeq int64
 }
 
 // Scheduler is the outgoing port over the job runtime (adapters/jobs over platform/jobs). Every
@@ -126,6 +151,9 @@ type Scheduler interface {
 	Collect(ctx context.Context, user, thread ids.ID, end time.Time) (inserted bool, err error)
 	// Send inserts one job notify.push_send at at (zero: now).
 	Send(ctx context.Context, job PushJob, at time.Time) error
+	// Gateway inserts the job notify.gateway_send of job unique per hint and recipient, so the
+	// second and later gateway routes of the same hint add nothing (M3-23 design note 3 a).
+	Gateway(ctx context.Context, job GatewayJob) error
 	// BadgeSyncPending returns the ScheduledAt of the latest pending notify.badge_sync of user;
 	// ok is false when none is pending. A sync due at or before now may already run.
 	BadgeSyncPending(ctx context.Context, user ids.ID) (at time.Time, ok bool, err error)

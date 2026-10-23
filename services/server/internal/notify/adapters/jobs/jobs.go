@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package jobs is the job adapter of the notify module (docs/spec/02-architecture.md "Job catalogue",
-// brief M3-19 design notes 9, 11 and 16): the arguments and handlers of notify.push_send,
-// notify.coalesce_window, notify.coalesce_flush, notify.badge_sync and notify.badge_sync_hold on
-// the queue delivery, the Scheduler of notify/app over platform/jobs, and the span push.send
+// brief M3-19 design notes 9, 11 and 16, brief M3-23 design note 4): the arguments and handlers of
+// notify.push_send, notify.gateway_send, notify.coalesce_window, notify.coalesce_flush,
+// notify.badge_sync and notify.badge_sync_hold on the queue delivery, the Scheduler of notify/app
+// over platform/jobs, and the span push.send
 // around every provider request.
 package jobs
 
@@ -43,6 +44,9 @@ const (
 	KindBadgeSync = "notify.badge_sync"
 	// KindBadgeSyncHold marks the interval after a badge sync.
 	KindBadgeSyncHold = "notify.badge_sync_hold"
+	// KindGatewaySend publishes notification.created of one hint to the live connections of its
+	// recipient (M3-23).
+	KindGatewaySend = "notify.gateway_send"
 )
 
 // PushSend are the arguments of notify.push_send (design note 11 a): only IDs and int64. KindCode
@@ -62,10 +66,32 @@ type PushSend struct {
 	Count          int64    `json:"count"`
 	DueAtUnixMicro int64    `json:"due_at"`
 	Attempt        int64    `json:"attempt"`
+	// ReleaseSeq is zero for an immediate push and the thread_seq of the hint's message for a
+	// push delayed while a desktop is active (M3-23 design note 5); omitted when zero.
+	ReleaseSeq int64 `json:"release_seq,omitzero"`
 }
 
 // Kind implements jobs.Args.
 func (PushSend) Kind() string { return KindPushSend }
+
+// GatewaySend are the arguments of notify.gateway_send (M3-23 design note 4): only IDs and int64,
+// with the meaning and kind codes of PushSend. The job is unique per hint and recipient
+// (NotificationID and RecipientID, river:"unique"), so the gateway routes of the other connected
+// devices of the same hint insert nothing. Absent IDs are left out of the stored JSON.
+type GatewaySend struct {
+	NotificationID ids.ID `json:"notification_id" river:"unique"`
+	RecipientID    ids.ID `json:"recipient_id" river:"unique"`
+	ThreadID       ids.ID `json:"thread_id,omitzero"`
+	MessageID      ids.ID `json:"message_id,omitzero"`
+	TargetID       ids.ID `json:"target_id,omitzero"`
+	KindCode       int64  `json:"kind"`
+	Quiet          int64  `json:"quiet"`
+	Count          int64  `json:"count"`
+	DueAtUnixMicro int64  `json:"due_at"`
+}
+
+// Kind implements jobs.Args.
+func (GatewaySend) Kind() string { return KindGatewaySend }
 
 // CoalesceWindow are the arguments of notify.coalesce_window: one marker per (recipient, thread)
 // and window. EndUnixMicro is the window end; it is part of the arguments (beyond the brief's two
@@ -193,6 +219,20 @@ func (s *Scheduler) Send(ctx context.Context, job app.PushJob, at time.Time) err
 	return ins.InsertTx(ctx, args, &jobs.InsertOptions{ScheduledAt: at})
 }
 
+// Gateway implements app.Scheduler: notify.gateway_send unique per hint and recipient, due now.
+func (s *Scheduler) Gateway(ctx context.Context, job app.GatewayJob) error {
+	ins, err := s.inserter()
+	if err != nil {
+		return err
+	}
+	args, err := gatewayArgs(job)
+	if err != nil {
+		return err
+	}
+	_, err = ins.InsertUniqueTx(ctx, args, nil)
+	return err
+}
+
 // BadgeSyncPending implements app.Scheduler.
 func (s *Scheduler) BadgeSyncPending(ctx context.Context, user ids.ID) (time.Time, bool, error) {
 	ins, err := s.inserter()
@@ -245,7 +285,7 @@ func pushArgs(j app.PushJob) (PushSend, error) {
 	return PushSend{
 		NotificationID: j.NotificationID, RegistrationID: j.RegistrationID, RecipientID: j.RecipientID, ThreadID: j.ThreadID,
 		MessageID: j.MessageID, TargetID: j.TargetID, Cleared: j.Cleared, KindCode: code, Quiet: quiet, Count: j.Count,
-		DueAtUnixMicro: j.DueAt.UnixMicro(), Attempt: j.Attempt,
+		DueAtUnixMicro: j.DueAt.UnixMicro(), Attempt: j.Attempt, ReleaseSeq: j.ReleaseSeq,
 	}, nil
 }
 
@@ -258,18 +298,47 @@ func pushJob(a PushSend) (app.PushJob, error) {
 	return app.PushJob{
 		NotificationID: a.NotificationID, RegistrationID: a.RegistrationID, RecipientID: a.RecipientID, ThreadID: a.ThreadID,
 		MessageID: a.MessageID, TargetID: a.TargetID, Cleared: a.Cleared, Kind: kind, Quiet: a.Quiet == 1, Count: a.Count,
-		DueAt: time.UnixMicro(a.DueAtUnixMicro).UTC(), Attempt: a.Attempt,
+		DueAt: time.UnixMicro(a.DueAtUnixMicro).UTC(), Attempt: a.Attempt, ReleaseSeq: a.ReleaseSeq,
+	}, nil
+}
+
+// gatewayArgs maps a GatewayJob onto the stored arguments.
+func gatewayArgs(j app.GatewayJob) (GatewaySend, error) {
+	code, err := domain.KindCode(j.Kind)
+	if err != nil {
+		return GatewaySend{}, err
+	}
+	var quiet int64
+	if j.Quiet {
+		quiet = 1
+	}
+	return GatewaySend{
+		NotificationID: j.NotificationID, RecipientID: j.RecipientID, ThreadID: j.ThreadID, MessageID: j.MessageID,
+		TargetID: j.TargetID, KindCode: code, Quiet: quiet, Count: j.Count, DueAtUnixMicro: j.DueAt.UnixMicro(),
+	}, nil
+}
+
+// gatewayJob maps stored arguments back onto a GatewayJob.
+func gatewayJob(a GatewaySend) (app.GatewayJob, error) {
+	kind, err := domain.KindFromCode(a.KindCode)
+	if err != nil {
+		return app.GatewayJob{}, err
+	}
+	return app.GatewayJob{
+		NotificationID: a.NotificationID, RecipientID: a.RecipientID, ThreadID: a.ThreadID, MessageID: a.MessageID,
+		TargetID: a.TargetID, Kind: kind, Quiet: a.Quiet == 1, Count: a.Count, DueAt: time.UnixMicro(a.DueAtUnixMicro).UTC(),
 	}, nil
 }
 
 // UseCases are the use cases the handlers run (implemented by *app.Push).
 type UseCases interface {
 	Send(ctx context.Context, job app.PushJob) error
+	GatewaySend(ctx context.Context, job app.GatewayJob) error
 	Flush(ctx context.Context, user, thread ids.ID, end time.Time) error
 	BadgeSync(ctx context.Context, user ids.ID, afterSeq int64) error
 }
 
-// Register registers the five job kinds of notify on the queue delivery (02 12.2: they are part
+// Register registers the six job kinds of notify on the queue delivery (02 12.2: they are part
 // of push, so they keep running in maintenance mode). uc may be nil where no job runs (a
 // registry of a test); a job of such a registry fails with an internal error.
 //
@@ -277,6 +346,9 @@ type UseCases interface {
 func Register(reg *jobs.Registry, uc UseCases) error {
 	o := jobs.HandlerOptions{Queue: jobs.QueueDelivery}
 	if err := jobs.Register[PushSend](reg, sendHandler{uc}, o); err != nil {
+		return err
+	}
+	if err := jobs.Register[GatewaySend](reg, gatewayHandler{uc}, o); err != nil {
 		return err
 	}
 	if err := jobs.Register[CoalesceWindow](reg, nothing[CoalesceWindow]{}, o); err != nil {
@@ -307,6 +379,21 @@ func (h sendHandler) Work(ctx context.Context, job jobs.Job[PushSend]) error {
 		return err
 	}
 	return h.uc.Send(ctx, j)
+}
+
+// gatewayHandler runs notify.gateway_send.
+type gatewayHandler struct{ uc UseCases }
+
+// Work implements jobs.Handler.
+func (h gatewayHandler) Work(ctx context.Context, job jobs.Job[GatewaySend]) error {
+	if h.uc == nil {
+		return errNoUseCases
+	}
+	j, err := gatewayJob(job.Args)
+	if err != nil {
+		return err
+	}
+	return h.uc.GatewaySend(ctx, j)
 }
 
 // flushHandler runs notify.coalesce_flush.

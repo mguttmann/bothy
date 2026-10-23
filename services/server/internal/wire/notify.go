@@ -136,10 +136,19 @@ type PushDeps struct {
 	// Providers are the registered push providers; production registers none until M3-20 and
 	// M3-21, tests pass fakepush providers.
 	Providers []notifyapp.PushProvider
-	// Presence gives the live connections; nil means presence.None (until M3-23).
+	// Presence gives the live connections; nil means presence.None (role worker; role all passes
+	// the gateway's PresenceView, M3-23).
 	Presence presence.View
-	// Routes takes the gateway and delayed routes; nil means notifyapp.FailClosedRoutes.
+	// Routes takes the gateway and delayed routes; nil means notifyapp.FailClosedRoutes, unless
+	// LiveRoutes is set.
 	Routes notifyapp.LiveRoutes
+	// LiveRoutes wires notifyapp.NewLiveRoutes over the scheduler of the push path when Routes is
+	// nil: role all, where the gateway and the consumer push share the process (M3-23,
+	// docs/DECISIONS.md D-M3-23-1).
+	LiveRoutes bool
+	// Publisher is the EphemeralPublisher of the gateway of this process for the job
+	// notify.gateway_send (role all); nil in role worker.
+	Publisher eventlog.EphemeralPublisher
 	// Metrics records the push signals; nil means notify/adapters/otelmetrics on the global meter
 	// provider, which also gets the gauge bothy.push.registrations.active. Tests pass their own.
 	Metrics notifyapp.Metrics
@@ -166,9 +175,13 @@ func NewPush(cfg notifyapp.PushConfig, pool *pg.Pool, uow txn.UnitOfWork, d Push
 		metrics = m
 	}
 	sched := notifyjobs.NewScheduler(nil)
+	routes := d.Routes
+	if routes == nil && d.LiveRoutes {
+		routes = notifyapp.NewLiveRoutes(sched)
+	}
 	p, err := notifyapp.NewPush(cfg, notifyapp.PushDeps{
 		Facts: d.Notify.Service.Facts(), Settings: d.Settings, Authorizer: d.Authorizer, Readers: d.Recipients,
-		Principals: d.Directory, Devices: d.Devices, Registrations: regs, Store: regs, Presence: d.Presence, Routes: d.Routes,
+		Principals: d.Directory, Devices: d.Devices, Registrations: regs, Store: regs, Presence: d.Presence, Routes: routes, Publisher: d.Publisher,
 		Scheduler: sched, History: d.History, Positions: d.Positions, Threads: d.Chat, Messages: d.Messaging,
 		Mentions: d.Messaging.Mentions(), Providers: notifyjobs.Traced(d.Providers, nil), UoW: uow, InstanceID: d.InstanceID,
 		Clock: clk, Metrics: metrics, Log: log,

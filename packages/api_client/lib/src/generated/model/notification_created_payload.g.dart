@@ -16,6 +16,8 @@ class _$NotificationCreatedPayload extends NotificationCreatedPayload {
   @override
   final String? messageId;
   @override
+  final String? targetId;
+  @override
   final bool quiet;
   @override
   final int count;
@@ -43,6 +45,7 @@ class _$NotificationCreatedPayload extends NotificationCreatedPayload {
     required this.kind,
     this.threadId,
     this.messageId,
+    this.targetId,
     required this.quiet,
     required this.count,
     this.spaceName,
@@ -70,6 +73,7 @@ class _$NotificationCreatedPayload extends NotificationCreatedPayload {
         kind == other.kind &&
         threadId == other.threadId &&
         messageId == other.messageId &&
+        targetId == other.targetId &&
         quiet == other.quiet &&
         count == other.count &&
         spaceName == other.spaceName &&
@@ -88,6 +92,7 @@ class _$NotificationCreatedPayload extends NotificationCreatedPayload {
     _$hash = $jc(_$hash, kind.hashCode);
     _$hash = $jc(_$hash, threadId.hashCode);
     _$hash = $jc(_$hash, messageId.hashCode);
+    _$hash = $jc(_$hash, targetId.hashCode);
     _$hash = $jc(_$hash, quiet.hashCode);
     _$hash = $jc(_$hash, count.hashCode);
     _$hash = $jc(_$hash, spaceName.hashCode);
@@ -108,6 +113,7 @@ class _$NotificationCreatedPayload extends NotificationCreatedPayload {
           ..add('kind', kind)
           ..add('threadId', threadId)
           ..add('messageId', messageId)
+          ..add('targetId', targetId)
           ..add('quiet', quiet)
           ..add('count', count)
           ..add('spaceName', spaceName)
@@ -141,6 +147,10 @@ class NotificationCreatedPayloadBuilder
   String? _messageId;
   String? get messageId => _$this._messageId;
   set messageId(String? messageId) => _$this._messageId = messageId;
+
+  String? _targetId;
+  String? get targetId => _$this._targetId;
+  set targetId(String? targetId) => _$this._targetId = targetId;
 
   bool? _quiet;
   bool? get quiet => _$this._quiet;
@@ -191,6 +201,7 @@ class NotificationCreatedPayloadBuilder
       _kind = $v.kind;
       _threadId = $v.threadId;
       _messageId = $v.messageId;
+      _targetId = $v.targetId;
       _quiet = $v.quiet;
       _count = $v.count;
       _spaceName = $v.spaceName;
@@ -234,6 +245,7 @@ class NotificationCreatedPayloadBuilder
           ),
           threadId: threadId,
           messageId: messageId,
+          targetId: targetId,
           quiet: BuiltValueNullFieldError.checkNotNull(
             quiet,
             r'NotificationCreatedPayload',

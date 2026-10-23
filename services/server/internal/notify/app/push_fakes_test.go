@@ -19,6 +19,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -120,6 +121,8 @@ type pushWorld struct {
 	providers []app.PushProvider
 	presence  presence.View
 	liveRoute app.LiveRoutes
+	// publisher records notification.created (M3-23); nil builds the push path without one.
+	publisher *fakePublisher
 }
 
 // agentMessage is one message of an agent in a thread of the fake messaging.
@@ -177,18 +180,31 @@ func (w *pushWorld) addDevice(person ids.ID, platform, provider string) {
 // push builds the push path over the fakes.
 func (w *pushWorld) push() *app.Push {
 	w.t.Helper()
+	return w.pushWith(nil)
+}
+
+// pushWith builds the push path over the fakes after mod changed its collaborators.
+func (w *pushWorld) pushWith(mod func(*app.PushDeps)) *app.Push {
+	w.t.Helper()
 	routes := w.liveRoute
 	if routes == nil {
 		routes = &recordRoutes{w: w}
 	}
-	p, err := app.NewPush(w.cfg, app.PushDeps{
+	deps := app.PushDeps{
 		Facts: pushFacts{w}, Settings: pushSettings{w}, Authorizer: pushAuthz{w}, Readers: pushReaders{w},
 		Principals: pushPrincipals{w}, Devices: pushDevices{w}, Registrations: pushRegs{w}, Store: w.store,
 		Presence: w.presenceView(), Routes: routes, Scheduler: w.sched, History: pushHistory{w}, Positions: pushPositions{w},
 		Threads: pushThreads{w}, Messages: pushMessages{w}, Mentions: pushMentions{w}, Providers: w.providers, UoW: pushUoW{},
 		InstanceID: ids.New(), Clock: w.clock, Metrics: pushMetrics{w}, Log: slog.New(slog.NewTextHandler(&w.log, nil)),
 		Jitter: func() float64 { return 1 },
-	})
+	}
+	if w.publisher != nil {
+		deps.Publisher = w.publisher
+	}
+	if mod != nil {
+		mod(&deps)
+	}
+	p, err := app.NewPush(w.cfg, deps)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -597,9 +613,11 @@ type fakeScheduler struct {
 	windows map[[2]ids.ID]time.Time
 	flushes map[string]time.Time
 	sends   []scheduledSend
-	syncs   map[ids.ID]time.Time
-	syncArg map[ids.ID]int64
-	holds   map[ids.ID]time.Time
+	// gateways are the inserted notify.gateway_send jobs, unique per hint and recipient.
+	gateways []app.GatewayJob
+	syncs    map[ids.ID]time.Time
+	syncArg  map[ids.ID]int64
+	holds    map[ids.ID]time.Time
 }
 
 func newFakeScheduler() *fakeScheduler {
@@ -646,6 +664,21 @@ func (s *fakeScheduler) Send(ctx context.Context, job app.PushJob, at time.Time)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sends = append(s.sends, scheduledSend{job: job, at: at})
+	return nil
+}
+
+func (s *fakeScheduler) Gateway(ctx context.Context, job app.GatewayJob) error {
+	if !inTx(ctx) {
+		return errs.New(errs.CodeInternalError, "insert outside a unit of work")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, g := range s.gateways {
+		if g.NotificationID == job.NotificationID && g.RecipientID == job.RecipientID {
+			return nil
+		}
+	}
+	s.gateways = append(s.gateways, job)
 	return nil
 }
 
@@ -774,4 +807,23 @@ func (p *testProvider) Send(ctx context.Context, _ app.Registration, n app.Notif
 	p.running--
 	p.mu.Unlock()
 	return p.result, p.err
+}
+
+// fakePublisher records the published ephemeral events and every publish inside a unit of work.
+type fakePublisher struct {
+	mu      stdsync.Mutex
+	events  []eventlog.EphemeralEvent
+	inTx    bool
+	failing error
+}
+
+func (p *fakePublisher) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.inTx = p.inTx || inTx(ctx)
+	if p.failing != nil {
+		return p.failing
+	}
+	p.events = append(p.events, ev)
+	return nil
 }

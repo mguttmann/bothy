@@ -146,7 +146,7 @@ func (w *world) asPushJob(a notifyjobs.PushSend) notifyapp.PushJob {
 	return notifyapp.PushJob{
 		NotificationID: a.NotificationID, RegistrationID: a.RegistrationID, RecipientID: a.RecipientID, ThreadID: a.ThreadID,
 		MessageID: a.MessageID, TargetID: a.TargetID, Cleared: a.Cleared, Kind: kind, Quiet: a.Quiet == 1, Count: a.Count,
-		DueAt: time.UnixMicro(a.DueAtUnixMicro).UTC(), Attempt: a.Attempt,
+		DueAt: time.UnixMicro(a.DueAtUnixMicro).UTC(), Attempt: a.Attempt, ReleaseSeq: a.ReleaseSeq,
 	}
 }
 
@@ -159,6 +159,18 @@ func (w *world) send(j pushJob) error {
 	}
 	w.complete(j.ID)
 	return nil
+}
+
+// sendPending runs every pending job notify.push_send due at the clock (send) and fails the test
+// on an error.
+func (w *world) sendPending() {
+	w.t.Helper()
+	now := w.clk.Now()
+	for _, j := range w.pushJobs() {
+		if j.pending() && !j.ScheduledAt.After(now) {
+			must(w.t, w.send(j))
+		}
+	}
 }
 
 // flushDue runs every pending notify.coalesce_window (its handler does nothing) and

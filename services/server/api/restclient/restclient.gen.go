@@ -11658,7 +11658,7 @@ type NotificationCreatedPayload struct {
 	AttachmentCount *int    `json:"attachment_count,omitempty"`
 	ChannelName     *string `json:"channel_name,omitempty"`
 
-	// Count Bundled notifications of this thread.
+	// Count 1, or the unread count of a bundled hint (13 4.5).
 	Count int `json:"count"`
 
 	// Excerpt Plain text, at most `notify.preview_max_chars`; only with `notify.preview_mode = full`.
@@ -11668,7 +11668,7 @@ type NotificationCreatedPayload struct {
 	ImageUrl *string          `json:"image_url,omitempty"`
 	Kind     NotificationKind `json:"kind"`
 
-	// MessageId UUIDv7 (RFC 9562), lowercase canonical form.
+	// MessageId Message the hint points at; absent when the hint points at no message.
 	MessageId *Uuid `json:"message_id,omitempty"`
 
 	// Nid UUIDv7 (RFC 9562), lowercase canonical form.
@@ -11679,7 +11679,10 @@ type NotificationCreatedPayload struct {
 	SenderDisplayName *string `json:"sender_display_name,omitempty"`
 	SpaceName         *string `json:"space_name,omitempty"`
 
-	// ThreadId UUIDv7 (RFC 9562), lowercase canonical form.
+	// TargetId Target of a hint without a thread: the waiting device for `security`, the grant or group of the reminder for `admin` (R-AZ-30).
+	TargetId *Uuid `json:"target_id,omitempty"`
+
+	// ThreadId Thread of the hint; absent for hints without a thread.
 	ThreadId    *Uuid   `json:"thread_id,omitempty"`
 	ThreadTitle *string `json:"thread_title,omitempty"`
 }

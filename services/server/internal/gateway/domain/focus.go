@@ -117,9 +117,11 @@ type EphemeralType struct {
 // run.updated carry the additional condition "thread in focus" of 05 "Ephemeral events";
 // host.presence_changed (M2-43) has no scope, so every live connection is a candidate and its
 // receive action host.read admits it, and agent.presence_changed (M2-20) likewise with
-// agent.read. The other ephemeral types of 05 (notification.created,
-// command.autocomplete_requested, stats.live) are added by the tickets that build them, with their
-// own candidate rule. TestEphemeralTypes holds the receive actions against
+// agent.read. notification.created (M3-23) is personal: its candidates are the connections of
+// its audience, and sync.Admit admits it with push.deliver on the thread, or for a hint without
+// a thread (resource user) only to the recipient's own connections. The other ephemeral types of
+// 05 (command.autocomplete_requested, stats.live) are added by the tickets that build them, with
+// their own candidate rule. TestEphemeralTypes holds the receive actions against
 // docs/spec/actions.yaml.
 var ephemeralTypes = map[string]EphemeralType{
 	"typing.started":        {ReceiveAction: "thread.read", FocusBound: true, ExcludeActor: true},
@@ -128,6 +130,9 @@ var ephemeralTypes = map[string]EphemeralType{
 	// agent.presence_changed (M2-20) has no scope either; agent.read admits owners, readers of a
 	// served channel and the agent itself.
 	"agent.presence_changed": {ReceiveAction: "agent.read"},
+	// notification.created (M3-23): a hint to the live connections of its recipient (audience
+	// self), instead of a push to that device (13 6.3).
+	"notification.created": {ReceiveAction: "push.deliver"},
 }
 
 // LookupEphemeral returns the delivery rule of the ephemeral type typ; false when the gateway

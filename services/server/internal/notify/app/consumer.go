@@ -7,10 +7,12 @@ import (
 	"errors"
 	"log/slog"
 	"math/rand/v2"
+	stdsync "sync"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
@@ -89,6 +91,10 @@ type PushDeps struct {
 	Presence presence.View
 	// Routes takes the routes gateway and push_delayed; nil means FailClosedRoutes.
 	Routes LiveRoutes
+	// Publisher hands notification.created to the gateway of this process (the hub in role all);
+	// nil in a process without a gateway (role worker), where notify.gateway_send skips with
+	// no_registration (M3-23 design note 4 b).
+	Publisher eventlog.EphemeralPublisher
 	// Scheduler inserts and reads the jobs of notify.
 	Scheduler Scheduler
 	// History reads retained events (sync.History).
@@ -124,6 +130,8 @@ type Push struct {
 	d         PushDeps
 	providers map[string]PushProvider
 	sem       chan struct{}
+	// noGateway logs the Warn line of a gateway hint without a gateway once per process.
+	noGateway stdsync.Once
 }
 
 // NewPush returns the push path. Errors: a missing collaborator, two providers of one name, or a

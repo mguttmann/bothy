@@ -291,6 +291,28 @@ for `validation_failed`, `forbidden`, `not_found`, `conflict`, `base_version_con
 `GatewayError` has no `current`, so after `base_version_conflict` the adapter loads `getRun`
 (D-M2-10-14). A credential revoked since `identify` closes with `4012`.
 
+## Presence for the hint decision (M3-23)
+
+- `app.PresenceView` implements the kernel port `presence.View` over the hub (`Hub.Presence`): for
+  each requested person one entry per device with a counted connection, with a copy of the
+  focused threads and the `idle` flag of the last `focus` op. A connection counts exactly when its
+  principal is a human with a device, it is in phase `live` (after `catchup.complete`) and it is
+  not closing; agent and app connections never count. A connection that never sent `focus` has an
+  empty focus and is not idle. While the hub briefly holds two connections of one device, the
+  newer registration wins.
+- The read copies under the hub's lock, never waits on a connection queue, reads no database and
+  returns new slices; its only error is a cancelled context.
+- Presence is an internal fact of the hint decision of `notify`: it is never sent to another
+  person and appears in no event, log or metric (OQ-06).
+- Role wiring (`internal/wire`, docs/decisions.d/M3-23.md D-M3-23-1): only role `all` passes the view to
+  the push path, because only there the hub and the consumer `push` share the process; role
+  `worker` uses `presence.None`. With several api nodes the view sees its own node only (RK-37,
+  M7-17).
+- `notification.created` is registered as a personal ephemeral type with the receive action
+  `push.deliver`; its candidates are the connections of the audience. `sync.Admit` admits a hint
+  with resource `thread` through `push.deliver` on the thread and a hint without a thread
+  (resource `user`) only on connections of that person (D-M3-23-6).
+
 ## Metrics (M1-68)
 
 The use cases record through the port `app.Metrics` (nil: `NopMetrics`); `internal/wire` passes

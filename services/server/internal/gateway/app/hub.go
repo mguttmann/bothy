@@ -120,6 +120,10 @@ type member struct {
 	// attached orders the connections by their Attach (the newest wins the relay of an
 	// autocomplete request, M2-17); 0 before Attach.
 	attached atomic.Uint64
+	// seq orders the registrations of the hub (Register), so the presence read keeps the newer
+	// connection of a device while the hub briefly holds two (M3-23); set once under the hub's
+	// mutex.
+	seq uint64
 }
 
 // Hub implements Delivery and delivers the durable events of the log to the registered
@@ -146,6 +150,8 @@ type Hub struct {
 	// and the flush decides with the rights of that moment (M1-65/15).
 	notLive   map[*member]struct{}
 	processed int64
+	// registrations counts the registrations; each member takes the next value as its seq.
+	registrations uint64
 	// consumers serves agent sessions (M2-07); nil delivers to them like to people.
 	consumers *ConsumerEngine
 	// livebox coalesces run.updated (M2-10); nil sends it on the immediate path of M1-66.
@@ -244,6 +250,8 @@ func (h *Hub) Register(ctx context.Context, c *Connection, s *Session) {
 	if old := h.members[c]; old != nil {
 		h.removeLocked(old)
 	}
+	h.registrations++
+	m.seq = h.registrations
 	h.members[c] = m
 	addTo(h.byPrincipal, a.ID, m)
 	h.pending[m] = struct{}{}
