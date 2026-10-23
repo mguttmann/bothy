@@ -94,9 +94,10 @@ func TestCreateMessage_Card(t *testing.T) {
 }
 
 // TestCreateMessage_CardRules: components without kind card, a card without components, a card
-// from a person, run_id on a text message (not_enabled), a run of Texter, a run of another thread
-// and an ended run (all three the same invalid on /run_id), and a card whose event would exceed
-// sync.event_payload_max_bytes (too_long): exact status, pointer and code; nothing is stored.
+// from a person, a run of Texter and a run of another thread (both the same run_mismatch on
+// /run_id, the answer of M2-19), an ended own run (409 run_not_active) and a card whose event
+// would exceed sync.event_payload_max_bytes (too_long): exact status, pointer and code; nothing is
+// stored (D-M2-15-29).
 func TestCreateMessage_CardRules(t *testing.T) {
 	t.Parallel()
 	w := runsWorld(t)
@@ -129,10 +130,8 @@ func TestCreateMessage_CardRules(t *testing.T) {
 		{"components without card", "lotse", `{"client_msg_id":"` + ids.New().String() + `","content_md":"x","components":` + twoButtons + `}`, "/kind", "invalid"},
 		{"card without components", "lotse", `{"client_msg_id":"` + ids.New().String() + `","kind":"card","content_md":"x","components":[]}`, "/components", "required"},
 		{"card of a person", "alex", cardBody("x", "", twoButtons), "/components", "invalid"},
-		{"run_id on text", "lotse", `{"client_msg_id":"` + ids.New().String() + `","content_md":"x","run_id":"` + r.ID + `"}`, "/run_id", "not_enabled"},
-		{"run of Texter", "lotse", cardBody("x", tr.ID, twoButtons), "/run_id", "invalid"},
-		{"run of another thread", "lotse", cardBody("x", other.ID, twoButtons), "/run_id", "invalid"},
-		{"ended run", "lotse", cardBody("x", ended.ID, twoButtons), "/run_id", "invalid"},
+		{"run of Texter", "lotse", cardBody("x", tr.ID, twoButtons), "/run_id", "run_mismatch"},
+		{"run of another thread", "lotse", cardBody("x", other.ID, twoButtons), "/run_id", "run_mismatch"},
 		{"too large", "lotse", cardBody("x", r.ID, huge), "/components", "too_long"},
 	} {
 		resp := w.do(c.who, http.MethodPost, "/api/v1/threads/"+thread.String()+"/messages", c.body, key()...)
@@ -142,6 +141,11 @@ func TestCreateMessage_CardRules(t *testing.T) {
 		if first["pointer"] != c.pointer || first["code"] != c.code {
 			t.Errorf("%s: %v", c.name, errsList)
 		}
+	}
+	p := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+thread.String()+"/messages", cardBody("x", ended.ID, twoButtons), key()...),
+		http.StatusConflict, "conflict")
+	if p["reason"] != "run_not_active" {
+		t.Errorf("ended run: %v", p)
 	}
 	if n := w.count(`SELECT count(*) FROM messages`); n != messages {
 		t.Fatalf("%d messages stored", n-messages)

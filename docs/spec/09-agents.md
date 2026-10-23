@@ -548,7 +548,7 @@ rate-limit class from 05.
 | Report step | `run.update` on `/steps/<id>` | step ID (UUIDv7) from the adapter | the server assigns `ordinal` |
 | Acknowledge follow-up | `run.update` on `/followups/<message_id>/state` | state only forward | `delivered`, then `absorbed` |
 | Finish run | `run.finish` | same end state repeated = `200` | Body: `state`, `reason`, `summary`, `usage` (4.10) |
-| Send reply | `message.create` | `client_msg_id` | `origin = agent`; the adapter stores the ID before sending |
+| Send reply | `message.create` | `client_msg_id` | `origin = agent`; the adapter stores the ID before sending. Optional `run_id`, only for an active run (`queued`, `running`, `waiting_input`) of the agent itself in the target thread; otherwise `400 validation_failed` with `errors[].code` `run_mismatch` (also for a person or app, an unknown run, a run of another thread or agent, one body for all), or for an own ended run `409 conflict` with `reason` `run_not_active`. `run_id` is checked, not stored, and not part of the canonical request of `client_msg_id`. The adapter sends its replies before `run.finish` (04 16.5); a reply refused after the end of the run it sends again without `run_id`, with the same `client_msg_id` (M2-19). |
 | Send file | `file.upload`, then `message.create` | upload session, `client_msg_id` | needs `+upload` and the feature `files_out` |
 | Question, approval | `message.create` with `kind = card` and components | `client_msg_id` | then `run.finish` with `waiting_input` (section 11) |
 | Change components | `component.update` | `version` | only own messages |
@@ -1432,17 +1432,19 @@ than a late one.
 
 **A card and its run (M2-15).** An agent posts a card with `createMessage` (`kind = card`, at
 least one component); `components` require `kind = card`, people get `400` with code `invalid`,
-and apps `not_enabled` until M2-25. `MessageCreate.run_id` binds the components of the card to the
-author's own active run: it is accepted only with `kind = card` (every other kind keeps
-`not_enabled` until M2-19), and it must name a run of the author in the thread of the message in
-state `queued`, `running` or `waiting_input`, else `400` with code `invalid` on `/run_id`, one
-code for every case, so nothing about the runs of other agents leaks. The run lives in
+and apps `not_enabled` until M2-25. `MessageCreate.run_id` on a card binds its components to the
+author's own active run. It follows the answer rules of section 4.7: it must name a run of the
+author in the thread of the message in state `queued`, `running` or `waiting_input`; an unknown
+run, a run of another thread or of another agent answer alike `400 validation_failed` with
+`errors[].code` `run_mismatch` on `/run_id`, so nothing about the runs of other agents leaks, and
+an ended own run answers `409 conflict` with `reason` `run_not_active`. The run lives in
 `message_components.run_id`; `messages.run_id` stays empty for a card, because 03 allows it only
 for `kind = 'run'`. The card's message row is written first, then the components under a share
 lock on the run, so a concurrent end of the run either comes first (the card is refused) or
 disables the new components (section 11.6). The request hash of a card is `bothy-msg-v2` (04
-section 5.1): the fields of `bothy-msg-v1`, then `run_id` and the components as received; a
-request with neither `components` nor `run_id` keeps `bothy-msg-v1`.
+section 5.1): the fields of `bothy-msg-v1`, then `run_id` and the components as received; every
+other request keeps `bothy-msg-v1`, so the `run_id` of a text answer stays outside the hash
+(section 4.7).
 
 **Flow of `createInteraction`.** An unknown component gives `404`. One unit of work locks, in
 this order, the thread, the component's run and the thread's active run (ascending id), the card
@@ -1616,8 +1618,8 @@ Everyone with `file.read` sees the transcript under the message.
 
 Cron jobs and background work of a runtime report results without a human trigger:
 
-1. The agent writes with `message.create` into a report channel on which it has `write`. There is
-   no run (`runs.triggered_by` is a person) and no token.
+1. The agent writes with `message.create` without `run_id` into a report channel on which it has
+   `write`. There is no run (`runs.triggered_by` is a person) and no token.
 2. Per report a new thread (`thread.create`, title from the first line) or a fixed
    thread; the adapter configuration chooses.
 3. Notification according to the settings of the channel ([13-push-notifications.md](13-push-notifications.md)).

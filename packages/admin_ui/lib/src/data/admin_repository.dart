@@ -14,6 +14,7 @@ import 'package:auth/auth.dart';
 import '../audit/audit_repository.dart';
 import 'access_repository.dart';
 import 'agents_repository.dart';
+import 'apps_repository.dart';
 import 'hosts_repository.dart';
 import 'self_repository.dart';
 
@@ -284,7 +285,8 @@ final class WaitingDevice {
 /// The administration's calls; every changing one carries the [purpose] text that the step-up
 /// dialog shows when the server answers `401 step_up_required` (05 2.4, 08 6.2). The
 /// repository never asks for a step-up on its own (fixed requirement 10). It also holds the
-/// grant calls of [AccessRepository] (M4-27) and the host calls of [HostsRepository] (M4-37),
+/// grant calls of [AccessRepository] (M4-27), the host calls of [HostsRepository] (M4-37) and
+/// the app and webhook calls of [AppsRepository] (M6-08),
 /// so an app passes one repository to the shell.
 ///
 /// The audit log of A6 is part of it ([AuditRepository], brief M4-29), so the shell hands one
@@ -296,6 +298,7 @@ abstract interface class AdminRepository
     implements
         AccessRepository,
         AgentsRepository,
+        AppsRepository,
         AuditRepository,
         HostsRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
@@ -480,13 +483,167 @@ final class ApiAdminRepository implements AdminRepository {
     : _newKey = newIdempotencyKey,
       _access = ApiAccessRepository(_api, newIdempotencyKey: newIdempotencyKey),
       _agents = ApiAgentsRepository(_api, newIdempotencyKey: newIdempotencyKey),
-      _hosts = ApiHostsRepository(_api, newIdempotencyKey: newIdempotencyKey);
+      _hosts = ApiHostsRepository(_api, newIdempotencyKey: newIdempotencyKey),
+      _apps = ApiAppsRepository(_api, newIdempotencyKey: newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
   final ApiAccessRepository _access;
   final ApiAgentsRepository _agents;
   final ApiHostsRepository _hosts;
+  final ApiAppsRepository _apps;
+
+  @override
+  Future<List<AppRecord>> apps() => _apps.apps();
+
+  @override
+  Future<AppRecord> app(String appId) => _apps.app(appId);
+
+  @override
+  Future<ManifestCheck> validateManifest(ManifestUpload upload) =>
+      _apps.validateManifest(upload);
+
+  @override
+  Future<AppRecord> installApp(
+    ManifestUpload upload, {
+    required List<String> grantedScopes,
+    required List<String> eventSubscriptions,
+    required String reason,
+    required String purpose,
+  }) => _apps.installApp(
+    upload,
+    grantedScopes: grantedScopes,
+    eventSubscriptions: eventSubscriptions,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<AppRecord> upgradeManifest(
+    String appId,
+    ManifestUpload upload, {
+    required List<String> grantedScopes,
+    required List<String> eventSubscriptions,
+    required String reason,
+    required String purpose,
+  }) => _apps.upgradeManifest(
+    appId,
+    upload,
+    grantedScopes: grantedScopes,
+    eventSubscriptions: eventSubscriptions,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<AppRecord> setScopes(
+    String appId, {
+    required List<String> grantedScopes,
+    required List<String> eventSubscriptions,
+    required String reason,
+    required String purpose,
+  }) => _apps.setScopes(
+    appId,
+    grantedScopes: grantedScopes,
+    eventSubscriptions: eventSubscriptions,
+    reason: reason,
+    purpose: purpose,
+  );
+
+  @override
+  Future<void> suspendApp(String appId, {required String purpose}) =>
+      _apps.suspendApp(appId, purpose: purpose);
+
+  @override
+  Future<void> resumeApp(String appId, {required String purpose}) =>
+      _apps.resumeApp(appId, purpose: purpose);
+
+  @override
+  Future<void> uninstallApp(
+    String appId, {
+    required String reason,
+    required String purpose,
+  }) => _apps.uninstallApp(appId, reason: reason, purpose: purpose);
+
+  @override
+  Future<List<AppSubscription>> subscriptions(String appId) =>
+      _apps.subscriptions(appId);
+
+  @override
+  Future<SubscriptionSaved> createSubscription(
+    String appId, {
+    required String url,
+    required List<String> eventTypes,
+    bool enableHmac = false,
+    required String purpose,
+  }) => _apps.createSubscription(
+    appId,
+    url: url,
+    eventTypes: eventTypes,
+    enableHmac: enableHmac,
+    purpose: purpose,
+  );
+
+  @override
+  Future<SubscriptionSaved> updateSubscription(
+    String subscriptionId, {
+    String? url,
+    List<String>? eventTypes,
+    SubscriptionState? state,
+    bool rotateHmacSecret = false,
+    required String purpose,
+  }) => _apps.updateSubscription(
+    subscriptionId,
+    url: url,
+    eventTypes: eventTypes,
+    state: state,
+    rotateHmacSecret: rotateHmacSecret,
+    purpose: purpose,
+  );
+
+  @override
+  Future<void> deleteSubscription(
+    String subscriptionId, {
+    required String purpose,
+  }) => _apps.deleteSubscription(subscriptionId, purpose: purpose);
+
+  @override
+  Future<AdminPage<AppDelivery>> deliveries(
+    String subscriptionId, {
+    String? cursor,
+  }) => _apps.deliveries(subscriptionId, cursor: cursor);
+
+  @override
+  Future<AppDelivery> redeliver(String deliveryId, {required String purpose}) =>
+      _apps.redeliver(deliveryId, purpose: purpose);
+
+  @override
+  Future<List<WebhookKeyInfo>> webhookKeys() => _apps.webhookKeys();
+
+  @override
+  Future<List<IncomingWebhookInfo>> incomingWebhooks(String channelId) =>
+      _apps.incomingWebhooks(channelId);
+
+  @override
+  Future<IncomingWebhookCreatedInfo> createIncomingWebhook(
+    String channelId, {
+    required String appId,
+    required String name,
+    String? threadId,
+    required String purpose,
+  }) => _apps.createIncomingWebhook(
+    channelId,
+    appId: appId,
+    name: name,
+    threadId: threadId,
+    purpose: purpose,
+  );
+
+  @override
+  Future<void> revokeIncomingWebhook(
+    String webhookId, {
+    required String purpose,
+  }) => _apps.revokeIncomingWebhook(webhookId, purpose: purpose);
 
   @override
   Future<List<AgentRecord>> agentRecords() => _agents.agentRecords();

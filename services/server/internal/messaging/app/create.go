@@ -37,6 +37,9 @@ type prepared struct {
 	hash    []byte
 	// card holds the checked components of a card (M2-15); empty for every other kind.
 	card cardPrepared
+	// runID is the run_id of an agent's answer (M2-19 design note 3); it goes into MessagePosted
+	// only, never into the row or the hash (design note 6).
+	runID *ids.ID
 }
 
 // Create implements messaging.Messages (brief D1): the thread (404 for an unknown or invisible
@@ -150,6 +153,9 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err != nil {
 		return prepared{}, err
 	}
+	if err := domain.CheckRunID(string(a.Kind), cmd.RunID); err != nil {
+		return prepared{}, err
+	}
 	content := ""
 	if cmd.ContentMD != nil {
 		content = *cmd.ContentMD
@@ -157,7 +163,8 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err := domain.CheckContent(content, s.cfg.MaxContentBytes); err != nil {
 		return prepared{}, err
 	}
-	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, kind: domain.Kind(kind), content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft}
+	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, kind: domain.Kind(kind), content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft,
+		runID: cmd.RunID}
 	// SkipMentions leaves handles empty, so send resolves and stores no mention (R-EX-09).
 	if !cmd.SkipMentions {
 		p.handles = domain.ScanMentions(content)
@@ -297,6 +304,11 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	}
 	posted := s.posted(a, info, m, p.clearDraft)
 	posted.CreatedThread, posted.ReopenedThread = created, line != nil
+	if p.runID != nil {
+		// runs checks the named run in its subscriber and vetoes the unit (M2-19 design note 4).
+		r := *p.runID
+		posted.RunID = &r
+	}
 	if err := s.announce(ctx, a, info, line, m, posted); err != nil {
 		return messaging.Created{}, err
 	}
@@ -412,6 +424,11 @@ func (s *Service) posted(a actor.Actor, info chat.ThreadInfo, m messaging.Messag
 	if !m.ReplyToID.IsZero() {
 		r := m.ReplyToID
 		ev.ReplyToID = &r
+	}
+	if !m.RunID.IsZero() {
+		// Only the live box anchor stores run_id (03 messages, CreateRunAnchor).
+		r := m.RunID
+		ev.RunID = &r
 	}
 	return ev
 }

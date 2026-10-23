@@ -25,8 +25,8 @@ const (
 
 // cardRules applies the body rules of a card after the decoder (M2-15 design note 6 a) to the kind
 // of the request and returns whether it is a card: components require kind card, a card requires
-// a component, only agents send cards (people: invalid; apps: not_enabled until M2-25), and
-// run_id is accepted only with kind card (not_enabled otherwise until M2-19).
+// a component, and only agents send cards (people: invalid; apps: not_enabled until M2-25).
+// run_id follows the answer rules of M2-19 for every kind; on a card it also binds the components.
 func cardRules(a actor.Actor, kind string, cmd messaging.CreateMessageCmd) (bool, error) {
 	card := kind == string(domain.KindCard)
 	switch {
@@ -34,8 +34,6 @@ func cardRules(a actor.Actor, kind string, cmd messaging.CreateMessageCmd) (bool
 		return false, cardField("/kind", domain.FieldInvalid, "components need kind card")
 	case card && len(cmd.Components) == 0:
 		return false, cardField("/components", fieldRequired, "a card needs at least one component")
-	case cmd.RunID != nil && !card:
-		return false, domain.NotEnabled("/run_id")
 	}
 	if !card {
 		return false, nil

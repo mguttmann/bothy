@@ -1,6 +1,6 @@
 # Module `messaging`
 
-Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message.
+Status: sending built (M1-56): `createMessage` and `createThread`, the tables `messages` and `mentions`, the in-transaction event `MessagePosted` and the durable event `message.created`. Reading built (M1-57): `listThreadMessages` and `getMessage`. Editing, deleting and revisions built (M1-58): `updateMessage`, `deleteMessage`, `listMessageRevisions`, the table `message_revisions`, the in-transaction event `MessageDeleted` and the durable events `message.updated` and `message.deleted`. Mentions and templates built (M1-60): `listMyMentions`, the port `Mentions` with `CountUnread`, the table `message_templates` and its six operations. Reactions and pins built (M1-59): `addReaction`, `removeReaction`, `listReactions`, `pinMessage`, `unpinMessage`, `listPins`, the tables `reactions` and `pins` and the durable events `reaction.added`, `reaction.removed`, `pin.added` and `pin.removed`. The port `ReplyTargets` and the first subscriber of `MessagePosted`, sync for `clear_draft`, came with M1-61. The ports of runs built (M2-05): `SetTriggerState`, `CreateRunAnchor`, `run_id` and the trigger state in every representation, and the order "append `message.created`, then publish `MessagePosted`". Channel export built (M3-11): `exportChannel`, the port `Export` and the NDJSON stream. Agent answers built (M2-19): `run_id` of agents, `MessagePosted.RunID`. Cards built (M2-15): `kind = card` with components for agents, the source ports `ComponentReader` and `ComponentWriter` that runs implements, the port methods `LockCard`, `ComponentsChanged` and `PrincipalOf`, the request hash `bothy-msg-v2` and the components in every representation of a message.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -249,7 +249,7 @@ message.
   access (`component.v1`, the server fields) and returns `CheckedCard` with `Canonical`, the input
   of the request hash, and the components as they will be stored; `ComponentWriter.Attach(ctx,
   messageID, CheckedCard)` stores them in the ambient unit of work and returns them in position
-  order. Errors are runs' (`400 validation_failed` per finding, `400 validation_failed` with code `invalid` on `/run_id`,
+  order. Errors are runs' (`400 validation_failed` per finding, `400 validation_failed` with `run_mismatch` on `/run_id` or `409 conflict` with reason `run_not_active`,
   `403 feature_disabled`).
 - `ComponentReader.ForMessages(ctx, messageIDs)` returns the components of the given messages in
   position order, in the ambient transaction when there is one. messaging names only messages that
@@ -258,8 +258,8 @@ message.
 Card rules of `createMessage` (`cards.go` `cardRules`, after the decoder, D-M2-15-5): non-empty
 `components` require `kind = card` (`invalid` on `/kind`); `kind = card` requires a component
 (`required` on `/components`); only agents send cards (people `invalid` on `/components`, apps
-`not_enabled` until M2-25); `run_id` is accepted only with `kind = card` (`not_enabled` otherwise
-until M2-19); `content_md` keeps the rule of M1-56. Then `ComponentWriter.Check` and the size rule:
+`not_enabled` until M2-25); `run_id` follows the answer rules of M2-19 for every kind and on a card
+also binds the components; `content_md` keeps the rule of M1-56. Then `ComponentWriter.Check` and the size rule:
 the largest `message.updated` payload of the card (every component disabled, used and expiring,
 `reply_to_message_id`, `edited_at`, pinned, the most distinct reactions of the longest symbol,
 `message.max_mentions` mentions, the author with the longest handle and display name and an
@@ -543,13 +543,34 @@ behaviour of M1-56.
 Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContextOverride`,
 `TestCreateThread_HashContextOverride`).
 
+## Agent answers and announcements (M2-19)
+
+- `MessageCreate.run_id` is enabled. The body rule (`domain.CheckRunID`) refuses it for every
+  principal that is not an agent: `400 validation_failed`, pointer `/run_id`, `errors[].code`
+  `run_mismatch` with `domain.RunMismatchDetail`. An agent's `run_id` passes unchanged into
+  `MessagePosted.RunID`; messaging does not check the run, because it may not import `runs` (02
+  4.4). The acceptance subscriber of `runs` checks it in the same unit of work and vetoes it (see
+  the runs README).
+- `MessagePosted.RunID` is the run the message belongs to: the anchored run for `kind = run`
+  (`CreateRunAnchor`), the `run_id` of the request for an agent's answer, nil otherwise.
+- `run_id` of an answer is never stored (`messages.run_id` names only the run of a live box
+  anchor, 03) and is not part of the request hash (04 5.1 point 3), so a replay of an answer is
+  `200` with `Idempotent-Replay: true` also after its run ended, and an answer refused with
+  `run_not_active` can be sent again with the same `client_msg_id` without `run_id`.
+- `createThread` refuses `first_message.run_id` for every principal (`domain.CheckFirstMessageRunID`,
+  pointer `/first_message/run_id`, `run_mismatch`) before the unit of work: a new thread has no run.
+- Announcements without a trigger (09 14) are ordinary `createMessage` or `createThread` calls of
+  the agent with its own rights (a grant with `write` or the operator rule); a report channel is a
+  normal channel. Limit of 09 14: the server checks only where an agent writes, never what it
+  writes; nothing here inspects content.
+
 ## Notes for the build
 
 - Idempotency through the pair of author and `client_msg_id` (04, 5.1).
 - Deletion empties the content and redacts the payload of the events in the same transaction (03, 6.5).
 - A mention of a principal without read permission is stored but triggers nothing (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md and D-M2-15-1 to D-M2-15-28 in docs/decisions.d/M2-15.md.
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md and D-M2-15-1 to D-M2-15-29 in docs/decisions.d/M2-15.md.
 
 ## Chapters
 

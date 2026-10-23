@@ -21,6 +21,7 @@ export 'admin/admin_page.dart';
 export 'admin/console_admin.dart';
 export 'admin/console_route.dart';
 export 'admin/download_target.dart';
+export 'admin/manifest_target.dart';
 export 'admin/step_up.dart';
 export 'admin/step_up_dialog.dart';
 export 'app.dart';

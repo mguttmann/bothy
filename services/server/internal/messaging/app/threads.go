@@ -35,13 +35,9 @@ func (s *Service) CreateThread(ctx context.Context, a actor.Actor, cmd messaging
 	if err := s.check(ctx, a, authorize.ActionThreadCreate, authorize.Resource{Kind: authorize.ResourceChannel, ID: cmd.ChannelID}); err != nil {
 		return messaging.ThreadCreated{}, err
 	}
-	var p *prepared
-	if cmd.FirstMessage != nil {
-		first, err := s.prepare(ctx, a, *cmd.FirstMessage, ids.ID{}, newThreadContext(cmd))
-		if err != nil {
-			return messaging.ThreadCreated{}, err
-		}
-		p = &first
+	p, err := s.prepareFirst(ctx, a, cmd)
+	if err != nil {
+		return messaging.ThreadCreated{}, err
 	}
 	var out messaging.ThreadCreated
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
@@ -66,6 +62,22 @@ func (s *Service) CreateThread(ctx context.Context, a actor.Actor, cmd messaging
 		}
 	}
 	return out, err
+}
+
+// prepareFirst applies the body rules to the first message of a new thread; nil without one.
+func (s *Service) prepareFirst(ctx context.Context, a actor.Actor, cmd messaging.CreateThreadCmd) (*prepared, error) {
+	if cmd.FirstMessage == nil {
+		return nil, nil
+	}
+	// A thread created by this request has no run (M2-19 design note 5).
+	if err := domain.CheckFirstMessageRunID(cmd.FirstMessage.RunID); err != nil {
+		return nil, err
+	}
+	first, err := s.prepare(ctx, a, *cmd.FirstMessage, ids.ID{}, newThreadContext(cmd))
+	if err != nil {
+		return nil, err
+	}
+	return &first, nil
 }
 
 // committedFirst replaces the first message of a new thread with the row as committed, like the

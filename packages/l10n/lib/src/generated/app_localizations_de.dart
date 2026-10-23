@@ -4927,4 +4927,1029 @@ class AppLocalizationsDe extends AppLocalizations {
   String fileVideoTitle(String name) {
     return 'Video $name';
   }
+
+  @override
+  String get adminNavApps => 'Apps';
+
+  @override
+  String get adminNavIncomingWebhooks => 'Eingehende Webhooks';
+
+  @override
+  String get adminAppListTitle => 'Apps';
+
+  @override
+  String get adminAppInstall => 'App installieren';
+
+  @override
+  String get adminAppInstallNoPicker =>
+      'Zum Installieren braucht es einen Dateidialog; nutze die Web-Konsole.';
+
+  @override
+  String get adminAppListEmpty => 'Keine Apps installiert.';
+
+  @override
+  String adminAppVersion(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String adminAppPublisher(String publisher) {
+    return 'von $publisher';
+  }
+
+  @override
+  String get adminAppBack => 'Zurück zu den Apps';
+
+  @override
+  String get adminAppStateActive => 'Aktiv';
+
+  @override
+  String get adminAppStateSuspended => 'Angehalten';
+
+  @override
+  String get adminAppStateUninstalled => 'Deinstalliert';
+
+  @override
+  String get adminAppStateUnknown => 'Unbekannter Zustand';
+
+  @override
+  String get adminAppScopeMessagesRead =>
+      'Nachrichten und Threads lesen und darin suchen';
+
+  @override
+  String get adminAppScopeMessagesWrite =>
+      'Nachrichten schreiben, ändern und löschen, reagieren und Threads beginnen';
+
+  @override
+  String get adminAppScopeFilesRead => 'Dateien lesen';
+
+  @override
+  String get adminAppScopeFilesWrite => 'Dateien hochladen';
+
+  @override
+  String get adminAppScopeCommandsWrite =>
+      'Befehle anlegen und entfernen und ihre Vorschläge beantworten';
+
+  @override
+  String get adminAppScopeComponentsWrite =>
+      'Eigene Schaltflächen und Formulare ändern und auf Interaktionen antworten';
+
+  @override
+  String get adminAppScopeUsersRead => 'Profile von Personen lesen';
+
+  @override
+  String get adminAppScopeEventsSubscribe =>
+      'Ereignisse empfangen und verpasste nachholen';
+
+  @override
+  String get adminAppScopeCostsReconcile =>
+      'Kostenabgleiche lesen und einreichen';
+
+  @override
+  String get adminAppScopeUnknown => 'Keine Beschreibung in dieser Version';
+
+  @override
+  String get adminAppScopeRequired => 'erforderlich';
+
+  @override
+  String get adminAppScopeOptional => 'optional';
+
+  @override
+  String get adminAppFileNotText => 'Die Datei ist kein Text (UTF-8).';
+
+  @override
+  String get adminAppFileNotJsonOrYaml => 'Die Datei ist weder JSON noch YAML.';
+
+  @override
+  String get adminAppFileNotObject => 'Die Datei enthält kein Manifest-Objekt.';
+
+  @override
+  String get adminAppUpdate => 'Aktualisieren';
+
+  @override
+  String get adminAppSuspend => 'Anhalten';
+
+  @override
+  String get adminAppResume => 'Fortsetzen';
+
+  @override
+  String get adminAppUninstall => 'Deinstallieren';
+
+  @override
+  String adminAppSuspendTitle(String name) {
+    return '$name anhalten?';
+  }
+
+  @override
+  String get adminAppSuspendBody =>
+      'Ein Nothalt: nichts wird gelöscht, und das Fortsetzen braucht keine neue Zustimmung.';
+
+  @override
+  String adminAppResumeTitle(String name) {
+    return '$name fortsetzen?';
+  }
+
+  @override
+  String get adminAppResumeBody =>
+      'Das kommt zurück, wenn die App fortgesetzt wird:';
+
+  @override
+  String adminAppUninstallTitle(String name) {
+    return '$name deinstallieren?';
+  }
+
+  @override
+  String get adminAppUninstallBody =>
+      'Das lässt sich nicht rückgängig machen; eine neue Installation braucht eine neue Zustimmung.';
+
+  @override
+  String get adminAppEffectsPart => 'Teil';
+
+  @override
+  String get adminAppEffectsResult => 'Wirkung';
+
+  @override
+  String get adminAppEffectRowTokens => 'Tokens';
+
+  @override
+  String get adminAppEffectRowDeliveries => 'Zustellungen';
+
+  @override
+  String get adminAppEffectRowCommands => 'Befehle';
+
+  @override
+  String get adminAppEffectRowComponents => 'Komponenten';
+
+  @override
+  String get adminAppEffectRowGrants => 'Freigaben und eingehende Webhooks';
+
+  @override
+  String get adminAppEffectRowMessages => 'Nachrichten der App';
+
+  @override
+  String get adminAppEffectBlocked => 'Gesperrt, nicht widerrufen';
+
+  @override
+  String get adminAppEffectPaused => 'Pausiert, die Position bleibt erhalten';
+
+  @override
+  String get adminAppEffectHidden => 'Ausgeblendet';
+
+  @override
+  String get adminAppEffectDisabled => 'Deaktiviert';
+
+  @override
+  String get adminAppEffectSuspendGrants =>
+      'Bleiben; eingehende Webhooks antworten mit 404, bis die App fortgesetzt wird';
+
+  @override
+  String get adminAppEffectRemain => 'Bleiben';
+
+  @override
+  String get adminAppEffectRevoked => 'Widerrufen';
+
+  @override
+  String get adminAppEffectSubscriptionsDisabled =>
+      'Abonnements werden deaktiviert';
+
+  @override
+  String get adminAppEffectRemoved => 'Entfernt';
+
+  @override
+  String get adminAppEffectUninstallMessages =>
+      'Bleiben; der Autor bleibt erhalten, die App wird deaktiviert';
+
+  @override
+  String get adminAppEffectWorkAgain => 'Funktionieren wieder';
+
+  @override
+  String get adminAppEffectDeliveriesContinue =>
+      'Gehen ab der gespeicherten Position weiter';
+
+  @override
+  String get adminAppEffectShownAgain => 'Wieder sichtbar';
+
+  @override
+  String get adminAppEffectEnabledAgain => 'Wieder aktiv';
+
+  @override
+  String get adminAppEffectResumeGrants =>
+      'Unverändert; eingehende Webhooks nehmen wieder Aufrufe an';
+
+  @override
+  String get adminAppEffectUnchanged => 'Unverändert';
+
+  @override
+  String adminAppSuspended(String name) {
+    return '$name ist angehalten.';
+  }
+
+  @override
+  String adminAppResumed(String name) {
+    return '$name ist wieder aktiv.';
+  }
+
+  @override
+  String adminAppUninstalled(String name) {
+    return '$name ist deinstalliert.';
+  }
+
+  @override
+  String adminAppUpdated(String name, String version) {
+    return '$name hat jetzt Version $version.';
+  }
+
+  @override
+  String adminAppConsentSaved(String name) {
+    return 'Die neue Zustimmung für $name ist gespeichert.';
+  }
+
+  @override
+  String adminAppPurposeInstall(String name) {
+    return 'Die App $name installieren';
+  }
+
+  @override
+  String adminAppPurposeUpdate(String name) {
+    return 'Die App $name aktualisieren';
+  }
+
+  @override
+  String adminAppPurposeScopes(String name) {
+    return 'Die Zustimmung für $name ändern';
+  }
+
+  @override
+  String adminAppPurposeSuspend(String name) {
+    return 'Die App $name anhalten';
+  }
+
+  @override
+  String adminAppPurposeResume(String name) {
+    return 'Die App $name fortsetzen';
+  }
+
+  @override
+  String adminAppPurposeUninstall(String name) {
+    return 'Die App $name deinstallieren';
+  }
+
+  @override
+  String adminAppPurposeGrant(String name, String target) {
+    return 'Die Freigabe für $name auf $target anlegen';
+  }
+
+  @override
+  String adminAppPurposeToken(String name) {
+    return 'Ein Token für $name anlegen';
+  }
+
+  @override
+  String get adminAppInstallTitle => 'Eine App installieren';
+
+  @override
+  String get adminAppInstallPickBody =>
+      'Wähle die Manifest-Datei der App (JSON oder YAML). Der Server prüft sie, bevor etwas installiert wird.';
+
+  @override
+  String get adminAppPick => 'Datei wählen';
+
+  @override
+  String get adminAppChecking => 'Das Manifest wird geprüft';
+
+  @override
+  String adminAppFileChosen(String name) {
+    return 'Datei: $name';
+  }
+
+  @override
+  String get adminAppInvalid => 'Der Server hat das Manifest abgelehnt:';
+
+  @override
+  String adminAppErrorLine(String pointer, String rule) {
+    return '$pointer: Regel „$rule“';
+  }
+
+  @override
+  String get adminAppManifestRoot => 'das ganze Manifest';
+
+  @override
+  String adminAppConsentIntro(String name, String publisher, String version) {
+    return '$name von $publisher, Version $version, bittet um Folgendes. Lies es, bevor du zustimmst.';
+  }
+
+  @override
+  String get adminAppConsentScopes => 'Was die App lesen und schreiben darf';
+
+  @override
+  String get adminAppConsentEvents => 'Ereignisse, die die App empfängt';
+
+  @override
+  String get adminAppConsentDestinations => 'Wohin Daten gesendet werden';
+
+  @override
+  String get adminAppConsentCommands => 'Befehle';
+
+  @override
+  String get adminAppConsentComponents => 'Komponenten';
+
+  @override
+  String get adminAppConsentGrants => 'Freigaben, um die die App bittet';
+
+  @override
+  String get adminAppConsentEgress =>
+      'Daten, die die Instanz verlassen, in den Worten des Herausgebers';
+
+  @override
+  String get adminAppConsentNoEgress =>
+      'Das Manifest nennt keine Daten, die die Instanz verlassen.';
+
+  @override
+  String get adminAppConsentNone => 'Keine.';
+
+  @override
+  String get adminAppComponentButton => 'Schaltflächen';
+
+  @override
+  String get adminAppComponentSelect => 'Auswahllisten';
+
+  @override
+  String get adminAppComponentForm => 'Formulare';
+
+  @override
+  String adminAppGrantAskChannel(String level) {
+    return '$level auf einem Kanal';
+  }
+
+  @override
+  String adminAppGrantAskSpace(String level) {
+    return '$level in einem Bereich';
+  }
+
+  @override
+  String adminAppGrantAskInstance(String level) {
+    return '$level auf der ganzen Instanz';
+  }
+
+  @override
+  String adminAppGrantAskOther(String level) {
+    return '$level auf einem Ziel, das diese Version nicht kennt';
+  }
+
+  @override
+  String adminAppGrantPurpose(String purpose) {
+    return 'Zweck: $purpose';
+  }
+
+  @override
+  String get adminAppGrantTarget => 'Ziel';
+
+  @override
+  String get adminAppGrantNone => 'Nicht anlegen';
+
+  @override
+  String get adminAppConsentToken => 'Token der App';
+
+  @override
+  String get adminAppTokenBody =>
+      'Die App meldet sich mit diesem Token an. Sein Geheimnis wird nur einmal angezeigt.';
+
+  @override
+  String get adminAppTokenDpop => 'DPoP-Schlüssel-Thumbprint (optional)';
+
+  @override
+  String get adminAppInstallSubmit => 'Installieren';
+
+  @override
+  String get adminAppGrantsStepTitle => 'Freigaben und Token';
+
+  @override
+  String adminAppGrantsStepBody(String name) {
+    return '$name ist installiert. Prüfe, was jede Freigabe ändert, und lege dann die Freigaben und das Token an.';
+  }
+
+  @override
+  String get adminAppNoGrants =>
+      'Keine Freigabe gewählt; nur das Token wird angelegt.';
+
+  @override
+  String get adminAppCreateGrants => 'Freigaben und Token anlegen';
+
+  @override
+  String adminAppStepInstall(String name) {
+    return '$name installieren';
+  }
+
+  @override
+  String adminAppStepGrant(String target) {
+    return 'Freigabe auf $target';
+  }
+
+  @override
+  String adminAppStepToken(String name) {
+    return 'Token $name';
+  }
+
+  @override
+  String adminAppStepLine(String step, String status) {
+    return '$step: $status';
+  }
+
+  @override
+  String get adminAppStepFinished => 'abgeschlossen';
+
+  @override
+  String adminAppStepFailed(String reason) {
+    return 'fehlgeschlagen: $reason';
+  }
+
+  @override
+  String get adminAppStepWaiting => 'wartet';
+
+  @override
+  String adminAppTokenSecretTitle(String name) {
+    return 'Token von $name';
+  }
+
+  @override
+  String get adminAppTokenSecretOnce =>
+      'Dieses Geheimnis wird nur einmal angezeigt. Kopiere es jetzt in den Geheimnisspeicher der App.';
+
+  @override
+  String adminAppKeyId(String kid) {
+    return 'Schlüssel-ID der Webhook-Signaturen: $kid';
+  }
+
+  @override
+  String adminAppHomepage(String url) {
+    return 'Website: $url';
+  }
+
+  @override
+  String get adminAppPageEvents => 'Abonnierte Ereignisse';
+
+  @override
+  String get adminAppTokenNew => 'Neues Token';
+
+  @override
+  String adminAppTokenCreateTitle(String name) {
+    return 'Ein Token für $name anlegen';
+  }
+
+  @override
+  String get adminAppTokenRevokeBody =>
+      'Die App verliert den Zugang mit diesem Token sofort.';
+
+  @override
+  String adminAppUpdateTitle(String name) {
+    return '$name aktualisieren';
+  }
+
+  @override
+  String adminAppUpdateBody(String slug) {
+    return 'Wähle die neue Manifest-Datei mit demselben Slug ($slug).';
+  }
+
+  @override
+  String adminAppDiffTitle(String from, String to) {
+    return 'Änderungen von Version $from zu $to';
+  }
+
+  @override
+  String get adminAppDiffScopes => 'Was die App lesen und schreiben darf';
+
+  @override
+  String get adminAppDiffEvents => 'Ereignisse';
+
+  @override
+  String get adminAppDiffGrants => 'Erbetene Freigaben';
+
+  @override
+  String adminAppDiffAdded(String items) {
+    return 'Neu: $items';
+  }
+
+  @override
+  String adminAppDiffRemoved(String items) {
+    return 'Entfernt: $items';
+  }
+
+  @override
+  String get adminAppDiffNone =>
+      'Bei Berechtigungen, Ereignissen, Zielen, Freigaben und Befehlen ändert sich nichts.';
+
+  @override
+  String get adminAppDiffRemovedNow => 'Entfernte Punkte wirken sofort.';
+
+  @override
+  String get adminAppDiffHostsConfirmed =>
+      'Neue Ziele bestätigst du mit diesem Update.';
+
+  @override
+  String get adminAppDiffGrantsLater =>
+      'Ein Update legt nie eine Freigabe an: lege neue unter Freigaben an.';
+
+  @override
+  String get adminAppDiffNewConsent =>
+      'Neue Berechtigungen und Ereignisse brauchen nach dem Update eine neue Zustimmung; bis dahin behält die App die bisherigen.';
+
+  @override
+  String adminAppNewConsentTitle(String name) {
+    return 'Neue Zustimmung für $name';
+  }
+
+  @override
+  String adminAppNewConsentBody(String version) {
+    return 'Version $version bittet um mehr. Wähle, was die App nutzen darf; erforderliche Punkte bleiben an.';
+  }
+
+  @override
+  String get adminAppNewConsentSubmit => 'Zustimmung speichern';
+
+  @override
+  String get adminAppNewConsentLater => 'Später';
+
+  @override
+  String get adminHookTitle => 'Ausgehende Webhooks';
+
+  @override
+  String get adminHookEmpty => 'Keine Abonnements.';
+
+  @override
+  String get adminHookCreate => 'Neues Abonnement';
+
+  @override
+  String get adminHookStateActive => 'Aktiv';
+
+  @override
+  String get adminHookStatePaused => 'Pausiert';
+
+  @override
+  String get adminHookStateDisabled => 'Deaktiviert';
+
+  @override
+  String get adminHookStateUnknown => 'Unbekannter Zustand';
+
+  @override
+  String adminHookEvents(String events) {
+    return 'Ereignisse: $events';
+  }
+
+  @override
+  String adminHookFailures(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Fehlschläge in Folge',
+      one: '1 Fehlschlag in Folge',
+      zero: 'Keine Fehlschläge in Folge',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String adminHookSigned(String schemes, String kid) {
+    return 'Signiert mit $schemes, Schlüssel $kid';
+  }
+
+  @override
+  String adminHookDisabledAt(String when) {
+    return 'Deaktiviert $when';
+  }
+
+  @override
+  String get adminHookReasonGap =>
+      'Eine Lücke: Ereignisse haben das Ereignisprotokoll verlassen, bevor sie zugestellt wurden.';
+
+  @override
+  String get adminHookReasonGone =>
+      'Der Empfänger hat mit 410 Gone geantwortet.';
+
+  @override
+  String adminHookReasonFailures(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deaktiviert nach $count Fehlschlägen in Folge.',
+      one: 'Deaktiviert nach 1 Fehlschlag in Folge.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminHookReasonNone => 'Der Server nennt keinen Grund.';
+
+  @override
+  String get adminHookPause => 'Pausieren';
+
+  @override
+  String get adminHookResume => 'Fortsetzen';
+
+  @override
+  String get adminHookDelete => 'Löschen';
+
+  @override
+  String get adminHookDeliveries => 'Zustellungen';
+
+  @override
+  String adminHookPauseTitle(String url) {
+    return 'Abonnement an $url pausieren?';
+  }
+
+  @override
+  String get adminHookPauseBody =>
+      'An diese Adresse geht nichts, bis du fortsetzt. Passende Ereignisse werden weiter vorgemerkt und gehen danach der Reihe nach hinaus.';
+
+  @override
+  String adminHookResumeTitle(String url) {
+    return 'Abonnement an $url fortsetzen?';
+  }
+
+  @override
+  String get adminHookResumeBody =>
+      'Wartende Zustellungen gehen wieder der Reihe nach an diese Adresse.';
+
+  @override
+  String adminHookDeleteTitle(String url) {
+    return 'Abonnement an $url löschen?';
+  }
+
+  @override
+  String get adminHookDeleteBody =>
+      'An diese Adresse gehen keine weiteren Ereignisse.';
+
+  @override
+  String adminHookPausedNotice(String url) {
+    return 'Das Abonnement an $url ist pausiert.';
+  }
+
+  @override
+  String adminHookResumedNotice(String url) {
+    return 'Das Abonnement an $url ist aktiv.';
+  }
+
+  @override
+  String adminHookDeletedNotice(String url) {
+    return 'Das Abonnement an $url ist gelöscht.';
+  }
+
+  @override
+  String adminHookCreatedNotice(String url) {
+    return 'Das Abonnement an $url ist angelegt.';
+  }
+
+  @override
+  String adminHookFormTitle(String app) {
+    return 'Neues Abonnement für $app';
+  }
+
+  @override
+  String get adminHookFormBody =>
+      'Ereignisse der gewählten Typen gehen an diese Adresse, signiert mit v1a. Der Server nimmt nur https-Adressen an, die seine Webhook-Einstellungen erlauben.';
+
+  @override
+  String get adminHookUrl => 'Adresse';
+
+  @override
+  String get adminHookUrlHttps => 'Die Adresse muss mit https:// beginnen.';
+
+  @override
+  String get adminHookEventTypes => 'Ereignistypen';
+
+  @override
+  String get adminHookNoEvents =>
+      'Die Installation gewährt keine Ereignisse, die sich abonnieren lassen.';
+
+  @override
+  String get adminHookHmac => 'Zusätzlich mit HMAC signieren (v1)';
+
+  @override
+  String get adminHookSubmit => 'Abonnement anlegen';
+
+  @override
+  String adminHookPurposeCreate(String app) {
+    return 'Webhook-Abonnement für $app anlegen';
+  }
+
+  @override
+  String adminHookPurposeChange(String url) {
+    return 'Webhook-Abonnement an $url ändern';
+  }
+
+  @override
+  String adminHookPurposeDelete(String url) {
+    return 'Webhook-Abonnement an $url löschen';
+  }
+
+  @override
+  String get adminHookPurposeRedeliver => 'Ereignis erneut zustellen';
+
+  @override
+  String adminHookDeliveriesTitle(String url) {
+    return 'Zustellungen an $url';
+  }
+
+  @override
+  String get adminHookDeliveriesEmpty => 'Noch keine Zustellungen.';
+
+  @override
+  String get adminHookReload => 'Neu laden';
+
+  @override
+  String get adminHookMore => 'Mehr laden';
+
+  @override
+  String get adminHookDeliveryPending => 'Wartet';
+
+  @override
+  String get adminHookDeliverySucceeded => 'Zugestellt';
+
+  @override
+  String get adminHookDeliveryFailed => 'Fehlgeschlagen';
+
+  @override
+  String get adminHookDeliveryDead => 'Aufgegeben';
+
+  @override
+  String get adminHookDeliveryUnknown => 'Unbekannter Status';
+
+  @override
+  String adminHookAttempts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Versuche',
+      one: '1 Versuch',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String adminHookNextAttempt(String when) {
+    return 'nächster Versuch $when';
+  }
+
+  @override
+  String adminHookLastStatus(String code) {
+    return 'letzter Status $code';
+  }
+
+  @override
+  String adminHookLastError(String error) {
+    return 'letzter Fehler: $error';
+  }
+
+  @override
+  String adminHookEventSeq(String type, String seq) {
+    return '$type, Sequenz $seq';
+  }
+
+  @override
+  String adminHookEventGone(String seq) {
+    return 'Ereignis nicht mehr im Protokoll, Sequenz $seq';
+  }
+
+  @override
+  String adminHookCreatedAt(String when) {
+    return 'angelegt $when';
+  }
+
+  @override
+  String adminHookDeliveredAt(String when) {
+    return 'zugestellt $when';
+  }
+
+  @override
+  String get adminHookErrorTimeout => 'Zeitüberschreitung';
+
+  @override
+  String get adminHookErrorConnectionFailed => 'Verbindung fehlgeschlagen';
+
+  @override
+  String get adminHookErrorTlsFailed =>
+      'TLS-Aufbau oder Zertifikat fehlgeschlagen';
+
+  @override
+  String get adminHookErrorAddressBlocked =>
+      'die Adresse führt in ein gesperrtes Netz';
+
+  @override
+  String get adminHookErrorHostNotAllowed =>
+      'die Zieladresse ist nicht erlaubt';
+
+  @override
+  String get adminHookErrorHttpStatus => 'unerwarteter HTTP-Status';
+
+  @override
+  String get adminHookErrorThrottled => 'vom Empfänger gebremst';
+
+  @override
+  String get adminHookErrorGone => 'der Empfänger hat mit 410 Gone geantwortet';
+
+  @override
+  String get adminHookErrorNotAuthorized =>
+      'die App darf dieses Ereignis nicht mehr empfangen';
+
+  @override
+  String get adminHookErrorNotSubscribed =>
+      'das Abonnement umfasst diesen Ereignistyp nicht mehr';
+
+  @override
+  String get adminHookErrorEventExpired =>
+      'das Ereignis ist nicht mehr im Ereignisprotokoll';
+
+  @override
+  String get adminHookRedeliver => 'Erneut zustellen';
+
+  @override
+  String get adminHookRedelivered => 'Die Zustellung ist wieder fällig.';
+
+  @override
+  String get adminHookRedeliverExpired =>
+      'Das Ereignis ist nicht mehr im Ereignisprotokoll; es lässt sich nicht erneut zustellen.';
+
+  @override
+  String get adminHookKeysTitle => 'Signaturschlüssel';
+
+  @override
+  String get adminHookKeysBody =>
+      'Empfänger prüfen die v1a-Signatur jeder Zustellung mit einem dieser öffentlichen Schlüssel.';
+
+  @override
+  String get adminHookKeyActive => 'Aktiv';
+
+  @override
+  String get adminHookKeyNext => 'Nächster';
+
+  @override
+  String get adminHookKeyRetiring => 'Läuft aus';
+
+  @override
+  String adminHookKeyUntil(String when) {
+    return 'gültig bis $when';
+  }
+
+  @override
+  String adminSecretHmacTitle(String url) {
+    return 'HMAC-Geheimnis für $url';
+  }
+
+  @override
+  String get adminSecretHmacLabel => 'HMAC-Geheimnis (v1)';
+
+  @override
+  String get adminSecretHmacOnce =>
+      'Dieses Geheimnis wird nur jetzt angezeigt. Hinterlege es beim Empfänger, der damit die v1-Signatur prüft.';
+
+  @override
+  String get adminManifestFileType => 'App-Manifest';
+
+  @override
+  String get adminIncomingTitle => 'Eingehende Webhooks';
+
+  @override
+  String get adminIncomingChannel => 'Kanal';
+
+  @override
+  String get adminIncomingNoChannels => 'Du siehst keinen Kanal.';
+
+  @override
+  String get adminIncomingEmpty =>
+      'Dieser Kanal hat keine eingehenden Webhooks.';
+
+  @override
+  String get adminIncomingCreate => 'Eingehenden Webhook anlegen';
+
+  @override
+  String adminIncomingWritesAs(String app) {
+    return 'schreibt als $app';
+  }
+
+  @override
+  String adminIncomingCreatedAt(String when) {
+    return 'angelegt $when';
+  }
+
+  @override
+  String adminIncomingLastUsed(String when) {
+    return 'zuletzt benutzt $when';
+  }
+
+  @override
+  String get adminIncomingNeverUsed => 'noch nie benutzt';
+
+  @override
+  String get adminIncomingRevoke => 'Widerrufen';
+
+  @override
+  String adminIncomingRevokeTitle(String name) {
+    return 'Eingehenden Webhook $name widerrufen?';
+  }
+
+  @override
+  String get adminIncomingRevokeBody =>
+      'Aufrufe seiner Adresse werden ab jetzt mit 404 beantwortet.';
+
+  @override
+  String adminIncomingRevokedNotice(String name) {
+    return 'Der eingehende Webhook $name ist widerrufen.';
+  }
+
+  @override
+  String adminIncomingCreatedNotice(String name) {
+    return 'Der eingehende Webhook $name ist angelegt.';
+  }
+
+  @override
+  String adminIncomingDialogTitle(String path) {
+    return 'Neuer eingehender Webhook in $path';
+  }
+
+  @override
+  String get adminIncomingDialogBody =>
+      'Ein Dienst schreibt über die Adresse des Webhooks Nachrichten in diesen Kanal. Der Webhook schreibt als App.';
+
+  @override
+  String get adminIncomingName => 'Name';
+
+  @override
+  String get adminIncomingModeExisting => 'Als bestehende App schreiben';
+
+  @override
+  String get adminIncomingModeNewApp => 'Neue Eingangs-App';
+
+  @override
+  String get adminIncomingNewAppBody =>
+      'Installiert eine minimale App, die nur Nachrichten schreiben darf, mit Schreibzugriff auf genau diesen Kanal.';
+
+  @override
+  String get adminIncomingApp => 'App';
+
+  @override
+  String get adminIncomingNoApps => 'Es ist keine aktive App installiert.';
+
+  @override
+  String get adminIncomingSubmit => 'Anlegen';
+
+  @override
+  String get adminIncomingStepInstall => 'Eingangs-App installieren';
+
+  @override
+  String adminIncomingStepGrant(String path) {
+    return 'Schreibzugriff auf $path gewähren';
+  }
+
+  @override
+  String get adminIncomingStepWebhook => 'Webhook anlegen';
+
+  @override
+  String adminIncomingStepLine(String step, String state) {
+    return '$step: $state';
+  }
+
+  @override
+  String get adminIncomingStepDone => 'erledigt';
+
+  @override
+  String get adminIncomingStepWaiting => 'wartet';
+
+  @override
+  String get adminIncomingRetry => 'Erneut versuchen';
+
+  @override
+  String get adminIncomingUninstall => 'Eingangs-App deinstallieren';
+
+  @override
+  String get adminIncomingUninstalled => 'Die Eingangs-App ist deinstalliert.';
+
+  @override
+  String adminIncomingPurposeCreate(String path) {
+    return 'Eingehenden Webhook in $path anlegen';
+  }
+
+  @override
+  String adminIncomingPurposeRevoke(String name) {
+    return 'Eingehenden Webhook $name widerrufen';
+  }
+
+  @override
+  String adminIncomingPurposeUninstall(String name) {
+    return 'Eingangs-App $name deinstallieren';
+  }
+
+  @override
+  String adminSecretIncomingTitle(String name) {
+    return 'Adresse von $name';
+  }
+
+  @override
+  String get adminSecretIncomingLabel => 'Webhook-Adresse mit Token';
+
+  @override
+  String get adminSecretIncomingOnce =>
+      'Diese Adresse enthält das Token und wird nur jetzt angezeigt. Kopiere sie in den sendenden Dienst.';
+
+  @override
+  String get adminSecretIncomingBearer =>
+      'Sender, die einen Header setzen können, lassen den letzten Abschnitt der Adresse weg und senden ihn als Authorization: Bearer <token>.';
 }

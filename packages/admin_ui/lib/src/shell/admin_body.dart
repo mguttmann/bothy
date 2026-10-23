@@ -11,6 +11,9 @@ import 'package:flutter/material.dart';
 import '../access/who_has_access.dart' show AdminViewAs;
 import '../agents/agent_page.dart';
 import '../agents/agents_list.dart';
+import '../apps/app_page.dart';
+import '../apps/apps_list.dart';
+import '../apps/manifest_picker.dart';
 import '../audit/audit_export.dart';
 import '../audit/audit_list.dart';
 import '../data/admin_repository.dart';
@@ -21,6 +24,7 @@ import '../groups/group_detail.dart';
 import '../groups/groups_list.dart';
 import '../hosts/host_page.dart';
 import '../hosts/hosts_list.dart';
+import '../incoming_webhooks/incoming_webhooks_view.dart';
 import '../people/people_list.dart';
 import '../people/person_detail.dart';
 import 'admin_routes.dart';
@@ -36,7 +40,8 @@ import 'admin_routes.dart';
 /// [agentPresence] streams the live presence of an agent (null: the presence of `getAgent`);
 /// [maxWidth] limits the content (880 on the desktop; null fills the width, for the browser);
 /// [onViewAs] starts "View as person" in the host from [PersonDetail] and from "Who has
-/// access?" of [GrantsList] (null: the dialog of the desktop).
+/// access?" of [GrantsList] (null: the dialog of the desktop); [pickManifest] is the host's file
+/// dialog for the manifest of an app (null: no install and no update).
 ///
 /// The body holds no permission logic: a screen the server refuses shows the server's reason
 /// (15 1 principle 1). A section without a screen shows the people list, as the shell does.
@@ -65,6 +70,7 @@ class AdminBody extends StatelessWidget {
     this.agentPresence,
     this.maxWidth = 880,
     this.onViewAs,
+    this.pickManifest,
   });
 
   /// The administration's calls.
@@ -98,6 +104,9 @@ class AdminBody extends StatelessWidget {
 
   /// Starts "View as person" in the host, or null for the dialog of the desktop.
   final AdminViewAs? onViewAs;
+
+  /// The host's file dialog for an app manifest, or null.
+  final ManifestPicker? pickManifest;
 
   Widget _screen() {
     final r = repository;
@@ -153,6 +162,30 @@ class AdminBody extends StatelessWidget {
       AdminSection.agents => AgentsList(
         repository: r,
         onOpen: (a) => onNavigate(AdminLocation(AdminSection.agents, id: a)),
+        onChanged: changed,
+      ),
+      AdminSection.apps when id != null => AppPage(
+        key: ValueKey('admin.app.$id'),
+        repository: r,
+        appId: id,
+        pickManifest: pickManifest,
+        timeZone: timeZone,
+        clock: clock,
+        onBack: () => onNavigate(const AdminLocation(AdminSection.apps)),
+        onChanged: changed,
+      ),
+      AdminSection.apps => AppsList(
+        repository: r,
+        pickManifest: pickManifest,
+        timeZone: timeZone,
+        clock: clock,
+        onOpen: (a) => onNavigate(AdminLocation(AdminSection.apps, id: a)),
+        onChanged: changed,
+      ),
+      AdminSection.webhooks => IncomingWebhooksView(
+        repository: r,
+        timeZone: timeZone,
+        clock: clock,
         onChanged: changed,
       ),
       AdminSection.audit => AuditLogView(

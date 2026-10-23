@@ -32,7 +32,7 @@ part 'message.g.dart';
 /// * [contentFormat] - Version of the Markdown dialect; `1` is CommonMark 0.31.2 without raw HTML, with mention tokens (03 `messages`).
 /// * [contentTruncated] - Set when `content_md` was cut (events above `sync.event_payload_max_bytes`, lists above `message.list_content_max_bytes`); `getMessage` returns the full content.
 /// * [replyToMessageId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [runId] - Set only for `kind = run`: the run whose live box this anchor holds.
 /// * [triggerState]
 /// * [triggerStateAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [triggerStateReason] - Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`.
@@ -100,7 +100,7 @@ abstract class Message implements Built<Message, MessageBuilder> {
   @BuiltValueField(wireName: r'reply_to_message_id')
   String? get replyToMessageId;
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// Set only for `kind = run`: the run whose live box this anchor holds.
   @BuiltValueField(wireName: r'run_id')
   String? get runId;
 

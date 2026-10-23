@@ -2,7 +2,8 @@
 
 /// The places of the administration below the pages of the console (brief M6-04 Design note 1,
 /// docs/decisions.d/M6-04.md D-M6-04-1): the pages of M6-02 host the screens of `admin_ui`, and a
-/// detail adds the ID of its person, group or agent to the page's path.
+/// detail adds the ID of its person, group, agent or app to the page's path (M6-08 adds the apps
+/// and the incoming webhooks below the apps page).
 library;
 
 import 'package:admin_ui/admin_ui.dart';
@@ -14,6 +15,10 @@ const String viewAsSegment = 'view-as';
 
 /// The path segment of the access grants below the groups page.
 const String grantsSegment = 'grants';
+
+/// The path segment of the incoming webhooks below the apps page (brief M6-08); the channel is
+/// chosen on the screen and never enters the path (ADR 0028).
+const String incomingWebhooksSegment = 'incoming-webhooks';
 
 /// One place of the console: a [page] of the route table and, on an administration page with a
 /// screen of `admin_ui`, the [admin] place it shows, or the stored view ([viewAs]).
@@ -51,7 +56,7 @@ final class ConsoleRoute {
         AdminSection.agents => ConsolePage.agents,
         AdminSection.audit => ConsolePage.audit,
         AdminSection.hosts => ConsolePage.hosts,
-        AdminSection.apps => ConsolePage.apps,
+        AdminSection.apps || AdminSection.webhooks => ConsolePage.apps,
         AdminSection.statistics => ConsolePage.stats,
         AdminSection.instance => ConsolePage.instance,
       }, admin: location);
@@ -63,6 +68,7 @@ final class ConsoleRoute {
     ConsolePage.devices: AdminLocation(AdminSection.devices),
     ConsolePage.agents: AdminLocation(AdminSection.agents),
     ConsolePage.audit: AdminLocation(AdminSection.audit),
+    ConsolePage.apps: AdminLocation(AdminSection.apps),
   };
 
   /// The pages whose detail has an ID in the path, with the section of the detail.
@@ -70,6 +76,7 @@ final class ConsoleRoute {
     ConsolePage.people: AdminSection.people,
     ConsolePage.groups: AdminSection.groups,
     ConsolePage.agents: AdminSection.agents,
+    ConsolePage.apps: AdminSection.apps,
   };
 
   /// The place of [path] (relative to the console's base, without query), or null for a path
@@ -91,6 +98,12 @@ final class ConsoleRoute {
         admin: AdminLocation(AdminSection.grants),
       );
     }
+    if (parent == ConsolePage.apps && child == incomingWebhooksSegment) {
+      return const ConsoleRoute(
+        ConsolePage.apps,
+        admin: AdminLocation(AdminSection.webhooks),
+      );
+    }
     final section = _details[parent];
     if (section == null) return null;
     return ConsoleRoute(parent, admin: AdminLocation(section, id: child));
@@ -103,6 +116,9 @@ final class ConsoleRoute {
     if (at == null) return page.path;
     if (at.section == AdminSection.grants) {
       return '${ConsolePage.groups.path}/$grantsSegment';
+    }
+    if (at.section == AdminSection.webhooks) {
+      return '${ConsolePage.apps.path}/$incomingWebhooksSegment';
     }
     final id = at.id;
     return id == null ? page.path : '${page.path}/$id';

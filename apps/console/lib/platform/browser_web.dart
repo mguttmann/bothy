@@ -24,7 +24,54 @@ ConsoleEnvironment browserEnvironment() {
     navigation: WindowNavigation(web.window),
     passkeys: BrowserPasskeys(web.window.navigator.credentials),
     downloads: AnchorDownloads(web.window.document),
+    files: InputFileChooser(web.window.document),
   );
+}
+
+/// [FileChooser] over a hidden `<input type="file">`: appended to the body for the choice (so
+/// the browser and the tests of `make console-e2e` see it), clicked, and removed after its
+/// `change` or `cancel` event. The file is read into memory with `arrayBuffer()`.
+class InputFileChooser implements FileChooser {
+  /// Creates the chooser of [document].
+  InputFileChooser(this.document);
+
+  /// The document of the tab.
+  final web.Document document;
+
+  @override
+  Future<ChosenFile?> choose({required String accept, required String tag}) {
+    final done = Completer<ChosenFile?>();
+    final input = document.createElement('input') as web.HTMLInputElement
+      ..type = 'file'
+      ..accept = accept
+      ..style.display = 'none'
+      ..setAttribute('data-bothy-file-input', tag);
+    void finish(ChosenFile? file) {
+      input.remove();
+      if (!done.isCompleted) done.complete(file);
+    }
+
+    input
+      ..addEventListener(
+        'change',
+        ((web.Event _) {
+          final file = input.files?.item(0);
+          if (file == null) {
+            finish(null);
+            return;
+          }
+          file.arrayBuffer().toDart.then(
+            (buffer) =>
+                finish(ChosenFile(file.name, buffer.toDart.asUint8List())),
+            onError: (Object _) => finish(null),
+          );
+        }).toJS,
+      )
+      ..addEventListener('cancel', ((web.Event _) => finish(null)).toJS);
+    document.body?.append(input);
+    input.click();
+    return done.future;
+  }
 }
 
 /// [FileDownloads] over a temporary `blob:` URL and an anchor with the `download` attribute:

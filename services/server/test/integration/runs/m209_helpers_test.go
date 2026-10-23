@@ -219,7 +219,7 @@ func (w *world) cancel(name, run string) *httpservertest.Response {
 }
 
 // wantReason checks a problem with code and reason.
-func (w *world) wantReason(r *httpservertest.Response, status int, code, reason string) { //nolint:unparam // the status stays explicit next to the code at each call.
+func (w *world) wantReason(r *httpservertest.Response, status int, code, reason string) {
 	w.t.Helper()
 	p := w.want(r, status, code)
 	if p["reason"] != reason {

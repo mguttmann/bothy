@@ -7,7 +7,8 @@ devices (M4-26), grants with preview, "Who has access?" and "View as person" (M4
 audit log (M4-29), the hosts of the terminal with pairing and session users (M4-37) and the
 agents with their backend switch, the guided flow and their tokens (M4-28), and what the
 console needs to host the administration: the body without navigation and the stored view of
-"View as person" (M6-04). Kind: Flutter package, a member of the Dart
+"View as person" (M6-04), and the apps with their consent, lifecycle and outgoing webhooks and
+the incoming webhooks per channel (M6-08). Kind: Flutter package, a member of the Dart
 workspace at the repository root (`resolution: workspace`, `publish_to: none`).
 
 ## What it offers
@@ -48,6 +49,12 @@ database, because the console has neither a gateway nor a local store (15 3.1).
 | `SwitchModeDialog`, `HolderDialog`, `SwitchAllDialog`, `I1Explanation` | the switch of one agent (reason required; to organization clears the holder, to personal needs one), the change of the holder, the switch of several agents (all to organization with a reason; all to personal with a holder and an explicit, editable list proposed from the last global switch; one violating agent changes nothing, BR-08), and the explanation of an I1 rejection with the principals the caller may read and a count of the others |
 | `AgentTokens`, `TokenSecretView` | the agent's API tokens: prefix, validity, last use, DPoP binding, revoked ones; create with step-up and the DPoP key thumbprint of the adapter, the secret shown once and never kept, revoke after one confirmation without step-up |
 | `GuidedSwitch`, `GuidedFlow`, `GuidedResult` | the guided flow of 10 11 in the grant preview and on a `409 i1_violation` of adding a group member or an owner: the explanation, "Switch to Organization and grant" with a reason, one request with `resolve_i1`, and the result with the warning while the adapter still reports the old mode |
+| `AppsRepository`, `ApiAppsRepository`, `ManifestUpload` | apps and webhooks over REST (part of `AdminRepository`): `listApps`, `getApp`, `validateManifest`, `installApp`, `upgradeAppManifest`, `setAppScopes`, `suspendApp`, `resumeApp`, `uninstallApp`, `listWebhookSubscriptions`, `createWebhookSubscription`, `updateWebhookSubscription`, `deleteWebhookSubscription`, `listWebhookDeliveries`, `redeliverWebhook`, `getWebhookKeys`, `listIncomingWebhooks`, `createIncomingWebhook`, `revokeIncomingWebhook`; a manifest file is read as JSON (its exact text) or YAML (converted to JSON) and sent as text, so the server's closed schema sees every member |
+| `AppsList`, `InstallAppDialog`, `ConsentView` | the installed apps and the install from a manifest file the host picks (`ManifestPicker`): the server's validation, the consent in plain text (scopes with their meaning, events, target hosts, commands, components, requested grants with a target each, `data_egress`), `installApp`, the server's preview of each grant, then the grants and the app token, shown once with the key ID for receivers; a failed step shows the progress with "Retry" and "Uninstall" |
+| `AppPage`, `UpdateAppDialog`, `AppLifecycleDialog` | one app: consent summary, its tokens, the update with the diff and the new consent (`setAppScopes`), suspend, resume and uninstall with the effects of 11 4.3 before the confirmation |
+| `AppSubscriptionsSection`, `DeliveriesView`, `WebhookKeysCard` | outgoing subscriptions within the granted events and `https` addresses, their state and the reason of a disabled one, the HMAC secret once, the deliveries with status, attempts, next attempt and last status code (never a body), "Redeliver", and the public keys of the `v1a` signatures |
+| `IncomingWebhooksView`, `CreateIncomingDialog` | the incoming webhooks of a chosen channel (the channel never enters a path), create with an existing app or, for owners, the composed "incoming app" (`installApp` with a built-in manifest, `createGrant` write on the channel, `createIncomingWebhook`), the address with its token shown once, revoke |
+| `OnceOnlySecret` | the one dialog for every secret shown once (app and agent tokens, incoming webhook addresses, HMAC secrets): kept only in its state, dropped on close, not announced to screen readers until focused, never logged or stored |
 | `ConfirmChange`, `ProblemBanner`, `adminFailure`, `CodeText` | the one confirmation before a change (danger style for destructive ones), the server's problem texts (`one_time_secret` and `i1_violation` explained), the code view of onboarding and enrollment codes |
 
 Step-up comes only from the server: a changing call carries its purpose text
@@ -59,7 +66,9 @@ translated reason; the screens hold no permission logic (15 1 principle 1).
 
 ## Embedding the administration
 
-The desktop app hosts `AdminShell` at `/admin` (`apps/client/lib/admin/admin_route.dart`):
+The desktop app hosts `AdminShell` at `/admin` (`apps/client/lib/admin/admin_route.dart`) and
+passes the system file dialog as the `ManifestPicker` of the apps; the console passes a file
+input of the browser:
 it builds `ApiAdminRepository` over the client of the signed-in session and maps
 `AdminLocation` to `/admin/<section>/<id>`. The console (M6-04) passes its own repository and
 maps the same locations to its routes: it hosts `AdminBody` inside its own shell, with
@@ -97,6 +106,8 @@ Further rules checked by `make arch`:
 | `lib/src/grants/`, `lib/src/access/`, `lib/src/data/access_repository.dart` | the permission screens of M4-27 |
 | `lib/src/hosts/`, `lib/src/data/hosts_repository.dart` | screen A8 of M4-37 |
 | `lib/src/agents/`, `lib/src/data/agents_repository.dart` | screen A5 of M4-28 and the guided flow |
+| `lib/src/apps/`, `lib/src/incoming_webhooks/`, `lib/src/secrets/`, `lib/src/data/apps_repository.dart` | apps, outgoing and incoming webhooks and the once-only secret of M6-08 |
+| `test/apps/`, `test/incoming_webhooks/`, `test/secrets/` | the app screens, subscriptions, deliveries, incoming webhooks and the once-only test over the app fake (`test/admin/apps_fake.dart`) |
 | `test/agents/` | agent page, switches, switch of all agents, tokens, guided flow and the REST source over the agent fake (`test/admin/agents_fake.dart`) |
 | `test/hosts/` | pairing, I6, session users, check results, grants on a host and the host page over the host fake (`test/admin/hosts_fake.dart`) |
 | `test/grants/`, `test/access/` | the wizard, revoke, "Who has access?" and "View as person"; the fake reads the example of 07 9.3 at run time |

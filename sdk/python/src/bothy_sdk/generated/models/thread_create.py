@@ -18,7 +18,9 @@ T = TypeVar("T", bound="ThreadCreate")
 @_attrs_define
 class ThreadCreate:
     """Creates a forum post (with `title` and `first_message`) or a thread from a message of the
-    main thread (with `parent_message_id`, optional `first_message`).
+    main thread (with `parent_message_id`, optional `first_message`). `first_message.run_id` is
+    never valid, because a new thread has no run: `400 validation_failed` with pointer
+    `/first_message/run_id` and `errors[].code` `run_mismatch`.
 
         Attributes:
             title (str | Unset):

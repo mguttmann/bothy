@@ -21,7 +21,7 @@ part 'message_create.g.dart';
 /// * [mentionIds] - Optional check. The server resolves mentions from `content_md` (03 `messages`, content format; 07 section 4.6); when present, the set must equal the resolved set, else `400 validation_failed` with code `mention_mismatch`.
 /// * [silent]
 /// * [clearDraft]
-/// * [runId] - Agents only, and only with `kind = card`, which binds its components to this run (`Component.run_id`); it must be an active run of the author in the same thread, else `400 validation_failed` with code `invalid` on `/run_id` (09, 11.4). Every other kind gives `not_enabled` until answers in a run are built (M2-19). `Message.run_id` stays absent for a card.
+/// * [runId] - Agents only; the run this message belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Never stored on the message (`Message.run_id` stays absent). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`. With `kind = card` it also binds the components of the card to this run (`Component.run_id`, 09 11.4) and is part of the canonical request of `client_msg_id` (`bothy-msg-v2`); for every other kind it is not (09 4.7).
 /// * [components] - Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1).
 @BuiltValue()
 abstract class MessageCreate
@@ -54,7 +54,7 @@ abstract class MessageCreate
   @BuiltValueField(wireName: r'clear_draft')
   bool? get clearDraft;
 
-  /// Agents only, and only with `kind = card`, which binds its components to this run (`Component.run_id`); it must be an active run of the author in the same thread, else `400 validation_failed` with code `invalid` on `/run_id` (09, 11.4). Every other kind gives `not_enabled` until answers in a run are built (M2-19). `Message.run_id` stays absent for a card.
+  /// Agents only; the run this message belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Never stored on the message (`Message.run_id` stays absent). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`. With `kind = card` it also binds the components of the card to this run (`Component.run_id`, 09 11.4) and is part of the canonical request of `client_msg_id` (`bothy-msg-v2`); for every other kind it is not (09 4.7).
   @BuiltValueField(wireName: r'run_id')
   String? get runId;
 

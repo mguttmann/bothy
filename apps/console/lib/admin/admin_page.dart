@@ -13,15 +13,18 @@ import '../session/console_controller.dart';
 import 'console_admin.dart';
 import 'console_route.dart';
 import 'download_target.dart';
+import 'manifest_target.dart';
 
 /// The page frame of an administration page of the console (brief M6-04 Scope): the screen of
 /// `admin_ui` for the place of [route] at the full width of the browser (01 5.5), the tabs
-/// "Groups" and "Access grants" on the groups page, the structure of "View as person", and the
-/// placeholder on a page whose screen comes with a later ticket.
+/// "Groups" and "Access grants" on the groups page and "Apps" and "Incoming webhooks" on the
+/// apps page (M6-08), the structure of "View as person", and the placeholder on a page whose
+/// screen comes with a later ticket.
 ///
 /// The screens are the desktop's ([AdminBody]); the console passes its repository, its time
-/// zone, the browser download as the save target of the audit export and its own entry to
-/// "View as person" (it opens the structure page instead of the desktop's dialog).
+/// zone, the browser download as the save target of the audit export, the browser's file input
+/// as the manifest picker of the apps and its own entry to "View as person" (it opens the
+/// structure page instead of the desktop's dialog).
 ///
 /// Example: `ConsoleAdminPage(controller: c, admin: admin, route: c.route)`.
 class ConsoleAdminPage extends StatelessWidget {
@@ -32,6 +35,7 @@ class ConsoleAdminPage extends StatelessWidget {
     required this.admin,
     required this.route,
     this.downloads,
+    this.files,
   });
 
   /// The console's state; its places are changed through it.
@@ -45,6 +49,36 @@ class ConsoleAdminPage extends StatelessWidget {
 
   /// The browser download, or null (no audit export).
   final FileDownloads? downloads;
+
+  /// The browser's file input, or null (no install or update of an app).
+  final FileChooser? files;
+
+  /// The tabs of a page that holds two sections, or null.
+  static List<(AdminSection, String Function(AppLocalizations), String)>? _tabs(
+    ConsolePage page,
+  ) => switch (page) {
+    ConsolePage.groups => [
+      (
+        AdminSection.groups,
+        (l) => l.adminNavGroups,
+        'console.groups.tab.groups',
+      ),
+      (
+        AdminSection.grants,
+        (l) => l.adminNavGrants,
+        'console.groups.tab.grants',
+      ),
+    ],
+    ConsolePage.apps => [
+      (AdminSection.apps, (l) => l.adminNavApps, 'console.apps.tab.apps'),
+      (
+        AdminSection.webhooks,
+        (l) => l.adminNavIncomingWebhooks,
+        'console.apps.tab.incoming',
+      ),
+    ],
+    _ => null,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +96,7 @@ class ConsoleAdminPage extends StatelessWidget {
       );
     }
     final save = downloads;
+    final chooser = files;
     final body = AdminBody(
       key: ValueKey('console.admin.${route.path}.${at.id}'),
       repository: admin.repository,
@@ -70,6 +105,7 @@ class ConsoleAdminPage extends StatelessWidget {
       timeZone: admin.timeZone,
       clock: admin.clock,
       saveTarget: save == null ? null : downloadSaveTarget(save),
+      pickManifest: chooser == null ? null : manifestPickerOf(chooser),
       onNavigate: controller.openAdmin,
       onViewAs: (person) => unawaited(
         admin.startViewAs(
@@ -78,8 +114,9 @@ class ConsoleAdminPage extends StatelessWidget {
         ),
       ),
     );
-    if (route.page != ConsolePage.groups) return body;
-    final grants = at.section == AdminSection.grants;
+    final tabs = _tabs(route.page);
+    if (tabs == null) return body;
+    final pageKey = route.page == ConsolePage.groups ? 'groups' : 'apps';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -92,31 +129,24 @@ class ConsoleAdminPage extends StatelessWidget {
           ),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: SegmentedButton<bool>(
-              key: const ValueKey('console.groups.tabs'),
+            child: SegmentedButton<AdminSection>(
+              key: ValueKey('console.$pageKey.tabs'),
               showSelectedIcon: false,
               segments: [
-                ButtonSegment(
-                  value: false,
-                  label: Text(
-                    l.adminNavGroups,
-                    key: const ValueKey('console.groups.tab.groups'),
+                for (final (section, label, key) in tabs)
+                  ButtonSegment(
+                    value: section,
+                    label: Text(label(l), key: ValueKey(key)),
                   ),
-                ),
-                ButtonSegment(
-                  value: true,
-                  label: Text(
-                    l.adminNavGrants,
-                    key: const ValueKey('console.groups.tab.grants'),
-                  ),
-                ),
               ],
-              selected: {grants},
-              onSelectionChanged: (s) => controller.openAdmin(
-                AdminLocation(
-                  s.first ? AdminSection.grants : AdminSection.groups,
-                ),
-              ),
+              // A detail (a group, an app) belongs to the first tab.
+              selected: {
+                tabs.any((t) => t.$1 == at.section)
+                    ? at.section
+                    : tabs.first.$1,
+              },
+              onSelectionChanged: (s) =>
+                  controller.openAdmin(AdminLocation(s.first)),
             ),
           ),
         ),

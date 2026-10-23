@@ -65,6 +65,29 @@ void main() {
       expect(ConsoleRoute.forAdmin(target.admin!).page, ConsolePage.groups);
     });
 
+    test('apps have a list and a detail, the incoming webhooks a place of their own', () {
+      expect(
+        ConsoleRoute.parse('/apps')!.admin,
+        const AdminLocation(AdminSection.apps),
+      );
+      expect(
+        ConsoleRoute.parse('/apps/$_id')!.admin,
+        const AdminLocation(AdminSection.apps, id: _id),
+      );
+      final incoming = ConsoleRoute.parse('/apps/incoming-webhooks')!;
+      expect(incoming.page, ConsolePage.apps);
+      expect(incoming.admin, const AdminLocation(AdminSection.webhooks));
+      expect(incoming.path, '/apps/incoming-webhooks');
+      expect(
+        ConsoleRoute.forAdmin(const AdminLocation(AdminSection.webhooks)),
+        incoming,
+      );
+      expect(ConsoleRoute.parse('/apps/incoming-webhooks/$_id'), isNull);
+      for (final r in [ConsoleRoute.parse('/apps/$_id')!, incoming]) {
+        expect(ConsoleRoute.parse(r.path), r);
+      }
+    });
+
     test('view as person has its own place below people', () {
       final r = ConsoleRoute.parse('/people/view-as')!;
       expect(r.page, ConsolePage.people);
@@ -106,6 +129,8 @@ void main() {
         AdminSection.agents: ConsolePage.agents,
         AdminSection.audit: ConsolePage.audit,
         AdminSection.hosts: ConsolePage.hosts,
+        AdminSection.apps: ConsolePage.apps,
+        AdminSection.webhooks: ConsolePage.apps,
       };
       for (final e in pages.entries) {
         expect(

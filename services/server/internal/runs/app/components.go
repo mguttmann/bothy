@@ -99,7 +99,7 @@ func domainInputs(list []messaging.ComponentInput) []domain.ComponentInput {
 // AttachCard stores the components of a new card message in the ambient unit of work (M2-15
 // design note 6 b), after messaging inserted the message row: the request is checked again (the
 // checked form is not trusted across the port), the run of run_id is share-locked and must be an
-// active run of the author in the message's thread (one 400 invalid on /run_id for every case, so
+// active run of the author in the message's thread (the answers of M2-19, so
 // nothing about other agents' runs leaks), the owner's switch supports_components = false gives
 // 403 feature_disabled, then the rows are inserted and runs.component_expiry is scheduled at the
 // earliest expires_at. It is the Attach of messaging.ComponentWriter. messages.run_id stays NULL:
@@ -148,8 +148,9 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 }
 
 // checkCardRun share-locks the run of a card's run_id and checks that it is an active run of the
-// author in the message's thread; one 400 invalid on /run_id for every failing case (design note
-// 6 b). A card without run_id passes.
+// author in the message's thread with the verdict and the answers of M2-19 (400 run_mismatch on
+// /run_id for an unknown run, a run of another thread or agent; 409 run_not_active for an ended
+// own run; ruling D-M2-15-29). A card without run_id passes.
 func (s *Service) checkCardRun(ctx context.Context, in messaging.CardInput) error {
 	if in.RunID.IsZero() {
 		return nil
@@ -158,10 +159,8 @@ func (s *Service) checkCardRun(ctx context.Context, in messaging.CardInput) erro
 	if err != nil {
 		return err
 	}
-	if !found || run.AgentID != in.AuthorID || run.ThreadID != in.ThreadID || !run.State.Active() {
-		return fieldError("/run_id", domain.FieldInvalid, "run_id is not an active run of the author in this thread")
-	}
-	return nil
+	return answerError(domain.AnswerVerdict(domain.AnswerRun{AgentID: run.AgentID, ThreadID: run.ThreadID, State: run.State}, found,
+		in.AuthorID, in.ThreadID))
 }
 
 // componentRows returns the rows of the checked components of a new card (design note 5: state

@@ -165,11 +165,11 @@ The port `runs.Runs` gains `Start`, `Resume`, `RenewToken`, `AwaitInput`, `Finis
 
 ## Components and interactions (M2-15)
 
-`runs` owns `message_components` and `interactions`; `messaging` owns `messages` and the request of `createMessage` and may not import `runs`. Rulings D-M2-15-1 to D-M2-15-28 in docs/decisions.d/M2-15.md; the behaviour is 09 section 11.
+`runs` owns `message_components` and `interactions`; `messaging` owns `messages` and the request of `createMessage` and may not import `runs`. Rulings D-M2-15-1 to D-M2-15-29 in docs/decisions.d/M2-15.md; the behaviour is 09 section 11.
 
 **Ports.** Incoming `runs.Interactions` (`Create`, `Respond`, `UpdateComponent`). The source ports of `messaging` are implemented in `adapters/messagingsource`: `Source.Check` and `Source.Attach` (`messaging.ComponentWriter`, over `app.Service.CheckCard` and `AttachCard`) and `Source.ForMessages` (`messaging.ComponentReader`, one statement for all messages of an answer or page, in the ambient transaction when there is one). `internal/wire` builds the `Source` before the messaging module, which receives it, and binds it in `NewRuns`; an unbound source fails closed with an internal error (D-M2-15-25). The outgoing ports are `ComponentRepository` (`app/component_ports.go`, implemented by `adapters/postgres`), `CardMessages` (`messaging.Messages`: `LockCard`, `ComponentsChanged`, `PrincipalOf`), `ThreadLocker` (`chat.Threads.LockForMessageChange`) and `ComponentExpiryScheduler` (`adapters/jobs.ComponentScheduler` over `jobs.Inserter.InsertTx`, bound by `Runs.BindJobs`). Without `Deps.Components` the components are off: a card is refused, `ForMessages` returns none.
 
-**Card rules and error codes.** `CheckCard` (no database access) applies `component.v1` and the server fields: closed member sets per type, semantic icon names of `kernel/designkeys`, `kernel/textcheck` on every display text, `value` and `custom_id`, the keys `component.max_per_message`, `component.custom_id_max_chars`, `component.form_max_fields` and `component.default_ttl`; `400 validation_failed` with one `errors[]` entry per finding below `/components/<index>/...` and the codes `required`, `too_long`, `limit_reached` or `invalid` (`detail` names the rule, never the text). It returns the canonical bytes of the request hash `bothy-msg-v2` and the components as they will be stored (normalized definition with defaults). `AttachCard` (inside the unit of work of `createMessage`, after the message row) checks the request again, locks the run of `run_id` with `FOR SHARE` (an active run of the author in the message's thread, else `400 validation_failed` with code `invalid` on `/run_id`), refuses `supports_components = false` with `403 feature_disabled` (`agents.RunFacts.ComponentsAllowed`), inserts the rows (`state = active`, `version = 1`, `run_id` the card's run; `messages.run_id` stays NULL) and schedules `runs.component_expiry` at the earliest `expires_at`. The body rules before it (`kind`, people and apps, `run_id` on other kinds) and the size rule belong to `messaging`.
+**Card rules and error codes.** `CheckCard` (no database access) applies `component.v1` and the server fields: closed member sets per type, semantic icon names of `kernel/designkeys`, `kernel/textcheck` on every display text, `value` and `custom_id`, the keys `component.max_per_message`, `component.custom_id_max_chars`, `component.form_max_fields` and `component.default_ttl`; `400 validation_failed` with one `errors[]` entry per finding below `/components/<index>/...` and the codes `required`, `too_long`, `limit_reached` or `invalid` (`detail` names the rule, never the text). It returns the canonical bytes of the request hash `bothy-msg-v2` and the components as they will be stored (normalized definition with defaults). `AttachCard` (inside the unit of work of `createMessage`, after the message row) checks the request again, locks the run of `run_id` with `FOR SHARE` (an active run of the author in the message's thread, with the answers of M2-19: `400 validation_failed` with `run_mismatch` on `/run_id`, or `409 conflict` with `run_not_active` for an ended own run; D-M2-15-29), refuses `supports_components = false` with `403 feature_disabled` (`agents.RunFacts.ComponentsAllowed`), inserts the rows (`state = active`, `version = 1`, `run_id` the card's run; `messages.run_id` stays NULL) and schedules `runs.component_expiry` at the earliest `expires_at`. The body rules before it (`kind`, people and apps, `run_id` on other kinds) and the size rule belong to `messaging`.
 
 **`createInteraction` (`Create`).** `client_interaction_id` must be a UUIDv7 (`not_uuid_v7`). The component and its card are read without locks (unknown: `404`); one unit of work takes the locks below, answers a repetition (the person must still read the card, else `404`; the same `component_id` and `values` equal as JSON give `200` with `Idempotent-Replay`, anything else `422 idempotency_key_reuse`), decides `interaction.create` with `authorize.InteractionFacts` at stage `accept` from the locked rows (denials are audited by authz and mapped by `Decision.Err`: `component_inactive` as `409 component_used`), runs `CheckValues` (`interaction_values_invalid`) and the payload size rule (`too_long` on `/values`), and writes: the single-use rule (chosen `used` with `used_by` and `used_at`, the rest of the locked group `disabled`, each `version + 1`; a component without `single_use` stays unchanged, D-M2-15-13), the interaction in `received`, `ComponentsChanged` when a component changed, the run of `domain.RouteInteraction` (the component's run, or `Open` with `trigger_kind = interaction`, `TriggeringInteractionID`, the person as `TriggeredBy`), `interaction.created`, `agent.invocation` last for a new run (`triggered_by` through `Messages.PrincipalOf`) and the allow audit of an `approve_actions` component (`domain.InteractionAuditDetails`: IDs, `component_type`, `required_capability`, `restricted_to`, `choice` only for `once`, `session`, `always`, `deny`). A unique violation of the idempotency key (`ErrInteractionTaken`, only when the locks were bypassed) is answered like a repetition in a new unit of work.
 
@@ -232,6 +232,33 @@ neither creates a run or a cost entry (R-AG-14).
   `internal/wire`, `BindAutocomplete`), `sync.event_payload_max_bytes`, `agent.invocation_token_ttl`.
 - Registrations: `runs.Register` declares the ephemeral `command.autocomplete_requested` and the op
   `command.autocomplete_result`, whose handler the gateway runs on `CommandExec`.
+
+## Answers with `run_id` (M2-19)
+
+- `Acceptor.OnMessagePosted` has a first branch for answers: an event with `RunID` and a `Kind`
+  other than `run` must have `Origin = agent` (anything else is an internal error, because
+  messaging never builds it); for a kind other than `system` it calls `checkAnswer`
+  (`app/answer.go`). Afterwards every message whose origin is not human returns without trigger
+  work, as before: no run, no follow-up, no `SetTriggerState`, no audit (AG-01, 07 SR4).
+- `checkAnswer` reads the run with `Repository.LockRunForAnswer` (`queries/run_answer.sql`,
+  `SELECT id, thread_id, agent_id, state ... FOR SHARE`) and decides with the pure
+  `domain.AnswerVerdict`: unknown, another thread or another agent is `ErrAnswerRunMismatch`
+  (`400 validation_failed`, `/run_id`, `run_mismatch`, one detail for every case, equal to the
+  body rule of messaging); an own run in an end state is `ErrAnswerRunNotActive` (`409 conflict`,
+  `reason` `run_not_active`). Ownership comes before the state, so `run_id` cannot probe runs
+  outside the authorized thread (05 rule 1.2). There is no `authorize` call for the run: the
+  message was authorized as `message.create` on its thread, and a run's path is its thread.
+- A valid `run_id` changes nothing on the run (no `version`, no event, no step).
+- Lock and order: messaging holds the thread row (`AppendToThread`), then the answer check takes
+  the run row `FOR SHARE`, the same order as the acceptance (thread, then run). `finishRun`,
+  `cancelRun`, the cancel timeout and the stall check update the run row under `FOR UPDATE`, so
+  they wait for the answer's commit, or the answer waits for theirs and then sees the end state.
+  Every answer stored with a `run_id` therefore commits while its run is active, and its
+  `message.created` has a lower `seq` than the `run.state_changed` of the end. A deadlock with a
+  path that locks the run first and a thread later is retried by the unit of work
+  (`database.tx_retry_max`).
+- `LockRunForAnswer` is an `after_authorize` exception of the SQL visibility lint
+  (`tools/lint/sql_visibility.yaml`).
 
 ## Invocation tokens (M2-06)
 
