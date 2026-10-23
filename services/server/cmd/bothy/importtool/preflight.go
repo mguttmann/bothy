@@ -9,8 +9,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/uuid"
-
 	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
 )
@@ -287,10 +285,10 @@ type collisions struct {
 	r      bothyReads
 	m      *Mapping
 	gs     *guildState
-	ours   map[uuid.UUID]bool
-	posted map[string]uuid.UUID
+	ours   map[restclient.Uuid]bool
+	posted map[string]restclient.Uuid
 	spaces []restclient.Space
-	names  map[uuid.UUID]map[string]bool
+	names  map[restclient.Uuid]map[string]bool
 }
 
 // checkCollisions is step 6 of 22 4.4 (22 5.1 rule 1): a create name equal (without regard to
@@ -298,7 +296,7 @@ type collisions struct {
 // channel in the target space, that is not the target of a posted item of this source ends the run
 // before the first write; so does a name the mapping creates twice in one place.
 func checkCollisions(ctx context.Context, r bothyReads, m *Mapping, gs *guildState, src *restclient.ImportSource) error {
-	c := &collisions{r: r, m: m, gs: gs, ours: map[uuid.UUID]bool{}, posted: map[string]uuid.UUID{}, names: map[uuid.UUID]map[string]bool{}}
+	c := &collisions{r: r, m: m, gs: gs, ours: map[restclient.Uuid]bool{}, posted: map[string]restclient.Uuid{}, names: map[restclient.Uuid]map[string]bool{}}
 	if src != nil {
 		items, err := r.items(ctx, src.Id, restclient.ImportItemStatePosted)
 		if err != nil {
@@ -405,9 +403,10 @@ func categoryOf(gs *guildState, m *Mapping, channel string) string {
 
 // targetSpace returns the Bothy space of a category when it is known: the existing space of the
 // mapping, or the space this source posted for it.
-func targetSpace(m *Mapping, category string, posted map[string]uuid.UUID) (uuid.UUID, bool) {
+func targetSpace(m *Mapping, category string, posted map[string]restclient.Uuid) (restclient.Uuid, bool) {
 	if s := m.Space(category); s != nil && s.Target.Existing != "" {
-		id, err := uuid.Parse(s.Target.Existing)
+		var id restclient.Uuid
+		err := id.UnmarshalText([]byte(s.Target.Existing))
 		return id, err == nil
 	}
 	id, ok := posted[keySpace+category]

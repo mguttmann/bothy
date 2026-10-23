@@ -13,8 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 )
@@ -84,7 +82,7 @@ func newRunID() string {
 type writer struct {
 	api    bothyAPI
 	reads  bothyReads
-	src    uuid.UUID
+	src    restclient.Uuid
 	clk    clock.Clock
 	runID  string
 	stale  time.Duration
@@ -240,7 +238,7 @@ func (w *writer) renewLoop(ctx context.Context, every time.Duration, sleep Sleep
 }
 
 // sendBatch sends one batch (applyImportBatch) and returns its items by origin key.
-func sendBatch(ctx context.Context, api bothyAPI, src uuid.UUID, b restclient.ImportBatch) (map[string]restclient.ImportItem, error) {
+func sendBatch(ctx context.Context, api bothyAPI, src restclient.Uuid, b restclient.ImportBatch) (map[string]restclient.ImportItem, error) {
 	resp, err := api.ApplyImportBatchWithResponse(ctx, src, b)
 	if err != nil {
 		return nil, err

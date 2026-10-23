@@ -10,8 +10,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/google/uuid"
-
 	"github.com/OWNER/bothy/services/server/api/restclient"
 )
 
@@ -96,7 +94,7 @@ type bothyReads struct {
 
 // person is an active or disabled person or agent of Bothy by handle.
 type person struct {
-	id     uuid.UUID
+	id     restclient.Uuid
 	active bool
 }
 
@@ -159,7 +157,7 @@ func (r bothyReads) spaces(ctx context.Context) ([]restclient.Space, error) {
 }
 
 // channels returns the live channels of a space (listSpaceChannels).
-func (r bothyReads) channels(ctx context.Context, space uuid.UUID) ([]restclient.Channel, error) {
+func (r bothyReads) channels(ctx context.Context, space restclient.Uuid) ([]restclient.Channel, error) {
 	resp, err := r.api.ListSpaceChannelsWithResponse(ctx, space)
 	if err != nil {
 		return nil, err
@@ -194,7 +192,7 @@ func (r bothyReads) sources(ctx context.Context) ([]restclient.ImportSource, err
 }
 
 // source returns one import source with its cursor (getImport).
-func (r bothyReads) source(ctx context.Context, id uuid.UUID) (*restclient.ImportSource, error) {
+func (r bothyReads) source(ctx context.Context, id restclient.Uuid) (*restclient.ImportSource, error) {
 	resp, err := r.api.GetImportWithResponse(ctx, id)
 	if err != nil {
 		return nil, err
@@ -207,7 +205,7 @@ func (r bothyReads) source(ctx context.Context, id uuid.UUID) (*restclient.Impor
 
 // items returns every item of a source in the given state ("" for all) by origin key
 // (listImportItems).
-func (r bothyReads) items(ctx context.Context, id uuid.UUID, state restclient.ImportItemState) (map[string]restclient.ImportItem, error) {
+func (r bothyReads) items(ctx context.Context, id restclient.Uuid, state restclient.ImportItemState) (map[string]restclient.ImportItem, error) {
 	out := map[string]restclient.ImportItem{}
 	var cursor *restclient.Cursor
 	params := &restclient.ListImportItemsParams{}

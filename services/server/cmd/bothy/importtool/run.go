@@ -14,8 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/bothyapi"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -446,7 +445,7 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, cl
 // limit with a note.
 func newWalker(o options, env Env, cfg Config, m *Mapping, gs *guildState, p *plan, s *session, cl clients) (*walker, error) {
 	wk := &walker{cfg: cfg, m: m, gs: gs, p: p, dc: cl.dc, api: cl.api, log: env.logger(), afterBatch: env.AfterBatch,
-		known: map[string]*refInfo{}, targets: map[string]uuid.UUID{}, skipped: map[string]bool{}, userDone: map[string]bool{},
+		known: map[string]*refInfo{}, targets: map[string]restclient.Uuid{}, skipped: map[string]bool{}, userDone: map[string]bool{},
 		maxContent: s.limits.MessageMaxContentBytes, attachMax: s.limits.FileMaxUploadBytes, batchMax: cfg.BatchMaxItems}
 	if cfg.AttachmentMaxBytes > 0 {
 		wk.attachMax = cfg.AttachmentMaxBytes
@@ -472,7 +471,7 @@ func newWalker(o options, env Env, cfg Config, m *Mapping, gs *guildState, p *pl
 	if err != nil {
 		return nil, &usageError{msg: "configuration: " + err.Error()}
 	}
-	wk.up = &uploader{api: cl.api, src: wk.src, fetch: fetch, max: wk.attachMax, posted: map[string]uuid.UUID{}}
+	wk.up = &uploader{api: cl.api, src: wk.src, fetch: fetch, max: wk.attachMax, posted: map[string]restclient.Uuid{}}
 	wk.w = &writer{api: cl.api, reads: bothyReads{api: cl.api}, src: wk.src, clk: env.clock(), runID: newRunID(), stale: cfg.LeaseStaleAfter}
 	return wk, nil
 }

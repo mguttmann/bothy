@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/OWNER/bothy/services/server/api/restclient"
 	"github.com/OWNER/bothy/services/server/cmd/bothy/importtool/discord"
 )
@@ -42,7 +40,7 @@ type walker struct {
 	p          *plan
 	dc         discordAPI
 	api        bothyAPI
-	src        uuid.UUID
+	src        restclient.Uuid
 	w          *writer
 	up         *uploader
 	log        *slog.Logger
@@ -54,9 +52,9 @@ type walker struct {
 	rep        *report
 
 	known    map[string]*refInfo
-	targets  map[string]uuid.UUID // origin key to the target of a posted item (structure and users)
-	skipped  map[string]bool      // origin keys the server skipped
-	userDone map[string]bool      // user keys posted (or counted in a dry run) in this run
+	targets  map[string]restclient.Uuid // origin key to the target of a posted item (structure and users)
+	skipped  map[string]bool            // origin keys the server skipped
+	userDone map[string]bool            // user keys posted (or counted in a dry run) in this run
 	present  time.Time
 }
 
