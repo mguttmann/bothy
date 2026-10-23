@@ -25,6 +25,7 @@ SAM = {"id": str(uuid7()), "kind": "user", "handle": "sam", "display_name": "Sam
 ROBIN = {"id": str(uuid7()), "kind": "user", "handle": "robin", "display_name": "Robin"}
 LOTSE = {"id": str(uuid7()), "kind": "agent", "handle": "lotse", "display_name": "Lotse"}
 IMPORTER = {"id": str(uuid7()), "kind": "app", "handle": "importer", "display_name": "Importer"}
+CHANNEL_ID = str(uuid7())
 
 ROLE = {"trigger": "user", "authorized": "user", "self": "assistant", "system": "other"}
 ORIGIN = {"self": "agent", "system": "system"}
@@ -64,6 +65,7 @@ def message(
         "role": ROLE.get(trust, "other"),
         "origin": ORIGIN.get(trust, "human"),
         "kind": "voice" if any("transcript" in a for a in attachments) else "text",
+        "channel_id": CHANNEL_ID,
         "content_md": content,
         "attachments": [dict(a) for a in attachments],
         "trust": trust,
