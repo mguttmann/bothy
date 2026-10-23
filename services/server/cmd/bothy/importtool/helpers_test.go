@@ -138,7 +138,7 @@ func (e *testEnv) env() Env {
 		SessionPath: func() (string, error) { return e.session, nil }, Clock: e.clk, Sleep: e.sleep,
 		LeaseSleep: func(ctx context.Context, _ time.Duration) error { <-ctx.Done(); return ctx.Err() },
 		Logger:     slog.New(slog.NewTextHandler(e.debug, &slog.HandlerOptions{Level: slog.LevelDebug})),
-		Bothy:      bothyapi.Deps{}, Discord: discord.Deps{Resolver: e.discord.Resolver, RootCAs: e.discord.RootCAs},
+		Bothy:      bothyapi.Deps{Clock: e.clk}, Discord: discord.Deps{Resolver: e.discord.Resolver, RootCAs: e.discord.RootCAs},
 		CDN:           discord.Deps{Resolver: e.cdn.Resolver, RootCAs: e.cdn.RootCAs},
 		DiscordEgress: e.discord.EgressConfig(), CDNEgress: e.cdn.EgressConfig(e.t), AfterBatch: e.hook}
 }

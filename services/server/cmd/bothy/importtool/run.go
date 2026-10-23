@@ -46,7 +46,8 @@ type Env struct {
 	Version string
 	// SessionPath returns the default session file (bothyapi.DefaultSessionPath).
 	SessionPath func() (string, error)
-	// Clock is the time of the lease; nil means clock.System().
+	// Clock is the time of the run lease and of the rate-limit guards of Discord and the CDN; nil
+	// means clock.System(). The Bothy client takes its clock from Bothy.Clock.
 	Clock clock.Clock
 	// Sleep waits for rate limits of Discord, the CDN and Bothy; nil means a timer.
 	Sleep Sleeper
@@ -54,7 +55,8 @@ type Env struct {
 	LeaseSleep Sleeper
 	// Logger receives the debug log of the clients; nil discards it.
 	Logger *slog.Logger
-	// Bothy are the network dependencies of the Bothy client (resolver, roots).
+	// Bothy are the dependencies of the Bothy client (resolver, roots, the clock of its DPoP
+	// proofs); its logger and sleeper come from this Env.
 	Bothy bothyapi.Deps
 	// Discord are the network dependencies of the Discord client.
 	Discord discord.Deps
@@ -318,8 +320,10 @@ func newBothy(ctx context.Context, cfg Config, sessionFile string, env Env) (*bo
 		}
 		path = p
 	}
+	// The client keeps its own clock (env.Bothy.Clock, nil for the system clock): the server checks
+	// the time in its DPoP proofs against its own clock, while env.Clock is the time of the lease.
 	deps := env.Bothy
-	deps.Clock, deps.Logger = env.clock(), env.logger()
+	deps.Logger = env.logger()
 	if env.Sleep != nil {
 		deps.Sleep = bothyapi.Sleeper(env.Sleep)
 	}

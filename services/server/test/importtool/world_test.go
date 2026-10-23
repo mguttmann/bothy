@@ -105,10 +105,9 @@ type world struct {
 	clk   *clock.Fake
 }
 
-// newWorld starts a server, seeds the people and starts the fakes. The fake clock starts at the
-// current time because the server checks the DPoP proofs of the tool, which carry the time of
-// this clock, against its own clock (auth.clock_leeway); a test only moves it forward by a few
-// windows of import.lease_stale_after, well inside that leeway.
+// newWorld starts a server, seeds the people and starts the fakes. The fake clock is the time of
+// the run lease only (Env.Clock); the Bothy client signs its DPoP proofs with the system clock,
+// which the server checks against its own, so a slow run never ages a proof.
 func newWorld(t *testing.T) *world {
 	t.Helper()
 	s := harness.Start(t, harness.Options{EgressDenyAll: true, Config: harness.RaisedRateLimits()})
