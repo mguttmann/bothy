@@ -5,13 +5,13 @@ package app_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/app"
 	"github.com/OWNER/bothy/services/server/internal/gateway/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // connections reads the presence of users through the view of e.
@@ -143,13 +143,8 @@ func TestPresence_DoesNotBlock(t *testing.T) {
 		got, _ := view.Connections(context.Background(), []ids.ID{alex.ID})
 		done <- got
 	}()
-	select {
-	case got := <-done:
-		if len(got[alex.ID]) != 1 {
-			t.Fatalf("presence %+v", got)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("Connections waited on a full connection")
+	if got := testkit.Receive(t, "Connections with a full connection queue", done); len(got[alex.ID]) != 1 {
+		t.Fatalf("presence %+v", got)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

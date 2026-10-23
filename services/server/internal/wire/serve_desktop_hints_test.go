@@ -12,6 +12,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/wstest"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -78,7 +79,7 @@ func TestServeAll_DesktopHintOverGateway(t *testing.T) {
 	marker(t, samC)
 
 	w.post(support.thread, "The export is back")
-	f, ok := nextHint(t, samC, 60*time.Second)
+	f, ok := nextHint(t, samC, testkit.Patience)
 	if !ok {
 		t.Fatal("no notification.created reached Sam's live desktop")
 	}
@@ -97,18 +98,11 @@ func TestServeAll_DesktopHintOverGateway(t *testing.T) {
 	w.post(support.thread, "And the import too")
 	var head int64
 	w.scan(`SELECT max(seq) FROM event_log`, &head)
-	deadline := time.Now().Add(60 * time.Second)
-	for {
+	testkit.Until(t, "the consumer push reaches the head of the log", func() bool {
 		var cursor int64
 		w.scan(`SELECT last_seq FROM event_consumer_cursors WHERE name = 'push'`, &cursor)
-		if cursor >= head {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the consumer push stayed at %d below %d", cursor, head)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return cursor >= head
+	})
 	var after int64
 	w.scan(`SELECT count(*) FROM jobs.river_job WHERE kind = 'notify.gateway_send'`, &after)
 	if after != before {
