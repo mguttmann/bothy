@@ -53,7 +53,7 @@ func TestMessagingMigration_Schema(t *testing.T) {
 		// Added by 00035 (M3-13); the vector is a stored generated column without a default.
 		{"search_language", "regconfig", false, "'simple'::regconfig"},
 		{"search_vector", "tsvector", false, ""},
-		// Added by 00059 (M3-07).
+		// Added by 00062 (M3-07).
 		{"has_attachments", "boolean", false, "false"},
 	}
 	if got := principalColumns(t, conn, "messages"); !reflect.DeepEqual(got, want) {
@@ -63,7 +63,7 @@ func TestMessagingMigration_Schema(t *testing.T) {
 	slices.Sort(cons)
 	wantCons := []string{
 		"CHECK (((deleted_at IS NULL) OR (content_md = ''::text)))",
-		// Added by 00059 and validated by 00060 (M3-07).
+		// Added by 00062 and validated by 00063 (M3-07).
 		"CHECK (((deleted_at IS NULL) OR (NOT has_attachments)))",
 		"CHECK (((kind <> 'system'::text) OR ((origin = 'system'::text) AND silent AND (content_md = ''::text))))",
 		"CHECK (((kind = 'run'::text) = (run_id IS NOT NULL)))",

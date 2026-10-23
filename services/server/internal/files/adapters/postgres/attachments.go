@@ -20,7 +20,7 @@ import (
 // Compile-time check: Repository is the port of the subscriber of chat.ThreadMoved (M3-07).
 var _ app.ThreadAttachments = (*Repository)(nil)
 
-// fileIDKey is the unique constraint on message_attachments(file_id) (migration 00058).
+// fileIDKey is the unique constraint on message_attachments(file_id) (migration 00061).
 const fileIDKey = "message_attachments_file_id_key"
 
 // uniqueViolation is the SQLSTATE of a unique violation.
