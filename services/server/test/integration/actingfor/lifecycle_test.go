@@ -126,8 +126,8 @@ func (w *lifecycleWorld) runInactive(e *env) {
 
 // foreignRun (brief "TestSR9_ForeignRunIsBound", design note 5): the owner makes Lotse the
 // operator of Engineering/Werkzeuge and triggers it there (run R2, started by Lotse with its own
-// token); finishRun(completed) of R2 with Alex's T answers 404 like an unknown run, without the
-// header 200.
+// token); patchRun and finishRun(completed) of R2 with Alex's T answer 404 like an unknown run,
+// without the header 200.
 func (w *lifecycleWorld) foreignRun(e *env) {
 	path := "/channels/" + e.w.Channels["Engineering/Werkzeuge"]
 	cur := e.must(e.owner, http.MethodGet, path, nil, http.StatusOK)
@@ -140,8 +140,13 @@ func (w *lifecycleWorld) foreignRun(e *env) {
 	}
 	e.ok(set, http.StatusOK, "setChannelOperator")
 	r2 := e.startedRun(e.owner, e.lotse, "Engineering/Werkzeuge", "Werkzeug bauen")
+	patch := e.statusPatch(r2.id, "Baue das Werkzeug")
+	got := e.do(e.lotse, http.MethodPatch, "/runs/"+r2.id, patch, w.main.token)
+	e.wantProblem(got, http.StatusNotFound, "not_found", "", "patchRun of R2 with T")
+	e.sameAnswer(got, e.do(e.lotse, http.MethodPatch, "/runs/"+ids.New().String(), patch, w.main.token), "patchRun of R2 with T")
+	e.ok(e.do(e.lotse, http.MethodPatch, "/runs/"+r2.id, patch), http.StatusOK, "patchRun of R2 without the header")
 	finish := map[string]any{"state": "completed"}
-	got := e.do(e.lotse, http.MethodPost, "/runs/"+r2.id+"/finish", finish, w.main.token)
+	got = e.do(e.lotse, http.MethodPost, "/runs/"+r2.id+"/finish", finish, w.main.token)
 	unknown := e.do(e.lotse, http.MethodPost, "/runs/"+ids.New().String()+"/finish", finish, w.main.token)
 	e.wantProblem(got, http.StatusNotFound, "not_found", "", "finishRun of R2 with T")
 	e.sameAnswer(got, unknown, "finishRun of R2 with T")
@@ -150,8 +155,8 @@ func (w *lifecycleWorld) foreignRun(e *env) {
 
 // finishAfterRevocation (brief "TestSR9_FinishOwnRunAfterRevocation"): the owner revokes G-1, the
 // run gets run.cancel_requested with access_revoked (M2-09); a Support message outside the run's
-// thread answers 404 with T, and finishRun(cancelled, access_revoked) of the own run with T
-// answers 200 (exception run.finish).
+// thread answers 404 with T, while patchRun (exception run.update, M2-10) and
+// finishRun(cancelled, access_revoked) of the own run with T answer 200 (exception run.finish).
 func (w *lifecycleWorld) finishAfterRevocation(e *env) {
 	e.revoke(e.w.Grants["G-1"])
 	e.eventually("run.cancel_requested of the run", func() bool {
@@ -161,6 +166,8 @@ func (w *lifecycleWorld) finishAfterRevocation(e *env) {
 	got := e.do(e.lotse, http.MethodGet, "/messages/"+e.w.Messages["Support/Allgemein"][0], nil, w.main.token)
 	e.wantProblem(got, http.StatusNotFound, "not_found", "", "getMessage outside the run's thread after the revocation")
 	e.sameAnswer(got, e.do(e.lotse, http.MethodGet, "/messages/"+ids.New().String(), nil, w.main.token), "getMessage after the revocation")
+	e.ok(e.do(e.lotse, http.MethodPatch, "/runs/"+w.main.id, e.statusPatch(w.main.id, "Breche ab"), w.main.token), http.StatusOK,
+		"patchRun of the own run with T after the revocation")
 	m := e.ok(e.do(e.lotse, http.MethodPost, "/runs/"+w.main.id+"/finish", map[string]any{"state": "cancelled", "reason": "access_revoked"},
 		w.main.token), http.StatusOK, "finishRun of the own run with T")
 	if m["state"] != "cancelled" {
@@ -194,4 +201,13 @@ func (w *lifecycleWorld) writes(e *env) {
 		http.StatusCreated, "the reply in the run's own thread with T")
 	e.wantProblem(e.do(e.lotse, http.MethodPost, "/threads/"+e.w.Threads["Support/Allgemein"]+"/messages", msg("Fremder Thread"), run.token),
 		http.StatusForbidden, "forbidden", "acting_for_insufficient", "createMessage in another Support thread with T")
+}
+
+// statusPatch is a patchRun body (M2-10) that sets the status line of run on its current version,
+// read without the header (the owner of the run is the agent).
+func (e *env) statusPatch(run, line string) map[string]any {
+	e.t.Helper()
+	cur := e.ok(e.do(e.lotse, http.MethodGet, "/runs/"+run, nil), http.StatusOK, "getRun")
+	return map[string]any{"base_version": cur["version"],
+		"ops": []any{map[string]any{"op": "replace", "path": "/status_line", "value": line}}}
 }
