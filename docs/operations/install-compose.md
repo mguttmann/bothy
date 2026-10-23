@@ -159,7 +159,8 @@ docker compose -f compose.yaml -f compose.multi-node.yaml up -d
 5. `edge` restarts when an api node is recreated (for example by an upgrade), because nginx
    resolves the node names only at start.
 6. Both api nodes share the key store volume `signing-keys` (ADR 0066) and run with
-   `cluster.mode = multi`, as the worker does.
+   `cluster.mode = multi`, as the worker does. What crosses the nodes and how failures show is
+   in [multi-node.md](multi-node.md).
 7. The idle timeouts of `edge` follow the defaults of `terminal.idle_timeout` plus
    `terminal.idle_grace` on the stream paths and of `terminal.host_heartbeat_interval` times
    `terminal.host_heartbeat_miss_limit` elsewhere. If you change these keys, change

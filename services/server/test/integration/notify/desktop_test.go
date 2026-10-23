@@ -425,10 +425,11 @@ func TestFlushHintOverGateway(t *testing.T) {
 	}
 }
 
-// TestRoleWorker_PushOnly (design note 1): wired as role worker (presence.None and the fail-closed
-// routes of M3-19), a desktop that is live on a separate api process is invisible: the phone gets
-// an immediate push and no notify.gateway_send exists. The wiring and its Info line are tested in
-// internal/wire (TestWirePresence_ByRole).
+// TestRoleWorker_PushOnly (design note 1): a push path without presence (presence.None and the
+// fail-closed routes of M3-19) sees no desktop: the phone gets an immediate push and no
+// notify.gateway_send exists. Since M7-17 role worker reads gateway_presence instead; that wiring
+// is tested in internal/wire (TestWirePresence_ByRole) and test/gateway/multinode
+// (TestDesktopHintWithSeparateWorker).
 func TestRoleWorker_PushOnly(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)

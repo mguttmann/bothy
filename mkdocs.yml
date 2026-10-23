@@ -194,6 +194,7 @@ nav:
   - Operations:
       - Configuration: operations/configuration.md
       - Installation with Compose: operations/install-compose.md
+      - Several api nodes: operations/multi-node.md
       - Backup and restore: operations/backup-restore.md
       - Emergency: operations/disaster-recovery.md
       - Moving to the cloud: operations/cloud-migration.md

@@ -543,6 +543,28 @@ reasons):
   HD10 fails with `peer_check_unavailable` and the host gives no terminal (RK-23); the operator
   waits for a release with the recorded platform run.
 
+### 4.5 Several api nodes (M7-17)
+
+Level 2 of the scaling path ([02-architecture.md](02-architecture.md), section 16):
+
+1. All api nodes and the worker run with `cluster.mode = multi` on one database and one key store
+   of the signing keys (5.2). The channel `ephemeral` carries typing, live box updates, agent
+   presence, the replacement of a device connection, the takeover of an agent consumer and the
+   hints of the worker between the processes (02 11.6); `gateway_presence` holds the live
+   connections that the worker's push decision reads (13 12 point 4).
+2. The edge needs no sticky sessions: REST and `/api/v1/gateway` may land on any node, a
+   reconnect on another node continues with `identify` and catch-up, and a second connection of
+   the same device or agent consumer on another node closes the older one with `4017` or `4015`.
+   Only the two stream paths of a terminal session are routed by the hash of 4.4 (R-OP-19).
+3. Rate limits are buckets per process (02 16): with `n` api nodes up to `n` times each value
+   applies. The operator divides the `ratelimit.*` values by the node count or lets the edge keep
+   a client on one node.
+4. Rolling updates replace one api node after the other; migrations follow expand and contract
+   (section 10). A stopped node deletes its rows of `gateway_presence`; a crashed one's rows are
+   ignored after `cluster.presence_ttl`.
+5. The guide is [docs/operations/multi-node.md](../operations/multi-node.md); the Compose
+   example is the overlay `infra/compose/compose.multi-node.yaml`.
+
 ## 5. Configuration and secrets
 
 ### 5.1 Configuration (ADR 0011)
@@ -628,6 +650,17 @@ in `secrets.signing_key_dir` (directory owned by the service user, mode `0700`, 
 `0600`) via `Put` of the file driver; every other reference stays read-only ([ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md),
 [19-security.md](19-security.md) section 10). Reason: scheduled and emergency rotation
 need new keys without manual work on the host.
+
+Several processes of one instance (separate `api` and `worker`, several api nodes; M7-17,
+docs/decisions.d/M7-17.md D-M7-17-8) use one key store: every process reads and writes the same
+`secrets.signing_key_dir`, and a key rotated by one process is used by every other within
+`signing_key.cache_ttl`. Per target: Compose mounts the one named volume of the key store into
+`api`, `api-2` and `worker` (`infra/compose/compose.multi-node.yaml` extends the service `api`,
+so `api-2` gets the same volumes); on a generic VM all processes run on the host with the same
+directory; a target that runs the processes on several hosts needs a shared file system with
+POSIX permissions for that directory (for example NFS with the service user's UID) or one host
+for all api and worker processes. A key store per process is not supported: a token signed by
+one node would fail on the others.
 
 ### 5.3 Secrets in the Compose stack
 

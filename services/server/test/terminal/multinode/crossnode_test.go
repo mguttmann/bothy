@@ -178,8 +178,9 @@ func TestCrossNode_ForgedSignalOpensNothing(t *testing.T) {
 }
 
 // TestCrossNode_SingleModeSendsNoNotify: one node with cluster.mode single: open, attach and close
-// work as M2-44's tests expect; the test listener receives nothing and no backend runs with the
-// application name of the terminal listener.
+// work as M2-44's tests expect and the test listener receives nothing. The node runs in role api,
+// so it holds the one LISTEN ephemeral connection of the process for the hints of a separate
+// worker (M7-17, D-M7-17-7), without a route of the terminal.
 func TestCrossNode_SingleModeSendsNoNotify(t *testing.T) {
 	t.Parallel()
 	c := newCluster(t, "single")
@@ -199,9 +200,9 @@ func TestCrossNode_SingleModeSendsNoNotify(t *testing.T) {
 	if p := c.listen.all(); len(p) != 0 {
 		t.Fatalf("%d notifications with one node", len(p))
 	}
-	if n := c.count(`SELECT count(*) FROM pg_stat_activity WHERE application_name = 'bothy-terminal-ephemeral' AND datname = current_database()`); n != 0 {
-		t.Fatalf("%d listener backends with one node", n)
-	}
+	c.eventually("the one listener backend of the node in role api", func() bool {
+		return c.count(`SELECT count(*) FROM pg_stat_activity WHERE application_name = 'bothy-ephemeral' AND datname = current_database()`) == 1
+	})
 }
 
 // hashedTo opens sessions through A until one hashes to node; the others are closed.

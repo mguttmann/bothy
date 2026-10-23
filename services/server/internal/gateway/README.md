@@ -4,7 +4,8 @@ Status: connection and session built (M1-64); delivery of durable events, catch-
 WebSocket, revocation of open connections and the shutdown close built (M1-65); focus, typing and
 the ephemeral publisher built (M1-66); agent consumers with the op `ack` built (M2-07); the relay of
 autocomplete requests and the op `command.autocomplete_result` built (M2-17); frame
-conformance, gate G9, built (M1-67).
+conformance, gate G9, built (M1-67); several api nodes (signals on the channel `ephemeral`,
+`4017` and `4015` across nodes, the shared presence `gateway_presence`) built (M7-17).
 Normative are [docs/spec/04-sync-protocol.md](../../../../docs/spec/04-sync-protocol.md) section 6
 and [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); on any difference the
 chapters win. Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-64, M1-65, M1-66 and M1-67.
@@ -305,13 +306,47 @@ for `validation_failed`, `forbidden`, `not_found`, `conflict`, `base_version_con
 - Presence is an internal fact of the hint decision of `notify`: it is never sent to another
   person and appears in no event, log or metric (OQ-06).
 - Role wiring (`internal/wire`, docs/decisions.d/M3-23.md D-M3-23-1): only role `all` passes the view to
-  the push path, because only there the hub and the consumer `push` share the process; role
-  `worker` uses `presence.None`. With several api nodes the view sees its own node only (RK-37,
-  M7-17).
+  the push path, because only there the hub and the consumer `push` share the process. Since
+  M7-17 role `worker` and role `all` with `cluster.mode = multi` read `gateway_presence` instead
+  (see "Several api nodes").
 - `notification.created` is registered as a personal ephemeral type with the receive action
   `push.deliver`; its candidates are the connections of the audience. `sync.Admit` admits a hint
   with resource `thread` through `push.deliver` on the thread and a hint without a thread
   (resource `user`) only on connections of that person (D-M3-23-6).
+
+## Several api nodes (M7-17)
+
+docs/spec/02-architecture.md 11.6 and 16, docs/decisions.d/M7-17.md.
+
+- Signals: `domain/cluster.go` encodes and decodes the gateway signals on the channel
+  `ephemeral` (kind with prefix `gateway.`, the node, IDs, the run version and lower-case codes,
+  never a text; strict decoding, a foreign kind such as the terminal's is ignored).
+  `app.Cluster` is the publisher decorator (`Publisher`: local first, then a signal for
+  `typing.started`, `run.updated`, `agent.presence_changed` and `notification.created`), the
+  sender of the device and consumer signals (`app.ClusterSignals`), and the gateway's route of
+  the one `LISTEN ephemeral` connection of the process (`platform/pg.EphemeralListener`): it
+  ignores its own node and rebuilds each signal for the hub (typing with the place of the thread
+  and `expires_at`, hints with the audience), the coalescer (`run.updated` with snapshot), the
+  sessions (`4017`) or the consumer engine (`4015`).
+- Device replacement: `Sessions.bind` gives every binding of a device a UUIDv7 bind ID;
+  `Gateway.DeviceTaken` closes the local connection of the device with `4017` when it belongs to
+  another session and its binding is older.
+- Consumer fencing: `ConsumerEngine.Fence` saves the held acknowledgement of every local
+  connection of the agent that is not the new holder at once with the guarded statement of
+  `agents` and closes it with `4015` when the row is gone.
+- Shared presence: `app.PresenceWriter` writes `Hub.PresenceRows` (one row per counted
+  connection, the rule of "Presence for the hint decision") into `gateway_presence` every
+  `cluster.presence_flush_interval` (an upsert with a fresh `updated_at`, the delete of ended
+  rows and of every node's rows older than `cluster.presence_ttl`) and deletes the node's rows
+  in its stop step; a failed write is logged and counted
+  (`bothy.gateway.presence.write_failures`). `adapters/postgres` holds the store, the
+  table-backed `presence.View` (`PresenceView`, the newest fresh row per device) and the
+  `pg_notify` sender.
+- Wiring (`internal/wire/gateway_cluster.go`, `GatewayPlan`): role `all` with `single` runs none
+  of it; role `api` always listens and writes presence and sends signals with `multi`; role
+  `worker` reads the table and sends hints; role `all` with `multi` does everything.
+- `command.autocomplete_requested` stays on its node (it carries a token); without a connection
+  of the agent on that node the request ends with an empty result.
 
 ## Metrics (M1-68)
 
@@ -383,7 +418,8 @@ resumable for `sync.resume_window`; the sweeper runs every `sync.resume_window`.
 `ratelimit.rl.read.burst`, `ratelimit.rl.typing.per_minute`, `ratelimit.rl.typing.burst`,
 `agent.ack_timeout`, `agent.ack_persist_interval`, `agent.max_inflight_events`,
 `ratelimit.rl.agent_runtime.per_minute`, `ratelimit.rl.agent_runtime.burst`,
-`sync.run_patch_coalesce_interval` (M2-10); the DPoP windows
+`sync.run_patch_coalesce_interval` (M2-10), `cluster.mode`, `cluster.presence_flush_interval`,
+`cluster.presence_ttl` (M7-17); the DPoP windows
 `auth.dpop_nonce_ttl` and `auth.clock_leeway` apply through identity.
 
 ## Dependencies
@@ -402,7 +438,8 @@ instance row, the threads of chat and the hub, which is also the process's `Ephe
 
 ## Tables
 
-`gateway_presence` (03-data-model.md, section 4.16, R-DM-51; built by PLAN M7-17).
+`gateway_presence` (03-data-model.md, section 4.16, R-DM-51; migration
+`00061_gateway_presence.sql`, built by M7-17).
 
 Only this module writes and reads this table via SQL (03-data-model.md, principle 12); for everything else it reads through the ports of other modules.
 
@@ -415,7 +452,8 @@ Only this module writes and reads this table via SQL (03-data-model.md, principl
 ## Events and WebSocket ops
 
 - Durable: none.
-- Ephemeral: `typing.started`.
+- Ephemeral: `typing.started`; across nodes the internal signals `gateway.*` on the channel
+  `ephemeral` (no event types of 05).
 - WebSocket ops (client to server): `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop`.
 
 ## Enabled ops
@@ -425,6 +463,10 @@ M1-64 enables `identify`, `resume`, `heartbeat` and `reauth`; M1-66 enables `foc
 coalesces the `run.updated` of `runs`.
 
 ## Not proven here
+
+- Several api nodes run in the integration tests as two in-process servers and a worker behind an
+  in-process edge (`test/gateway/multinode`); a real load balancer and more than two api nodes
+  are not tested.
 
 - The heartbeat and expiry tests run with windows of seconds; their margins under heavy load are
   not measured.

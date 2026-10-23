@@ -137,8 +137,9 @@ type Deps struct {
 	// TerminalSignals wraps the signals of the terminal module (M2-47); a test wraps the NOTIFY
 	// signals to fail a unit after its signal was staged. nil in production.
 	TerminalSignals func(terminalapp.Signals) terminalapp.Signals
-	// TerminalListenerGate runs before every dial of the LISTEN ephemeral connection (M2-47); a
-	// test blocks it to keep a node deaf after it ended the listener's backend. nil in production.
+	// TerminalListenerGate runs before every dial of the LISTEN ephemeral connection (M2-47; the
+	// one connection of the process, shared by the terminal and the gateway since M7-17); a test
+	// blocks it to keep a node deaf after it ended the listener's backend. nil in production.
 	TerminalListenerGate func(ctx context.Context) error
 	// TerminalMetrics replaces the instruments of the relay (M2-47): two nodes in one test process
 	// count bothy.terminal.relay.unpaired apart. nil creates the OpenTelemetry adapter.

@@ -145,7 +145,7 @@ func TestCrossNode_DuplicateControlConnection(t *testing.T) {
 		a := c.n(nodeA)
 		a.gate.close()
 		c.terminateListeners()
-		c.eventually("A deaf", func() bool { return len(a.logs.records("terminal ephemeral listener lost")) > 0 })
+		c.eventually("A deaf", func() bool { return len(a.logs.records("ephemeral listener lost")) > 0 })
 		c.connectHost(nodeB, host, key)
 		time.Sleep(500 * time.Millisecond)
 		if c.count(`SELECT count(*) FROM hosts WHERE id = $1 AND state = 'active'`, host.String()) != 1 {
@@ -185,7 +185,7 @@ func (c *cluster) openOnHost(node string, host ids.ID) grantBody {
 func (c *cluster) terminateListeners() {
 	c.t.Helper()
 	if _, err := c.n(nodeA).srv.AdminDB().Exec(context.Background(), `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-		WHERE application_name = 'bothy-terminal-ephemeral' AND datname = current_database()`); err != nil {
+		WHERE application_name = 'bothy-ephemeral' AND datname = current_database()`); err != nil {
 		c.t.Fatal(err)
 	}
 }
@@ -252,7 +252,7 @@ func TestCrossNode_ListenerLossReconciles(t *testing.T) {
 	a := c.n(nodeA)
 	a.gate.close()
 	c.terminateListeners()
-	c.eventually("A deaf", func() bool { return len(a.logs.records("terminal ephemeral listener lost")) == 1 })
+	c.eventually("A deaf", func() bool { return len(a.logs.records("ephemeral listener lost")) == 1 })
 	c.setState(nodeB, c.host, "disabled")
 	c.closeCode("device", func() (int, string) { return d.CloseCode(ctx) }, int(domain.StreamTerminalClosed), "host_disabled")
 	c.closeCode("host data", func() (int, string) { return dc.CloseCode(ctx) }, int(domain.StreamTerminalClosed), "host_disabled")
@@ -265,8 +265,8 @@ func TestCrossNode_ListenerLossReconciles(t *testing.T) {
 	}
 	a.gate.release()
 	c.controlClose("after the reconnect", h, int(domain.CodeHostDisabled))
-	c.eventually("restored", func() bool { return len(a.logs.records("terminal ephemeral listener restored")) == 1 })
-	if n := len(a.logs.records("terminal ephemeral listener lost")); n != 1 {
+	c.eventually("restored", func() bool { return len(a.logs.records("ephemeral listener restored")) == 1 })
+	if n := len(a.logs.records("ephemeral listener lost")); n != 1 {
 		t.Fatalf("%d lost records", n)
 	}
 }
