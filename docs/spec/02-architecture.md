@@ -1473,7 +1473,7 @@ the target is "unchecked" (tickets). [ADR 0063](../adr/0063-performance-gate-for
 | `perf.ws_idle_conn_mem_max` | memory per idle connection | `perf/ws_soak` |
 | `perf.idle_rss_max` | memory of an `all` process without load | `perf/startup` |
 | `perf.startup_ready_max` | start to `ready` without migrations | `perf/startup` |
-| `perf.push_handoff_p95` | commit to handoff to the push service (fake) | `perf/push_handoff` |
+| `perf.push_handoff_p95` | commit to handoff to the push service (fake); measured from `occurred_at` of the transaction of a message that mentions the recipient (an upper bound of the commit, 13 section 9 t0) to the `200` of Fake-APNs (t1), for `mention` hints under `perf.sustained_messages_per_s`, with the server in the test process (`perf/README.md`) | `perf/push_handoff` |
 
 ## 18. Modules and chapters 06 to 23
 
@@ -1604,7 +1604,7 @@ the limits of outbound calls (`egress.*`) are listed in [19-security.md](19-secu
 | `shutdown.telemetry_flush_timeout` | Server | `5s` | flushing telemetry |
 | `shutdown.total_timeout` | Server | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) |
 | `perf.reference_profile` | Load test | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |
-| `perf.sustained_messages_per_s` | Load test | `200` | sustained load for `perf.message_create_p99` |
+| `perf.sustained_messages_per_s` | Load test | `200` | sustained load for `perf.message_create_p99`; also the load of `perf.push_handoff_p95` |
 | `perf.message_create_p99` | Load test | `150ms` | target |
 | `perf.event_commit_min_per_s` | Load test | `1000` | target (minimum) |
 | `perf.fanout_local_p99` | Load test | `200ms` | target |

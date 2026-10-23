@@ -1,6 +1,6 @@
 # Load tests of the server core (`services/server/perf`)
 
-Status: built (M1-16 `event_commit`, M1-72 everything else). Component `testsupport` (M1-05),
+Status: built (M1-16 `event_commit`, M3-24 `push_handoff`, M1-72 everything else). Component `testsupport` (M1-05),
 never imported by production code, left out of the Go coverage total.
 
 `make perf` runs these tests and the chaos tests of `test/chaos` with the build tag `perf`, one
@@ -67,6 +67,7 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 | `ws_soak` | `TestPerf_WSConnectionsPerNode` | `perf.ws_connections_per_node`, `perf.ws_idle_conn_mem_max` | `settle`, `intervals`, `ackGrace`, `fdReserve` |
 | `startup` | `TestPerf_StartupReadyAndIdleRSS` | `perf.startup_ready_max`, `perf.idle_rss_max` | `starts`, `idleSettle` |
 | `event_commit` | `TestEventCommitThroughput` | `perf.event_commit_min_per_s` | flags `perf.writers`, `perf.duration` |
+| `push_handoff` | `TestPerf_PushHandoffP95` | `perf.push_handoff_p95` under `perf.sustained_messages_per_s` | `BudgetShare`, `SendersPerChannel`, `RecipientsPerChannel`, `MentionEvery`, `MentionsPerMessage`, `Warmup`, `Window`, `Drain`, `MinSamples`, `LagSampleEvery` (section `push_handoff`) |
 
 - `load_messages`: open-loop arrivals at `perf.sustained_messages_per_s`, spread over as many
   senders as keep each one at `headroom` of `ratelimit.rl.message.per_minute`, into the main
@@ -97,6 +98,60 @@ path, as clients behind the reverse proxy of a deployment do, so the per-address
 - `event_commit`: durable events per second with the counter pattern in this process (M1-16); in
   emulated mode with `GOMAXPROCS` and container limits of the profile. The second subtest with an
   idle River worker only stores its rate in `extra`.
+
+## `push_handoff`
+
+`TestPerf_PushHandoffP95` (M3-24) measures "commit to handoff to the push service (fake)": the
+time from the commit of a message that mentions a person to the moment Fake-APNs accepts the push
+for that person's device with `200`.
+
+- Measuring points (13 section 9): t0 is `occurred_at` of the `message.created` event of the
+  mention, the time of its transaction, read after the run in one read-only query; it lies at or
+  before the commit, so each sample is an upper bound. t1 is `apnstest.Request.AcceptedAt`, taken
+  after the Fake read the request and verified the JWT, right before it writes `200`. Each sample
+  is t1 minus t0, corrected by the clock offset between database and host
+  (`report.ClockOffset`); one sample per mention message scheduled in the window and per mentioned
+  recipient; the value is the nearest-rank p95.
+- The server runs in the test process (`harness.Start` with `Options.APNsFake` and
+  `Options.DurableDB`), because only Go values (`wire.Deps.APNsEndpoints`, `wire.Deps.APNsRootCAs`)
+  point the wired APNs adapter at the Fake; APNs is enabled through `push.apns.team_id`,
+  `push.apns.key_id`, `push.apns.private_key_ref` (a P-256 key generated per run) and
+  `push.apns.topics`. In mode `emulated` the test sets `GOMAXPROCS` of the profile and the
+  container limits; the load generator and Fake-APNs share the CPUs with the server, so the value
+  is an upper bound of the server's own time (`extra` says so).
+- World (`perf/internal/pushworld`): one space, `channels` text channels, `senders` with `write`
+  and `recipients` with `read` on their channel, the level `mentions` per recipient on its channel
+  (`putNotificationPreference`) and one `apns` registration per recipient, written as a fixture
+  row because `registerPush` is not part of the measured path. Every `ratelimit.*` key is raised
+  for the seeding except `ratelimit.rl.message.per_minute` and `.burst`, which keep their defaults;
+  the seeding sends no message, and the measured path after the commit uses no rate-limit class.
+  No recipient opens a gateway connection or reads.
+- Load (`perf/internal/pushhandoff`): open-loop sends (`perfkit.Schedule`) at
+  `perf.sustained_messages_per_s`, round robin over the senders, each into the main thread of its
+  channel; every `MentionEvery`-th message mentions `MentionsPerMessage` recipients of its channel,
+  round robin per channel, by handle in `content_md` and in `mention_ids`. The plan derives
+  senders = ceil(rate / (`BudgetShare` x `ratelimit.rl.message.per_minute` / 60)), channels =
+  ceil(senders / `SendersPerChannel`), recipients = channels x `RecipientsPerChannel`.
+- Parameters: `BudgetShare` 0.5, `SendersPerChannel` 10, `RecipientsPerChannel` 4,
+  `MentionEvery` 10, `MentionsPerMessage` 2, `Warmup` 30 s, `Window` 3 min, `Drain` 30 s,
+  `MinSamples` 1000, `LagSampleEvery` 1 s. At their defaults the value holds for
+  `consumer.batch_size`, `consumer.poll_interval`, `jobs.queue.delivery.max_workers`,
+  `push.max_concurrent_requests`, `push.max_age`, `push.ttl`, `push.apns.jwt_refresh_interval`,
+  `notify.coalesce_window` and `egress.timeout`.
+- Failure conditions besides the threshold (`pushhandoff.Check`): an answer of `createMessage`
+  other than `201`; an expected pair of the window without a request after `Drain`; two requests
+  for one pair or with one `nid`; a request that does not decode strictly, whose `b.m` is no
+  mention message of the run, whose token belongs to no seeded registration, whose recipient was
+  not mentioned, whose `b.k` is not `mention`, whose `b.t` or `apns-collapse-id` is not the main
+  thread of the message, or whose `aps.badge` is missing or below one; a badge sync request; the
+  per-run canary of `content_md` in any body or header; a Fake answer other than `200`; a
+  registration with `disabled_at` or `failure_count` above zero after `Drain`; fewer than
+  `MinSamples` samples. Messages name counts, message and registration IDs, never tokens.
+- `extra`: `push_handoff.params` (the constants and plan counts), achieved message and mention
+  rates, expected, received and matched pushes, p50, p99 and maximum in ms, the largest and the
+  mean lag of the consumer `push` (`max(event_log.seq)` minus its `last_seq`, sampled every
+  `LagSampleEvery`), `GOMAXPROCS`, the clock offset and the note on shared CPUs. A large lag
+  points at the consumer round, a small lag with high values at the job and the adapter.
 
 ## `database.max_conns`
 
