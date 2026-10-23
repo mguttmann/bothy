@@ -141,6 +141,7 @@ import 'package:api_client/src/generated/model/cost_reconcile.dart';
 import 'package:api_client/src/generated/model/cost_reconcile_result.dart';
 import 'package:api_client/src/generated/model/cost_report.dart';
 import 'package:api_client/src/generated/model/cost_series.dart';
+import 'package:api_client/src/generated/model/cost_total.dart';
 import 'package:api_client/src/generated/model/credential_holder_set.dart';
 import 'package:api_client/src/generated/model/credential_overview.dart';
 import 'package:api_client/src/generated/model/csp_report_legacy.dart';
@@ -568,6 +569,7 @@ import 'package:api_client/src/generated/model/thread_title_hit_list_items_inner
 import 'package:api_client/src/generated/model/thread_title_put.dart';
 import 'package:api_client/src/generated/model/thread_updated_event.dart';
 import 'package:api_client/src/generated/model/thumbnail.dart';
+import 'package:api_client/src/generated/model/token_counts.dart';
 import 'package:api_client/src/generated/model/token_refresh_request.dart';
 import 'package:api_client/src/generated/model/token_response.dart';
 import 'package:api_client/src/generated/model/tool_class.dart';
@@ -742,6 +744,7 @@ part 'serializers.g.dart';
   CostReconcileResult,
   CostReport,
   CostSeries,
+  CostTotal,
   CredentialHolderSet,
   CredentialOverview,
   CspReportLegacy,
@@ -1171,6 +1174,7 @@ part 'serializers.g.dart';
   ThreadTitlePut,
   ThreadUpdatedEvent,
   Thumbnail,
+  TokenCounts,
   TokenRefreshRequest,
   TokenResponse,
   ToolClass,
@@ -1667,6 +1671,10 @@ Serializers serializers =
             () => ListBuilder<CostBucket>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(CostTotal)]),
+            () => ListBuilder<CostTotal>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(ClientMetricBucketsInner)]),
             () => ListBuilder<ClientMetricBucketsInner>(),
           )
@@ -1681,6 +1689,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(HostDoctorCheck)]),
             () => ListBuilder<HostDoctorCheck>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(Money)]),
+            () => ListBuilder<Money>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(HostReportedSessionUser)]),

@@ -37,7 +37,7 @@ class StatsApi {
   const StatsApi(this._dio, this._serializers);
 
   /// End the validity of a price
-  ///
+  /// Sets &#x60;valid_to&#x60; of an open row, the only change a row ever gets (R-DM-23). The same end again answers 200 without change. 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;price_closed&#x60; when the row is already closed with another end (a closed row is never reopened or moved; a gap is filled by a new row), &#x60;price_in_use&#x60; when a &#x60;computed&#x60; cost entry at or after the new end used the row.
   ///
   /// Parameters:
   /// * [priceId]
@@ -152,7 +152,7 @@ class StatsApi {
   }
 
   /// Add a price with source
-  ///
+  /// Owner with step-up, audited with row, source and retrieval time (10, 14). &#x60;source_url&#x60; is an absolute https URL without user info and fragment, &#x60;retrieved_at&#x60; not in the future, &#x60;currency&#x60; an ISO 4217 code. 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;price_overlap&#x60; when the validity overlaps a row of the same provider, model and unit, &#x60;price_currency_mismatch&#x60; when an overlapping row of the same provider and model has another currency (one currency per price set).
   ///
   /// Parameters:
   /// * [priceCreate]
@@ -1002,7 +1002,7 @@ class StatsApi {
   }
 
   /// Costs of a thread per run
-  ///
+  /// Valid cost entries of the thread (entries no correction supersedes), whatever channel they were booked in, per run (by &#x60;run_id&#x60; ascending, unpaginated) and summed per billing mode and currency without conversion. &#x60;tokens&#x60; are always present; amounts of runs in mode &#x60;personal&#x60; (their &#x60;costs&#x60; and their totals) appear only when the server key &#x60;billing.show_personal_estimates&#x60; is on (10, 12.2). Never a person: costs stand per run (20, 9). Without read on the thread the same 404 as for an unknown thread. A thread without entries answers empty lists.
   ///
   /// Parameters:
   /// * [threadId]
@@ -1443,7 +1443,7 @@ class StatsApi {
   }
 
   /// List prices
-  ///
+  /// Every row of the price table, closed ones included, ordered by &#x60;provider&#x60;, &#x60;model&#x60;, &#x60;unit&#x60;, &#x60;valid_from&#x60; and &#x60;id&#x60;; &#x60;valid_to&#x60; is absent while a row is open. A small unpaginated list (06, 6 point 6). Owner only; an owner&#39;s personal token gets 403.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation

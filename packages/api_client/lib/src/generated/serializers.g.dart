@@ -179,6 +179,7 @@ Serializers _$serializers =
           ..add(CostReconcileResult.serializer)
           ..add(CostReport.serializer)
           ..add(CostSeries.serializer)
+          ..add(CostTotal.serializer)
           ..add(CredentialHolderSet.serializer)
           ..add(CredentialOverview.serializer)
           ..add(CspReportLegacy.serializer)
@@ -714,6 +715,7 @@ Serializers _$serializers =
           ..add(ThreadUpdatedEventTypeEnum.serializer)
           ..add(Thumbnail.serializer)
           ..add(ThumbnailVariantEnum.serializer)
+          ..add(TokenCounts.serializer)
           ..add(TokenRefreshRequest.serializer)
           ..add(TokenResponse.serializer)
           ..add(TokenResponseTokenTypeEnum.serializer)
@@ -1049,6 +1051,14 @@ Serializers _$serializers =
             () => ListBuilder<CostReport>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(CostTotal)]),
+            () => ListBuilder<CostTotal>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(RunCost)]),
+            () => ListBuilder<RunCost>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Device)]),
             () => ListBuilder<Device>(),
           )
@@ -1256,6 +1266,10 @@ Serializers _$serializers =
             () => ListBuilder<MessageRevision>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(Money)]),
+            () => ListBuilder<Money>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [
               const FullType(NotificationPreference),
             ]),
@@ -1344,10 +1358,6 @@ Serializers _$serializers =
               const FullType(RunContextMessage),
             ]),
             () => ListBuilder<RunContextMessage>(),
-          )
-          ..addBuilderFactory(
-            const FullType(BuiltList, const [const FullType(RunCost)]),
-            () => ListBuilder<RunCost>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [

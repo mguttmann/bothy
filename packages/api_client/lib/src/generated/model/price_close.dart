@@ -8,7 +8,7 @@ import 'package:built_value/serializer.dart';
 
 part 'price_close.g.dart';
 
-/// PriceClose
+/// The new end of the validity, after `valid_from`.
 ///
 /// Properties:
 /// * [validTo] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.

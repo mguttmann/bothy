@@ -10,7 +10,7 @@ class _$CostBreakdown extends CostBreakdown {
   @override
   final String threadId;
   @override
-  final Money total;
+  final BuiltList<CostTotal> totals;
   @override
   final BuiltList<RunCost> runs;
 
@@ -19,7 +19,7 @@ class _$CostBreakdown extends CostBreakdown {
 
   _$CostBreakdown._({
     required this.threadId,
-    required this.total,
+    required this.totals,
     required this.runs,
   }) : super._();
   @override
@@ -34,7 +34,7 @@ class _$CostBreakdown extends CostBreakdown {
     if (identical(other, this)) return true;
     return other is CostBreakdown &&
         threadId == other.threadId &&
-        total == other.total &&
+        totals == other.totals &&
         runs == other.runs;
   }
 
@@ -42,7 +42,7 @@ class _$CostBreakdown extends CostBreakdown {
   int get hashCode {
     var _$hash = 0;
     _$hash = $jc(_$hash, threadId.hashCode);
-    _$hash = $jc(_$hash, total.hashCode);
+    _$hash = $jc(_$hash, totals.hashCode);
     _$hash = $jc(_$hash, runs.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -52,7 +52,7 @@ class _$CostBreakdown extends CostBreakdown {
   String toString() {
     return (newBuiltValueToStringHelper(r'CostBreakdown')
           ..add('threadId', threadId)
-          ..add('total', total)
+          ..add('totals', totals)
           ..add('runs', runs))
         .toString();
   }
@@ -66,9 +66,10 @@ class CostBreakdownBuilder
   String? get threadId => _$this._threadId;
   set threadId(String? threadId) => _$this._threadId = threadId;
 
-  MoneyBuilder? _total;
-  MoneyBuilder get total => _$this._total ??= MoneyBuilder();
-  set total(MoneyBuilder? total) => _$this._total = total;
+  ListBuilder<CostTotal>? _totals;
+  ListBuilder<CostTotal> get totals =>
+      _$this._totals ??= ListBuilder<CostTotal>();
+  set totals(ListBuilder<CostTotal>? totals) => _$this._totals = totals;
 
   ListBuilder<RunCost>? _runs;
   ListBuilder<RunCost> get runs => _$this._runs ??= ListBuilder<RunCost>();
@@ -82,7 +83,7 @@ class CostBreakdownBuilder
     final $v = _$v;
     if ($v != null) {
       _threadId = $v.threadId;
-      _total = $v.total.toBuilder();
+      _totals = $v.totals.toBuilder();
       _runs = $v.runs.toBuilder();
       _$v = null;
     }
@@ -113,14 +114,14 @@ class CostBreakdownBuilder
               r'CostBreakdown',
               'threadId',
             ),
-            total: total.build(),
+            totals: totals.build(),
             runs: runs.build(),
           );
     } catch (_) {
       late String _$failedField;
       try {
-        _$failedField = 'total';
-        total.build();
+        _$failedField = 'totals';
+        totals.build();
         _$failedField = 'runs';
         runs.build();
       } catch (e) {
