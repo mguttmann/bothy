@@ -1,0 +1,24 @@
+{
+  "agent_id": "01900000-0000-7000-8000-000000000001",
+  "billing_mode_expected": "organization",
+  "billing_mode_used": "organization",
+  "channel_id": "01900000-0000-7000-8000-000000000002",
+  "cost": {
+    "amount_micros": 0,
+    "currency": "USD",
+    "is_estimate": true
+  },
+  "followups": {},
+  "id": "01900000-0000-7000-8000-000000000003",
+  "metrics": {},
+  "model": "model-test",
+  "queued_at": "2026-01-01T00:00:00.000Z",
+  "started_at": "2026-01-01T00:00:00.000Z",
+  "state": "running",
+  "steps": {},
+  "thread_id": "01900000-0000-7000-8000-000000000004",
+  "trigger_kind": "message",
+  "triggered_by": "01900000-0000-7000-8000-000000000005",
+  "triggering_message_id": "01900000-0000-7000-8000-000000000006",
+  "version": 3
+}

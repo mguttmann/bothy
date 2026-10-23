@@ -15,7 +15,11 @@ import pytest
 @pytest.mark.parametrize(
     ("files", "expected"),
     [
-        (["services/server/internal/chat/x.go"], ["server"]),
+        # The real-server tests of the Python SDK build and run the server of this tree
+        # (services/server/test/sdkserver, M2-29), so a server change runs them too.
+        (["services/server/internal/chat/x.go"], ["sdk-python", "server"]),
+        (["services/server/internal/runs/app/patch.go"], ["sdk-python", "server"]),
+        (["services/server/test/sdkserver/sdkserver_test.go"], ["sdk-python", "server"]),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"]),
         (["design/tokens/color.json"], ["apps"]),
         # The root files of the Dart workspace and its architecture test run the Dart gates
@@ -242,6 +246,8 @@ DESKTOP = {"apps-macos", "apps-windows"}
 ANDROID = {"apps-android-26", "apps-android-36"}
 PLATFORM = DESKTOP | ANDROID
 CONSOLE = {"console-e2e"}
+# The real-server tests of the Python SDK build the server of this tree (M2-29).
+SDK = {"test-sdk-plugins"}
 EVERY_JOB = set(components.CONDITIONAL_JOBS)
 
 
@@ -249,25 +255,28 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
     ("files", "expected"),
     [
         # Server code inside the build context of bothy-postgres runs the image jobs.
-        (["services/server/internal/chat/x.go"], TESTS_SERVER | POSTGRES | CONSOLE),
-        (["services/server/cmd/bothy-backupd/main.go"], TESTS_SERVER | POSTGRES | CONSOLE),
-        (["services/server/images/bothy-postgres/Dockerfile"], TESTS_SERVER | POSTGRES),
-        (["services/server/images/bothy-postgres/entrypoint.sh"], TESTS_SERVER | POSTGRES),
-        (["services/server/test/postgresimage/postgresimage_test.go"], TESTS_SERVER | POSTGRES),
-        (["services/server/migrations/00099_x.sql"], TESTS_SERVER | POSTGRES | CONSOLE),
-        (["services/server/go.mod"], TESTS_SERVER | POSTGRES | CONSOLE),
-        (["services/server/VERSION"], TESTS_SERVER | POSTGRES | CONSOLE),
+        (["services/server/internal/chat/x.go"], TESTS_SERVER | POSTGRES | CONSOLE | SDK),
+        (["services/server/cmd/bothy-backupd/main.go"], TESTS_SERVER | POSTGRES | CONSOLE | SDK),
+        (["services/server/images/bothy-postgres/Dockerfile"], TESTS_SERVER | POSTGRES | SDK),
+        (["services/server/images/bothy-postgres/entrypoint.sh"], TESTS_SERVER | POSTGRES | SDK),
+        (
+            ["services/server/test/postgresimage/postgresimage_test.go"],
+            TESTS_SERVER | POSTGRES | SDK,
+        ),
+        (["services/server/migrations/00099_x.sql"], TESTS_SERVER | POSTGRES | CONSOLE | SDK),
+        (["services/server/go.mod"], TESTS_SERVER | POSTGRES | CONSOLE | SDK),
+        (["services/server/VERSION"], TESTS_SERVER | POSTGRES | CONSOLE | SDK),
         # The console test runs for the build context of the server image and the Compose
         # stack of the test (M6-03), not for other server or app files.
         (["apps/console/lib/main.dart"], {"test-apps"} | PLATFORM | CONSOLE),
-        (["services/server/test/smoke/seed.go"], TESTS_SERVER | CONSOLE),
-        (["services/server/Dockerfile"], TESTS_SERVER | CONSOLE),
+        (["services/server/test/smoke/seed.go"], TESTS_SERVER | CONSOLE | SDK),
+        (["services/server/Dockerfile"], TESTS_SERVER | CONSOLE | SDK),
         (["infra/compose/test/compose.console-e2e.yaml"], CONSOLE),
         (["tools/console-e2e/console_e2e.py"], EVERY_JOB),
         # Server code outside the build context of bothy-postgres does not run its image jobs.
-        (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE),
-        (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE),
-        (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER),
+        (["services/server/api/rest/handler.go"], TESTS_SERVER | CONSOLE | SDK),
+        (["services/server/cmd/bothy/main.go"], TESTS_SERVER | CONSOLE | SDK),
+        (["services/server/test/appsworld/scenarios_api.go"], TESTS_SERVER | SDK),
         (["services/host/internal/noise/noise.go"], TESTS_SERVER),
         (["docs/spec/actions.yaml"], TESTS_SERVER),
         # Members of the Dart workspace (with their native code) and its root files run the
@@ -294,7 +303,10 @@ EVERY_JOB = set(components.CONDITIONAL_JOBS)
         (["README.md", "infra/compose/secrets.yaml"], set()),
         # The Grafana pin of the Compose stack is an input of the panel plugin's tests (M7-25).
         (["README.md", "infra/compose/compose.yaml"], {"test-sdk-plugins"} | CONSOLE),
-        (["services/server/internal/x.go", "docs/DECISIONS.md"], TESTS_SERVER | POSTGRES | CONSOLE),
+        (
+            ["services/server/internal/x.go", "docs/DECISIONS.md"],
+            TESTS_SERVER | POSTGRES | CONSOLE | SDK,
+        ),
         # Shared inputs run every job: the API contract, the Makefile, tools, workflows, root
         # files outside the component map, and an empty or unknown diff.
         (["docs/api/openapi.yaml"], EVERY_JOB),

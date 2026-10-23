@@ -1,7 +1,7 @@
 # sdk
 
-Status: generated cores and tolerance layers of both SDKs (M2-23); the hand layers follow with
-M2-29 (Python) and M2-30 (TypeScript).
+Status: generated cores and tolerance layers of both SDKs (M2-23); the Python hand layer with the
+FakeServer (M2-29); the TypeScript hand layer follows with M2-30.
 
 ## Purpose
 
@@ -11,7 +11,7 @@ components, commands, idempotency, retries, webhook signatures and test doubles 
 
 | Folder | Language | State |
 |---|---|---|
-| `python/` | Python | generated core (openapi-python-client) and tolerance layer; [README](python/README.md) |
+| `python/` | Python | generated core (openapi-python-client), tolerance layer and hand layer with FakeServer and scenario tests (M2-29); [README](python/README.md) |
 | `typescript/` | TypeScript | generated types (openapi-typescript), openapi-fetch client and tolerance layer; [README](typescript/README.md) |
 | `testdata/` | - | shared G5 fixtures of both SDKs; [README](testdata/tolerance/README.md) |
 

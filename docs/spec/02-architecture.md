@@ -416,7 +416,8 @@ services/server/
         ...                   other adapters of the module
       README.md               purpose, ports, dependencies, tables, chapters
   test/                       test support across module boundaries: harness/ (real server, M1-71),
-                              integration/, leak/, contract/, canary/, smoke/
+                              integration/, leak/, contract/, canary/, smoke/; sdkserver/ (real server
+                              for the SDK tests, build tag sdkserver, M2-29)
   perf/                       load tests (build tag perf) and internal/report (thresholds from section 22)
   tools/archgen/              generator: architecture/modules.yaml -> .go-arch-lint.yml
   tools/flagcheck/            gate: registration of the feature flags against VERSION (ADR 0064)

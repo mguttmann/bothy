@@ -248,8 +248,8 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-lint,no Go module selected); \
 	else gl=$(call tool,golangci-lint) || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live,perf ./... && \
-	    "$$gl" run --build-tags contract_validate,contract_live,perf ./...) || exit 1; done; \
+	  for m in $(GO_MODS); do (cd $$m && go vet -tags contract_validate,contract_live,perf,sdkserver ./... && \
+	    "$$gl" run --build-tags contract_validate,contract_live,perf,sdkserver ./...) || exit 1; done; \
 	  for m in $(filter $(GO_CROSS_MODULES),$(GO_MODS)); do for os in $(GO_CROSS_OS); do \
 	    (cd $$m && GOOS=$$os go vet ./... && GOOS=$$os "$$gl" run ./...) || exit 1; done; done; fi
 	@# One analysis at the root covers every member of the workspace (docs/DECISIONS.md D-M4-01-5).
