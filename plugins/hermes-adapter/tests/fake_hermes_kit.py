@@ -162,6 +162,32 @@ class HermesWorld:
         return self.root / f"{self.count:02d}"
 
 
+#: Coverage of the Hermes processes: started from a ``.pth`` file when ``COVERAGE_PROCESS_START``
+#: is set, and saved before ``os._exit``, which the gateway ends with (atexit never runs there).
+_COVERAGE_STARTUP = """\
+# SPDX-License-Identifier: Apache-2.0
+\"\"\"Coverage of a Hermes process of the Fake-Hermes tests (written by the test harness).\"\"\"
+import os
+
+import coverage
+
+# The coverage distribution may start measuring from its own .pth file first; then
+# process_startup returns None and keeps the running instance on itself.
+_cov = coverage.process_startup() or getattr(coverage.process_startup, "coverage", None)
+if _cov is not None:
+    _exit = os._exit
+
+    def _saving_exit(code, _exit=_exit, _cov=_cov):
+        try:
+            _cov.stop()
+            _cov.save()
+        finally:
+            _exit(code)
+
+    os._exit = _saving_exit
+"""
+
+
 def _site_packages(venv: Path) -> Path:
     found = sorted(venv.glob("lib/python*/site-packages"))
     if not found:
@@ -196,9 +222,8 @@ def _add_adapter(install: HermesInstall, root: Path) -> tuple[Path, Path]:
         capture_output=True,
     )
     (site / "bothy_sources.pth").write_text(f"{SDK_SRC}\n{ADAPTER_SRC}\n", encoding="utf-8")
-    (site / "bothy_coverage.pth").write_text(
-        "import coverage; coverage.process_startup()\n", encoding="utf-8"
-    )
+    (site / "bothy_coverage_startup.py").write_text(_COVERAGE_STARTUP, encoding="utf-8")
+    (site / "bothy_coverage.pth").write_text("import bothy_coverage_startup\n", encoding="utf-8")
     coverage_dir = root / "cov"
     coverage_dir.mkdir()
     rc = root / "coveragerc"
