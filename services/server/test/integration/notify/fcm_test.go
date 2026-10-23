@@ -246,7 +246,7 @@ func TestHintReachesFakeFCM(t *testing.T) {
 	w := newWorld(t, withFCM())
 	const canary = "CANARY-fcm-hint-text"
 	th := w.newThread(w.allgemein)
-	w.setLevel("sam", "thread", th, "all")
+	w.setLevel("sam", th, "all")
 	m := w.post("alex", th, "The export is back "+canary)
 	w.consume()
 	jobs := w.pushJobsFor(w.sam)
@@ -291,7 +291,7 @@ func TestBadgeSyncReachesFakeFCM(t *testing.T) {
 	var msgs []msg
 	for range 2 {
 		th := w.newThread(w.allgemein)
-		w.setLevel("sam", "thread", th, "all")
+		w.setLevel("sam", th, "all")
 		threads, msgs = append(threads, th), append(msgs, w.post("owner", th, "For Sam"))
 	}
 	w.consume()
