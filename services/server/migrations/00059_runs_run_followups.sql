@@ -1,5 +1,5 @@
 -- SPDX-License-Identifier: Apache-2.0
--- Follow-ups of a run (M2-11): run_followups exactly as docs/spec/03-datenmodell.md section 4.8
+-- Follow-ups of a run (M2-11): run_followups exactly as docs/spec/03-data-model.md section 4.8
 -- states it. A human message that would trigger the agent of the thread's active run becomes one
 -- row here instead of a second run (09 section 7); the unique message makes it one follow-up per
 -- message, also when the rest of a follow-up set moves to the follow-on run. Rows end with their

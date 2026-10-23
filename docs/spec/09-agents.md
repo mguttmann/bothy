@@ -1021,7 +1021,7 @@ hands it over and restarts the run with the follow-up's token (`run.start`, 5.1)
 
 Control commands (section 10.1) are never follow-ups.
 
-Rulings of the build (M2-11, docs/DECISIONS.md D-M2-11-2 to D-M2-11-7):
+Rulings of the build (M2-11, `docs/decisions.d/M2-11.md` D-M2-11-2 to D-M2-11-8):
 
 - Acceptance: the acceptance reads the active run of the thread with its row lock before the
   decision, so the run cannot end before the follow-up is stored; `run.followup.create` is decided

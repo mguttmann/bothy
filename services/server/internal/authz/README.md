@@ -346,7 +346,7 @@ connections carry no binding (D-M2-14). Tests: `app/actingfor_test.go`,
 ### Follow-up `run.followup.create` (M2-11)
 
 No longer deferred (removed from `domain/testdata/deferred_actions.golden`). The requirement is
-`All(AtLeast(write), AtLeast(trigger))` ("write und `agent.invoke`", D-M2-11-9), and the guard of
+`All(AtLeast(write), AtLeast(trigger))` ("write and `agent.invoke`", D-M2-11-9), and the guard of
 `agent.invoke` applies to the descriptor's `Invoke` (a missing `Invoke` is an internal error), so
 SR4, the reachability of the agent, I2, SR2, the project checks, the read-only channel and the
 active run of another agent (`run_active_other_agent`) refuse a follow-up exactly as they refuse a

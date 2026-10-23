@@ -14,7 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 )
 
-// TestMigration_RunFollowups holds run_followups against docs/spec/03-datenmodell.md section 4.8
+// TestMigration_RunFollowups holds run_followups against docs/spec/03-data-model.md section 4.8
 // (M2-11): columns and defaults, the CHECK of the five states, the primary key, the unique message,
 // both foreign keys with ON DELETE CASCADE and the index (run_id, state). As bothy_app it shows the
 // rules: an unknown state fails, a second row of one message under another run fails, and

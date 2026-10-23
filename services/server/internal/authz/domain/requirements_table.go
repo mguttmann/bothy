@@ -158,7 +158,7 @@ var requirementGroups = []struct {
 		"run.cancel",
 	}},
 	// A follow-up (M2-11): write and the trigger level agent.invoke requires; the guard of
-	// agent.invoke applies to the descriptor's facts (guards, docs/DECISIONS.md D-M2-11-9).
+	// agent.invoke applies to the descriptor's facts (guards, docs/decisions.d/M2-11.md D-M2-11-9).
 	{"write and `agent.invoke`", All(AtLeast(LevelWrite), AtLeast(LevelTrigger)), []string{"run.followup.create"}},
 	// The invocation token (M2-09): runs computes the verdict, Token decides on it; a valid token
 	// starts a run, a valid or expired one renews it.

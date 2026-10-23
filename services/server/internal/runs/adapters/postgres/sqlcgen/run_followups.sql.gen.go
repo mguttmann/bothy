@@ -78,10 +78,10 @@ type InsertFollowupParams struct {
 }
 
 // SPDX-License-Identifier: Apache-2.0
-// run_followups (docs/spec/03-datenmodell.md section 4.8, M2-11). The table has no channel_id:
+// run_followups (docs/spec/03-data-model.md section 4.8, M2-11). The table has no channel_id:
 // every read names the rows of one run (or one message) whose run the use case authorized in the
 // same unit of work or is changing in it (07 section 7.4 rule 1, exception "loading a resource that
-// has already been checked"; docs/DECISIONS.md D-M2-05-9). tools/lint/sql_visibility.yaml lists
+// has already been checked"; docs/decisions.d/M2-05.md D-M2-05-9). tools/lint/sql_visibility.yaml lists
 // each read under after_authorize. Lock order (03 section 6.3): the runs row first, then the
 // follow-up rows in ascending message_id, then messages.
 // A new follow-up of the active run (state queued); the unique message_id is the last line
