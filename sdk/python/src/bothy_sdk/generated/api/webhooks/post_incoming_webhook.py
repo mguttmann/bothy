@@ -127,13 +127,15 @@ def sync_detailed(
         token (str):
         body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
             recognised per request (11 8.2,
-            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
-            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
-            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
-            Prometheus
-            Alertmanager (format `alertmanager`) and must contain no native member; every other body
-            is
-            `native` and needs `content_md`. Unknown members are refused.
+            docs/DECISIONS.md D-M2-27-5, D-M7-20-5). A body with at least one Alertmanager member
+            (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`,
+            `commonLabels`, `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook
+            payload of Prometheus Alertmanager (format `alertmanager`) and must contain no native
+            member; other members of such a payload, at the top and in each alert, are ignored,
+            because
+            Alertmanager adds members in new versions and drops a notification answered with `400`.
+            Every other body is `native`, needs `content_md` and refuses every other member with
+            `400 validation_failed` and `errors[].code` `unknown_member`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -193,13 +195,15 @@ def sync(
         token (str):
         body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
             recognised per request (11 8.2,
-            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
-            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
-            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
-            Prometheus
-            Alertmanager (format `alertmanager`) and must contain no native member; every other body
-            is
-            `native` and needs `content_md`. Unknown members are refused.
+            docs/DECISIONS.md D-M2-27-5, D-M7-20-5). A body with at least one Alertmanager member
+            (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`,
+            `commonLabels`, `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook
+            payload of Prometheus Alertmanager (format `alertmanager`) and must contain no native
+            member; other members of such a payload, at the top and in each alert, are ignored,
+            because
+            Alertmanager adds members in new versions and drops a notification answered with `400`.
+            Every other body is `native`, needs `content_md` and refuses every other member with
+            `400 validation_failed` and `errors[].code` `unknown_member`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -254,13 +258,15 @@ async def asyncio_detailed(
         token (str):
         body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
             recognised per request (11 8.2,
-            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
-            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
-            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
-            Prometheus
-            Alertmanager (format `alertmanager`) and must contain no native member; every other body
-            is
-            `native` and needs `content_md`. Unknown members are refused.
+            docs/DECISIONS.md D-M2-27-5, D-M7-20-5). A body with at least one Alertmanager member
+            (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`,
+            `commonLabels`, `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook
+            payload of Prometheus Alertmanager (format `alertmanager`) and must contain no native
+            member; other members of such a payload, at the top and in each alert, are ignored,
+            because
+            Alertmanager adds members in new versions and drops a notification answered with `400`.
+            Every other body is `native`, needs `content_md` and refuses every other member with
+            `400 validation_failed` and `errors[].code` `unknown_member`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -318,13 +324,15 @@ async def asyncio(
         token (str):
         body (IncomingWebhookPost): Body of an incoming webhook call in one of two shapes,
             recognised per request (11 8.2,
-            docs/DECISIONS.md D-M2-27-5). A body with at least one Alertmanager member (`version`,
-            `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
-            `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook payload of
-            Prometheus
-            Alertmanager (format `alertmanager`) and must contain no native member; every other body
-            is
-            `native` and needs `content_md`. Unknown members are refused.
+            docs/DECISIONS.md D-M2-27-5, D-M7-20-5). A body with at least one Alertmanager member
+            (`version`, `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`,
+            `commonLabels`, `commonAnnotations`, `externalURL`, `alerts`) is the unchanged webhook
+            payload of Prometheus Alertmanager (format `alertmanager`) and must contain no native
+            member; other members of such a payload, at the top and in each alert, are ignored,
+            because
+            Alertmanager adds members in new versions and drops a notification answered with `400`.
+            Every other body is `native`, needs `content_md` and refuses every other member with
+            `400 validation_failed` and `errors[].code` `unknown_member`.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

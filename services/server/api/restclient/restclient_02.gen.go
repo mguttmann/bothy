@@ -16,6 +16,182 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CompletePasskeyLoginWithBody Finish a passkey login and register the device
+//
+// Completes a passkey login with a DPoP proof of the device key. A new device stays `pending` until approved; a known active device stays active. Every rejection gives the same `401` body.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/passkey/complete (the `CompletePasskeyLogin` operationId).
+func (c *Client) CompletePasskeyLoginWithBody(ctx context.Context, params *CompletePasskeyLoginParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompletePasskeyLoginRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompletePasskeyLogin Finish a passkey login and register the device
+//
+// Completes a passkey login with a DPoP proof of the device key. A new device stays `pending` until approved; a known active device stays active. Every rejection gives the same `401` body.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/passkey/complete (the `CompletePasskeyLogin` operationId).
+func (c *Client) CompletePasskeyLogin(ctx context.Context, params *CompletePasskeyLoginParams, body CompletePasskeyLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompletePasskeyLoginRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LoginWithPasswordWithBody Log in with local password and TOTP
+//
+// Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays `pending` until approved (08, 5.2). Unknown names, wrong passwords and locked accounts give the same `401`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/password/login (the `LoginWithPassword` operationId).
+func (c *Client) LoginWithPasswordWithBody(ctx context.Context, params *LoginWithPasswordParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLoginWithPasswordRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// LoginWithPassword Log in with local password and TOTP
+//
+// Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays `pending` until approved (08, 5.2). Unknown names, wrong passwords and locked accounts give the same `401`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/password/login (the `LoginWithPassword` operationId).
+func (c *Client) LoginWithPassword(ctx context.Context, params *LoginWithPasswordParams, body LoginWithPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLoginWithPasswordRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateStepUpChallenge Create a step-up challenge
+//
+// Corresponds with POST /auth/step-up/challenge (the `CreateStepUpChallenge` operationId).
+func (c *Client) CreateStepUpChallenge(ctx context.Context, params *CreateStepUpChallengeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateStepUpChallengeRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteStepUpWithDeviceKeyWithBody Confirm step-up with the device key after user verification
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/step-up/device-key (the `CompleteStepUpWithDeviceKey` operationId).
+func (c *Client) CompleteStepUpWithDeviceKeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpWithDeviceKeyRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteStepUpWithDeviceKey Confirm step-up with the device key after user verification
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/step-up/device-key (the `CompleteStepUpWithDeviceKey` operationId).
+func (c *Client) CompleteStepUpWithDeviceKey(ctx context.Context, body CompleteStepUpWithDeviceKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpWithDeviceKeyRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginStepUpOidcReauthWithBody Start a console step-up with OIDC
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+func (c *Client) BeginStepUpOidcReauthWithBody(ctx context.Context, params *BeginStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginStepUpOidcReauthRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BeginStepUpOidcReauth Start a console step-up with OIDC
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/step-up/oidc (the `BeginStepUpOidcReauth` operationId).
+func (c *Client) BeginStepUpOidcReauth(ctx context.Context, params *BeginStepUpOidcReauthParams, body BeginStepUpOidcReauthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBeginStepUpOidcReauthRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteStepUpOidcReauthWithBody Finish a console step-up with OIDC
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/step-up/oidc/complete (the `CompleteStepUpOidcReauth` operationId).
+func (c *Client) CompleteStepUpOidcReauthWithBody(ctx context.Context, params *CompleteStepUpOidcReauthParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteStepUpOidcReauthRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CompleteStepUpOidcReauth Finish a console step-up with OIDC
 //
 // Takes a body of the `application/json` content type.

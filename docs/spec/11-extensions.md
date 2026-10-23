@@ -295,15 +295,19 @@ receiver does not allow forged webhooks.
 | `alertmanager` | webhook payload of Prometheus Alertmanager | one message per notification: state, count, `alertname`, summary per alert from labels and annotations, links `generatorURL` and `externalURL` as text. The layout, the escaping of payload values, the URL rules and the shortening to `message.max_content_bytes` are fixed in [DECISIONS.md](../DECISIONS.md) D-M2-27-10 and D-M2-27-23. Retries are not deduplicated: every post gets a new server `client_msg_id` |
 
 The format is decided per request from the body, not stored per webhook
-([DECISIONS.md](../DECISIONS.md) D-M2-27-5). One closed request schema, `IncomingWebhookPost`,
+([DECISIONS.md](../DECISIONS.md) D-M2-27-5, D-M7-20-5). One request schema, `IncomingWebhookPost`,
 holds the members of both formats. A body with at least one Alertmanager member (`version`,
 `groupKey`, `truncatedAlerts`, `status`, `receiver`, `groupLabels`, `commonLabels`,
 `commonAnnotations`, `externalURL`, `alerts`) is `alertmanager`; if it also holds a native
 member, the answer is `400 validation_failed` with the pointer of the first native member and
 `errors[].code` `format_mixed`. Every other body is `native`. A format not listed in
 `webhook_in.formats_enabled` gives `400 validation_failed` with `errors[].code`
-`format_disabled`. Unknown members give `400 validation_failed` (`unknown_member`); a native
-`content_md` above `message.max_content_bytes` gives `413 payload_too_large`.
+`format_disabled`. In a native body every other member gives `400 validation_failed`
+(`unknown_member`); in an Alertmanager payload members the payload description does not name, at
+the top and in each alert, are ignored (`routeLabels` and `notification_reason` of v0.34.1, and
+whatever a later version adds), because Alertmanager drops a notification answered with `400`
+and the payload is the sender's, not a request of a Bothy client. A native `content_md` above
+`message.max_content_bytes` gives `413 payload_too_large`.
 
 Which formats are enabled is controlled by `webhook_in.formats_enabled`. Further formats do not
 go into the server but come as an app (section 10). Reason: a built-in converter is

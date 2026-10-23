@@ -10,7 +10,7 @@ import 'package:built_value/serializer.dart';
 
 part 'alertmanager_alert.g.dart';
 
-/// One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`).
+/// One alert of an Alertmanager webhook payload; `status` and `labels` are required (checked with `errors[].code` `required`); other members are ignored (D-M7-20-5).
 ///
 /// Properties:
 /// * [status]
