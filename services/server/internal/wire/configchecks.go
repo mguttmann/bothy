@@ -61,6 +61,8 @@ var configChecks = []configCheck{
 	{name: "fingerprint_keys", keys: []string{keyFingerprintConfirmChars, keyFingerprintMaxAttempts}, fn: fingerprintKeys},
 	{name: "webauthn_relying_party", keys: []string{keyPublicURL, keyWebAuthnRPID, keyWebAuthnOrigins}, fn: webAuthnRelyingParty},
 	{name: "search_languages", keys: []string{keySearchLanguages}, fn: searchLanguagesCheck},
+	{name: "search_page_size", keys: []string{keySearchPageSizeDefault, keySearchPageSizeMax}, fn: searchPageSizeCheck},
+	{name: "search_headline_words", keys: []string{keySearchHeadlineMinWords, keySearchHeadlineMaxWords}, fn: searchHeadlineWordsCheck},
 	{name: "search_locale_map", keys: []string{keySearchLanguages, keySearchLocaleMap}, fn: searchLocaleMapCheck},
 	{name: "webhook_backoff_order", keys: []string{keyWebhookBackoffBase, keyWebhookBackoffCap}, fn: webhookBackoffOrder},
 	{name: "webhook_retry_within_retention", keys: []string{keyWebhookRetryMaxAge, keySyncEventRetention}, fn: webhookRetryWithinRetention},

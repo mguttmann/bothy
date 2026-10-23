@@ -18,7 +18,7 @@ import (
 
 // notWiredYet are the modules of architecture/modules.yaml that `bothy serve` does not wire yet.
 // The ticket that wires one removes it here and adds its module_<name>.go.
-var notWiredYet = []string{"privacy", "search", "status"}
+var notWiredYet = []string{"privacy", "status"}
 
 // registerModules returns the module names of architecture/modules.yaml, the module register
 // (ADR 0050).

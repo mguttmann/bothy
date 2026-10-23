@@ -53,19 +53,19 @@ type Renderers struct {
 	File    func(files.File) rest.File
 }
 
-// Search implements search and searchThreadTitles.
-type Search struct {
+// Finder implements search and searchThreadTitles.
+type Finder struct {
 	search  search.Search
 	objects Objects
 	render  Renderers
 }
 
 // New returns the handlers. Errors: a missing collaborator.
-func New(s search.Search, o Objects, r Renderers) (*Search, error) {
+func New(s search.Search, o Objects, r Renderers) (*Finder, error) {
 	if s == nil || o.Messages == nil || o.Threads == nil || o.Files == nil || r.Message == nil || r.Thread == nil || r.File == nil {
 		return nil, errors.New("httpapi: search needs the coordinator, the three read operations and the three renderers")
 	}
-	return &Search{search: s, objects: o, render: r}, nil
+	return &Finder{search: s, objects: o, render: r}, nil
 }
 
 // Cursors is the codec of the list cursors (platform/httpserver, M1-18), the outgoing port
@@ -94,7 +94,7 @@ func principal(ctx context.Context) actor.Actor {
 }
 
 // Search implements rest.StrictServerInterface (GET /search).
-func (h *Search) Search(ctx context.Context, req rest.SearchRequestObject) (rest.SearchResponseObject, error) {
+func (h *Finder) Search(ctx context.Context, req rest.SearchRequestObject) (rest.SearchResponseObject, error) {
 	res, err := h.search.Query(ctx, principal(ctx), request(req.Params))
 	if err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (h *Search) Search(ctx context.Context, req rest.SearchRequestObject) (rest
 }
 
 // SearchThreadTitles implements rest.StrictServerInterface (GET /search/thread-titles).
-func (h *Search) SearchThreadTitles(ctx context.Context, req rest.SearchThreadTitlesRequestObject) (rest.SearchThreadTitlesResponseObject, error) {
+func (h *Finder) SearchThreadTitles(ctx context.Context, req rest.SearchThreadTitlesRequestObject) (rest.SearchThreadTitlesResponseObject, error) {
 	r := search.PrefixRequest{Q: req.Params.Q}
 	if req.Params.Limit != nil {
 		r.Limit = *req.Params.Limit
@@ -193,7 +193,7 @@ type segment = struct {
 
 // items renders the hits in page order with the object of each from its module (design note 9);
 // a hit whose object vanished since the query is dropped. Never nil.
-func (h *Search) items(ctx context.Context, hits []search.ResultHit) ([]rest.SearchHit, error) {
+func (h *Finder) items(ctx context.Context, hits []search.ResultHit) ([]rest.SearchHit, error) {
 	out := make([]rest.SearchHit, 0, len(hits))
 	if len(hits) == 0 {
 		return out, nil
@@ -222,7 +222,7 @@ func (h *Search) items(ctx context.Context, hits []search.ResultHit) ([]rest.Sea
 // objectsOf loads the objects of hits (all of one kind) through the module's read operation,
 // called with the ids and channels of the hits, and returns each as a SearchHit with its object
 // set, keyed by the hit id.
-func (h *Search) objectsOf(ctx context.Context, hits []search.ResultHit) (map[ids.ID]rest.SearchHit, error) {
+func (h *Finder) objectsOf(ctx context.Context, hits []search.ResultHit) (map[ids.ID]rest.SearchHit, error) {
 	var idsOf, channels []ids.ID
 	seen := map[ids.ID]bool{}
 	for _, hit := range hits {
