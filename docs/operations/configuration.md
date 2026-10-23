@@ -595,18 +595,18 @@ Source: [14-search.md](../spec/14-search.md), section 15.
 |---|---|---|---|---|---|---|
 | `search.languages` | `BOTHY_SEARCH__LANGUAGES` | Server | list(string) | `["german","english"]` | configurations for query construction (plus always `simple`) | active |
 | `search.locale_map` | `BOTHY_SEARCH__LOCALE_MAP` | Server | map(string) | `{"de":"german","en":"english"}` | language tag to text search configuration | active |
-| `search.query_max_chars` | `BOTHY_SEARCH__QUERY_MAX_CHARS` | Server |  | `256` | length of the input | planned (M3) |
-| `search.max_candidates` | `BOTHY_SEARCH__MAX_CANDIDATES` | Server |  | `2000` | candidates before ranking | planned (M3) |
-| `search.rank_normalization` | `BOTHY_SEARCH__RANK_NORMALIZATION` | Server |  | `1` | normalization for `ts_rank` | planned (M3) |
-| `search.recency_scale` | `BOTHY_SEARCH__RECENCY_SCALE` | Server |  | `30d` | age at which the score falls to half | planned (M3) |
-| `search.page_size_default` | `BOTHY_SEARCH__PAGE_SIZE_DEFAULT` | Server |  | `20` | hits per page | planned (M3) |
-| `search.page_size_max` | `BOTHY_SEARCH__PAGE_SIZE_MAX` | Server |  | `50` | maximum hits per page | planned (M3) |
-| `search.headline_input_max_chars` | `BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS` | Server |  | `20000` | length of the text for `ts_headline` | planned (M3) |
-| `search.headline_max_fragments` | `BOTHY_SEARCH__HEADLINE_MAX_FRAGMENTS` | Server |  | `2` | snippets per hit | planned (M3) |
-| `search.headline_max_words` | `BOTHY_SEARCH__HEADLINE_MAX_WORDS` | Server |  | `30` | words per snippet, at most | planned (M3) |
-| `search.headline_min_words` | `BOTHY_SEARCH__HEADLINE_MIN_WORDS` | Server |  | `10` | words per snippet, at least | planned (M3) |
-| `search.prefix_min_chars` | `BOTHY_SEARCH__PREFIX_MIN_CHARS` | Server |  | `2` | shortest word length in the prefix search | planned (M3) |
-| `search.statement_timeout` | `BOTHY_SEARCH__STATEMENT_TIMEOUT` | Server |  | `3s` | time limit of a search query | planned (M3) |
+| `search.query_max_chars` | `BOTHY_SEARCH__QUERY_MAX_CHARS` | Server | int | `256` | length of the input | active |
+| `search.max_candidates` | `BOTHY_SEARCH__MAX_CANDIDATES` | Server | int | `2000` | candidates before ranking | active |
+| `search.rank_normalization` | `BOTHY_SEARCH__RANK_NORMALIZATION` | Server | int | `1` | normalization for `ts_rank` | active |
+| `search.recency_scale` | `BOTHY_SEARCH__RECENCY_SCALE` | Server | duration | `30d` | age at which the score falls to half | active |
+| `search.page_size_default` | `BOTHY_SEARCH__PAGE_SIZE_DEFAULT` | Server | int | `20` | hits per page | active |
+| `search.page_size_max` | `BOTHY_SEARCH__PAGE_SIZE_MAX` | Server | int | `50` | maximum hits per page | active |
+| `search.headline_input_max_chars` | `BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS` | Server | int | `20000` | length of the text for `ts_headline` | active |
+| `search.headline_max_fragments` | `BOTHY_SEARCH__HEADLINE_MAX_FRAGMENTS` | Server | int | `2` | snippets per hit | active |
+| `search.headline_max_words` | `BOTHY_SEARCH__HEADLINE_MAX_WORDS` | Server | int | `30` | words per snippet, at most | active |
+| `search.headline_min_words` | `BOTHY_SEARCH__HEADLINE_MIN_WORDS` | Server | int | `10` | words per snippet, at least | active |
+| `search.prefix_min_chars` | `BOTHY_SEARCH__PREFIX_MIN_CHARS` | Server | int | `2` | shortest word length in the prefix search | active |
+| `search.statement_timeout` | `BOTHY_SEARCH__STATEMENT_TIMEOUT` | Server | duration | `3s` | time limit of a search query | active |
 | `search.p95_target` | `BOTHY_SEARCH__P95_TARGET` | Server |  | `500ms` | p95 target in the load test | planned (M3) |
 | `search.prefix_p95_target` | `BOTHY_SEARCH__PREFIX_P95_TARGET` | Server |  | `100ms` | p95 target of the prefix search | planned (M3) |
 | `search.benchmark_messages` | `BOTHY_SEARCH__BENCHMARK_MESSAGES` | Server |  | `2000000` | corpus size in the load test | planned (M3) |

@@ -334,6 +334,19 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		// M3-13
 		"search.languages":  {Kind: config.KindStringList, Default: `["german","english"]`, Chapter: "14-search.md"},
 		"search.locale_map": {Kind: config.KindStringMap, Default: `{"de":"german","en":"english"}`, Chapter: "14-search.md"},
+		// The query side of the search (M3-14, brief design note 12).
+		"search.query_max_chars":          {Kind: config.KindInt, Default: "256", Min: "1", Chapter: "14-search.md"},
+		"search.max_candidates":           {Kind: config.KindInt, Default: "2000", Min: "1", Chapter: "14-search.md"},
+		"search.rank_normalization":       {Kind: config.KindInt, Default: "1", Min: "0", Max: "63", Chapter: "14-search.md"},
+		"search.recency_scale":            {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "14-search.md"},
+		"search.page_size_default":        {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "14-search.md"},
+		"search.page_size_max":            {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "14-search.md"},
+		"search.headline_input_max_chars": {Kind: config.KindInt, Default: "20000", Min: "1", Chapter: "14-search.md"},
+		"search.headline_max_fragments":   {Kind: config.KindInt, Default: "2", Min: "0", Chapter: "14-search.md"},
+		"search.headline_max_words":       {Kind: config.KindInt, Default: "30", Min: "1", Chapter: "14-search.md"},
+		"search.headline_min_words":       {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "14-search.md"},
+		"search.prefix_min_chars":         {Kind: config.KindInt, Default: "2", Min: "1", Chapter: "14-search.md"},
+		"search.statement_timeout":        {Kind: config.KindDuration, Default: "3s", Min: "1ms", Chapter: "14-search.md"},
 
 		// M2-26
 		"webhook.max_consecutive_failures":     {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "03-data-model.md"},
