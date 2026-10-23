@@ -29,7 +29,7 @@ class SecretError(Exception):
     """A ``secret_ref`` that cannot be parsed or resolved.
 
     Attributes:
-        code: ``unsupported``, ``missing``, ``empty`` or ``unsafe_mode``.
+        code: ``unsupported``, ``missing``, ``empty``, ``unsafe_mode`` or ``not_utf8``.
     """
 
     def __init__(self, code: str) -> None:
@@ -97,7 +97,7 @@ def resolve(ref: SecretRef) -> Secret:
         The secret.
 
     Raises:
-        SecretError: ``missing``, ``empty`` or ``unsafe_mode``.
+        SecretError: ``missing``, ``empty``, ``unsafe_mode`` or ``not_utf8``.
     """
     if ref.scheme == "env":
         value = os.environ.get(ref.target, "")
@@ -116,7 +116,10 @@ def resolve(ref: SecretRef) -> Secret:
             or stat.S_IMODE(info.st_mode) not in _ALLOWED_MODES
         ):
             raise SecretError("unsafe_mode")
-        raw = fh.read().decode("utf-8", errors="strict")
+        try:
+            raw = fh.read().decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            raise SecretError("not_utf8") from None
     if raw.endswith("\r\n"):
         raw = raw[:-2]
     elif raw.endswith("\n"):

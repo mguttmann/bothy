@@ -69,3 +69,13 @@ def test_file_errors(tmp_path: Path) -> None:
     assert str(wide) not in str(err.value)
     wide.chmod(0o400)
     assert resolve(parse_secret_ref(f"file:{wide}")).reveal() == "sk-wide"
+
+
+def test_file_not_utf8(tmp_path: Path) -> None:
+    path = tmp_path / "binary"
+    path.write_bytes(b"sk-\xff\xfe")
+    path.chmod(0o600)
+    with pytest.raises(SecretError) as err:
+        resolve(parse_secret_ref(f"file:{path}"))
+    assert err.value.code == "not_utf8"
+    assert "0xff" not in str(err.value)

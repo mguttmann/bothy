@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 import pytest
+from bothy_sdk.testing._patience import PATIENCE, eventually
 
 from claude_code_runner.locks import LockTimeout, acquire, release
 
@@ -43,3 +45,21 @@ async def test_child_keeps_inherited_lock(tmp_path: Path) -> None:
         child.wait()
     fd2 = await acquire(path, wait=1.0, poll=0.02)
     release(fd2)
+
+
+def _open_fds() -> int:
+    return sum(1 for _ in Path("/dev/fd").iterdir())
+
+
+@pytest.mark.anyio
+async def test_cancelled_wait_closes_the_descriptor(tmp_path: Path) -> None:
+    path = tmp_path / "locks" / "session-c.lock"
+    held = await acquire(path, wait=PATIENCE, poll=0.01)
+    before = _open_fds()
+    waiter = asyncio.ensure_future(acquire(path, wait=PATIENCE, poll=0.01))
+    await eventually(lambda: _open_fds() == before + 1, "the waiter's open descriptor")
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+    assert _open_fds() == before
+    release(held)

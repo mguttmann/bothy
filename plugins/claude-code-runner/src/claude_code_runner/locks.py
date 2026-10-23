@@ -47,18 +47,19 @@ async def acquire(path: Path, wait: float, poll: float) -> int:
     ensure_private_dir(path.parent)
     fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     deadline = time.monotonic() + wait
-    while True:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return fd
-        except BlockingIOError:
-            if time.monotonic() >= deadline:
-                os.close(fd)
-                raise LockTimeout from None
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return fd
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise LockTimeout from None
+            # Outside the handler: a cancellation during the wait reaches the close below.
             await asyncio.sleep(poll)
-        except BaseException:
-            os.close(fd)
-            raise
+    except BaseException:
+        os.close(fd)
+        raise
 
 
 def release(fd: int) -> None:
