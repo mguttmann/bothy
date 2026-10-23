@@ -76,6 +76,9 @@ type Runs struct {
 	// buildRuns sets them, and fillHandlers mounts their REST handlers. nil in a world without
 	// them.
 	Sessions *AgentSessions
+	// AppDispatches schedules runs.app_dispatch (M2-25); the jobs step binds its inserter
+	// (BindJobs).
+	AppDispatches *runsjobs.DispatchScheduler
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -126,6 +129,9 @@ type RunsDeps struct {
 	// Costs books the cost reports of finishRun (billing, M2-22); nil makes a finish with costs an
 	// internal error (a test world without billing). The process always sets it (startRuns).
 	Costs billing.Costs
+	// AppDispatches schedules runs.app_dispatch (M2-25); nil means the scheduler over the job
+	// runtime of the process (Runs.BindJobs).
+	AppDispatches runsapp.DispatchScheduler
 }
 
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
@@ -152,21 +158,8 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
-	var sched *runsjobs.Scheduler
-	if d.Expiry == nil {
-		sched = &runsjobs.Scheduler{}
-		d.Expiry = sched
-	}
-	var cancels *runsjobs.CancelScheduler
-	if d.CancelTimeouts == nil {
-		cancels = &runsjobs.CancelScheduler{}
-		d.CancelTimeouts = cancels
-	}
-	var holds *runsjobs.HoldScheduler
-	if d.Holds == nil {
-		holds = &runsjobs.HoldScheduler{}
-		d.Holds = holds
-	}
+	scheds := defaultSchedulers(&d)
+	sched, cancels, holds, dispatches := scheds.expiry, scheds.cancels, scheds.holds, scheds.dispatches
 	if d.Heartbeats == nil {
 		hb, err := agentsapp.NewHeartbeatReader(agentspg.NewRepository(pool))
 		if err != nil {
@@ -186,13 +179,47 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions, Costs: d.Costs,
 		ContextRows: repo,
 		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
+		AppDispatches: d.AppDispatches,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
 		return nil, err
 	}
 	return &Runs{Service: svc, Handlers: runshttp.New(svc), CommandHandlers: runshttp.NewCommandExec(svc), Expiry: sched,
-		CancelTimeouts: cancels, ComponentExpiry: components, Holds: holds}, nil
+		CancelTimeouts: cancels, ComponentExpiry: components, Holds: holds, AppDispatches: dispatches}, nil
+}
+
+// runsSchedulers are the job schedulers NewRuns creates for the deps that bring none; the jobs
+// step binds their inserter (Runs.BindJobs).
+type runsSchedulers struct {
+	expiry     *runsjobs.Scheduler
+	cancels    *runsjobs.CancelScheduler
+	holds      *runsjobs.HoldScheduler
+	dispatches *runsjobs.DispatchScheduler
+}
+
+// defaultSchedulers sets a scheduler over the job runtime of the process for every scheduler d
+// leaves nil (runs.queued_expiry, runs.cancel_timeout, runs.invocation_hold_timeout and
+// runs.app_dispatch) and returns the ones it created.
+func defaultSchedulers(d *RunsDeps) runsSchedulers {
+	var s runsSchedulers
+	if d.Expiry == nil {
+		s.expiry = &runsjobs.Scheduler{}
+		d.Expiry = s.expiry
+	}
+	if d.CancelTimeouts == nil {
+		s.cancels = &runsjobs.CancelScheduler{}
+		d.CancelTimeouts = s.cancels
+	}
+	if d.Holds == nil {
+		s.holds = &runsjobs.HoldScheduler{}
+		d.Holds = s.holds
+	}
+	if d.AppDispatches == nil {
+		s.dispatches = &runsjobs.DispatchScheduler{}
+		d.AppDispatches = s.dispatches
+	}
+	return s
 }
 
 // newRunsService builds the runs use cases over deps with the component collaborators of d
@@ -276,8 +303,8 @@ func stepMetrics(m runsapp.Metrics) runsapp.StepMetrics {
 	return nil
 }
 
-// BindJobs gives the schedulers of runs.queued_expiry, runs.cancel_timeout and
-// runs.component_expiry the inserter of the job runtime; the jobs step calls it once the runtime exists. A Runs built with its own
+// BindJobs gives the schedulers of runs.queued_expiry, runs.cancel_timeout,
+// runs.component_expiry and runs.app_dispatch the inserter of the job runtime; the jobs step calls it once the runtime exists. A Runs built with its own
 // scheduler ignores it for that scheduler.
 func (r *Runs) BindJobs(ins jobs.Inserter) {
 	if r == nil {
@@ -294,6 +321,9 @@ func (r *Runs) BindJobs(ins jobs.Inserter) {
 	}
 	if r.Holds != nil {
 		r.Holds.Bind(ins)
+	}
+	if r.AppDispatches != nil {
+		r.AppDispatches.Bind(ins)
 	}
 }
 

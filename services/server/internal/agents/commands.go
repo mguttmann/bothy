@@ -97,3 +97,30 @@ type UpdateCommand struct {
 	IfMatch    Precondition
 	Definition RegisterCommand
 }
+
+// OwnedCommands changes the commands of an owner for an owner action that another module already
+// authorized (M2-25 design note 2 d): the module apps writes the commands of an app's manifest at
+// app.install and app.upgrade and removes them at app.uninstall, decided and audited there with
+// step-up. The methods call no authorize, write no audit entry of command.register or
+// command.remove (the app did not act), and write command.changed exactly when a row changes. They
+// join the ambient unit of work of ctx; outside one they fail with internal. Errors are
+// kernel/errs errors: 400 validation_failed for a definition outside the rules (limit_reached
+// beyond command.max_per_principal), 409 conflict with reason command_name_reserved for a built-in
+// name.
+//
+// Example:
+//
+//	c, changed, err := owned.UpsertOwned(ctx, appID, agents.RegisterCommand{Name: "ticket", Description: "Open a ticket"})
+type OwnedCommands interface {
+	// UpsertOwned creates the instance-wide command def of ownerID, or replaces the fields of the
+	// owner's live instance-wide command with the same name compared case-insensitively. changed
+	// is false when the stored definition already equals def (no write, no event).
+	UpsertOwned(ctx context.Context, ownerID ids.ID, def RegisterCommand) (c Command, changed bool, err error)
+	// RemoveOwned removes the live instance-wide commands of ownerID named in names (compared
+	// case-insensitively) and returns the IDs it removed; a name without a live command is
+	// skipped.
+	RemoveOwned(ctx context.Context, ownerID ids.ID, names []string) ([]ids.ID, error)
+	// RemoveAllOwned removes every live command of ownerID, whatever its scope, and returns their
+	// IDs in ascending order.
+	RemoveAllOwned(ctx context.Context, ownerID ids.ID) ([]ids.ID, error)
+}

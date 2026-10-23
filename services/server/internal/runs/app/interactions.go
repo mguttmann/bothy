@@ -187,7 +187,7 @@ func (s *Service) createInteraction(ctx context.Context, a actor.Actor, cmd runs
 		}
 		return res, err
 	}
-	if err := s.authorizeErr(ctx, a, authorize.ActionInteractionCreate, interactionResource(l)); err != nil {
+	if err := s.authorizeErr(ctx, a, authorize.ActionInteractionCreate, interactionDescriptor(l)); err != nil {
 		return runs.InteractionResult{}, err
 	}
 	if err := domain.CheckValues(l.cur.Type, l.cur.Definition, values); err != nil {
@@ -243,6 +243,9 @@ func (s *Service) writeInteraction(ctx context.Context, a actor.Actor, cmd runs.
 		if _, err := s.d.Cards.ComponentsChanged(ctx, l.cur.MessageID); err != nil {
 			return runs.InteractionResult{}, err
 		}
+	}
+	if l.facts.AuthorKind == ownerKindApp {
+		return s.writeAppInteraction(ctx, a, ix, l)
 	}
 	runID, opened, mode, err := s.interactionRun(ctx, a, l, ix.ID)
 	if err != nil {
@@ -340,7 +343,7 @@ func (s *Service) lockForInteraction(ctx context.Context, row ComponentRow) (Com
 // proveInteraction decides interaction.create in filter mode and ignores the outcome: the proof
 // of the check for a repetition (see createInteraction). Errors: those of the authorizer.
 func (s *Service) proveInteraction(ctx context.Context, a actor.Actor, l lockedCard) error {
-	_, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), a, authorize.ActionInteractionCreate, interactionResource(l))
+	_, err := s.d.Authorizer.Authorize(authorize.Filter(ctx), a, authorize.ActionInteractionCreate, interactionDescriptor(l))
 	return err
 }
 
@@ -499,13 +502,19 @@ func (s *Service) interactionView(ctx context.Context, ix InteractionRow, thread
 // the agent, receive action agent.events.consume, payload InteractionCreatedPayload with the values
 // and without response, the person as actor.
 func (s *Service) emitInteractionCreated(ctx context.Context, a actor.Actor, v runs.Interaction, card messaging.CardFacts) error {
+	return s.emitInteractionCreatedID(ctx, ids.New(), a, v, card)
+}
+
+// emitInteractionCreatedID is emitInteractionCreated with the event ID id, which the job
+// runs.app_dispatch of an app card names (M2-25).
+func (s *Service) emitInteractionCreatedID(ctx context.Context, id ids.ID, a actor.Actor, v runs.Interaction, card messaging.CardFacts) error {
 	p, err := domain.InteractionCreatedPayload(domainInteractionView(v))
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "runs: the payload of interaction.created")
 	}
 	kind, actorID := eventActor(actor.WithActor(ctx, a))
 	return s.d.Events.Append(ctx, eventlog.Event{
-		Type: string(authorize.EventInteractionCreated), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
+		ID: id, Type: string(authorize.EventInteractionCreated), SchemaVersion: 1, ActorKind: kind, ActorPrincipalID: actorID,
 		SpaceID: card.SpaceID, ChannelID: card.ChannelID, ThreadID: card.ThreadID, ResourceKind: resourceInteraction, ResourceID: v.ID,
 		AudiencePrincipalID: card.AuthorID, ReceiveAction: string(authorize.ActionAgentEventsConsume), Payload: p,
 	})

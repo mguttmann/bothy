@@ -168,6 +168,16 @@ func (r *Repository) EventBySeq(ctx context.Context, seq int64) (sync.Event, boo
 	return toEvent(rows[0]), true, nil
 }
 
+// EventByID returns the event id (sync.LogReader); found is false when it is not in the log.
+// Outside a unit of work it reads on the pool.
+func (r *Repository) EventByID(ctx context.Context, id ids.ID) (sync.Event, bool, error) {
+	rows, err := r.queries(ctx).EventByID(ctx, uuid(id))
+	if err != nil || len(rows) == 0 {
+		return sync.Event{}, false, err
+	}
+	return toEvent(rows[0]), true, nil
+}
+
 // Compile-time check: Repository is the log of catch-up.
 var _ app.CatchUpLog = (*Repository)(nil)
 

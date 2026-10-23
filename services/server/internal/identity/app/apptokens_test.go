@@ -244,3 +244,24 @@ func TestPrincipalWrites(t *testing.T) {
 		return nil
 	})
 }
+
+// TestPrincipalSource_AppGrantedScopes (M2-25 design note 3 a): the principal source reports the
+// granted scopes of an active installation with the facts of an app, so authz decides the
+// app-owner guard from the facts of the owner; without an active installation the list is empty.
+func TestPrincipalSource_AppGrantedScopes(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	apps := &fakeInstallations{}
+	src := app.NewPrincipalSource(f.repo).WithApps(apps)
+	tracker := f.add(domain.KindApp, "tracker")
+	ctx := context.Background()
+	got, found, err := src.Principal(ctx, tracker.ID)
+	if err != nil || !found || got.AppInstallationActive || len(got.AppGrantedScopes) != 0 {
+		t.Fatalf("without installation: %+v %v %v", got, found, err)
+	}
+	apps.set(tracker.ID, &identity.ActiveAppInstallation{ID: ids.New(), GrantedScopes: []string{"commands:write", "messages:write"}})
+	got, found, err = src.Principal(ctx, tracker.ID)
+	if err != nil || !found || !got.AppInstallationActive || !slices.Equal(got.AppGrantedScopes, []string{"commands:write", "messages:write"}) {
+		t.Fatalf("with installation: %+v %v %v", got, found, err)
+	}
+}

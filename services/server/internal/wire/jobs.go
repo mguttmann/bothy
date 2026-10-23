@@ -125,6 +125,8 @@ type JobModules struct {
 	// InvocationHolds is the use case of runs.invocation_hold_timeout (M3-07); nil only where no
 	// job runs.
 	InvocationHolds runsjobs.Releaser
+	// AppDispatch is the use case of runs.app_dispatch (M2-25); nil only where no job runs.
+	AppDispatch runsjobs.AppDispatcher
 	// TerminalSweep is the use case of terminal.sweep (M2-46).
 	TerminalSweep terminaljobs.Sweeper
 	// TerminalSweepInterval is terminal.sweep_interval.
@@ -159,8 +161,8 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // runs.component_expiry, scheduled per card, on the queue maintenance (M2-15), terminal.sweep on
 // the queue maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), the
 // six jobs of notify on the queue delivery (M3-19, notify.gateway_send M3-23) and
-// runs.invocation_hold_timeout on the queue default (M3-07); the error is the first rejected
-// registration.
+// runs.invocation_hold_timeout (M3-07) and runs.app_dispatch (M2-25) on the queue default; the
+// error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -206,8 +208,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 }
 
 // registerRunsJobs registers the jobs of runs into reg: runs.queued_expiry (M2-08),
-// runs.cancel_timeout and runs.stall_check (M2-09), runs.component_expiry (M2-15) and
-// runs.invocation_hold_timeout (M3-07); the error is the first rejected registration.
+// runs.cancel_timeout and runs.stall_check (M2-09), runs.component_expiry (M2-15),
+// runs.invocation_hold_timeout (M3-07) and runs.app_dispatch (M2-25); the error is the first
+// rejected registration.
 func registerRunsJobs(reg *jobs.Registry, m *JobModules) error {
 	if err := runsjobs.Register(reg, m.QueuedExpiry); err != nil {
 		return err
@@ -218,7 +221,10 @@ func registerRunsJobs(reg *jobs.Registry, m *JobModules) error {
 	if err := runsjobs.RegisterComponentExpiry(reg, m.ComponentExpiry); err != nil {
 		return err
 	}
-	return runsjobs.RegisterHold(reg, m.InvocationHolds)
+	if err := runsjobs.RegisterHold(reg, m.InvocationHolds); err != nil {
+		return err
+	}
+	return runsjobs.RegisterAppDispatch(reg, m.AppDispatch)
 }
 
 // riverStep is the before-step of bothy migrate up that creates the schema of River's tables

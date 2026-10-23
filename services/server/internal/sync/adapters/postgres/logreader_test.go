@@ -5,6 +5,8 @@ package postgres_test
 import (
 	"context"
 	"testing"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
 // TestEventBySeq: the log reader of the delivery jobs (sync.LogReader, M2-26) returns a stored
@@ -25,5 +27,23 @@ func TestEventBySeq(t *testing.T) {
 	}
 	if m, err := e.repo.MinRetainedSeq(ctx); err != nil || m != 1 {
 		t.Fatalf("MinRetainedSeq = %d %v", m, err)
+	}
+}
+
+// TestEventByID: the log reader returns a stored event by its id with every field the envelope
+// needs (M2-25 design note 2 e: the interaction address of an app gets the event of its job by
+// id), and found false for an id that is not in the log.
+func TestEventByID(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t, envOptions{})
+	ctx := context.Background()
+	idList := e.mustAppend(t, 2)
+	ev, found, err := e.repo.EventByID(ctx, idList[1])
+	if err != nil || !found || ev.ID != idList[1] || ev.Seq != 2 || ev.ReceiveAction != "thread.read" ||
+		ev.ResourceKind != "thread" || string(ev.Payload) != `{"n":1}` {
+		t.Fatalf("EventByID(second) = %+v %v %v", ev, found, err)
+	}
+	if _, found, err := e.repo.EventByID(ctx, ids.New()); err != nil || found {
+		t.Fatalf("EventByID(unknown) found %v %v", found, err)
 	}
 }

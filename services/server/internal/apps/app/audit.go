@@ -44,6 +44,10 @@ const (
 	attrEventSubscriptionsRemoved = "event_subscriptions_removed"
 	attrTokensRevoked             = "tokens_revoked"
 	attrGrantsRevoked             = "grants_revoked"
+	attrCommandsAdded             = "commands_added"
+	attrCommandsChanged           = "commands_changed"
+	attrCommandsRemoved           = "commands_removed"
+	attrComponentsDisabled        = "components_disabled"
 )
 
 // codes returns list as an audit list of codes (never nil).
@@ -134,4 +138,14 @@ func sortedSet(list []string) []string {
 	out := append([]string{}, list...)
 	slices.Sort(out)
 	return slices.Compact(out)
+}
+
+// idList is a list of IDs as an audit value (the commands of a lifecycle action, M2-25 design note
+// 11; SEC-AUD-5 allows IDs).
+func idList(list []ids.ID) auditing.Value {
+	vs := make([]auditing.Value, 0, len(list))
+	for _, id := range list {
+		vs = append(vs, auditing.ID(id))
+	}
+	return auditing.List(vs...)
 }

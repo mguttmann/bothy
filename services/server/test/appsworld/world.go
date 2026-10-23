@@ -25,6 +25,8 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	agentspg "github.com/OWNER/bothy/services/server/internal/agents/adapters/postgres"
+	agentsapp "github.com/OWNER/bothy/services/server/internal/agents/app"
 	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
 	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
@@ -296,12 +298,20 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 		EmojiMaxBytes: 64, MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50},
 		pool, w.uow, az, wire.MessagingWrites{Events: w.appender, Redactor: syncpg.NewRedactor(pool), Audit: w.rec}, ch.Service, w.id.Directory, w.Clk, log)
 	Must(t, err)
+	// The commands of a manifest go through the command register of agents (M2-25); the world has
+	// no runs, so the components of an app's cards are disabled by noComponents, which finds none
+	// (no test of this world posts a card).
+	cmds, err := agentsapp.NewCommands(agentsapp.CommandConfig{MaxPerPrincipal: appsCfg.CommandMax,
+		DescriptionMaxChars: appsCfg.CommandDescriptionMaxChars, MaxChoices: 25, EventPayloadMaxBytes: 65536},
+		agentsapp.CommandDeps{Store: agentspg.NewRepository(pool), UoW: w.uow, Authorizer: az, Audit: w.rec, Events: w.appender,
+			Principals: w.id.Principals, Channels: ch.Service})
+	Must(t, err)
 	w.apps, err = wire.NewApps(cfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin,
 		Clock: w.Clk, Webhooks: wire.WebhookDeps{Config: wcfg, Keys: keys, State: instanceapp.NewState(instancepg.NewRepository(pool), w.uow),
 			Log: syncRepo, Master: master, Sender: sender, Logger: log},
 		Incoming: appsapp.IncomingConfig{MaxContentBytes: 4096, FormatsEnabled: []string{"native", "alertmanager"},
 			LastUsedGranularity: idCfg.LastActiveGranularity, PublicURL: httpservertest.PublicURL},
-		Chat: ch, Messages: msgs})
+		Chat: ch, Messages: msgs, Commands: cmds, Components: noComponents{}})
 	Must(t, err)
 	w.migrateJobs()
 	w.apps.BindJobs(w.newRuntime(jobs.RoleAPI).Inserter())
@@ -311,6 +321,12 @@ func (w *World) buildApps(o Options, pool *pg.Pool, hook *authzapp.RightsHook, a
 	Must(t, w.consumers.Register(sync.ConsumerWebhooks, w.apps.Consumer()))
 	Must(t, w.consumers.Ensure(context.Background()))
 }
+
+// noComponents is the component port of apps in a world without runs: there are no cards.
+type noComponents struct{}
+
+// DisableAuthoredBy implements appsapp.Components: nothing to disable.
+func (noComponents) DisableAuthoredBy(context.Context, ids.ID) (int, error) { return 0, nil }
 
 // Must fails t on err.
 func Must(t testing.TB, err error) {

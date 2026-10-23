@@ -171,6 +171,56 @@ func (q *Queries) ListCoveringCommands(ctx context.Context, arg ListCoveringComm
 	return items, nil
 }
 
+const listLiveCommandsOfOwner = `-- name: ListLiveCommandsOfOwner :many
+SELECT c.id, c.owner_principal_id, c.name, c.description, c.scope_kind, c.scope_space_id, c.scope_channel_id, c.options, c.required_level, c.control, c.version, c.created_at, c.removed_at, (a.principal_id IS NOT NULL)::boolean AS owner_is_agent
+FROM commands c
+LEFT JOIN agents a ON a.principal_id = c.owner_principal_id
+WHERE c.owner_principal_id = $1 AND c.removed_at IS NULL
+ORDER BY c.id
+`
+
+type ListLiveCommandsOfOwnerRow struct {
+	Command      Command
+	OwnerIsAgent bool
+}
+
+// The live commands of one owner, ascending by id: the uninstallation of an app removes them all
+// (M2-25, RemoveAllOwned).
+func (q *Queries) ListLiveCommandsOfOwner(ctx context.Context, ownerPrincipalID pgtype.UUID) ([]ListLiveCommandsOfOwnerRow, error) {
+	rows, err := q.db.Query(ctx, listLiveCommandsOfOwner, ownerPrincipalID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLiveCommandsOfOwnerRow
+	for rows.Next() {
+		var i ListLiveCommandsOfOwnerRow
+		if err := rows.Scan(
+			&i.Command.ID,
+			&i.Command.OwnerPrincipalID,
+			&i.Command.Name,
+			&i.Command.Description,
+			&i.Command.ScopeKind,
+			&i.Command.ScopeSpaceID,
+			&i.Command.ScopeChannelID,
+			&i.Command.Options,
+			&i.Command.RequiredLevel,
+			&i.Command.Control,
+			&i.Command.Version,
+			&i.Command.CreatedAt,
+			&i.Command.RemovedAt,
+			&i.OwnerIsAgent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeCommand = `-- name: RemoveCommand :one
 UPDATE commands SET removed_at = now(), version = version + 1
 WHERE id = $1 AND version = $2 AND removed_at IS NULL

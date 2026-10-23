@@ -90,6 +90,13 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   the `getPushPreview` requests that carry it, which no sink captures. The scenario server
   enables `apns` against Fake-APNs (`PushRunOptions`): it runs in role `all`, where an enabled
   `fcm` would build the real FCM adapter, and the harness has a fake only for APNs.
+  The app way (M2-25, `scenario_appway.go`): the app Ticketing, whose manifest declares
+  `delivery.interactions_url` at the fake app of `test/apps/fakeapp` (TLS on `127.0.0.1`, reached as
+  `ticketing.example.com` through a test resolver and listed in `webhook.allowed_hosts`), has write
+  on Support/Eskalation; Alex runs `/ticket` with a canary option value (`202`), the fake app
+  answers with a `MessageCreate` whose text is a canary, so the server writes a reply in
+  Ticketing's name; Ticketing posts a card with a form and Alex submits it with a canary value
+  (`201`), which the job `runs.app_dispatch` sends to the fake app.
 
 ## Sinks
 
@@ -136,6 +143,15 @@ card are `content` of Support/Allgemein. The events of Lotse's consumer are fore
 without their `invocation_token`, the agent's own credential of the delivery; the tokens are
 secrets and may appear nowhere.
 
+The values of the app way (M2-25) are `content`. The form value of the Ticketing card and the
+option value of `/ticket` belong to a scope only Ticketing reads: they may appear only in the success
+bodies of `invokeCommand` (`202`) and `createInteraction` (`201`) to Alex (no sink captures them),
+in the requests to Ticketing's interaction address and in the events to Ticketing. The canary text of
+the fake app's reply is `content` of the reply's thread: it may appear only in that message for
+its readers. None of them may appear in logs at level debug, traces, metrics, audit rows, error
+bodies or the frames and pages of Sam and Robin; the log line of a request to the app carries no
+URL path, header value, body, option or form value.
+
 Echo fields (ruling M1-69/2) are the fields of an error response the contract returns to the
 caller: `current` of `version_conflict` and `base_version_conflict` (06 "Errors" item 3, the
 representation the caller may read) and the `pointer` of an `unknown_member` error, which names
@@ -168,6 +184,7 @@ cannot call goes into `Exempt` with its reason; the expected list is empty.
   unrelated digits.
 - Transcripts, search terms and tool arguments: their tickets in M2 and M3 extend the scenario
   (channel prompts and skill references since M2-02, file names since M3-03, component form
-  values since M2-15, push device tokens and preview tokens since M3-22).
+  values since M2-15, push device tokens and preview tokens since M3-22, app form values,
+  option values and reply texts since M2-25).
 - The `current` member of a 412 and the `pointer` of `unknown_member` are judged as echoes to the
   caller, not as leaks (ruling M1-69/2).

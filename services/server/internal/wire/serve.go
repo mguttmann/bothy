@@ -173,6 +173,13 @@ type Deps struct {
 	// reaches them, and nil means the two Apple hosts and the system roots, as in production.
 	APNsEndpoints map[string]string
 	APNsRootCAs   *x509.CertPool
+	// AppsEgress are the resolver, the trusted TLS roots and the counter of refused attempts of the
+	// two egress clients of the module apps: the outgoing webhooks (M2-26) and the interaction
+	// addresses of apps (M2-25). They exist for in-process tests against a fake receiver; no
+	// configuration key, flag or environment variable reaches them, and the zero value means the
+	// system resolver, the system roots and no counter, as in production. The logger is always the
+	// process's.
+	AppsEgress egress.Deps
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.

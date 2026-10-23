@@ -23,6 +23,8 @@ import (
 // decided.
 type CardMessages interface {
 	LockCard(ctx context.Context, messageID ids.ID) (messaging.CardFacts, error)
+	// Authors reads the authors of messages (M2-25, DisableAuthoredBy).
+	Authors(ctx context.Context, messageIDs []ids.ID) (map[ids.ID]ids.ID, error)
 	ComponentsChanged(ctx context.Context, messageID ids.ID) (int64, error)
 	CardFits(ctx context.Context, messageID ids.ID) error
 	PrincipalOf(ctx context.Context, principalID ids.ID) (messaging.PrincipalRef, error)
@@ -105,7 +107,8 @@ func domainInputs(list []messaging.ComponentInput) []domain.ComponentInput {
 // earliest expires_at. It is the Attach of messaging.ComponentWriter. messages.run_id stays NULL:
 // the run of a card lives in message_components.run_id (ruling D-M2-15-6).
 //
-// Errors: internal outside a unit of work or for an author that is no agent; 400 and 403 as above;
+// Errors: internal outside a unit of work or for an author that is neither agent nor app (an app
+// card has no run and no supports_components, M2-25); 400 and 403 as above;
 // the errors of the database and the scheduler.
 func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messaging.CheckedCard) ([]messaging.Component, error) {
 	if err := needUnit(ctx, "AttachCard"); err != nil {
@@ -115,8 +118,13 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 		return nil, err
 	}
 	in := card.Input
-	if in.AuthorKind != string(actor.KindAgent) || in.AuthorID.IsZero() || in.ThreadID.IsZero() {
-		return nil, errs.New(errs.CodeInternalError, "runs: a card of a principal that is no agent, or without its thread")
+	app := in.AuthorKind == string(actor.KindApp)
+	if in.AuthorKind != string(actor.KindAgent) && !app || in.AuthorID.IsZero() || in.ThreadID.IsZero() {
+		return nil, errs.New(errs.CodeInternalError, "runs: a card of a principal that is neither agent nor app, or without its thread")
+	}
+	if app && !in.RunID.IsZero() {
+		// messaging refuses run_id of an app (M2-19); an app has no runs (11 section 2).
+		return nil, errs.New(errs.CodeInternalError, "runs: a card of an app bound to a run")
 	}
 	checked, _, err := domain.CheckCard(domainInputs(in.Components), in.Now, s.cardLimits())
 	if err != nil {
@@ -125,13 +133,10 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 	if err := s.checkCardRun(ctx, in); err != nil {
 		return nil, err
 	}
-	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{in.AuthorID})
-	if err != nil {
-		return nil, err
-	}
-	if !facts[in.AuthorID].ComponentsAllowed {
-		// The owner switched the capability off (09 2.2, R-AG-01; ruling D-M2-15-5).
-		return nil, errs.New(errs.CodeFeatureDisabled, "the owner switched components off for this agent")
+	if !app {
+		if err := s.componentsAllowed(ctx, in.AuthorID); err != nil {
+			return nil, err
+		}
 	}
 	rows, earliest := componentRows(messageID, in.RunID, checked)
 	if err := s.d.Components.InsertComponents(ctx, rows); err != nil {
@@ -145,6 +150,21 @@ func (s *Service) AttachCard(ctx context.Context, messageID ids.ID, card messagi
 		out[i] = messagingComponent(r)
 	}
 	return out, nil
+}
+
+// componentsAllowed refuses a card of an agent whose owner switched supports_components off (09
+// 2.2, R-AG-01; ruling D-M2-15-5) with 403 feature_disabled. An app has no agent record, and its
+// manifest's components list is only for the consent (11 section 3.1; M2-25 design note 6), so
+// the caller skips the check for apps.
+func (s *Service) componentsAllowed(ctx context.Context, agent ids.ID) error {
+	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{agent})
+	if err != nil {
+		return err
+	}
+	if !facts[agent].ComponentsAllowed {
+		return errs.New(errs.CodeFeatureDisabled, "the owner switched components off for this agent")
+	}
+	return nil
 }
 
 // checkCardRun share-locks the run of a card's run_id and checks that it is an active run of the

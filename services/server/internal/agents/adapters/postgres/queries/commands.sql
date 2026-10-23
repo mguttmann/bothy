@@ -51,3 +51,12 @@ WHERE c.removed_at IS NULL
   AND (sqlc.narg(owner_principal_id)::uuid IS NULL OR c.owner_principal_id = sqlc.narg(owner_principal_id)::uuid)
   AND (sqlc.narg(lower_name)::text IS NULL OR lower(c.name) = sqlc.narg(lower_name)::text)
 ORDER BY c.id;
+
+-- name: ListLiveCommandsOfOwner :many
+-- The live commands of one owner, ascending by id: the uninstallation of an app removes them all
+-- (M2-25, RemoveAllOwned).
+SELECT sqlc.embed(c), (a.principal_id IS NOT NULL)::boolean AS owner_is_agent
+FROM commands c
+LEFT JOIN agents a ON a.principal_id = c.owner_principal_id
+WHERE c.owner_principal_id = @owner_principal_id AND c.removed_at IS NULL
+ORDER BY c.id;

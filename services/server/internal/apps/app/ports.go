@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/apps/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -135,4 +136,20 @@ type Scopes interface {
 type Cursors interface {
 	Encode(list string, binding []byte, key any) (string, error)
 	Decode(list string, binding []byte, s string, key any) error
+}
+
+// Commands is the consumer port of agents for the commands of a manifest (agents.OwnedCommands,
+// M2-25 design note 11): the owner action decided and audited here, so the methods authorize
+// nothing and write no audit entry of their own.
+type Commands interface {
+	UpsertOwned(ctx context.Context, ownerID ids.ID, def agents.RegisterCommand) (c agents.Command, changed bool, err error)
+	RemoveOwned(ctx context.Context, ownerID ids.ID, names []string) ([]ids.ID, error)
+	RemoveAllOwned(ctx context.Context, ownerID ids.ID) ([]ids.ID, error)
+}
+
+// Components is the consumer port of runs for the components of an app's cards
+// (runs.Interactions.DisableAuthoredBy, M2-25 design note 11): app.suspend and app.uninstall
+// disable them; the messages stay.
+type Components interface {
+	DisableAuthoredBy(ctx context.Context, authorID ids.ID) (int, error)
 }

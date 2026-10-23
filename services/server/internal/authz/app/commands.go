@@ -82,8 +82,12 @@ func (a *Authorizer) commandFacts(ctx context.Context, s *actingPrincipal, spec 
 	if f == nil {
 		return nil, nil
 	}
+	owner := r.OwnerID
+	if !f.OwnerID.IsZero() {
+		owner = f.OwnerID
+	}
 	out := &domain.CommandFacts{
-		OwnerID: r.OwnerID, OwnerKind: f.OwnerKind, ScopeKind: f.ScopeKind, ScopeSpaceID: f.ScopeSpaceID, ScopeChannelID: f.ScopeChannelID,
+		OwnerID: owner, OwnerKind: f.OwnerKind, ScopeKind: f.ScopeKind, ScopeSpaceID: f.ScopeSpaceID, ScopeChannelID: f.ScopeChannelID,
 		Offered: !f.OfferedInChannelID.IsZero(), RequiredLevel: f.RequiredLevel, Control: f.Control, ActiveRun: f.ActiveRun,
 	}
 	if spec.ID == string(authorize.ActionCommandRegister) && f.ScopeKind == commandScopeSpace {
@@ -94,10 +98,10 @@ func (a *Authorizer) commandFacts(ctx context.Context, s *actingPrincipal, spec 
 		d, ok := details[f.ScopeSpaceID]
 		out.SpaceDefaultOperator = ok && !d.DefaultOperatorID.IsZero() && d.DefaultOperatorID == s.id
 	}
-	if !out.Offered || res.path.Kind != domain.PathChannel || r.OwnerID.IsZero() {
+	if !out.Offered || res.path.Kind != domain.PathChannel || owner.IsZero() {
 		return out, nil
 	}
-	if err := a.ownerOffer(ctx, s, r.OwnerID, res, t, out); err != nil {
+	if err := a.ownerOffer(ctx, s, owner, res, t, out); err != nil {
 		return nil, err
 	}
 	return out, nil

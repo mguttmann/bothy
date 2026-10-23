@@ -220,6 +220,11 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | I | Webhook to a private target (DNS rebinding) | host list `webhook.allowed_hosts`, egress client with an address check at connection setup, no redirects (M2-26) | T-NW-01 |
 | I | HMAC secret from the database or the idempotency store | derived, never stored, one-time response (M2-26) | T-TK-02 |
 | D | Slow receiver congests deliveries | order per subscription, queue `delivery`, delivery quota, disabling (M2-26) | T-DS-01 |
+| S | Forged request to the interaction address of an app | `v1a` with purpose `webhook_out`, checked by the app against `getWebhookKeys`; no token or secret is sent to the app (M2-25) | T-PL-01 |
+| I | Form values and options leave the instance | only to the owning app, only `https` to a host in `webhook.allowed_hosts` checked before the egress client, no redirects, canary test (SEC-T10; M2-25) | T-PL-01 |
+| D | Slow interaction address | bound by `app.interaction_timeout`, job without retry after the request, queue `default`; the component stays `used` (M2-25) | T-DS-01 |
+| E | App command or reply triggers an agent | `origin = app`, no `agent.invoke`, no run and no `trigger_state` (SR4; M2-25) | T-PL-01 |
+| E | App card imitates a system header | header from server fields, author and `origin` set by the server, an app card has no run (SEC-OUT-4; M2-25) | T-PL-01 |
 
 ### 5.12 Push
 
@@ -342,7 +347,7 @@ Pairing, relay, host service and terminal view ([24-terminal.md](../spec/24-term
 
 | ID | Threat | L | I | Mitigations | Tests | Residual risk |
 |---|---|---|---|---|---|---|
-| T-PL-01 | **Malicious plugin or app.** Reads everything within its scopes, deceives people with cards or messages. | medium | medium | apps never in the server process (B6), scopes plus grants, at most `write`, no triggering, installation only by owners with step-up, badge "App" (SEC-OUT-3), webhooks only to allowed targets | AZ-M32 to AZ-M34, AZ-M49; M2-24: `TestAZM32_AppWritesWithGrantAndScope`, `TestAZM33_AppReadWithoutScope`, `TestAZM34_AppWithoutGrant`, `TestInstallApp_RejectsInvalidManifests`, `TestValidateManifest_Rules`, `TestInstallApp_OwnerStepUpAudit`, `TestUpgrade_NewScopesStayInactive`, `TestUpgrade_RemovedScopeActsAtOnce`, `TestSuspendResume`, `TestAppAccessChanged_SuspendResumeUninstall`, `TestAppAuditDetails_Shape`, `TestAppEventScope_AllCatalogueEvents` | medium: what an app may read, it can exfiltrate; that is trust in the provider of the app |
+| T-PL-01 | **Malicious plugin or app.** Reads everything within its scopes, deceives people with cards or messages. | medium | medium | apps never in the server process (B6), scopes plus grants, at most `write`, no triggering, installation only by owners with step-up, badge "App" (SEC-OUT-3), webhooks only to allowed targets | AZ-M32 to AZ-M34, AZ-M49; M2-24: `TestAZM32_AppWritesWithGrantAndScope`, `TestAZM33_AppReadWithoutScope`, `TestAZM34_AppWithoutGrant`, `TestInstallApp_RejectsInvalidManifests`, `TestValidateManifest_Rules`, `TestInstallApp_OwnerStepUpAudit`, `TestUpgrade_NewScopesStayInactive`, `TestUpgrade_RemovedScopeActsAtOnce`, `TestSuspendResume`, `TestAppAccessChanged_SuspendResumeUninstall`, `TestAppAuditDetails_Shape`, `TestAppEventScope_AllCatalogueEvents`; M2-25: `TestAppCardRules`, `TestAppNeverTriggersAgent`, `TestInteractionsURLSecurity`, `TestAppCommandsSkipI2` | medium: what an app may read, it can exfiltrate; that is trust in the provider of the app |
 | T-UP-01 | **Malicious uploads** (malware, bombs, active content, location data). | high | medium | SEC-UP-1 to SEC-UP-11 | SEC-T08 | low; the virus scan does not detect everything, hence no inline rendering of active formats |
 | T-NW-01 | **SSRF.** | medium | high | no loading of foreign URLs, egress client with IP check at connection setup (SEC-NET-*) | SEC-T09 | low |
 | T-NW-02 | **Eavesdropping or redirection on the network.** | medium | high | TLS, HSTS, `verify-full`, no disabled certificate verification | SEC-T01, SEC-T02, SEC-T17 | low |

@@ -170,6 +170,18 @@
       "doc": "Largest page size; a larger limit is capped."
     },
     {
+      "name": "app.interaction_timeout",
+      "env": "BOTHY_APP__INTERACTION_TIMEOUT",
+      "kind": "duration",
+      "default": "3s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "11-extensions.md",
+      "doc": "Time limit of one synchronous request to the interactions_url of an app, the answer included."
+    },
+    {
       "name": "app.manifest_max_bytes",
       "env": "BOTHY_APP__MANIFEST_MAX_BYTES",
       "kind": "int",

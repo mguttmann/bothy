@@ -143,7 +143,7 @@ func newACWorld(t *testing.T) *acWorld {
 	if err := w.svc.BindCommands(aw.reg); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.svc.BindAutocomplete(app.AutocompleteConfig{Timeout: acTimeout, MaxChoices: 3},
+	if err := w.svc.BindAutocomplete(app.AutocompleteConfig{Timeout: acTimeout, MaxChoices: 3, InteractionTimeout: acTimeout / 2},
 		app.AutocompleteDeps{Relay: aw.relay, After: aw.timers.after}); err != nil {
 		t.Fatal(err)
 	}
@@ -270,14 +270,17 @@ func TestAutocomplete_NotSentGivesEmptyAtOnce(t *testing.T) {
 	}
 }
 
-// TestAutocomplete_AppOwnerAndForumWithoutThread: an app owner is never asked (until M2-25); an
-// agent owner in a forum without thread_id is checked as for a new thread and never asked
-// (R-AZ-26); a denial still gives its error.
+// TestAutocomplete_AppOwnerAndForumWithoutThread: an app whose installation is not active is never
+// asked (M2-25 design note 10); an agent owner in a forum without thread_id is checked as for a new
+// thread and never asked (R-AZ-26); a denial still gives its error.
 func TestAutocomplete_AppOwnerAndForumWithoutThread(t *testing.T) {
 	w := newACWorld(t)
 	app := agents.Command{ID: w.trackID, OwnerPrincipalID: ids.New(), OwnerKind: "app", Name: "track", ScopeKind: "instance",
 		Options: []agents.CommandOption{{Name: "ticket", Type: "string", Autocomplete: true}}, RequiredLevel: "write"}
 	w.reg[app.ID] = app
+	if err := w.svc.BindAppDispatcher(&fakeDispatcher{way: runs.AppWayInactive}); err != nil {
+		t.Fatal(err)
+	}
 	q := w.query()
 	q.CommandID = app.ID
 	r, err := w.svc.Autocomplete(alexCtx(w), q)
@@ -475,4 +478,91 @@ func TestAutocomplete_TokenIsNotARunToken(t *testing.T) {
 	if _, err := w.inv.svc.Verify(context.Background(), tok, app.VerifyInvocation{Audience: w.lotse}); err != nil {
 		t.Fatalf("Verify without a run: %v", err)
 	}
+}
+
+// TestAutocomplete_AppWays (M2-25 design note 10): an app without interactions_url is asked through
+// one gateway connection without a token; an app with one is asked through its address with the
+// earlier of the person's wait and app.interaction_timeout as deadline: an answer gives its
+// choices, 202 waits for answerAutocomplete for the rest of the wait, every other outcome gives an
+// empty list at once. Never a token, never a run.
+func TestAutocomplete_AppWays(t *testing.T) {
+	tracker := ids.New()
+	appCmd := func(w *acWorld) runs.AutocompleteQuery {
+		c := agents.Command{ID: w.trackID, OwnerPrincipalID: tracker, OwnerKind: "app", Name: "track", ScopeKind: "instance",
+			Options: []agents.CommandOption{{Name: "queue", Type: "string", Autocomplete: true}}, RequiredLevel: "trigger"}
+		w.reg[c.ID] = c
+		q := w.query()
+		q.CommandID, q.Option = c.ID, "queue"
+		return q
+	}
+	t.Run("gateway", func(t *testing.T) {
+		w := newACWorld(t)
+		if err := w.svc.BindAppDispatcher(&fakeDispatcher{way: runs.AppWayGateway}); err != nil {
+			t.Fatal(err)
+		}
+		q := appCmd(w)
+		done := make(chan runs.AutocompleteResult, 1)
+		go func() {
+			r, _ := w.svc.Autocomplete(alexCtx(w), q)
+			done <- r
+		}()
+		<-w.timers.starts
+		calls := w.relay.list()
+		if len(calls) != 1 || calls[0].token != "" || calls[0].owner != tracker || calls[0].ev.Audience != tracker {
+			t.Fatalf("relay %+v", calls)
+		}
+		ctx := actor.WithActor(context.Background(), actor.Actor{ID: tracker, Kind: actor.KindApp})
+		if err := w.svc.AnswerAutocomplete(ctx, runs.AutocompleteAnswer{RequestID: calls[0].request,
+			Choices: []runs.Choice{{Name: "Printer", Value: "printer"}}}); err != nil {
+			t.Fatal(err)
+		}
+		if r := <-done; len(r.Choices) != 1 || r.Choices[0].Value != "printer" {
+			t.Fatalf("result %+v", r)
+		}
+	})
+	t.Run("interactions_url", func(t *testing.T) {
+		cases := []struct {
+			name string
+			out  runs.AppOutcome
+			want int
+		}{
+			{"answered", runs.AppOutcome{Answered: true, Choices: []runs.Choice{{Name: "Printer", Value: "printer"}}}, 1},
+			{"timeout", runs.AppOutcome{Reason: runs.AppReasonTimeout}, 0},
+			{"invalid", runs.AppOutcome{Reason: runs.AppReasonInvalidReply}, 0},
+		}
+		for _, c := range cases {
+			w := newACWorld(t)
+			d := &fakeDispatcher{way: runs.AppWayInteractionsURL, ask: c.out}
+			if err := w.svc.BindAppDispatcher(d); err != nil {
+				t.Fatal(err)
+			}
+			r, err := w.svc.Autocomplete(alexCtx(w), appCmd(w))
+			if err != nil || r.Choices == nil || len(r.Choices) != c.want || len(w.relay.list()) != 0 || len(w.timers.list()) != 0 {
+				t.Fatalf("%s: %+v %v", c.name, r, err)
+			}
+			if len(d.asks) != 1 || d.asks[0].AppID != tracker || !d.asks[0].Deadline.Equal(w.clk.Now().UTC().Add(acTimeout/2)) {
+				t.Fatalf("%s: asks %+v", c.name, d.asks)
+			}
+		}
+	})
+	t.Run("deferred", func(t *testing.T) {
+		w := newACWorld(t)
+		d := &fakeDispatcher{way: runs.AppWayInteractionsURL, ask: runs.AppOutcome{Deferred: true}}
+		if err := w.svc.BindAppDispatcher(d); err != nil {
+			t.Fatal(err)
+		}
+		q := appCmd(w)
+		done := make(chan runs.AutocompleteResult, 1)
+		go func() {
+			r, _ := w.svc.Autocomplete(alexCtx(w), q)
+			done <- r
+		}()
+		if left := <-w.timers.starts; left > acTimeout {
+			t.Fatalf("waits %v, longer than command.autocomplete_timeout", left)
+		}
+		w.timers.fire <- w.clk.Now()
+		if r := <-done; r.Choices == nil || len(r.Choices) != 0 {
+			t.Fatalf("result %+v", r)
+		}
+	})
 }

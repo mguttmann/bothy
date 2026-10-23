@@ -47,6 +47,61 @@ func (q *Queries) EnsurePartitions(ctx context.Context, arg EnsurePartitionsPara
 	return column_1, err
 }
 
+const eventByID = `-- name: EventByID :many
+SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
+       channel_id, thread_id, resource_kind, resource_id, resource_version, audience_principal_id,
+       receive_action, payload, truncated, redacted_at, correlation_id, trace_context,
+       client_msg_id, permission_version
+FROM event_log
+WHERE id = $1::uuid
+LIMIT 1
+`
+
+// One event by its id for the interaction address of an app (M2-25); no row when retention
+// removed it. id is unique together with seq (03 event_log), so at most one row matches.
+func (q *Queries) EventByID(ctx context.Context, id pgtype.UUID) ([]EventLog, error) {
+	rows, err := q.db.Query(ctx, eventByID, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EventLog
+	for rows.Next() {
+		var i EventLog
+		if err := rows.Scan(
+			&i.Seq,
+			&i.ID,
+			&i.Type,
+			&i.SchemaVersion,
+			&i.OccurredAt,
+			&i.ActorKind,
+			&i.ActorPrincipalID,
+			&i.SpaceID,
+			&i.ChannelID,
+			&i.ThreadID,
+			&i.ResourceKind,
+			&i.ResourceID,
+			&i.ResourceVersion,
+			&i.AudiencePrincipalID,
+			&i.ReceiveAction,
+			&i.Payload,
+			&i.Truncated,
+			&i.RedactedAt,
+			&i.CorrelationID,
+			&i.TraceContext,
+			&i.ClientMsgID,
+			&i.PermissionVersion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const eventBySeq = `-- name: EventBySeq :many
 SELECT seq, id, type, schema_version, occurred_at, actor_kind, actor_principal_id, space_id,
        channel_id, thread_id, resource_kind, resource_id, resource_version, audience_principal_id,

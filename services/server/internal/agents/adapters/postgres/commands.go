@@ -226,3 +226,21 @@ func commandWriteError(err error, what string) error {
 	}
 	return mapError(err, what)
 }
+
+// LiveCommandsOfOwner implements app.CommandStore (M2-25): the live commands of owner, ascending by
+// id.
+func (r *Repository) LiveCommandsOfOwner(ctx context.Context, owner ids.ID) ([]domain.Command, error) {
+	rows, err := r.read(ctx).ListLiveCommandsOfOwner(ctx, uuid(owner))
+	if err != nil {
+		return nil, mapError(err, "listing the commands of an owner")
+	}
+	out := make([]domain.Command, 0, len(rows))
+	for _, row := range rows {
+		c, err := toCommand(row.Command, row.OwnerIsAgent)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}

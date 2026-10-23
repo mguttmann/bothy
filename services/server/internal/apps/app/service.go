@@ -59,6 +59,12 @@ type Deps struct {
 	Webhooks *WebhookService
 	// Incoming are the incoming webhooks: uninstall revokes them (M2-27 design note 11 a).
 	Incoming *IncomingService
+	// Commands writes the commands of the manifest at install and upgrade and removes them at
+	// uninstall (agents, M2-25 design note 11).
+	Commands Commands
+	// Components disables the components of the app's cards at suspend and uninstall (runs,
+	// M2-25 design note 11).
+	Components Components
 	// SpecVersion is the version of the API contract (routes.SpecVersion) min_api_version is
 	// compared with.
 	SpecVersion string
@@ -81,7 +87,8 @@ var _ apps.Apps = (*Service)(nil)
 // is no SemVer or an entry of webhook.allowed_hosts that is no host[:port].
 func New(cfg Config, d Deps) (*Service, error) {
 	if d.Repo == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil || d.Principals == nil || d.Tokens == nil ||
-		d.Grants == nil || d.Rights == nil || d.Scopes == nil || d.Cursors == nil || d.Webhooks == nil || d.Incoming == nil {
+		d.Grants == nil || d.Rights == nil || d.Scopes == nil || d.Cursors == nil || d.Webhooks == nil || d.Incoming == nil ||
+		d.Commands == nil || d.Components == nil {
 		return nil, errors.New("apps: New needs every collaborator")
 	}
 	if cfg.ManifestMaxBytes < 1 || cfg.CommandMax < 1 || cfg.CommandDescriptionMaxChars < 1 || cfg.HandleMaxChars < 1 ||

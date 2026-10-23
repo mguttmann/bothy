@@ -506,6 +506,11 @@ type Messages interface {
 	// note 2 b) and returns its facts; it never authorizes, runs decided. Errors: internal outside
 	// a unit of work; not_found for an unknown message (a tombstone is returned with Deleted).
 	LockCard(ctx context.Context, messageID ids.ID) (CardFacts, error)
+	// Authors returns author_principal_id of the known messages among messageIDs for runs (M2-25:
+	// DisableAuthoredBy keeps the cards of a suspended or uninstalled app); an unknown id is
+	// absent. It reads only the author, checks nothing and never authorizes: the owner authorized
+	// app.suspend or app.uninstall. Errors: the database error.
+	Authors(ctx context.Context, messageIDs []ids.ID) (map[ids.ID]ids.ID, error)
 	// ComponentsChanged raises messages.version of the card by one and appends message.updated
 	// with the representation of the message, its current components included, in the ambient
 	// unit of work (M2-15 design note 2 b; 05 section 6 "component state"). The caller holds the
