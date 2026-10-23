@@ -116,8 +116,8 @@ func TestFakeAppVerifiesSignature(t *testing.T) {
 }
 
 // TestFakeAppScript: the queue answers in order, then the handler; a redirect is not followed by
-// an egress client without redirects, so its target records nothing; a hanging answer ends with
-// the client's deadline; WaitRequests wakes on each request.
+// an egress client without redirects, so its target records nothing; a hanging answer ends when
+// the client gives up; WaitRequests wakes on each request.
 func TestFakeAppScript(t *testing.T) {
 	t.Parallel()
 	app := fakeapp.Start(t, nil)
@@ -164,14 +164,22 @@ func TestFakeAppScript(t *testing.T) {
 	}
 
 	app.Respond(fakeapp.Response{Hang: true})
-	short, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
-	defer cancel()
-	if _, _, err := post(short, c, app.URL("/hooks"), nil, []byte(`{}`)); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("hanging answer ended with %v, want the deadline", err)
-	}
+	hang, giveUp := context.WithCancel(ctx)
+	defer giveUp()
+	ended := make(chan error, 1)
+	go func() {
+		_, _, err := post(hang, c, app.URL("/hooks"), nil, []byte(`{}`))
+		ended <- err
+	}()
+	// The client gives up only after the app recorded the hanging request, so the request is
+	// recorded on a loaded host too.
 	got, err := app.WaitRequests(testkit.Context(t), 9)
 	if err != nil || len(got) != 9 {
 		t.Fatalf("WaitRequests = %d %v", len(got), err)
+	}
+	giveUp()
+	if err := testkit.Receive(t, "the end of the hanging request", ended); !errors.Is(err, context.Canceled) {
+		t.Fatalf("hanging answer ended with %v, want the client's cancellation", err)
 	}
 }
 
