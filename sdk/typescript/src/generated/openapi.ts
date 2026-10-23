@@ -2355,7 +2355,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start a new agent session in the thread */
+        /**
+         * Start a new agent session in the thread
+         * @description Ends the current session of the thread with `end_reason = reset` and returns the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
+         */
         post: operations["resetAgentSession"];
         delete?: never;
         options?: never;
@@ -2374,7 +2377,7 @@ export interface paths {
         put?: never;
         /**
          * Bind an existing external session
-         * @description Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+         * @description Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
          */
         post: operations["bindAgentSession"];
         delete?: never;
@@ -2392,7 +2395,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Report the external session reference and model */
+        /**
+         * Report the external session reference and model
+         * @description The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+         */
         post: operations["reportAgentSession"];
         delete?: never;
         options?: never;
@@ -7112,10 +7118,23 @@ export interface components {
             take_over: boolean;
         };
         AgentSessionReport: {
-            /** @example sess-7f3a */
+            /**
+             * @description The reference the runtime actually uses; a different one replaces the stored reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
+             * @example sess-7f3a
+             */
             external_session_ref: string;
-            /** @example model-large */
+            /**
+             * @description The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
+             * @example model-large
+             */
             model?: string;
+            /** @description `true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it. */
+            started?: boolean;
+            /**
+             * @description The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
+             * @enum {string}
+             */
+            bind_failed?: "session_missing";
         };
         /** @enum {string} */
         MessageKind: "text" | "voice" | "run" | "card" | "system";
@@ -9123,7 +9142,13 @@ export interface components {
             options?: components["schemas"]["CommandOptionValue"][];
             triggered_by: components["schemas"]["PrincipalRef"];
             billing_mode: components["schemas"]["BillingMode"];
+            /** @description The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`. */
             agent_session?: components["schemas"]["AgentSession"];
+            /**
+             * @description `session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread's operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).
+             * @enum {string}
+             */
+            session_mode?: "new" | "resume" | "bind";
             /**
              * Format: int64
              * @description Channel settings version; reload `agent.config.read` when newer than cached.
@@ -16594,6 +16619,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -16634,6 +16660,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -16656,6 +16683,8 @@ export interface operations {
             header?: {
                 /** @description UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`. */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+                /** @description Optional ETag; when given, a mismatch gives 412 `version_conflict`. */
+                "If-Match"?: components["parameters"]["IfMatchOptional"];
             };
             path: {
                 thread_id: components["parameters"]["ThreadIdPath"];
@@ -16674,6 +16703,7 @@ export interface operations {
                     "Correlation-Id": components["headers"]["Correlation-Id"];
                     RateLimit: components["headers"]["RateLimit"];
                     "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -16684,6 +16714,8 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];

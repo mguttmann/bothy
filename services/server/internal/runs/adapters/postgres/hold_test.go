@@ -215,6 +215,11 @@ func (t trigger) TriggerMessageOf(_ context.Context, id ids.ID) (messaging.Trigg
 		Author: messaging.PrincipalRef{ID: t.author, Kind: "user", Handle: "alex", DisplayName: "Alex"}}, nil
 }
 
+// AppendSystemLine is unused by the release; it writes no system line.
+func (trigger) AppendSystemLine(context.Context, messaging.SystemLine) (messaging.Message, error) {
+	return messaging.Message{}, nil
+}
+
 // PrincipalRefs is unused by the release; it renders no principal.
 func (trigger) PrincipalRefs(context.Context, []ids.ID) (map[ids.ID]messaging.PrincipalRef, error) {
 	return map[ids.ID]messaging.PrincipalRef{}, nil

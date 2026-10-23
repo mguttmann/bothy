@@ -1,6 +1,6 @@
 # Module `agents`
 
-Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); commands, agent sessions and dev environments follow with the tickets of the milestone.
+Status: agent records, backend policy, credential holder and tool class built (M1-51); consumer cursors with fencing, the op `ack` and the REST consumer operations built (M2-07); presence and heartbeat built (M2-20); the read of persisted heartbeats for the stall check built (M2-09); agent sessions per thread built (M2-12); dev environments follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -79,6 +79,64 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 - Configuration keys: `agent.ack_timeout`, `agent.ack_persist_interval`,
   `agent.max_inflight_events` (bound by the gateway engine).
 - Rulings: docs/DECISIONS.md M2-07.
+
+## Sessions (M2-12)
+
+- Port (`sessions.go`): `Sessions` with six methods. For people and adapters through
+  `adapters/httpapi` (`AgentSessions`): `List` (`listAgentSessions`, `agent_session.read`, every
+  row of the thread newest first by `created_at`, then `id`, unpaginated), `Reset`
+  (`resetAgentSession`, `agent_session.reset`), `Bind` (`bindAgentSession`, `agent_session.bind`)
+  and `Report` (`reportAgentSession`, `agent_session.report`, agent-self). For `runs`, in the
+  caller's unit of work and without authorization: `ForInvocation(ctx, InvocationSessionQuery)`
+  in the transaction that appends `agent.invocation` of an operator run (returns the session row
+  or none; `runs/domain` decides `session_mode` from it), and `AttachOnStart(ctx,
+  AttachOnStartCmd)` at `queued -> running` of `run.start` (returns the ID of the attached row, zero for none). `CheckStartModel(model)` validates the `model` of `startRun` and `resumeRun` before the transition stores it (D-M2-12-20).
+  DTO `Session` (every column `AgentSession` shows plus `CostBaselineMicros`), `SessionJSON` for
+  the payload of `agent_session.changed`, the end reasons, `bind_failed` and the conflict reasons
+  as constants.
+- Declared source `RunSource` with `ActiveRun(ctx, threadID)`: the run of the thread in `queued`,
+  `running` or `waiting_input`, its row locked `FOR UPDATE`. `runs` implements it in its postgres
+  adapter and `internal/wire` wires it; `agents` never imports `runs`.
+- In-Tx event `SessionAttached{ThreadID, RunID, AgentID, SessionID, ReplacedSessionID,
+  BindFailed}`: a report created the run's row, or `bind_failed` replaced it. The subscriber
+  `runs.OnSessionAttached` sets `runs.agent_session_id` and, with `BindFailed`, writes the system
+  line `agent_session.resume_failed` with the run's agent as author through
+  `messaging.Messages.AppendSystemLine` (it never reopens a closed thread, R-DM-42).
+- Rules: a thread has at most one current row and an external session (`agent_id`,
+  `external_session_ref`) is current in at most one thread (the two partial unique indexes of
+  03; every insert uses `ON CONFLICT DO NOTHING` and maps the outcome, so no unique violation reaches
+  a client as `500`). End reasons `reset` (reset), `rebind` (bind, take-over, `bind_failed`), `import`
+  (import rows, written by the importer) and `agent_changed` (the next invocation after an
+  operator change). Reset without a current row is 409 `conflict` with `reason` `no_current_session`; a reset or bind
+  during a run leaves the run on its row. Bind is a compare-and-swap over
+  `expected_current_session_id` (`session_changed`) and needs `take_over` for a reference current
+  elsewhere (`session_bound_elsewhere`); authz checks that thread as the second target. Report is a
+  compare-and-swap over `version` with `If-Match` (absent: the run has no row yet and the report
+  creates it); `started` only moves forward; `bind_failed` needs a started row
+  (`session_not_bound`).
+- Import binding: at the first trigger of a thread that has no row other than import rows, the
+  newest import row of the operator is copied into a current row with `started = true`, its
+  model, cost baseline and currency, audited `agent_session.bind` with `cause` `import`; of two
+  concurrent first triggers exactly one binds. Fail open: when the runtime no longer knows the
+  session, the report with `bind_failed: session_missing` ends the bound row with `rebind`,
+  starts a new row (created already ended when a reset or bind ended the bound row during the
+  run) and leads to exactly one system line; the run continues.
+- Events and audit: `agent_session.changed` for every committed change (ended rows first in
+  ascending `id`, then the new row; resource `thread` without version, receive action
+  `thread.read`). One allow audit entry per bind (explicit or import) with IDs and codes only,
+  never the reference; reset, read and report write none.
+- `domain/session.go`: the end transition, the report rules, the import-binding candidate, the
+  cost baseline and the checks of `external_session_ref` (`agent.session_ref_max_bytes`,
+  `textcheck.DisplayText`) and `model`, all pure.
+- Data owned: the table `agent_sessions` (migration `00064_agents_agent_sessions.sql`, also the FK
+  of `runs.agent_session_id`, validated by `00070`); queries in
+  `adapters/postgres/queries/agent_sessions.sql`, the repository in `adapters/postgres/sessions.go`.
+  Locks: run row (through `RunSource` or in `runs`) before session rows, session rows in ascending
+  `id` (03 6.3).
+- Configuration key: `agent.session_ref_max_bytes`.
+- Test helper `adapters/agentstest`: `InsertImportedSession` writes an import row as 22 section 9
+  step 1 describes, until the importer of M8 exists; only tests import it.
+- Rulings: docs/decisions.d/M2-12.md.
 
 ## Presence and heartbeat (M2-20)
 
@@ -320,7 +378,8 @@ The handlers of `registerCommand`, `updateCommand`, `removeCommand`, `getCommand
 ## Port (root package `internal/agents`)
 
 - Inbound: `Agents` (administration, policy, tool class; M1-51), `Facts` (run facts of runs; M2-05), `Presence` (heartbeat and presence; M2-20), `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `Sessions`, `DevEnvironments` (milestone).
-- Emits in-tx events: `AgentDisabled`.
+- Declares the source ports `ConsumerFeed` (M2-07) and `RunSource` (M2-12).
+- Emits in-tx events: `AgentDisabled`, `SessionAttached` (M2-12).
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: `authz.AgentPolicySource` (policy, tool class, readiness of the dev environment; M1-51), kernel `personaldata.Participant`.
 
@@ -352,7 +411,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 ## Notes for the build
 
 - `acked_seq` is stored at the latest after every `agent.ack_persist_interval` (04, 15.2); with several nodes, with fencing (02, section 16).
-- Rebinding an agent session is a compare-and-swap on `agent_sessions.version`.
+- Rebinding an agent session is a compare-and-swap over the current row (`expected_current_session_id`); `agent_session.report` is the compare-and-swap over `agent_sessions.version` (M2-12).
 
 ## Chapters
 

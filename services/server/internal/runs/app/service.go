@@ -113,7 +113,8 @@ func (c Config) check() error {
 }
 
 // MessageWriter is the part of messaging.Messages that runs writes through (M2-05): the live box
-// anchor and the trigger state of the triggering message. Neither authorizes; runs decided.
+// anchor, the trigger state of the triggering message and the fail-open line of an agent session
+// (M2-12). None authorizes; runs decided.
 type MessageWriter interface {
 	SetTriggerState(ctx context.Context, cmd messaging.SetTriggerStateCmd) error
 	CreateRunAnchor(ctx context.Context, cmd messaging.RunAnchorCmd) (messaging.AnchorRef, error)
@@ -121,6 +122,9 @@ type MessageWriter interface {
 	TriggerMessageOf(ctx context.Context, messageID ids.ID) (messaging.TriggerMessage, error)
 	// PrincipalRefs renders principals as PrincipalRef: the invoker of a command (M2-16).
 	PrincipalRefs(ctx context.Context, principalIDs []ids.ID) (map[ids.ID]messaging.PrincipalRef, error)
+	// AppendSystemLine writes the system line agent_session.resume_failed of a bind_failed report
+	// in the caller's unit of work, without reopening a closed thread (M2-12, R-DM-42).
+	AppendSystemLine(ctx context.Context, l messaging.SystemLine) (messaging.Message, error)
 }
 
 // ExpiryScheduler inserts the job runs.queued_expiry of a run in the unit of work of ctx, to run
@@ -247,6 +251,11 @@ type Deps struct {
 	// context of platform/otel), for the append of a released agent.invocation, which carries no
 	// correlation_id (M3-07). nil clears only the request correlation id of kernel/reqmeta.
 	Uncorrelated func(ctx context.Context) context.Context
+	// Sessions are the agent sessions of a thread (agents, M2-12): ForInvocation decides the
+	// session of every operator invocation, AttachOnStart the row a starting run attaches. nil
+	// gives every operator run session_mode new without a row and ignores the reference of
+	// run.start, so test worlds without the sessions keep working; internal/wire always sets it.
+	Sessions agents.Sessions
 }
 
 // ChannelThreads is the part of chat.Structure the subscriber of chat.ChannelReadOnlySet uses: every

@@ -46,9 +46,52 @@ _$agentInvocationPayloadTriggerKindEnumValues =
       ],
     );
 
+const AgentInvocationPayloadSessionModeEnum
+_$agentInvocationPayloadSessionModeEnum_new_ =
+    const AgentInvocationPayloadSessionModeEnum._('new_');
+const AgentInvocationPayloadSessionModeEnum
+_$agentInvocationPayloadSessionModeEnum_resume =
+    const AgentInvocationPayloadSessionModeEnum._('resume');
+const AgentInvocationPayloadSessionModeEnum
+_$agentInvocationPayloadSessionModeEnum_bind =
+    const AgentInvocationPayloadSessionModeEnum._('bind');
+const AgentInvocationPayloadSessionModeEnum
+_$agentInvocationPayloadSessionModeEnum_unknownDefaultOpenApi =
+    const AgentInvocationPayloadSessionModeEnum._('unknownDefaultOpenApi');
+
+AgentInvocationPayloadSessionModeEnum
+_$agentInvocationPayloadSessionModeEnumValueOf(String name) {
+  switch (name) {
+    case 'new_':
+      return _$agentInvocationPayloadSessionModeEnum_new_;
+    case 'resume':
+      return _$agentInvocationPayloadSessionModeEnum_resume;
+    case 'bind':
+      return _$agentInvocationPayloadSessionModeEnum_bind;
+    case 'unknownDefaultOpenApi':
+      return _$agentInvocationPayloadSessionModeEnum_unknownDefaultOpenApi;
+    default:
+      return _$agentInvocationPayloadSessionModeEnum_unknownDefaultOpenApi;
+  }
+}
+
+final BuiltSet<AgentInvocationPayloadSessionModeEnum>
+_$agentInvocationPayloadSessionModeEnumValues =
+    BuiltSet<AgentInvocationPayloadSessionModeEnum>(
+      const <AgentInvocationPayloadSessionModeEnum>[
+        _$agentInvocationPayloadSessionModeEnum_new_,
+        _$agentInvocationPayloadSessionModeEnum_resume,
+        _$agentInvocationPayloadSessionModeEnum_bind,
+        _$agentInvocationPayloadSessionModeEnum_unknownDefaultOpenApi,
+      ],
+    );
+
 Serializer<AgentInvocationPayloadTriggerKindEnum>
 _$agentInvocationPayloadTriggerKindEnumSerializer =
     _$AgentInvocationPayloadTriggerKindEnumSerializer();
+Serializer<AgentInvocationPayloadSessionModeEnum>
+_$agentInvocationPayloadSessionModeEnumSerializer =
+    _$AgentInvocationPayloadSessionModeEnumSerializer();
 
 class _$AgentInvocationPayloadTriggerKindEnumSerializer
     implements PrimitiveSerializer<AgentInvocationPayloadTriggerKindEnum> {
@@ -89,6 +132,45 @@ class _$AgentInvocationPayloadTriggerKindEnumSerializer
   );
 }
 
+class _$AgentInvocationPayloadSessionModeEnumSerializer
+    implements PrimitiveSerializer<AgentInvocationPayloadSessionModeEnum> {
+  static const Map<String, Object> _toWire = const <String, Object>{
+    'new_': 'new',
+    'resume': 'resume',
+    'bind': 'bind',
+    'unknownDefaultOpenApi': 'unknown_default_open_api',
+  };
+  static const Map<Object, String> _fromWire = const <Object, String>{
+    'new': 'new_',
+    'resume': 'resume',
+    'bind': 'bind',
+    'unknown_default_open_api': 'unknownDefaultOpenApi',
+  };
+
+  @override
+  final Iterable<Type> types = const <Type>[
+    AgentInvocationPayloadSessionModeEnum,
+  ];
+  @override
+  final String wireName = 'AgentInvocationPayloadSessionModeEnum';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    AgentInvocationPayloadSessionModeEnum object, {
+    FullType specifiedType = FullType.unspecified,
+  }) => _toWire[object.name] ?? object.name;
+
+  @override
+  AgentInvocationPayloadSessionModeEnum deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) => AgentInvocationPayloadSessionModeEnum.valueOf(
+    _fromWire[serialized] ?? (serialized is String ? serialized : ''),
+  );
+}
+
 class _$AgentInvocationPayload extends AgentInvocationPayload {
   @override
   final String runId;
@@ -119,6 +201,8 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
   @override
   final AgentSession? agentSession;
   @override
+  final AgentInvocationPayloadSessionModeEnum? sessionMode;
+  @override
   final int? settingsVersion;
 
   factory _$AgentInvocationPayload([
@@ -140,6 +224,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     required this.triggeredBy,
     required this.billingMode,
     this.agentSession,
+    this.sessionMode,
     this.settingsVersion,
   }) : super._();
   @override
@@ -169,6 +254,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
         triggeredBy == other.triggeredBy &&
         billingMode == other.billingMode &&
         agentSession == other.agentSession &&
+        sessionMode == other.sessionMode &&
         settingsVersion == other.settingsVersion;
   }
 
@@ -189,6 +275,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
     _$hash = $jc(_$hash, triggeredBy.hashCode);
     _$hash = $jc(_$hash, billingMode.hashCode);
     _$hash = $jc(_$hash, agentSession.hashCode);
+    _$hash = $jc(_$hash, sessionMode.hashCode);
     _$hash = $jc(_$hash, settingsVersion.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -211,6 +298,7 @@ class _$AgentInvocationPayload extends AgentInvocationPayload {
           ..add('triggeredBy', triggeredBy)
           ..add('billingMode', billingMode)
           ..add('agentSession', agentSession)
+          ..add('sessionMode', sessionMode)
           ..add('settingsVersion', settingsVersion))
         .toString();
   }
@@ -286,6 +374,11 @@ class AgentInvocationPayloadBuilder
   set agentSession(AgentSessionBuilder? agentSession) =>
       _$this._agentSession = agentSession;
 
+  AgentInvocationPayloadSessionModeEnum? _sessionMode;
+  AgentInvocationPayloadSessionModeEnum? get sessionMode => _$this._sessionMode;
+  set sessionMode(AgentInvocationPayloadSessionModeEnum? sessionMode) =>
+      _$this._sessionMode = sessionMode;
+
   int? _settingsVersion;
   int? get settingsVersion => _$this._settingsVersion;
   set settingsVersion(int? settingsVersion) =>
@@ -312,6 +405,7 @@ class AgentInvocationPayloadBuilder
       _triggeredBy = $v.triggeredBy.toBuilder();
       _billingMode = $v.billingMode;
       _agentSession = $v.agentSession?.toBuilder();
+      _sessionMode = $v.sessionMode;
       _settingsVersion = $v.settingsVersion;
       _$v = null;
     }
@@ -371,6 +465,7 @@ class AgentInvocationPayloadBuilder
               'billingMode',
             ),
             agentSession: _agentSession?.build(),
+            sessionMode: sessionMode,
             settingsVersion: settingsVersion,
           );
     } catch (_) {

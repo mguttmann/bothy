@@ -16,6 +16,146 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// SetCredentialHolder Change the credential holder
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /agents/{agent_id}/credential-holder (the `SetCredentialHolder` operationId).
+func (c *Client) SetCredentialHolder(ctx context.Context, agentId AgentIdPath, params *SetCredentialHolderParams, body SetCredentialHolderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetCredentialHolderRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableAgentWithBody Disable an agent
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{agent_id}/disable (the `DisableAgent` operationId).
+func (c *Client) DisableAgentWithBody(ctx context.Context, agentId AgentIdPath, params *DisableAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableAgentRequestWithBody(c.Server, agentId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableAgent Disable an agent
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{agent_id}/disable (the `DisableAgent` operationId).
+func (c *Client) DisableAgent(ctx context.Context, agentId AgentIdPath, params *DisableAgentParams, body DisableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableAgentRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableAgentWithBody Enable an agent
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
+func (c *Client) EnableAgentWithBody(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableAgentRequestWithBody(c.Server, agentId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableAgent Enable an agent
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{agent_id}/enable (the `EnableAgent` operationId).
+func (c *Client) EnableAgent(ctx context.Context, agentId AgentIdPath, params *EnableAgentParams, body EnableAgentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableAgentRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAgentToolClassWithBody Set the tool class of an agent
+//
+// Target tool class (`chat` < `scoped` < `host`, 07 2.11). `authorize` uses the higher of target and reported class; a guest run needs a matching tool class (SR2).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /agents/{agent_id}/tool-class (the `SetAgentToolClass` operationId).
+func (c *Client) SetAgentToolClassWithBody(ctx context.Context, agentId AgentIdPath, params *SetAgentToolClassParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAgentToolClassRequestWithBody(c.Server, agentId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAgentToolClass Set the tool class of an agent
+//
+// Target tool class (`chat` < `scoped` < `host`, 07 2.11). `authorize` uses the higher of target and reported class; a guest run needs a matching tool class (SR2).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /agents/{agent_id}/tool-class (the `SetAgentToolClass` operationId).
+func (c *Client) SetAgentToolClass(ctx context.Context, agentId AgentIdPath, params *SetAgentToolClassParams, body SetAgentToolClassJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAgentToolClassRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAgentWebhookSubscriptions List webhook subscriptions of an agent
+//
+// Webhook as transport for adapters without a running process (04, 15.6).
+//
+// Corresponds with GET /agents/{agent_id}/webhooks (the `ListAgentWebhookSubscriptions` operationId).
+func (c *Client) ListAgentWebhookSubscriptions(ctx context.Context, agentId AgentIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAgentWebhookSubscriptionsRequest(c.Server, agentId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CreateAgentWebhookSubscriptionWithBody Subscribe an agent to webhooks
 //
 // Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.
@@ -6918,7 +7058,7 @@ func (c *Client) ListAgentSessions(ctx context.Context, threadId ThreadIdPath, r
 
 // BindAgentSessionWithBody Bind an existing external session
 //
-// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6937,7 +7077,7 @@ func (c *Client) BindAgentSessionWithBody(ctx context.Context, threadId ThreadId
 
 // BindAgentSession Bind an existing external session
 //
-// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6956,6 +7096,8 @@ func (c *Client) BindAgentSession(ctx context.Context, threadId ThreadIdPath, pa
 
 // ReportAgentSessionWithBody Report the external session reference and model
 //
+// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -6973,6 +7115,8 @@ func (c *Client) ReportAgentSessionWithBody(ctx context.Context, threadId Thread
 
 // ReportAgentSession Report the external session reference and model
 //
+// The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/report (the `ReportAgentSession` operationId).
@@ -6989,6 +7133,8 @@ func (c *Client) ReportAgentSession(ctx context.Context, threadId ThreadIdPath, 
 }
 
 // ResetAgentSession Start a new agent session in the thread
+//
+// Ends the current session of the thread with `end_reason = reset` and returns the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
 //
 // Corresponds with POST /threads/{thread_id}/agent-sessions/reset (the `ResetAgentSession` operationId).
 func (c *Client) ResetAgentSession(ctx context.Context, threadId ThreadIdPath, params *ResetAgentSessionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -22198,6 +22344,17 @@ func NewReportAgentSessionRequestWithBody(server string, threadId ThreadIdPath, 
 			}
 
 			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+		if params.IfMatch != nil {
+			var headerParam1 string
+
+			headerParam1, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam1)
 		}
 
 	}

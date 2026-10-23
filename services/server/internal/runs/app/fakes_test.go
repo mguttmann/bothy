@@ -328,6 +328,24 @@ func (r *repo) LockActiveRunsByThreads(_ context.Context, threads []ids.ID) ([]a
 	return r.lockActive(func(x app.RunRow) bool { return slices.Contains(threads, x.ThreadID) }), nil
 }
 
+func (r *repo) SetRunSession(_ context.Context, runID, sessionID ids.ID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, x := range r.runs {
+		if x.ID == runID {
+			r.runs[i].AgentSessionID = sessionID
+			return nil
+		}
+	}
+	return errs.New(errs.CodeNotFound, "")
+}
+
+func (r *repo) SessionUsed(_ context.Context, threadID, sessionID ids.ID) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.ContainsFunc(r.runs, func(x app.RunRow) bool { return x.ThreadID == threadID && x.AgentSessionID == sessionID }), nil
+}
+
 func (r *repo) OrphanCandidates(context.Context) ([]app.RunRow, error) {
 	return r.lockActive(func(x app.RunRow) bool { return x.State != domain.StateQueued }), nil
 }
@@ -628,6 +646,11 @@ func (m msgs) CreateRunAnchor(_ context.Context, cmd messaging.RunAnchorCmd) (me
 	return messaging.AnchorRef{MessageID: ids.New(), ThreadSeq: 1}, nil
 }
 
+func (m msgs) AppendSystemLine(_ context.Context, l messaging.SystemLine) (messaging.Message, error) {
+	m.j.add("system-line", l)
+	return messaging.Message{ID: ids.New(), ThreadID: l.ThreadID, Kind: "system", Origin: "system", SystemCode: l.Code}, nil
+}
+
 // events is the fake appender; an append whose context carries a request correlation id is
 // journaled as "correlated" too.
 type events struct{ j *journal }
@@ -879,6 +902,8 @@ type world struct {
 	// gate, when set, makes the ports of the next build fail at its armed call (faults_test.go).
 	gate  *faultGate
 	files *attachments
+	// sessions is the fake agents.Sessions; nil builds the use cases without them.
+	sessions *sessions
 }
 
 // newWorld builds the world.
@@ -938,12 +963,21 @@ func (w *world) deps() app.Deps {
 		Repo: w.repo, UoW: cmp.Or[txn.UnitOfWork](w.uow, uow{}), Authorizer: w.authz, Events: events{w.j}, Messages: msgs{w.j, w.msgFacts}, Threads: w.threads, Channels: w.channels,
 		Agents: w.agents, Cursors: cursors{}, Errors: w.errs, Log: slog.New(slog.NewJSONHandler(w.log, nil)), Clock: w.clk, Metrics: w.metrics,
 		Versions: versions{}, Audit: w.audit, Telemetry: w.telemetry, Expiry: expiryJournal{w.j},
-		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus, Files: w.files, Holds: holdJournal{w.j},
+		Publisher: w.pub, Steps: w.steps, FollowupRows: w.fus, Files: w.files, Holds: holdJournal{w.j}, Sessions: w.agentSessions(),
 	}
 	if w.gate != nil {
 		d = w.gate.wrap(d)
 	}
 	return d
+}
+
+// agentSessions returns the fake sessions as the port, nil when the world has none (a typed nil
+// pointer would not be a nil interface).
+func (w *world) agentSessions() agents.Sessions {
+	if w.sessions == nil {
+		return nil
+	}
+	return w.sessions
 }
 
 // posted returns a MessagePosted of a text message of Alex in thread.

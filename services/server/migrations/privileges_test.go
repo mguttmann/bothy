@@ -193,6 +193,9 @@ var appPrivileges = map[string][]string{
 	// 03 run_followups (M2-11): a follow-up changes state and moves to the follow-on run; rows
 	// end only with their run or message (ON DELETE CASCADE).
 	"run_followups": {"SELECT", "INSERT", "UPDATE"},
+	// 03 agent_sessions (M2-12): a session ends with ended_at and end_reason, never with a
+	// delete; the rows are the session history of the thread.
+	"agent_sessions": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

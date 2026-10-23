@@ -229,7 +229,8 @@ type PrincipalRefPayload struct {
 
 // InvocationPayloadInput are the members of AgentInvocationPayload (M2-08 design note 14) of a
 // message trigger, with TriggerKind command of a command run (M2-16 design note 12 c) and with
-// TriggerKind interaction of an interaction trigger (M2-15); agent_session comes with M2-12.
+// TriggerKind interaction of an interaction trigger (M2-15), except the session, which
+// InvocationPayload takes as its own required argument (M2-12).
 type InvocationPayloadInput struct {
 	RunID, ThreadID, ChannelID, SpaceID ids.ID
 	// MessageID is the triggering message of trigger kind message; zero for command.
@@ -266,6 +267,8 @@ type invocationPayload struct {
 	Options             *[]optionValuePayload `json:"options,omitempty"`
 	TriggeredBy         PrincipalRefPayload   `json:"triggered_by"`
 	BillingMode         string                `json:"billing_mode"`
+	AgentSession        json.RawMessage       `json:"agent_session,omitempty"`
+	SessionMode         string                `json:"session_mode,omitempty"`
 	SettingsVersion     int64                 `json:"settings_version,omitzero"`
 }
 
@@ -273,49 +276,73 @@ type invocationPayload struct {
 var errPayload = errors.New("runs: incomplete event payload")
 
 // InvocationPayload encodes the payload of agent.invocation: IDs, the trigger kind, the triggering
-// person, the billing mode and the settings version, for a message trigger the message, for a
-// command run the invocation, the command and its parsed options, for an interaction trigger the
-// interaction (no message_id; M2-15 design note 11 c), never content, a prompt, skills, form
-// values or a project binding (04 2.2 rules 1 and 4), and no JSON null (ADR 0053). Errors: a zero
-// ID, an empty person or billing mode, or the members of another trigger kind.
-func InvocationPayload(in InvocationPayloadInput) ([]byte, error) {
+// person, the billing mode, the session of DecideSession and the settings version, for a message
+// trigger the message, for a command run the invocation, the command and its parsed options, for
+// an interaction trigger the interaction (no message_id; M2-15 design note 11 c), never content, a
+// prompt, skills, form values or a project binding (04 2.2 rules 1 and 4), and no JSON null (ADR
+// 0053). The session decision is a required argument, so every writer of agent.invocation decides
+// it (M2-12 design note 9): an operator run carries session_mode and, where a row exists,
+// agent_session; a guest run carries neither (09 3.6). Errors: a zero ID, an empty person or
+// billing mode, the members of another trigger kind, a session without mode, a guest session with
+// a row, or resume or bind without a row.
+//
+// Example:
+//
+//	p, err := domain.InvocationPayload(in, domain.DecideSession(true, nil)) // session_mode new
+func InvocationPayload(in InvocationPayloadInput, session SessionDecision) ([]byte, error) {
 	if in.RunID.IsZero() || in.ThreadID.IsZero() || in.ChannelID.IsZero() || in.TriggeredBy.ID == "" ||
 		in.TriggeredBy.Kind == "" || in.BillingMode == "" {
 		return nil, errPayload
+	}
+	if err := session.check(); err != nil {
+		return nil, err
 	}
 	p := invocationPayload{
 		RunID: in.RunID.String(), ThreadID: in.ThreadID.String(), ChannelID: in.ChannelID.String(),
 		TriggeredBy: in.TriggeredBy, BillingMode: in.BillingMode, SettingsVersion: in.SettingsVersion,
 	}
+	if err := setTrigger(&p, in); err != nil {
+		return nil, err
+	}
+	if session.Mode != SessionGuest {
+		p.SessionMode, p.AgentSession = string(session.Mode), session.Row
+	}
+	if !in.SpaceID.IsZero() {
+		p.SpaceID = in.SpaceID.String()
+	}
+	return json.Marshal(p)
+}
+
+// setTrigger sets the trigger kind and its members of p from in: the message of a message trigger,
+// the invocation, command and options of a command run, the interaction of an interaction trigger.
+// Errors: the members of another trigger kind, or a kind that agent.invocation never carries.
+func setTrigger(p *invocationPayload, in InvocationPayloadInput) error {
 	commandSet := !in.CommandID.IsZero() || !in.CommandInvocationID.IsZero() || in.CommandName != "" || in.Options != nil
 	switch TriggerKind(in.TriggerKind) {
 	case "", TriggerMessage:
 		if in.MessageID.IsZero() || !in.InteractionID.IsZero() || !in.CommandID.IsZero() || !in.CommandInvocationID.IsZero() || in.CommandName != "" || in.Options != nil {
-			return nil, errPayload
+			return errPayload
 		}
 		p.TriggerKind, p.MessageID = string(TriggerMessage), in.MessageID.String()
 	case TriggerCommand:
 		if !in.MessageID.IsZero() || !in.InteractionID.IsZero() || in.CommandID.IsZero() || in.CommandInvocationID.IsZero() || in.CommandName == "" {
-			return nil, errPayload
+			return errPayload
 		}
 		opts := optionPayloads(in.Options)
 		p.TriggerKind, p.CommandInvocationID, p.CommandID, p.CommandName, p.Options = string(TriggerCommand),
 			in.CommandInvocationID.String(), in.CommandID.String(), in.CommandName, &opts
 	case TriggerInteraction:
 		if !in.MessageID.IsZero() || in.InteractionID.IsZero() || commandSet {
-			return nil, errPayload
+			return errPayload
 		}
 		p.TriggerKind, p.InteractionID = string(TriggerInteraction), in.InteractionID.String()
 	case TriggerFollowup, TriggerAutocomplete:
 		// agent.invocation carries message, command and interaction runs.
-		return nil, errPayload
+		return errPayload
 	default:
-		return nil, errPayload
+		return errPayload
 	}
-	if !in.SpaceID.IsZero() {
-		p.SpaceID = in.SpaceID.String()
-	}
-	return json.Marshal(p)
+	return nil
 }
 
 // followupPayload is AgentFollowupPayload.

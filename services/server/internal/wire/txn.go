@@ -177,8 +177,8 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // agents.AgentDisabled -> runs (M2-09, 02 section 4.3), chat.ChannelReadOnlySet -> runs (the
 // cancellation of the active runs of a channel that becomes read-only, M8-03),
 // kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (the end of
-// terminal sessions at every revocation, M2-46) and messaging.MessageDeleted -> runs (the
-// components of a deleted card, M2-15).
+// terminal sessions at every revocation, M2-46) messaging.MessageDeleted -> runs (the
+// components of a deleted card, M2-15) and agents.SessionAttached -> runs (M2-12).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -245,7 +245,7 @@ func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 // kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46), then
 // messaging.MessageDeleted -> runs (the open follow-up of a deleted message, M2-11, and the
 // components of a deleted card, M2-15, in one subscriber), then files.FileFinalized -> runs (the
-// release of held agent invocations, M3-07).
+// release of held agent invocations, M3-07), then agents.SessionAttached -> runs (M2-12).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -282,6 +282,13 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnChannelReadOnlySet); err != nil {
 		return err
 	}
+	return subscribeTerminalAndRunEnds(reg, m)
+}
+
+// subscribeTerminalAndRunEnds continues subscribeArchivesAndRuns in the same order:
+// kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46),
+// then messaging.MessageDeleted, files.FileFinalized and agents.SessionAttached -> runs.
+func subscribeTerminalAndRunEnds(reg *txn.Registry, m *Modules) error {
 	if m.TerminalSubscribers == nil {
 		return errNoTerminalSubscribers
 	}
@@ -299,7 +306,12 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	}
 	// The transaction that makes the last attachment final writes the held agent.invocation
 	// (04 section 15.3 point 1, D-K-G6).
-	return txn.Subscribe(reg, m.RunsAcceptor.OnFileFinalized)
+	if err := txn.Subscribe(reg, m.RunsAcceptor.OnFileFinalized); err != nil {
+		return err
+	}
+	// A report that creates or replaces the session row of a run attaches it to the run and, on
+	// fail open, writes the system line (M2-12).
+	return txn.Subscribe(reg, m.RunsAcceptor.OnSessionAttached)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

@@ -23,7 +23,7 @@ func TestInvocationPayload_Interaction(t *testing.T) {
 		TriggeredBy: domain.PrincipalRefPayload{ID: ids.New().String(), Kind: "user", Handle: "alex", DisplayName: "Alex"},
 		BillingMode: "organization",
 	}
-	p, err := domain.InvocationPayload(in)
+	p, err := domain.InvocationPayload(in, domain.DecideSession(true, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestInvocationPayload_Interaction(t *testing.T) {
 			return v
 		},
 	} {
-		if _, err := domain.InvocationPayload(bad(in)); err == nil {
+		if _, err := domain.InvocationPayload(bad(in), domain.DecideSession(true, nil)); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}

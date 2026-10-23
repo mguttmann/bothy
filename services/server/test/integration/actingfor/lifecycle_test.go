@@ -151,12 +151,20 @@ func (w *lifecycleWorld) foreignRun(e *env) {
 	e.wantProblem(got, http.StatusNotFound, "not_found", "", "finishRun of R2 with T")
 	e.sameAnswer(got, unknown, "finishRun of R2 with T")
 	e.ok(e.do(e.lotse, http.MethodPost, "/runs/"+r2.id+"/finish", finish), http.StatusOK, "finishRun of R2 without the header")
+	// reportAgentSession (exception agent_session.report, M2-12): the session report on the
+	// thread of R2 with T answers 404 like an unknown thread.
+	report := map[string]any{"external_session_ref": "sess-foreign"}
+	got = e.do(e.lotse, http.MethodPost, "/threads/"+r2.thread+"/agent-sessions/report", report, w.main.token)
+	e.wantProblem(got, http.StatusNotFound, "not_found", "", "reportAgentSession on R2's thread with T")
+	e.sameAnswer(got, e.do(e.lotse, http.MethodPost, "/threads/"+ids.New().String()+"/agent-sessions/report", report, w.main.token),
+		"reportAgentSession on R2's thread with T")
 }
 
 // finishAfterRevocation (brief "TestSR9_FinishOwnRunAfterRevocation"): the owner revokes G-1, the
 // run gets run.cancel_requested with access_revoked (M2-09); a Support message outside the run's
-// thread answers 404 with T, while patchRun (exception run.update, M2-10) and
-// finishRun(cancelled, access_revoked) of the own run with T answer 200 (exception run.finish).
+// thread answers 404 with T, while patchRun (exception run.update, M2-10), reportAgentSession
+// (exception agent_session.report, M2-12) and finishRun(cancelled, access_revoked) of the own run
+// with T answer 200 (exception run.finish).
 func (w *lifecycleWorld) finishAfterRevocation(e *env) {
 	e.revoke(e.w.Grants["G-1"])
 	e.eventually("run.cancel_requested of the run", func() bool {
@@ -168,6 +176,8 @@ func (w *lifecycleWorld) finishAfterRevocation(e *env) {
 	e.sameAnswer(got, e.do(e.lotse, http.MethodGet, "/messages/"+ids.New().String(), nil, w.main.token), "getMessage after the revocation")
 	e.ok(e.do(e.lotse, http.MethodPatch, "/runs/"+w.main.id, e.statusPatch(w.main.id, "Breche ab"), w.main.token), http.StatusOK,
 		"patchRun of the own run with T after the revocation")
+	e.ok(e.do(e.lotse, http.MethodPost, "/threads/"+w.main.thread+"/agent-sessions/report", map[string]any{"external_session_ref": "sess-main"},
+		w.main.token), http.StatusOK, "reportAgentSession of the own run with T after the revocation")
 	m := e.ok(e.do(e.lotse, http.MethodPost, "/runs/"+w.main.id+"/finish", map[string]any{"state": "cancelled", "reason": "access_revoked"},
 		w.main.token), http.StatusOK, "finishRun of the own run with T")
 	if m["state"] != "cancelled" {

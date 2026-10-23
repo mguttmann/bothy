@@ -47,6 +47,27 @@ content_tables:
 # resolves their threads through the chat port, keeps only threads whose channel is in
 # Scope.ChannelIDs and authorizes each row; docs/DECISIONS.md D-M2-05-9).
 exceptions:
+  - query: agents.ThreadSessions
+    category: after_authorize
+    reason: "listAgentSessions reads the sessions of the one thread whose agent_session.read authorize allowed; agent_sessions has no channel_id, the thread was checked first (M2-12)"
+  - query: agents.CurrentSession
+    category: after_authorize
+    reason: "the current session of the one thread whose agent_session.bind authorize allowed or whose run invocation agent.invoke decided; nothing of the row leaves before that decision (M2-12)"
+  - query: agents.LockCurrentSession
+    category: after_authorize
+    reason: "locks the current session of the one thread whose agent_session.reset or agent_session.bind authorize allowed, or whose run invocation or run.start runs decided (09 9.1, 9.2, 9.4; M2-12)"
+  - query: agents.LockSessions
+    category: after_authorize
+    reason: "locks the session rows of a bind or a report in ascending id after authorize allowed the operation on their threads; a take-over target is a thread whose second-target check authorize passed (07 4.2, M2-12)"
+  - query: agents.CurrentByRef
+    category: authorize_resolution
+    reason: "finds the thread in which the reference of a bind or report is current; for agent_session.bind it resolves the second target TargetThreadID that authorize checks (07 4.2, 09 9.4); only its id and thread leave as a conflict reason (M2-12)"
+  - query: agents.LatestByRef
+    category: after_authorize
+    reason: "reads the cost baseline of the reference of a bind that authorize allowed; only the two amounts and the currency are used, nothing else of the row leaves (22 section 9 step 7, M2-12)"
+  - query: agents.LatestInThreadByRef
+    category: after_authorize
+    reason: "the most recent row of a reference in the one thread whose run.start runs accepted, to attach the starting run (09 9.1, M2-12)"
   - query: chat.GetChannel
     category: authorize_resolution
     reason: "resolves one channel (space, archive state, operator) for authorize; the use case returns it only after channel.read allowed it; for chat.TriggerFacts (M2-05) it gives the trigger facts inside the unit of work of a message whose message.create authorize allowed, and runs decides with agent.invoke"
@@ -266,6 +287,12 @@ exceptions:
   - query: runs.OrphanCandidates
     category: system_job
     reason: "the job runs.stall_check reads the started active runs without a principal and fails the interrupted and stale ones; nothing of the rows leaves the server (09 5.5, M2-09)"
+  - query: runs.SessionUsed
+    category: after_authorize
+    reason: "asks whether a run of the one thread whose invocation agent.invoke allowed already used a session row (the session mode of 09 9.1); only the boolean leaves, never a row (M2-12)"
+  - query: runs.LockActiveRunForReport
+    category: authorize_resolution
+    reason: "the declared source agents.RunSource locks the active run of the one thread of agent_session.report; its agent and session row form the descriptor that authorize decides agent-self on, and a run of another agent gives the not_found of an unknown thread (09 4.7, M2-12)"
   - query: runs.ActiveRunOfThread
     category: after_authorize
     reason: "the active run of the one thread whose message the acceptance handles (09 3.4) or whose run Open found taken; runs has no channel_id, the thread was checked first (D-M2-05-9)"

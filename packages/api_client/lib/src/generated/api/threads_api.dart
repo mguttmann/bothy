@@ -31,7 +31,7 @@ class ThreadsApi {
   const ThreadsApi(this._dio, this._serializers);
 
   /// Bind an existing external session
-  /// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
+  /// Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. &#x60;reason&#x60; &#x60;session_changed&#x60; when &#x60;expected_current_session_id&#x60; does not name the current session, &#x60;session_bound_elsewhere&#x60; when the reference is current in another thread without &#x60;take_over&#x60;. With &#x60;take_over&#x60; the permission is checked in that thread too. The next run gets &#x60;session_mode &#x3D; bind&#x60;.
   ///
   /// Parameters:
   /// * [threadId]
@@ -893,7 +893,7 @@ class ThreadsApi {
   }
 
   /// Start a new agent session in the thread
-  ///
+  /// Ends the current session of the thread with &#x60;end_reason &#x3D; reset&#x60; and returns the ended row; the next run gets &#x60;session_mode &#x3D; new&#x60; (09, 9.2). A run in progress keeps its session. Without a current session 409 &#x60;conflict&#x60; with &#x60;reason&#x60; &#x60;no_current_session&#x60;.
   ///
   /// Parameters:
   /// * [threadId]

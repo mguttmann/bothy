@@ -384,6 +384,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"component.max_per_message":     {Kind: config.KindInt, Default: "25", Min: "1", Max: "1000", Chapter: "09-agents.md"},
 		"component.custom_id_max_chars": {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "09-agents.md"},
 		"component.form_max_fields":     {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "09-agents.md"},
+		// M2-12
+		"agent.session_ref_max_bytes": {Kind: config.KindInt, Default: "1024", Min: "1", Max: "2048", Chapter: "09-agents.md"},
 		// M1-64
 		"sync.ws_max_frame_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1024", Max: "16777216", Chapter: "04-sync-protocol.md"},
 		"sync.identify_timeout":     {Kind: config.KindDuration, Default: "10s", Min: "1ms", Chapter: "04-sync-protocol.md"},

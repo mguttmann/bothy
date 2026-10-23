@@ -70,6 +70,10 @@ type Runs struct {
 	// Holds schedules runs.invocation_hold_timeout (M3-07); the jobs step binds its inserter
 	// (BindJobs).
 	Holds *runsjobs.HoldScheduler
+	// Sessions are the agent sessions the runs use at the invocation and the start (M2-12);
+	// buildRuns sets them, and fillHandlers mounts their REST handlers. nil in a world without
+	// them.
+	Sessions *AgentSessions
 }
 
 // RunsDeps are the collaborators of the runs module from the other steps of the start: the
@@ -113,6 +117,10 @@ type RunsDeps struct {
 	// Holds schedules runs.invocation_hold_timeout (M3-07); nil means the scheduler over the job
 	// runtime of the process (Runs.BindJobs).
 	Holds runsapp.HoldScheduler
+	// Sessions decides the session of every operator invocation and attaches it at the start
+	// (agents, M2-12); nil gives every operator run session_mode new without a row (a test world
+	// without the sessions). The process always sets it (buildRuns).
+	Sessions agents.Sessions
 }
 
 // NewRuns builds the runs module over pool with the unit of work uow, the Authorizer az and the
@@ -170,7 +178,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Repo: repo, UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
-		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics),
+		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics), Sessions: d.Sessions,
 		Files: d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
@@ -260,7 +268,7 @@ func (r *Runs) RegisterActiveGauge() error {
 	return err
 }
 
-// fillHandlers sets the nil runs handlers of h to the ones r built (the reads and invokeCommand);
+// fillHandlers sets the nil runs handlers of h to the ones r built (the reads, invokeCommand and the agent session operations);
 // a nil r leaves h unchanged.
 func (r *Runs) fillHandlers(h *Handlers) {
 	if r != nil && h.Runs == nil {
@@ -268,6 +276,9 @@ func (r *Runs) fillHandlers(h *Handlers) {
 	}
 	if r != nil && h.CommandExec == nil {
 		h.CommandExec = r.CommandHandlers
+	}
+	if r != nil && r.Sessions != nil && h.AgentSessions == nil {
+		h.AgentSessions = r.Sessions.Handlers
 	}
 }
 

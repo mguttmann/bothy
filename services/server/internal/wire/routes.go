@@ -69,6 +69,9 @@ type Handlers struct {
 	// CommandExec implements invokeCommand (runs, M2-16), autocompleteCommand and answerAutocomplete
 	// (runs, M2-17).
 	*runshttp.CommandExec
+	// AgentSessions implements listAgentSessions, resetAgentSession, bindAgentSession and
+	// reportAgentSession (agents, M2-12).
+	*agentshttp.AgentSessions
 	// Spaces implements listSpaces, createSpace, getSpace, updateSpace, moveSpace, archiveSpace
 	// and putMySidebarSpace (chat, M1-52).
 	*chathttp.Spaces

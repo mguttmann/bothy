@@ -42,7 +42,9 @@ var requirementGroups = []struct {
 	{"owner or agent-self or read on a channel that the agent operates", Any(Owner, AgentSelf, ReadOnOperatedChannel), []string{
 		"agent.read",
 	}},
-	{"trigger and `agent.invoke`", Deferred("M2"), []string{"agent_session.bind", "agent_session.reset"}},
+	// A session switch is trigger plus the agent.invoke guard on the thread (brief M2-12 design
+	// note 5); the guard runs in guards, and agent_session.bind also on its second target.
+	{"trigger and `agent.invoke`", AtLeast(LevelTrigger), []string{"agent_session.bind", "agent_session.reset"}},
 	{"read", AtLeast(LevelRead), []string{
 		"agent_session.read", "channel.read", "cost.read.thread", "gateway.focus",
 		"message.read", "message.revisions.read", "push.deliver", "run.read", "space.read",
