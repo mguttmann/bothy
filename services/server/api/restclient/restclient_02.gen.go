@@ -16,6 +16,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ListAuditEvents Query the audit log
+//
+// Corresponds with GET /audit/events (the `ListAuditEvents` operationId).
+func (c *Client) ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuditEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ExportAuditEvents Export the audit log
 //
 // Streams one `AuditEvent` per line in ascending `seq`, with hashes for offline verification. The stream is the contiguous `seq` span from the smallest to the largest `seq` whose `occurred_at` lies in [`from`, `to`), so every line links the line before by `prev_hash`; a row inside the span whose `occurred_at` lies outside the range (an aggregated denial keeps the time of its first denial) is part of it. A gap inside the stream breaks the hash links (`prev_hash`); an error after the first line aborts the transfer instead of ending it, so a client sees a broken response, not a shorter complete one.

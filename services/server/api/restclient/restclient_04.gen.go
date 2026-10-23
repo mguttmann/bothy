@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RemoveGroupMemberResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
 // GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
 func (r RemoveGroupMemberResponse) GetApplicationproblemJSON429() *TooManyRequests {
 	return r.ApplicationproblemJSON429
@@ -26054,9 +26059,4 @@ func (r UpdateWebhookSubscriptionResponse) GetJSON200() *WebhookSubscriptionCrea
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
 }

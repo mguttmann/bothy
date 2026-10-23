@@ -13,6 +13,11 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
 // GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
 func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON403() *Forbidden {
 	return r.ApplicationproblemJSON403

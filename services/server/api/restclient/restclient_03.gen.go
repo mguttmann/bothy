@@ -22726,8 +22726,3 @@ func (r RemoveGroupMemberResponse) GetApplicationproblemJSON403() *Forbidden {
 func (r RemoveGroupMemberResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
 }
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON409() *Conflict {
-	return r.ApplicationproblemJSON409
-}

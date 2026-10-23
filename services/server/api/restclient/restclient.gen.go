@@ -25448,18 +25448,3 @@ func (c *Client) CreateWebhookSubscription(ctx context.Context, appId AppIdPath,
 	}
 	return c.Client.Do(req)
 }
-
-// ListAuditEvents Query the audit log
-//
-// Corresponds with GET /audit/events (the `ListAuditEvents` operationId).
-func (c *Client) ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAuditEventsRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
