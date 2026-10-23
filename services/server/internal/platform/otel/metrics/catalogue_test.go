@@ -248,7 +248,7 @@ func TestCatalogue_RegistryMatchesSignalsDoc(t *testing.T) {
 // bothy.file.upload.size of M3-03, the app metrics of M4-31, the scan instruments of M3-04, the
 // relay counter of M2-44, the gauges of bothy-backupd of M7-02, the restore test instruments of
 // M7-03, the counter bothy.console.csp_violations of M6-03, the four run instruments of M2-05 and
-// the four push instruments of M3-19 and the cost counter of M2-22).
+// the four push instruments of M3-19, the cost counter of M2-22 and the purge backlog gauge of M3-08).
 func TestCatalogue_M1InstrumentSet(t *testing.T) {
 	want := []string{
 		"bothy.audit.verify.failures", "bothy.audit.verify.last_success.timestamp", "bothy.authz.decisions",
@@ -256,7 +256,7 @@ func TestCatalogue_M1InstrumentSet(t *testing.T) {
 		"bothy.backup.restore_test.duration", "bothy.backup.restore_test.failures", "bothy.backup.restore_test.last_success.timestamp",
 		"bothy.backup.wal.last_archived.timestamp", "bothy.console.csp_violations", "bothy.db.event_seq.lock_wait", "bothy.db.pool.connections", "bothy.delivery.duration",
 		"bothy.egress.blocked", "bothy.event.appended", "bothy.event.consumer.lag", "bothy.event.consumer.pending_age",
-		"bothy.event.fanout.lag", "bothy.file.scan", "bothy.file.scan.duration", "bothy.file.scan.queue", "bothy.file.upload.size", "bothy.gateway.catchup.duration", "bothy.gateway.close", "bothy.gateway.connect.duration",
+		"bothy.event.fanout.lag", "bothy.file.purge.backlog", "bothy.file.scan", "bothy.file.scan.duration", "bothy.file.scan.queue", "bothy.file.upload.size", "bothy.gateway.catchup.duration", "bothy.gateway.close", "bothy.gateway.connect.duration",
 		"bothy.gateway.connections.active", "bothy.gateway.outbound.dropped", "bothy.gateway.resync", "bothy.job.duration",
 		"bothy.job.queue", "bothy.message.created", "bothy.ratelimit.rejected",
 		// M2-05: the run instruments of 4.3.
