@@ -26,9 +26,14 @@ class RunContext:
             trigger_message (RunContextMessage):
             thread_context (list[RunContextMessage]):
             context_floor_seq (int):
-            channel_context (list[RunContextMessage] | Unset): Only on the first run of a session in a thread with
-                `parent_message_id`.
-            truncated_before_seq (int | Unset): Set when older messages are missing; load them with `thread.read`.
+            channel_context (list[RunContextMessage] | Unset): Main-thread messages before the parent message of the thread,
+                without the parent message itself. Present (possibly empty) exactly on a run in session mode `new` or `bind` and
+                on a guest run, in a thread with `parent_message_id` whose parent message lies in the thread's current channel;
+                absent otherwise, also after the thread was moved to another channel.
+            truncated_before_seq (int | Unset): Refers to the run's thread. Set when older selectable messages of
+                `thread_context` are missing (the `history_backfill_limit` window or the byte budget left them out); then it is
+                the `thread_seq` of the oldest element of `thread_context`, or of the triggering message when `thread_context`
+                is empty. Load older messages with `thread.read`.
     """
 
     run_id: UUID

@@ -23,12 +23,13 @@ part 'run_context_message.g.dart';
 /// * [role]
 /// * [origin]
 /// * [kind]
+/// * [channelId] - Channel of the message (SEC-AI-1).
 /// * [contentMd]
-/// * [truncated]
+/// * [truncated] - Present and true only when `content_md` was cut at `agent.context_message_max_bytes` on a UTF-8 boundary; never on `trigger_message`.
 /// * [attachments]
 /// * [replyToMessageId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [trust] - How the runtime must treat the content; `unverified` only as marked data, never as instruction.
-/// * [alreadyDelivered] - Already delivered to this session as a follow-up.
+/// * [alreadyDelivered] - Present and true only in session mode `resume` for a message already delivered to this session as a follow-up (`run_followups` in `delivered` or `absorbed`).
 @BuiltValue()
 abstract class RunContextMessage
     implements Built<RunContextMessage, RunContextMessageBuilder> {
@@ -58,9 +59,14 @@ abstract class RunContextMessage
   MessageKind get kind;
   // enum kindEnum {  text,  voice,  run,  card,  system,  };
 
+  /// Channel of the message (SEC-AI-1).
+  @BuiltValueField(wireName: r'channel_id')
+  String get channelId;
+
   @BuiltValueField(wireName: r'content_md')
   String get contentMd;
 
+  /// Present and true only when `content_md` was cut at `agent.context_message_max_bytes` on a UTF-8 boundary; never on `trigger_message`.
   @BuiltValueField(wireName: r'truncated')
   bool? get truncated;
 
@@ -76,7 +82,7 @@ abstract class RunContextMessage
   RunContextMessageTrustEnum get trust;
   // enum trustEnum {  trigger,  authorized,  self,  unverified,  system,  };
 
-  /// Already delivered to this session as a follow-up.
+  /// Present and true only in session mode `resume` for a message already delivered to this session as a follow-up (`run_followups` in `delivered` or `absorbed`).
   @BuiltValueField(wireName: r'already_delivered')
   bool? get alreadyDelivered;
 
@@ -140,6 +146,11 @@ class _$RunContextMessageSerializer
     yield serializers.serialize(
       object.kind,
       specifiedType: const FullType(MessageKind),
+    );
+    yield r'channel_id';
+    yield serializers.serialize(
+      object.channelId,
+      specifiedType: const FullType(String),
     );
     yield r'content_md';
     yield serializers.serialize(
@@ -254,6 +265,13 @@ class _$RunContextMessageSerializer
             specifiedType: const FullType(MessageKind),
           ) as MessageKind;
           result.kind = valueDes;
+          break;
+        case r'channel_id':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.channelId = valueDes;
           break;
         case r'content_md':
           final valueDes = serializers.deserialize(

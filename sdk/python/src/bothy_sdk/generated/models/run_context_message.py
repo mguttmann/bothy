@@ -33,13 +33,16 @@ class RunContextMessage:
         role (RunContextMessageRole):
         origin (MessageOrigin):
         kind (MessageKind):
+        channel_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         content_md (str):
         attachments (list[RunContextAttachment]):
         trust (RunContextMessageTrust): How the runtime must treat the content; `unverified` only as marked data, never
             as instruction.
-        truncated (bool | Unset):
+        truncated (bool | Unset): Present and true only when `content_md` was cut at `agent.context_message_max_bytes`
+            on a UTF-8 boundary; never on `trigger_message`.
         reply_to_message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        already_delivered (bool | Unset): Already delivered to this session as a follow-up.
+        already_delivered (bool | Unset): Present and true only in session mode `resume` for a message already delivered
+            to this session as a follow-up (`run_followups` in `delivered` or `absorbed`).
     """
 
     message_id: UUID
@@ -49,6 +52,7 @@ class RunContextMessage:
     role: RunContextMessageRole
     origin: MessageOrigin
     kind: MessageKind
+    channel_id: UUID
     content_md: str
     attachments: list[RunContextAttachment]
     trust: RunContextMessageTrust
@@ -71,6 +75,8 @@ class RunContextMessage:
         origin = self.origin.value
 
         kind = self.kind.value
+
+        channel_id = str(self.channel_id)
 
         content_md = self.content_md
 
@@ -100,6 +106,7 @@ class RunContextMessage:
                 "role": role,
                 "origin": origin,
                 "kind": kind,
+                "channel_id": channel_id,
                 "content_md": content_md,
                 "attachments": attachments,
                 "trust": trust,
@@ -134,6 +141,8 @@ class RunContextMessage:
 
         kind = MessageKind(d.pop("kind"))
 
+        channel_id = UUID(d.pop("channel_id"))
+
         content_md = d.pop("content_md")
 
         attachments = []
@@ -164,6 +173,7 @@ class RunContextMessage:
             role=role,
             origin=origin,
             kind=kind,
+            channel_id=channel_id,
             content_md=content_md,
             attachments=attachments,
             trust=trust,

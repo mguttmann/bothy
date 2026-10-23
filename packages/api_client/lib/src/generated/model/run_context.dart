@@ -16,9 +16,9 @@ part 'run_context.g.dart';
 /// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [triggerMessage]
 /// * [threadContext]
-/// * [channelContext] - Only on the first run of a session in a thread with `parent_message_id`.
+/// * [channelContext] - Main-thread messages before the parent message of the thread, without the parent message itself. Present (possibly empty) exactly on a run in session mode `new` or `bind` and on a guest run, in a thread with `parent_message_id` whose parent message lies in the thread's current channel; absent otherwise, also after the thread was moved to another channel.
 /// * [contextFloorSeq]
-/// * [truncatedBeforeSeq] - Set when older messages are missing; load them with `thread.read`.
+/// * [truncatedBeforeSeq] - Refers to the run's thread. Set when older selectable messages of `thread_context` are missing (the `history_backfill_limit` window or the byte budget left them out); then it is the `thread_seq` of the oldest element of `thread_context`, or of the triggering message when `thread_context` is empty. Load older messages with `thread.read`.
 @BuiltValue()
 abstract class RunContext implements Built<RunContext, RunContextBuilder> {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
@@ -31,14 +31,14 @@ abstract class RunContext implements Built<RunContext, RunContextBuilder> {
   @BuiltValueField(wireName: r'thread_context')
   BuiltList<RunContextMessage> get threadContext;
 
-  /// Only on the first run of a session in a thread with `parent_message_id`.
+  /// Main-thread messages before the parent message of the thread, without the parent message itself. Present (possibly empty) exactly on a run in session mode `new` or `bind` and on a guest run, in a thread with `parent_message_id` whose parent message lies in the thread's current channel; absent otherwise, also after the thread was moved to another channel.
   @BuiltValueField(wireName: r'channel_context')
   BuiltList<RunContextMessage>? get channelContext;
 
   @BuiltValueField(wireName: r'context_floor_seq')
   int get contextFloorSeq;
 
-  /// Set when older messages are missing; load them with `thread.read`.
+  /// Refers to the run's thread. Set when older selectable messages of `thread_context` are missing (the `history_backfill_limit` window or the byte budget left them out); then it is the `thread_seq` of the oldest element of `thread_context`, or of the triggering message when `thread_context` is empty. Load older messages with `thread.read`.
   @BuiltValueField(wireName: r'truncated_before_seq')
   int? get truncatedBeforeSeq;
 
