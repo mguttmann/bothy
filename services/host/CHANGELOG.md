@@ -10,30 +10,6 @@ is the [`VERSION`](VERSION) file next to this one; release tags are `host/v<vers
 
 ### Added
 
-- Terminal conformance (M2-48): `make platform-bundle OUT=<dir> [GOOS= GOARCH=]` builds what a
-  platform run needs (the service, the Fake-`claude`, the tagged platform test binary, the test
-  binaries of `internal/pty`, `internal/session`, `internal/profiles` and `internal/confirm`, and
-  `bundle.json` with SHA-256 per file); `platform-test` builds and runs that bundle. The platform
-  suite refuses to run without the marker file of a disposable test machine (exit 2).
-  `test/noisedevice` is the Noise sidecar of the terminal suite's Go test device.
-
-- Terminal sessions (M2-45): `internal/session` opens one data connection per `session.open`,
-  answers Noise message 1, checks the session token in the order of docs/spec/24-terminal.md 5.3
-  with its own EdDSA verification of the ADR 0067 profile and the `jti` memory, binds session
-  users to people in `bindings.json`, waits for `start`, runs the gate of HD6, HD10 and HD11 and
-  the local confirmation, and relays frames with the scrollback of `host_service.scrollback_bytes`
-  and the idle and detach timers from the server values of `hello`; `run` binds it instead of
-  `RefuseSessions`. `internal/pty` starts each PTY in its own POSIX session (ConPTY on Windows)
-  and ends the whole tree at once: a delegated cgroup per session on Linux (`Delegate=yes` on the
-  helper unit), process table snapshots and a run file on macOS, a Job Object on Windows.
-  `internal/profiles` builds `shell`, `claude` (`organization` and `personal`) and `command` with
-  allow-list environments and `TERM=xterm-256color`. `internal/confirm` and the command
-  `confirm-agent` give the local confirmation (endpoint, peer rule, dialog). The local channel
-  gains the session ops `pty.*` and the frame kind `0x01`; `doctor` gains the `Light` run of one
-  session user; `install` adds `RuntimeDirectory=bothy-host-confirm` on Linux and the
-  confirmation folder on macOS. Tests `TestVerifyOrder`, `TestTMT03Replay`,
-  `TestTMT04TokenFailures`, `TestTMT05NoStart`, the integration tests against `sessiontest` and
-  the fuzz target `FuzzVerifySessionToken`.
 - `internal/control` (M2-43): the control connection to `wss://<server>/api/v1/hosts/connect`
   with the EdDSA proof of `identify`, `report` first after every `ready`, heartbeats, the key set of
   purpose `terminal`, the reconnect policy per close code with the new keys
@@ -76,10 +52,3 @@ is the [`VERSION`](VERSION) file next to this one; release tags are `host/v<vers
 
 - Go toolchain 1.27.2 to 1.27.3 (`toolchain` of `go.mod`): the standard library advisory
   GO-2026-6809 in `crypto/x509` failed the gate `osv`.
-### Fixed
-
-- A declaration that a ready delivers while a run of `doctor` is in progress is no longer lost
-  when the run stores its result, so the profile `claude` is offered after `confirmHost` (M2-48).
-- `bothy-host session-user remove` stops the host service before the helper of the removed
-  session user, so its sessions end `host_restarted` (R-TM-27) instead of `process_exited`
-  (M2-48).
