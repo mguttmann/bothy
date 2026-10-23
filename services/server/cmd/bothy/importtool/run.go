@@ -56,8 +56,11 @@ type Env struct {
 	Logger *slog.Logger
 	// Bothy are the network dependencies of the Bothy client (resolver, roots).
 	Bothy bothyapi.Deps
-	// Discord are the network dependencies of the Discord client and the CDN fetcher.
+	// Discord are the network dependencies of the Discord client.
 	Discord discord.Deps
+	// CDN are the network dependencies of the CDN fetcher (resolver, roots); its clock, logger
+	// and sleeper come from this Env.
+	CDN discord.Deps
 	// DiscordEgress and CDNEgress replace the egress values of the clients (tests open the
 	// private address of a fake through allowed_hosts); zero means none.
 	DiscordEgress, CDNEgress egress.Config
@@ -491,8 +494,8 @@ func cdnEgress(cfg Config, env Env) egress.Config {
 
 // cdnDeps returns the dependencies of the fetcher.
 func cdnDeps(env Env) discord.Deps {
-	d := env.Discord
-	d.Clock, d.Logger = env.clock(), env.logger()
+	d := env.CDN
+	d.Clock, d.Logger = env.clock(), newCDNLogger(env.logger())
 	if env.Sleep != nil {
 		d.Sleep = discord.Sleeper(env.Sleep)
 	}

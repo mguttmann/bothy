@@ -69,7 +69,7 @@ func (u *uploader) take(ctx context.Context, readID string, msg discord.Message,
 	case errors.Is(err, discord.ErrTooLarge):
 		return attachmentResult{reason: reasonTooLarge}, nil
 	case err != nil && abortsRun(err):
-		return attachmentResult{}, err
+		return attachmentResult{}, redactFetch(err)
 	case err != nil || len(data) == 0:
 		return attachmentResult{reason: reasonFailed}, nil
 	}

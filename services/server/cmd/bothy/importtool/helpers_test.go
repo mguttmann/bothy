@@ -99,6 +99,7 @@ type testEnv struct {
 	environ []string
 	hook    func(int) error
 	sleep   Sleeper
+	mapText string // a mapping a test case builds after the fakes started
 }
 
 // newTestEnv starts the fakes for fixture and logs the tool in to the fake Bothy.
@@ -138,6 +139,7 @@ func (e *testEnv) env() Env {
 		LeaseSleep: func(ctx context.Context, _ time.Duration) error { <-ctx.Done(); return ctx.Err() },
 		Logger:     slog.New(slog.NewTextHandler(e.debug, &slog.HandlerOptions{Level: slog.LevelDebug})),
 		Bothy:      bothyapi.Deps{}, Discord: discord.Deps{Resolver: e.discord.Resolver, RootCAs: e.discord.RootCAs},
+		CDN:           discord.Deps{Resolver: e.cdn.Resolver, RootCAs: e.cdn.RootCAs},
 		DiscordEgress: e.discord.EgressConfig(), CDNEgress: e.cdn.EgressConfig(e.t), AfterBatch: e.hook}
 }
 

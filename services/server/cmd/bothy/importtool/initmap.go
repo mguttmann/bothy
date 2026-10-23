@@ -137,7 +137,7 @@ func readAuthors(ctx context.Context, dc discordAPI, gs *guildState, botID strin
 		}
 		for _, id := range ids {
 			if err := collectAuthors(ctx, dc, id, botID, cfg.DiscordPageSize, out); err != nil {
-				if errors.Is(err, discord.ErrForbidden) {
+				if errors.Is(err, discord.ErrForbidden) || errors.Is(err, discord.ErrNotFound) {
 					continue
 				}
 				return nil, err
