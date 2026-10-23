@@ -172,7 +172,8 @@ func setMode(t *testing.T, path string, mode os.FileMode) {
 	}
 }
 
-// serveEnv is the environment of a serve process against db; extra entries replace defaults.
+// serveEnv is the environment of a serve process against db, with the database deadlines of
+// testkit.PatientDatabase; extra entries replace defaults.
 func serveEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 	t.Helper()
 	cfg := db.Config(pg.RoleApp)
@@ -191,6 +192,9 @@ func serveEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 		"BOTHY_TELEMETRY__ENABLED=false",
 		"BOTHY_TELEMETRY__LOGS__EXPORTER=stdout",
 		"BOTHY_SHUTDOWN__DRAIN_DELAY=0s",
+	}
+	for k, v := range testkit.PatientDatabase() {
+		env = append(env, config.EnvName(k)+"="+v)
 	}
 	for _, e := range extra {
 		name, _, _ := strings.Cut(e, "=")
@@ -232,8 +236,14 @@ func start(t *testing.T, role wire.Role, env []string, deps wire.Deps) *process 
 	go func() { p.done <- r.Run(context.Background()) }()
 	t.Cleanup(func() {
 		select {
-		case <-p.done:
+		case code := <-p.done:
+			if t.Failed() {
+				t.Logf("serve %s ended early with exit code %d; logs:\n%s", role, code, p.logs)
+			}
 		default:
+			if t.Failed() {
+				t.Logf("serve %s still running at the failure; logs:\n%s", role, p.logs)
+			}
 			p.sigs <- syscall.SIGTERM
 			p.sigs <- syscall.SIGTERM
 			<-p.done
@@ -523,6 +533,29 @@ func TestServeAbortsWithoutRiverTables(t *testing.T) {
 		if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "bothy migrate up") || !strings.Contains(err.Error(), "River") {
 			t.Fatalf("%s: Err() = %v", role, err)
 		}
+	}
+}
+
+// TestServeEnvDatabaseDeadlinesArePatient: a serve process of these tests waits Patience for a
+// pool connection, a statement and a lock, so a loaded runner neither fails a start step (which
+// ends the process, and /readyz refuses connections) nor answers a request 503 or 500 after the
+// production deadlines of 2s and 5s; an entry of extra still replaces a deadline.
+func TestServeEnvDatabaseDeadlinesArePatient(t *testing.T) {
+	t.Parallel()
+	db := newServeDB(t)
+	cfg, err := wire.DatabaseConfig(loadEnv(t, serveEnv(t, db)), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AcquireTimeout != testkit.Patience || cfg.StatementTimeout != testkit.Patience || cfg.LockTimeout != testkit.Patience {
+		t.Fatalf("acquire %s, statement %s, lock %s; want %s each", cfg.AcquireTimeout, cfg.StatementTimeout, cfg.LockTimeout, testkit.Patience)
+	}
+	cfg, err = wire.DatabaseConfig(loadEnv(t, serveEnv(t, db, "BOTHY_DATABASE__LOCK_TIMEOUT=2s")), "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LockTimeout != 2*time.Second {
+		t.Fatalf("lock %s with an own value, want 2s", cfg.LockTimeout)
 	}
 }
 
