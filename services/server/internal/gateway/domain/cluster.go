@@ -60,7 +60,7 @@ type Signal struct {
 	Node ids.ID
 	// The IDs of the kinds.
 	ThreadID, PrincipalID, RunID, AgentID, ActorID, DeviceID, SessionID, BindID ids.ID
-	RecipientID, NotificationID, MessageID, TargetID                         ids.ID
+	RecipientID, NotificationID, MessageID, TargetID                            ids.ID
 	// Version is the run version of SignalRun (at least 1).
 	Version int64
 	// State and BillingMode are the codes of AgentPresencePayload; HintKind the kind of

@@ -5,11 +5,14 @@ package wire
 import (
 	"slices"
 	"testing"
+
+	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
-// componentNames returns the names of the start sequence of role with cluster.mode mode.
-func clusterComponents(role Role, mode string) []string {
-	s := &server{role: role, terminalState: terminalState{plan: TerminalClusterPlan(mode, role)}}
+// clusterComponents returns the names of the start sequence of role with cluster.mode mode.
+func clusterComponents(t *testing.T, role Role, mode string) []string {
+	t.Helper()
+	s := &server{role: role, values: loadValues(t, "BOTHY_CLUSTER__MODE="+mode), terminalState: terminalState{plan: TerminalClusterPlan(mode, role)}}
 	var out []string
 	for _, c := range s.components() {
 		out = append(out, c.Name())
@@ -17,15 +20,16 @@ func clusterComponents(role Role, mode string) []string {
 	return out
 }
 
-// TestTerminalSignalsWiring (M2-47 Design note 2): single uses LocalSignals and has no component
-// terminal_ephemeral; multi uses NotifySignals in every role, and api and all start the listener
-// after the public listener (its stop step lies in PhaseEventTail, startTerminalEphemeral); a
-// worker with multi gets NotifySignals without a listener.
+// TestTerminalSignalsWiring (M2-47 Design note 2, shared listener since M7-17): single uses
+// LocalSignals and gives the terminal no route; multi uses NotifySignals in every role, and api
+// and all start the shared component ephemeral_listener after the public listener (its stop step
+// lies in PhaseEventTail, startEphemeral); a worker with multi gets NotifySignals without a
+// listener. Role api with single still holds the listener for the gateway (M7-17 Design note 3).
 func TestTerminalSignalsWiring(t *testing.T) {
 	t.Parallel()
 	for _, role := range []Role{RoleAPI, RoleWorker, RoleAll} {
 		single := TerminalClusterPlan("single", role)
-		if single.Multi || single.Notify || single.Listener || slices.Contains(clusterComponents(role, "single"), "terminal_ephemeral") {
+		if single.Multi || single.Notify || single.Listener || slices.Contains(clusterComponents(t, role, "single"), pg.EphemeralComponent) != (role == RoleAPI) {
 			t.Errorf("%s single: %+v", role, single)
 		}
 		sig, local := terminalSignals(single, nil, nil)
@@ -34,11 +38,11 @@ func TestTerminalSignalsWiring(t *testing.T) {
 		}
 		multi := TerminalClusterPlan("multi", role)
 		listener := role != RoleWorker
-		names := clusterComponents(role, "multi")
-		if !multi.Multi || !multi.Notify || multi.Listener != listener || slices.Contains(names, "terminal_ephemeral") != listener {
+		names := clusterComponents(t, role, "multi")
+		if !multi.Multi || !multi.Notify || multi.Listener != listener || slices.Contains(names, pg.EphemeralComponent) != listener {
 			t.Errorf("%s multi: %+v %v", role, multi, names)
 		}
-		if listener && slices.Index(names, "terminal_ephemeral") < slices.Index(names, "public_listener") {
+		if listener && slices.Index(names, pg.EphemeralComponent) < slices.Index(names, "public_listener") {
 			t.Errorf("%s multi: the listener starts before the HTTP listeners: %v", role, names)
 		}
 		sig, local = terminalSignals(multi, nil, nil)

@@ -162,7 +162,9 @@ func (s *server) startEphemeral(ctx context.Context) error {
 
 // gatewayPresenceMetrics returns the counter of failed presence writes on the global meter
 // provider of platform/otel.
-func gatewayPresenceMetrics() (*gatewaymetrics.PresenceMetrics, error) { return gatewaymetrics.NewPresence(nil) }
+func gatewayPresenceMetrics() (*gatewaymetrics.PresenceMetrics, error) {
+	return gatewaymetrics.NewPresence(nil)
+}
 
 // workerPresence returns, for a process whose push path reads gateway_presence (role worker, and
 // role all with multi), the table-backed presence view and, for role worker, the publisher that
