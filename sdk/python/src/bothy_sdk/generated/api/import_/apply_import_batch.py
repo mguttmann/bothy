@@ -104,6 +104,12 @@ def sync_detailed(
      One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of
     this running source. Existing `posted` keys return their target without a duplicate or event (22,
     7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+    A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target
+    outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
+    channel whose name equals a live channel of its space is `409 conflict` with `reason`
+    `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
+    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
+    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -141,6 +147,12 @@ def sync(
      One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of
     this running source. Existing `posted` keys return their target without a duplicate or event (22,
     7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+    A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target
+    outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
+    channel whose name equals a live channel of its space is `409 conflict` with `reason`
+    `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
+    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
+    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -173,6 +185,12 @@ async def asyncio_detailed(
      One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of
     this running source. Existing `posted` keys return their target without a duplicate or event (22,
     7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+    A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target
+    outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
+    channel whose name equals a live channel of its space is `409 conflict` with `reason`
+    `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
+    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
+    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -208,6 +226,12 @@ async def asyncio(
      One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of
     this running source. Existing `posted` keys return their target without a duplicate or event (22,
     7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+    A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target
+    outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
+    channel whose name equals a live channel of its space is `409 conflict` with `reason`
+    `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
+    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
+    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

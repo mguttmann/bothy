@@ -2004,7 +2004,7 @@ class ChannelsApi {
   }
 
   /// Switch the read-only state of a channel
-  /// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+  /// Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel. The imported channel of a source that is neither &#x60;completed&#x60; nor &#x60;failed&#x60; is controlled by its ownership list only: &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_lead_controls&#x60; (use &#x60;setImportLead&#x60;).
   ///
   /// Parameters:
   /// * [channelId]

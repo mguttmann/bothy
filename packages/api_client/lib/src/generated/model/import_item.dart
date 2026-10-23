@@ -20,6 +20,7 @@ part 'import_item.g.dart';
 /// * [targetId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [state]
 /// * [error]
+/// * [sourceChanged] - Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
 abstract class ImportItem implements Built<ImportItem, ImportItemBuilder> {
@@ -47,6 +48,10 @@ abstract class ImportItem implements Built<ImportItem, ImportItemBuilder> {
 
   @BuiltValueField(wireName: r'error')
   String? get error;
+
+  /// Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
+  @BuiltValueField(wireName: r'source_changed')
+  bool? get sourceChanged;
 
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'created_at')
@@ -114,6 +119,13 @@ class _$ImportItemSerializer implements PrimitiveSerializer<ImportItem> {
       yield serializers.serialize(
         object.error,
         specifiedType: const FullType(String),
+      );
+    }
+    if (object.sourceChanged != null) {
+      yield r'source_changed';
+      yield serializers.serialize(
+        object.sourceChanged,
+        specifiedType: const FullType(bool),
       );
     }
     yield r'created_at';
@@ -199,6 +211,14 @@ class _$ImportItemSerializer implements PrimitiveSerializer<ImportItem> {
           ) as String?;
           if (valueDes == null) continue;
           result.error = valueDes;
+          break;
+        case r'source_changed':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(bool),
+          ) as bool?;
+          if (valueDes == null) continue;
+          result.sourceChanged = valueDes;
           break;
         case r'created_at':
           final valueDes = serializers.deserialize(

@@ -19,7 +19,8 @@ part 'import_source.g.dart';
 /// * [name]
 /// * [config] - Schema `import_source.<kind>.v1`; credentials only as `secret_ref` names.
 /// * [state] - A dry run writes nothing and keeps the state.
-/// * [stats] - Counters per item kind and state, without content.
+/// * [stats] - Counters without content. The server's counters per item kind and state are under `server` (`server.<item_kind>.<state>`, `server.source_changed`, `server.cancelled`); the counters of the import tool from `setImportCursor` are under `tool`.
+/// * [cursor] - The object last stored by `setImportCursor` (progress and the run lease of the import tool, 22 7.3 and 7.4); `{}` before the first one. The server never interprets it.
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [startedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [finishedAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -46,9 +47,13 @@ abstract class ImportSource
   ImportSourceStateEnum get state;
   // enum stateEnum {  draft,  running,  paused,  completed,  failed,  };
 
-  /// Counters per item kind and state, without content.
+  /// Counters without content. The server's counters per item kind and state are under `server` (`server.<item_kind>.<state>`, `server.source_changed`, `server.cancelled`); the counters of the import tool from `setImportCursor` are under `tool`.
   @BuiltValueField(wireName: r'stats')
   BuiltMap<String, JsonObject?> get stats;
+
+  /// The object last stored by `setImportCursor` (progress and the run lease of the import tool, 22 7.3 and 7.4); `{}` before the first one. The server never interprets it.
+  @BuiltValueField(wireName: r'cursor')
+  BuiltMap<String, JsonObject?>? get cursor;
 
   /// RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
   @BuiltValueField(wireName: r'created_at')
@@ -121,6 +126,16 @@ class _$ImportSourceSerializer implements PrimitiveSerializer<ImportSource> {
         FullType.nullable(JsonObject),
       ]),
     );
+    if (object.cursor != null) {
+      yield r'cursor';
+      yield serializers.serialize(
+        object.cursor,
+        specifiedType: const FullType(BuiltMap, [
+          FullType(String),
+          FullType.nullable(JsonObject),
+        ]),
+      );
+    }
     yield r'created_at';
     yield serializers.serialize(
       object.createdAt,
@@ -214,6 +229,17 @@ class _$ImportSourceSerializer implements PrimitiveSerializer<ImportSource> {
             ]),
           ) as BuiltMap<String, JsonObject?>;
           result.stats.replace(valueDes);
+          break;
+        case r'cursor':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType.nullable(BuiltMap, [
+              FullType(String),
+              FullType.nullable(JsonObject),
+            ]),
+          ) as BuiltMap<String, JsonObject?>?;
+          if (valueDes == null) continue;
+          result.cursor.replace(valueDes);
           break;
         case r'created_at':
           final valueDes = serializers.deserialize(

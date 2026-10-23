@@ -106,6 +106,8 @@ class _$ImportSource extends ImportSource {
   @override
   final BuiltMap<String, JsonObject?> stats;
   @override
+  final BuiltMap<String, JsonObject?>? cursor;
+  @override
   final DateTime createdAt;
   @override
   final DateTime? startedAt;
@@ -122,6 +124,7 @@ class _$ImportSource extends ImportSource {
     required this.config,
     required this.state,
     required this.stats,
+    this.cursor,
     required this.createdAt,
     this.startedAt,
     this.finishedAt,
@@ -143,6 +146,7 @@ class _$ImportSource extends ImportSource {
         config == other.config &&
         state == other.state &&
         stats == other.stats &&
+        cursor == other.cursor &&
         createdAt == other.createdAt &&
         startedAt == other.startedAt &&
         finishedAt == other.finishedAt;
@@ -157,6 +161,7 @@ class _$ImportSource extends ImportSource {
     _$hash = $jc(_$hash, config.hashCode);
     _$hash = $jc(_$hash, state.hashCode);
     _$hash = $jc(_$hash, stats.hashCode);
+    _$hash = $jc(_$hash, cursor.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jc(_$hash, startedAt.hashCode);
     _$hash = $jc(_$hash, finishedAt.hashCode);
@@ -173,6 +178,7 @@ class _$ImportSource extends ImportSource {
           ..add('config', config)
           ..add('state', state)
           ..add('stats', stats)
+          ..add('cursor', cursor)
           ..add('createdAt', createdAt)
           ..add('startedAt', startedAt)
           ..add('finishedAt', finishedAt))
@@ -211,6 +217,12 @@ class ImportSourceBuilder
       _$this._stats ??= MapBuilder<String, JsonObject?>();
   set stats(MapBuilder<String, JsonObject?>? stats) => _$this._stats = stats;
 
+  MapBuilder<String, JsonObject?>? _cursor;
+  MapBuilder<String, JsonObject?> get cursor =>
+      _$this._cursor ??= MapBuilder<String, JsonObject?>();
+  set cursor(MapBuilder<String, JsonObject?>? cursor) =>
+      _$this._cursor = cursor;
+
   DateTime? _createdAt;
   DateTime? get createdAt => _$this._createdAt;
   set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
@@ -236,6 +248,7 @@ class ImportSourceBuilder
       _config = $v.config.toBuilder();
       _state = $v.state;
       _stats = $v.stats.toBuilder();
+      _cursor = $v.cursor?.toBuilder();
       _createdAt = $v.createdAt;
       _startedAt = $v.startedAt;
       _finishedAt = $v.finishedAt;
@@ -285,6 +298,7 @@ class ImportSourceBuilder
               'state',
             ),
             stats: stats.build(),
+            cursor: _cursor?.build(),
             createdAt: BuiltValueNullFieldError.checkNotNull(
               createdAt,
               r'ImportSource',
@@ -301,6 +315,8 @@ class ImportSourceBuilder
 
         _$failedField = 'stats';
         stats.build();
+        _$failedField = 'cursor';
+        _cursor?.build();
       } catch (e) {
         throw BuiltValueNestedFieldError(
           r'ImportSource',

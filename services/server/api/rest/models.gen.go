@@ -548,16 +548,16 @@ func (e AppManifestComponents) Valid() bool {
 
 // Defines values for AppManifestDeliveryMode.
 const (
-	Gateway AppManifestDeliveryMode = "gateway"
-	Webhook AppManifestDeliveryMode = "webhook"
+	AppManifestDeliveryModeGateway AppManifestDeliveryMode = "gateway"
+	AppManifestDeliveryModeWebhook AppManifestDeliveryMode = "webhook"
 )
 
 // Valid indicates whether the value is a known member of the AppManifestDeliveryMode enum.
 func (e AppManifestDeliveryMode) Valid() bool {
 	switch e {
-	case Gateway:
+	case AppManifestDeliveryModeGateway:
 		return true
-	case Webhook:
+	case AppManifestDeliveryModeWebhook:
 		return true
 	default:
 		return false
@@ -2295,6 +2295,24 @@ func (e IdentityProviderKind) Valid() bool {
 	}
 }
 
+// Defines values for ImportChannelDataKind.
+const (
+	ImportChannelDataKindForum ImportChannelDataKind = "forum"
+	ImportChannelDataKindText  ImportChannelDataKind = "text"
+)
+
+// Valid indicates whether the value is a known member of the ImportChannelDataKind enum.
+func (e ImportChannelDataKind) Valid() bool {
+	switch e {
+	case ImportChannelDataKindForum:
+		return true
+	case ImportChannelDataKindText:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImportItemItemKind.
 const (
 	ImportItemItemKindChannel  ImportItemItemKind = "channel"
@@ -2478,6 +2496,96 @@ func (e ImportSourceState) Valid() bool {
 	case ImportSourceStatePaused:
 		return true
 	case ImportSourceStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigChannelsLead.
+const (
+	ImportSourceDiscordConfigChannelsLeadBothy   ImportSourceDiscordConfigChannelsLead = "bothy"
+	ImportSourceDiscordConfigChannelsLeadDiscord ImportSourceDiscordConfigChannelsLead = "discord"
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigChannelsLead enum.
+func (e ImportSourceDiscordConfigChannelsLead) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigChannelsLeadBothy:
+		return true
+	case ImportSourceDiscordConfigChannelsLeadDiscord:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigDefaultsUnmappedBot.
+const (
+	ImportSourceDiscordConfigDefaultsUnmappedBotPlaceholder ImportSourceDiscordConfigDefaultsUnmappedBot = "placeholder"
+	ImportSourceDiscordConfigDefaultsUnmappedBotSkip        ImportSourceDiscordConfigDefaultsUnmappedBot = "skip"
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigDefaultsUnmappedBot enum.
+func (e ImportSourceDiscordConfigDefaultsUnmappedBot) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigDefaultsUnmappedBotPlaceholder:
+		return true
+	case ImportSourceDiscordConfigDefaultsUnmappedBotSkip:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigDefaultsUnmappedHuman.
+const (
+	ImportSourceDiscordConfigDefaultsUnmappedHumanPlaceholder ImportSourceDiscordConfigDefaultsUnmappedHuman = "placeholder"
+	ImportSourceDiscordConfigDefaultsUnmappedHumanSkip        ImportSourceDiscordConfigDefaultsUnmappedHuman = "skip"
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigDefaultsUnmappedHuman enum.
+func (e ImportSourceDiscordConfigDefaultsUnmappedHuman) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigDefaultsUnmappedHumanPlaceholder:
+		return true
+	case ImportSourceDiscordConfigDefaultsUnmappedHumanSkip:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportSourceDiscordConfigVersion.
+const (
+	ImportSourceDiscordConfigVersionN1 ImportSourceDiscordConfigVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the ImportSourceDiscordConfigVersion enum.
+func (e ImportSourceDiscordConfigVersion) Valid() bool {
+	switch e {
+	case ImportSourceDiscordConfigVersionN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ImportUserDataDiscordKind.
+const (
+	ImportUserDataDiscordKindBot     ImportUserDataDiscordKind = "bot"
+	ImportUserDataDiscordKindUser    ImportUserDataDiscordKind = "user"
+	ImportUserDataDiscordKindWebhook ImportUserDataDiscordKind = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the ImportUserDataDiscordKind enum.
+func (e ImportUserDataDiscordKind) Valid() bool {
+	switch e {
+	case ImportUserDataDiscordKindBot:
+		return true
+	case ImportUserDataDiscordKindUser:
+		return true
+	case ImportUserDataDiscordKindWebhook:
 		return true
 	default:
 		return false
@@ -10398,6 +10506,29 @@ type ImportBatchResult struct {
 	UnreadFloorSeq *int64 `json:"unread_floor_seq,omitempty"`
 }
 
+// ImportChannelData `data` of a `channel` item (origin key `channel:<channel_id>`). The space is the target of the posted item `space_origin_key` or, without it, of the category named in `defaults.uncategorized_space`; `existing_space_id` and `existing_channel_id` must equal the stored mapping. `read_only` is not a member: the server derives it from the stored `lead`.
+type ImportChannelData struct {
+	// ExistingChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	ExistingChannelId *Uuid `json:"existing_channel_id,omitempty"`
+
+	// ExistingSpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	ExistingSpaceId *Uuid                 `json:"existing_space_id,omitempty"`
+	Kind            ImportChannelDataKind `json:"kind"`
+	Name            *string               `json:"name,omitempty"`
+
+	// SortKey Fractional index key of the order in the space.
+	//
+	// Examples: a0
+	SortKey string `json:"sort_key"`
+
+	// SpaceOriginKey Examples: space:1029384001
+	SpaceOriginKey *string `json:"space_origin_key,omitempty"`
+	Topic          *string `json:"topic,omitempty"`
+}
+
+// ImportChannelDataKind defines model for ImportChannelData.Kind.
+type ImportChannelDataKind string
+
 // ImportCursorSet defines model for ImportCursorSet.
 type ImportCursorSet struct {
 	// Cursor Progress per source channel and thread; only after a successful batch.
@@ -10406,6 +10537,11 @@ type ImportCursorSet struct {
 	// Stats Free-form JSON object whose schema is named in the field description.
 	Stats *JsonObject `json:"stats,omitempty"`
 }
+
+// ImportDiscordId A Discord snowflake as a string of digits.
+//
+// Examples: 1029384000
+type ImportDiscordId = string
 
 // ImportFileCreate defines model for ImportFileCreate.
 type ImportFileCreate struct {
@@ -10434,6 +10570,14 @@ type ImportFileSlot struct {
 	Upload *UploadSession `json:"upload,omitempty"`
 }
 
+// ImportForumTagData `data` of a `forum_tag` item (origin key `forum_tag:<channel_id>:<tag_id>`). A tag with the same name, without regard to case, is adopted (22, 6.6). `emoji` is accepted and not stored (forum tags have no emoji).
+type ImportForumTagData struct {
+	// ChannelOriginKey Examples: channel:1029384000
+	ChannelOriginKey string  `json:"channel_origin_key"`
+	Emoji            *string `json:"emoji,omitempty"`
+	Name             string  `json:"name"`
+}
+
 // ImportItem defines model for ImportItem.
 type ImportItem struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -10445,8 +10589,11 @@ type ImportItem struct {
 	ItemKind ImportItemItemKind `json:"item_kind"`
 
 	// OriginKey Examples: message:1029384756:0
-	OriginKey string          `json:"origin_key"`
-	State     ImportItemState `json:"state"`
+	OriginKey string `json:"origin_key"`
+
+	// SourceChanged Present and `true` when a repeated key came with a `content_sha256` different from the stored one; nothing was changed (22, 7.2 item 4).
+	SourceChanged *bool           `json:"source_changed,omitempty"`
+	State         ImportItemState `json:"state"`
 
 	// TargetId UUIDv7 (RFC 9562), lowercase canonical form.
 	TargetId   *Uuid   `json:"target_id,omitempty"`
@@ -10486,12 +10633,15 @@ type ImportLeadSet struct {
 // ImportLeadSetLead `discord`: the source leads, the channel here is read-only and mirrored; `bothy`: this server leads (22, 12.1).
 type ImportLeadSetLead string
 
+// ImportMappingTarget Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
+type ImportMappingTarget = interface{}
+
 // ImportObject defines model for ImportObject.
 type ImportObject struct {
 	// ContentSha256 Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
 	ContentSha256 *string `json:"content_sha256,omitempty"`
 
-	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6).
+	// Data Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`).
 	Data     JsonObject           `json:"data"`
 	ItemKind ImportObjectItemKind `json:"item_kind"`
 
@@ -10574,6 +10724,9 @@ type ImportSource struct {
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	CreatedAt Timestamp `json:"created_at"`
 
+	// Cursor The object last stored by `setImportCursor` (progress and the run lease of the import tool, 22 7.3 and 7.4); `{}` before the first one. The server never interprets it.
+	Cursor *JsonObject `json:"cursor,omitempty"`
+
 	// FinishedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	FinishedAt *Timestamp `json:"finished_at,omitempty"`
 
@@ -10590,7 +10743,7 @@ type ImportSource struct {
 	// State A dry run writes nothing and keeps the state.
 	State ImportSourceState `json:"state"`
 
-	// Stats Counters per item kind and state, without content.
+	// Stats Counters without content. The server's counters per item kind and state are under `server` (`server.<item_kind>.<state>`, `server.source_changed`, `server.cancelled`); the counters of the import tool from `setImportCursor` are under `tool`.
 	Stats JsonObject `json:"stats"`
 }
 
@@ -10599,13 +10752,78 @@ type ImportSourceState string
 
 // ImportSourceCreate defines model for ImportSourceCreate.
 type ImportSourceCreate struct {
-	// Config Free-form JSON object whose schema is named in the field description.
+	// Config For `kind = discord` the mapping of schema `import_source.discord.v1`, see `ImportSourceDiscordConfig` (22, 5.2); every violation is one error of `400 validation_failed` with its JSON pointer, all reported at once. `kind = archive` is `400 validation_failed` with the code `not_enabled`.
 	Config JsonObject `json:"config"`
 	Kind   ImportKind `json:"kind"`
 
 	// Name Examples: Old community server
 	Name string `json:"name"`
 }
+
+// ImportSourceDiscordConfig Mapping file of schema `import_source.discord.v1` as JSON (22, 5.2); the web console converts the YAML of the owner. It holds no secret.
+type ImportSourceDiscordConfig struct {
+	Channels *[]struct {
+		// DiscordChannel A Discord snowflake as a string of digits.
+		//
+		// Examples: 1029384000
+		DiscordChannel ImportDiscordId                        `json:"discord_channel"`
+		Lead           *ImportSourceDiscordConfigChannelsLead `json:"lead,omitempty"`
+
+		// PlannedOperator `agent:<handle>` of an active agent or `none` (default).
+		//
+		// Examples: agent:lotse
+		PlannedOperator *string `json:"planned_operator,omitempty"`
+
+		// Target Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
+		Target ImportMappingTarget `json:"target"`
+	} `json:"channels,omitempty"`
+	Defaults struct {
+		// UncategorizedSpace `skip` or the `discord_category` of an entry in `spaces`.
+		//
+		// Examples: skip
+		UncategorizedSpace string                                         `json:"uncategorized_space"`
+		UnmappedBot        ImportSourceDiscordConfigDefaultsUnmappedBot   `json:"unmapped_bot"`
+		UnmappedHuman      ImportSourceDiscordConfigDefaultsUnmappedHuman `json:"unmapped_human"`
+	} `json:"defaults"`
+
+	// GuildId A Discord snowflake as a string of digits.
+	//
+	// Examples: 1029384000
+	GuildId ImportDiscordId `json:"guild_id"`
+	Spaces  *[]struct {
+		// DiscordCategory A Discord snowflake as a string of digits.
+		//
+		// Examples: 1029384000
+		DiscordCategory ImportDiscordId `json:"discord_category"`
+
+		// Target Exactly one of the string `skip`, `{create: {name}}` or `{existing: <uuid>}` (22, 5.2). The server checks the form and reports a violation at the pointer of the member.
+		Target ImportMappingTarget `json:"target"`
+	} `json:"spaces,omitempty"`
+	Users *[]struct {
+		// DiscordUser A Discord snowflake as a string of digits.
+		//
+		// Examples: 1029384000
+		DiscordUser ImportDiscordId `json:"discord_user"`
+
+		// Target `user:<handle>`, `agent:<handle>` or `placeholder`.
+		//
+		// Examples: user:alex
+		Target string `json:"target"`
+	} `json:"users,omitempty"`
+	Version ImportSourceDiscordConfigVersion `json:"version"`
+}
+
+// ImportSourceDiscordConfigChannelsLead defines model for ImportSourceDiscordConfig.Channels.Lead.
+type ImportSourceDiscordConfigChannelsLead string
+
+// ImportSourceDiscordConfigDefaultsUnmappedBot defines model for ImportSourceDiscordConfig.Defaults.UnmappedBot.
+type ImportSourceDiscordConfigDefaultsUnmappedBot string
+
+// ImportSourceDiscordConfigDefaultsUnmappedHuman defines model for ImportSourceDiscordConfig.Defaults.UnmappedHuman.
+type ImportSourceDiscordConfigDefaultsUnmappedHuman string
+
+// ImportSourceDiscordConfigVersion defines model for ImportSourceDiscordConfig.Version.
+type ImportSourceDiscordConfigVersion int
 
 // ImportSourcePage One page. `next_cursor` is absent on the last page.
 type ImportSourcePage struct {
@@ -10616,6 +10834,28 @@ type ImportSourcePage struct {
 	// Examples: eyJrIjoiMDE5MmY0YTAtN2IxYy03MDAwLThhMDAtMDAwMDAwMDAwMDAxIn0
 	NextCursor *Cursor `json:"next_cursor,omitempty"`
 }
+
+// ImportSpaceData `data` of a `space` item (origin key `space:<category_id>`). Exactly one of `name` (a new space as the mapping says `create`) and `existing_space_id` (equal to the mapping's `existing`).
+type ImportSpaceData struct {
+	// ExistingSpaceId UUIDv7 (RFC 9562), lowercase canonical form.
+	ExistingSpaceId *Uuid   `json:"existing_space_id,omitempty"`
+	Name            *string `json:"name,omitempty"`
+
+	// SortKey Fractional index key of the space order, derived by the tool from the Discord `position`.
+	//
+	// Examples: a0
+	SortKey string `json:"sort_key"`
+}
+
+// ImportUserData `data` of a `user` item (origin key `user:<user_id>`). The target comes from the stored mapping and its `defaults`; a webhook author is always a placeholder (22, 5.3).
+type ImportUserData struct {
+	DiscordKind ImportUserDataDiscordKind `json:"discord_kind"`
+	GlobalName  *string                   `json:"global_name,omitempty"`
+	Username    string                    `json:"username"`
+}
+
+// ImportUserDataDiscordKind defines model for ImportUserData.DiscordKind.
+type ImportUserDataDiscordKind string
 
 // IncomingWebhook defines model for IncomingWebhook.
 type IncomingWebhook struct {
@@ -16673,6 +16913,12 @@ type PutProjectBindingParams struct {
 	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
 }
 
+// SetChannelReadOnlyParams defines parameters for SetChannelReadOnly.
+type SetChannelReadOnlyParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
 // CreateForumTagParams defines parameters for CreateForumTag.
 type CreateForumTagParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -16951,6 +17197,53 @@ type CreateIdentityProviderParams struct {
 
 // UpdateIdentityProviderParams defines parameters for UpdateIdentityProvider.
 type UpdateIdentityProviderParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListImportsParams defines parameters for ListImports.
+type ListImportsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateImportParams defines parameters for CreateImport.
+type CreateImportParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CancelImportParams defines parameters for CancelImport.
+type CancelImportParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CompleteImportParams defines parameters for CompleteImport.
+type CompleteImportParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListImportItemsParams defines parameters for ListImportItems.
+type ListImportItemsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// State Filter by state.
+	State *ImportItemState `form:"state,omitempty" json:"state,omitempty"`
+}
+
+// PauseImportParams defines parameters for PauseImport.
+type PauseImportParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// StartImportParams defines parameters for StartImport.
+type StartImportParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -17459,6 +17752,9 @@ type SetChannelOperatorJSONRequestBody = OperatorSet
 // PutProjectBindingJSONRequestBody defines body for PutProjectBinding for application/json ContentType.
 type PutProjectBindingJSONRequestBody = ProjectBindingPut
 
+// SetChannelReadOnlyJSONRequestBody defines body for SetChannelReadOnly for application/json ContentType.
+type SetChannelReadOnlyJSONRequestBody = ChannelReadOnlySet
+
 // CreateForumTagJSONRequestBody defines body for CreateForumTag for application/json ContentType.
 type CreateForumTagJSONRequestBody = ForumTagCreate
 
@@ -17563,6 +17859,18 @@ type CreateIdentityProviderJSONRequestBody = IdentityProviderCreate
 
 // UpdateIdentityProviderJSONRequestBody defines body for UpdateIdentityProvider for application/json ContentType.
 type UpdateIdentityProviderJSONRequestBody = IdentityProviderUpdate
+
+// CreateImportJSONRequestBody defines body for CreateImport for application/json ContentType.
+type CreateImportJSONRequestBody = ImportSourceCreate
+
+// ApplyImportBatchJSONRequestBody defines body for ApplyImportBatch for application/json ContentType.
+type ApplyImportBatchJSONRequestBody = ImportBatch
+
+// SetImportCursorJSONRequestBody defines body for SetImportCursor for application/json ContentType.
+type SetImportCursorJSONRequestBody = ImportCursorSet
+
+// SetImportLeadJSONRequestBody defines body for SetImportLead for application/json ContentType.
+type SetImportLeadJSONRequestBody = ImportLeadSet
 
 // SetAllAgentsBillingModeJSONRequestBody defines body for SetAllAgentsBillingMode for application/json ContentType.
 type SetAllAgentsBillingModeJSONRequestBody = BillingModeSetAll

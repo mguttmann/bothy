@@ -98,6 +98,10 @@ def sync_detailed(
 ) -> Response[ImportSource | Problem]:
     """Pause an import
 
+     Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with
+    `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is
+    `409 conflict` with `reason` `import_state`.
+
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -130,6 +134,10 @@ def sync(
 ) -> ImportSource | Problem | None:
     """Pause an import
 
+     Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with
+    `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is
+    `409 conflict` with `reason` `import_state`.
+
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -156,6 +164,10 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[ImportSource | Problem]:
     """Pause an import
+
+     Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with
+    `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is
+    `409 conflict` with `reason` `import_state`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -186,6 +198,10 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> ImportSource | Problem | None:
     """Pause an import
+
+     Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with
+    `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is
+    `409 conflict` with `reason` `import_state`.
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

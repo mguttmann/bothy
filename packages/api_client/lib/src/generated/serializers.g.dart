@@ -351,9 +351,12 @@ Serializers _$serializers =
           ..add(IdentityProviderUpdate.serializer)
           ..add(ImportBatch.serializer)
           ..add(ImportBatchResult.serializer)
+          ..add(ImportChannelData.serializer)
+          ..add(ImportChannelDataKindEnum.serializer)
           ..add(ImportCursorSet.serializer)
           ..add(ImportFileCreate.serializer)
           ..add(ImportFileSlot.serializer)
+          ..add(ImportForumTagData.serializer)
           ..add(ImportItem.serializer)
           ..add(ImportItemItemKindEnum.serializer)
           ..add(ImportItemPage.serializer)
@@ -368,8 +371,20 @@ Serializers _$serializers =
           ..add(ImportProgressPayload.serializer)
           ..add(ImportSource.serializer)
           ..add(ImportSourceCreate.serializer)
+          ..add(ImportSourceDiscordConfig.serializer)
+          ..add(ImportSourceDiscordConfigChannelsInner.serializer)
+          ..add(ImportSourceDiscordConfigChannelsInnerLeadEnum.serializer)
+          ..add(ImportSourceDiscordConfigDefaults.serializer)
+          ..add(ImportSourceDiscordConfigDefaultsUnmappedBotEnum.serializer)
+          ..add(ImportSourceDiscordConfigDefaultsUnmappedHumanEnum.serializer)
+          ..add(ImportSourceDiscordConfigSpacesInner.serializer)
+          ..add(ImportSourceDiscordConfigUsersInner.serializer)
+          ..add(ImportSourceDiscordConfigVersionEnum.serializer)
           ..add(ImportSourcePage.serializer)
           ..add(ImportSourceStateEnum.serializer)
+          ..add(ImportSpaceData.serializer)
+          ..add(ImportUserData.serializer)
+          ..add(ImportUserDataDiscordKindEnum.serializer)
           ..add(IncomingWebhook.serializer)
           ..add(IncomingWebhookCreate.serializer)
           ..add(IncomingWebhookCreated.serializer)
@@ -1179,6 +1194,24 @@ Serializers _$serializers =
             () => ListBuilder<ImportSource>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(ImportSourceDiscordConfigSpacesInner),
+            ]),
+            () => ListBuilder<ImportSourceDiscordConfigSpacesInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(ImportSourceDiscordConfigChannelsInner),
+            ]),
+            () => ListBuilder<ImportSourceDiscordConfigChannelsInner>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(ImportSourceDiscordConfigUsersInner),
+            ]),
+            () => ListBuilder<ImportSourceDiscordConfigUsersInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(IncomingWebhook)]),
             () => ListBuilder<IncomingWebhook>(),
           )
@@ -1894,6 +1927,13 @@ Serializers _$serializers =
               const FullType(HostReportedSessionUser),
             ]),
             () => ListBuilder<HostReportedSessionUser>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltMap, const [
+              const FullType(String),
+              const FullType.nullable(JsonObject),
+            ]),
+            () => MapBuilder<String, JsonObject?>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltMap, const [

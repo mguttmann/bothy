@@ -30,7 +30,7 @@ class ImportApi {
   const ImportApi(this._dio, this._serializers);
 
   /// Write a batch of imported objects
-  /// One transaction, at most &#x60;import.batch_max_items&#x60; objects. Every target must lie in a channel of this running source. Existing &#x60;posted&#x60; keys return their target without a duplicate or event (22, 7.2). Writes &#x60;thread.updated&#x60; and &#x60;import.progress&#x60; instead of one event per message.
+  /// One transaction, at most &#x60;import.batch_max_items&#x60; objects. Every target must lie in a channel of this running source. Existing &#x60;posted&#x60; keys return their target without a duplicate or event (22, 7.2). Writes &#x60;thread.updated&#x60; and &#x60;import.progress&#x60; instead of one event per message. A source that is not &#x60;running&#x60; is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_not_running&#x60;; a target outside the channels of the source is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;target_outside_source&#x60;; a new channel whose name equals a live channel of its space is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;name_collision&#x60;. The &#x60;data&#x60; of a structure item follows &#x60;ImportSpaceData&#x60;, &#x60;ImportChannelData&#x60;, &#x60;ImportForumTagData&#x60; or &#x60;ImportUserData&#x60;; until the content items are enabled, &#x60;thread&#x60;, &#x60;message&#x60; and &#x60;pin&#x60; items and &#x60;thread_origin_key&#x60; answer &#x60;400 validation_failed&#x60; with the code &#x60;not_enabled&#x60;.
   ///
   /// Parameters:
   /// * [importId]
@@ -140,7 +140,7 @@ class ImportApi {
   }
 
   /// Cancel an import
-  ///
+  /// Ends a &#x60;draft&#x60;, &#x60;running&#x60; or &#x60;paused&#x60; source as &#x60;failed&#x60; with the counter &#x60;server.cancelled&#x60; set to &#x60;true&#x60; in &#x60;stats&#x60; and sets &#x60;finished_at&#x60;. Any other state is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_state&#x60;.
   ///
   /// Parameters:
   /// * [importId]
@@ -237,7 +237,7 @@ class ImportApi {
   }
 
   /// Complete an import
-  /// When every channel is led by this server: stop the mirror, source &#x60;completed&#x60; (22, 13.5).
+  /// When every channel is led by this server: stop the mirror, source &#x60;completed&#x60; (22, 13.5). Only from &#x60;running&#x60; or &#x60;paused&#x60;, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_state&#x60;. Every channel of the mapping whose target is not &#x60;skip&#x60; and whose channel item is &#x60;posted&#x60; must have &#x60;lead &#x3D; bothy&#x60;, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;lead_not_bothy&#x60;; mapped channels that were never imported do not block it.
   ///
   /// Parameters:
   /// * [importId]
@@ -867,7 +867,7 @@ class ImportApi {
   }
 
   /// Pause an import
-  ///
+  /// Moves a &#x60;running&#x60; source to &#x60;paused&#x60;; batches and cursor writes then answer &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_not_running&#x60;. Pausing a &#x60;paused&#x60; source answers it unchanged. Any other state is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_state&#x60;.
   ///
   /// Parameters:
   /// * [importId]
@@ -964,7 +964,7 @@ class ImportApi {
   }
 
   /// Advance the import cursor
-  /// Only after a successful batch (22, 7.3).
+  /// Only after a successful batch (22, 7.3). Replaces &#x60;cursor&#x60; with the given object and merges the top-level members of &#x60;stats&#x60; into the member &#x60;tool&#x60; of &#x60;ImportSource.stats&#x60; (the server&#39;s own counters stay under &#x60;server&#x60;). Only for a &#x60;running&#x60; source, else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_not_running&#x60;.
   ///
   /// Parameters:
   /// * [importId]
@@ -1074,7 +1074,7 @@ class ImportApi {
   }
 
   /// Set the leading side of a channel
-  /// Switches &#x60;lead&#x60; of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+  /// Switches &#x60;lead&#x60; of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13). The channel must be in the mapping with a target other than &#x60;skip&#x60; (else &#x60;404&#x60;) and its channel item must be &#x60;posted&#x60; (else &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;channel_not_imported&#x60;). &#x60;lead &#x3D; discord&#x60; sets the target channel read-only and cancels its active runs; &#x60;lead &#x3D; bothy&#x60; lifts read-only. A &#x60;completed&#x60; or &#x60;failed&#x60; source is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_state&#x60;. A lead equal to the current one changes nothing.
   ///
   /// Parameters:
   /// * [importId]
@@ -1184,7 +1184,7 @@ class ImportApi {
   }
 
   /// Start or continue an import
-  ///
+  /// Moves a &#x60;draft&#x60; or &#x60;paused&#x60; source to &#x60;running&#x60; (22, 7.4); &#x60;started_at&#x60; is set on the first start. Starting a &#x60;running&#x60; source answers it unchanged. Any other state is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_state&#x60;.
   ///
   /// Parameters:
   /// * [importId]

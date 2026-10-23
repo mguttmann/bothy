@@ -136,6 +136,8 @@ class _$ImportItem extends ImportItem {
   @override
   final String? error;
   @override
+  final bool? sourceChanged;
+  @override
   final DateTime createdAt;
 
   factory _$ImportItem([void Function(ImportItemBuilder)? updates]) =>
@@ -149,6 +151,7 @@ class _$ImportItem extends ImportItem {
     this.targetId,
     required this.state,
     this.error,
+    this.sourceChanged,
     required this.createdAt,
   }) : super._();
   @override
@@ -169,6 +172,7 @@ class _$ImportItem extends ImportItem {
         targetId == other.targetId &&
         state == other.state &&
         error == other.error &&
+        sourceChanged == other.sourceChanged &&
         createdAt == other.createdAt;
   }
 
@@ -182,6 +186,7 @@ class _$ImportItem extends ImportItem {
     _$hash = $jc(_$hash, targetId.hashCode);
     _$hash = $jc(_$hash, state.hashCode);
     _$hash = $jc(_$hash, error.hashCode);
+    _$hash = $jc(_$hash, sourceChanged.hashCode);
     _$hash = $jc(_$hash, createdAt.hashCode);
     _$hash = $jf(_$hash);
     return _$hash;
@@ -197,6 +202,7 @@ class _$ImportItem extends ImportItem {
           ..add('targetId', targetId)
           ..add('state', state)
           ..add('error', error)
+          ..add('sourceChanged', sourceChanged)
           ..add('createdAt', createdAt))
         .toString();
   }
@@ -233,6 +239,11 @@ class ImportItemBuilder implements Builder<ImportItem, ImportItemBuilder> {
   String? get error => _$this._error;
   set error(String? error) => _$this._error = error;
 
+  bool? _sourceChanged;
+  bool? get sourceChanged => _$this._sourceChanged;
+  set sourceChanged(bool? sourceChanged) =>
+      _$this._sourceChanged = sourceChanged;
+
   DateTime? _createdAt;
   DateTime? get createdAt => _$this._createdAt;
   set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
@@ -251,6 +262,7 @@ class ImportItemBuilder implements Builder<ImportItem, ImportItemBuilder> {
       _targetId = $v.targetId;
       _state = $v.state;
       _error = $v.error;
+      _sourceChanged = $v.sourceChanged;
       _createdAt = $v.createdAt;
       _$v = null;
     }
@@ -293,6 +305,7 @@ class ImportItemBuilder implements Builder<ImportItem, ImportItemBuilder> {
             'state',
           ),
           error: error,
+          sourceChanged: sourceChanged,
           createdAt: BuiltValueNullFieldError.checkNotNull(
             createdAt,
             r'ImportItem',

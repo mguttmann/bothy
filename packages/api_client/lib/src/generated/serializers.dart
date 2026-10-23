@@ -284,9 +284,11 @@ import 'package:api_client/src/generated/model/identity_provider_list.dart';
 import 'package:api_client/src/generated/model/identity_provider_update.dart';
 import 'package:api_client/src/generated/model/import_batch.dart';
 import 'package:api_client/src/generated/model/import_batch_result.dart';
+import 'package:api_client/src/generated/model/import_channel_data.dart';
 import 'package:api_client/src/generated/model/import_cursor_set.dart';
 import 'package:api_client/src/generated/model/import_file_create.dart';
 import 'package:api_client/src/generated/model/import_file_slot.dart';
+import 'package:api_client/src/generated/model/import_forum_tag_data.dart';
 import 'package:api_client/src/generated/model/import_item.dart';
 import 'package:api_client/src/generated/model/import_item_page.dart';
 import 'package:api_client/src/generated/model/import_item_state.dart';
@@ -297,7 +299,14 @@ import 'package:api_client/src/generated/model/import_progress_event.dart';
 import 'package:api_client/src/generated/model/import_progress_payload.dart';
 import 'package:api_client/src/generated/model/import_source.dart';
 import 'package:api_client/src/generated/model/import_source_create.dart';
+import 'package:api_client/src/generated/model/import_source_discord_config.dart';
+import 'package:api_client/src/generated/model/import_source_discord_config_channels_inner.dart';
+import 'package:api_client/src/generated/model/import_source_discord_config_defaults.dart';
+import 'package:api_client/src/generated/model/import_source_discord_config_spaces_inner.dart';
+import 'package:api_client/src/generated/model/import_source_discord_config_users_inner.dart';
 import 'package:api_client/src/generated/model/import_source_page.dart';
+import 'package:api_client/src/generated/model/import_space_data.dart';
+import 'package:api_client/src/generated/model/import_user_data.dart';
 import 'package:api_client/src/generated/model/incoming_webhook.dart';
 import 'package:api_client/src/generated/model/incoming_webhook_create.dart';
 import 'package:api_client/src/generated/model/incoming_webhook_created.dart';
@@ -873,9 +882,11 @@ part 'serializers.g.dart';
   IdentityProviderUpdate,
   ImportBatch,
   ImportBatchResult,
+  ImportChannelData,
   ImportCursorSet,
   ImportFileCreate,
   ImportFileSlot,
+  ImportForumTagData,
   ImportItem,
   ImportItemPage,
   ImportItemState,
@@ -886,7 +897,14 @@ part 'serializers.g.dart';
   ImportProgressPayload,
   ImportSource,
   ImportSourceCreate,
+  ImportSourceDiscordConfig,
+  ImportSourceDiscordConfigChannelsInner,
+  ImportSourceDiscordConfigDefaults,
+  ImportSourceDiscordConfigSpacesInner,
+  ImportSourceDiscordConfigUsersInner,
   ImportSourcePage,
+  ImportSpaceData,
+  ImportUserData,
   IncomingWebhook,
   IncomingWebhookCreate,
   IncomingWebhookCreated,
@@ -1347,6 +1365,12 @@ Serializers serializers =
             () => ListBuilder<EvaluatedFlag>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [
+              FullType(ImportSourceDiscordConfigUsersInner),
+            ]),
+            () => ListBuilder<ImportSourceDiscordConfigUsersInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(SpaceView)]),
             () => ListBuilder<SpaceView>(),
           )
@@ -1506,6 +1530,12 @@ Serializers serializers =
             () => ListBuilder<AccessEntry>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [
+              FullType(ImportSourceDiscordConfigSpacesInner),
+            ]),
+            () => ListBuilder<ImportSourceDiscordConfigSpacesInner>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Grant)]),
             () => ListBuilder<Grant>(),
           )
@@ -1560,6 +1590,12 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(InvariantViolation)]),
             () => ListBuilder<InvariantViolation>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [
+              FullType(ImportSourceDiscordConfigChannelsInner),
+            ]),
+            () => ListBuilder<ImportSourceDiscordConfigChannelsInner>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AppScope)]),
