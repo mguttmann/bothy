@@ -7,6 +7,94 @@ import (
 	"net/http"
 )
 
+// RemoveGroupMemberResponse204Headers the declared response headers of an HTTP 204 response for RemoveGroupMember
+type RemoveGroupMemberResponse204Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+// RemoveGroupMemberResponse400Headers the declared response headers of an HTTP 400 response for RemoveGroupMember
+type RemoveGroupMemberResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// RemoveGroupMemberResponse401Headers the declared response headers of an HTTP 401 response for RemoveGroupMember
+type RemoveGroupMemberResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// RemoveGroupMemberResponse403Headers the declared response headers of an HTTP 403 response for RemoveGroupMember
+type RemoveGroupMemberResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// RemoveGroupMemberResponse404Headers the declared response headers of an HTTP 404 response for RemoveGroupMember
+type RemoveGroupMemberResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// RemoveGroupMemberResponse409Headers the declared response headers of an HTTP 409 response for RemoveGroupMember
+type RemoveGroupMemberResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// RemoveGroupMemberResponse429Headers the declared response headers of an HTTP 429 response for RemoveGroupMember
+type RemoveGroupMemberResponse429Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      *int
+}
+
+// RemoveGroupMemberResponseDefaultHeaders the declared response headers of an HTTP default response for RemoveGroupMember
+type RemoveGroupMemberResponseDefaultHeaders struct {
+	CorrelationId *CorrelationId
+}
+
+type RemoveGroupMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthorized
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyRequests
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *Error
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *RemoveGroupMemberResponse204Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *RemoveGroupMemberResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RemoveGroupMemberResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *RemoveGroupMemberResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *RemoveGroupMemberResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *RemoveGroupMemberResponse409Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *RemoveGroupMemberResponse429Headers
+	// HeadersDefault the parsed response headers for an HTTP default response
+	HeadersDefault *RemoveGroupMemberResponseDefaultHeaders
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RemoveGroupMemberResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
 func (r RemoveGroupMemberResponse) GetApplicationproblemJSON401() *Unauthorized {
 	return r.ApplicationproblemJSON401
@@ -25976,65 +26064,4 @@ func (r DeleteWebhookSubscriptionResponse) StatusCode() int {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r DeleteWebhookSubscriptionResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-// UpdateWebhookSubscriptionResponse200Headers the declared response headers of an HTTP 200 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse200Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-}
-
-// UpdateWebhookSubscriptionResponse400Headers the declared response headers of an HTTP 400 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateWebhookSubscriptionResponse401Headers the declared response headers of an HTTP 401 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// UpdateWebhookSubscriptionResponse403Headers the declared response headers of an HTTP 403 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateWebhookSubscriptionResponse404Headers the declared response headers of an HTTP 404 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateWebhookSubscriptionResponse409Headers the declared response headers of an HTTP 409 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse409Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateWebhookSubscriptionResponse422Headers the declared response headers of an HTTP 422 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse422Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// UpdateWebhookSubscriptionResponse429Headers the declared response headers of an HTTP 429 response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// UpdateWebhookSubscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for UpdateWebhookSubscription
-type UpdateWebhookSubscriptionResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
 }

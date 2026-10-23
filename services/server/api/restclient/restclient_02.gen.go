@@ -16,6 +16,288 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CreateAgentWebhookSubscription Subscribe an agent to webhooks
+//
+// Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /agents/{agent_id}/webhooks (the `CreateAgentWebhookSubscription` operationId).
+func (c *Client) CreateAgentWebhookSubscription(ctx context.Context, agentId AgentIdPath, params *CreateAgentWebhookSubscriptionParams, body CreateAgentWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAgentWebhookSubscriptionRequest(c.Server, agentId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ValidateManifestWithBody Validate a manifest without installing
+//
+// Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /app-manifests/validate (the `ValidateManifest` operationId).
+func (c *Client) ValidateManifestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateManifestRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ValidateManifest Validate a manifest without installing
+//
+// Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /app-manifests/validate (the `ValidateManifest` operationId).
+func (c *Client) ValidateManifest(ctx context.Context, body ValidateManifestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateManifestRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListApps List installed apps
+//
+// Corresponds with GET /apps (the `ListApps` operationId).
+func (c *Client) ListApps(ctx context.Context, params *ListAppsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAppsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InstallAppWithBody Install an app from its manifest
+//
+// Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /apps (the `InstallApp` operationId).
+func (c *Client) InstallAppWithBody(ctx context.Context, params *InstallAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInstallAppRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InstallApp Install an app from its manifest
+//
+// Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /apps (the `InstallApp` operationId).
+func (c *Client) InstallApp(ctx context.Context, params *InstallAppParams, body InstallAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInstallAppRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetApp Read an app
+//
+// Corresponds with GET /apps/{app_id} (the `GetApp` operationId).
+func (c *Client) GetApp(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAppRequest(c.Server, appId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpgradeAppManifestWithBody Install a new manifest version
+//
+// Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /apps/{app_id}/manifest (the `UpgradeAppManifest` operationId).
+func (c *Client) UpgradeAppManifestWithBody(ctx context.Context, appId AppIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpgradeAppManifestRequestWithBody(c.Server, appId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpgradeAppManifest Install a new manifest version
+//
+// Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /apps/{app_id}/manifest (the `UpgradeAppManifest` operationId).
+func (c *Client) UpgradeAppManifest(ctx context.Context, appId AppIdPath, body UpgradeAppManifestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpgradeAppManifestRequest(c.Server, appId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResumeApp Resume a suspended app
+//
+// Corresponds with POST /apps/{app_id}/resume (the `ResumeApp` operationId).
+func (c *Client) ResumeApp(ctx context.Context, appId AppIdPath, params *ResumeAppParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResumeAppRequest(c.Server, appId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAppScopesWithBody Change granted scopes and subscriptions
+//
+// Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /apps/{app_id}/scopes (the `SetAppScopes` operationId).
+func (c *Client) SetAppScopesWithBody(ctx context.Context, appId AppIdPath, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAppScopesRequestWithBody(c.Server, appId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAppScopes Change granted scopes and subscriptions
+//
+// Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /apps/{app_id}/scopes (the `SetAppScopes` operationId).
+func (c *Client) SetAppScopes(ctx context.Context, appId AppIdPath, body SetAppScopesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAppScopesRequest(c.Server, appId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SuspendApp Suspend an app
+//
+// Emergency stop without losing grants: tokens blocked, deliveries paused, commands hidden, components disabled (11, 6).
+//
+// Corresponds with POST /apps/{app_id}/suspend (the `SuspendApp` operationId).
+func (c *Client) SuspendApp(ctx context.Context, appId AppIdPath, params *SuspendAppParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSuspendAppRequest(c.Server, appId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UninstallAppWithBody Uninstall an app
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /apps/{app_id}/uninstall (the `UninstallApp` operationId).
+func (c *Client) UninstallAppWithBody(ctx context.Context, appId AppIdPath, params *UninstallAppParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUninstallAppRequestWithBody(c.Server, appId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UninstallApp Uninstall an app
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /apps/{app_id}/uninstall (the `UninstallApp` operationId).
+func (c *Client) UninstallApp(ctx context.Context, appId AppIdPath, params *UninstallAppParams, body UninstallAppJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUninstallAppRequest(c.Server, appId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListWebhookSubscriptions List outgoing webhook subscriptions
+//
+// Corresponds with GET /apps/{app_id}/webhooks (the `ListWebhookSubscriptions` operationId).
+func (c *Client) ListWebhookSubscriptions(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWebhookSubscriptionsRequest(c.Server, appId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CreateWebhookSubscriptionWithBody Subscribe a URL to events
 //
 // The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
@@ -1329,6 +1611,7 @@ func (c *Client) PutProjectBinding(ctx context.Context, channelId ChannelIdPath,
 // SetChannelReadOnlyWithBody Switch the read-only state of a channel
 //
 // Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1348,6 +1631,7 @@ func (c *Client) SetChannelReadOnlyWithBody(ctx context.Context, channelId Chann
 // SetChannelReadOnly Switch the read-only state of a channel
 //
 // Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+// The imported channel of a source that is neither `completed` nor `failed` is controlled by its ownership list only: `409 conflict` with `reason` `import_lead_controls` (use `setImportLead`).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3589,6 +3873,7 @@ func (c *Client) GetImport(ctx context.Context, importId ImportIdPath, reqEditor
 // ApplyImportBatchWithBody Write a batch of imported objects
 //
 // One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3608,6 +3893,7 @@ func (c *Client) ApplyImportBatchWithBody(ctx context.Context, importId ImportId
 // ApplyImportBatch Write a batch of imported objects
 //
 // One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+// A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3626,6 +3912,8 @@ func (c *Client) ApplyImportBatch(ctx context.Context, importId ImportIdPath, bo
 
 // CancelImport Cancel an import
 //
+// Ends a `draft`, `running` or `paused` source as `failed` with the counter `server.cancelled` set to `true` in `stats` and sets `finished_at`. Any other state is `409 conflict` with `reason` `import_state`.
+//
 // Corresponds with POST /imports/{import_id}/cancel (the `CancelImport` operationId).
 func (c *Client) CancelImport(ctx context.Context, importId ImportIdPath, params *CancelImportParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCancelImportRequest(c.Server, importId, params)
@@ -3642,6 +3930,7 @@ func (c *Client) CancelImport(ctx context.Context, importId ImportIdPath, params
 // CompleteImport Complete an import
 //
 // When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+// Only from `running` or `paused`, else `409 conflict` with `reason` `import_state`. Every channel of the mapping whose target is not `skip` and whose channel item is `posted` must have `lead = bothy`, else `409 conflict` with `reason` `lead_not_bothy`; mapped channels that were never imported do not block it.
 //
 // Corresponds with POST /imports/{import_id}/complete (the `CompleteImport` operationId).
 func (c *Client) CompleteImport(ctx context.Context, importId ImportIdPath, params *CompleteImportParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3659,6 +3948,7 @@ func (c *Client) CompleteImport(ctx context.Context, importId ImportIdPath, para
 // SetImportCursorWithBody Advance the import cursor
 //
 // Only after a successful batch (22, 7.3).
+// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3678,6 +3968,7 @@ func (c *Client) SetImportCursorWithBody(ctx context.Context, importId ImportIdP
 // SetImportCursor Advance the import cursor
 //
 // Only after a successful batch (22, 7.3).
+// Replaces `cursor` with the given object and merges the top-level members of `stats` into the member `tool` of `ImportSource.stats` (the server's own counters stay under `server`). Only for a `running` source, else `409 conflict` with `reason` `import_not_running`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3750,6 +4041,7 @@ func (c *Client) ListImportItems(ctx context.Context, importId ImportIdPath, par
 // SetImportLeadWithBody Set the leading side of a channel
 //
 // Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3769,6 +4061,7 @@ func (c *Client) SetImportLeadWithBody(ctx context.Context, importId ImportIdPat
 // SetImportLead Set the leading side of a channel
 //
 // Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
+// The channel must be in the mapping with a target other than `skip` (else `404`) and its channel item must be `posted` (else `409 conflict` with `reason` `channel_not_imported`). `lead = discord` sets the target channel read-only and cancels its active runs; `lead = bothy` lifts read-only. A `completed` or `failed` source is `409 conflict` with `reason` `import_state`. A lead equal to the current one changes nothing.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3787,6 +4080,8 @@ func (c *Client) SetImportLead(ctx context.Context, importId ImportIdPath, body 
 
 // PauseImport Pause an import
 //
+// Moves a `running` source to `paused`; batches and cursor writes then answer `409 conflict` with `reason` `import_not_running`. Pausing a `paused` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
+//
 // Corresponds with POST /imports/{import_id}/pause (the `PauseImport` operationId).
 func (c *Client) PauseImport(ctx context.Context, importId ImportIdPath, params *PauseImportParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPauseImportRequest(c.Server, importId, params)
@@ -3801,6 +4096,8 @@ func (c *Client) PauseImport(ctx context.Context, importId ImportIdPath, params 
 }
 
 // StartImport Start or continue an import
+//
+// Moves a `draft` or `paused` source to `running` (22, 7.4); `started_at` is set on the first start. Starting a `running` source answers it unchanged. Any other state is `409 conflict` with `reason` `import_state`.
 //
 // Corresponds with POST /imports/{import_id}/start (the `StartImport` operationId).
 func (c *Client) StartImport(ctx context.Context, importId ImportIdPath, params *StartImportParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
