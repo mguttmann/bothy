@@ -8,7 +8,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -191,7 +190,23 @@ type FileCmd struct {
 type FileSlot struct {
 	Item Item
 	// Upload is the open session; nil once the file item is posted.
-	Upload *files.UploadSession
+	Upload *UploadPlan
+}
+
+// UploadPlan is the open upload session of a file item (schema UploadSession, mode direct).
+type UploadPlan struct {
+	FileID ids.ID
+	// Mode is direct.
+	Mode          string
+	PartSizeBytes int64
+	PartCount     int
+	ExpiresAt     time.Time
+}
+
+// PartRef is one confirmed part with its ETag (schemas UploadPartResult and UploadComplete).
+type PartRef struct {
+	PartNumber int
+	ETag       string
 }
 
 // FilePartCmd is one part of uploadImportFilePart.
@@ -208,7 +223,7 @@ type FilePartCmd struct {
 // FileCompleteCmd is the body of completeImportFile (schema UploadComplete).
 type FileCompleteCmd struct {
 	FileID ids.ID
-	Parts  []files.PartRef
+	Parts  []PartRef
 }
 
 // CursorCmd is the body of setImportCursor (schema ImportCursorSet).
@@ -268,7 +283,7 @@ type Imports interface {
 	// 22 6.5 and 7.2 item 3).
 	CreateFile(ctx context.Context, a actor.Actor, id ids.ID, cmd FileCmd) (FileSlot, error)
 	// UploadFilePart stores one part of the file of a file item of the source (import.apply).
-	UploadFilePart(ctx context.Context, a actor.Actor, id ids.ID, cmd FilePartCmd) (files.PartRef, error)
+	UploadFilePart(ctx context.Context, a actor.Actor, id ids.ID, cmd FilePartCmd) (PartRef, error)
 	// CompleteFile completes the upload of the file of a file item and posts the item
 	// (import.apply).
 	CompleteFile(ctx context.Context, a actor.Actor, id ids.ID, cmd FileCompleteCmd) (FileSlot, error)

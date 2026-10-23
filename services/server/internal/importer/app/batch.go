@@ -50,15 +50,7 @@ type parsed struct {
 // batch.
 func parseBatch(b importer.Batch) ([]parsed, *domain.ThreadKey, error) {
 	var p domain.Problems
-	var tk *domain.ThreadKey
-	if b.ThreadOriginKeySet {
-		refs := make([]domain.ItemRef, 0, len(b.Items))
-		for _, it := range b.Items {
-			refs = append(refs, domain.ItemRef{Kind: it.ItemKind, OriginKey: it.OriginKey})
-		}
-		k := domain.CheckThreadBatch(b.ThreadOriginKey, refs, &p)
-		tk = &k
-	}
+	tk := threadKey(b, &p)
 	out := make([]parsed, 0, len(b.Items))
 	for i, it := range b.Items {
 		base := domain.Pointer("/items", i)
@@ -90,6 +82,19 @@ func parseBatch(b importer.Batch) ([]parsed, *domain.ThreadKey, error) {
 		return nil, nil, err
 	}
 	return out, tk, nil
+}
+
+// threadKey checks the shape of a thread batch and returns its key; nil for a structure batch.
+func threadKey(b importer.Batch, p *domain.Problems) *domain.ThreadKey {
+	if !b.ThreadOriginKeySet {
+		return nil
+	}
+	refs := make([]domain.ItemRef, 0, len(b.Items))
+	for _, it := range b.Items {
+		refs = append(refs, domain.ItemRef{Kind: it.ItemKind, OriginKey: it.OriginKey})
+	}
+	k := domain.CheckThreadBatch(b.ThreadOriginKey, refs, p)
+	return &k
 }
 
 // parseData checks the data of x by its kind.

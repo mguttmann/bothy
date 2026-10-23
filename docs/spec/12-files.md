@@ -1035,7 +1035,7 @@ file ID, with a new session after an aborted or expired one. After the completio
 from 3.4 applies: checksum, type, scan, metadata, thumbnails. Differences: no quota (the open
 sessions and the free space still hold); the jobs `files.scan` and `files.thumbnail` of an import
 file stand on the queue `files` with the lowest River job priority (their arguments carry the
-mark `bulk`, which their retries and thumbnails inherit), so a worker always fetches the jobs of
+mark `bulk = 1`, which their retries and thumbnails inherit), so a worker always fetches the jobs of
 live uploads first and a large import does not delay them, without a queue or a configuration key
 of its own; the messages are `silent`. `uploaded_by` is the principal to whom the import assigns
 the message, and the file attaches only to a message of that author in the channel it was

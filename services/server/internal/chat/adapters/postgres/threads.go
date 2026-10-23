@@ -71,15 +71,24 @@ func (r *Repository) InsertThread(ctx context.Context, th domain.Thread) (domain
 		TitleSource: string(th.TitleSource), OperatorAgentID: optionalUUID(th.OperatorAgentID), CreatedBy: uuid(th.CreatedBy),
 		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true}, SearchLanguage: th.SearchLanguage,
 	})
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == sqlstateUniqueViolation && pgErr.ConstraintName == parentConstraint {
-		return domain.Thread{}, errs.Wrap(errs.CodeConflict, err, "the message already started a thread").
-			WithFields(errs.FieldError{Pointer: "/parent_message_id", Code: "taken", Detail: "already started a thread"})
+	if err := parentTaken(err); err != nil {
+		return domain.Thread{}, err
 	}
 	if err != nil {
 		return domain.Thread{}, mapError(err, "inserting a thread")
 	}
 	return toThread(threadRow(row)), nil
+}
+
+// parentTaken turns the unique violation of a second thread of the same parent message into 409
+// conflict on /parent_message_id; any other error gives nil.
+func parentTaken(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == sqlstateUniqueViolation && pgErr.ConstraintName == parentConstraint {
+		return errs.Wrap(errs.CodeConflict, err, "the message already started a thread").
+			WithFields(errs.FieldError{Pointer: "/parent_message_id", Code: "taken", Detail: "already started a thread"})
+	}
+	return nil
 }
 
 // SaveThread implements app.Store.

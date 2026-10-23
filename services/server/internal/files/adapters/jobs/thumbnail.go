@@ -17,8 +17,8 @@ import (
 type ThumbnailArgs struct {
 	// FileID is the file whose original, thumbnails or container values the job processes.
 	FileID ids.ID `json:"file_id"`
-	// Bulk marks the job of an import file, inserted with the lowest priority (M8-11).
-	Bulk bool `json:"bulk,omitempty"`
+	// Bulk is 1 for the job of an import file, inserted with the lowest priority (M8-11).
+	Bulk int64 `json:"bulk,omitempty"`
 }
 
 // Kind implements jobs.Args.
@@ -66,5 +66,5 @@ func (q *Queue) EnqueueThumbnail(ctx context.Context, fileID ids.ID) error {
 		return errs.New(errs.CodeInternalError, "files: the scan queue has no job runtime")
 	}
 	bulk := app.BulkJobs(ctx)
-	return ins.InsertTx(ctx, ThumbnailArgs{FileID: fileID, Bulk: bulk}, &jobs.InsertOptions{Priority: priorityOf(bulk)})
+	return ins.InsertTx(ctx, ThumbnailArgs{FileID: fileID, Bulk: bulkMark(bulk)}, &jobs.InsertOptions{Priority: priorityOf(bulk)})
 }

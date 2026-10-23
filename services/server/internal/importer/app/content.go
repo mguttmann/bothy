@@ -67,27 +67,13 @@ func (s *Service) applyThreadBatch(ctx context.Context, a actor.Actor, bt *batch
 	}
 	run := &threadRun{batch: bt}
 	out := importer.BatchResult{Items: make([]importer.Item, 0, len(items))}
+	first, err := s.resolveThread(ctx, run, tk, items)
+	if err != nil {
+		return importer.BatchResult{}, err
+	}
 	start := 0
-	switch {
-	case tk.Kind == domain.KindChannel:
-		if err := s.mainThread(ctx, run, tk); err != nil {
-			return importer.BatchResult{}, err
-		}
-	case len(items) > 0 && items[0].obj.ItemKind == domain.KindThread:
-		it, err := s.threadItem(ctx, run, items[0])
-		if err != nil {
-			return importer.BatchResult{}, s.refused(ctx, bt, err, 0)
-		}
-		out.Items, start = append(out.Items, it), 1
-	default:
-		row, found, err := s.posted(ctx, bt, tk.Key)
-		if err != nil {
-			return importer.BatchResult{}, err
-		}
-		if !found {
-			return importer.BatchResult{}, threadNotImported("the thread is not imported")
-		}
-		run.threadID = row.TargetID
+	if first != nil {
+		out.Items, start = append(out.Items, *first), 1
 	}
 	if run.threadID.IsZero() {
 		if len(items) > start {
@@ -109,6 +95,30 @@ func (s *Service) applyThreadBatch(ctx context.Context, a actor.Actor, bt *batch
 	out.UnreadFloorSeq = &floor
 	bt.changed = run.changed
 	return out, s.count(ctx, bt)
+}
+
+// resolveThread sets the thread of run: the main thread of a channel: key, the thread the first
+// item creates or mirrors (returned as the first item of the answer), or a posted thread.
+func (s *Service) resolveThread(ctx context.Context, run *threadRun, tk domain.ThreadKey, items []parsed) (*importer.Item, error) {
+	switch {
+	case tk.Kind == domain.KindChannel:
+		return nil, s.mainThread(ctx, run, tk)
+	case len(items) > 0 && items[0].obj.ItemKind == domain.KindThread:
+		it, err := s.threadItem(ctx, run, items[0])
+		if err != nil {
+			return nil, s.refused(ctx, run.batch, err, 0)
+		}
+		return &it, nil
+	}
+	row, found, err := s.posted(ctx, run.batch, tk.Key)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, threadNotImported("the thread is not imported")
+	}
+	run.threadID = row.TargetID
+	return nil, nil
 }
 
 // refused records the denial of a target outside the source and puts the field pointers of item i

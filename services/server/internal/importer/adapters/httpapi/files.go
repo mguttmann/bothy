@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
-	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/importer"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
@@ -63,9 +62,9 @@ func (h *Imports) UploadImportFilePart(ctx context.Context, req rest.UploadImpor
 // CompleteImportFile implements rest.StrictServerInterface (POST
 // /imports/{import_id}/files/{file_id}/complete): 200 with the posted item.
 func (h *Imports) CompleteImportFile(ctx context.Context, req rest.CompleteImportFileRequestObject) (rest.CompleteImportFileResponseObject, error) {
-	parts := make([]files.PartRef, 0, len(req.Body.Parts))
+	parts := make([]importer.PartRef, 0, len(req.Body.Parts))
 	for _, p := range req.Body.Parts {
-		parts = append(parts, files.PartRef{PartNumber: p.PartNumber, ETag: p.Etag})
+		parts = append(parts, importer.PartRef{PartNumber: p.PartNumber, ETag: p.Etag})
 	}
 	s, err := h.imports.CompleteFile(ctx, principal(ctx), ids.ID(req.ImportId), importer.FileCompleteCmd{FileID: ids.ID(req.FileId), Parts: parts})
 	if err != nil {

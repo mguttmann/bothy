@@ -4,16 +4,13 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres/sqlcgen"
 	"github.com/OWNER/bothy/services/server/internal/chat/app"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
-	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -37,10 +34,8 @@ func (r *Repository) InsertImportedThread(ctx context.Context, th domain.Thread)
 		CreatedAt: pgtype.Timestamptz{Time: th.CreatedAt, Valid: true}, LastActivityAt: pgtype.Timestamptz{Time: th.LastActivityAt, Valid: true},
 		SearchLanguage: th.SearchLanguage,
 	})
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == sqlstateUniqueViolation && pgErr.ConstraintName == parentConstraint {
-		return domain.Thread{}, errs.Wrap(errs.CodeConflict, err, "the message already started a thread").
-			WithFields(errs.FieldError{Pointer: "/parent_message_id", Code: "taken", Detail: "already started a thread"})
+	if err := parentTaken(err); err != nil {
+		return domain.Thread{}, err
 	}
 	if err != nil {
 		return domain.Thread{}, mapError(err, "inserting an imported thread")

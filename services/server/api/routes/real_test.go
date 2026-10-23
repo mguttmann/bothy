@@ -693,6 +693,18 @@ func (stubServer) ApplyImportBatch(context.Context, rest.ApplyImportBatchRequest
 	return nil, nil
 }
 
+func (stubServer) CreateImportFile(context.Context, rest.CreateImportFileRequestObject) (rest.CreateImportFileResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UploadImportFilePart(context.Context, rest.UploadImportFilePartRequestObject) (rest.UploadImportFilePartResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteImportFile(context.Context, rest.CompleteImportFileRequestObject) (rest.CompleteImportFileResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetImportCursor(context.Context, rest.SetImportCursorRequestObject) (rest.SetImportCursorResponseObject, error) {
 	return nil, nil
 }
@@ -1337,6 +1349,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"resetAgentSession":  {"POST /api/v1/threads/{thread_id}/agent-sessions/reset", "agent_session.reset", "rl.trigger"},
 		"bindAgentSession":   {"POST /api/v1/threads/{thread_id}/agent-sessions/bind", "agent_session.bind", "rl.trigger"},
 		"reportAgentSession": {"POST /api/v1/threads/{thread_id}/agent-sessions/report", "agent_session.report", "rl.agent_runtime"},
+		// M8-11
+		"createImportFile":     {"POST /api/v1/imports/{import_id}/files", "import.apply", "rl.import"},
+		"uploadImportFilePart": {"PUT /api/v1/imports/{import_id}/files/{file_id}/parts/{part_number}", "import.apply", "rl.import"},
+		"completeImportFile":   {"POST /api/v1/imports/{import_id}/files/{file_id}/complete", "import.apply", "rl.import"},
 		// M1-58
 		"updateMessage":        {"PATCH /api/v1/messages/{message_id}", "message.update", "rl.message"},
 		"deleteMessage":        {"DELETE /api/v1/messages/{message_id}", "message.delete", "rl.message"},

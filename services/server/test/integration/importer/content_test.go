@@ -180,7 +180,7 @@ func TestThreadItemFields(t *testing.T) {
 	starter := w.text(`SELECT target_id::text FROM import_items WHERE source_id = $1 AND origin_key = 'message:7201'`, id)
 	a := w.mustThreadBatch(id, "thread:6201", threadObj("6201", chText, "Login fails on mobile", map[string]any{
 		"starter_message_origin_key": "message:7201", "closed": true, "closed_at": tsClosed, "last_activity_at": tsLater}))
-	b := w.mustThreadBatch(id, "thread:6202", threadObj("6202", chText, "new thread", map[string]any{"starter_message_origin_key": "message:7299"}))
+	b := w.mustThreadBatch(id, "thread:6202", threadObj("6202", chText, "Untitled", map[string]any{"starter_message_origin_key": "message:7299"}))
 	c := w.mustThreadBatch(id, "thread:6203", threadObj("6203", chForum, "Feature", map[string]any{"tag_origin_keys": []string{"forum_tag:" + chForum + ":9"}}))
 	type thread struct {
 		source, state, channel, operator, parent, created, activity, closed string
@@ -224,7 +224,7 @@ func TestMirrorChangesOfPostedThread(t *testing.T) {
 	t.Parallel()
 	w := newIW(t)
 	id, _ := w.imported()
-	auto := w.mustThreadBatch(id, "thread:6301", threadObj("6301", chForum, "new thread", nil)).Items[0].TargetID
+	auto := w.mustThreadBatch(id, "thread:6301", threadObj("6301", chForum, "Untitled", nil)).Items[0].TargetID
 	manual := w.mustThreadBatch(id, "thread:6302", threadObj("6302", chForum, "Billing", nil)).Items[0].TargetID
 	state := func(thread string) (title, source, st string) {
 		if err := w.s.AdminDB().QueryRow(w.ctx, `SELECT title, title_source, state FROM threads WHERE id = $1`, thread).Scan(&title, &source, &st); err != nil {
@@ -638,7 +638,7 @@ func TestImportFileScanPriority(t *testing.T) {
 	if p := prio(file); p != 4 {
 		t.Errorf("import scan priority %d", p)
 	}
-	if n := w.count(`SELECT count(*) FROM jobs.river_job WHERE kind = 'files.scan' AND args->>'file_id' = $1 AND (args->>'bulk')::boolean`, file); n < 1 {
+	if n := w.count(`SELECT count(*) FROM jobs.river_job WHERE kind = 'files.scan' AND args->>'file_id' = $1 AND args->>'bulk' = '1'`, file); n < 1 {
 		t.Error("the import scan job has no bulk mark")
 	}
 	if p := prio(s.FileID); p != 1 {

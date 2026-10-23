@@ -121,7 +121,7 @@ Normative: [12-files.md](../../../../docs/spec/12-files.md) sections 2, 10 and 1
   `queries/import.sql`); `UploadPart` and `Complete` use the rules of `uploadPart` and
   `completeUpload` (`storePart`, `closeSession`) for the session of the uploader.
 - Priority: `Complete` marks its context with `app.WithBulkJobs`, so `adapters/jobs.Queue` inserts
-  `files.scan` with `bulk: true` and the lowest River priority (`platform/jobs.PriorityLowest`); the
+  `files.scan` with the argument `bulk = 1` and the lowest River priority (`platform/jobs.PriorityLowest`); the
   scan handler marks the context of such a job again, so its retries and `files.thumbnail` inherit
   the priority. Live uploads keep the highest priority and are fetched first on the shared queue
   `files` (12 11, 02 12.2).

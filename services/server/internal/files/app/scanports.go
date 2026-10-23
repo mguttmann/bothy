@@ -38,7 +38,9 @@ type bulkJobsKey struct{}
 // an import file marks it, and the job handlers mark the context of a job that was inserted so,
 // which carries the mark into its retry rounds and its thumbnails. Live uploads keep the default
 // priority and are fetched first from the shared queue files.
-func WithBulkJobs(ctx context.Context) context.Context { return context.WithValue(ctx, bulkJobsKey{}, true) }
+func WithBulkJobs(ctx context.Context) context.Context {
+	return context.WithValue(ctx, bulkJobsKey{}, true)
+}
 
 // BulkJobs reports the mark of WithBulkJobs.
 func BulkJobs(ctx context.Context) bool {

@@ -133,8 +133,12 @@ func (s *Service) createFile(ctx context.Context, bt *batch, cmd importer.FileCm
 		return importer.FileSlot{}, err
 	}
 	bt.counts.Add(domain.KindFile, importer.ItemPending)
-	upload := slot.Upload
-	return importer.FileSlot{Item: itemDTO(row, false), Upload: &upload}, nil
+	return importer.FileSlot{Item: itemDTO(row, false), Upload: plan(slot.Upload)}, nil
+}
+
+// plan converts the session of files into the port DTO.
+func plan(u files.UploadSession) *importer.UploadPlan {
+	return &importer.UploadPlan{FileID: u.FileID, Mode: u.Mode, PartSizeBytes: u.PartSizeBytes, PartCount: u.PartCount, ExpiresAt: u.ExpiresAt}
 }
 
 // fileAgain answers a key that exists (M8-11 design note 6 d): posted without a session; pending
@@ -155,8 +159,7 @@ func (s *Service) fileAgain(ctx context.Context, bt *batch, key string) (importe
 		return importer.FileSlot{}, err
 	}
 	if !slot.Completed {
-		upload := slot.Upload
-		return importer.FileSlot{Item: itemDTO(row, false), Upload: &upload}, nil
+		return importer.FileSlot{Item: itemDTO(row, false), Upload: plan(slot.Upload)}, nil
 	}
 	row, err = s.postFile(ctx, bt, row)
 	return importer.FileSlot{Item: itemDTO(row, false)}, err
@@ -197,13 +200,13 @@ func (s *Service) fileItem(ctx context.Context, bt *batch, fileID ids.ID) (ItemR
 // source and the file of a file item of the source (404 otherwise) in a short unit of work, then
 // the part through files.ImportFiles.UploadPart outside any unit of work, because the body streams
 // into the object store (02 8.5).
-func (s *Service) UploadFilePart(ctx context.Context, a actor.Actor, id ids.ID, cmd importer.FilePartCmd) (files.PartRef, error) {
+func (s *Service) UploadFilePart(ctx context.Context, a actor.Actor, id ids.ID, cmd importer.FilePartCmd) (importer.PartRef, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
-		return files.PartRef{}, err
+		return importer.PartRef{}, err
 	}
 	if err := s.filesDeps(); err != nil {
-		return files.PartRef{}, err
+		return importer.PartRef{}, err
 	}
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		bt, err := s.running(ctx, a, id)
@@ -214,10 +217,11 @@ func (s *Service) UploadFilePart(ctx context.Context, a actor.Actor, id ids.ID, 
 		return err
 	})
 	if err != nil {
-		return files.PartRef{}, err
+		return importer.PartRef{}, err
 	}
-	return s.d.Files.UploadPart(ctx, files.PutPart{FileID: cmd.FileID, PartNumber: cmd.PartNumber, ContentDigest: cmd.ContentDigest,
+	ref, err := s.d.Files.UploadPart(ctx, files.PutPart{FileID: cmd.FileID, PartNumber: cmd.PartNumber, ContentDigest: cmd.ContentDigest,
 		ContentLength: -1, Body: cmd.Body})
+	return importer.PartRef{PartNumber: ref.PartNumber, ETag: ref.ETag}, err
 }
 
 // CompleteFile implements importer.Imports (M8-11 design note 6 b2 and d): one unit of work with
@@ -234,27 +238,37 @@ func (s *Service) CompleteFile(ctx context.Context, a actor.Actor, id ids.ID, cm
 	}
 	var out importer.FileSlot
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		bt, err := s.running(ctx, a, id)
-		if err != nil {
-			return err
-		}
-		row, err := s.fileItem(ctx, bt, cmd.FileID)
-		if err != nil {
-			return err
-		}
-		if row.State == importer.ItemPending {
-			if _, err := s.d.Files.Complete(ctx, files.CompleteUpload{FileID: cmd.FileID, Parts: cmd.Parts}); err != nil {
-				return err
-			}
-			if row, err = s.postFile(ctx, bt, row); err != nil {
-				return err
-			}
-		}
-		out = importer.FileSlot{Item: itemDTO(row, false)}
-		return s.count(ctx, bt)
+		var err error
+		out, err = s.completeFile(ctx, a, id, cmd)
+		return err
 	})
 	if err != nil {
 		return importer.FileSlot{}, err
 	}
 	return out, nil
+}
+
+// completeFile is CompleteFile inside its unit of work.
+func (s *Service) completeFile(ctx context.Context, a actor.Actor, id ids.ID, cmd importer.FileCompleteCmd) (importer.FileSlot, error) {
+	bt, err := s.running(ctx, a, id)
+	if err != nil {
+		return importer.FileSlot{}, err
+	}
+	row, err := s.fileItem(ctx, bt, cmd.FileID)
+	if err != nil {
+		return importer.FileSlot{}, err
+	}
+	if row.State == importer.ItemPending {
+		parts := make([]files.PartRef, 0, len(cmd.Parts))
+		for _, p := range cmd.Parts {
+			parts = append(parts, files.PartRef{PartNumber: p.PartNumber, ETag: p.ETag})
+		}
+		if _, err := s.d.Files.Complete(ctx, files.CompleteUpload{FileID: cmd.FileID, Parts: parts}); err != nil {
+			return importer.FileSlot{}, err
+		}
+		if row, err = s.postFile(ctx, bt, row); err != nil {
+			return importer.FileSlot{}, err
+		}
+	}
+	return importer.FileSlot{Item: itemDTO(row, false)}, s.count(ctx, bt)
 }
