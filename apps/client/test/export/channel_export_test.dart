@@ -234,7 +234,13 @@ void main() {
       final result = start(path, cancel: cancel, firstChunk: first);
       adapter.body.add(Uint8List.fromList(utf8.encode('{"id":"a"}\n')));
       await first.future.timeout(patience);
-      expect(File(path).existsSync(), isTrue);
+      // `openWrite` opens the file on the IO thread after the first chunk; on a loaded
+      // machine that lags behind the progress callback, so wait for the file to appear.
+      final watch = Stopwatch()..start();
+      while (!File(path).existsSync()) {
+        if (watch.elapsed > patience) fail('the partial file never appeared');
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
       cancel.cancel();
       expect(await result.timeout(patience), isA<ChannelExportCancelled>());
       expect(File(path).existsSync(), isFalse);
