@@ -81,13 +81,14 @@ func (e *env) titledThread(t *testing.T, c *harness.Client, ch, title string) st
 }
 
 // TestSearch_TypesFiles: type files finds an attached clean file by name and by transcript with
-// thread_title, channel_name and space_name; has_file keeps exactly the messages with or without
-// attachments.
+// thread_title, channel_name and space_name. The names hold a space: the parser of PostgreSQL reads
+// "name.txt" as one file token, so a word of a name is found when it stands apart (14 3.3).
+// has_file keeps exactly the messages with or without attachments.
 func TestSearch_TypesFiles(t *testing.T) {
 	t.Parallel()
 	e := start(t)
 	th := e.titledThread(t, e.alex, e.allg, "Quarter close")
-	f := e.clean(t, e.alex, e.allg, "quarterly-ledger.txt", []byte("ledger"))
+	f := e.clean(t, e.alex, e.allg, "quarterly ledger.txt", []byte("ledger"))
 	with := msgOf(t, e.send(t, e.alex, th, "see the ledger", []string{f}, nil), http.StatusCreated)
 	without := msgOf(t, e.send(t, e.alex, th, "the ledger follows", nil, nil), http.StatusCreated)
 	// The transcript comes from an agent or the transcription service (12 3.6); the fixture
@@ -173,7 +174,7 @@ func TestSearch_HitObjectsEqualModuleRepresentation(t *testing.T) {
 	t.Parallel()
 	e := start(t)
 	th := e.titledThread(t, e.alex, e.allg, "Walrus planning")
-	f := e.clean(t, e.alex, e.allg, "walrus.txt", []byte("walrus"))
+	f := e.clean(t, e.alex, e.allg, "walrus plan.txt", []byte("walrus"))
 	m := msgOf(t, e.send(t, e.alex, th, "walrus with a file", []string{f}, nil), http.StatusCreated)
 
 	var list struct {
@@ -211,26 +212,27 @@ func jsonOf(v any) string {
 }
 
 // TestSearchFiles_FollowsThreadMove: after moveThread from Support/Allgemein (Alex and Sam read
-// it) to Marketing/Kampagnen (Sam reads it, Alex not), the attached file of a message in the moved
-// thread is found by Sam and no longer by Alex.
+// it) to Support/Eskalation (Alex reads it, Sam not), the attached file of a message in the moved
+// thread is found by Alex, a reader of the target, and no longer by Sam, a reader of the source
+// only.
 func TestSearchFiles_FollowsThreadMove(t *testing.T) {
 	t.Parallel()
 	e := start(t)
 	th := e.newThread(t, e.alex, e.allg)
-	f := e.clean(t, e.alex, e.allg, "narwhal.txt", []byte("narwhal"))
+	f := e.clean(t, e.alex, e.allg, "narwhal notes.txt", []byte("narwhal"))
 	msgOf(t, e.send(t, e.alex, th, "narwhal file", []string{f}, nil), http.StatusCreated)
 	for _, c := range []*harness.Client{e.alex, e.sam} {
 		if got := search(t, c, sq("narwhal", "type", "files")).ids(); !slices.Equal(got, []string{f}) {
 			t.Fatalf("before the move: %v", got)
 		}
 	}
-	if r := e.move(t, th, e.w.Channels["Marketing/Kampagnen"]); r.Status != http.StatusOK {
+	if r := e.move(t, th, e.esk); r.Status != http.StatusOK {
 		t.Fatalf("moveThread: %d %s", r.Status, r.Body)
 	}
-	if got := search(t, e.sam, sq("narwhal", "type", "files")).ids(); !slices.Equal(got, []string{f}) {
-		t.Fatalf("Sam after the move: %v", got)
+	if got := search(t, e.alex, sq("narwhal", "type", "files")).ids(); !slices.Equal(got, []string{f}) {
+		t.Fatalf("Alex after the move: %v", got)
 	}
-	if got := search(t, e.alex, sq("narwhal", "type", "files")); len(got.Items) != 0 {
-		t.Fatalf("Alex after the move: %v", got.ids())
+	if got := search(t, e.sam, sq("narwhal", "type", "files")); len(got.Items) != 0 {
+		t.Fatalf("Sam after the move: %v", got.ids())
 	}
 }
