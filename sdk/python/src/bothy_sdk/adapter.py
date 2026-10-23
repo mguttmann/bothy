@@ -511,7 +511,7 @@ class Adapter:
         return task
 
     def _fetcher(self, jwks_uri: str) -> Any:
-        url = self.client.url(jwks_uri)
+        url = self.client.origin_url(jwks_uri)
 
         async def fetch() -> tuple[Mapping[str, Any], float | None]:
             response = await self.client.http.get(url, headers={"Accept": "application/json"})

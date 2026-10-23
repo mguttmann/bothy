@@ -124,10 +124,14 @@ class ReconcileResult:
     removed: tuple[str, ...] = ()
 
 
+# Members the registration leaves out at their default; the stored command always carries them.
+_REGISTER_DEFAULTS: dict[str, Any] = {"options": [], "control": False}
+
+
 def _differs(existing: Command, wanted: CommandRegister) -> bool:
-    mine = wanted.to_dict()
+    mine = {**_REGISTER_DEFAULTS, **wanted.to_dict()}
     theirs = existing.to_dict()
-    return any(theirs.get(k) != v for k, v in mine.items())
+    return any(theirs.get(k, _REGISTER_DEFAULTS.get(k)) != v for k, v in mine.items())
 
 
 async def own_commands(client: Client, agent_id: UUID) -> dict[str, Command]:

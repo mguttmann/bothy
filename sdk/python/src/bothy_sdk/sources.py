@@ -32,7 +32,13 @@ import httpx
 from bothy_sdk.auth import Secret
 from bothy_sdk.client import Client, expect
 from bothy_sdk.clock import Clock, SystemClock
-from bothy_sdk.errors import ForbiddenError, GoneError, ProblemError, UnauthenticatedError
+from bothy_sdk.errors import (
+    ForbiddenError,
+    GoneError,
+    ProblemError,
+    UnauthenticatedError,
+    UseDpopNonce,
+)
 from bothy_sdk.gateway import CloseReason, Gateway, GatewayEvent
 from bothy_sdk.generated.api.agent_runtime import (
     ack_agent_events,
@@ -462,6 +468,11 @@ class PollingSource(_WindowedSource):
         except GoneError:
             # 410 resync_required: the server moved the cursor to head_seq.
             return "resync", {}
+        except UseDpopNonce:
+            # The nonce rotated again after the one retry of the auth flow: transient, the next
+            # poll after the backoff carries the newest nonce.
+            _LOG.info("poll met a new DPoP nonce; polling again")
+            return "retry", {}
         except (UnauthenticatedError, ForbiddenError) as exc:
             # The API token is invalid or revoked: only the owner can fix that.
             _LOG.error("polling stopped: %s", exc.code)

@@ -77,6 +77,9 @@ would raise otherwise); in TypeScript the page is passed through and `knownEvent
 An agent adapter subclasses `AgentHandler` and runs an `Adapter`:
 
 ```python
+import asyncio
+from pathlib import Path
+
 from bothy_sdk.adapter import ActualBilling, Adapter, AdapterConfig, AgentHandler, StartOptions
 from bothy_sdk.auth import Credentials, FileDpopKey, Secret
 
@@ -94,15 +97,20 @@ class Echo(AgentHandler):
         await run.send("Hello from the adapter")
 
 
-config = AdapterConfig(
-    base_url="https://example.com/api/v1",
-    instance_id=...,  # the configured instance
-    agent_id=...,  # the agent's principal ID
-    credentials=Credentials(Secret.from_file("token"), FileDpopKey.load("dpop.pem")),
-    consumer="main",
-    state_dir=Path("state"),  # inbox.sqlite3 and outbox.sqlite3, mode 0600
-)
-reason = await Adapter(config, Echo()).run()  # returns the CloseReason, for example 4015
+async def main() -> None:
+    config = AdapterConfig(
+        base_url="https://example.com/api/v1",
+        instance_id=...,  # the configured instance
+        agent_id=...,  # the agent's principal ID
+        credentials=Credentials(Secret.from_file("token"), FileDpopKey.load("dpop.pem")),
+        consumer="main",
+        state_dir=Path("state"),  # inbox.sqlite3 and outbox.sqlite3, mode 0600
+    )
+    reason = await Adapter(config, Echo()).run()  # returns the CloseReason, for example 4015
+    print(reason)
+
+
+asyncio.run(main())
 ```
 
 The adapter checks every invocation token itself (09 4.5), acknowledges an event only after it is

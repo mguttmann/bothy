@@ -55,10 +55,15 @@ def open_db(path: str | os.PathLike[str]) -> sqlite3.Connection:
         The connection; usable from any thread, so the caller must serialize its use.
 
     Raises:
-        PermissionError: The file is accessible by group or others (POSIX).
+        PermissionError: The file is accessible by group or others, or its directory is writable
+            by them (POSIX).
         OSError: The path is a symbolic link or not a regular file, or cannot be created.
     """
     p = Path(path)
+    if os.name == "posix" and p.parent.stat().st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        # Whoever can write the directory could replace the checked file before SQLite opens
+        # it; the state directory must be private to its owner.
+        raise PermissionError(f"the directory {p.parent} must not be writable by group or others")
     flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     fd = os.open(p, flags, _PRIVATE)
     try:

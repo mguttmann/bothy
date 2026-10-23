@@ -85,8 +85,8 @@ def test_patch_paths_match_spec() -> None:
         cells = [c.strip() for c in line.strip("|").split("|")]
         ops = frozenset(re.findall(r"`(add|replace|remove)`", cells[2]))
         if not ops:
-            continue  # "nie": the server owns these paths
-        path = cells[0].strip("`").replace("<feld>", "<field>")
+            continue  # "never": the server owns these paths
+        path = cells[0].strip("`")
         if path == "/steps/<id>":
             expected.add((path, frozenset({"add"})))
             for member in re.findall(r"`(status|title|detail|finished_at)`", cells[2]):
@@ -303,3 +303,24 @@ async def test_transient_patch_failure_keeps_the_changes() -> None:
         await patcher.flush()
     await patcher.flush()
     assert [op["path"] for op in rec.requests[1][2]["ops"]] == ["/model"]
+
+
+@pytest.mark.anyio
+async def test_change_during_a_timed_patch_goes_out_later() -> None:
+    clock = FakeClock()
+    patcher: RunPatcher | None = None
+
+    def answer(request: httpx.Request, n: int) -> httpx.Response:
+        if n == 1:
+            assert patcher is not None
+            patcher.set_status_line("late")  # arrives while the first patch is on its way
+        return _patch_ok(request, n)
+
+    rec = Recorder(answer)
+    patcher = RunPatcher(_client(rec, clock, run_update_min_interval=0.5), RUN_ID, 1, clock=clock)
+    patcher.set_status_line("first")
+    await clock.advance(0)
+    assert len(rec.requests) == 1
+    await clock.advance(0.6)
+    assert len(rec.requests) == 2
+    assert {"op": "replace", "path": "/status_line", "value": "late"} in rec.requests[1][2]["ops"]

@@ -279,3 +279,16 @@ async def test_undecodable_problem_body_maps_by_status(status: int, body: bytes,
     async with _client(handler, settings=SdkSettings(retry_max_attempts=1)) as client:
         with pytest.raises(cls):
             await client.call(get_run.asyncio_detailed, run_id=RUN)
+
+
+def test_origin_url_keeps_the_token_on_the_api_origin() -> None:
+    client = _client(lambda request: httpx.Response(200))
+    assert client.origin_url("/api/v1/instance/jwks") == "https://example.com/api/v1/instance/jwks"
+    assert client.origin_url("https://example.com/keys") == "https://example.com/keys"
+    for foreign in (
+        "http://example.com/api/v1/instance/jwks",
+        "https://keys.example.org/jwks",
+        "https://example.com:8443/jwks",
+    ):
+        with pytest.raises(ValueError, match="origin"):
+            client.origin_url(foreign)

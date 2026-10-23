@@ -142,6 +142,8 @@ class _Server:
         answer = queue.pop(0) if queue else 201
         if answer == "network":
             raise httpx.ConnectError("refused", request=request)
+        if answer == "in_progress":
+            return _problem(409, "request_in_progress")
         if answer != 201:
             return _problem(int(answer), _CODES.get(int(answer), "internal"))
         if target == "commands":
@@ -378,7 +380,7 @@ async def test_sync_on_failed_called() -> None:
     assert reported == [entry.key]
 
 
-@pytest.mark.parametrize("answer", [500, 502, 503, 429, "network"])
+@pytest.mark.parametrize("answer", [500, 502, 503, 429, "network", "in_progress"])
 async def test_transient_failure_stays_pending(answer: int | str) -> None:
     server = _Server()
     attempts = 3

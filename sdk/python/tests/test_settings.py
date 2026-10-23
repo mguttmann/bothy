@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 
 import pytest
 from conftest import config_defaults
@@ -35,5 +36,8 @@ def test_from_mapping_parses_durations_and_rejects_unknown_keys() -> None:
         SdkSettings.from_mapping({"sdk.nope": "1s"})
     with pytest.raises(ValueError, match=r"sdk\.retry_max_attempts"):
         SdkSettings.from_mapping({"sdk.retry_max_attempts": "many"})
+    for key, text in (("sdk.poll_interval", "0s"), ("sdk.retry_max_attempts", "0")):
+        with pytest.raises(ValueError, match=rf"invalid value for {re.escape(key)}"):
+            SdkSettings.from_mapping({key: text})
     with pytest.raises(ValueError, match="not a duration"):
         parse_duration("10 parsecs")

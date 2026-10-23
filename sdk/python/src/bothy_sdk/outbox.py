@@ -40,7 +40,7 @@ import httpx
 from bothy_sdk._store import Db
 from bothy_sdk.auth import Secret
 from bothy_sdk.client import Client
-from bothy_sdk.errors import InvocationTokenInvalid, ProblemError
+from bothy_sdk.errors import InvocationTokenInvalid, ProblemError, RequestInProgress
 from bothy_sdk.generated import models
 from bothy_sdk.generated.api.messages import create_message
 from bothy_sdk.generated.models import ComponentCreate, MessageCreate, MessageCreateKind
@@ -454,7 +454,9 @@ class Outbox:
             # invalid or run_inactive: the token of the run is no longer usable (07 SR9).
             return await self._fail(entry, exc.code)
         except ProblemError as exc:
-            if exc.status in PERMANENT_STATUSES:
+            # 409 request_in_progress: the original request with this key may still complete,
+            # so the entry waits and goes out again with the same key (06 7).
+            if exc.status in PERMANENT_STATUSES and not isinstance(exc, RequestInProgress):
                 return await self._fail(entry, exc.code)
             _LOG.info("outbox entry %d stays pending code=%s", entry.entry_id, exc.code)
             return entry

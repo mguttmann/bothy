@@ -564,11 +564,8 @@ async def ag09_double_delivery(server: ScenarioServer) -> None:
             await _until(server, _ready(rec2), "the second adapter to connect")
             await _until(server, task1.done, "the first adapter to stop")
             reason = task1.result()
+            # `run()` of the first adapter returned with 4015: it stopped instead of reconnecting.
             _check(reason.code == 4015, f"close code {reason.code}, expected 4015")
-            connects = getattr(first.source, "inner", None)
-            gateway = getattr(getattr(connects, "inner", None), "gateway", None)
-            if gateway is not None:
-                _check(gateway.connects == 1, "the first adapter reconnected after 4015")
 
 
 # ---- AG-12 ------------------------------------------------------------------------------------

@@ -445,8 +445,14 @@ class RunPatcher:
             await self.flush()
         except ProblemError as exc:
             _LOG.info("run %s: patch failed code=%s", self.run_id, exc.code)
+            return
         except httpx.TransportError as exc:
             _LOG.info("run %s: patch failed: %s", self.run_id, type(exc).__name__)
+            return
+        if self._pending and not self.ended:
+            # Changes set while this patch was on its way: `_schedule` saw this timer running.
+            self._timer = None
+            self._schedule()
 
     def _ops(self) -> list[JsonPatchOperation]:
         ops = []

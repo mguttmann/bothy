@@ -375,15 +375,22 @@ async def test_polling_without_heartbeat_sends_none() -> None:
 class _Failing(_Responder):
     """Answers the first polls with 503 (as during a server restart), then pages."""
 
-    def __init__(self, clock: FakeClock, pages: list[dict[str, Any]], failures: int) -> None:
+    def __init__(
+        self,
+        clock: FakeClock,
+        pages: list[dict[str, Any]],
+        failures: int,
+        failure: Callable[[], httpx.Response] | None = None,
+    ) -> None:
         super().__init__(clock, pages)
         self.failures = failures
+        self.failure = failure or (lambda: httpx.Response(503, content=b"<html>restarting</html>"))
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.path == POLL_PATH and self.failures > 0:
             self.failures -= 1
             self.polls.append(self.clock.monotonic())
-            return httpx.Response(503, content=b"<html>restarting</html>")
+            return self.failure()
         return super().__call__(request)
 
 
@@ -397,4 +404,33 @@ async def test_polling_survives_a_server_restart() -> None:
         await eventually(running.envelopes, "the first page", step=lambda: clock.advance(1.0))
         assert [e.seq for e in running.envelopes()] == [3]
         assert not running.task.done()
+        await running.stop(clock)
+
+
+async def test_polling_survives_a_second_dpop_nonce_challenge() -> None:
+    # A nonce rotation between the one retry of the auth flow and the next poll is transient:
+    # `use_dpop_nonce` never stops the consumer like a revoked token (4004) would.
+    def challenge() -> httpx.Response:
+        return httpx.Response(
+            401,
+            json={
+                "type": "about:blank",
+                "title": "use_dpop_nonce",
+                "status": 401,
+                "code": "use_dpop_nonce",
+                "correlation_id": "0192f4a0-7b1c-7000-8a00-000000000009",
+            },
+            headers={"Content-Type": "application/problem+json", "DPoP-Nonce": "n-2"},
+        )
+
+    clock = FakeClock()
+    page = {"events": [_envelope(3, invocation_token=TOKEN)], "next_cursor": 3}
+    responder = _Failing(clock, [page], failures=2, failure=challenge)
+    settings = SdkSettings(poll_interval=1000.0, retry_max_attempts=1)
+    async with _client(clock, responder, settings) as client:
+        source = PollingSource(client, CONSUMER, settings=settings, clock=clock)
+        running = _Running(source)
+        await eventually(running.envelopes, "the first page", step=lambda: clock.advance(1.0))
+        assert [e.seq for e in running.envelopes()] == [3]
+        assert source.close_reason is None
         await running.stop(clock)

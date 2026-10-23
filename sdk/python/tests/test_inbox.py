@@ -120,6 +120,17 @@ def test_open_db_refuses_wider_mode_and_symlink(tmp_path: Path) -> None:
         open_db(link)
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX modes")
+def test_open_db_refuses_a_directory_others_can_write(tmp_path: Path) -> None:
+    # Whoever can write the directory could swap the file between the check and SQLite's open.
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    shared.chmod(0o777)
+    with pytest.raises(PermissionError, match="directory"):
+        open_db(shared / "inbox.sqlite3")
+    assert not (shared / "inbox.sqlite3").exists()
+
+
 @pytest.mark.anyio
 async def test_db_pragmas_and_rollback(tmp_path: Path) -> None:
     db = Db(tmp_path / "db.sqlite3")

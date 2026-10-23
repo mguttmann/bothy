@@ -27,11 +27,12 @@ from bothy_sdk.commands import (
     AutocompleteTooManyChoicesError,
     CommandSpec,
     ReconcileResult,
+    _differs,
     guarded_autocomplete,
     reconcile_commands,
 )
 from bothy_sdk.errors import ForbiddenError
-from bothy_sdk.generated.models import CommandChoice
+from bothy_sdk.generated.models import Command, CommandChoice
 from bothy_sdk.settings import SdkSettings
 from bothy_sdk.testing import FakeClock
 from bothy_sdk.testing._patience import eventually
@@ -386,3 +387,15 @@ async def test_too_many_choices_raise() -> None:
     with pytest.raises(AutocompleteTooManyChoicesError):
         await guarded_autocomplete(exactly, _request(clock, 3), sender, clock=clock, settings=tight)
     assert len(sender.sent) == 1
+
+
+def test_removed_options_or_control_count_as_a_change() -> None:
+    # The registration leaves options and control out at their defaults; the stored command
+    # always carries them, so a declaration that removes them still differs.
+    plain = Command.from_dict(_command(1, "status", "Show the run status", AGENT))
+    assert not _differs(plain, CommandSpec("status", "Show the run status").to_register())
+    with_control = Command.from_dict({**_command(1, "status", "Show", AGENT), "control": True})
+    assert _differs(with_control, CommandSpec("status", "Show").to_register())
+    option = {"name": "verbose", "description": "More detail", "type": "boolean", "required": False}
+    with_option = Command.from_dict({**_command(1, "status", "Show", AGENT), "options": [option]})
+    assert _differs(with_option, CommandSpec("status", "Show").to_register())

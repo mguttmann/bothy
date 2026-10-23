@@ -17,6 +17,7 @@ Examples:
 from __future__ import annotations
 
 import dataclasses
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -137,7 +138,8 @@ class SdkSettings:
             The settings.
 
         Raises:
-            ValueError: A key is unknown or a value does not parse; the message names the key.
+            ValueError: A key is unknown, a value does not parse or is not positive; the message
+                names the key.
         """
         by_key = {f.metadata["key"]: f for f in dataclasses.fields(cls)}
         kwargs: dict[str, Any] = {}
@@ -146,7 +148,12 @@ class SdkSettings:
             if f is None:
                 raise ValueError(f"unknown SDK setting: {key}")
             try:
-                kwargs[f.name] = int(text) if f.type in ("int", int) else parse_duration(text)
+                value = int(text) if f.type in ("int", int) else parse_duration(text)
             except ValueError as exc:
                 raise ValueError(f"invalid value for {key}") from exc
+            # Every named value is a positive count, size or wait; zero would poll or retry
+            # without pause or never try at all.
+            if not (math.isfinite(value) and value > 0):
+                raise ValueError(f"invalid value for {key}: must be positive")
+            kwargs[f.name] = value
         return cls(**kwargs)

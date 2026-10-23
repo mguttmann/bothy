@@ -435,6 +435,28 @@ class Client:
         result = await self.call(get_discovery.asyncio_detailed)
         return expect(result, Discovery)
 
+    def origin_url(self, path: str) -> str:
+        """Return `url` of ``path`` only when it is on the origin of the API base.
+
+        Every request of the shared HTTP client carries the API token, so a URL the server names
+        (for example ``jwks_uri`` of the discovery) must not lead to another origin or to clear
+        text.
+
+        Args:
+            path: As for `url`.
+
+        Returns:
+            The absolute URL.
+
+        Raises:
+            ValueError: The URL has another scheme, host or port than the API base.
+        """
+        url = self.url(path)
+        mine, theirs = urlsplit(self.base_url), urlsplit(url)
+        if (theirs.scheme, theirs.netloc) != (mine.scheme, mine.netloc):
+            raise ValueError("URL is not on the origin of the API base")
+        return url
+
     def url(self, path: str) -> str:
         """Return the absolute URL of an API path or of a URL relative to the origin.
 
