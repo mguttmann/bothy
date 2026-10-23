@@ -72,7 +72,9 @@ Future<String> _subscriptionTo(String appId, String url) async {
 /// a fresh client_msg_id; createMessage takes no Idempotency-Key), which causes message.created.
 Future<void> _postMessage(String channelId, String text) async {
   final channel = await consoleApi('GET', '/channels/$channelId');
-  final thread = (channel.json as Map?)?['main_thread_id'];
+  // getChannel answers a ChannelView: the channel sits under `channel`.
+  final view = channel.json as Map?;
+  final thread = (view?['channel'] as Map?)?['main_thread_id'];
   expect(channel.status, 200, reason: 'getChannel');
   expect(thread, isA<String>(), reason: 'the channel names its main thread');
   final sent = await consoleApi(
