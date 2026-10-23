@@ -88,8 +88,10 @@ GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
 GATE_COMPONENT_INPUT_PREFIXES: dict[str, tuple[str, ...]] = {
     "server": ("tools/observability/", "infra/observability/slo/"),
     "apps": ("tools/observability/", "infra/observability/slo/"),
-    # The panel plugin imports the TypeScript tokens and bundles their fonts (M7-24, M7-25).
-    "plugins": ("design/build/ts/",),
+    # The panel plugin imports the TypeScript tokens and bundles their fonts (M7-24, M7-25). The
+    # Hermes adapter imports the Python SDK from its source tree (M2-33), so an SDK change runs
+    # the adapter's tests too.
+    "plugins": ("design/build/ts/", "sdk/python/src/"),
 }
 # Self-contained tool folders under tools/ (and single files in them) with the gate components
 # whose gates or tests read them; the longest matching key decides. A tool without a component is

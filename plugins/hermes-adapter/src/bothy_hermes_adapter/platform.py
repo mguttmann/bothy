@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The Hermes platform plugin: the only runtime module that imports Hermes (09 17.2, 17.3).
 
-`BothyPlatform` subclasses Hermes's ``BasePlatformAdapter``. It implements
+`ServerPlatform` subclasses Hermes's ``BasePlatformAdapter``. It implements
 `bothy_hermes_adapter.runtime.Runtime` for the adapter logic and forwards every Hermes callback
 of 17.3 to `bothy_hermes_adapter.handler.HermesHandler` on the adapter's event loop:
 
@@ -74,7 +74,7 @@ from bothy_hermes_adapter.runtime import (
 )
 from bothy_hermes_adapter.store import CallbackStore
 
-__all__ = ["CONTROL_SENDER", "BothyPlatform", "make_register"]
+__all__ = ["CONTROL_SENDER", "ServerPlatform", "make_register"]
 
 _LOG = logging.getLogger("bothy_hermes_adapter")
 
@@ -88,10 +88,10 @@ _NOT_BUILT: Final = "not supported by this server adapter yet"
 # How often the adapter looks at the gateway's startup restore before it connects; a poll of a
 # flag, not a deadline (the wait ends when Hermes is ready).
 _READY_POLL_S: Final = 0.1
-_PLATFORMS: dict[str, BothyPlatform] = {}
+_PLATFORMS: dict[str, ServerPlatform] = {}
 
 
-class BothyPlatform(BasePlatformAdapter):
+class ServerPlatform(BasePlatformAdapter):
     """The platform adapter of one Hermes profile (one agent principal).
 
     Args:
@@ -692,8 +692,8 @@ def make_register(platform_key: str) -> Any:
         ``register(ctx)``: registers the platform and the hooks of this module.
     """
 
-    def factory(config: PlatformConfig) -> BothyPlatform:
-        return BothyPlatform(config, platform_key)
+    def factory(config: PlatformConfig) -> ServerPlatform:
+        return ServerPlatform(config, platform_key)
 
     def hook(name: str) -> Any:
         def callback(**kwargs: Any) -> None:

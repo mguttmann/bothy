@@ -38,7 +38,8 @@ BEFORE = frozenset("/-_.:@")
 #   - module paths and the repository: github.com/OWNER/bothy, OWNER.github.io/bothy;
 #   - a path segment: cmd/bothy, /run/bothy, /var/lib/bothy, the image namespace bothy/...;
 #   - a prefix: bothy-<x> (images, host service, protocol ids, SDK, plugin, SLO, dashboard and
-#     tool ids), bothy_<x> (database roles, Dart packages, metrics, token prefixes), bothy.<x>
+#     tool ids), bothy_<x> (database roles, Dart packages, the Python packages of the SDK and the
+#     Hermes adapter, metrics, token prefixes), bothy.<x>
 #     (telemetry attributes, configuration file), BOTHY_ (environment), Bothy<Name> (alerts);
 #   - the binary in front of a subcommand (bothy migrate up);
 #   - the display name in the tool configurations listed in DISPLAY (02 6 "display names").

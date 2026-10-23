@@ -479,6 +479,8 @@ by kind:
 - Packages of the apps: Dart packages with the prefix `bothy_` (`bothy_viz`, `bothy_noise`).
 - SDKs: Python distribution `bothy-sdk`, import package `bothy_sdk`, npm package `bothy-sdk` (not
   published until OQ-17 is decided).
+- Hermes adapter ([09-agents.md](09-agents.md) 17): Python distribution `bothy-hermes-adapter`,
+  import package `bothy_hermes_adapter`, default value `bothy` of `hermes_adapter.platform_key`.
 - Grafana plugin ([25-visualization.md](25-visualization.md), section 8): folder and
   release component `grafana-bothy-live`, plugin ID `bothy-live-panel`, dashboard `bothy-live`.
 - Cross-cutting: prefix of the telemetry, alert and SLO names (`bothy.`, `bothy_`, `Bothy`); prefix

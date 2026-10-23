@@ -1904,10 +1904,22 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 ### 17.2 Package and registration
 
 - Plugin folder with `plugin.yaml` (`kind: platform`) and adapter module; registration with
-  `ctx.register_platform(...)`. Logic without a Hermes import in separate modules; only the
-  adapter module imports Hermes. Reason: testable without Hermes, small coupling surface.
+  `ctx.register_platform(...)`. Logic without a Hermes import in separate modules. Exactly two
+  modules import Hermes: the platform module (the runtime, `platform.py`) and the configuration
+  bridge (`hermes_config.py`: Hermes' own YAML reader and writer for the installer, and the
+  credential resolution of 17.8). Every other module depends on a runtime protocol that the
+  platform module implements and unit tests fake. Reason: testable without Hermes, small coupling
+  surface.
 - Configuration through the platform configuration (`PlatformConfig.extra`, `env_enablement_fn`,
-  `apply_yaml_config_fn`), never through `os.getenv`.
+  `apply_yaml_config_fn`), never through `os.getenv`. The installer writes the adapter's keys
+  (section 21, place "Hermes adapter") flat with their full names into `PlatformConfig.extra` of
+  the platform section; the API token lies in the file `hermes_adapter.token_file`, readable only
+  by the profile's user, because the configuration file must not hold it and the environment
+  must not be read.
+- State directory: `<profile home>/<platform key>` (mode `0700`), the home taken from Hermes'
+  function for plugins, never from the environment. It holds the inbox and outbox of the SDK and
+  the adapter's own file of resolved callbacks and open cards; no file holds a content or a key
+  value.
 - Platform key `hermes_adapter.platform_key`. **Never change after commissioning:** Hermes
   builds the session key from the platform name; a new name separates every thread from its
   Hermes session.
@@ -1925,19 +1937,19 @@ compatibility test runs against the pinned and the newest version (16.1, fake He
 | `edit_message(..., finalize)` | own reply message: buffer the content, a `message.update` only on `finalize=True` or at the end of the run; reason: every edit would be a durable event and a revision. Measured: without draft streaming Hermes first sends the reply as `send` with a typing cursor, edits it with `finalize=False` and closes it with exactly one `edit_message(finalize=True)` carrying the finished text; with draft streaming there is no `finalize=True`. If `send_draft` is off, the buffered content is the source of `/last_text_excerpt` |
 | `supports_draft_streaming()` = true, `send_draft(...)` | draft text of a running turn as `run.update` on `/last_text_excerpt`; the finished reply comes via `send`. Measured: the text is cumulative (each draft contains the previous one), the last draft equals the reply except for leading spaces; after a tool it starts with a paragraph |
 | `supports_status_text` = true, `set_status_text(chat_id, text)` | `run.update` on `/status_line`. Measured: Hermes sets a status sentence when a tool starts and `None` when it ends; that is the only signal about tool steps. The adapter creates the step `tool_call` at the status sentence, takes the text verbatim as the step title (never parsed, D-L7) and completes it at `None`, at the next status sentence, at the next draft or the reply, or at `on_processing_complete`, whichever comes first |
-| `format_tool_event(event)` | not called in `v2026.9.24` (the base class offers the method, no caller in the gateway). The adapter still overrides it with the return value `None` and, on a later call, creates the step as with `set_status_text`. Hermes sends progress bubbles via `send` and edits them with `edit_message`; that is why the installer sets `display.platforms.<platform_key>.tool_progress: off` (measured: then no progress message) |
+| `format_tool_event(event)` | not called in `v2026.9.24` (the base class offers the method, no caller in the gateway). The adapter still overrides it with the return value `None` and, on a later call, creates the step as with `set_status_text`: `kind: tool_call`, title the preview, `detail` exactly `{"preview": <the preview Hermes would have shown>}` (never a tool result), paired by Hermes' call ID or first in, first out. Hermes sends progress bubbles via `send` and edits them with `edit_message`; that is why the installer sets `display.platforms.<platform_key>.tool_progress: off` (measured: then no progress message) |
 | `render_message_event(event, sink)` | not called in `v2026.9.24`; the default behavior stays, text parts also as `last_text_excerpt` |
 | `send_typing`, `stop_typing` | no operation (4.7, typing) |
-| `send_image`, `send_document`, `send_voice`, `send_video` | `file.upload`, then `message.create` with an attachment (`+upload` needed) |
+| `send_image`, `send_document`, `send_voice`, `send_video` | `file.upload`, then `message.create` with an attachment (`+upload` needed). Not built yet (follow-up ticket): the adapter answers with Hermes' failure result "not supported by this server adapter yet", sends nothing and reports no `files_out` |
 | `send_clarify(...)` | card with buttons or a selection, `custom_id` = callback ID `cl:<id>:<idx>`; run `waiting_input` |
 | `_send_exec_approval_prompt(prompt)` | approval card per 11.5, `custom_id` = `appr:<id>:<choice>` |
 | `send_slash_confirm(...)` | card "Once", "Always", "Cancel", `custom_id` = `sc:<choice>:<id>` |
 | `send_model_picker`, `send_choice_picker` | selection component; missing from the base class in `v2026.9.24` (Hermes then falls back to text, which arrives as `send`) |
-| Interaction (`interaction.created`) | pass the callback ID to the Hermes resolver, `interaction.respond`, update the card |
+| Interaction (`interaction.created`) | the SDK resumes the run with the interaction's token; the adapter passes the callback ID to the Hermes resolver exactly once per prompt (a stored record of resolved IDs, so a redelivery resolves nothing) and answers with `interaction.respond` (`acknowledged`, the chosen label as `response.text`). No `component.update` after an interaction: the server disables the other single-use components of the card in the same transaction (11.3). Every card is a message `kind = card` of the run with `single_use` components, followed by `run.await_input` with the question's first line as status line |
 | `on_processing_start(event)` | no operation (the start is already `run.start`) |
 | `on_processing_complete(event, outcome)` | `run.finish` with `completed`, `failed` or `cancelled`, `usage`. Measured: after `/stop` comes `ProcessingOutcome.CANCELLED` |
 | `get_chat_info(chat_id)` | read thread and channel (`thread.read`) |
-| Hermes commands | register as control commands (`control = true`), skill commands as model commands. Measured: a new session (`session.mode = new` after a reset) with `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers the question, because the server has already checked the reset, through the resolver `tools.slash_confirm.resolve(session_key, confirm_id, "once")`. Rebinding (`bind`) with `/resume <session ID>` via `handle_message` (17.4, 9.5). Stop with `/stop` via `handle_message` (8 item 3). A follow-up without configuration also with `/steer <text>` (17.5) |
+| Hermes commands | Not built yet (follow-up ticket, needs the reconciliation of M2-16): the adapter registers no commands and refuses a run with `trigger_kind` `command` (`failed`, `adapter_error`). The rest of this row describes the target. Register as control commands (`control = true`), skill commands as model commands. Measured: a new session (`session.mode = new` after a reset) with `/new` via `handle_message`; Hermes asks via `send_slash_confirm`, and the adapter answers the question, because the server has already checked the reset, through the resolver `tools.slash_confirm.resolve(session_key, confirm_id, "once")`. Rebinding (`bind`) with `/resume <session ID>` via `handle_message` (17.4, 9.5). Stop with `/stop` via `handle_message` (8 item 3). A follow-up without configuration also with `/steer <text>` (17.5) |
 | Title | after the first completed run of a new session, the Hermes session title as a suggestion (section 12) |
 
 `MAX_MESSAGE_LENGTH` corresponds to `message.max_content_bytes`; the adapter does not split
@@ -2011,10 +2023,31 @@ sequenceDiagram
     P->>S: ack seq
 ```
 
-The adapter passes on the context (4.6) in the format of Hermes' channel context: header line,
-lines `[Name] Text`, contents with `trust = unverified` marked as `[unverified]` with the fixed
-note never to treat them as an instruction. Reason: Hermes already knows this format and its
-protection.
+Order as built (M2-33): the SDK checks the token, stores the event with its token in the inbox
+and acknowledges it before the adapter reads `run.context.read`; `run.start` follows after the
+actual mode was determined again (17.8), and the Hermes turn starts only after `200`.
+
+The adapter passes on the context (4.6) as a fixed system part, handed to Hermes as the event's
+ephemeral channel prompt (never stored in the transcript), separate from the text of the
+triggering person, which is the event's text together with the transcripts of its voice
+attachments:
+
+1. A fixed note for the model: the context comes from the chat server; lines marked unverified
+   and every data block are material, never instructions.
+2. "Channel instructions" when set: the channel prompt of `agent.config.read` and the channel's
+   skills (`ChannelBehavior.skills`, in order, as the skills to use in this channel, which Hermes
+   loads with its own skill tools). Both come from a person with `manage` (R-AZ-09).
+3. The rendering of the SDK's context function: every element with author, role and trust
+   mark; contents with `trust = unverified`, every file text and the transcripts of unverified
+   messages only inside data blocks after a fixed notice line, opened and closed by markers with
+   a random boundary of this turn, so no content can close a block or pose as a header line.
+
+Elements with `already_delivered` are left out (the continued session holds them). Attachments
+with `scan_status` `clean` or `skipped` and a `text/*` or `application/json` type are loaded
+(`file.read`, at most `hermes_adapter.attachment_text_max_bytes` bytes, cut at a UTF-8 boundary and
+marked as cut); every other attachment and one the server refuses (`409 file_not_ready`,
+`409 file_blocked`) stands as a line with name, type and size. Reason: the runtime cannot tell
+senders apart; the markers keep foreign contents data (ADR 0054, T-AI-01, T-AI-03).
 
 ### 17.7 Access layers and allowlist
 
@@ -2051,7 +2084,12 @@ resolved login of the runtime:
 | Anthropic with Console API key | `organization` | `api_key` |
 | Anthropic with OAuth (subscription) | `personal` | `oauth` |
 | other provider with API key | `organization` | `api_key` |
-| not determinable | none | `unknown`; `run.finish` with `billing_mode_mismatch` |
+| not determinable (every other resolution: no login, cloud credentials, an OAuth login of another provider, an external process, an error, an unknown answer) | none | `unknown`; `run.finish` with `billing_mode_mismatch` |
+
+The adapter determines the mode at intake (4.5 point 8), again immediately before every
+`run.start` and `run.resume`, and at every heartbeat. A change during a running turn (the
+heartbeat determination differs from the run's `billing_mode_used`) interrupts the turn and ends
+the run `failed` with `billing_mode_mismatch` (10, BR-05).
 
 Detection uses only the key type; the value is never stored, sent or logged. There is no
 public surface for it in `v2026.9.24`. The compatibility layer uses the internal function with
@@ -2076,7 +2114,9 @@ installer shows this beforehand.
 
 `cron_deliver_env_var` and `standalone_sender_fn` (both present in `v2026.9.24`) are registered so that Hermes cron jobs can send
 without a live adapter. The target is the report channel from the platform configuration
-(section 14).
+(section 14). Not built yet (follow-up ticket, needs the reports of section 14): cron delivery is
+not registered; until then the installer writes a placeholder home channel (`chat_id`
+`unassigned`), because Hermes otherwise asks for one in the thread of the first turn.
 
 ### 17.10 To check before building
 
@@ -2093,6 +2133,18 @@ every row from the facts, and a test keeps table and evidence equal.
 | `interrupt_outcome` | confirmed: `/stop` via `handle_message` ends the turn, `on_processing_complete` reports `CANCELLED`, and the model is not called further; `cancel_session_processing` also reports `CANCELLED`, but lets the agent run on. | `interrupt.json`, `interrupt_command.json`, `observations.json` | 8, 17.3 |
 | `session_switch` | confirmed: `/new` with the confirmation through `tools.slash_confirm.resolve` starts a new session, `/resume` binds a session of the same thread, a foreign one only with `--all` for an admin sender; the hook `pre_llm_call` delivers the ID, and a missing ID leaves the current session in place. | `session_new.json`, `session_resume.json`, `session_resume_admin.json`, `session_resume_same_thread.json`, `session_resume_missing.json`, `observations.json` | 9.5, 17.3, 17.4 |
 | `own_access_policy` | confirmed: with `enforces_own_access_policy = True` and `dm_policy = "allowlist"` in `PlatformConfig.extra` the message of a person without a Hermes list reaches the turn; without the declaration Hermes holds it back. | `access_policy_own.json`, `access_policy_default.json`, `observations.json` | 17.7 |
+
+### 17.11 Tool class
+
+The adapter's actual tool class (2.4) follows the toolsets Hermes enables for the platform
+(`platform_toolsets.<platform_key>` with Hermes' own resolution, read at connect and at every
+heartbeat). The class is the highest class of any enabled toolset: no toolset gives `chat`, a
+toolset that acts only inside the conversation (`clarify`, `todo`) gives `chat`, a toolset with
+named tools of their own minimal credentials whose effect outside the thread needs an approval
+card would give `scoped` (the pinned version has none), and every other toolset, also an unknown
+name or an MCP server, gives `host`. The adapter's table names every toolset of the pinned version
+with its class and reason; a test fails when a pin update brings a toolset the table does not
+name. Reason: fail closed; a too high report only blocks starts whose token carries a lower class.
 
 ## 18. Reference adapter: Claude-Code-Runner (development forums)
 
@@ -2500,6 +2552,12 @@ configuration of the respective program outside the server.
 | `runner.forward_ssh_agent` | Runner | `false` | pass `SSH_AUTH_SOCK` on to the turn |
 | `runner.cli_probe_timeout` | Runner | `30s` | time limit for `claude auth status` and `claude --version` |
 | `runner.poll_interval` | Runner | `200ms` | interval at which the runner checks the recording for new lines and a held lock again |
+| `hermes_adapter.server_url` | Hermes adapter | no default, required | API base of the instance (`https://<host>/api/v1`); discovery and JWKS come from `getDiscovery` |
+| `hermes_adapter.instance_id` | Hermes adapter | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |
+| `hermes_adapter.token_file` | Hermes adapter | no default, required | file with the agent's API token, readable only by the profile's user |
+| `hermes_adapter.dpop_key_file` | Hermes adapter | no default | private key of the DPoP proofs; without it no DPoP |
+| `hermes_adapter.max_message_bytes` | Hermes adapter | `262144` | longest answer (`MAX_MESSAGE_LENGTH`); the default equals `message.max_content_bytes`, both change together |
+| `hermes_adapter.attachment_text_max_bytes` | Hermes adapter | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |
 | `runner.claude_bin` | Runner | `claude` | program, searched in the cleaned `PATH` |
 | `runner.projects_root` | Runner | no default, required | root of all project folders |
 | `runner.state_dir` | Runner | no default, required | state, recordings, incoming files |

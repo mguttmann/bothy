@@ -452,6 +452,12 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `runner.forward_ssh_agent` |  | Runner |  | `false` | pass `SSH_AUTH_SOCK` on to the turn |  |
 | `runner.cli_probe_timeout` |  | Runner |  | `30s` | time limit for `claude auth status` and `claude --version` |  |
 | `runner.poll_interval` |  | Runner |  | `200ms` | interval at which the runner checks the recording for new lines and a held lock again |  |
+| `hermes_adapter.server_url` |  | Hermes adapter |  | no default, required | API base of the instance (`https://<host>/api/v1`); discovery and JWKS come from `getDiscovery` |  |
+| `hermes_adapter.instance_id` |  | Hermes adapter |  | no default, required | instance ID of the server and the expected `iss` of every token (4.5 point 4) |  |
+| `hermes_adapter.token_file` |  | Hermes adapter |  | no default, required | file with the agent's API token, readable only by the profile's user |  |
+| `hermes_adapter.dpop_key_file` |  | Hermes adapter |  | no default | private key of the DPoP proofs; without it no DPoP |  |
+| `hermes_adapter.max_message_bytes` |  | Hermes adapter |  | `262144` | longest answer (`MAX_MESSAGE_LENGTH`); the default equals `message.max_content_bytes`, both change together |  |
+| `hermes_adapter.attachment_text_max_bytes` |  | Hermes adapter |  | `32768` | longest attachment text the adapter inlines as a data block; the default equals `agent.context_message_max_bytes` |  |
 | `runner.claude_bin` |  | Runner |  | `claude` | program, searched in the cleaned `PATH` |  |
 | `runner.projects_root` |  | Runner |  | no default, required | root of all project folders |  |
 | `runner.state_dir` |  | Runner |  | no default, required | state, recordings, incoming files |  |
