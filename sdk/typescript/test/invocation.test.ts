@@ -411,7 +411,7 @@ function invalidCases(
   );
   invalid["iat beyond int64"] = signEd(
     header(issuer.active),
-    enc.encode(text.replace(/"iat":(\d+)/, '"iat":9223372036854775808')),
+    enc.encode(text.replace(/"iat":(\d+)/, `"iat":${(2n ** 63n).toString()}`)),
     key,
   );
   invalid["duplicate payload member"] = signEd(

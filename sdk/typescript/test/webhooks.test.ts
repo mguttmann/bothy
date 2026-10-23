@@ -130,7 +130,7 @@ describe("verifyWebhook headers", () => {
     "+1760346000",
     " 1760346000",
     "1e9",
-    "12345678901234567",
+    "9".repeat(17),
   ])("webhook-timestamp %j gives invalid_timestamp", (value) => {
     const headers = { ...signed(), "webhook-timestamp": value };
     expect(failure(base({ headers })).code).toBe("invalid_timestamp");
