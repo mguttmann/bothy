@@ -343,6 +343,8 @@ describe("RunPatcher against the FakeServer", () => {
     expect(patches(sent)).toHaveLength(1); // still throttled
     await fake.passTime(310);
     await eventually(() => patches(sent).length === 2);
+    // `sent` records a request before the server has it: wait for the answer, too.
+    await eventually(() => patcher.patchesSent === 2);
     expect(patches(sent)[1]?.body?.base_version).toBe(run.version + 1);
     expect(fake.run(runId).model).toBe("m1");
     await patcher.aclose();
