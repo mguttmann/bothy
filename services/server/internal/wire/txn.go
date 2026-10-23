@@ -282,6 +282,13 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnChannelReadOnlySet); err != nil {
 		return err
 	}
+	return subscribeTerminalAndRunEnds(reg, m)
+}
+
+// subscribeTerminalAndRunEnds continues subscribeArchivesAndRuns in the same order:
+// kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46),
+// then messaging.MessageDeleted, files.FileFinalized and agents.SessionAttached -> runs.
+func subscribeTerminalAndRunEnds(reg *txn.Registry, m *Modules) error {
 	if m.TerminalSubscribers == nil {
 		return errNoTerminalSubscribers
 	}
