@@ -33,6 +33,14 @@ const audienceSelf = "self"
 // version below 1, a payload that is no JSON object, contains a null or reaches
 // sync.event_payload_max_bytes.
 func (h *Hub) PublishEphemeral(ctx context.Context, ev eventlog.EphemeralEvent) error {
+	if ev.Type == eventRunUpdated {
+		// run.updated goes into the coalescer instead of the immediate path (M2-10 design note
+		// 9); nothing changes for typing.started.
+		if lb := h.liveBox(); lb != nil {
+			lb.Changed(ctx, ev)
+			return nil
+		}
+	}
 	et, ok := domain.LookupEphemeral(ev.Type)
 	if !ok {
 		return fmt.Errorf("gateway: %q is no registered ephemeral type", ev.Type)

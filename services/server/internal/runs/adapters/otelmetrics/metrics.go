@@ -2,8 +2,8 @@
 
 // Package otelmetrics is the metrics adapter of the runs module: the run instruments of
 // docs/observability/signals.md 4.3 through the declarations metrics.RunStartLatency,
-// metrics.RunDuration, metrics.RunFinished and metrics.RunActive of the metric registry. Metrics
-// implements app.Metrics; RegisterActiveGauge registers the gauge bothy.run.active.
+// metrics.RunDuration, metrics.RunFinished, metrics.RunSteps and metrics.RunActive of the metric
+// registry. Metrics implements app.Metrics and app.StepMetrics; RegisterActiveGauge registers the gauge bothy.run.active.
 //
 // Example:
 //
@@ -24,11 +24,14 @@ import (
 // Metrics holds the instruments of the committed run transitions.
 type Metrics struct {
 	startLatency, duration *metrics.Histogram
-	finished               *metrics.Counter
+	finished, steps        *metrics.Counter
 }
 
 // Compile-time check: Metrics is the outgoing port of app.
 var _ app.Metrics = (*Metrics)(nil)
+
+// Compile-time check: Metrics counts the steps of patches (M2-10).
+var _ app.StepMetrics = (*Metrics)(nil)
 
 // New creates the instruments on mp; nil means the global provider that platform/otel installs
 // in otel.Setup. bothy.agent.handle needs no values: its set is the handle pattern
@@ -46,7 +49,11 @@ func New(mp metric.MeterProvider) (*Metrics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("otelmetrics: %w", err)
 	}
-	return &Metrics{startLatency: start, duration: dur, finished: fin}, nil
+	steps, err := metrics.NewCounter(mp, metrics.RunSteps, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	return &Metrics{startLatency: start, duration: dur, finished: fin, steps: steps}, nil
 }
 
 // outcomes maps the target of a transition out of queued to bothy.outcome.
@@ -80,6 +87,12 @@ func (m *Metrics) RunTransitioned(ctx context.Context, t app.Transitioned) {
 		reason = t.Run.StateReason
 	}
 	m.finished.Add(ctx, 1, t.AgentHandle, string(t.To), reason)
+}
+
+// StepAdded implements app.StepMetrics: bothy.run.steps with bothy.agent.handle and
+// bothy.step.kind, never an id, a value or a text (M2-10 design note 13).
+func (m *Metrics) StepAdded(ctx context.Context, agentHandle, kind string) {
+	m.steps.Add(ctx, 1, agentHandle, kind)
 }
 
 // ActiveSource reads the active runs grouped by agent handle and state, the data points of

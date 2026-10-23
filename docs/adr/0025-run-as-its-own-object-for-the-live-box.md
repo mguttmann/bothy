@@ -53,8 +53,9 @@ session and token.
 
 - Tests of the state machine: every transition that is not allowed is rejected (docs/spec/03-data-model.md
   `runs`; docs/spec/09-agents.md section 5.1).
-- Test AG-12: a patch on a forbidden path results in `422`, an old `base_version` results in `409`
-  with the document.
+- Test AG-12: a patch on a forbidden path results in `400 validation_failed` with `errors[].code`
+  `patch_path_forbidden` (ADR 0015; corrected by M2-10, D-M2-10-15), an old `base_version`
+  results in `409` with the document.
 - Load test: the number of durable events per run stays independent of the patch rate.
 - Test that live box anchors create no revisions (03 `message_revisions`).
 - M2-05 names the tests of the state machine and the run object: `TestCanTransition_AllPairs`,

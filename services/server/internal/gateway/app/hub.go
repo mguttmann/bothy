@@ -148,6 +148,8 @@ type Hub struct {
 	processed int64
 	// consumers serves agent sessions (M2-07); nil delivers to them like to people.
 	consumers *ConsumerEngine
+	// livebox coalesces run.updated (M2-10); nil sends it on the immediate path of M1-66.
+	livebox *Coalescer
 	// position is the hub position: the highest seq Dispatch has finished (Position).
 	position atomic.Int64
 	// attachSeq counts the attaches of the process for member.attached (M2-17).
@@ -319,6 +321,9 @@ func (h *Hub) Detach(c *Connection) {
 	if m.consumer {
 		h.consumers.Detach(c)
 	}
+	if lb := h.liveBox(); lb != nil {
+		lb.memberGone(m)
+	}
 }
 
 // Len returns the number of registered connections.
@@ -341,6 +346,10 @@ func (h *Hub) Dispatch(ctx context.Context, ev sync.Event) {
 		h.sessionRevoked(ev)
 	case ev.Type == eventThreadMoved || ev.Type == eventChannelArchived || ev.Type == eventSpaceArchived:
 		h.structureChanged(ctx, ev)
+	case ev.Type == eventRunStateChanged:
+		if lb := h.liveBox(); lb != nil {
+			lb.stateChanged(ev)
+		}
 	}
 	enc := &encoded{ev: ev}
 	// One structure scope per event: the checks of every candidate read the thread and channel of
@@ -618,7 +627,12 @@ func (h *Hub) flush(ctx context.Context, m *member) {
 			m.mu.Unlock()
 			h.mu.Lock()
 			delete(h.notLive, m)
+			lb := h.livebox
 			h.mu.Unlock()
+			if lb != nil {
+				// The snapshots of the focus waited for catch-up (M2-10 design note 10).
+				lb.signal()
+			}
 			return
 		}
 		batch, head := m.buffer, m.head

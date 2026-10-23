@@ -23,8 +23,9 @@ func TestRegister_Events(t *testing.T) {
 		ev[3].Type != authorize.EventRunCancelRequested || ev[4].Type != authorize.EventRunStateChanged {
 		t.Fatalf("events %+v", ev)
 	}
+	// M2-17 and M2-10: runs serves the gateway ops command.autocomplete_result and run.update.
 	ops := r.Ops()
-	if len(ops) != 1 || ops[0].Module != "runs" || ops[0].Op != authorize.OpCommandAutocompleteResult {
+	if len(ops) != 2 || ops[0].Module != "runs" || ops[0].Op != authorize.OpCommandAutocompleteResult || ops[1].Module != "runs" || ops[1].Op != authorize.OpRunUpdate {
 		t.Fatalf("ops %+v", ops)
 	}
 }

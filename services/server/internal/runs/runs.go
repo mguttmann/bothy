@@ -4,6 +4,7 @@ package runs
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -14,7 +15,8 @@ import (
 // sections 6 and 7): the durable run.state_changed (M2-05), agent.invocation (M2-08),
 // command.invoked (M2-16) and run.cancel_requested (M2-09), the ephemeral
 // command.autocomplete_requested and the gateway op command.autocomplete_result (M2-17), whose
-// handler the gateway runs on CommandExec. internal/wire lists it in moduleRegistrations.
+// handler the gateway runs on CommandExec, and the gateway op run.update it serves (M2-10).
+// internal/wire lists it in moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunStateChanged)
 	r.Event("runs", authorize.EventAgentInvocation)
@@ -22,6 +24,8 @@ func Register(r *authorize.Registry) {
 	r.Event("runs", authorize.EventRunCancelRequested)
 	r.Event("runs", authorize.EventCommandAutocompleteRequested)
 	r.Op("runs", authorize.OpCommandAutocompleteResult)
+	// The live-box op of the adapter (M2-10); run.updated is ephemeral and needs no declaration.
+	r.Op("runs", authorize.OpRunUpdate)
 }
 
 // Money is an amount with its currency (schema Money): AmountMicros in millionths of the unit,
@@ -244,8 +248,98 @@ type Runs interface {
 	// state again answers without change. Errors: 400 validation_failed, 409
 	// invalid_state_transition.
 	Finish(ctx context.Context, cmd FinishRun) (Run, error)
+	// Patch applies a live-box patch of the run's own agent (patchRun and the gateway op
+	// run.update, run.update; M2-10): RFC 6902 add, replace and remove on the paths of 09
+	// section 5.3 with base_version as compare-and-swap on runs.version. A stored patch raises the
+	// version by exactly one, writes no durable event and publishes the ephemeral run.updated
+	// after the commit. Errors: 404 for an unknown or invisible run, 403 forbidden (another
+	// agent's run, a person or an app), 400 validation_failed with errors[] (codes
+	// patch_path_forbidden, patch_target_missing, patch_target_exists, limit_reached and the
+	// value codes), 409 conflict with reason run_not_active for an ended run, 409
+	// base_version_conflict with the run document in Current.
+	//
+	// Example:
+	//
+	//	res, err := rs.Patch(ctx, runs.PatchRun{RunID: id, BaseVersion: 7, Ops: []runs.PatchOp{
+	//		{Op: "replace", Path: "/status_line", Value: json.RawMessage(`"Reading export.log"`)}}})
+	Patch(ctx context.Context, in PatchRun) (PatchResult, error)
 	// Cancel stops a run for a person (cancelRun, run.cancel): a queued run ends at once, an active
 	// one gets run.cancel_requested and the job runs.cancel_timeout. Errors: 404, 403, 400
 	// validation_failed for the reason, 409 invalid_state_transition for completed or failed.
 	Cancel(ctx context.Context, cmd CancelRun) (RunSummary, error)
+}
+
+// PatchOp is one RFC 6902 operation as sent by the adapter (09 5.3).
+type PatchOp struct {
+	// Op is "add", "replace" or "remove".
+	Op string
+	// Path is a JSON Pointer (RFC 6901) into run_document.v1.
+	Path string
+	// Value is the raw JSON value; empty for "remove" and for an absent member, the bytes null
+	// for a JSON null (which the checks refuse).
+	Value json.RawMessage
+}
+
+// PatchRun is the input of Runs.Patch; REST (patchRun) and the gateway op run.update build the
+// same value.
+type PatchRun struct {
+	RunID       ids.ID
+	BaseVersion int64
+	Ops         []PatchOp
+}
+
+// PatchResult carries the new runs.version (schema RunPatchResult).
+type PatchResult struct{ Version int64 }
+
+// RunUpdated is the payload of the ephemeral event run.updated as runs publishes it after the
+// commit of a patch (schema RunUpdatedPayload, M2-10 design note 8). Ops are the normalized ops
+// with the stored values; Truncated means the ops were left out because the encoded payload
+// exceeds sync.event_payload_max_bytes, and the gateway sends the whole document instead. ThreadID
+// is the run's thread, which the gateway needs for the focus index; it is not a member of the
+// payload. MarshalJSON writes the payload form.
+type RunUpdated struct {
+	RunID, ThreadID      ids.ID
+	BaseVersion, Version int64
+	Ops                  []PatchOp
+	Truncated            bool
+}
+
+// MarshalJSON implements json.Marshaler with the members of RunUpdatedPayload: run_id,
+// base_version, version and ops (each {op, path, value}, value absent for remove); ops absent
+// when Truncated.
+func (u RunUpdated) MarshalJSON() ([]byte, error) {
+	type op struct {
+		Op    string          `json:"op"`
+		Path  string          `json:"path"`
+		Value json.RawMessage `json:"value,omitempty"`
+	}
+	type payload struct {
+		RunID       ids.ID `json:"run_id"`
+		BaseVersion int64  `json:"base_version"`
+		Version     int64  `json:"version"`
+		Ops         *[]op  `json:"ops,omitempty"`
+	}
+	p := payload{RunID: u.RunID, BaseVersion: u.BaseVersion, Version: u.Version}
+	if !u.Truncated {
+		ops := make([]op, 0, len(u.Ops))
+		for _, o := range u.Ops {
+			ops = append(ops, op(o))
+		}
+		p.Ops = &ops
+	}
+	return json.Marshal(p)
+}
+
+// LiveBox serves the delivery reads of the gateway (M2-10 design note 10): the whole run
+// document of active runs for the snapshot after focus and resume and after a dropped frame.
+// They do not authorize: the focus handler checked gateway.focus per thread and the gateway admits
+// every recipient with run.read before it sends (07 section 7.4 rule 1, exception "loading a
+// resource that has already been checked"); callers admit every recipient first. Errors are
+// kernel/errs errors.
+type LiveBox interface {
+	// Documents returns the documents of the active runs of threadIDs (at most one per thread,
+	// R-DM-14), in no particular order; threads without an active run are absent.
+	Documents(ctx context.Context, threadIDs []ids.ID) ([]Run, error)
+	// Document returns the document of the run runID; false when it is unknown or not active.
+	Document(ctx context.Context, runID ids.ID) (Run, bool, error)
 }

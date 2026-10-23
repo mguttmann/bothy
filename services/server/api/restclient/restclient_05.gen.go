@@ -13,6 +13,29 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ListWebhookDeliveriesResponse400Headers the declared response headers of an HTTP 400 response for ListWebhookDeliveries
+type ListWebhookDeliveriesResponse400Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ListWebhookDeliveriesResponse401Headers the declared response headers of an HTTP 401 response for ListWebhookDeliveries
+type ListWebhookDeliveriesResponse401Headers struct {
+	CorrelationId   *CorrelationId
+	DPoPNonce       *string
+	SetCookie       *string
+	WWWAuthenticate *string
+}
+
+// ListWebhookDeliveriesResponse403Headers the declared response headers of an HTTP 403 response for ListWebhookDeliveries
+type ListWebhookDeliveriesResponse403Headers struct {
+	CorrelationId *CorrelationId
+}
+
+// ListWebhookDeliveriesResponse404Headers the declared response headers of an HTTP 404 response for ListWebhookDeliveries
+type ListWebhookDeliveriesResponse404Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // ListWebhookDeliveriesResponse429Headers the declared response headers of an HTTP 429 response for ListWebhookDeliveries
 type ListWebhookDeliveriesResponse429Headers struct {
 	CorrelationId   *CorrelationId
@@ -5095,8 +5118,14 @@ func (c *ClientWithResponses) GetRunWithResponse(ctx context.Context, runId RunI
 
 // PatchRunWithBodyWithResponse Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -5111,8 +5140,14 @@ func (c *ClientWithResponses) PatchRunWithBodyWithResponse(ctx context.Context, 
 
 // PatchRunWithResponse Apply a live-box patch
 //
-// Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-// `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+// Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+// the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+// 09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+// `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+// `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+// `base_version_conflict` with the current document in `current`, exactly as `getRun`
+// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

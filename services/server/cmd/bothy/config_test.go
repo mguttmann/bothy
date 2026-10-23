@@ -440,6 +440,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"reaction.emoji_max_bytes = 64  # default\n" +
 		"reaction.max_distinct_per_message = 20  # default\n" +
 		"retention.audit = 365d  # default\n" +
+		"run.excerpt_max_chars = 500  # default\n" +
+		"run.max_steps_persisted = 2000  # default\n" +
 		"run.orphan_timeout = 15m  # default\n" +
 		"run.queued_max_age = 2d  # default\n" +
 		"run.step_detail_max_bytes = 16384  # default\n" +
@@ -486,6 +488,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"sync.partition_maintenance_interval = 10m  # default\n" +
 		"sync.reauth_lead_time = 1m  # default\n" +
 		"sync.resume_window = 5m  # default\n" +
+		"sync.run_patch_coalesce_interval = 250ms  # default\n" +
 		"sync.tail_batch_size = 1000  # default\n" +
 		"sync.typing_min_interval = 5s  # default\n" +
 		"sync.typing_ttl = 8s  # default\n" +

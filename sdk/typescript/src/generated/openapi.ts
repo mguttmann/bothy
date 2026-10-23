@@ -3482,8 +3482,14 @@ export interface paths {
         head?: never;
         /**
          * Apply a live-box patch
-         * @description Same as gateway op `run.update`. Paths outside the allowed set and `state` are rejected. A wrong
-         *     `base_version` gives 409 `base_version_conflict` with the current document in `current`.
+         * @description Same as gateway op `run.update` (one use case). Only the run's own agent patches, only while
+         *     the run is `queued`, `running` or `waiting_input`. A path or op outside the allowed set of
+         *     09 section 5.3 (for example `/state`) gives 400 `validation_failed` with `errors[].code`
+         *     `patch_path_forbidden` and the `pointer` of the op. An ended run gives 409 `conflict` with
+         *     `reason` `run_not_active`, checked before the version. A wrong `base_version` gives 409
+         *     `base_version_conflict` with the current document in `current`, exactly as `getRun`
+         *     answers it. Set semantics: `add` and `replace` set a member also when it is absent,
+         *     `remove` of an absent member is a no-op, and one stored patch raises the version by one.
          */
         patch: operations["patchRun"];
         trace?: never;
