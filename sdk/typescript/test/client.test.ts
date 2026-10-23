@@ -549,6 +549,10 @@ describe("retries", () => {
       retry,
       fetch: (request: Request) => {
         calls++;
+        // Like the real fetch: a signal that expired before the call (a slow machine can spend
+        // the 20 ms in preparing the attempt) rejects at once, a later abort rejects then.
+        if (request.signal.aborted)
+          return Promise.reject(request.signal.reason as Error);
         return new Promise<Response>((_, reject) => {
           request.signal.addEventListener("abort", () => {
             reject(request.signal.reason as Error);
