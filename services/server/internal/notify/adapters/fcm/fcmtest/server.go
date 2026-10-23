@@ -359,7 +359,7 @@ func (s *Server) verifyAssertion(a string) bool {
 		return false
 	}
 	sum := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
-	return rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig) == nil
+	return rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig) == nil // NOSONAR: RS256 signature check of the assertion, not encryption (as kernel/jose, M1-41/17)
 }
 
 // intClaim returns v as an integer when it is a JSON integer.
