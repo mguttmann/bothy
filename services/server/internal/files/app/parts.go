@@ -256,11 +256,9 @@ func (s *Service) ownSession(ctx context.Context, a actor.Actor, fileID ids.ID, 
 		// An avatar or logo has no scope channel; its session belongs to its operation (M3-10).
 		return SessionRecord{}, notFound()
 	}
-	r := authorize.Resource{Kind: authorize.ResourceChannel, ID: rec.File.ScopeChannelID}
-	if act == authorize.ActionFileDelete {
-		if r, err = s.readResource(ctx, rec.File); err != nil {
-			return SessionRecord{}, err
-		}
+	r, err := s.sessionResource(ctx, rec.File, act)
+	if err != nil {
+		return SessionRecord{}, err
 	}
 	d, err := s.decide(ctx, a, act, r)
 	if err != nil {
@@ -275,6 +273,15 @@ func (s *Service) ownSession(ctx context.Context, a actor.Actor, fileID ids.ID, 
 		return SessionRecord{}, notFound()
 	}
 	return rec, d.Err()
+}
+
+// sessionResource is the resource of act on the file of a session: its scope channel for
+// file.upload, the file itself (fileResource through readResource) for file.delete.
+func (s *Service) sessionResource(ctx context.Context, f FileRecord, act authorize.Action) (authorize.Resource, error) {
+	if act == authorize.ActionFileDelete {
+		return s.readResource(ctx, f)
+	}
+	return authorize.Resource{Kind: authorize.ResourceChannel, ID: f.ScopeChannelID}, nil
 }
 
 // actingPrincipal is the 401 of a caller without an acting principal (anonymous or host). Every
