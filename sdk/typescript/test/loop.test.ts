@@ -43,16 +43,19 @@ import {
 } from "../src/runs/index.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
 import { Fault } from "../src/testing/faults.js";
+import {
+  eventually as patiently,
+  PATIENCE_MS,
+  withinPatience,
+} from "../src/testing/patience.js";
 
 type S = components["schemas"];
 type Log = string[];
 
 // Real turns per waiting step; the FakeServer's clock moves one step per turn.
 const STEP_MS = 50;
-const TEST_TIMEOUT = 30_000;
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((r) => setTimeout(r, ms));
+// The runner limit of the tests that start an adapter: the patience, never a few seconds.
+const TEST_TIMEOUT = PATIENCE_MS;
 
 /** The first 16 hex characters of the SHA-256 of a token (never the token itself). */
 function fingerprint(token: Secret | string): string {
@@ -64,14 +67,10 @@ function fingerprint(token: Secret | string): string {
 async function until(
   fake: FakeServer,
   predicate: () => unknown,
-  limit = 400,
 ): Promise<void> {
-  for (let i = 0; i < limit; i++) {
-    if (await predicate()) return;
-    await fake.passTime(STEP_MS);
-    await sleep(5);
-  }
-  throw new Error("condition not reached");
+  await patiently(predicate, "the condition of the test", {
+    step: () => fake.passTime(STEP_MS),
+  });
 }
 
 /** A gate a handler waits on until the test opens it. */
@@ -419,7 +418,10 @@ async function running<T>(
     return await body({ source, done });
   } finally {
     await adapter.stop();
-    await Promise.race([done.catch(() => undefined), sleep(10_000)]);
+    await withinPatience(
+      done.catch(() => undefined),
+      "the end of the adapter loop",
+    );
   }
 }
 
@@ -1183,7 +1185,10 @@ describe("stop while startRun is in flight", () => {
       const stopping = adapter.stop();
       hold.open();
       await stopping;
-      await Promise.race([done.catch(() => undefined), sleep(10_000)]);
+      await withinPatience(
+        done.catch(() => undefined),
+        "the end of the adapter loop",
+      );
       expect(first.count("execute")).toBe(0);
 
       const second = new RecordingHandler();

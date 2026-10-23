@@ -28,6 +28,7 @@ import { uuidv7 } from "../src/ids.js";
 import { silentLogger } from "../src/logger.js";
 import { FakeClock, settle } from "../src/testing/clock.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
+import { eventually as patiently } from "../src/testing/patience.js";
 
 type Heartbeat = components["schemas"]["Heartbeat"];
 type Json = Record<string, unknown>;
@@ -256,7 +257,7 @@ describe("buildHeartbeat", () => {
     "two words",
     "runtime\n",
     "run\ttime",
-    "r\u00fcntime",
+    "r\u00e9ntime",
     "runtime\u202e",
     "",
     "-runtime",
@@ -485,9 +486,5 @@ describe("HeartbeatSender over a gateway callback", () => {
 });
 
 async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let i = 0; i < 500; i++) {
-    if (predicate()) return;
-    await new Promise((r) => setTimeout(r, 2));
-  }
-  throw new Error("condition not reached");
+  await patiently(predicate, "the condition of the test");
 }

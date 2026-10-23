@@ -349,9 +349,7 @@ describe("builders", () => {
         text,
       );
       // Emoji and accented letters are display text like any other.
-      expect(
-        button("b", "Grüße \u{1f44d}‍", "v").definition.label,
-      ).toBeTruthy();
+      expect(button("b", "Café \u{1f44d}‍", "v").definition.label).toBeTruthy();
     },
   );
 });
@@ -360,7 +358,7 @@ describe("cards", () => {
   it("builds the approval card of the table of 09 11.5", () => {
     const rows = [
       ...section("11.5").matchAll(
-        /^\| [^|`]+ \| `([a-z]+)` \| (`[a-z_]+`|keine) \| `([a-z_]+)` \|$/gm,
+        /^\| [^|`]+ \| `([a-z]+)` \| (`[a-z_]+`|none) \| `([a-z_]+)` \|$/gm,
       ),
     ]
       .map((m) => [m[1] ?? "", m[2] ?? "", m[3] ?? ""] as const)
@@ -382,7 +380,7 @@ describe("cards", () => {
       expect(component.definition.value).toBe(value);
       expect(component.definition.label).toBeTruthy();
       expect(component.required_capability).toBe(
-        capability === "keine" ? undefined : capability.replace(/`/g, ""),
+        capability === "none" ? undefined : capability.replace(/`/g, ""),
       );
       expect(component.restricted_to).toBe(restricted);
       // One decision per card (09 11.3).

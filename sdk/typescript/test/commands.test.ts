@@ -27,6 +27,7 @@ import type { components } from "../src/generated/openapi.js";
 import { silentLogger } from "../src/logger.js";
 import { FakeClock } from "../src/testing/clock.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
+import { eventually as patiently } from "../src/testing/patience.js";
 
 type S = components["schemas"];
 type Json = Record<string, unknown>;
@@ -491,11 +492,7 @@ class Sender {
 }
 
 async function sleeping(clock: FakeClock, n: number): Promise<void> {
-  for (let i = 0; i < 1000; i++) {
-    if (clock.sleepers === n) return;
-    await new Promise((r) => setImmediate(r));
-  }
-  throw new Error("sleepers not reached");
+  await patiently(() => clock.sleepers === n, `${n} sleepers`, { pauseMs: 0 });
 }
 
 function choices(n: number): S["CommandChoice"][] {

@@ -35,18 +35,21 @@ import {
   FORGED_VARIANTS,
   type ForgedVariant,
 } from "../src/testing/scenario-server.js";
+import {
+  eventually as patiently,
+  PATIENCE_MS,
+  withinPatience,
+} from "../src/testing/patience.js";
 
 type S = components["schemas"];
 
 const STEP_MS = 50;
-const TEST_TIMEOUT = 30_000;
+// The runner limit of the tests that start an adapter: the patience, never a few seconds.
+const TEST_TIMEOUT = PATIENCE_MS;
 const KEEP = Symbol("keep");
 const REMOVE = Symbol("remove");
 
 type Rewrite = (env: Envelope) => Promise<Secret | typeof KEEP | typeof REMOVE>;
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((r) => setTimeout(r, ms));
 
 function fingerprint(token: Secret | string): string {
   const text = typeof token === "string" ? token : token.reveal();
@@ -56,14 +59,10 @@ function fingerprint(token: Secret | string): string {
 async function until(
   fake: FakeServer,
   predicate: () => unknown,
-  limit = 400,
 ): Promise<void> {
-  for (let i = 0; i < limit; i++) {
-    if (await predicate()) return;
-    await fake.passTime(STEP_MS);
-    await sleep(5);
-  }
-  throw new Error("condition not reached");
+  await patiently(predicate, "the condition of the test", {
+    step: () => fake.passTime(STEP_MS),
+  });
 }
 
 /** The runtime spy: `execute` is the runtime; every call is logged in order. */
@@ -229,7 +228,10 @@ async function running(
     await body(source, seen);
   } finally {
     await adapter.stop();
-    await Promise.race([done.catch(() => undefined), sleep(10_000)]);
+    await withinPatience(
+      done.catch(() => undefined),
+      "the end of the adapter loop",
+    );
   }
   return seen;
 }

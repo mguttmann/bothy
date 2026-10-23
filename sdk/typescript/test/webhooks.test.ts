@@ -253,7 +253,7 @@ describe("verifyWebhook signatures", () => {
 
   it("counts a string body as its UTF-8 bytes", () => {
     const body =
-      '{"type":"message.created","payload":{"content_md":"Grüße 😀"}}';
+      '{"type":"message.created","payload":{"content_md":"Café 😀"}}';
     const headers = signed(new TextEncoder().encode(body));
     expect(verifyWebhook(base({ body, headers })).id).toBe(ID);
   });
@@ -766,7 +766,7 @@ describe("seeded fuzz", () => {
         "timestamp_out_of_tolerance",
       ].sort(),
     );
-  }, 30_000);
+  });
 
   it("no error message contains the body, a signature or a secret", () => {
     const body =

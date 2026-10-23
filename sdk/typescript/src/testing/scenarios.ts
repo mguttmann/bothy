@@ -25,6 +25,8 @@
  * @module
  */
 
+import { performance } from "node:perf_hooks";
+
 import type { Secret } from "../auth/secret.js";
 import { type ApiClient, createApiClient, unwrap } from "../client.js";
 import {
@@ -64,6 +66,7 @@ import {
   type ForgedVariant,
   type ScenarioServer,
 } from "./scenario-server.js";
+import { PATIENCE_MS } from "./patience.js";
 
 export {
   FORGED_VARIANTS,
@@ -110,7 +113,12 @@ function check(condition: boolean, message: string): void {
   if (!condition) throw new ScenarioFailed(message);
 }
 
-/** Waits until `predicate` holds, letting time pass on the server's clock. */
+/**
+ * Waits until `predicate` holds, letting time pass on the server's clock.
+ *
+ * It fails only after `limit` of server time and {@link PATIENCE_MS} of real time both passed,
+ * so a loaded machine that needs more rounds per server second never fails a correct run.
+ */
 async function until(
   server: ScenarioServer,
   predicate: () => unknown,
@@ -119,9 +127,10 @@ async function until(
   step: number = UNTIL_STEP_MS,
 ): Promise<void> {
   let waited = 0;
+  const deadline = performance.now() + PATIENCE_MS;
   for (;;) {
     if (await predicate()) return;
-    if (waited >= limit)
+    if (waited >= limit && performance.now() > deadline)
       throw new ScenarioFailed(`timed out waiting for ${what}`);
     await server.passTime(step);
     await realPause(UNTIL_REAL_PAUSE_MS);

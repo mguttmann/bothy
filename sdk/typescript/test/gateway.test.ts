@@ -39,6 +39,10 @@ import {
 } from "../src/gateway/index.js";
 import { FakeClock } from "../src/testing/clock.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
+import {
+  eventually as patiently,
+  withinPatience,
+} from "../src/testing/patience.js";
 
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -79,12 +83,8 @@ function scriptedRandom(...values: number[]): () => number {
 const sleep = (ms: number): Promise<void> =>
   new Promise((r) => setTimeout(r, ms));
 
-async function until(condition: () => boolean, ms = 3000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!condition()) {
-    if (Date.now() > end) throw new Error("condition not reached");
-    await sleep(5);
-  }
+async function until(condition: () => boolean): Promise<void> {
+  await patiently(condition, "the condition of the test");
 }
 
 function hello(intervalMs = 600_000, extra: Json = {}): Json {
@@ -243,7 +243,6 @@ async function closedAndWaiting(
   n: number,
 ): Promise<void> {
   await until(() => server.peers[n - 1]?.closed === true);
-  await sleep(20);
   await until(() => clock.sleepers >= 1);
 }
 
@@ -495,10 +494,11 @@ describe("identify and resume", () => {
     });
     const collector = new Collector(gw);
     const step = async (connections: number): Promise<void> => {
-      for (let i = 0; i < 400 && server.connections < connections; i++) {
-        await clock.advance(1000);
-        await sleep(2);
-      }
+      await patiently(
+        () => server.connections >= connections,
+        `${connections} connections`,
+        { step: () => clock.advance(1000), pauseMs: 2 },
+      );
     };
     await until(() => ops(server).length >= 1);
     await step(2);
@@ -590,10 +590,9 @@ describe("heartbeat", () => {
     });
     const collector = new Collector(gw);
     await until(() => collector.seen.length >= 1);
-    for (let i = 0; i < 200 && server.connections < 2; i++) {
-      await clock.advance(500);
-      await sleep(5);
-    }
+    await patiently(() => server.connections >= 2, "a second connection", {
+      step: () => clock.advance(500),
+    });
     expect(server.connections).toBeGreaterThanOrEqual(2);
     expect(server.frames.some((f) => f.op === "heartbeat")).toBe(true);
     expect(server.peers[0]?.closeReason).toBe("heartbeat_ack missing");
@@ -633,11 +632,7 @@ describe("unanswered close", () => {
     await until(() => collector.seen.length >= 1);
     await sleep(50);
     await gw.close();
-    const ended = await Promise.race([
-      collector.done.then(() => true),
-      sleep(2000).then(() => false),
-    ]);
-    expect(ended).toBe(true);
+    await withinPatience(collector.done, "the end of frames()");
   });
 
   it("reconnects after a heartbeat timeout whose close gets no answer", async () => {
@@ -651,10 +646,10 @@ describe("unanswered close", () => {
     const collector = new Collector(gw);
     await until(() => collector.seen.length >= 1);
     await sleep(50);
-    for (let i = 0; i < 100 && server.connections < 2; i++) {
-      await clock.advance(500);
-      await sleep(30);
-    }
+    await patiently(() => server.connections >= 2, "a second connection", {
+      step: () => clock.advance(500),
+      pauseMs: 30,
+    });
     expect(server.connections).toBe(2);
     await gw.close();
     await collector.finish();
@@ -749,10 +744,10 @@ describe("close codes", () => {
     await clock.advance(ms - MARGIN);
     await sleep(50);
     expect(server.connections).toBe(n);
-    for (let i = 0; i < 400 && server.connections === n; i++) {
-      await clock.advance(5);
-      await sleep(5);
-    }
+    // Time moves only while the gateway still sleeps, so a slow wake-up cannot stretch the wait.
+    await patiently(() => server.connections > n, `connection ${n + 1}`, {
+      step: () => (clock.sleepers >= 1 ? clock.advance(5) : undefined),
+    });
     expect(server.connections).toBe(n + 1);
     const waited = clock.monotonic() - start;
     expect(waited).toBeGreaterThanOrEqual(ms);
@@ -1038,10 +1033,10 @@ describe("against the FakeServer", () => {
     condition: () => boolean,
     stepMs = 100,
   ): Promise<void> {
-    for (let i = 0; i < 300 && !condition(); i++) {
-      await fake.passTime(stepMs);
-      await sleep(2);
-    }
+    await patiently(condition, "the condition of the test", {
+      step: () => fake.passTime(stepMs),
+      pauseMs: 2,
+    });
     expect(condition()).toBe(true);
   }
 

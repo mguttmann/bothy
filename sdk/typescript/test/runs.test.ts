@@ -37,6 +37,7 @@ import {
 import { FakeClock } from "../src/testing/clock.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
 import { Fault } from "../src/testing/faults.js";
+import { eventually as patiently } from "../src/testing/patience.js";
 
 type S = components["schemas"];
 type Json = Record<string, unknown>;
@@ -56,12 +57,8 @@ interface Sent {
 }
 
 /** Waits in real time until `check` holds (HTTP to the FakeServer takes real turns). */
-async function eventually(check: () => boolean, ms = 3_000): Promise<void> {
-  const until = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > until) throw new Error("condition not reached in time");
-    await new Promise((r) => setTimeout(r, 5));
-  }
+async function eventually(check: () => boolean): Promise<void> {
+  await patiently(check, "the condition of the test");
 }
 
 /** Lets pending I/O run for a while without moving the fake clock. */
@@ -1023,7 +1020,7 @@ describe("RunHandle.reportSession", () => {
     const api = scriptedClient(() => json(200, session, { ETag: '"4"' }), sent);
     const handle = new RunHandle(api, uuidv7(), threadId);
     const answer = await handle.reportSession(
-      { external_session_ref: "sess-7f3a", started: true },
+      { external_session_ref: "sess-7f3a", model: "model-large" },
       { ifMatch: 3 },
     );
     expect(answer).toEqual(session);
@@ -1035,7 +1032,7 @@ describe("RunHandle.reportSession", () => {
     expect(sent[0]?.headers.get("Idempotency-Key")).toMatch(UUID7);
     expect(sent[0]?.body).toEqual({
       external_session_ref: "sess-7f3a",
-      started: true,
+      model: "model-large",
     });
 
     await handle.reportSession({ external_session_ref: "sess-7f3a" });

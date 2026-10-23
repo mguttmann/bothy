@@ -54,7 +54,6 @@ import {
   type StrictObject,
 } from "./json.js";
 
-
 const ALG = "EdDSA";
 const TYP = "agent-invocation+jwt";
 const ED25519_KEY_BYTES = 32;

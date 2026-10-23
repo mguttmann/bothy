@@ -31,6 +31,7 @@ import {
 } from "../src/gateway/index.js";
 import { FakeClock } from "../src/testing/clock.js";
 import { FIXTURES } from "../src/testing/fake/fixtures.js";
+import { eventually as patiently } from "../src/testing/patience.js";
 
 type Json = Record<string, unknown>;
 type Heartbeat = components["schemas"]["Heartbeat"];
@@ -67,12 +68,8 @@ async function turns(n = 50): Promise<void> {
   for (let i = 0; i < n; i++) await turn();
 }
 
-async function until(condition: () => boolean, max = 2000): Promise<void> {
-  for (let i = 0; i < max; i++) {
-    if (condition()) return;
-    await turn();
-  }
-  throw new Error("condition not reached");
+async function until(condition: () => boolean): Promise<void> {
+  await patiently(condition, "the condition of the test", { pauseMs: 0 });
 }
 
 function json(status: number, body: unknown): Response {
@@ -534,10 +531,13 @@ describe("PollingSource", () => {
         clock,
       }),
     );
-    for (let i = 0; i < 200 && running.envelopes().length === 0; i++) {
-      await clock.advance(1000);
-      await turn();
-    }
+    await patiently(() => running.envelopes().length > 0, "an envelope", {
+      step: async () => {
+        await clock.advance(1000);
+        await turn();
+      },
+      pauseMs: 0,
+    });
     expect(running.envelopes().map((e) => e.seq)).toEqual([3]);
     expect(responder.polls.length).toBeGreaterThanOrEqual(4);
     expect(running.finished).toBe(false);

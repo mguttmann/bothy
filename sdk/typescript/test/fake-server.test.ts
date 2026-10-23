@@ -28,6 +28,7 @@ import { applyOps, parseOps } from "../src/testing/fake/patch.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
 import { Fault, FaultKind } from "../src/testing/faults.js";
 import type { ScenarioServer } from "../src/testing/scenario-server.js";
+import { eventually as patiently } from "../src/testing/patience.js";
 
 // The prefix is assembled at runtime so no literal matches the secret-scanning format.
 const WHSEC = ["whsec", ""].join("_");
@@ -211,33 +212,27 @@ class Gw {
   readonly pending: Frame[] = [];
   sessionId = "";
   private readonly queue: Frame[] = [];
-  private waiter: (() => void) | undefined;
   private closedCode: number | undefined;
 
   constructor(readonly ws: WebSocket) {
     ws.on("message", (data: Buffer) => {
       this.queue.push(JSON.parse(data.toString("utf8")) as Frame);
-      this.waiter?.();
     });
     ws.on("close", (code: number) => {
       this.closedCode = code;
-      this.waiter?.();
     });
     ws.on("error", () => undefined);
   }
 
   async recv(): Promise<Frame> {
-    const deadline = Date.now() + 5_000;
-    for (;;) {
-      const frame = this.queue.shift();
-      if (frame !== undefined) return frame;
+    let frame: Frame | undefined;
+    await patiently(() => {
+      frame = this.queue.shift();
+      if (frame !== undefined) return true;
       if (this.closedCode !== undefined) throw new Closed(this.closedCode);
-      if (Date.now() > deadline) throw new Error("no frame within 5 s");
-      await new Promise<void>((resolve) => {
-        this.waiter = resolve;
-        setTimeout(resolve, 50);
-      });
-    }
+      return false;
+    }, "a gateway frame");
+    return frame as Frame;
   }
 
   send(op: string, d: Json): void {
@@ -326,11 +321,7 @@ async function resume(fake: FakeServer, sessionId: string): Promise<Gw> {
 }
 
 async function eventually(check: () => boolean): Promise<void> {
-  const deadline = Date.now() + 5_000;
-  while (!check()) {
-    if (Date.now() > deadline) throw new Error("condition not met within 5 s");
-    await new Promise((r) => setTimeout(r, 10));
-  }
+  await patiently(check, "the condition of the test");
 }
 
 let fake: FakeServer;

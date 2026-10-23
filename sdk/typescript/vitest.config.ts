@@ -16,6 +16,10 @@ import { configDefaults, defineConfig } from "vitest/config";
 // The real server starts a PostgreSQL container and waits real time (agent.invocation_token_ttl
 // plus auth.clock_leeway in AG-28), far beyond the default hook and test timeouts.
 const LIVE_TIMEOUT_MS = 600_000;
+// A unit test waits for a condition with src/testing/patience.ts; its only bound is
+// `quality.test.patience` (PATIENCE_MS), so the runner's own limits are the same value and a
+// loaded machine never fails a correct test on Vitest's 5 s default (test/no-fixed-waits.test.ts).
+const UNIT_TIMEOUT_MS = 180_000;
 
 export default defineConfig({
   test: {
@@ -28,6 +32,8 @@ export default defineConfig({
           name: "unit",
           include: ["test/**/*.test.ts"],
           exclude: [...configDefaults.exclude, "test/live/**"],
+          testTimeout: UNIT_TIMEOUT_MS,
+          hookTimeout: UNIT_TIMEOUT_MS,
         },
       },
       {

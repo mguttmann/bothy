@@ -22,8 +22,8 @@ import {
 const REFERENCE = fileURLToPath(
   new URL("../../../docs/operations/configuration.md", import.meta.url),
 );
-const KEY_HEADERS = new Set(["Schlüssel", "Key"]);
-const DEFAULT_HEADERS = new Set(["Standard", "Default"]);
+const KEY_HEADERS = new Set(["Key"]);
+const DEFAULT_HEADERS = new Set(["Default"]);
 
 /** The cells of one Markdown table row, trimmed; `undefined` for a line that is no row. */
 function cells(line: string): string[] | undefined {

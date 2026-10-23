@@ -35,6 +35,7 @@ import {
 import { FakeClock, settle } from "../src/testing/clock.js";
 import { FakeServer } from "../src/testing/fakeserver.js";
 import { Fault } from "../src/testing/faults.js";
+import { eventually as patiently } from "../src/testing/patience.js";
 
 type S = components["schemas"];
 type Json = Record<string, unknown>;
@@ -189,11 +190,10 @@ async function drive<T>(
     () => (done = true),
     () => (done = true),
   );
-  for (let i = 0; i < 400 && !done; i++) {
-    await new Promise((r) => setTimeout(r, 1));
-    await clock.advance(stepMs);
-  }
-  if (!done) throw new Error("the outbox did not finish");
+  await patiently(() => done, "the end of the outbox task", {
+    step: () => clock.advance(stepMs),
+    pauseMs: 1,
+  });
   return task;
 }
 
@@ -372,14 +372,21 @@ describe("FakeServer faults", () => {
     const before = fake.messages.length;
     const task = new Outbox(api).sendMessage(triggered.threadId, "Late");
     // The server waits on its clock; the client times out and sleeps before its retry.
-    for (let i = 0; i < 300 && fake.clock.sleepers < 2; i++)
-      await new Promise((r) => setTimeout(r, 10));
-    expect(fake.clock.sleepers).toBeGreaterThanOrEqual(2);
+    await patiently(() => fake.clock.sleepers >= 2, "two sleepers", {
+      pauseMs: 10,
+    });
     const entry = await drive(fake.clock, task);
     // Let the late request finish its store as well.
     await fake.passTime(delayMs);
-    await new Promise((r) => setTimeout(r, 50));
-    await fake.passTime(0);
+    await patiently(
+      () =>
+        fake
+          .requests()
+          .filter((r) => r.path.endsWith("/messages"))
+          .every((r) => r.status !== 0),
+      "the answer to the late request",
+      { step: () => fake.passTime(0) },
+    );
     expect(entry.state).toBe(OutboxState.SENT);
     // At least one repeat after the timeout; a slow machine may time out once more.
     expect(keys.length).toBeGreaterThanOrEqual(2);
@@ -452,8 +459,10 @@ describe("order", () => {
     server.gates.set(THREAD_A, new Promise<void>((r) => (open = r)));
     let flushed = false;
     const flush = outbox.flush().then(() => (flushed = true));
-    for (let i = 0; i < 500 && server.keys(THREAD_B).length < 2; i++)
-      await settle(1);
+    await patiently(() => server.keys(THREAD_B).length >= 2, "two sends of B", {
+      step: () => settle(1),
+      pauseMs: 0,
+    });
     await settle();
     expect(server.keys(THREAD_B)).toEqual([b1.key, b1.key]);
     expect((await store.pending()).map((e) => e.key)).toEqual([a1.key]);
