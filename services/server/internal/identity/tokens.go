@@ -103,6 +103,18 @@ type IncomingWebhookToken struct {
 	Hash []byte
 }
 
+// PushPreviewToken is a new preview token of a push registration (bothy_pvw_..., 13 section 6.4,
+// ADR 0061, M3-22): the secret, shown exactly once by registerPush, and its HMAC-SHA-256 with the
+// token pepper of auth.token_pepper_ref, the only form the module notify stores
+// (push_registrations.preview_token_hash). The secret prints "[redacted]" through fmt, slog and
+// JSON.
+type PushPreviewToken struct {
+	// Secret is the token; only the registerPush handler reveals it, once.
+	Secret Token
+	// Hash is HMAC-SHA-256(pepper, token).
+	Hash []byte
+}
+
 // Tokens is the API token port of identity (02 section 4.3, brief M1-44). Its methods authorize
 // nothing: the calling use case did. Each joins the ambient unit of work of ctx, or runs its own.
 // Every error is a kernel/errs error without the secret, the hash or SQL.
@@ -143,6 +155,16 @@ type Tokens interface {
 	// that is not a well-formed token of kind whi (form, kind, checksum) is ErrTokenMalformed
 	// before any HMAC is computed; it reads and writes no database and authorizes nothing.
 	HashIncomingWebhookToken(ctx context.Context, raw string) ([]byte, error)
+	// NewPushPreviewToken returns a new preview token of kind pvw from crypto/rand with its HMAC
+	// (M3-22 design note 3). It reads and writes no database and authorizes nothing: push.register
+	// did. The authenticator never accepts the token; getPushPreview checks it. Errors:
+	// internal_error when the random source fails.
+	NewPushPreviewToken(ctx context.Context) (PushPreviewToken, error)
+	// HashPushPreviewToken returns the HMAC of raw exactly as NewPushPreviewToken computes it, the
+	// value getPushPreview looks up in push_registrations.preview_token_hash. A value that is not a
+	// well-formed token of kind pvw (form, kind, checksum) is ErrTokenMalformed before any HMAC is
+	// computed; it reads and writes no database and authorizes nothing.
+	HashPushPreviewToken(ctx context.Context, raw string) ([]byte, error)
 }
 
 // ErrTokenMalformed reports a value that is not a well-formed token of the expected kind (ADR

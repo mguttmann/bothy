@@ -2,7 +2,7 @@
 
 // Package apitoken is the pure format of the long-lived API tokens of the identity module
 // (docs/spec/08-identity.md section 12, ADR 0061): bothy_<kind>_<random>_<checksum> with the
-// kinds agt, app, pat, whi and hpc, 256 random bits as 43 Base62 digits and a CRC-32 checksum of the
+// kinds agt, app, pat, whi, hpc and pvw, 256 random bits as 43 Base62 digits and a CRC-32 checksum of the
 // random part as 6 Base62 digits. It generates, parses and hashes tokens; it reads no clock and no
 // database.
 //
@@ -52,12 +52,16 @@ const (
 	// issued only by host.manage (M2-39), redeemed only by host.pair (M2-41), never accepted by
 	// the authenticator.
 	KindHostPairingCode Kind = "hpc"
+	// KindPushPreview is the preview token of a push registration (13-push-notifications.md
+	// section 6.4, M3-22): issued only by push.register, accepted only by getPushPreview, never by
+	// the authenticator.
+	KindPushPreview Kind = "pvw"
 )
 
-// Valid reports whether k is one of the five kinds.
+// Valid reports whether k is one of the six kinds.
 func (k Kind) Valid() bool {
 	switch k {
-	case KindAgent, KindApp, KindPersonal, KindIncomingWebhook, KindHostPairingCode:
+	case KindAgent, KindApp, KindPersonal, KindIncomingWebhook, KindHostPairingCode, KindPushPreview:
 		return true
 	}
 	return false
@@ -86,7 +90,7 @@ const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
 // ErrMalformed reports a value that is not an API token of this format; it never names the value.
 var ErrMalformed = errors.New("apitoken: malformed token")
 
-// errKind reports a kind outside the five kinds.
+// errKind reports a kind outside the six kinds.
 var errKind = errors.New("apitoken: unknown kind")
 
 // limit is 2^256: a random part decodes to a value below it.
@@ -137,7 +141,7 @@ func Checksum(random string) string {
 	return encode(new(big.Int).SetUint64(uint64(crc32.ChecksumIEEE([]byte(random)))), ChecksumLen)
 }
 
-// Parse checks s against ^bothy_(agt|app|pat|whi|hpc)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$, the checksum
+// Parse checks s against ^bothy_(agt|app|pat|whi|hpc|pvw)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$, the checksum
 // and the range of the random part (below 2^256) and returns its parts. Errors: ErrMalformed for
 // every other value.
 func Parse(s string) (Parsed, error) {

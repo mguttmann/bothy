@@ -19,7 +19,7 @@ import (
 // M1-64 calls it with the token and proof of its frame. dpopScheme reports the scheme DPoP
 // (false is Bearer); creds carries the proofs, method and htu.
 //
-// Order: format and checksum, kind whi refused, all without a database call; one query by
+// Order: format and checksum, kinds whi, hpc and pvw refused, all without a database call; one query by
 // HMAC-SHA-256 of the token with the pepper; the principal kind must fit the token kind. A
 // revoked or expired token yields the actor of its principal with the token id and
 // CredentialInactive: authorize refuses it in check_active with token_revoked and audits the
@@ -29,7 +29,7 @@ import (
 // records last_used_at at most once per identity.last_active_granularity. The actor carries no
 // session and no device, so it never has owner rights and never provides step-up (SR5).
 //
-// Errors: 401 unauthenticated (malformed, unknown, whi, kind mismatch, DPoP without binding),
+// Errors: 401 unauthenticated (malformed, unknown, whi, hpc, pvw, kind mismatch, DPoP without binding),
 // 401 invalid_dpop_proof or use_dpop_nonce from the verifier (Bearer with a bound token
 // included), and the errors of the store.
 func (a *Authenticator) AuthenticateAPIToken(ctx context.Context, token string, dpopScheme bool, creds actor.Credentials) (actor.Actor, error) {

@@ -377,6 +377,30 @@ type Credentials struct {
 	InvocationTokens []string
 }
 
+type credentialsKey struct{}
+
+// WithCredentials returns a copy of ctx that carries c, the credentials of a request whose
+// operation checks its own credential instead of the Authenticator (the route flag
+// OwnCredential, getPushPreview with the preview token of a push registration; M3-22 design note
+// 12). StageAuthenticate stores them for such a route; the use case reads them with
+// CredentialsFrom. The values are secrets: they never reach a log, a span or a problem body.
+func WithCredentials(ctx context.Context, c Credentials) context.Context {
+	c.DPoPProofs = slices.Clone(c.DPoPProofs)
+	c.InvocationTokens = slices.Clone(c.InvocationTokens)
+	return context.WithValue(ctx, credentialsKey{}, c)
+}
+
+// CredentialsFrom returns the credentials stored with WithCredentials and true, or the zero value
+// and false. A use case that finds none must refuse the request.
+func CredentialsFrom(ctx context.Context) (Credentials, bool) {
+	c, ok := ctx.Value(credentialsKey{}).(Credentials)
+	if ok {
+		c.DPoPProofs = slices.Clone(c.DPoPProofs)
+		c.InvocationTokens = slices.Clone(c.InvocationTokens)
+	}
+	return c, ok
+}
+
 // Present reports whether the request carries credentials: an Authorization header, the console
 // cookie or the Invocation-Token header. A request without any is anonymous; a DPoP header alone is
 // not a credential. The Invocation-Token header counts, so a request that sends it without an

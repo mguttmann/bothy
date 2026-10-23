@@ -55,3 +55,32 @@ func TestPushReads(t *testing.T) {
 		t.Fatalf("Newest = %+v %v %v, want %+v", got, found, err, ref)
 	}
 }
+
+// TestForPreview (M3-22 design note 9): the facts of a message for the preview of a push hint,
+// read without a principal: thread, channel, author, kind, content, the attachment flag and the
+// mentioned principals; a tombstone has neither content nor mentions; an unknown id is not found.
+func TestForPreview(t *testing.T) {
+	t.Parallel()
+	w := mw.New(t, subscribe)
+	space, ch, main := w.TextChannel()
+	sam := w.Person("sam", false)
+	w.Grant("user", sam, space, "read")
+	body := w.Send("owner", main, "**hi** @sam", http.StatusCreated)
+	id := ids.MustParse(body["id"].(string))
+	ctx := context.Background()
+	m, found, err := w.Svc.ForPreview(ctx, id)
+	if err != nil || !found {
+		t.Fatalf("ForPreview: %v %v", found, err)
+	}
+	if m.ID != id || m.ThreadID != main || m.ChannelID != ch || m.AuthorID != w.OwnerID || m.Kind != "text" ||
+		m.ContentMD != "**hi** @sam" || m.ContentFormat != 1 || m.HasAttachments || m.Deleted || len(m.MentionIDs) != 1 || m.MentionIDs[0] != sam {
+		t.Fatalf("ForPreview = %+v", m)
+	}
+	w.Tombstone(id)
+	if m, found, err := w.Svc.ForPreview(ctx, id); err != nil || !found || !m.Deleted || m.ContentMD != "" || m.MentionIDs != nil {
+		t.Fatalf("tombstone: %+v %v %v", m, found, err)
+	}
+	if _, found, err := w.Svc.ForPreview(ctx, ids.New()); err != nil || found {
+		t.Fatalf("unknown: %v %v", found, err)
+	}
+}

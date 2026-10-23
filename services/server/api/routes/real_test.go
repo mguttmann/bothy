@@ -1061,6 +1061,18 @@ func (stubServer) GetTranscript(context.Context, rest.GetTranscriptRequestObject
 	return nil, nil
 }
 
+func (stubServer) RegisterPush(context.Context, rest.RegisterPushRequestObject) (rest.RegisterPushResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UnregisterPush(context.Context, rest.UnregisterPushRequestObject) (rest.UnregisterPushResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetPushPreview(context.Context, rest.GetPushPreviewRequestObject) (rest.GetPushPreviewResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) SetMyAvatar(context.Context, rest.SetMyAvatarRequestObject) (rest.SetMyAvatarResponseObject, error) {
 	return nil, nil
 }
@@ -1090,7 +1102,8 @@ func (stubServer) DeleteBrandingLogo(context.Context, rest.DeleteBrandingLogoReq
 // records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), sending (M1-56),
 // editing and deleting (M1-58), the preferences (M3-18), the client metrics (M4-31), the agent
 // sessions (M2-12), the upload sessions with getFile (M3-03), the downloads, tickets and
-// transcripts (M3-05) and the avatar and logo operations (M3-10). A handler
+// transcripts (M3-05), the avatar and logo operations (M3-10) and the push registrations and
+// preview (M3-22). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -1106,6 +1119,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"downloadFile":      {"GET /api/v1/files/{file_id}/content", "file.read", "rl.read"},
 		"downloadThumbnail": {"GET /api/v1/files/{file_id}/thumbnails/{variant}", "file.read", "rl.read"},
 		"createFileTicket":  {"POST /api/v1/files/{file_id}/tickets", "file.read", "rl.read"},
+		"registerPush":      {"POST /api/v1/me/devices/current/push-registrations", "push.register", "rl.write"},
+		"unregisterPush":    {"DELETE /api/v1/push-registrations/{registration_id}", "push.unregister", "rl.write"},
+		"getPushPreview":    {"GET /api/v1/push/preview", "message.read", "rl.read"},
 		"getTranscript":     {"GET /api/v1/files/{file_id}/transcript", "file.read", "rl.read"},
 		"listMyDevices":     {"GET /api/v1/me/devices", "device.list", "rl.read"},
 		"listUserDevices":   {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
@@ -1551,4 +1567,22 @@ func (stubServer) AutocompleteCommand(context.Context, rest.AutocompleteCommandR
 
 func (stubServer) AnswerAutocomplete(context.Context, rest.AnswerAutocompleteRequestObject) (rest.AnswerAutocompleteResponseObject, error) {
 	return nil, nil
+}
+
+// TestOperations_OwnCredentialFlag (M3-22 design note 12 a): the route flag OwnCredential is set
+// exactly for the operations whose only security scheme is pushPreviewToken, which is
+// getPushPreview alone.
+func TestOperations_OwnCredentialFlag(t *testing.T) {
+	var flagged []string
+	for _, op := range routes.Enabled() {
+		if op.OwnCredential {
+			flagged = append(flagged, op.ID)
+		}
+	}
+	if len(flagged) != 1 || flagged[0] != "getPushPreview" {
+		t.Fatalf("OwnCredential on %v, want only getPushPreview", flagged)
+	}
+	if op, ok := routes.ByID("getPushPreview"); !ok || op.Public {
+		t.Fatalf("getPushPreview: found %v, public %v", ok, op.Public)
+	}
 }

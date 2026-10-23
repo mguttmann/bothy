@@ -6,7 +6,35 @@ part of 'push_registration.dart';
 // BuiltValueGenerator
 // **************************************************************************
 
-class _$PushRegistration extends PushRegistration {
+abstract mixin class PushRegistrationBuilder {
+  void replace(PushRegistration other);
+  void update(void Function(PushRegistrationBuilder) updates);
+  String? get id;
+  set id(String? id);
+
+  String? get deviceId;
+  set deviceId(String? deviceId);
+
+  PushProvider? get provider;
+  set provider(PushProvider? provider);
+
+  PushEnvironment? get environment;
+  set environment(PushEnvironment? environment);
+
+  String? get appId;
+  set appId(String? appId);
+
+  DateTime? get createdAt;
+  set createdAt(DateTime? createdAt);
+
+  DateTime? get disabledAt;
+  set disabledAt(DateTime? disabledAt);
+
+  String? get disabledReason;
+  set disabledReason(String? disabledReason);
+}
+
+class _$$PushRegistration extends $PushRegistration {
   @override
   final String id;
   @override
@@ -24,11 +52,11 @@ class _$PushRegistration extends PushRegistration {
   @override
   final String? disabledReason;
 
-  factory _$PushRegistration([
-    void Function(PushRegistrationBuilder)? updates,
-  ]) => (PushRegistrationBuilder()..update(updates))._build();
+  factory _$$PushRegistration([
+    void Function($PushRegistrationBuilder)? updates,
+  ]) => ($PushRegistrationBuilder()..update(updates))._build();
 
-  _$PushRegistration._({
+  _$$PushRegistration._({
     required this.id,
     required this.deviceId,
     required this.provider,
@@ -39,17 +67,17 @@ class _$PushRegistration extends PushRegistration {
     this.disabledReason,
   }) : super._();
   @override
-  PushRegistration rebuild(void Function(PushRegistrationBuilder) updates) =>
+  $PushRegistration rebuild(void Function($PushRegistrationBuilder) updates) =>
       (toBuilder()..update(updates)).build();
 
   @override
-  PushRegistrationBuilder toBuilder() =>
-      PushRegistrationBuilder()..replace(this);
+  $PushRegistrationBuilder toBuilder() =>
+      $PushRegistrationBuilder()..replace(this);
 
   @override
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
-    return other is PushRegistration &&
+    return other is $PushRegistration &&
         id == other.id &&
         deviceId == other.deviceId &&
         provider == other.provider &&
@@ -77,7 +105,7 @@ class _$PushRegistration extends PushRegistration {
 
   @override
   String toString() {
-    return (newBuiltValueToStringHelper(r'PushRegistration')
+    return (newBuiltValueToStringHelper(r'$PushRegistration')
           ..add('id', id)
           ..add('deviceId', deviceId)
           ..add('provider', provider)
@@ -90,49 +118,52 @@ class _$PushRegistration extends PushRegistration {
   }
 }
 
-class PushRegistrationBuilder
-    implements Builder<PushRegistration, PushRegistrationBuilder> {
-  _$PushRegistration? _$v;
+class $PushRegistrationBuilder
+    implements
+        Builder<$PushRegistration, $PushRegistrationBuilder>,
+        PushRegistrationBuilder {
+  _$$PushRegistration? _$v;
 
   String? _id;
   String? get id => _$this._id;
-  set id(String? id) => _$this._id = id;
+  set id(covariant String? id) => _$this._id = id;
 
   String? _deviceId;
   String? get deviceId => _$this._deviceId;
-  set deviceId(String? deviceId) => _$this._deviceId = deviceId;
+  set deviceId(covariant String? deviceId) => _$this._deviceId = deviceId;
 
   PushProvider? _provider;
   PushProvider? get provider => _$this._provider;
-  set provider(PushProvider? provider) => _$this._provider = provider;
+  set provider(covariant PushProvider? provider) => _$this._provider = provider;
 
   PushEnvironment? _environment;
   PushEnvironment? get environment => _$this._environment;
-  set environment(PushEnvironment? environment) =>
+  set environment(covariant PushEnvironment? environment) =>
       _$this._environment = environment;
 
   String? _appId;
   String? get appId => _$this._appId;
-  set appId(String? appId) => _$this._appId = appId;
+  set appId(covariant String? appId) => _$this._appId = appId;
 
   DateTime? _createdAt;
   DateTime? get createdAt => _$this._createdAt;
-  set createdAt(DateTime? createdAt) => _$this._createdAt = createdAt;
+  set createdAt(covariant DateTime? createdAt) => _$this._createdAt = createdAt;
 
   DateTime? _disabledAt;
   DateTime? get disabledAt => _$this._disabledAt;
-  set disabledAt(DateTime? disabledAt) => _$this._disabledAt = disabledAt;
+  set disabledAt(covariant DateTime? disabledAt) =>
+      _$this._disabledAt = disabledAt;
 
   String? _disabledReason;
   String? get disabledReason => _$this._disabledReason;
-  set disabledReason(String? disabledReason) =>
+  set disabledReason(covariant String? disabledReason) =>
       _$this._disabledReason = disabledReason;
 
-  PushRegistrationBuilder() {
-    PushRegistration._defaults(this);
+  $PushRegistrationBuilder() {
+    $PushRegistration._defaults(this);
   }
 
-  PushRegistrationBuilder get _$this {
+  $PushRegistrationBuilder get _$this {
     final $v = _$v;
     if ($v != null) {
       _id = $v.id;
@@ -149,50 +180,50 @@ class PushRegistrationBuilder
   }
 
   @override
-  void replace(PushRegistration other) {
-    _$v = other as _$PushRegistration;
+  void replace(covariant $PushRegistration other) {
+    _$v = other as _$$PushRegistration;
   }
 
   @override
-  void update(void Function(PushRegistrationBuilder)? updates) {
+  void update(void Function($PushRegistrationBuilder)? updates) {
     if (updates != null) updates(this);
   }
 
   @override
-  PushRegistration build() => _build();
+  $PushRegistration build() => _build();
 
-  _$PushRegistration _build() {
+  _$$PushRegistration _build() {
     final _$result =
         _$v ??
-        _$PushRegistration._(
+        _$$PushRegistration._(
           id: BuiltValueNullFieldError.checkNotNull(
             id,
-            r'PushRegistration',
+            r'$PushRegistration',
             'id',
           ),
           deviceId: BuiltValueNullFieldError.checkNotNull(
             deviceId,
-            r'PushRegistration',
+            r'$PushRegistration',
             'deviceId',
           ),
           provider: BuiltValueNullFieldError.checkNotNull(
             provider,
-            r'PushRegistration',
+            r'$PushRegistration',
             'provider',
           ),
           environment: BuiltValueNullFieldError.checkNotNull(
             environment,
-            r'PushRegistration',
+            r'$PushRegistration',
             'environment',
           ),
           appId: BuiltValueNullFieldError.checkNotNull(
             appId,
-            r'PushRegistration',
+            r'$PushRegistration',
             'appId',
           ),
           createdAt: BuiltValueNullFieldError.checkNotNull(
             createdAt,
-            r'PushRegistration',
+            r'$PushRegistration',
             'createdAt',
           ),
           disabledAt: disabledAt,

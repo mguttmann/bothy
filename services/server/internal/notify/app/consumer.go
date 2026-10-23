@@ -105,6 +105,9 @@ type PushDeps struct {
 	Threads ThreadSource
 	// Messages reads anchors and agent messages (messaging).
 	Messages MessageSource
+	// Preview builds the preview fields of notification.created (M3-22 design note 9 f); nil
+	// builds none (internal/wire always sets it; the push tests of M3-19 leave it out).
+	Preview *PreviewBuilder
 	// Mentions counts unread mentions for the badge (messaging).
 	Mentions MentionSource
 	// Providers are the registered push providers, at most one per Name; empty is allowed.

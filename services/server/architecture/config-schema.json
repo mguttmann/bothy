@@ -2616,6 +2616,22 @@
       "doc": "Default of the personal switch notify.input_needed_breaks_quiet_hours."
     },
     {
+      "name": "notify.default_preview_mode",
+      "env": "BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE",
+      "kind": "enum",
+      "default": "full",
+      "required": false,
+      "enum": [
+        "full",
+        "names",
+        "none"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "13-push-notifications.md",
+      "doc": "Default of the personal setting notify.preview_mode: what a push preview shows."
+    },
+    {
       "name": "notify.mobile_delay_when_desktop_active",
       "env": "BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE",
       "kind": "duration",
@@ -2626,6 +2642,18 @@
       "max": "",
       "chapter": "13-push-notifications.md",
       "doc": "Delay of mobile pushes while a desktop of the person is active; zero delays nothing."
+    },
+    {
+      "name": "notify.preview_max_chars",
+      "env": "BOTHY_NOTIFY__PREVIEW_MAX_CHARS",
+      "kind": "int",
+      "default": "240",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "13-push-notifications.md",
+      "doc": "Length of the excerpt in a preview, in code points; the excerpt parses at most eight times as many code points of the message."
     },
     {
       "name": "notify.user_default_level",
@@ -2882,6 +2910,18 @@
       "max": "100000",
       "chapter": "03-data-model.md",
       "doc": "Consecutive transient failures after which a push registration is deactivated."
+    },
+    {
+      "name": "push.registration_field_max_bytes",
+      "env": "BOTHY_PUSH__REGISTRATION_FIELD_MAX_BYTES",
+      "kind": "int",
+      "default": "1024",
+      "required": false,
+      "enum": [],
+      "min": "64",
+      "max": "2048",
+      "chapter": "13-push-notifications.md",
+      "doc": "Largest token and app_id of a push registration in bytes, so a token always fits the unique key (provider, token)."
     },
     {
       "name": "push.retry_base",

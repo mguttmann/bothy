@@ -302,6 +302,7 @@ an agent or app), in the unit of work of the insert ([14-search.md](../../../../
 
 - Port: `Structure` adds `NotificationPath` and `LockNotificationPath` (the path of a notification preference target as `chat.NotificationPath`: kind, space, channel, thread, channel kind, `default_notification_level`, archived; the lock form takes `FOR SHARE` on thread, then channel, then space), `ChannelIDsOfSpace` (archived channels included) and `ThreadIDsOfChannels`, all ascending. None of them authorizes: `notify` authorizes the target with the returned path, and the two id lists run inside an archive that `space.archive` or `channel.archive` allowed. An id of another kind than the requested one is `not_found`.
 - Code: `chat/notification.go`, `app/notification.go`, `adapters/postgres/notification.go`; queries `ShareSpace`, `ShareChannel`, `ChannelIDsOfSpace`, `ThreadIDsOfChannels`.
+- `Structure.PreviewNames(ctx, threadID)` (M3-22) returns `PreviewNames` (`SpaceName`, `ChannelName`, `ThreadTitle`) for the preview of a push hint (13 6.4): the title of the thread, and unless its channel is a DM channel the channel name and the name of its space; "" where the place has no such name. It never authorizes (the caller checked `push.deliver` or `message.read` on the thread first) and reads in the ambient transaction of ctx when there is one; an unknown thread is `not_found`. Code: `chat.go`, `app/notification.go`; test `app/notification_test.go`.
 
 ### Auto title and placeholders (M2-18)
 

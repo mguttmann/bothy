@@ -28,6 +28,10 @@
     {
       "random": "EXAMPLEhostpairingcode000000000000000000000",
       "checksum": "4SigQv"
+    },
+    {
+      "random": "EXAMPLEpushpreviewtoken00000000000000000000",
+      "checksum": "4Z1L0A"
     }
   ]
 }

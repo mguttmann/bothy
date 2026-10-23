@@ -30,6 +30,29 @@ type Metrics struct {
 	duration      *metrics.Histogram
 }
 
+// Fetch holds bothy.push.fetch, the counter of the preview endpoint (M3-22).
+type Fetch struct {
+	fetch *metrics.Counter
+}
+
+// Compile-time check: Fetch is the outgoing port of the preview.
+var _ app.FetchMetrics = (*Fetch)(nil)
+
+// NewFetch creates bothy.push.fetch on mp; nil means the global provider. The error comes from
+// the meter provider.
+func NewFetch(mp metric.MeterProvider) (*Fetch, error) {
+	c, err := metrics.NewCounter(mp, metrics.PushFetch, nil)
+	if err != nil {
+		return nil, fmt.Errorf("otelmetrics: %w", err)
+	}
+	return &Fetch{fetch: c}, nil
+}
+
+// Fetch implements app.FetchMetrics: bothy.push.fetch with bothy.push.provider.
+func (f *Fetch) Fetch(ctx context.Context, provider string) {
+	f.fetch.Add(ctx, 1, provider)
+}
+
 // Compile-time check: Metrics is the outgoing port of app.
 var _ app.Metrics = (*Metrics)(nil)
 

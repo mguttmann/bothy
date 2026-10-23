@@ -10,7 +10,8 @@ import (
 // notifyConfigKeys returns the keys of the notify module that are built (13 "Configuration values
 // of this chapter"): notify.user_default_level, the last step of the effective level (M3-18), and
 // the keys of the push path (M3-19): the bundling window, the mobile delay, the defaults of the
-// personal switches and the interval of the badge sync.
+// personal switches and the interval of the badge sync; the keys of the preview (M3-22): the
+// default preview mode and the length of the excerpt.
 // notifyIntervalDefault is the default of the bundling window, the mobile delay and the smallest
 // badge sync interval (13 "Configuration values of this chapter").
 const notifyIntervalDefault = "60s"
@@ -29,6 +30,12 @@ func notifyConfigKeys() []config.Key {
 			Doc: "Default of the personal switch notify.input_needed_breaks_quiet_hours."},
 		{Name: "notify.badge_sync_min_interval", Kind: config.KindDuration, Default: notifyIntervalDefault, Min: "0s", Chapter: chapter13,
 			Doc: "Smallest interval between two badge syncs of one person."},
+		// The preview of a push and of notification.created (13 6.3 and 6.4, M3-22).
+		{Name: "notify.default_preview_mode", Kind: config.KindEnum, Default: string(domain.PreviewFull),
+			Enum: []string{string(domain.PreviewFull), string(domain.PreviewNames), string(domain.PreviewNone)}, Chapter: chapter13,
+			Doc: "Default of the personal setting notify.preview_mode: what a push preview shows."},
+		{Name: "notify.preview_max_chars", Kind: config.KindInt, Default: "240", Min: "1", Max: "1000", Chapter: chapter13,
+			Doc: "Length of the excerpt in a preview, in code points; the excerpt parses at most eight times as many code points of the message."},
 	}
 }
 

@@ -544,6 +544,7 @@ from .push_preview import PushPreview
 from .push_provider import PushProvider
 from .push_registration import PushRegistration
 from .push_registration_create import PushRegistrationCreate
+from .push_registration_created import PushRegistrationCreated
 from .put_notification_preference_target_kind import PutNotificationPreferenceTargetKind
 from .quiet_hours_list import QuietHoursList
 from .quiet_hours_payload import QuietHoursPayload
@@ -1323,6 +1324,7 @@ __all__ = (
     "PushProvider",
     "PushRegistration",
     "PushRegistrationCreate",
+    "PushRegistrationCreated",
     "PutNotificationPreferenceTargetKind",
     "QuietHoursList",
     "QuietHoursPayload",

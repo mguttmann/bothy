@@ -9,7 +9,8 @@ import (
 
 // pushConfigKeys returns the keys of the job notify.push_send (13 "Configuration values of this
 // chapter", 03 section 9 for push.max_consecutive_failures; M3-19) and of the APNs adapter
-// (push.ttl and push.apns.*, M3-20) and of the FCM adapter (push.fcm.*, M3-21).
+// (push.ttl and push.apns.*, M3-20), of the FCM adapter (push.fcm.*, M3-21) and of registerPush
+// (push.registration_field_max_bytes, M3-22).
 func pushConfigKeys() []config.Key {
 	return append([]config.Key{
 		{Name: "push.max_age", Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: chapter13,
@@ -22,6 +23,8 @@ func pushConfigKeys() []config.Key {
 			Doc: "Concurrent provider requests per process."},
 		{Name: "push.max_consecutive_failures", Kind: config.KindInt, Default: "5", Min: "1", Max: "100000", Chapter: chapter03,
 			Doc: "Consecutive transient failures after which a push registration is deactivated."},
+		{Name: "push.registration_field_max_bytes", Kind: config.KindInt, Default: "1024", Min: "64", Max: "2048", Chapter: chapter13,
+			Doc: "Largest token and app_id of a push registration in bytes, so a token always fits the unique key (provider, token)."},
 		{Name: fcm.KeyProjectID, Kind: config.KindString, Default: "", Chapter: chapter13,
 			Doc: "Firebase project of the FCM adapter; empty disables FCM."},
 		{Name: fcm.KeyServiceAccountRef, Kind: config.KindSecretRef, Default: "file:<secrets.dir>/fcm_service_account.json", Chapter: chapter13,

@@ -121,6 +121,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getMySidebar
   - getProblemType
+  - getPushPreview
   - getRun
   - getServedChannelConfig
   - getSnapshot
@@ -216,6 +217,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - redeliverWebhook
   - refreshToken
   - registerCommand
+  - registerPush
   - removeCommand
   - removeGroupMember
   - removeReaction
@@ -260,6 +262,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - uninstallApp
   - unlinkIdentity
   - unpinMessage
+  - unregisterPush
   - updateAgent
   - updateBranding
   - updateChannel
@@ -328,8 +331,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getPublicStatus
     milestone: M7
     ticket: M7-09
-  - operation_id: getPushPreview
-    milestone: M3
   - operation_id: getRunContext
     milestone: M2
     ticket: M2-13
@@ -379,9 +380,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: reconcileCosts
     milestone: M2
     ticket: M2-28
-  - operation_id: registerPush
-    milestone: M3
-    ticket: M3-22
   - operation_id: requestTranscription
     milestone: M3
     ticket: M3-09
@@ -397,9 +395,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: submitTranscript
     milestone: M3
     ticket: M3-09
-  - operation_id: unregisterPush
-    milestone: M3
-    ticket: M3-22
   - operation_id: updateStatusComponent
     milestone: M7
     ticket: M7-09

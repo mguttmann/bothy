@@ -254,6 +254,15 @@ def test_pairing_code_with_valid_checksum_is_detected(tmp_path: Path) -> None:
     assert "bothy-api-token" in _findings(tmp_path, "BOTHY_PAIRING_CODE=" + code)
 
 
+def test_push_preview_token_with_valid_checksum_is_detected(tmp_path: Path) -> None:
+    """A preview token of a push registration (kind pvw, 13 section 6.4) built like the server
+    builds it is a finding of the rule bothy-api-token (SEC-SEC-4, M3-22)."""
+    random_part = _base62(int.from_bytes(secrets.token_bytes(32), "big"), 43)
+    token = "bothy" + "_pvw_" + random_part + "_" + _checksum(random_part)
+    assert len(token) == 60
+    assert "bothy-api-token" in _findings(tmp_path, "BOTHY_PREVIEW_TOKEN=" + token)
+
+
 def test_checksum_vectors_match_go() -> None:
     """Python and Go agree on every checksum vector of the Go testdata file."""
     vectors = json.loads(VECTORS.read_text())["vectors"]

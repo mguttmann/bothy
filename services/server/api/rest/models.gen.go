@@ -8246,8 +8246,10 @@ type Device struct {
 	LastSeenAt *Timestamp `json:"last_seen_at,omitempty"`
 
 	// Name Examples: Alex iPhone
-	Name              string              `json:"name"`
-	Platform          DevicePlatform      `json:"platform"`
+	Name     string         `json:"name"`
+	Platform DevicePlatform `json:"platform"`
+
+	// PushRegistrations Every push registration of the device, active and disabled, ascending by `id`, never with a token (13, 13). Absent when the device has none.
 	PushRegistrations *[]PushRegistration `json:"push_registrations,omitempty"`
 	RevokeReason      *DeviceRevokeReason `json:"revoke_reason,omitempty"`
 
@@ -12794,15 +12796,43 @@ type PushRegistration struct {
 
 // PushRegistrationCreate defines model for PushRegistrationCreate.
 type PushRegistrationCreate struct {
-	// AppId Examples: com.example.teamchat
+	// AppId Bundle ID or package of the app, at most `push.registration_field_max_bytes` bytes (`too_long` at `/app_id`). For `apns` it must be one of `push.apns.topics` (`invalid` at `/app_id`). `apns` needs a device with platform `ios` or `macos`, `fcm` one with `android` (`invalid` at `/provider`); `sandbox` exists only for `apns` (`invalid` at `/environment`); an absent `environment` is `production`.
+	//
+	// Examples: com.example.teamchat
 	AppId       string           `json:"app_id"`
 	Environment *PushEnvironment `json:"environment,omitempty"`
 	Provider    PushProvider     `json:"provider"`
 
-	// Token Push token or endpoint of the provider. Never returned.
+	// Token Push token of the provider, at most `push.registration_field_max_bytes` bytes (`too_long` at `/token`). Never returned. An `apns` token is an even number of hexadecimal digits and is stored in lower case; an `fcm` token is printable ASCII without white space; otherwise `pattern_mismatch` at `/token`.
 	//
-	// Examples: example-device-token-a1b2
+	// Examples: EXAMPLE-device-token-a1b2
 	Token string `json:"token"`
+}
+
+// PushRegistrationCreated A new push registration with its preview token, which is shown exactly once and never again (13, 6.4).
+type PushRegistrationCreated struct {
+	// AppId Examples: com.example.teamchat
+	AppId string `json:"app_id"`
+
+	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	CreatedAt Timestamp `json:"created_at"`
+
+	// DeviceId UUIDv7 (RFC 9562), lowercase canonical form.
+	DeviceId Uuid `json:"device_id"`
+
+	// DisabledAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
+	DisabledAt     *Timestamp      `json:"disabled_at,omitempty"`
+	DisabledReason *string         `json:"disabled_reason,omitempty"`
+	Environment    PushEnvironment `json:"environment"`
+
+	// Id UUIDv7 (RFC 9562), lowercase canonical form.
+	Id Uuid `json:"id"`
+
+	// PreviewToken Preview token of the registration (`bothy_pvw_...`), shown exactly once. The app keeps it in the store it shares with its notification extension.
+	//
+	// Examples: bothy_pvw_EXAMPLEpushpreviewtoken00000000000000000000_4Z1L0A
+	PreviewToken string       `json:"preview_token"`
+	Provider     PushProvider `json:"provider"`
 }
 
 // QuietHoursList defines model for QuietHoursList.
@@ -17395,6 +17425,12 @@ type ListMyDevicesParams struct {
 	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// RegisterPushParams defines parameters for RegisterPush.
+type RegisterPushParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ApprovePairingParams defines parameters for ApprovePairing.
 type ApprovePairingParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -17487,6 +17523,18 @@ type ListTokensParams struct {
 type CreateTokenParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// GetPushPreviewParams defines parameters for GetPushPreview.
+type GetPushPreviewParams struct {
+	// Nid Notification ID from the push.
+	Nid Uuid `form:"nid" json:"nid"`
+
+	// MessageId Message of the notification.
+	MessageId Uuid `form:"message_id" json:"message_id"`
+
+	// Kind Kind of the notification, copied from the push payload (`k`, 13, 6.1 and 6.2). The server keeps no record of a hint, so the kind selects only the labels on the device; the answer echoes it. Only the kinds that point at a message are allowed; `security` and `admin` give `400 validation_failed` with `errors[].code` `invalid` at `#query/kind`, before the token is checked.
+	Kind NotificationKind `form:"kind" json:"kind"`
 }
 
 // ListActiveRunsParams defines parameters for ListActiveRuns.
@@ -18038,6 +18086,9 @@ type RespondToInteractionJSONRequestBody = InteractionRespond
 
 // SetMyAvatarMultipartRequestBody defines body for SetMyAvatar for multipart/form-data ContentType.
 type SetMyAvatarMultipartRequestBody = ImageUpload
+
+// RegisterPushJSONRequestBody defines body for RegisterPush for application/json ContentType.
+type RegisterPushJSONRequestBody = PushRegistrationCreate
 
 // ApprovePairingJSONRequestBody defines body for ApprovePairing for application/json ContentType.
 type ApprovePairingJSONRequestBody = PairingApprove

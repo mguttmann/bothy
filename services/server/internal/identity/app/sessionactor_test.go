@@ -19,7 +19,8 @@ import (
 // download ticket carries the flags of the session read per call; it never fails on them, only
 // authorize does. A family on another key than the device's dpop key is no active key, a pending
 // device past auth.device_pending_ttl counts as revoked, a foreign or unknown session is inactive
-// with an unknown device, and there is never a step-up time.
+// with an unknown device, and there is never a step-up time. KeyThumbprint is the dpop_jkt of the
+// session's active family, "" without one (M3-22 design note 8 d).
 func TestSessionActor_ActiveRevokedExpiredForeignUnknown(t *testing.T) {
 	t.Parallel()
 	w := newPeopleWorld(t)
@@ -80,16 +81,17 @@ func TestSessionActor_ActiveRevokedExpiredForeignUnknown(t *testing.T) {
 	active := base
 	active.SessionID, active.DeviceID, active.SessionActive, active.DeviceState, active.DeviceKeyActive =
 		bound, phone, true, actor.DeviceActive, true
+	active.KeyThumbprint = "alex-phone-key"
 	want("active", get(alex.ID, bound), active)
 
 	mismatch := active
-	mismatch.SessionID, mismatch.DeviceKeyActive, mismatch.CredentialInactive = otherKey, false, true
+	mismatch.SessionID, mismatch.DeviceKeyActive, mismatch.CredentialInactive, mismatch.KeyThumbprint = otherKey, false, true, "another-key"
 	want("key of another family", get(alex.ID, otherKey), mismatch)
 
 	expiredDevice := base
 	expiredDevice.SessionID, expiredDevice.DeviceID, expiredDevice.SessionActive, expiredDevice.DeviceState =
 		stale, pending, true, actor.DeviceRevoked
-	expiredDevice.DeviceKeyActive, expiredDevice.CredentialInactive = true, true
+	expiredDevice.DeviceKeyActive, expiredDevice.CredentialInactive, expiredDevice.KeyThumbprint = true, true, "alex-tablet-key"
 	want("pending past auth.device_pending_ttl", get(alex.ID, stale), expiredDevice)
 
 	foreign := actor.Actor{Kind: actor.KindUser, ID: sam.ID, SessionID: bound, DeviceState: actor.DeviceUnknown, CredentialInactive: true}
@@ -103,7 +105,7 @@ func TestSessionActor_ActiveRevokedExpiredForeignUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	revoked := active
-	revoked.SessionActive, revoked.DeviceKeyActive, revoked.CredentialInactive = false, false, true
+	revoked.SessionActive, revoked.DeviceKeyActive, revoked.CredentialInactive, revoked.KeyThumbprint = false, false, true, ""
 	want("revoked", get(alex.ID, bound), revoked)
 
 	w.clk.Advance(25 * time.Hour)

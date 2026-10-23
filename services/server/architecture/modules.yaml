@@ -263,8 +263,9 @@ modules:
     events: [notification_pref.updated, quiet_hours.updated]
     ephemeral_events: [notification.created]
     ws_ops: []
-    # authz (M3-19): the candidate readers of a channel for hints (authz.Recipients).
-    depends_on: [identity, chat, messaging, sync, authz]
+    # authz (M3-19): the candidate readers of a channel for hints (authz.Recipients). files
+    # (M3-22): attachments and fetch tickets for the preview.
+    depends_on: [identity, chat, messaging, sync, authz, files]
     # pgx: sqlc code and the repository (M3-18); otel: the span push.send and the push metrics (M3-19).
     adapter_vendors: [pgx, otel]
   apps:

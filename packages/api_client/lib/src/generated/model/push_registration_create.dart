@@ -14,9 +14,9 @@ part 'push_registration_create.g.dart';
 ///
 /// Properties:
 /// * [provider]
-/// * [token] - Push token or endpoint of the provider. Never returned.
+/// * [token] - Push token of the provider, at most `push.registration_field_max_bytes` bytes (`too_long` at `/token`). Never returned. An `apns` token is an even number of hexadecimal digits and is stored in lower case; an `fcm` token is printable ASCII without white space; otherwise `pattern_mismatch` at `/token`.
 /// * [environment]
-/// * [appId]
+/// * [appId] - Bundle ID or package of the app, at most `push.registration_field_max_bytes` bytes (`too_long` at `/app_id`). For `apns` it must be one of `push.apns.topics` (`invalid` at `/app_id`). `apns` needs a device with platform `ios` or `macos`, `fcm` one with `android` (`invalid` at `/provider`); `sandbox` exists only for `apns` (`invalid` at `/environment`); an absent `environment` is `production`.
 @BuiltValue()
 abstract class PushRegistrationCreate
     implements Built<PushRegistrationCreate, PushRegistrationCreateBuilder> {
@@ -24,7 +24,7 @@ abstract class PushRegistrationCreate
   PushProvider get provider;
   // enum providerEnum {  apns,  fcm,  unifiedpush,  wns,  };
 
-  /// Push token or endpoint of the provider. Never returned.
+  /// Push token of the provider, at most `push.registration_field_max_bytes` bytes (`too_long` at `/token`). Never returned. An `apns` token is an even number of hexadecimal digits and is stored in lower case; an `fcm` token is printable ASCII without white space; otherwise `pattern_mismatch` at `/token`.
   @BuiltValueField(wireName: r'token')
   String get token;
 
@@ -32,6 +32,7 @@ abstract class PushRegistrationCreate
   PushEnvironment? get environment;
   // enum environmentEnum {  production,  sandbox,  };
 
+  /// Bundle ID or package of the app, at most `push.registration_field_max_bytes` bytes (`too_long` at `/app_id`). For `apns` it must be one of `push.apns.topics` (`invalid` at `/app_id`). `apns` needs a device with platform `ios` or `macos`, `fcm` one with `android` (`invalid` at `/provider`); `sandbox` exists only for `apns` (`invalid` at `/environment`); an absent `environment` is `production`.
   @BuiltValueField(wireName: r'app_id')
   String get appId;
 

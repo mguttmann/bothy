@@ -89,3 +89,35 @@ func (s *Service) pathSpace(ctx context.Context, p chat.NotificationPath, id ids
 	p.Archived = p.Archived || sp.Archived()
 	return p, nil
 }
+
+// PreviewNames implements chat.Structure (M3-22) without authorizing: the title of the thread, and
+// unless its channel is a dm channel the channel name and the name of its space.
+func (s *Service) PreviewNames(ctx context.Context, threadID ids.ID) (chat.PreviewNames, error) {
+	th, found, err := s.d.Store.Thread(ctx, threadID)
+	if err != nil {
+		return chat.PreviewNames{}, err
+	}
+	if !found {
+		return chat.PreviewNames{}, invisible()
+	}
+	c, err := s.threadChannel(ctx, th)
+	if err != nil {
+		return chat.PreviewNames{}, err
+	}
+	out := chat.PreviewNames{ThreadTitle: th.Title}
+	if c.Channel.Kind == domain.ChannelDM {
+		return out, nil
+	}
+	out.ChannelName = c.Channel.Name
+	if c.Channel.SpaceID.IsZero() {
+		return out, nil
+	}
+	sp, found, err := s.d.Store.Space(ctx, c.Channel.SpaceID)
+	if err != nil {
+		return chat.PreviewNames{}, err
+	}
+	if found {
+		out.SpaceName = sp.Name
+	}
+	return out, nil
+}

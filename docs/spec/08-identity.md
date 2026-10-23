@@ -639,6 +639,7 @@ command line.
 | Console session | cookie, 256 bits of randomness | browser | `auth.console_session_max_age`, idle `auth.console_session_idle_timeout` | HMAC-SHA-256 |
 | API token (agent, app, personal) | prefix plus 256 bits of randomness plus checksum | optional DPoP (`api_tokens.dpop_jkt`) | `expires_at`, at most `auth.api_token_max_ttl` | HMAC-SHA-256 |
 | Invocation token | JWS, purpose `invocation` | run, agent (`aud`) | `agent.invocation_token_ttl` (04) | `runs.invocation_jti` |
+| Preview token (push) | `bothy_pvw_` prefix plus 256 bits of randomness plus checksum ([ADR 0061](../adr/0061-token-format-with-a-fixed-prefix-and-checksum.md)); only `getPushPreview` accepts it | the push registration, its session and the device key (DPoP proof with `ath` over the token) | lifetime of the registration, no expiry and no refresh of its own (13 6.4, R-PN-07) | HMAC-SHA-256 (`push_registrations.preview_token_hash`) |
 
 ### 7.2 Access token
 

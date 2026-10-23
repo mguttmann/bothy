@@ -555,6 +555,7 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 | `push.retry_base` | `BOTHY_PUSH__RETRY_BASE` | Server | duration | `2s` | base of the backoff | active |
 | `push.retry_cap` | `BOTHY_PUSH__RETRY_CAP` | Server | duration | `5m` | largest backoff interval | active |
 | `push.max_concurrent_requests` | `BOTHY_PUSH__MAX_CONCURRENT_REQUESTS` | Server | int | `32` | concurrent requests to providers per process | active |
+| `push.registration_field_max_bytes` | `BOTHY_PUSH__REGISTRATION_FIELD_MAX_BYTES` | Server | int | `1024` | largest `token` and `app_id` of a push registration in bytes, between 64 and 2048, so a token always fits the unique key `(provider, token)` | active |
 | `push.apns.team_id` | `BOTHY_PUSH__APNS__TEAM_ID` | Server | string | empty | Apple team ID | active |
 | `push.apns.key_id` | `BOTHY_PUSH__APNS__KEY_ID` | Server | string | empty | key ID of the `.p8` key | active |
 | `push.apns.private_key_ref` | `BOTHY_PUSH__APNS__PRIVATE_KEY_REF` | Server | secret_ref | empty | reference to the key in the secret provider | active |
@@ -565,12 +566,12 @@ Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17
 | `push.fcm.project_id` | `BOTHY_PUSH__FCM__PROJECT_ID` | Server | string | empty | Firebase project | active |
 | `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server | secret_ref | `file:<secrets.dir>/fcm_service_account.json` | reference to the service account key | active |
 | `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server | enum(all, mentions, mute) | `mentions` | level without any setting | active |
-| `notify.default_preview_mode` | `BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE` | Server |  | `full` | default for `notify.preview_mode` | planned (M3) |
+| `notify.default_preview_mode` | `BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE` | Server | enum(full, names, none) | `full` | default for `notify.preview_mode` | active |
 | `notify.default_input_needed_breaks_quiet_hours` | `BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS` | Server | bool | `false` | default for the switch of the same name | active |
 | `notify.default_admin_enabled` | `BOTHY_NOTIFY__DEFAULT_ADMIN_ENABLED` | Server | bool | `true` | default for `notify.admin_enabled` | active |
 | `notify.coalesce_window` | `BOTHY_NOTIFY__COALESCE_WINDOW` | Server | duration | `60s` | coalescing window per recipient and thread | active |
 | `notify.mobile_delay_when_desktop_active` | `BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE` | Server | duration | `60s` | delay of mobile pushes while the desktop is active | active |
-| `notify.preview_max_chars` | `BOTHY_NOTIFY__PREVIEW_MAX_CHARS` | Server |  | `240` | length of the excerpt in the preview | planned (M3) |
+| `notify.preview_max_chars` | `BOTHY_NOTIFY__PREVIEW_MAX_CHARS` | Server | int | `240` | length of the excerpt in the preview, between 1 and 1000 code points | active |
 | `notify.badge_sync_min_interval` | `BOTHY_NOTIFY__BADGE_SYNC_MIN_INTERVAL` | Server | duration | `60s` | smallest interval between badge syncs per person | active |
 
 ### 14 Search

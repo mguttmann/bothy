@@ -133,7 +133,7 @@ var secretMembers = map[string]bool{
 	"access_token": true, "refresh_token": true, "secret": true, "code": true, "enrollment_code": true,
 	"pairing_code": true, "login_code": true, "challenge": true, "verification_code": true,
 	"totp_secret_uri": true, "hmac_secret": true, "recovery_code": true, "client_secret": true,
-	"token": true, "id_token": true, "authorization_url": true, "redirect_uri_with_code": true,
+	"token": true, "preview_token": true, "id_token": true, "authorization_url": true, "redirect_uri_with_code": true,
 }
 
 // harvest registers every secret member of a JSON success body as a secret.

@@ -13,11 +13,12 @@ import 'package:api_client/src/generated/model/device.dart';
 import 'package:api_client/src/generated/model/device_approve.dart';
 import 'package:api_client/src/generated/model/device_page.dart';
 import 'package:api_client/src/generated/model/extension_session_create.dart';
+import 'package:api_client/src/generated/model/notification_kind.dart';
 import 'package:api_client/src/generated/model/pairing_approve.dart';
 import 'package:api_client/src/generated/model/problem.dart';
 import 'package:api_client/src/generated/model/push_preview.dart';
-import 'package:api_client/src/generated/model/push_registration.dart';
 import 'package:api_client/src/generated/model/push_registration_create.dart';
+import 'package:api_client/src/generated/model/push_registration_created.dart';
 import 'package:api_client/src/generated/model/reason_body.dart';
 import 'package:api_client/src/generated/model/session_page.dart';
 import 'package:api_client/src/generated/model/token_response.dart';
@@ -443,11 +444,12 @@ class DevicesApi {
   }
 
   /// Load the preview of a notification
-  /// Called by the notification extension with the preview token of the push registration (&#x60;Authorization: DPoP &lt;token&gt;&#x60; and a proof with the device key). Answers &#x60;404&#x60; if access is gone or the message was deleted (13, 6.4).
+  /// Called by the notification extension with the preview token of the push registration (&#x60;Authorization: DPoP &lt;token&gt;&#x60;) and a DPoP proof of the device key whose &#x60;ath&#x60; is the hash of the preview token; no other operation accepts the token, and no other credential works here (13, 6.4; R-PN-07). Checks in this order: the parameter &#x60;kind&#x60;; exactly one &#x60;Authorization&#x60; value with the scheme &#x60;DPoP&#x60;; the form, kind &#x60;pvw&#x60; and checksum of the token without a database access; an active registration with the token; the session of the registration, whose device must be the device of the registration; the DPoP proof against the key of that session (&#x60;DPoP-Nonce&#x60; as on every DPoP request); then &#x60;message.read&#x60; on the message and &#x60;push.deliver&#x60; on its thread with the rights of the moment of the fetch. A missing, malformed or unknown token, a deactivated registration, a session that is unknown or belongs to another device and a wrong proof give &#x60;401&#x60;; while the registration is still active, a session, device or person that is no longer active (for example an expired session) gives &#x60;401 session_revoked&#x60;. &#x60;auth.logout&#x60;, &#x60;device.revoke&#x60; and &#x60;user.disable&#x60; deactivate the registration in their own transaction, so after them the token itself answers &#x60;401&#x60;. No right, a deleted or an unknown message give &#x60;404&#x60;, identical to each other. The answer follows &#x60;notify.preview_mode&#x60; of the person (13, 6.4 table): &#x60;full&#x60; with names, excerpt (text without Markdown, mentions as names, at most &#x60;notify.preview_max_chars&#x60;), &#x60;attachment_count&#x60; and &#x60;image_url&#x60; (a fetch ticket for the &#x60;small&#x60; thumbnail of the first image); &#x60;names&#x60; with the four names only; &#x60;none&#x60; only &#x60;kind&#x60;, &#x60;thread_id&#x60;, &#x60;message_id&#x60; and &#x60;badge&#x60;.
   ///
   /// Parameters:
   /// * [nid] - Notification ID from the push.
   /// * [messageId] - Message of the notification.
+  /// * [kind] - Kind of the notification, copied from the push payload (`k`, 13, 6.1 and 6.2). The server keeps no record of a hint, so the kind selects only the labels on the device; the answer echoes it. Only the kinds that point at a message are allowed; `security` and `admin` give `400 validation_failed` with `errors[].code` `invalid` at `#query/kind`, before the token is checked.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -460,6 +462,7 @@ class DevicesApi {
   Future<Response<PushPreview>> getPushPreview({
     required String nid,
     required String messageId,
+    required NotificationKind kind,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -473,7 +476,7 @@ class DevicesApi {
       headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'pushPreviewToken'},
         ],
         ...?extra,
       },
@@ -486,6 +489,11 @@ class DevicesApi {
         _serializers,
         messageId,
         const FullType(String),
+      ),
+      r'kind': encodeQueryParameter(
+        _serializers,
+        kind,
+        const FullType(NotificationKind),
       ),
     };
 
@@ -957,7 +965,7 @@ class DevicesApi {
   }
 
   /// Register a push target for the current device
-  ///
+  /// Registers the push target of the caller&#39;s own active device in the caller&#39;s session and returns the preview token of the registration exactly once (13, 6.4 and 13). The row binds the person, the device and the session. A known &#x60;(provider, token)&#x60; is taken over: its row is deleted, whoever it belonged to, so the token stops reaching its former owner; the other active registrations of this device with the same provider and &#x60;app_id&#x60; end with &#x60;disabled_reason&#x60; &#x60;token_invalid&#x60; (one current token per app installation). Every new registration rotates the preview token. &#x60;unifiedpush&#x60; and &#x60;wns&#x60; give &#x60;400 validation_failed&#x60; with &#x60;errors[].code&#x60; &#x60;not_enabled&#x60;; &#x60;apns&#x60; or &#x60;fcm&#x60; without a configured adapter on this instance give &#x60;403 feature_disabled&#x60; with &#x60;reason&#x60; &#x60;push_provider_disabled&#x60;; a principal without a session (API tokens, agents, apps) gives &#x60;403 forbidden&#x60; with &#x60;reason&#x60; &#x60;step_up_not_possible&#x60;; a pending device gives &#x60;403 device_pending&#x60;. The preview token is a one-time secret: a replay with the same &#x60;Idempotency-Key&#x60; answers &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;one_time_secret&#x60; (06, 7), and the app registers again with a new key. A second concurrent registration of the same token can answer &#x60;409 conflict&#x60;.
   ///
   /// Parameters:
   /// * [pushRegistrationCreate]
@@ -969,9 +977,9 @@ class DevicesApi {
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [PushRegistration] as data
+  /// Returns a [Future] containing a [Response] with a [PushRegistrationCreated] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<PushRegistration>> registerPush({
+  Future<Response<PushRegistrationCreated>> registerPush({
     required PushRegistrationCreate pushRegistrationCreate,
     String? idempotencyKey,
     CancelToken? cancelToken,
@@ -1031,7 +1039,7 @@ class DevicesApi {
       onReceiveProgress: onReceiveProgress,
     );
 
-    PushRegistration? _responseData;
+    PushRegistrationCreated? _responseData;
 
     try {
       final rawResponse = _response.data;
@@ -1039,8 +1047,8 @@ class DevicesApi {
           ? null
           : _serializers.deserialize(
               rawResponse,
-              specifiedType: const FullType(PushRegistration),
-            ) as PushRegistration;
+              specifiedType: const FullType(PushRegistrationCreated),
+            ) as PushRegistrationCreated;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1051,7 +1059,7 @@ class DevicesApi {
       );
     }
 
-    return Response<PushRegistration>(
+    return Response<PushRegistrationCreated>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1247,7 +1255,7 @@ class DevicesApi {
   }
 
   /// Remove a push target
-  ///
+  /// Deletes a registration of the caller (13, 13). The token is free for a later registration and the preview token of the registration is worthless from then on. A registration of another person and an unknown one give the same &#x60;404&#x60;.
   ///
   /// Parameters:
   /// * [registrationId]

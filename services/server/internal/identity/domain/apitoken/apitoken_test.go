@@ -16,8 +16,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/apitoken"
 )
 
-// kinds are the five token kinds of 08 section 12 (hpc since M2-39).
-var kinds = []apitoken.Kind{apitoken.KindAgent, apitoken.KindApp, apitoken.KindPersonal, apitoken.KindIncomingWebhook, apitoken.KindHostPairingCode}
+// kinds are the six token kinds of 08 section 12 (hpc since M2-39, pvw since M3-22).
+var kinds = []apitoken.Kind{apitoken.KindAgent, apitoken.KindApp, apitoken.KindPersonal, apitoken.KindIncomingWebhook, apitoken.KindHostPairingCode, apitoken.KindPushPreview}
 
 // TestFormat_RoundTrip generates a token of every kind and parses it back: length 60, the prefix,
 // the kind at its position, the random part and the checksum (ADR 0061 "Confirmation").
@@ -225,5 +225,34 @@ func TestTokenPrefix(t *testing.T) {
 	m.Write([]byte(tok))
 	if !hmac.Equal(apitoken.Hash(pepper, tok), m.Sum(nil)) {
 		t.Fatal("Hash is not HMAC-SHA-256 of the full token with the pepper")
+	}
+}
+
+// TestAPIToken_KindPVW (brief M3-22, Tests): the vector of kind pvw with the checksum 4Z1L0A of
+// testdata/checksum_vectors.json parses with its kind; a generated pvw token parses back; one
+// changed checksum character fails.
+func TestAPIToken_KindPVW(t *testing.T) {
+	t.Parallel()
+	const random, checksum = "EXAMPLEpushpreviewtoken00000000000000000000", "4Z1L0A"
+	found := false
+	for _, v := range readVectors(t) {
+		found = found || v.Random == random && v.Checksum == checksum
+	}
+	if !found {
+		t.Fatal("testdata/checksum_vectors.json lacks the pvw vector")
+	}
+	p, err := apitoken.Parse("bothy_pvw_" + random + "_" + checksum)
+	if err != nil || p.Kind != apitoken.KindPushPreview {
+		t.Fatalf("Parse(pvw vector) = %+v, %v", p, err)
+	}
+	if _, err := apitoken.Parse("bothy_pvw_" + random + "_4Z1L0B"); err == nil {
+		t.Fatal("a changed checksum character parsed")
+	}
+	tok, err := apitoken.Generate(nil, apitoken.KindPushPreview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err := apitoken.Parse(tok); err != nil || p.Kind != apitoken.KindPushPreview || !strings.HasPrefix(tok, "bothy_pvw_") {
+		t.Fatalf("round trip of a generated pvw token: %+v, %v", p, err)
 	}
 }

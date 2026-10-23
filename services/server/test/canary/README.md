@@ -75,6 +75,16 @@ go test -race -count=1 ./test/canary/... ./test/harness/...
   a source whose mapping creates a space and a channel with canary names, starts it, applies one batch,
   lists its items, stores a cursor, hands the lead to this server, pauses and completes it, cancels a second
   source, and switches the imported channel read-only and back.
+  `scenario_push.go` drives the push registration and the preview endpoint (M3-22): Alex pairs
+  a phone (platform `ios`), registers it with `fcm` and a canary device token (`403`
+  `push_provider_disabled`), then with `apns` and a random device token, replays the
+  registration (`409`), fetches a preview with the issued preview token and a DPoP proof of the
+  phone's key, reads `listMyDevices`, sends `Authorization: DPoP bothy_pvw_<canary>` (`401`),
+  unregisters and fetches once more (`401`). Device tokens, the preview token and the proofs are
+  secrets; the preview token may appear only in the `registerPush` answer that issues it and in
+  the `getPushPreview` requests that carry it, which no sink captures. The scenario server
+  enables `apns` against Fake-APNs (`PushRunOptions`): it runs in role `all`, where an enabled
+  `fcm` would build the real FCM adapter, and the harness has a fake only for APNs.
 
 ## Sinks
 
@@ -151,8 +161,8 @@ cannot call goes into `Exempt` with its reason; the expected list is empty.
   of the server, the standard logger or slog.
 - Texts shorter than `minNeedle` (`scan.go`): six-digit TOTP codes are registered, but would match
   unrelated digits.
-- Transcripts, search terms, push tokens and tool arguments: their tickets in M2 and M3 extend
-  the scenario (channel prompts and skill references since M2-02, file names since M3-03,
-  component form values since M2-15).
+- Transcripts, search terms and tool arguments: their tickets in M2 and M3 extend the scenario
+  (channel prompts and skill references since M2-02, file names since M3-03, component form
+  values since M2-15, push device tokens and preview tokens since M3-22).
 - The `current` member of a 412 and the `pointer` of `unknown_member` are judged as echoes to the
   caller, not as leaks (ruling M1-69/2).

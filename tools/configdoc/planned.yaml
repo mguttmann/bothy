@@ -39,8 +39,6 @@ rules:
     milestone: M3
   - match: "interaction."  # M2-15
     milestone: M2
-  - match: "notify."  # M3-17, M3-22, M3-23; milestone of the chapter for badge_sync_min_interval (no ticket names it)
-    milestone: M3
   - match: "privacy."  # M7-06, M7-07; milestone of the chapter for ai_notice_enabled, notice_url (no ticket names it)
     milestone: M7
   - match: privacy.object_delete_delay  # M3-08

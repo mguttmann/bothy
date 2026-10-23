@@ -291,7 +291,7 @@ func TestOperationMetadata_FollowsWhatOapiCodegenSees(t *testing.T) {
 // TestLoadInputs_RejectsSecurityOverrideOfEnabledOperation: the route table records only
 // "public" or "inherits the root security"; an enabled operation with its own requirements
 // would be served as if it inherited them, so the generator refuses it. A later operation may
-// have one, as getPushPreview and the downloads of the real spec do.
+// have one.
 func TestLoadInputs_RejectsSecurityOverrideOfEnabledOperation(t *testing.T) {
 	pairs := []string{
 		"      operationId: updateThing\n", "      operationId: updateThing\n      security:\n      - dpopAuth: []\n",
@@ -341,6 +341,32 @@ func TestLoadInputs_AcceptsFileTicketBesideRootSecurity(t *testing.T) {
 	_, err = loadInputs(spec, catalog, list)
 	if joined := strings.Join(problemsOf(t, err), "\n"); !strings.Contains(joined, "updateThing") {
 		t.Errorf("another extra requirement is an override; problems:\n%s", joined)
+	}
+}
+
+// TestLoadInputs_PushPreviewTokenIsOwnCredential (M3-22 design note 12 a): an enabled operation
+// whose only requirement is pushPreviewToken is no override; the route table records it with
+// OwnCredential, not public. pushPreviewToken beside another requirement stays an override.
+func TestLoadInputs_PushPreviewTokenIsOwnCredential(t *testing.T) {
+	schemes := "  securitySchemes:\n    pushPreviewToken:\n      type: http\n      scheme: DPoP\n"
+	spec, catalog, list := specWith(t, "      operationId: updateThing\n", "      operationId: updateThing\n      security:\n      - pushPreviewToken: []\n",
+		"  securitySchemes:\n", schemes)
+	in, err := loadInputs(spec, catalog, list)
+	if err != nil {
+		t.Fatalf("pushPreviewToken alone is no override: %v", err)
+	}
+	if op := opByID(t, in, "updateThing"); !op.OwnCredential || op.Public {
+		t.Errorf("updateThing: %+v, want OwnCredential and not public", op)
+	}
+	if op := opByID(t, in, "getThing"); op.OwnCredential {
+		t.Errorf("getThing has OwnCredential: %+v", op)
+	}
+
+	spec, catalog, list = specWith(t, "      operationId: updateThing\n", "      operationId: updateThing\n      security:\n      - bearerAuth: []\n      - pushPreviewToken: []\n",
+		"  securitySchemes:\n", schemes)
+	_, err = loadInputs(spec, catalog, list)
+	if joined := strings.Join(problemsOf(t, err), "\n"); !strings.Contains(joined, "updateThing") {
+		t.Errorf("pushPreviewToken beside another requirement is an override; problems:\n%s", joined)
 	}
 }
 

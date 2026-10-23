@@ -382,6 +382,23 @@ type AnchorRef struct {
 	RunID ids.ID
 }
 
+// PreviewMessage is a message as the preview of a push hint needs it (Messages.ForPreview, M3-22).
+type PreviewMessage struct {
+	// ID is the message; ThreadID and ChannelID its place; AuthorID its author.
+	ID, ThreadID, ChannelID, AuthorID ids.ID
+	// Kind is messages.kind (text, voice, card, run, system).
+	Kind string
+	// ContentMD is the content; ContentFormat its dialect version. Empty for a tombstone.
+	ContentMD     string
+	ContentFormat int
+	// HasAttachments is messages.has_attachments.
+	HasAttachments bool
+	// Deleted reports a tombstone (deleted_at set).
+	Deleted bool
+	// MentionIDs are the principals of the message's mentions rows, sorted; nil for none.
+	MentionIDs []ids.ID
+}
+
 // Messages is the incoming port of sending (M1-56) and reading (M1-57). The caller a is the principal of the request;
 // errors are kernel/errs errors, and an unknown and an invisible thread or channel give the same
 // 404 not_found.
@@ -473,6 +490,18 @@ type Messages interface {
 	//
 	//	refs, err := msgs.PrincipalRefs(ctx, []ids.ID{alex})
 	PrincipalRefs(ctx context.Context, principalIDs []ids.ID) (map[ids.ID]PrincipalRef, error)
+	// ForPreview returns the facts of one message that the preview of a push hint shows (13
+	// section 6.4, M3-22 design note 9): thread, channel, author, kind, content, format, the
+	// attachment flag, the deletion and the mentioned principals. found is false for an unknown
+	// message; a tombstone is returned with Deleted and without content and mentions. It never
+	// authorizes: the preview fetch checks message.read and push.deliver itself, and the job
+	// notify.gateway_send checks push.deliver. It reads in the ambient transaction of ctx when there
+	// is one. Errors: those of the read.
+	//
+	// Example:
+	//
+	//	m, found, err := msgs.ForPreview(ctx, messageID)
+	ForPreview(ctx context.Context, messageID ids.ID) (PreviewMessage, bool, error)
 	// LockCard locks the row of a card message in the ambient unit of work for runs (M2-15 design
 	// note 2 b) and returns its facts; it never authorizes, runs decided. Errors: internal outside
 	// a unit of work; not_found for an unknown message (a tombstone is returned with Deleted).

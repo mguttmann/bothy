@@ -21,9 +21,8 @@ part 'push_registration.g.dart';
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [disabledAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [disabledReason]
-@BuiltValue()
-abstract class PushRegistration
-    implements Built<PushRegistration, PushRegistrationBuilder> {
+@BuiltValue(instantiable: false)
+abstract class PushRegistration {
   /// UUIDv7 (RFC 9562), lowercase canonical form.
   @BuiltValueField(wireName: r'id')
   String get id;
@@ -54,14 +53,6 @@ abstract class PushRegistration
   @BuiltValueField(wireName: r'disabled_reason')
   String? get disabledReason;
 
-  PushRegistration._();
-
-  factory PushRegistration([void updates(PushRegistrationBuilder b)]) =
-      _$PushRegistration;
-
-  @BuiltValueHook(initializeBuilder: true)
-  static void _defaults(PushRegistrationBuilder b) => b;
-
   @BuiltValueSerializer(custom: true)
   static Serializer<PushRegistration> get serializer =>
       _$PushRegistrationSerializer();
@@ -70,7 +61,7 @@ abstract class PushRegistration
 class _$PushRegistrationSerializer
     implements PrimitiveSerializer<PushRegistration> {
   @override
-  final Iterable<Type> types = const [PushRegistration, _$PushRegistration];
+  final Iterable<Type> types = const [PushRegistration];
 
   @override
   final String wireName = r'PushRegistration';
@@ -137,6 +128,59 @@ class _$PushRegistrationSerializer
       object,
       specifiedType: specifiedType,
     ).toList();
+  }
+
+  @override
+  PushRegistration deserialize(
+    Serializers serializers,
+    Object serialized, {
+    FullType specifiedType = FullType.unspecified,
+  }) {
+    return serializers.deserialize(
+      serialized,
+      specifiedType: FullType($PushRegistration),
+    ) as $PushRegistration;
+  }
+}
+
+/// a concrete implementation of [PushRegistration], since [PushRegistration] is not instantiable
+@BuiltValue(instantiable: true)
+abstract class $PushRegistration
+    implements
+        PushRegistration,
+        Built<$PushRegistration, $PushRegistrationBuilder> {
+  $PushRegistration._();
+
+  factory $PushRegistration([
+    void Function($PushRegistrationBuilder)? updates,
+  ]) = _$$PushRegistration;
+
+  @BuiltValueHook(initializeBuilder: true)
+  static void _defaults($PushRegistrationBuilder b) => b;
+
+  @BuiltValueSerializer(custom: true)
+  static Serializer<$PushRegistration> get serializer =>
+      _$$PushRegistrationSerializer();
+}
+
+class _$$PushRegistrationSerializer
+    implements PrimitiveSerializer<$PushRegistration> {
+  @override
+  final Iterable<Type> types = const [$PushRegistration, _$$PushRegistration];
+
+  @override
+  final String wireName = r'$PushRegistration';
+
+  @override
+  Object serialize(
+    Serializers serializers,
+    $PushRegistration object, {
+    FullType specifiedType = FullType.unspecified,
+  }) {
+    return serializers.serialize(
+      object,
+      specifiedType: FullType(PushRegistration),
+    )!;
   }
 
   void _deserializeProperties(
@@ -218,12 +262,12 @@ class _$PushRegistrationSerializer
   }
 
   @override
-  PushRegistration deserialize(
+  $PushRegistration deserialize(
     Serializers serializers,
     Object serialized, {
     FullType specifiedType = FullType.unspecified,
   }) {
-    final result = PushRegistrationBuilder();
+    final result = $PushRegistrationBuilder();
     final serializedList = (serialized as Iterable<Object?>).toList();
     final unhandled = <Object?>[];
     _deserializeProperties(

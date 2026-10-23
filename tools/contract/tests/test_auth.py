@@ -15,7 +15,7 @@ from typing import Any, ClassVar
 import auth
 import pytest
 from broker_client import BrokerClient, BrokerError, http_request
-from dpop import DPoPKey
+from dpop import DPoPKey, ath
 
 KEY = DPoPKey.generate()
 
@@ -33,6 +33,8 @@ class Stub(BaseHTTPRequestHandler):
     tokens: ClassVar[list[str]] = []
     log: ClassVar[list[str]] = []
     revoked: ClassVar[set[str]] = set()
+    registrations: ClassVar[list[dict[str, Any]]] = []
+    register_status: ClassVar[int] = 201
 
     def log_message(self, format: str, *args: Any) -> None:
         """Silence the default request log."""
@@ -53,7 +55,9 @@ class Stub(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         payload = json.loads(self.rfile.read(length) or b"{}")
         self.log.append(f"POST {self.path}")
-        if self.path == "/principals":
+        if self.path == "/api/v1" + auth.PUSH_REGISTRATIONS_PATH:
+            self._register(payload)
+        elif self.path == "/principals":
             token = self.tokens.pop(0)
             self._send(
                 200,
@@ -71,6 +75,23 @@ class Stub(BaseHTTPRequestHandler):
         else:
             self._send(404, {})
 
+    def _register(self, payload: dict[str, Any]) -> None:
+        """registerPush: needs nonce n-9 and a live token; answers a fresh preview token."""
+        proof = _claims(self.headers["DPoP"])
+        token = (self.headers.get("Authorization") or "").removeprefix("DPoP ")
+        if proof.get("nonce") != "n-9":
+            self._send(401, {"code": "use_dpop_nonce"}, {"DPoP-Nonce": "n-9"})
+        elif token in self.revoked:
+            self._send(401, {"code": "session_revoked"})
+        elif self.register_status != 201:
+            self._send(self.register_status, {"code": "feature_disabled"})
+        else:
+            self.registrations.append({**payload, "session_token": token})
+            n = len(self.registrations)
+            self._send(
+                201, {"id": f"r-{n}", "preview_token": f"bothy_pvw_{n}"}, {"DPoP-Nonce": "n-9"}
+            )
+
     def do_GET(self) -> None:
         """API: needs nonce n-9; answers session_revoked for revoked tokens."""
         proof = _claims(self.headers["DPoP"])
@@ -87,6 +108,7 @@ class Stub(BaseHTTPRequestHandler):
 @pytest.fixture
 def stub() -> Iterator[str]:
     Stub.tokens, Stub.log, Stub.revoked = ["tok-1", "tok-2"], [], {"tok-1"}
+    Stub.registrations, Stub.register_status = [], 201
     srv = ThreadingHTTPServer(("127.0.0.1", 0), Stub)
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
     thread.start()
@@ -185,3 +207,50 @@ def test_without_host_drops_generated_host_headers() -> None:
     generated = {"host": "&uJ", "HOST": "hIWc&n", "Idempotency-Key": "B@1q", "gl": "a.R&"}
     assert auth.without_host(generated) == {"Idempotency-Key": "B@1q", "gl": "a.R&"}
     assert auth.without_host({}) == {}
+
+
+def test_preview_headers_carry_a_fresh_registration(stub: str, tmp_path: Path) -> None:
+    """Each request of pushPreviewToken registers anew and binds the proof to its token."""
+    state = _state(stub, tmp_path)
+    state.push_app_id = "com.example.chat"
+    url = stub + "/api/v1/push/preview?nid=1&message_id=2&kind=message"
+    first = state.preview_headers("GET", url)
+    second = state.preview_headers("GET", url)
+    assert first["Authorization"] == "DPoP bothy_pvw_1"
+    assert second["Authorization"] == "DPoP bothy_pvw_2"
+    claims = _claims(first["DPoP"])
+    assert claims["ath"] == ath("bothy_pvw_1")
+    assert claims["nonce"] == "n-9"
+    assert claims["htm"] == "GET"
+    assert claims["htu"] == stub + "/api/v1/push/preview"
+    header = json.loads(base64.urlsafe_b64decode(first["DPoP"].split(".")[0] + "=="))
+    assert header["jwk"] == KEY.public_jwk()
+    # The first session was revoked, so the renewed session (tok-2) registered both targets.
+    assert [r["session_token"] for r in Stub.registrations] == ["tok-2", "tok-2"]
+    for reg in Stub.registrations:
+        assert reg["provider"] == "apns"
+        assert reg["app_id"] == "com.example.chat"
+        assert len(reg["token"]) == 64
+        assert reg["token"] == reg["token"].lower()
+        int(reg["token"], 16)
+    assert Stub.registrations[0]["token"] != Stub.registrations[1]["token"]
+
+
+def test_register_push_returns_the_registering_session(stub: str, tmp_path: Path) -> None:
+    state = _state(stub, tmp_path)
+    state.push_app_id = "com.example.chat"
+    reg = state.register_push()
+    assert reg.registration_id == "r-1"
+    assert reg.preview_token == "bothy_pvw_1"
+    assert reg.session is state.session
+    assert reg.session.credentials.access_token == "tok-2"
+
+
+def test_register_push_errors(stub: str, tmp_path: Path) -> None:
+    state = _state(stub, tmp_path)
+    with pytest.raises(auth.RegistrationError, match="BOTHY_CONTRACT_PUSH_APP_ID"):
+        state.register_push()
+    state.push_app_id = "com.example.chat"
+    Stub.register_status = 403
+    with pytest.raises(auth.RegistrationError, match="403 feature_disabled"):
+        state.preview_headers("GET", stub + "/api/v1/push/preview")

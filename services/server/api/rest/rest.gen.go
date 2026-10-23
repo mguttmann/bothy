@@ -510,6 +510,9 @@ type ServerInterface interface {
 	// ListMyDevices List own devices
 	// (GET /me/devices)
 	ListMyDevices(w http.ResponseWriter, r *http.Request, params ListMyDevicesParams)
+	// RegisterPush Register a push target for the current device
+	// (POST /me/devices/current/push-registrations)
+	RegisterPush(w http.ResponseWriter, r *http.Request, params RegisterPushParams)
 	// ApprovePairing Approve a device pairing with its code
 	// (POST /me/devices/pairings)
 	ApprovePairing(w http.ResponseWriter, r *http.Request, params ApprovePairingParams)
@@ -633,6 +636,12 @@ type ServerInterface interface {
 	// GetProblemType Documentation of a problem type
 	// (GET /problems/{code})
 	GetProblemType(w http.ResponseWriter, r *http.Request, code CodePath)
+	// UnregisterPush Remove a push target
+	// (DELETE /push-registrations/{registration_id})
+	UnregisterPush(w http.ResponseWriter, r *http.Request, registrationId RegistrationIdPath)
+	// GetPushPreview Load the preview of a notification
+	// (GET /push/preview)
+	GetPushPreview(w http.ResponseWriter, r *http.Request, params GetPushPreviewParams)
 	// ListActiveRuns Running now
 	// (GET /runs)
 	ListActiveRuns(w http.ResponseWriter, r *http.Request, params ListActiveRunsParams)
@@ -7358,6 +7367,47 @@ func (siw *ServerInterfaceWrapper) ListMyDevices(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// RegisterPush operation middleware
+func (siw *ServerInterfaceWrapper) RegisterPush(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegisterPushParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterPush(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ApprovePairing operation middleware
 func (siw *ServerInterfaceWrapper) ApprovePairing(w http.ResponseWriter, r *http.Request) {
 
@@ -8583,6 +8633,91 @@ func (siw *ServerInterfaceWrapper) GetProblemType(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetProblemType(w, r, code)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnregisterPush operation middleware
+func (siw *ServerInterfaceWrapper) UnregisterPush(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "registration_id" -------------
+	var registrationId RegistrationIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "registration_id", r.PathValue("registration_id"), &registrationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "registration_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnregisterPush(w, r, registrationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPushPreview operation middleware
+func (siw *ServerInterfaceWrapper) GetPushPreview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetPushPreviewParams
+
+	// ------------- Required query parameter "nid" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "nid", r.URL.Query(), &params.Nid, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "nid"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "nid", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "message_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "message_id", r.URL.Query(), &params.MessageId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "message_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "message_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPushPreview(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -11680,6 +11815,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/devices/{device_id}", wrapper.GetDevice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/devices/{device_id}/approve", wrapper.ApproveDevice)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/devices/{device_id}/revoke", wrapper.RevokeDevice)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/devices/current/push-registrations", wrapper.RegisterPush)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/push-registrations/{registration_id}", wrapper.UnregisterPush)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/push/preview", wrapper.GetPushPreview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/sessions/extensions", wrapper.CreateExtensionSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/sessions/{session_id}/revoke", wrapper.RevokeSession)
@@ -12561,6 +12699,9 @@ type StrictServerInterface interface {
 	// ListMyDevices List own devices
 	// (GET /me/devices)
 	ListMyDevices(ctx context.Context, request ListMyDevicesRequestObject) (ListMyDevicesResponseObject, error)
+	// RegisterPush Register a push target for the current device
+	// (POST /me/devices/current/push-registrations)
+	RegisterPush(ctx context.Context, request RegisterPushRequestObject) (RegisterPushResponseObject, error)
 	// ApprovePairing Approve a device pairing with its code
 	// (POST /me/devices/pairings)
 	ApprovePairing(ctx context.Context, request ApprovePairingRequestObject) (ApprovePairingResponseObject, error)
@@ -12684,6 +12825,12 @@ type StrictServerInterface interface {
 	// GetProblemType Documentation of a problem type
 	// (GET /problems/{code})
 	GetProblemType(ctx context.Context, request GetProblemTypeRequestObject) (GetProblemTypeResponseObject, error)
+	// UnregisterPush Remove a push target
+	// (DELETE /push-registrations/{registration_id})
+	UnregisterPush(ctx context.Context, request UnregisterPushRequestObject) (UnregisterPushResponseObject, error)
+	// GetPushPreview Load the preview of a notification
+	// (GET /push/preview)
+	GetPushPreview(ctx context.Context, request GetPushPreviewRequestObject) (GetPushPreviewResponseObject, error)
 	// ListActiveRuns Running now
 	// (GET /runs)
 	ListActiveRuns(ctx context.Context, request ListActiveRunsRequestObject) (ListActiveRunsResponseObject, error)
@@ -17850,6 +17997,39 @@ func (sh *strictHandler) ListMyDevices(w http.ResponseWriter, r *http.Request, p
 	}
 }
 
+// RegisterPush operation middleware
+func (sh *strictHandler) RegisterPush(w http.ResponseWriter, r *http.Request, params RegisterPushParams) {
+	var request RegisterPushRequestObject
+
+	request.Params = params
+
+	var body RegisterPushJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterPush(ctx, request.(RegisterPushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterPush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterPushResponseObject); ok {
+		if err := validResponse.VisitRegisterPushResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ApprovePairing operation middleware
 func (sh *strictHandler) ApprovePairing(w http.ResponseWriter, r *http.Request, params ApprovePairingParams) {
 	var request ApprovePairingRequestObject
@@ -19011,6 +19191,58 @@ func (sh *strictHandler) GetProblemType(w http.ResponseWriter, r *http.Request, 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetProblemTypeResponseObject); ok {
 		if err := validResponse.VisitGetProblemTypeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnregisterPush operation middleware
+func (sh *strictHandler) UnregisterPush(w http.ResponseWriter, r *http.Request, registrationId RegistrationIdPath) {
+	var request UnregisterPushRequestObject
+
+	request.RegistrationId = registrationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnregisterPush(ctx, request.(UnregisterPushRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnregisterPush")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnregisterPushResponseObject); ok {
+		if err := validResponse.VisitUnregisterPushResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPushPreview operation middleware
+func (sh *strictHandler) GetPushPreview(w http.ResponseWriter, r *http.Request, params GetPushPreviewParams) {
+	var request GetPushPreviewRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPushPreview(ctx, request.(GetPushPreviewRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPushPreview")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPushPreviewResponseObject); ok {
+		if err := validResponse.VisitGetPushPreviewResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

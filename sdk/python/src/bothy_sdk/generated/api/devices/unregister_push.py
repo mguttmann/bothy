@@ -79,6 +79,10 @@ def sync_detailed(
 ) -> Response[Any | Problem]:
     """Remove a push target
 
+     Deletes a registration of the caller (13, 13). The token is free for a later registration and the
+    preview token of the registration is worthless from then on. A registration of another person and an
+    unknown one give the same `404`.
+
     Args:
         registration_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -108,6 +112,10 @@ def sync(
 ) -> Any | Problem | None:
     """Remove a push target
 
+     Deletes a registration of the caller (13, 13). The token is free for a later registration and the
+    preview token of the registration is worthless from then on. A registration of another person and an
+    unknown one give the same `404`.
+
     Args:
         registration_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
 
@@ -131,6 +139,10 @@ async def asyncio_detailed(
     client: AuthenticatedClient | Client,
 ) -> Response[Any | Problem]:
     """Remove a push target
+
+     Deletes a registration of the caller (13, 13). The token is free for a later registration and the
+    preview token of the registration is worthless from then on. A registration of another person and an
+    unknown one give the same `404`.
 
     Args:
         registration_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -158,6 +170,10 @@ async def asyncio(
     client: AuthenticatedClient | Client,
 ) -> Any | Problem | None:
     """Remove a push target
+
+     Deletes a registration of the caller (13, 13). The token is free for a later registration and the
+    preview token of the registration is worthless from then on. A registration of another person and an
+    unknown one give the same `404`.
 
     Args:
         registration_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

@@ -95,3 +95,36 @@ func TestNotificationPath(t *testing.T) {
 		t.Fatalf("threads %v, %v", got, err)
 	}
 }
+
+// TestPreviewNames (M3-22): the names of a thread's place for a push preview; a dm channel shows
+// neither space nor channel name, a thread without a title no title; an unknown thread is
+// not_found.
+func TestPreviewNames(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := context.Background()
+	sp := domain.Space{ID: ids.New(), Name: "Support"}
+	ch := domain.Channel{ID: ids.New(), SpaceID: sp.ID, Kind: domain.ChannelText, Name: "Allgemein"}
+	dm := domain.Channel{ID: ids.New(), Kind: domain.ChannelDM, Name: "dm"}
+	titled := domain.Thread{ID: ids.New(), ChannelID: ch.ID, Title: "Invoice export"}
+	main := domain.Thread{ID: ids.New(), ChannelID: ch.ID}
+	inDM := domain.Thread{ID: ids.New(), ChannelID: dm.ID}
+	e.store.spaces[sp.ID] = sp
+	e.store.channels[ch.ID], e.store.channels[dm.ID] = ch, dm
+	e.store.ensureThreads()
+	e.store.threads[titled.ID], e.store.threads[main.ID], e.store.threads[inDM.ID] = titled, main, inDM
+	for _, tc := range []struct {
+		th   ids.ID
+		want chat.PreviewNames
+	}{
+		{titled.ID, chat.PreviewNames{SpaceName: "Support", ChannelName: "Allgemein", ThreadTitle: "Invoice export"}},
+		{main.ID, chat.PreviewNames{SpaceName: "Support", ChannelName: "Allgemein"}},
+		{inDM.ID, chat.PreviewNames{}},
+	} {
+		if got, err := e.svc.PreviewNames(ctx, tc.th); err != nil || got != tc.want {
+			t.Fatalf("PreviewNames = %+v, %v, want %+v", got, err, tc.want)
+		}
+	}
+	_, err := e.svc.PreviewNames(ctx, ids.New())
+	wantCode(t, err, errs.CodeNotFound)
+}

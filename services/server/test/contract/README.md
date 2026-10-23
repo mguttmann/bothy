@@ -11,7 +11,7 @@ CONTRACT_SEED=<seed> make contract-test # repeat a run
 ```
 
 `TestG7_SchemathesisAllEnabledOperations` (build tags `contract_validate`, `contract_live`) starts
-the harness server with `EgressDenyAll` and every rate-limit class raised (23 R-QA-11: G7 checks
+the harness server with `EgressDenyAll`, APNs enabled for `registerPush` (topic `com.example.chat`, the adapter pointed at a Fake-APNs that egress denial keeps unreached; the test fails if a request reaches it) and every rate-limit class raised (23 R-QA-11: G7 checks
 conformance, M1-19 owns throttling), builds the matrix world, starts the credential broker and runs
 `uv run --project tools --locked pytest -p no:cacheprovider tools/contract/live_contract.py` from the
 repository root. It prints `CONTRACT_SEED` and fails when pytest exits non-zero. The server runs

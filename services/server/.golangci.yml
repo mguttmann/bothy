@@ -194,6 +194,12 @@ linters:
       - path: ^internal/identity/adapters/postgres/sqlcgen/refresh\.sql\.go$
         linters: [gosec]
         text: "G101:"
+      # The queries of push registrations (M3-22) name the columns token and preview_token_hash;
+      # they bind the device token and the HMAC of the preview token as parameters, never a secret
+      # of the server.
+      - path: ^internal/notify/adapters/postgres/sqlcgen/registrations_write\.sql\.gen\.go$
+        linters: [gosec]
+        text: "G101:"
       # The same for api_tokens (M1-44): the lookup binds token_hash, never the token itself.
       - path: ^internal/identity/adapters/postgres/sqlcgen/apitokens\.sql\.go$
         linters: [gosec]
