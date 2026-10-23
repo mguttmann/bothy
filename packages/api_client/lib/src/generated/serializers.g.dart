@@ -19,6 +19,8 @@ Serializers _$serializers =
           ..add(AccessExpiringPayload.serializer)
           ..add(AccessExpiringPayloadKindEnum.serializer)
           ..add(AccessExplanation.serializer)
+          ..add(AccessLabel.serializer)
+          ..add(AccessLabels.serializer)
           ..add(AccessSource.serializer)
           ..add(AccessSourceKindEnum.serializer)
           ..add(AccessSourceRuleEnum.serializer)
@@ -113,6 +115,7 @@ Serializers _$serializers =
           ..add(ChannelCreatedEvent.serializer)
           ..add(ChannelCreatedEventTypeEnum.serializer)
           ..add(ChannelKind.serializer)
+          ..add(ChannelLabel.serializer)
           ..add(ChannelOperator.serializer)
           ..add(ChannelPayload.serializer)
           ..add(ChannelReadOnlySet.serializer)
@@ -214,6 +217,9 @@ Serializers _$serializers =
           ..add(EventPage.serializer)
           ..add(EventResource.serializer)
           ..add(EventScope.serializer)
+          ..add(ExpiringAccessItem.serializer)
+          ..add(ExpiringAccessItemKindEnum.serializer)
+          ..add(ExpiringAccessPage.serializer)
           ..add(ExtensionSessionCreate.serializer)
           ..add(ExtensionSessionCreateClientComponentEnum.serializer)
           ..add(FeatureFlag.serializer)
@@ -456,6 +462,10 @@ Serializers _$serializers =
           ..add(PasskeyLoginCompleteRequest.serializer)
           ..add(PasskeyRegisterComplete.serializer)
           ..add(PasswordLoginRequest.serializer)
+          ..add(PermissionHint.serializer)
+          ..add(PermissionHintKind.serializer)
+          ..add(PermissionHintPage.serializer)
+          ..add(PermissionHintRulesEnum.serializer)
           ..add(Pin.serializer)
           ..add(PinAddedEvent.serializer)
           ..add(PinAddedEventTypeEnum.serializer)
@@ -1034,6 +1044,12 @@ Serializers _$serializers =
             () => ListBuilder<Event>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(ExpiringAccessItem),
+            ]),
+            () => ListBuilder<ExpiringAccessItem>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(FeatureFlag)]),
             () => ListBuilder<FeatureFlag>(),
           )
@@ -1211,12 +1227,42 @@ Serializers _$serializers =
             () => ListBuilder<Owner>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(PermissionHint)]),
+            () => ListBuilder<PermissionHint>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [
+              const FullType(PermissionHintRulesEnum),
+            ]),
+            () => ListBuilder<PermissionHintRulesEnum>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(String)]),
+            () => ListBuilder<String>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Pin)]),
             () => ListBuilder<Pin>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(Price)]),
             () => ListBuilder<Price>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(PrincipalRef)]),
+            () => ListBuilder<PrincipalRef>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AccessLabel)]),
+            () => ListBuilder<AccessLabel>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(AccessLabel)]),
+            () => ListBuilder<AccessLabel>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, const [const FullType(ChannelLabel)]),
+            () => ListBuilder<ChannelLabel>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, const [const FullType(PushRegistration)]),

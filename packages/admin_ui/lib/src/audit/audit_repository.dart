@@ -11,9 +11,6 @@
 /// requirement 15): this interface has no such call.
 library;
 
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart';
 import 'package:dio/dio.dart';
@@ -320,9 +317,10 @@ final class ApiAuditRepository implements AuditRepository {
     required DateTime to,
     required String purpose,
   }) async* {
-    // A streamed response hides its problem body from the step-up interceptor, so the step-up
-    // (and a 403) comes from one entry of the same range first; the export follows within
-    // the step-up's validity (08 6.2; docs/DECISIONS.md D-M4-29-4).
+    // The step-up (and a 403) comes from one entry of the same range first; the export follows
+    // within the step-up's validity (08 6.2; docs/DECISIONS.md D-M4-29-4). When the step-up
+    // ends in between, the client decodes the refused stream's problem before the step-up
+    // interceptors see it (`BinaryProblemInterceptor`), so the export's own step-up runs.
     await _call(
       () => _audit.listAuditEvents(
         from: from.toUtc(),
@@ -347,7 +345,7 @@ final class ApiAuditRepository implements AuditRepository {
     } on DioException catch (e) {
       final cause = e.error;
       if (cause is AuthException) throw cause;
-      throw SelfActionFailed(await _streamProblem(e));
+      throw SelfActionFailed(ApiProblem.of(e));
     }
     try {
       yield* response.data!.stream;
@@ -371,31 +369,6 @@ final class ApiAuditRepository implements AuditRepository {
       {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
     ],
   };
-
-  /// The problem of a refused export: the streamed body read as JSON, or the status alone.
-  static Future<ApiProblem?> _streamProblem(DioException e) async {
-    final response = e.response;
-    if (response == null) return null;
-    Object? body;
-    final data = response.data;
-    if (data is ResponseBody) {
-      try {
-        final bytes = BytesBuilder(copy: false);
-        await data.stream.forEach(bytes.add);
-        body = jsonDecode(utf8.decode(bytes.takeBytes()));
-      } on Object {
-        body = null;
-      }
-    }
-    return ApiProblem.fromResponse(
-      Response<Object?>(
-        requestOptions: response.requestOptions,
-        statusCode: response.statusCode,
-        headers: response.headers,
-        data: body,
-      ),
-    );
-  }
 
   static AuditEntry _entry(AuditEvent e) => AuditEntry(
     seq: e.seq,

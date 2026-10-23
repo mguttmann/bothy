@@ -845,6 +845,17 @@ final class ApiAdminRepository implements AdminRepository {
   @override
   Future<ViewAsResult> viewAs(String userId, {required String purpose}) =>
       _access.viewAs(userId, purpose: purpose);
+
+  @override
+  Future<AccessHintPage> permissionHints({
+    String? spaceId,
+    AccessHintKind? kind,
+    String? cursor,
+  }) => _access.permissionHints(spaceId: spaceId, kind: kind, cursor: cursor);
+
+  @override
+  Future<ExpiringPage> expiringAccess({String? spaceId, String? cursor}) =>
+      _access.expiringAccess(spaceId: spaceId, cursor: cursor);
   late final ApiAuditRepository _auditLog = ApiAuditRepository(_api);
 
   UsersApi get _users => _api.getUsersApi();

@@ -57,8 +57,10 @@ final class GrantSubjectChoice {
 /// one transaction (BR-07). Success shows [GuidedResult] and then [onCreated]; a failure
 /// changed nothing and shows the problem, with the conflicts that remain.
 ///
-/// [target], [subject] and [level] preselect parts of the request and [step] opens a step
-/// (0 to 2), for example from "Who has access?" or the grants of a target. [onCreated]
+/// [target], [subject], [level] and [capabilities] preselect parts of the request and [step]
+/// opens a step (0 to 2), for example from "Who has access?", the grants of a target or
+/// "Extend" of an expiring grant (M6-07, which also passes its [title]). The reason and the
+/// last day are never preselected: every grant needs its own reason (07 9.5). [onCreated]
 /// receives the new grant; [onCancel] adds a "Cancel" button.
 ///
 /// Example:
@@ -73,6 +75,8 @@ class GrantWizard extends StatefulWidget {
     this.target,
     this.subject,
     this.level,
+    this.capabilities = const {},
+    this.title,
     this.step = 0,
     this.timeZone = 'UTC',
     this.clock = DateTime.now,
@@ -86,6 +90,12 @@ class GrantWizard extends StatefulWidget {
 
   /// The preselected level, or null.
   final AccessLevel? level;
+
+  /// The preselected capabilities (ignored for a host target, which has exactly `terminal`).
+  final Set<AccessCapability> capabilities;
+
+  /// The heading instead of "Create access grant", or null.
+  final String? title;
 
   /// The step that opens first (0: who, 1: where, 2: level).
   final int step;
@@ -187,6 +197,9 @@ class _GrantWizardState extends State<GrantWizard>
     _step = widget.step.clamp(0, 2);
     _level = widget.level;
     _setTarget(widget.target);
+    if (widget.target?.kind != AdminTargetKind.host) {
+      _capabilities.addAll(widget.capabilities);
+    }
     if (widget.subject case final subject?) {
       _kind = subject.kind;
       _subjectId = subject.id;
@@ -459,7 +472,7 @@ class _GrantWizardState extends State<GrantWizard>
               child: Semantics(
                 header: true,
                 child: Text(
-                  l.adminGrantsCreate,
+                  widget.title ?? l.adminGrantsCreate,
                   style: dsTextStyle(DsType.title)
                       .copyWith(color: colors.textPrimary),
                 ),

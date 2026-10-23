@@ -379,4 +379,56 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets(
+    'prefilled capabilities and title: the request carries them, the reason stays empty',
+    (tester) async {
+      await pumpInApp(
+        tester,
+        GrantWizard(
+          repository: repository,
+          subject: const GrantSubjectChoice(
+            AdminSubjectKind.user,
+            'sam',
+            'Sam',
+          ),
+          target: campaigns,
+          level: AccessLevel.trigger,
+          capabilities: const {AccessCapability.upload},
+          step: 2,
+          title: 'Extend the access grant for Sam',
+          timeZone: 'Europe/Berlin',
+          clock: testClock,
+          debounce: Duration.zero,
+          onCreated: created.add,
+        ),
+        navigatorKey: navigator,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Extend the access grant for Sam'), findsOneWidget);
+      expect(find.text('Create access grant'), findsNothing);
+      expect(repository.previews.last.capabilities, {AccessCapability.upload});
+      expect(repository.previews.last.reason, isEmpty);
+      final reason = tester.widget<TextField>(
+        find.byKey(const ValueKey('wizard.reason')),
+      );
+      expect(reason.controller!.text, isEmpty);
+      FilledButton confirm() => tester.widget<FilledButton>(
+        find.byKey(const ValueKey('wizard.confirm')),
+      );
+      expect(confirm().onPressed, isNull, reason: 'the reason is required');
+
+      await type(tester, 'wizard.until', '2027-03-31');
+      await type(tester, 'wizard.reason', 'Next quarter');
+      await tap(tester, 'wizard.confirm');
+      await tap(tester, 'stepUp.continue');
+
+      expect(repository.calls, [
+        'createGrant sam channel.campaigns trigger Next quarter',
+      ]);
+      expect(created.single.capabilities, [AccessCapability.upload]);
+      expect(created.single.expiresAt, DateTime.utc(2027, 3, 31, 22));
+    },
+  );
 }

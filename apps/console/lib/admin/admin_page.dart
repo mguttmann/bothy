@@ -17,9 +17,9 @@ import 'manifest_target.dart';
 
 /// The page frame of an administration page of the console (brief M6-04 Scope): the screen of
 /// `admin_ui` for the place of [route] at the full width of the browser (01 5.5), the tabs
-/// "Groups" and "Access grants" on the groups page and "Apps" and "Incoming webhooks" on the
-/// apps page (M6-08), the structure of "View as person", and the placeholder on a page whose
-/// screen comes with a later ticket.
+/// "Groups", "Access grants", "Permission hints" and "Expiring soon" on the groups page
+/// (M6-07) and "Apps" and "Incoming webhooks" on the apps page (M6-08), the structure of
+/// "View as person", and the placeholder on a page whose screen comes with a later ticket.
 ///
 /// The screens are the desktop's ([AdminBody]); the console passes its repository, its time
 /// zone, the browser download as the save target of the audit export, the browser's file input
@@ -67,6 +67,13 @@ class ConsoleAdminPage extends StatelessWidget {
         AdminSection.grants,
         (l) => l.adminNavGrants,
         'console.groups.tab.grants',
+      ),
+      // The lists of 07 9.4 and 9.5 (M6-07) below the same page.
+      (AdminSection.hints, (l) => l.adminNavHints, 'console.groups.tab.hints'),
+      (
+        AdminSection.expiring,
+        (l) => l.adminNavExpiring,
+        'console.groups.tab.expiring',
       ),
     ],
     ConsolePage.apps => [

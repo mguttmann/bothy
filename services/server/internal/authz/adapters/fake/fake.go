@@ -813,3 +813,63 @@ func (s *Hosts) AssignedTo(_ context.Context, userID ids.ID) ([]ids.ID, error) {
 	}
 	return sortIDs(out), nil
 }
+
+// Compile-time check: Policies also lists the agents (M6-07).
+var _ authz.AgentDirectory = (*Policies)(nil)
+
+// AgentIDs implements authz.AgentDirectory: every agent with a policy, ascending.
+func (s *Policies) AgentIDs(_ context.Context) ([]ids.ID, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]ids.ID, 0, len(s.policies))
+	for id := range s.policies {
+		out = append(out, id)
+	}
+	return sortIDs(out), nil
+}
+
+// Tokens is an in-memory authz.TokenExpirySource (M6-07): the tokens of agents and apps put with
+// Put.
+type Tokens struct {
+	failer
+	mu   sync.Mutex
+	list []authz.ExpiringToken
+}
+
+// Compile-time check.
+var _ authz.TokenExpirySource = (*Tokens)(nil)
+
+// NewTokens returns an empty source.
+func NewTokens() *Tokens { return &Tokens{} }
+
+// Put adds a token.
+func (s *Tokens) Put(t authz.ExpiringToken) {
+	s.mu.Lock()
+	s.list = append(s.list, t)
+	s.mu.Unlock()
+}
+
+// ExpiringTokens implements authz.TokenExpirySource.
+func (s *Tokens) ExpiringTokens(_ context.Context, t, until time.Time) ([]authz.ExpiringToken, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []authz.ExpiringToken
+	for _, tok := range s.list {
+		if tok.ExpiresAt.After(t) && !tok.ExpiresAt.After(until) {
+			out = append(out, tok)
+		}
+	}
+	slices.SortFunc(out, func(a, b authz.ExpiringToken) int {
+		if c := a.ExpiresAt.Compare(b.ExpiresAt); c != 0 {
+			return c
+		}
+		return compareIDs(a.ID, b.ID)
+	})
+	return out, nil
+}

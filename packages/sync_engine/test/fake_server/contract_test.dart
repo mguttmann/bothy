@@ -374,6 +374,40 @@ void main() {
     await access.viewAsUser(userId: w.sam.id);
     await access.revokeGrant(grantId: grant.id, reasonBody: why);
 
+    // Permission hints and expiring access (M6-07): a personal agent of Alex and a grant that
+    // expires within `authz.expiry_reminder_lead`, so the contract check sees real items.
+    world.addAgent(
+      handle: 'texter',
+      displayName: 'Texter',
+      billingMode: 'personal',
+      credentialHolderId: w.alex.id,
+    );
+    final expiring = (await access.createGrant(
+      grantCreate: GrantCreate(
+        (b) => b
+          ..subjectKind = GrantSubjectKind.user
+          ..subjectId = w.sam.id
+          ..targetKind = TargetKind.channel
+          ..targetId = w.support
+          ..level = Level.read
+          ..expiresAt = world.now().add(const Duration(hours: 1))
+          ..reason = 'Cover',
+      ),
+    )).data!;
+    final hints = (await access.listPermissionHints()).data!;
+    expect(
+      hints.items.map((x) => x.kind),
+      contains(PermissionHintKind.agentPersonal),
+    );
+    await access.listPermissionHints(
+      spaceId: w.space,
+      kind: PermissionHintKind.grantToDisabled,
+      limit: 1,
+    );
+    final soon = (await access.listExpiringAccess()).data!;
+    expect([for (final x in soon.items) x.grant?.id], contains(expiring.id));
+    await access.listExpiringAccess(spaceId: w.space, limit: 1);
+
     // Agents (M4-28): the card, the backend policy per agent and for all, the holder, and the
     // agent tokens. Sam holds the personal agent first, so moving it to Alex, the only owner
     // and so the only triggerer, keeps I1 (10 5.4).
@@ -608,7 +642,9 @@ void main() {
     };
     expect(h.server.rest.handled.difference(served), isEmpty);
     expect(h.server.violations, isEmpty);
-  });
+    // One walk over every handler: its run time grows with each operation and with the load of
+    // the machine, so no fixed wall-clock bound applies (rules for deterministic tests).
+  }, timeout: Timeout.none);
 
   test('every frame of a gateway session validates', () async {
     final alex = h.device();

@@ -18,6 +18,12 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListExpiringAccess List the access that expires soon
+	// (GET /access/expiring)
+	ListExpiringAccess(w http.ResponseWriter, r *http.Request, params ListExpiringAccessParams)
+	// ListPermissionHints List the permission hints
+	// (GET /access/hints)
+	ListPermissionHints(w http.ResponseWriter, r *http.Request, params ListPermissionHintsParams)
 	// ListAgents List visible agents
 	// (GET /agents)
 	ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams)
@@ -769,6 +775,137 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListExpiringAccess operation middleware
+func (siw *ServerInterfaceWrapper) ListExpiringAccess(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListExpiringAccessParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "space_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "space_id", r.URL.Query(), &params.SpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "space_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListExpiringAccess(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPermissionHints operation middleware
+func (siw *ServerInterfaceWrapper) ListPermissionHints(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPermissionHintsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "space_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "space_id", r.URL.Query(), &params.SpaceId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "space_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "space_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPermissionHints(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListAgents operation middleware
 func (siw *ServerInterfaceWrapper) ListAgents(w http.ResponseWriter, r *http.Request) {
@@ -10547,6 +10684,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/grants/{grant_id}/revoke", wrapper.RevokeGrant)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/spaces/{space_id}/access", wrapper.ExplainSpaceAccess)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/channels/{channel_id}/access", wrapper.ExplainChannelAccess)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/access/hints", wrapper.ListPermissionHints)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/access/expiring", wrapper.ListExpiringAccess)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance", wrapper.GetInstance)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/settings", wrapper.ListInstanceSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/settings/{key}", wrapper.PutInstanceSetting)
@@ -10893,6 +11032,12 @@ type UnsupportedMediaTypeApplicationProblemPlusJSONResponse struct {
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListExpiringAccess List the access that expires soon
+	// (GET /access/expiring)
+	ListExpiringAccess(ctx context.Context, request ListExpiringAccessRequestObject) (ListExpiringAccessResponseObject, error)
+	// ListPermissionHints List the permission hints
+	// (GET /access/hints)
+	ListPermissionHints(ctx context.Context, request ListPermissionHintsRequestObject) (ListPermissionHintsResponseObject, error)
 	// ListAgents List visible agents
 	// (GET /agents)
 	ListAgents(ctx context.Context, request ListAgentsRequestObject) (ListAgentsResponseObject, error)
@@ -11673,6 +11818,58 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListExpiringAccess operation middleware
+func (sh *strictHandler) ListExpiringAccess(w http.ResponseWriter, r *http.Request, params ListExpiringAccessParams) {
+	var request ListExpiringAccessRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListExpiringAccess(ctx, request.(ListExpiringAccessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListExpiringAccess")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListExpiringAccessResponseObject); ok {
+		if err := validResponse.VisitListExpiringAccessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPermissionHints operation middleware
+func (sh *strictHandler) ListPermissionHints(w http.ResponseWriter, r *http.Request, params ListPermissionHintsParams) {
+	var request ListPermissionHintsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPermissionHints(ctx, request.(ListPermissionHintsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPermissionHints")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPermissionHintsResponseObject); ok {
+		if err := validResponse.VisitListPermissionHintsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListAgents operation middleware

@@ -13,8 +13,14 @@ import '../routes.dart';
 /// The path segment of "View as person" below the people page.
 const String viewAsSegment = 'view-as';
 
-/// The path segment of the access grants below the groups page.
-const String grantsSegment = 'grants';
+/// The lists below the groups page next to the groups (01 5.5 "Groups, grants"): the access
+/// grants (M4-27), the permission hints and the access that expires soon (M6-07); each is
+/// `/groups/<segment>` with the segment of its section.
+const List<AdminSection> groupsPageLists = [
+  AdminSection.grants,
+  AdminSection.hints,
+  AdminSection.expiring,
+];
 
 /// The path segment of the incoming webhooks below the apps page (brief M6-08); the channel is
 /// chosen on the screen and never enters the path (ADR 0028).
@@ -51,7 +57,10 @@ final class ConsoleRoute {
   factory ConsoleRoute.forAdmin(AdminLocation location) =>
       ConsoleRoute(switch (location.section) {
         AdminSection.people => ConsolePage.people,
-        AdminSection.groups || AdminSection.grants => ConsolePage.groups,
+        AdminSection.groups ||
+        AdminSection.grants ||
+        AdminSection.hints ||
+        AdminSection.expiring => ConsolePage.groups,
         AdminSection.devices => ConsolePage.devices,
         AdminSection.agents => ConsolePage.agents,
         AdminSection.audit => ConsolePage.audit,
@@ -92,11 +101,11 @@ final class ConsoleRoute {
     if (parent == ConsolePage.people && child == viewAsSegment) {
       return const ConsoleRoute(ConsolePage.people, viewAs: true);
     }
-    if (parent == ConsolePage.groups && child == grantsSegment) {
-      return const ConsoleRoute(
-        ConsolePage.groups,
-        admin: AdminLocation(AdminSection.grants),
-      );
+    if (parent == ConsolePage.groups) {
+      final list = groupsPageLists.where((s) => s.segment == child).firstOrNull;
+      if (list != null) {
+        return ConsoleRoute(ConsolePage.groups, admin: AdminLocation(list));
+      }
     }
     if (parent == ConsolePage.apps && child == incomingWebhooksSegment) {
       return const ConsoleRoute(
@@ -114,8 +123,8 @@ final class ConsoleRoute {
     final at = admin;
     if (viewAs) return '${ConsolePage.people.path}/$viewAsSegment';
     if (at == null) return page.path;
-    if (at.section == AdminSection.grants) {
-      return '${ConsolePage.groups.path}/$grantsSegment';
+    if (groupsPageLists.contains(at.section)) {
+      return '${ConsolePage.groups.path}/${at.section.segment}';
     }
     if (at.section == AdminSection.webhooks) {
       return '${ConsolePage.apps.path}/$incomingWebhooksSegment';

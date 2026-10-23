@@ -463,3 +463,53 @@ func grantMatches(f app.GrantFilter, g domain.Grant, t time.Time) bool {
 	return (g.Target.Kind == domain.TargetSpace && slices.Contains(f.ManageSpaces, g.Target.SpaceID)) ||
 		(g.Target.Kind == domain.TargetChannel && slices.Contains(f.ManageChannels, g.Target.ChannelID))
 }
+
+// ExpiringGrants implements app.Store (M6-07).
+func (s *Store) ExpiringGrants(_ context.Context, t, until time.Time) ([]domain.Grant, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Grant
+	for _, g := range s.grants {
+		if !g.RevokedAt.IsZero() || !domain.ExpiresWithin(g.ExpiresAt, t, until) {
+			continue
+		}
+		if g.Subject.Kind == domain.SubjectGroup && !s.groups[g.Subject.GroupID].DeletedAt.IsZero() {
+			continue
+		}
+		out = append(out, g)
+	}
+	slices.SortFunc(out, func(a, b domain.Grant) int {
+		if c := a.ExpiresAt.Compare(b.ExpiresAt); c != 0 {
+			return c
+		}
+		return compareIDs(a.ID, b.ID)
+	})
+	return out, nil
+}
+
+// ExpiringMemberships implements app.Store (M6-07).
+func (s *Store) ExpiringMemberships(_ context.Context, t, until time.Time) ([]domain.MembershipWithGroup, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.MembershipWithGroup
+	for _, m := range s.memberships {
+		g, ok := s.groups[m.GroupID]
+		if !ok || !g.DeletedAt.IsZero() || !m.RemovedAt.IsZero() || !domain.ExpiresWithin(m.ExpiresAt, t, until) {
+			continue
+		}
+		out = append(out, domain.MembershipWithGroup{Membership: m, Group: g})
+	}
+	slices.SortFunc(out, func(a, b domain.MembershipWithGroup) int {
+		if c := a.Membership.ExpiresAt.Compare(b.Membership.ExpiresAt); c != 0 {
+			return c
+		}
+		return compareIDs(a.Membership.ID, b.Membership.ID)
+	})
+	return out, nil
+}

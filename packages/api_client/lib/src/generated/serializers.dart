@@ -21,6 +21,8 @@ import 'package:api_client/src/generated/model/access_entry.dart';
 import 'package:api_client/src/generated/model/access_expiring_event.dart';
 import 'package:api_client/src/generated/model/access_expiring_payload.dart';
 import 'package:api_client/src/generated/model/access_explanation.dart';
+import 'package:api_client/src/generated/model/access_label.dart';
+import 'package:api_client/src/generated/model/access_labels.dart';
 import 'package:api_client/src/generated/model/access_source.dart';
 import 'package:api_client/src/generated/model/access_target.dart';
 import 'package:api_client/src/generated/model/access_target_kind.dart';
@@ -93,6 +95,7 @@ import 'package:api_client/src/generated/model/channel_behavior_put.dart';
 import 'package:api_client/src/generated/model/channel_create.dart';
 import 'package:api_client/src/generated/model/channel_created_event.dart';
 import 'package:api_client/src/generated/model/channel_kind.dart';
+import 'package:api_client/src/generated/model/channel_label.dart';
 import 'package:api_client/src/generated/model/channel_operator.dart';
 import 'package:api_client/src/generated/model/channel_payload.dart';
 import 'package:api_client/src/generated/model/channel_read_only_set.dart';
@@ -171,6 +174,8 @@ import 'package:api_client/src/generated/model/event_envelope.dart';
 import 'package:api_client/src/generated/model/event_page.dart';
 import 'package:api_client/src/generated/model/event_resource.dart';
 import 'package:api_client/src/generated/model/event_scope.dart';
+import 'package:api_client/src/generated/model/expiring_access_item.dart';
+import 'package:api_client/src/generated/model/expiring_access_page.dart';
 import 'package:api_client/src/generated/model/extension_session_create.dart';
 import 'package:api_client/src/generated/model/feature_flag.dart';
 import 'package:api_client/src/generated/model/feature_flag_list.dart';
@@ -369,6 +374,9 @@ import 'package:api_client/src/generated/model/passkey_login_begin_request.dart'
 import 'package:api_client/src/generated/model/passkey_login_complete_request.dart';
 import 'package:api_client/src/generated/model/passkey_register_complete.dart';
 import 'package:api_client/src/generated/model/password_login_request.dart';
+import 'package:api_client/src/generated/model/permission_hint.dart';
+import 'package:api_client/src/generated/model/permission_hint_kind.dart';
+import 'package:api_client/src/generated/model/permission_hint_page.dart';
 import 'package:api_client/src/generated/model/pin.dart';
 import 'package:api_client/src/generated/model/pin_added_event.dart';
 import 'package:api_client/src/generated/model/pin_list.dart';
@@ -601,6 +609,8 @@ part 'serializers.g.dart';
   AccessExpiringEvent,
   AccessExpiringPayload,
   AccessExplanation,
+  AccessLabel,
+  AccessLabels,
   AccessSource,
   AccessTarget,
   AccessTargetKind,
@@ -673,6 +683,7 @@ part 'serializers.g.dart';
   ChannelCreate,
   ChannelCreatedEvent,
   ChannelKind,
+  ChannelLabel,
   ChannelOperator,
   ChannelPayload,
   ChannelReadOnlySet,
@@ -752,6 +763,8 @@ part 'serializers.g.dart';
   EventPage,
   EventResource,
   EventScope,
+  ExpiringAccessItem,
+  ExpiringAccessPage,
   ExtensionSessionCreate,
   FeatureFlag,
   FeatureFlagList,
@@ -950,6 +963,9 @@ part 'serializers.g.dart';
   PasskeyLoginCompleteRequest,
   PasskeyRegisterComplete,
   PasswordLoginRequest,
+  PermissionHint,
+  PermissionHintKind,
+  PermissionHintPage,
   Pin,
   PinAddedEvent,
   PinList,
@@ -1265,6 +1281,10 @@ Serializers serializers =
             () => ListBuilder<FieldError>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(PermissionHint)]),
+            () => ListBuilder<PermissionHint>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(UnreadThread)]),
             () => ListBuilder<UnreadThread>(),
           )
@@ -1293,6 +1313,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(BuiltMap)]),
             () => ListBuilder<BuiltMap>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(PrincipalRef)]),
+            () => ListBuilder<PrincipalRef>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(AccessEffect)]),
@@ -1365,6 +1389,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(CommandOption)]),
             () => ListBuilder<CommandOption>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ExpiringAccessItem)]),
+            () => ListBuilder<ExpiringAccessItem>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(StatsLiveRate)]),
@@ -1498,6 +1526,10 @@ Serializers serializers =
             () => ListBuilder<Message>(),
           )
           ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(AccessLabel)]),
+            () => ListBuilder<AccessLabel>(),
+          )
+          ..addBuilderFactory(
             const FullType(BuiltList, [FullType(Owner)]),
             () => ListBuilder<Owner>(),
           )
@@ -1540,6 +1572,10 @@ Serializers serializers =
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(GdprRequest)]),
             () => ListBuilder<GdprRequest>(),
+          )
+          ..addBuilderFactory(
+            const FullType(BuiltList, [FullType(ChannelLabel)]),
+            () => ListBuilder<ChannelLabel>(),
           )
           ..addBuilderFactory(
             const FullType(BuiltList, [FullType(UserSetting)]),

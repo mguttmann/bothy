@@ -132,6 +132,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listChannelCommands
   - listChannelThreads
   - listEvents
+  - listExpiringAccess
   - listFeatureFlags
   - listForumTags
   - listGrants
@@ -152,6 +153,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listMySettings
   - listMyTemplates
   - listOwners
+  - listPermissionHints
   - listPins
   - listReactions
   - listRunSteps

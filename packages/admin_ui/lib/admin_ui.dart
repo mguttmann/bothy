@@ -56,6 +56,13 @@
 /// [AppSubscriptionsSection] with its deliveries, the [IncomingWebhooksView] per channel with
 /// the composed "incoming app", the shared [OnceOnlySecret] for every secret shown once, and
 /// the data source [AppsRepository] ([ApiAppsRepository]), which [AdminRepository] includes.
+///
+/// M6-07 adds the lists of 07 9.4 and 9.5 as the places [AdminSection.hints] and
+/// [AdminSection.expiring]: [PermissionHintsView] (H1, grants to disabled principals, blocked
+/// `trigger` grants, agents in mode `personal`; each hint as a sentence from the templates of
+/// `l10n`, see [hintLines]) and [ExpiringAccessView] (grants, memberships and tokens that
+/// expire soon, with "Extend" as a new grant and then the revocation of the old one), and
+/// their data in [AccessRepository] ([AccessHintPage], [ExpiringPage], [AccessPageLabels]).
 library;
 
 export 'src/access/source_chain.dart';
@@ -110,6 +117,10 @@ export 'src/grants/revoke_grant_dialog.dart';
 export 'src/groups/group_detail.dart';
 export 'src/groups/groups_list.dart';
 export 'src/groups/member_editor.dart';
+export 'src/hints/access_list.dart' show AccessListView;
+export 'src/hints/expiring_access_view.dart';
+export 'src/hints/hint_texts.dart';
+export 'src/hints/permission_hints_view.dart';
 export 'src/hosts/create_host_dialog.dart';
 export 'src/hosts/doctor_results.dart';
 export 'src/hosts/fingerprint_confirm.dart';

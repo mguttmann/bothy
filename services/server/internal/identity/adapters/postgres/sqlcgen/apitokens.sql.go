@@ -166,6 +166,47 @@ func (q *Queries) ListActiveAPITokens(ctx context.Context, arg ListActiveAPIToke
 	return items, nil
 }
 
+const listExpiringBotTokens = `-- name: ListExpiringBotTokens :many
+SELECT t.id, t.principal_id, t.expires_at
+FROM api_tokens t
+JOIN principals p ON p.id = t.principal_id
+WHERE t.revoked_at IS NULL AND t.expires_at > $1 AND t.expires_at <= $2 AND p.kind IN ('agent', 'app')
+ORDER BY t.expires_at, t.id
+`
+
+type ListExpiringBotTokensParams struct {
+	At    pgtype.Timestamptz
+	Until pgtype.Timestamptz
+}
+
+type ListExpiringBotTokensRow struct {
+	ID          pgtype.UUID
+	PrincipalID pgtype.UUID
+	ExpiresAt   pgtype.Timestamptz
+}
+
+// "Expiring soon" (07 section 9.4, M6-07): the active tokens of agents and apps expiring in
+// (at, until], never personal tokens, never the hash or the prefix.
+func (q *Queries) ListExpiringBotTokens(ctx context.Context, arg ListExpiringBotTokensParams) ([]ListExpiringBotTokensRow, error) {
+	rows, err := q.db.Query(ctx, listExpiringBotTokens, arg.At, arg.Until)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListExpiringBotTokensRow
+	for rows.Next() {
+		var i ListExpiringBotTokensRow
+		if err := rows.Scan(&i.ID, &i.PrincipalID, &i.ExpiresAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockAPIToken = `-- name: LockAPIToken :one
 SELECT id, principal_id, name, token_prefix, token_hash, scopes, dpop_jkt, expires_at, created_by, created_at, last_used_at, revoked_at, revoked_by FROM api_tokens WHERE id = $1 FOR UPDATE
 `

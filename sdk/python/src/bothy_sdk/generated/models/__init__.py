@@ -10,6 +10,8 @@ from .access_expiring_event_type import AccessExpiringEventType
 from .access_expiring_payload import AccessExpiringPayload
 from .access_expiring_payload_kind import AccessExpiringPayloadKind
 from .access_explanation import AccessExplanation
+from .access_label import AccessLabel
+from .access_labels import AccessLabels
 from .access_source import AccessSource
 from .access_source_kind import AccessSourceKind
 from .access_source_rule import AccessSourceRule
@@ -107,6 +109,7 @@ from .channel_create_kind import ChannelCreateKind
 from .channel_created_event import ChannelCreatedEvent
 from .channel_created_event_type import ChannelCreatedEventType
 from .channel_kind import ChannelKind
+from .channel_label import ChannelLabel
 from .channel_operator import ChannelOperator
 from .channel_payload import ChannelPayload
 from .channel_read_only_set import ChannelReadOnlySet
@@ -226,6 +229,9 @@ from .event_envelope_audience import EventEnvelopeAudience
 from .event_page import EventPage
 from .event_resource import EventResource
 from .event_scope import EventScope
+from .expiring_access_item import ExpiringAccessItem
+from .expiring_access_item_kind import ExpiringAccessItemKind
+from .expiring_access_page import ExpiringAccessPage
 from .extension_session_create import ExtensionSessionCreate
 from .extension_session_create_client_component import (
     ExtensionSessionCreateClientComponent,
@@ -475,6 +481,10 @@ from .passkey_login_begin_request import PasskeyLoginBeginRequest
 from .passkey_login_complete_request import PasskeyLoginCompleteRequest
 from .passkey_register_complete import PasskeyRegisterComplete
 from .password_login_request import PasswordLoginRequest
+from .permission_hint import PermissionHint
+from .permission_hint_kind import PermissionHintKind
+from .permission_hint_page import PermissionHintPage
+from .permission_hint_rules_item import PermissionHintRulesItem
 from .pin import Pin
 from .pin_added_event import PinAddedEvent
 from .pin_added_event_type import PinAddedEventType
@@ -775,6 +785,8 @@ __all__ = (
     "AccessExpiringPayload",
     "AccessExpiringPayloadKind",
     "AccessExplanation",
+    "AccessLabel",
+    "AccessLabels",
     "AccessSource",
     "AccessSourceKind",
     "AccessSourceRule",
@@ -870,6 +882,7 @@ __all__ = (
     "ChannelCreatedEvent",
     "ChannelCreatedEventType",
     "ChannelKind",
+    "ChannelLabel",
     "ChannelOperator",
     "ChannelPayload",
     "ChannelReadOnlySet",
@@ -977,6 +990,9 @@ __all__ = (
     "EventPage",
     "EventResource",
     "EventScope",
+    "ExpiringAccessItem",
+    "ExpiringAccessItemKind",
+    "ExpiringAccessPage",
     "ExtensionSessionCreate",
     "ExtensionSessionCreateClientComponent",
     "FeatureFlag",
@@ -1224,6 +1240,10 @@ __all__ = (
     "PasskeyLoginCompleteRequest",
     "PasskeyRegisterComplete",
     "PasswordLoginRequest",
+    "PermissionHint",
+    "PermissionHintKind",
+    "PermissionHintPage",
+    "PermissionHintRulesItem",
     "Pin",
     "PinAddedEvent",
     "PinAddedEventType",

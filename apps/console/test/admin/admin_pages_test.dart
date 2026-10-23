@@ -112,6 +112,58 @@ void main() {
       expect(await picker(), isNull);
     });
 
+    testWidgets('Groups has the tabs Permission hints and Expiring soon', (
+      tester,
+    ) async {
+      browserWindow(tester);
+      final b = signedIn();
+      b.server.routes['GET /api/v1/access/hints'] = (_) => const Answer(200, {
+        'items': <Object>[],
+        'labels': {
+          'principals': <Object>[],
+          'groups': <Object>[],
+          'spaces': <Object>[],
+          'channels': <Object>[],
+        },
+      });
+      b.server.routes['GET /api/v1/access/expiring'] = (_) =>
+          const Answer(200, {
+            'items': <Object>[],
+            'labels': {
+              'principals': <Object>[],
+              'groups': <Object>[],
+              'spaces': <Object>[],
+              'channels': <Object>[],
+            },
+          });
+      final c = await pumpConsole(tester, b, location: '/groups');
+      expect(find.text('Permission hints'), findsOneWidget);
+      expect(find.text('Expiring soon'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('console.groups.tab.hints')));
+      await tester.pumpAndSettle();
+      expect(c.path, '/groups/hints');
+      expect(c.page, ConsolePage.groups);
+      expect(find.byType(PermissionHintsView), findsOneWidget);
+      expect(find.text('No permission hints.'), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(PermissionHintsView)).width,
+        greaterThan(880),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('console.groups.tab.expiring')),
+      );
+      await tester.pumpAndSettle();
+      expect(c.path, '/groups/expiring');
+      expect(find.byType(ExpiringAccessView), findsOneWidget);
+      expect(find.text('Nothing expires soon.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('console.groups.tab.groups')));
+      await tester.pumpAndSettle();
+      expect(c.path, '/groups');
+    });
+
     testWidgets('a page of a later ticket keeps its placeholder', (
       tester,
     ) async {

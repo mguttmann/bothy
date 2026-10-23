@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:convert';
+
 import 'package:api_client/api_client.dart';
 import 'package:auth/auth.dart' show StepUpCancelled, stepUpPurposeExtra;
 import 'package:console/console.dart';
@@ -71,7 +73,7 @@ class Harness {
     client = createConsoleApiClient(
       origin: Uri.parse('https://chat.example.com'),
       adapter: b.server,
-      onUnauthorized: (_) {},
+      onUnauthorized: (p) => unauthorized.add(p.code),
       interceptors: [
         ConsoleStepUpInterceptor(
           dio: () => client.dio,
@@ -88,6 +90,7 @@ class Harness {
   final List<StepUpMethod> methods;
   final bool active;
   final List<ConsoleProvider> oidc = [];
+  final List<String> unauthorized = [];
   int confirmed = 0;
   late final ConsoleActionStepUp stepUp;
   late final ApiClient api;
@@ -147,6 +150,28 @@ void main() {
     expect(h.b.passkeys.calls.single['challenge'], 'Zm9vYmFy');
     expect(h.confirmed, 1);
   });
+
+  test(
+    'a streamed download that needs a step-up runs it instead of logging out',
+    () async {
+      // The audit export asks for a stream; the step-up of its read can end between the check
+      // entry and the download (a CI run of A6 was logged out with http_401 that way).
+      final h = Harness(TestBrowser(), FakePrompt(const StepUpWithPasskey()));
+      stepUpFirst(h.b.server, 'GET /api/v1/audit/export');
+      final r = await h.api.dio.get<ResponseBody>(
+        '/audit/export',
+        options: Options(
+          responseType: ResponseType.stream,
+          extra: {stepUpPurposeExtra: 'Export the audit log'},
+        ),
+      );
+      expect(r.statusCode, 201);
+      expect(await utf8.decodeStream(r.data!.stream), contains('"id"'));
+      expect(h.prompt.purposes, ['Export the audit log']);
+      expect(h.b.server.to('GET', '/api/v1/audit/export'), hasLength(2));
+      expect(h.unauthorized, ['step_up_required']);
+    },
+  );
 
   test('two requests that need a step-up at once share one prompt', () async {
     final h = Harness(TestBrowser(), FakePrompt(const StepUpWithPasskey()));
