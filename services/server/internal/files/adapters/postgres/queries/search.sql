@@ -16,9 +16,11 @@
 -- first, at most max_candidates plus one; capped reports the extra row, which kept drops before
 -- ranking. score is ts_rank over the age from ref_time, never now(), divided by recency_seconds
 -- (0 for newest). page is the keyset strictly after the from position in the order of the sort
--- (score, id or created_at, id, both descending), page_limit rows (the page size plus one). The outer join on the one row of flag keeps capped on an empty page; its page
--- columns are then NULL. ts_headline reads only the page rows: the name followed by the
--- transcript in simple, cut at headline_max_chars.
+-- (score, id or created_at, id, both descending), page_size rows plus one that only tells a
+-- further page exists; n numbers them in that order. The outer join on the one row of flag keeps
+-- capped on an empty page; its page columns are then NULL. ts_headline reads only the page_size
+-- rows the caller returns (n <= page_size): the name followed by the transcript in simple, cut at
+-- headline_max_chars.
 WITH cand AS (
     SELECT f.id, f.created_at, f.original_name, f.transcript_text, f.search_vector,
            a.message_id, a.thread_id, a.channel_id
@@ -54,21 +56,25 @@ scored AS (
     FROM kept k
 ),
 page AS (
-    SELECT s.*
+    SELECT s.*,
+           row_number() OVER (ORDER BY CASE WHEN sqlc.arg(newest)::boolean THEN NULL ELSE s.score END DESC,
+                                       CASE WHEN sqlc.arg(newest)::boolean THEN s.created_at END DESC, s.id DESC) AS n
     FROM scored s
     WHERE NOT sqlc.arg(has_from)::boolean
        OR (sqlc.arg(newest)::boolean AND (s.created_at, s.id) < (sqlc.arg(from_created_at)::timestamptz, sqlc.arg(from_id)::uuid))
        OR (NOT sqlc.arg(newest)::boolean AND (s.score, s.id) < (sqlc.arg(from_score)::float8, sqlc.arg(from_id)::uuid))
     ORDER BY CASE WHEN sqlc.arg(newest)::boolean THEN NULL ELSE s.score END DESC,
              CASE WHEN sqlc.arg(newest)::boolean THEN s.created_at END DESC, s.id DESC
-    LIMIT sqlc.arg(page_limit)::integer
+    LIMIT sqlc.arg(page_size)::integer + 1
 )
 SELECT flag.capped::boolean AS capped,
        p.id AS file_id, p.message_id, p.thread_id, p.channel_id, p.created_at,
        coalesce(p.score, 0)::float8 AS score,
-       coalesce(ts_headline('simple'::regconfig,
-                            left(concat_ws(' ', p.original_name, p.transcript_text), sqlc.arg(headline_max_chars)::integer),
-                            sqlc.arg(tsq)::tsquery, sqlc.arg(headline_options)::text), '')::text AS headline
+       coalesce(CASE WHEN p.n <= sqlc.arg(page_size)::integer THEN
+                    ts_headline('simple'::regconfig,
+                                left(concat_ws(' ', p.original_name, p.transcript_text), sqlc.arg(headline_max_chars)::integer),
+                                sqlc.arg(tsq)::tsquery, sqlc.arg(headline_options)::text)
+                END, '')::text AS headline
 FROM flag
 LEFT JOIN page p ON true
 ORDER BY CASE WHEN sqlc.arg(newest)::boolean THEN NULL ELSE p.score END DESC,

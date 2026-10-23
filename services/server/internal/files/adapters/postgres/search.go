@@ -19,7 +19,7 @@ var _ app.SearchReadStore = (*Repository)(nil)
 // SearchFiles implements app.SearchReadStore with the one statement SearchFiles in the ambient
 // unit of work of the coordinator (its statement_timeout is search.statement_timeout). It fetches
 // the page size plus one row to know whether a next page exists; the extra row is neither returned
-// nor highlighted for the caller. Errors as searchError.
+// nor highlighted. Errors as searchError.
 func (r *Repository) SearchFiles(ctx context.Context, q searchkit.Query) (searchkit.Page, error) {
 	newest := q.Sort == searchkit.SortNewest
 	arg := sqlcgen.SearchFilesParams{
@@ -27,7 +27,7 @@ func (r *Repository) SearchFiles(ctx context.Context, q searchkit.Query) (search
 		RefTime: ts(q.RefTime), MaxCandidates: int32(q.Limits.MaxCandidates), //nolint:gosec // G115: search.max_candidates
 		RankNormalization: int32(q.Limits.RankNormalization), //nolint:gosec // G115: search.rank_normalization
 		RecencySeconds:    q.Limits.RecencySeconds(), Newest: newest,
-		PageLimit:        int32(q.Limits.PageSize + 1),          //nolint:gosec // G115: capped at search.page_size_max
+		PageSize:         int32(q.Limits.PageSize),              //nolint:gosec // G115: capped at search.page_size_max
 		HeadlineMaxChars: int32(q.Limits.HeadlineInputMaxChars), //nolint:gosec // G115: search.headline_input_max_chars
 		HeadlineOptions:  q.Limits.HeadlineOptions(q.Markers),
 	}

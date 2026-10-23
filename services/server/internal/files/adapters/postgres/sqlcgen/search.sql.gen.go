@@ -145,58 +145,63 @@ WITH cand AS (
            a.message_id, a.thread_id, a.channel_id
     FROM files f
     JOIN message_attachments a ON a.file_id = f.id
-    WHERE f.search_vector @@ $2::tsquery
-      AND a.channel_id = ANY($5::uuid[])
+    WHERE f.search_vector @@ $3::tsquery
+      AND a.channel_id = ANY($6::uuid[])
       AND f.upload_state = 'complete'
       AND f.scan_status IN ('clean', 'skipped')
       AND f.deleted_at IS NULL
       AND f.purpose = 'attachment'
-      AND (NOT $6::boolean OR a.thread_id = ANY($7::uuid[]))
-      AND ($8::uuid IS NULL OR f.uploaded_by = $8::uuid)
-      AND ($9::timestamptz IS NULL OR f.created_at >= $9::timestamptz)
-      AND ($10::timestamptz IS NULL OR f.created_at < $10::timestamptz)
-      AND f.created_at <= $11::timestamptz
+      AND (NOT $7::boolean OR a.thread_id = ANY($8::uuid[]))
+      AND ($9::uuid IS NULL OR f.uploaded_by = $9::uuid)
+      AND ($10::timestamptz IS NULL OR f.created_at >= $10::timestamptz)
+      AND ($11::timestamptz IS NULL OR f.created_at < $11::timestamptz)
+      AND f.created_at <= $12::timestamptz
     ORDER BY f.created_at DESC, f.id DESC
-    LIMIT $12::integer + 1
+    LIMIT $13::integer + 1
 ),
 flag AS (
-    SELECT count(*) > $12::integer AS capped FROM cand
+    SELECT count(*) > $13::integer AS capped FROM cand
 ),
 kept AS (
-    SELECT id, created_at, original_name, transcript_text, search_vector, message_id, thread_id, channel_id FROM cand ORDER BY created_at DESC, id DESC LIMIT $12::integer
+    SELECT id, created_at, original_name, transcript_text, search_vector, message_id, thread_id, channel_id FROM cand ORDER BY created_at DESC, id DESC LIMIT $13::integer
 ),
 scored AS (
     SELECT k.id, k.created_at, k.original_name, k.transcript_text, k.search_vector, k.message_id, k.thread_id, k.channel_id,
-           CASE WHEN $4::boolean THEN 0::float8
-                ELSE ts_rank(k.search_vector, $2::tsquery, $13::integer)::float8
-                     / (1 + extract(epoch FROM ($11::timestamptz - k.created_at))::float8
-                            / $14::float8)
+           CASE WHEN $5::boolean THEN 0::float8
+                ELSE ts_rank(k.search_vector, $3::tsquery, $14::integer)::float8
+                     / (1 + extract(epoch FROM ($12::timestamptz - k.created_at))::float8
+                            / $15::float8)
            END AS score
     FROM kept k
 ),
 page AS (
-    SELECT s.id, s.created_at, s.original_name, s.transcript_text, s.search_vector, s.message_id, s.thread_id, s.channel_id, s.score
+    SELECT s.id, s.created_at, s.original_name, s.transcript_text, s.search_vector, s.message_id, s.thread_id, s.channel_id, s.score,
+           row_number() OVER (ORDER BY CASE WHEN $5::boolean THEN NULL ELSE s.score END DESC,
+                                       CASE WHEN $5::boolean THEN s.created_at END DESC, s.id DESC) AS n
     FROM scored s
-    WHERE NOT $15::boolean
-       OR ($4::boolean AND (s.created_at, s.id) < ($16::timestamptz, $17::uuid))
-       OR (NOT $4::boolean AND (s.score, s.id) < ($18::float8, $17::uuid))
-    ORDER BY CASE WHEN $4::boolean THEN NULL ELSE s.score END DESC,
-             CASE WHEN $4::boolean THEN s.created_at END DESC, s.id DESC
-    LIMIT $19::integer
+    WHERE NOT $16::boolean
+       OR ($5::boolean AND (s.created_at, s.id) < ($17::timestamptz, $18::uuid))
+       OR (NOT $5::boolean AND (s.score, s.id) < ($19::float8, $18::uuid))
+    ORDER BY CASE WHEN $5::boolean THEN NULL ELSE s.score END DESC,
+             CASE WHEN $5::boolean THEN s.created_at END DESC, s.id DESC
+    LIMIT $1::integer + 1
 )
 SELECT flag.capped::boolean AS capped,
        p.id AS file_id, p.message_id, p.thread_id, p.channel_id, p.created_at,
        coalesce(p.score, 0)::float8 AS score,
-       coalesce(ts_headline('simple'::regconfig,
-                            left(concat_ws(' ', p.original_name, p.transcript_text), $1::integer),
-                            $2::tsquery, $3::text), '')::text AS headline
+       coalesce(CASE WHEN p.n <= $1::integer THEN
+                    ts_headline('simple'::regconfig,
+                                left(concat_ws(' ', p.original_name, p.transcript_text), $2::integer),
+                                $3::tsquery, $4::text)
+                END, '')::text AS headline
 FROM flag
 LEFT JOIN page p ON true
-ORDER BY CASE WHEN $4::boolean THEN NULL ELSE p.score END DESC,
-         CASE WHEN $4::boolean THEN p.created_at END DESC, p.id DESC
+ORDER BY CASE WHEN $5::boolean THEN NULL ELSE p.score END DESC,
+         CASE WHEN $5::boolean THEN p.created_at END DESC, p.id DESC
 `
 
 type SearchFilesParams struct {
+	PageSize          int32
 	HeadlineMaxChars  int32
 	Tsq               interface{}
 	HeadlineOptions   string
@@ -215,7 +220,6 @@ type SearchFilesParams struct {
 	FromCreatedAt     pgtype.Timestamptz
 	FromID            pgtype.UUID
 	FromScore         float64
-	PageLimit         int32
 }
 
 type SearchFilesRow struct {
@@ -245,11 +249,14 @@ type SearchFilesRow struct {
 // first, at most max_candidates plus one; capped reports the extra row, which kept drops before
 // ranking. score is ts_rank over the age from ref_time, never now(), divided by recency_seconds
 // (0 for newest). page is the keyset strictly after the from position in the order of the sort
-// (score, id or created_at, id, both descending), page_limit rows (the page size plus one). The outer join on the one row of flag keeps capped on an empty page; its page
-// columns are then NULL. ts_headline reads only the page rows: the name followed by the
-// transcript in simple, cut at headline_max_chars.
+// (score, id or created_at, id, both descending), page_size rows plus one that only tells a
+// further page exists; n numbers them in that order. The outer join on the one row of flag keeps
+// capped on an empty page; its page columns are then NULL. ts_headline reads only the page_size
+// rows the caller returns (n <= page_size): the name followed by the transcript in simple, cut at
+// headline_max_chars.
 func (q *Queries) SearchFiles(ctx context.Context, arg SearchFilesParams) ([]SearchFilesRow, error) {
 	rows, err := q.db.Query(ctx, searchFiles,
+		arg.PageSize,
 		arg.HeadlineMaxChars,
 		arg.Tsq,
 		arg.HeadlineOptions,
@@ -268,7 +275,6 @@ func (q *Queries) SearchFiles(ctx context.Context, arg SearchFilesParams) ([]Sea
 		arg.FromCreatedAt,
 		arg.FromID,
 		arg.FromScore,
-		arg.PageLimit,
 	)
 	if err != nil {
 		return nil, err
