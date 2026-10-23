@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"slices"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
 // Paths discovery names (docs/api/openapi.yaml schema Discovery).
@@ -20,6 +22,15 @@ const (
 	// is set.
 	LogoURL = "/api/v1/instance/branding/logo"
 )
+
+// DiscoveryLogoURL returns logo_url of discovery for the logo file id logo: LogoURL while a logo
+// is set, "" (member omitted) for the zero id, which LogoFileID returns for NoLogo.
+func DiscoveryLogoURL(logo ids.ID) string {
+	if logo.IsZero() {
+		return ""
+	}
+	return LogoURL
+}
 
 // NoMinVersion is the min_version of a platform that has a recommended version but no minimum:
 // the contract requires min_version, and 0.0.0 admits every app version (docs/DECISIONS.md

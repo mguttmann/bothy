@@ -14,10 +14,13 @@ T = TypeVar("T", bound="ImageUpload")
 
 @_attrs_define
 class ImageUpload:
-    """Image as multipart part `file`. The server detects the type (PNG, JPEG, WebP) and re-encodes it without metadata.
+    """Image as the one multipart part `file` (a further part is rejected with 400 `validation_failed`). The server detects
+    the type from the bytes; it accepts only JPEG and PNG, whose metadata it removes losslessly, and still WebP, which
+    it converts to PNG or JPEG without metadata. Thumbnails are re-encoded. Any other detected type ends the file
+    `failed` with `file_type_denied`.
 
-    Attributes:
-        file (File):
+        Attributes:
+            file (File):
     """
 
     file: File

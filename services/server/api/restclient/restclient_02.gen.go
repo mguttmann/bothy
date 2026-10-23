@@ -16,6 +16,57 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// ExportAuditEvents Export the audit log
+//
+// Streams one `AuditEvent` per line in ascending `seq`, with hashes for offline verification. The stream is the contiguous `seq` span from the smallest to the largest `seq` whose `occurred_at` lies in [`from`, `to`), so every line links the line before by `prev_hash`; a row inside the span whose `occurred_at` lies outside the range (an aggregated denial keeps the time of its first denial) is part of it. A gap inside the stream breaks the hash links (`prev_hash`); an error after the first line aborts the transfer instead of ending it, so a client sees a broken response, not a shorter complete one.
+//
+// Corresponds with GET /audit/export (the `ExportAuditEvents` operationId).
+func (c *Client) ExportAuditEvents(ctx context.Context, params *ExportAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAuditEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// VerifyAuditChainWithBody Verify the hash chain
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /audit/verify (the `VerifyAuditChain` operationId).
+func (c *Client) VerifyAuditChainWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVerifyAuditChainRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// VerifyAuditChain Verify the hash chain
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /audit/verify (the `VerifyAuditChain` operationId).
+func (c *Client) VerifyAuditChain(ctx context.Context, body VerifyAuditChainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewVerifyAuditChainRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // BeginEnrollmentWithBody Start the first passkey registration with an enrollment code
 //
 // Starts the first passkey registration with an enrollment code of purpose `first_login` or `recovery`. The code is checked but not redeemed; the stored challenge keeps a reference to it. Every rejected code gives `401`.
@@ -3826,6 +3877,8 @@ func (c *Client) DeleteBrandingLogo(ctx context.Context, reqEditors ...RequestEd
 
 // GetBrandingLogo Download the instance logo
 //
+// Serves the variant `medium` of the logo (longest edge `file.thumbnail.medium_px`, re-encoded by the server without metadata, 12 3.7 and 7.3), never the original. Answers 404 while no logo is set and while the logo file is not deliverable (pending, blocked, failed or deleted) or has no variant `medium`, always with the same status, body and headers. The response carries `Content-Disposition: inline`, `Cache-Control: no-store`, `ETag` and `Repr-Digest` over the variant and `Access-Control-Allow-Origin: *` without credentials; `Range` is ignored.
+//
 // Corresponds with GET /instance/branding/logo (the `GetBrandingLogo` operationId).
 func (c *Client) GetBrandingLogo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetBrandingLogoRequest(c.Server)
@@ -3840,6 +3893,8 @@ func (c *Client) GetBrandingLogo(ctx context.Context, reqEditors ...RequestEdito
 }
 
 // UploadBrandingLogoWithBody Upload the logo
+//
+// Owner with fresh step-up; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once and replaces the previous logo; it becomes deliverable later, after scan and metadata removal, and until then `getBrandingLogo` answers 404. Last write wins; no `If-Match` (06 8).
 //
 // Takes any type of body and a specified content type.
 //
@@ -4015,6 +4070,8 @@ func (c *Client) DeleteMyAvatar(ctx context.Context, reqEditors ...RequestEditor
 }
 
 // SetMyAvatarWithBody Upload own avatar
+//
+// Only for people; nothing of the body is read before `authorize` allowed the action. Checks in this order (12 3.7): the first part is `file` (400 `validation_failed`); the declared type is JPEG, PNG or WebP (415 `unsupported_media_type`, with `reason` `file_type_denied` for a type in `file.denied_mime_types`); the part holds at most the smaller of `file.max_upload_bytes` and `file.upload_part_bytes` (413 `payload_too_large`) and at least one byte, and no further part follows (400 `validation_failed`); open sessions (429) and free space of the file system driver (503 `unavailable` with `reason` `storage_full`). The new file is linked at once (`avatar_file_id`) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 `file_not_ready`.
 //
 // Takes any type of body and a specified content type.
 //

@@ -228,7 +228,7 @@ func admit(ctx context.Context, az authorize.Authorizer, a actor.Actor, ev sync.
 		// A receive action outside the catalogue of this build cannot be decided: fail closed.
 		return false, authorize.Decision{}, nil
 	}
-	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
+	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID, ev.AudiencePrincipalID)
 	if agentConsumer {
 		// The audience is matched above; for the consumer engine, which runs runs.Delivery before
 		// every invocation-bearing event, a receive action on the agent itself decides on it (M2-08).

@@ -93,10 +93,9 @@ type Resource struct {
 // FileFacts describes a file for the visibility rule of kind file (docs/spec/05-actions.md
 // section 2.2, docs/DECISIONS.md D-M3-03-17): an attachment that is not attached yet is visible
 // only to its uploader (Resource.OwnerID) with read on its scope channel (Resource.ChannelID); an
-// attached one to every reader of the path of its message (Resource.ThreadID or ChannelID). For
-// file.read an avatar is visible to every authenticated principal and a branding file to everybody
-// (M3-05); a gdpr_export is never visible through file.read, and no other action sees a file of a
-// purpose other than attachment.
+// attached one to every reader of the path of its message (Resource.ThreadID or ChannelID); an
+// avatar or branding file is readable through file.read by every signed-in principal (M3-10); a
+// gdpr_export file never through file.read (its path is gdpr.export.download, M7).
 //
 // Example:
 //
@@ -245,24 +244,33 @@ type CommandFacts struct {
 // ResourceFromEvent returns the descriptor of a stored event for the check of its receive action
 // at delivery (docs/spec/04-sync-protocol.md "Flow" point 2, 07 section 8.1): REST catch-up
 // (M1-63) and the gateway hub (M1-65) build it from the columns resource_kind, resource_id,
-// space_id, channel_id and thread_id of event_log. A thread, channel or space names itself in ID
-// and carries no hint; any other kind carries only its most specific scope (the thread, else the
-// channel, else the space). Reason: the scope of an event is a copy from the time of the event,
-// and a thread moved since then would contradict it, which authz treats as an internal error;
-// the most specific hint lets authz read the current path from the structure, so the rights at
-// delivery decide (04 "Basic rule"). Event carries the whole scope, so authz can decide an
-// event whose resource kind the receive action does not take on the object it does take.
+// space_id, channel_id, thread_id and audience_principal_id of event_log. A thread, channel or
+// space names itself in ID and carries no hint; any other kind carries only its most specific
+// scope (the thread, else the channel, else the space). Reason: the scope of an event is a copy
+// from the time of the event, and a thread moved since then would contradict it, which authz
+// treats as an internal error; the most specific hint lets authz read the current path from the
+// structure, so the rights at delivery decide (04 "Basic rule"). Event carries the whole scope, so
+// authz can decide an event whose resource kind the receive action does not take on the object it
+// does take.
+//
+// audience is event_log.audience_principal_id, zero for a broadcast event. For kind file only it
+// becomes OwnerID (brief M3-10 design note 7): the event row has no column for the purpose, so the
+// personal file.updated of an avatar or logo file names its uploader as audience and authz admits
+// exactly that principal to a file without path; any other kind ignores it.
 //
 // Example:
 //
-//	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID)
+//	r := authorize.ResourceFromEvent(ev.ResourceKind, ev.ResourceID, ev.SpaceID, ev.ChannelID, ev.ThreadID, ev.AudiencePrincipalID)
 //	d, err := az.Authorize(authorize.Filter(ctx), p, authorize.Action(ev.ReceiveAction), r)
-func ResourceFromEvent(kind string, id, spaceID, channelID, threadID ids.ID) Resource {
+func ResourceFromEvent(kind string, id, spaceID, channelID, threadID, audience ids.ID) Resource {
 	// An unknown kind stays empty, which Authorize refuses as an internal error (fail closed).
 	k, _ := ParseResourceKind(kind)
 	r := Resource{Kind: k, ID: id, Event: &EventScope{SpaceID: spaceID, ChannelID: channelID, ThreadID: threadID}}
 	if k == ResourceThread || k == ResourceChannel || k == ResourceSpace {
 		return r
+	}
+	if k == ResourceFile {
+		r.OwnerID = audience
 	}
 	switch {
 	case !threadID.IsZero():

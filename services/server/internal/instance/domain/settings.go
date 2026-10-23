@@ -13,7 +13,6 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/designkeys"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
-	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 )
 
@@ -21,7 +20,8 @@ import (
 const (
 	// KeyAccentColor is branding.accent_color, an accent key of kernel/designkeys.
 	KeyAccentColor = "branding.accent_color"
-	// KeyLogoFileID is branding.logo_file_id, the UUIDv7 of the logo file; only M3-10 writes it.
+	// KeyLogoFileID is branding.logo_file_id, the UUIDv7 of the logo file or NoLogo; only the logo
+	// operations of M3-10 write it.
 	KeyLogoFileID = "branding.logo_file_id"
 	// KeyProductName is branding.product_name, the displayed product name.
 	KeyProductName = "branding.product_name"
@@ -39,6 +39,9 @@ const (
 	DefaultAccentColor = "spruce"
 	// DefaultLocale is the default of locale.default (01 section 9).
 	DefaultLocale = "de"
+	// NoLogo is the stored value of branding.logo_file_id after the logo was removed: the row is
+	// never deleted, so the branding version keeps rising (brief M3-10 design note 9).
+	NoLogo = ""
 )
 
 // Route names the operation that writes a key: putInstanceSetting for RouteSettings,
@@ -184,8 +187,8 @@ func (r *Registry) Validate(key string, value json.RawMessage) (json.RawMessage,
 			return nil, repoint(err)
 		}
 	case KeyLogoFileID:
-		if _, err := ids.Parse(s); err != nil {
-			return nil, field(pointerValue, CodeInvalidFormat, "The value is not a UUIDv7.")
+		if _, err := LogoFileID(s); err != nil {
+			return nil, field(pointerValue, CodeInvalidFormat, "The value is not a UUIDv7 or the empty string.")
 		}
 	case KeyLocaleDefault:
 		if !slices.Contains(r.locales, s) {

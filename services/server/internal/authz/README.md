@@ -260,8 +260,9 @@ The delivery job calls it in filter mode, so no denial is written (AZ-P13).
 
 `authorize.ResourceFromEvent` describes a stored event for the check of its receive action at
 delivery (REST catch-up, gateway, webhooks): a thread, channel or space by its id, any other kind
-with its most specific scope, and `Resource.Event` with the full scope. When the receive action
-does not take the stored kind, `eventTarget` (`app/eventtarget.go`) decides on the first object
+with its most specific scope, and `Resource.Event` with the full scope. Its last parameter is
+`audience_principal_id` (zero for a broadcast); for kind `file` only it becomes `OwnerID` (M3-10,
+see "Files"). When the receive action does not take the stored kind, `eventTarget` (`app/eventtarget.go`) decides on the first object
 it does take: the target of a grant (for an instance grant its subject principal), then the
 thread, channel and space of the scope. No fitting object, or a receive action whose requirement
 is still deferred, is `not_found` without an error line, so one event never stops a reader
@@ -392,7 +393,8 @@ filter-mode receive check of `command.changed` takes the path from the event sco
 
 ### Files (M3-03)
 
-`file.read` is no longer deferred: its requirement is read on the path. Kind `file` has its own
+`file.read` is no longer deferred. Its 05 text stays `read`; the expression chooses by purpose
+(`domain.ByFilePurpose`, evaluated like `ByKind`; brief M3-10 design note 6). Kind `file` has its own
 visibility rule (`domain/visibility.go`, `fileVisible`; docs/DECISIONS.md D-M3-03-17), fed by
 `authorize.Resource.File` (`FileFacts{Purpose, Attached}`):
 
@@ -401,13 +403,15 @@ visibility rule (`domain/visibility.go`, `fileVisible`; docs/DECISIONS.md D-M3-0
   the channel's other readers, the owner and everybody else get `not_found`;
 - attached (M3-07 sets the fact): visible with read on the path of the message (`ThreadID` or
   `ChannelID`);
-- purposes `avatar`, `branding`, `gdpr_export` need no path (`resolve` gives them none). For
-  `file.read` (M3-05, brief design note 7) an avatar is visible to every authenticated principal
-  with the requirement `Auth`, a branding file to everybody with `Public` (an anonymous caller still gets `401` on `downloadFile`, which is not a public operation; it reaches the logo through `getBrandingLogo`, M3-10), and a `gdpr_export` to
-  nobody (`no_grant`; it leaves only through `gdpr.export.download`). The requirement table keeps
-  read for `file.read`, because list scopes and filter mode decide file events by their channel
-  path; `domain.Decide` replaces it by purpose (`fileReadRequirement`). Every other action, such
-  as `file.delete`, sees no file of these purposes.
+- purposes `avatar` and `branding` (M3-10): visible for `file.read` only, to every principal that
+  passed step 1 of 07 section 4.2 (active, signed in, not pending; anonymous callers get
+  `unauthenticated` there, a pending device `device_pending`); the requirement is `Auth`, and an
+  app still needs the scope `files:read`. Every other action on such a file (`file.delete`,
+  `file.transcribe`) gets `not_found`: the avatar and logo operations replace and remove them.
+  The public path to the logo is `getBrandingLogo` with `instance.discovery.read`;
+- purpose `gdpr_export`: never visible through `file.read` (`not_found` `no_grant`), also for its
+  uploader and the owner; its path is `gdpr.export.download` (M7);
+- `avatar`, `branding` and `gdpr_export` need no path (`resolve` gives them `PathNone`).
 
 Session rule of download tickets (M3-05): `createFileTicket` sets `authorize.Resource.IssueTicket`.
 A ticket binds to a login session (12 section 9.2), so for `file.read` with `IssueTicket` a
@@ -416,9 +420,14 @@ principal that is not a person in a session (API token, agent, app) gets `forbid
 and requirement, like step 8 of 07 section 4.2, so an invisible file still answers `not_found`.
 
 `File == nil` is allowed only in filter and delivery mode (a stored `file.updated` decided by
-`ResourceFromEvent`, where the event scope is the path); in request mode it is an internal error,
-so no caller widens access by leaving the facts out. `file.delete` keeps self or manage with the
-same visibility; `file.upload` stays on the channel.
+`ResourceFromEvent`); in request mode it is an internal error, so no caller widens access by
+leaving the facts out. The event row has no column for the purpose, so the event descriptor
+decides by its scope: with a thread, channel or space the scope is the path and read on it
+decides; without any scope (the personal `file.updated` of an avatar or logo file, brief M3-10
+design note 7) `resolve` gives `PathNone`, `ResourceFromEvent` sets `OwnerID` from
+`audience_principal_id`, and only that principal sees it (requirement `Self`); a broadcast row
+without scope fails closed with `not_found`. `file.delete` keeps self or manage with the
+visibility of an attachment; `file.upload` stays on the channel.
 
 ### Tests
 

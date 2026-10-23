@@ -35,10 +35,13 @@ const apiPrefix = "/api/v1"
 type Request struct {
 	// Method and Path name the operation; Path is relative to /api/v1 and may carry a query.
 	Method, Path string
-	// Body is marshalled as JSON when not nil; a []byte is sent as is.
+	// Body is marshalled as JSON when not nil; a []byte or an io.Reader is sent as is.
 	Body any
 	// Header are extra request headers (If-Match, a fixed Idempotency-Key).
 	Header http.Header
+	// ContentLength, when positive, is the declared length of a streamed Body; otherwise a stream
+	// is sent chunked.
+	ContentLength int64
 }
 
 // Response is the answer to a Request.
@@ -170,6 +173,10 @@ func (c *Client) attempt(ctx context.Context, r Request, auth bool) Response {
 	case nil:
 	case []byte:
 		body = bytes.NewReader(b)
+	case io.Reader:
+		// A stream is sent as it is, once: a retry after use_dpop_nonce finds it consumed, so a
+		// caller that streams sends a request with the nonce first.
+		body = b
 	default:
 		raw, err := json.Marshal(b)
 		if err != nil {
@@ -184,6 +191,9 @@ func (c *Client) attempt(ctx context.Context, r Request, auth bool) Response {
 	}
 	for name, vs := range r.Header {
 		req.Header[name] = vs
+	}
+	if r.ContentLength > 0 {
+		req.ContentLength = r.ContentLength
 	}
 	if c.ClientIP != "" {
 		req.Header.Set("X-Forwarded-For", c.ClientIP)

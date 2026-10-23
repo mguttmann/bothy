@@ -23,6 +23,7 @@ import (
 	filesmimetype "github.com/OWNER/bothy/services/server/internal/files/adapters/mimetype"
 	filesmetrics "github.com/OWNER/bothy/services/server/internal/files/adapters/otelmetrics"
 	filespg "github.com/OWNER/bothy/services/server/internal/files/adapters/postgres"
+	"github.com/OWNER/bothy/services/server/internal/files/adapters/profileimages"
 	filess3 "github.com/OWNER/bothy/services/server/internal/files/adapters/s3"
 	filesunicode "github.com/OWNER/bothy/services/server/internal/files/adapters/unicode"
 	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
@@ -269,7 +270,7 @@ func NewFiles(cfg filesapp.Config, driver string, store filesapp.ObjectStore, po
 	svc, err := filesapp.New(cfg, filesapp.Deps{
 		Repo: repo, Parts: parts, UoW: uow, Authorizer: az, Events: w.Events, Channels: channels,
 		Names: filesunicode.Normalizer{}, Types: filesmimetype.Extensions{}, FreeSpace: free, ScanQueue: queue, Metrics: w.Metrics,
-		Clock: clk, Log: log,
+		Store: store, Clock: clk, Log: log,
 	})
 	if err != nil {
 		return nil, err
@@ -421,6 +422,21 @@ func (f *Files) Close() error {
 		return c.Close()
 	}
 	return nil
+}
+
+// BindProfileImages binds the avatar and logo use cases of f into identity and instance through
+// their source ports identity.AvatarFiles and instance.LogoFiles (M3-10, adapters/profileimages);
+// files starts after both, so they take the ports late. A nil module is skipped.
+func (f *Files) BindProfileImages(id *Identity, st *InstanceSettings) {
+	if f == nil {
+		return
+	}
+	if id != nil && id.People != nil {
+		id.People.BindAvatarFiles(profileimages.Avatar{Images: f.Service})
+	}
+	if st != nil && st.Admin != nil {
+		st.Admin.BindLogoFiles(profileimages.Logo{Images: f.Service})
+	}
 }
 
 // fillHandlers sets the nil files handler of h to the one f built; a nil f leaves h unchanged.

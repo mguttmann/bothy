@@ -923,7 +923,7 @@ class MeApi {
   }
 
   /// Upload own avatar
-  ///
+  /// Only for people; nothing of the body is read before &#x60;authorize&#x60; allowed the action. Checks in this order (12 3.7): the first part is &#x60;file&#x60; (400 &#x60;validation_failed&#x60;); the declared type is JPEG, PNG or WebP (415 &#x60;unsupported_media_type&#x60;, with &#x60;reason&#x60; &#x60;file_type_denied&#x60; for a type in &#x60;file.denied_mime_types&#x60;); the part holds at most the smaller of &#x60;file.max_upload_bytes&#x60; and &#x60;file.upload_part_bytes&#x60; (413 &#x60;payload_too_large&#x60;) and at least one byte, and no further part follows (400 &#x60;validation_failed&#x60;); open sessions (429) and free space of the file system driver (503 &#x60;unavailable&#x60; with &#x60;reason&#x60; &#x60;storage_full&#x60;). The new file is linked at once (&#x60;avatar_file_id&#x60;) and replaces the previous avatar; it becomes deliverable later, after scan and metadata removal, and until then file downloads answer 409 &#x60;file_not_ready&#x60;.
   ///
   /// Parameters:
   /// * [file]

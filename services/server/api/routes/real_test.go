@@ -973,6 +973,26 @@ func (stubServer) GetTranscript(context.Context, rest.GetTranscriptRequestObject
 	return nil, nil
 }
 
+func (stubServer) SetMyAvatar(context.Context, rest.SetMyAvatarRequestObject) (rest.SetMyAvatarResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteMyAvatar(context.Context, rest.DeleteMyAvatarRequestObject) (rest.DeleteMyAvatarResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UploadBrandingLogo(context.Context, rest.UploadBrandingLogoRequestObject) (rest.UploadBrandingLogoResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetBrandingLogo(context.Context, rest.GetBrandingLogoRequestObject) (rest.GetBrandingLogoResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteBrandingLogo(context.Context, rest.DeleteBrandingLogoRequestObject) (rest.DeleteBrandingLogoResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
@@ -981,7 +1001,8 @@ func (stubServer) GetTranscript(context.Context, rest.GetTranscriptRequestObject
 // the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
 // records (M2-39), the local accounts (M1-39), the nine app operations (M2-24), sending (M1-56),
 // editing and deleting (M1-58), the preferences (M3-18), the client metrics (M4-31), the upload
-// sessions with getFile (M3-03) and the downloads, tickets and transcripts (M3-05). A handler
+// sessions with getFile (M3-03), the downloads, tickets and transcripts (M3-05) and the avatar
+// and logo operations (M3-10). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -1012,6 +1033,12 @@ func TestRealTable_Enabled(t *testing.T) {
 		"updateMyProfile":   {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
 		"getJwks":           {"GET /api/v1/instance/jwks", "instance.discovery.read", "rl.public_auth"},
 		"rotateSigningKey":  {"POST /api/v1/signing-keys/rotate", "signing_key.rotate", "rl.admin"},
+		// M3-10 (TestRoutesRegistered of the brief)
+		"setMyAvatar":        {"PUT /api/v1/me/avatar", "self.profile.update", "rl.write"},
+		"deleteMyAvatar":     {"DELETE /api/v1/me/avatar", "self.profile.update", "rl.write"},
+		"uploadBrandingLogo": {"PUT /api/v1/instance/branding/logo", "instance.branding.update", "rl.admin"},
+		"deleteBrandingLogo": {"DELETE /api/v1/instance/branding/logo", "instance.branding.update", "rl.admin"},
+		"getBrandingLogo":    {"GET /api/v1/instance/branding/logo", "instance.discovery.read", "rl.public_auth"},
 		// M1-34
 		"refreshToken":           {"POST /api/v1/auth/token/refresh", "auth.token.refresh", "rl.public_auth"},
 		"logout":                 {"POST /api/v1/auth/logout", "auth.logout", "rl.write"},
@@ -1295,10 +1322,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		if w := want[op.ID]; w.pattern != op.Pattern || op.Action != w.action || op.RateLimitClass != w.class {
 			t.Errorf("operation %+v, want %+v", op, w)
 		}
-		// Only the exports (M1-50, M3-11) and the file downloads (M3-05) stream a body that is not
-		// JSON (route class of downloads).
+		// Only the exports (M1-50, M3-11), the file downloads (M3-05) and the logo (M3-10) stream a
+		// body that is not JSON (route class of downloads).
 		if op.Download != (op.ID == "exportAuditEvents" || op.ID == "exportChannel" || op.ID == "downloadFile" ||
-			op.ID == "downloadThumbnail") {
+			op.ID == "downloadThumbnail" || op.ID == "getBrandingLogo") {
 			t.Errorf("%s: Download = %v", op.ID, op.Download)
 		}
 		if got, ok := routes.ByPattern(op.Pattern); !ok || got.ID != op.ID {

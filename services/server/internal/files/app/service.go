@@ -70,6 +70,8 @@ type Deps struct {
 	Types TypeExtensions
 	// FreeSpace is the free space of the file system driver; nil for the S3 driver.
 	FreeSpace FreeSpace
+	// Store opens the variants of avatar and logo files (OpenImageVariant, M3-10); nil refuses it.
+	Store ObjectStore
 	// ScanQueue inserts the job files.scan when an upload completes (M3-04).
 	ScanQueue ScanQueue
 	// Metrics records bothy.file.upload.size; nil records nothing.

@@ -162,6 +162,11 @@ type Repository interface {
 	// SetMediaInfo writes the non-zero values of m to a file that is not deleted. It needs a
 	// unit of work.
 	SetMediaInfo(ctx context.Context, fileID ids.ID, m MediaInfo) error
+
+	// ReleaseFile sets deleted_at = at on the file fileID when its purpose is purpose, it is not
+	// deleted and, unless uploadedBy is zero, uploadedBy uploaded it (M3-10); released reports
+	// whether it did. It needs a unit of work.
+	ReleaseFile(ctx context.Context, fileID ids.ID, purpose string, uploadedBy ids.ID, at time.Time) (released bool, err error)
 }
 
 // FreeSpace reports the free bytes of the file system of file.fs.root (adapters/fs); only the
