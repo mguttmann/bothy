@@ -52,6 +52,7 @@ type Run struct {
 // Result is the outcome of Check: the samples, counts and every problem found. A problem names
 // counts, message IDs and registration IDs, never a token.
 type Result struct {
+	// Samples are the measurements of the window, one per matched pair (Sample).
 	Samples []time.Duration
 	// Expected are the (message, recipient) pairs of the window; Matched those with exactly one
 	// matching accepted request; Received all requests at the Fake.

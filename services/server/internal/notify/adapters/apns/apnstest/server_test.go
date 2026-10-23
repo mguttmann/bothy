@@ -233,3 +233,46 @@ func TestFakeStampsAcceptedAt(t *testing.T) {
 		t.Errorf("a 403 carries AcceptedAt %s, want zero", reqs[1].AcceptedAt)
 	}
 }
+
+// TestRequestsShowsOnlyAnsweredRequests (review of M3-24): a reader polling Requests while
+// requests arrive never sees an accepted request without its AcceptedAt, and every request shows
+// up once it is answered.
+func TestRequestsShowsOnlyAnsweredRequests(t *testing.T) {
+	t.Parallel()
+	srv, key := fake(t)
+	bearer := jwt(t, key, kid, team)
+	const n = 20
+	done := make(chan struct{})
+	bad := make(chan string, 1)
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
+			for _, r := range srv.Requests() {
+				if r.JWT == bearer && r.AcceptedAt.IsZero() {
+					select {
+					case bad <- "an accepted request without AcceptedAt":
+					default:
+					}
+				}
+			}
+		}
+	}()
+	for range n {
+		if a := send(t, srv, http.MethodPost, "/3/device/"+token, bearer); a.status != http.StatusOK {
+			t.Fatalf("send: %+v", a)
+		}
+	}
+	close(done)
+	select {
+	case msg := <-bad:
+		t.Fatal(msg)
+	default:
+	}
+	if got := len(srv.Requests()); got != n {
+		t.Fatalf("%d requests, want %d", got, n)
+	}
+}

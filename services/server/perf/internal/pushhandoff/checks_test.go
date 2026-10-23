@@ -111,7 +111,7 @@ func TestHintSample(t *testing.T) {
 	r.From = t0.Add(time.Second) // message 0 now lies in the warm-up
 	r.To = t0.Add(2 * time.Second)
 	r.MinSamples = 1
-	r.Requests[len(r.Requests)-1].AcceptedAt = t0.Add(time.Minute) // the last message is after the window
+	r.Requests[len(r.Requests)-1].AcceptedAt = t0.Add(time.Minute) // a late answer to a message after the window changes nothing
 	res := pushhandoff.Check(r)
 	if !res.OK() || len(res.Samples) != 2 || res.Expected != 2 {
 		t.Fatalf("window of one message: %d samples, %d expected, problems %v", len(res.Samples), res.Expected, res.Problems)
