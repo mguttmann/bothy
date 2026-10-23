@@ -96,11 +96,20 @@ type errorBody struct {
 	} `json:"error"`
 }
 
-// parsed is what classify takes from a body: the FCM error code, error.status and whether a
-// BadRequest violation names message.token. A missing or broken body gives the zero value.
+// parsed is what classify takes from a body: the FCM error code, error.status, whether a
+// BadRequest violation names message.token and whether one names another field. A missing or
+// broken body gives the zero value.
 type parsed struct {
 	code, status string
 	tokenField   bool
+	otherField   bool
+}
+
+// tokenCause reports whether a 400 answer blames the registration token: a BadRequest violation
+// on message.token, or the FcmError INVALID_ARGUMENT without any violation on another field,
+// which is the shape Google documents for an invalid registration token [13 Q16].
+func (p parsed) tokenCause() bool {
+	return p.tokenField || (p.code == codeInvalidArgument && !p.otherField)
 }
 
 // parseBody reads the error body; a body that does not decode leaves the status alone to decide.
@@ -120,6 +129,8 @@ func parseBody(body []byte) parsed {
 			for _, v := range d.FieldViolations {
 				if v.Field == fieldToken {
 					p.tokenField = true
+				} else {
+					p.otherField = true
 				}
 			}
 		}
@@ -152,7 +163,7 @@ func classify(status int, body []byte, header http.Header, now time.Time) verdic
 		return verdict{result: domain.SendResult{Class: domain.ResultAccepted}}
 	case status == http.StatusNotFound && p.code == codeUnregistered:
 		return verdict{result: domain.SendResult{Class: domain.ResultDisable, DisableReason: domain.DisableTokenInvalid}}
-	case status == http.StatusBadRequest && p.tokenField:
+	case status == http.StatusBadRequest && p.tokenCause():
 		return verdict{result: domain.SendResult{Class: domain.ResultDisable, DisableReason: domain.DisableTokenInvalid}}
 	case status == http.StatusForbidden && p.code == codeSenderIDMismatch:
 		return verdict{result: domain.SendResult{Class: domain.ResultDisable, DisableReason: domain.DisableSenderMismatch},

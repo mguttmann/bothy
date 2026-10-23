@@ -44,7 +44,11 @@ func TestClassifyTable(t *testing.T) {
 		{"200", 200, []byte(`{"name":"projects/x/messages/1"}`), nil, domain.ResultAccepted, "", 0, false, false, logNone, ""},
 		{"404 UNREGISTERED", 404, errBody(404, "NOT_FOUND", "UNREGISTERED", false), nil, domain.ResultDisable, domain.DisableTokenInvalid, 0, false, false, logNone, ""},
 		{"400 token violation", 400, errBody(400, "INVALID_ARGUMENT", "INVALID_ARGUMENT", true), nil, domain.ResultDisable, domain.DisableTokenInvalid, 0, false, false, logNone, ""},
-		{"400 other INVALID_ARGUMENT", 400, errBody(400, "INVALID_ARGUMENT", "INVALID_ARGUMENT", false), nil, domain.ResultProgramError, "", 0, false, false, logErrorProgram, "INVALID_ARGUMENT"},
+		// Google's example of an invalid token: only the FcmError detail, no BadRequest.
+		{"400 FcmError INVALID_ARGUMENT without violation", 400, errBody(400, "INVALID_ARGUMENT", "INVALID_ARGUMENT", false), nil, domain.ResultDisable, domain.DisableTokenInvalid, 0, false, false, logNone, ""},
+		// Google's example of a bad field value: a BadRequest violation on another field.
+		{"400 other field violation", 400, []byte(`{"error":{"code":400,"message":"canary","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.BadRequest","fieldViolations":[{"field":"message.data[0].value","description":"x"}]}]}}`), nil, domain.ResultProgramError, "", 0, false, false, logErrorProgram, "other"},
+		{"400 FcmError with other field violation", 400, []byte(`{"error":{"code":400,"message":"canary","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"INVALID_ARGUMENT"},{"@type":"type.googleapis.com/google.rpc.BadRequest","fieldViolations":[{"field":"message.android.ttl","description":"x"}]}]}}`), nil, domain.ResultProgramError, "", 0, false, false, logErrorProgram, "INVALID_ARGUMENT"},
 		{"400 without FcmError", 400, errBody(400, "INVALID_ARGUMENT", "", false), nil, domain.ResultProgramError, "", 0, false, false, logErrorProgram, "other"},
 		{"403 SENDER_ID_MISMATCH", 403, errBody(403, "PERMISSION_DENIED", "SENDER_ID_MISMATCH", false), nil, domain.ResultDisable, domain.DisableSenderMismatch, 0, false, false, logErrorSender, "SENDER_ID_MISMATCH"},
 		{"401 THIRD_PARTY_AUTH_ERROR", 401, errBody(401, "UNAUTHENTICATED", "THIRD_PARTY_AUTH_ERROR", false), nil, domain.ResultConfigError, "", 0, false, false, logErrorConfig, "THIRD_PARTY_AUTH_ERROR"},

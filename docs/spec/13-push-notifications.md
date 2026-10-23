@@ -669,7 +669,10 @@ The adapter `fcm` maps every answer onto one result class of 7.3 (docs/DECISIONS
 The FCM error code is `errorCode` of the detail of type
 `type.googleapis.com/google.firebase.fcm.v1.FcmError`; an `INVALID_ARGUMENT` is caused by the token
 when the detail of type `type.googleapis.com/google.rpc.BadRequest` holds a `fieldViolations` entry
-with `field` `message.token` [Q16, verified]. A missing or broken body leaves the HTTP status and
+with `field` `message.token`, or when the `FcmError` detail carries `INVALID_ARGUMENT` and no
+`fieldViolations` entry names another field: Google answers an invalid registration token with the
+`FcmError` detail alone and a bad field value with a `BadRequest` violation on that field [Q16,
+verified]. A missing or broken body leaves the HTTP status and
 `error.status` to decide; `error.message` is never read into a log or an error text, because it
 may echo request values. Answers the table above does not list follow the nearest listed answer of
 the same status, because Google documents the status as the class and the error code as its
@@ -678,8 +681,8 @@ detail [Q16, verified]:
 | Answer | Class |
 |---|---|
 | `200` | `accepted` |
-| `404 UNREGISTERED`; `400 INVALID_ARGUMENT` with a violation on `message.token` | `disable` with `token_invalid` |
-| `400 INVALID_ARGUMENT` otherwise, any other `400` | `program_error`, alert |
+| `404 UNREGISTERED`; `400 INVALID_ARGUMENT` with a violation on `message.token`, or with the `FcmError` code `INVALID_ARGUMENT` and no violation on another field | `disable` with `token_invalid` |
+| `400 INVALID_ARGUMENT` otherwise (a violation on another field, or no `FcmError` code), any other `400` | `program_error`, alert |
 | `403 SENDER_ID_MISMATCH` | `disable` with `sender_mismatch`, configuration alert |
 | `401 THIRD_PARTY_AUTH_ERROR` | `config_error`, configuration alert, no pause |
 | `401` otherwise (`UNAUTHENTICATED`) | renew the access token and send once more (5.2); a second `401` is `config_error`, alert, pause |

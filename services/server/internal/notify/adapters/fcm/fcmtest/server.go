@@ -85,6 +85,9 @@ type Response struct {
 	RPCStatus string
 	// TokenField adds a BadRequest detail with a violation on message.token.
 	TokenField bool
+	// OtherField adds a BadRequest detail with a violation on message.android.ttl, the shape
+	// Google documents for a bad field value.
+	OtherField bool
 	// RetryAfter is the Retry-After header verbatim; empty: absent.
 	RetryAfter string
 }
@@ -459,6 +462,15 @@ func (s *Server) answer(w http.ResponseWriter, resp Response) {
 			"fieldViolations": []map[string]string{{
 				"field":       "message.token",
 				"description": "The registration token is not a valid FCM registration token",
+			}},
+		})
+	}
+	if resp.OtherField {
+		e.Error.Details = append(e.Error.Details, map[string]any{
+			"@type": "type.googleapis.com/google.rpc.BadRequest",
+			"fieldViolations": []map[string]string{{
+				"field":       "message.android.ttl",
+				"description": "Invalid value",
 			}},
 		})
 	}
