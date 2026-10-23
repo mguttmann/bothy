@@ -553,9 +553,10 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 | `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server | duration | `5m` | validity of a file ticket | active |
 | `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/file_ticket_key` | reference to the ticket key in the secret provider | active |
 | `file.not_ready_retry_after` | `BOTHY_FILE__NOT_READY_RETRY_AFTER` | Server | duration | `5s` | `Retry-After` of the `409 file_not_ready` responses (in whole seconds) | active |
-| `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server |  | `24h` | period for never attached files | planned (M3) |
-| `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server |  | `7d` | period for rows of failed or blocked files | planned (M3) |
-| `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server |  | `10m` | interval of the cleanup job | planned (M3) |
+| `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server | duration | `24h` | period for never attached files | active |
+| `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server | duration | `7d` | period for rows of failed or blocked files | active |
+| `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server | duration | `10m` | interval of the cleanup job | active |
+| `file.gc_batch_size` | `BOTHY_FILE__GC_BATCH_SIZE` | Server | int | `500` | candidates per batch of a cleanup step | active |
 | `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server | duration | `15m` | longest voice message | active |
 | `voice.transcription_mode` | `BOTHY_VOICE__TRANSCRIPTION_MODE` | Server |  | `agent` | `off`, `agent` or `service` | planned (M3) |
 | `voice.transcription_url` | `BOTHY_VOICE__TRANSCRIPTION_URL` | Server |  | empty | endpoint of the transcription service | planned (M3) |
@@ -790,7 +791,7 @@ Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 | `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server |  | `7d` | availability of an export package | planned (M7) |
 | `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server |  | `false` | export of one's own data needs the approval of the owner | planned (M7) |
 | `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server |  | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` | planned (M7) |
-| `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server |  | `24h` | maximum time until deleted objects are removed | planned (M3) |
+| `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | duration | `24h` | maximum time until deleted objects are removed | active |
 | `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server |  | `400d` | retention of the deletion journal; at least the backup period | planned (M7) |
 | `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | period per key for IP pseudonyms | active |
 | `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | duration | `90d` | keys are destroyed after this | active |

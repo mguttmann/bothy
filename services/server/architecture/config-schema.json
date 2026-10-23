@@ -1679,6 +1679,18 @@
       "doc": "Media types refused at upload, by declared type and by file extension; empty refuses none."
     },
     {
+      "name": "file.failed_row_ttl",
+      "env": "BOTHY_FILE__FAILED_ROW_TTL",
+      "kind": "duration",
+      "default": "7d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Period for rows of failed or blocked files."
+    },
+    {
       "name": "file.fs.min_free_bytes",
       "env": "BOTHY_FILE__FS__MIN_FREE_BYTES",
       "kind": "int",
@@ -1701,6 +1713,30 @@
       "max": "",
       "chapter": "12-files.md",
       "doc": "Root directory of the file system driver, used only by the server and owned by its user with mode 0700."
+    },
+    {
+      "name": "file.gc_batch_size",
+      "env": "BOTHY_FILE__GC_BATCH_SIZE",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Candidates per batch of a cleanup step."
+    },
+    {
+      "name": "file.gc_interval",
+      "env": "BOTHY_FILE__GC_INTERVAL",
+      "kind": "duration",
+      "default": "10m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Interval of the cleanup job."
     },
     {
       "name": "file.image.jpeg_quality",
@@ -2118,6 +2154,18 @@
       "max": "",
       "chapter": "12-files.md",
       "doc": "Validity of a download ticket (createFileTicket)."
+    },
+    {
+      "name": "file.unattached_ttl",
+      "env": "BOTHY_FILE__UNATTACHED_TTL",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-files.md",
+      "doc": "Period for never attached files."
     },
     {
       "name": "file.upload_max_open_sessions",
@@ -2778,6 +2826,18 @@
       "max": "",
       "chapter": "20-privacy.md",
       "doc": "How long after its period a key of the IP pseudonyms is kept before it is destroyed."
+    },
+    {
+      "name": "privacy.object_delete_delay",
+      "env": "BOTHY_PRIVACY__OBJECT_DELETE_DELAY",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Maximum time until deleted objects are removed."
     },
     {
       "name": "privacy.telemetry_pseudonym_rotation",
