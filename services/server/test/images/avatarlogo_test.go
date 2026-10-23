@@ -150,11 +150,19 @@ func testSetMyAvatarReplacesPrevious(t *testing.T, e *avatarEnv) {
 	sameAnswer(t, "replaced avatar and unknown id", gone, unknown)
 }
 
+// liveFiles and liveSessions count the rows of files that are not deleted: the purge job (M3-08)
+// removes the row of a replaced image and its session at any time, so a count over the whole
+// table would depend on when that job runs.
+const (
+	liveFiles    = `SELECT count(*) FROM files WHERE deleted_at IS NULL`
+	liveSessions = `SELECT count(*) FROM file_upload_sessions s JOIN files f ON f.id = s.file_id WHERE f.deleted_at IS NULL`
+)
+
 // testSetMyAvatarRejections: the checks of design note 2 b to d; nothing is stored after any.
 func testSetMyAvatarRejections(t *testing.T, e *avatarEnv) {
 	png := encodePNG(t, twoColour(4, 4, colourFirst, colourSecond))
-	filesBefore := e.rowCount(t, `SELECT count(*) FROM files`)
-	sessionsBefore := e.rowCount(t, `SELECT count(*) FROM file_upload_sessions`)
+	filesBefore := e.rowCount(t, liveFiles)
+	sessionsBefore := e.rowCount(t, liveSessions)
 	for _, c := range []struct {
 		name    string
 		parts   []part
@@ -183,7 +191,7 @@ func testSetMyAvatarRejections(t *testing.T, e *avatarEnv) {
 			}
 		})
 	}
-	if e.rowCount(t, `SELECT count(*) FROM files`) != filesBefore || e.rowCount(t, `SELECT count(*) FROM file_upload_sessions`) != sessionsBefore {
+	if e.rowCount(t, liveFiles) != filesBefore || e.rowCount(t, liveSessions) != sessionsBefore {
 		t.Error("a refused image left a row")
 	}
 }
@@ -192,7 +200,7 @@ func testSetMyAvatarRejections(t *testing.T, e *avatarEnv) {
 // subject_kind_not_allowed while the body is held back, so authorize ran before the body; nothing
 // is stored.
 func testSetMyAvatarAuthorizeBeforeBody(t *testing.T, e *avatarEnv) {
-	filesBefore := e.rowCount(t, `SELECT count(*) FROM files`)
+	filesBefore := e.rowCount(t, liveFiles)
 	if r := putUnread(t, e.alex, pathAvatar, true); r.Status != http.StatusUnauthorized {
 		t.Errorf("anonymous: %d %s", r.Status, r.Body)
 	}
@@ -200,7 +208,7 @@ func testSetMyAvatarAuthorizeBeforeBody(t *testing.T, e *avatarEnv) {
 	if r.Status != http.StatusForbidden || problemOf(t, r).Reason != "subject_kind_not_allowed" {
 		t.Errorf("agent: %d %s", r.Status, r.Body)
 	}
-	if e.rowCount(t, `SELECT count(*) FROM files`) != filesBefore {
+	if e.rowCount(t, liveFiles) != filesBefore {
 		t.Error("a refused caller stored a file")
 	}
 }
