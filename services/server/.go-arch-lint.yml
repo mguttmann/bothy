@@ -423,6 +423,7 @@ deps:
     mayDependOn: [search-app, search, search-domain, kernel-ports, chat, messaging, files]
   search-adapters:
     mayDependOn: [search-adapters, search, search-app, search-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, platform-testkit, api, chat, messaging, files]
+    canUse: [v-pgx, v-otel]
   importer:
     mayDependOn: [importer, kernel-ports]
   importer-domain:

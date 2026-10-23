@@ -57,7 +57,7 @@ None. The module reads through the ports of other modules (03-data-model.md, pri
 
 ## Actions (05-actions.md)
 
-`search.query` (resource instance, right `auth`, rate-limit class `rl.search`, effect `read`, no audit entry for an allow; apps need `messages:read`).
+`search.query`: right auth, rate-limit class rl.search, effect read; an allow is not logged, and an app token needs its read scope (05 section 2.6).
 
 ## Events and WebSocket ops
 

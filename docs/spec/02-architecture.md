@@ -517,7 +517,7 @@ entries, never fields):
 version: 1
 exclude: [tools]                  # directories that go-arch-lint does not check (tools)
 kernel:
-  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang]   # usable by every package
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys, searchlang, searchkit]   # usable by every package
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
 platform:                         # one component per platform package
   jobs: {depends_on: [pg], vendors: [river]}
