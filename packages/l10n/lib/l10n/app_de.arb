@@ -1806,7 +1806,7 @@
   "importStateCompleted": "Abgeschlossen",
   "importStateFailed": "Fehlgeschlagen",
   "importStateCancelled": "Abgebrochen",
-  "importItemsImported": "{count} Einträge importiert",
+  "importItemsImported": "{count, plural, =1{1 Eintrag importiert} other{{count} Einträge importiert}}",
   "importBack": "Alle Importquellen",
   "importServerCounters": "Zähler des Servers",
   "importToolCounters": "Zähler des Import-Werkzeugs",

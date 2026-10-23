@@ -13,6 +13,7 @@ import 'package:admin_ui/admin_ui.dart';
 import 'package:api_client/api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:l10n/l10n.dart';
 
 import 'support.dart';
 
@@ -60,6 +61,8 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('discord  |  Draft  |  0 items imported'), findsOneWidget);
+    final l = lookupAppLocalizations(const Locale('en'));
+    expect(l.importItemsImported(1), '1 item imported');
     // Newest first.
     final rows = find.byWidgetPredicate(
       (w) => w is ListTile && '${w.key}'.contains('import.row.'),

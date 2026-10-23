@@ -10942,7 +10942,7 @@ abstract class AppLocalizations {
   /// Progress of an import source in the list: the number of posted items.
   ///
   /// In en, this message translates to:
-  /// **'{count} items imported'**
+  /// **'{count, plural, =1{1 item imported} other{{count} items imported}}'**
   String importItemsImported(int count);
 
   /// Button back from one import source to the list.

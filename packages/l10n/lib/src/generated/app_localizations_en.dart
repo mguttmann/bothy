@@ -6841,7 +6841,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String importItemsImported(int count) {
-    return '$count items imported';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items imported',
+      one: '1 item imported',
+    );
+    return '$_temp0';
   }
 
   @override

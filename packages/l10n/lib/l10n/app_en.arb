@@ -10486,7 +10486,7 @@
   "@importStateCancelled": {
     "description": "State of an import source the owner cancelled (failed with the counter cancelled)."
   },
-  "importItemsImported": "{count} items imported",
+  "importItemsImported": "{count, plural, =1{1 item imported} other{{count} items imported}}",
   "@importItemsImported": {
     "description": "Progress of an import source in the list: the number of posted items.",
     "placeholders": {
