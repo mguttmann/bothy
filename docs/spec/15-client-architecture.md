@@ -368,6 +368,7 @@ stateDiagram-v2
 `4017`: a newer connection of the same device is active; the app reconnects only on the return to the foreground or on user action.
 `4008`: the app waits the seconds of `retry_after=<seconds>` in the close reason instead of the jitter; without a readable value the normal backoff applies.
 `4006`: the app connects with `identify` instead of `resume`.
+After an app start the first connection is `identify` with the stored cursor, also inside the resume window: `resumed` carries no snapshot, and the new engine holds no counters until the snapshot of `ready` seeds them (04 14; docs/DECISIONS.md D-M4-30-11).
 Every attempt has the deadline `client.sync.connect_timeout` from its start in `Connecting` until `ready` or `resumed`: a socket that does not open, a missing `hello` or a missing answer to `identify` or `resume` ends the attempt, and the app goes to `Backoff` like after a failed connect.
 
 Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it. `Offline` with `networkUnavailable` connects when the network returns. The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).
@@ -562,6 +563,13 @@ sending: [13-push-notifications.md](13-push-notifications.md).
 | Windows | WebSocket | the app in the notification area keeps the connection; local notifications | no push in the M milestones; WNS later (baseline R-Push) |
 | Web (console) | REST, fetch on opening | nothing | none |
 
+**Idle (13 4.4).** A desktop client reports `idle: true` in `focus` (04 6.2) while its window is
+hidden to the notification area, minimized, or not the foreground window of the system, and
+`idle: false` as soon as the window is the foreground window again. There is no timer and no
+idle time of the system: the window state alone decides (docs/DECISIONS.md D-M4-30-3). A thread
+in `focus` of a connection with `idle: true` counts for live box patches and typing, not as
+"Active in the thread".
+
 ### 10.1 iOS and macOS: Notification Service Extension
 
 The NSE runs only for pushes with `mutable-content: 1` and a visible `alert` and has about 30
@@ -616,6 +624,21 @@ MSIX, otherwise `cancel` and `getActiveNotifications` do not work
 (https://pub.dev/packages/flutter_local_notifications, retrieved 2026-10-10 [verified]). Start at
 login is a setting (default off). An app that has quit gets no notifications; the
 settings say so.
+
+**Without package identity (until the MSIX of M7).** The Windows app is unpackaged until M7. Local
+toasts work with an app user model ID (the bundle identifier of the build branding) and an
+activation GUID derived from it; a click reaches the running app through the activation callback
+of `flutter_local_notifications` and opens the thread at the message (section 11). `cancel` and
+`getActiveNotifications` need package identity and are skipped with a log line without content;
+a thread's notification is replaced by showing the next one under the same notification ID.
+"Start at login" is the value `<app name>` under
+`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run` on Windows (the `Run` key starts the
+program every time the user logs on,
+https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys, retrieved
+2026-10-23 [verified]) and the login item `SMAppService.mainApp` on macOS ("the main application
+as a login item", macOS 13.0 and later,
+https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp, retrieved
+2026-10-23 [verified]), kept only by the system and off until the person turns it on (D-M4-30-4).
 
 ## 11. Deep links and navigation
 

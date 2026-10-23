@@ -1782,5 +1782,18 @@
   "instanceFlagSwitchedOn": "{key} ist eingeschaltet.",
   "instanceFlagSwitchedOff": "{key} ist ausgeschaltet.",
   "instanceFlagConflict": "Eine andere Person mit Inhaberrechten hat {key} inzwischen geändert; es ist jetzt {state}. Nichts wurde geändert; schalte bei Bedarf erneut.",
-  "adminLogoFileType": "Bild"
+  "adminLogoFileType": "Bild",
+  "notificationPlaceholder": "Neue Nachricht",
+  "notificationTitle": "{name} · {title}",
+  "notificationText": "{author}: {excerpt}",
+  "notificationBundled": "{count, plural, =1{1 neue Nachricht} other{{count} neue Nachrichten}}",
+  "notificationSecurityTitle": "Neues Gerät",
+  "notificationSecurityText": "Ein neues Gerät wartet auf deine Bestätigung.",
+  "notificationAdminTitle": "Verwaltung",
+  "notificationAdminText": "Eine Erinnerung der Verwaltung wartet.",
+  "trayOpen": "Öffnen",
+  "trayQuit": "Beenden",
+  "settingsNotificationsWhileRunning": "Hinweise kommen nur, solange die App läuft.",
+  "settingsStartAtLogin": "Bei Anmeldung starten",
+  "settingsStartAtLoginUnavailable": "Dieses System bietet den Start bei Anmeldung für die App nicht an."
 }

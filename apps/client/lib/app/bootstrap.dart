@@ -26,9 +26,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sync_engine/sync_engine.dart';
 
 import '../composer/draft_sync.dart';
+import '../desktop/start_at_login.dart';
+import '../desktop/tray.dart';
+import '../desktop/window_behavior.dart';
 import '../files/file_cache.dart';
 import '../files/file_ports.dart';
 import '../files/upload_executor.dart';
+import '../notifications/notification_presenter.dart';
 import '../platform/app_lifecycle.dart';
 import '../platform/browser_launcher.dart';
 import '../platform/device_key_signer.dart';
@@ -82,6 +86,10 @@ final class AppPorts {
     AppMeasurements? measurements,
     CrashReports? crashReports,
     FilePorts? files,
+    this.notifications = const NoNotificationPresenter(),
+    this.window = const NoDesktopWindow(),
+    this.tray = const NoTray(),
+    this.startAtLogin = _noStartAtLogin,
   }) : config = config ?? AppConfig.defaults(),
        files = files ?? FilePorts(),
        navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>(),
@@ -168,6 +176,21 @@ final class AppPorts {
   /// The file picker, clipboard, opener, microphone and media players (brief M4-22).
   final FilePorts files;
 
+  /// The local notifications of `notification.created` (brief M4-30).
+  final NotificationPresenter notifications;
+
+  /// The app window: hidden to the notification area on Windows, its state decides `idle`
+  /// (brief M4-30).
+  final DesktopWindow window;
+
+  /// The icon in the Windows notification area (brief M4-30).
+  final TrayPort tray;
+
+  /// "Start at login" of the platform, a device setting (brief M4-30 Design note 4).
+  final Future<StartAtLogin> Function() startAtLogin;
+
+  static Future<StartAtLogin> _noStartAtLogin() async => const NoStartAtLogin();
+
   /// Explains a step-up before the system asks for the confirmation: by default the
   /// `StepUpDialog` of `admin_ui` over [navigatorKey] (brief M4-25 Design note 3).
   late final StepUpPrompt stepUpPrompt =
@@ -220,6 +243,14 @@ AppPorts productionPorts({
     network: LifecycleNetworkStatus(lifecycle),
     ticker: SchedulerFrameTicker(),
     deepLinks: MethodChannelDeepLinks(),
+    notifications: LocalNotificationPresenter(
+      appName: branding.appName,
+      appUserModelId: branding.bundleId,
+      guid: LocalNotificationPresenter.guidFor(branding.bundleId),
+    ),
+    window: WindowManagerWindow(),
+    tray: Platform.isWindows ? TrayManagerTray() : const NoTray(),
+    startAtLogin: () => platformStartAtLogin(appName: branding.appName),
   );
 }
 

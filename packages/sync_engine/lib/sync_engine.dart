@@ -47,6 +47,7 @@ export 'src/frames.dart';
 export 'src/gap_filler.dart';
 export 'src/heartbeat.dart';
 export 'src/isolate_decode.dart';
+export 'src/notifications.dart';
 export 'src/outbox/backoff.dart' show fullJitterBackoff;
 export 'src/outbox/classify.dart' show Classification, OutcomeClass, classify;
 export 'src/outbox/entry.dart' show OutboxEntryView, OutboxStateLabel;

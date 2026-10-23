@@ -3,7 +3,8 @@
 /// The gateway side of the fake server (brief M4-17 Design note 1; 04 6, 7, 8.3, 11.3):
 /// `hello`, `identify` and `resume`, `ready` with the snapshot, catch-up in pages with
 /// `cursor` frames, `resync_required`, live delivery, heartbeats, `reauth`, focus, typing,
-/// coalesced `run.updated` and the close codes of 04 6.4.
+/// coalesced `run.updated`, `notification.created` to the live connections of its target
+/// devices (13 4.6) and the close codes of 04 6.4.
 library;
 
 import 'dart:async';
@@ -174,6 +175,10 @@ final class GatewayFake implements GatewayFaultTarget {
   }) {
     world.eventHooks.add(_onEvent);
     world.runPatchHooks.add(_onRunPatched);
+    world.connectedDevices = (userId) => {
+      for (final c in _open)
+        if (c.live && c.principalId == userId) ?c.deviceId,
+    };
   }
 
   /// The world.
@@ -605,7 +610,10 @@ final class GatewayFake implements GatewayFaultTarget {
   // Delivery
 
   void _onEvent(FakeEvent e) {
-    if (e.seq == null) return;
+    if (e.seq == null) {
+      _onTargeted(e);
+      return;
+    }
     for (final c in _open) {
       if (!c.live || !world.mayReceive(c.principalId!, e)) continue;
       _dispatch(c, e.envelope);
@@ -619,6 +627,20 @@ final class GatewayFake implements GatewayFaultTarget {
       if (e.type == 'session.revoked' &&
           (e.envelope['payload']! as JsonMap)['session_id'] == c.sessionId) {
         _close(c, 4012, 'revoked');
+      }
+    }
+  }
+
+  /// An ephemeral event with an audience and target devices (`notification.created`, 13 4.6)
+  /// goes to each live connection of the audience on those devices, at most once: no
+  /// catch-up, no log, no hold. Other ephemeral events of the world are not sent.
+  void _onTargeted(FakeEvent e) {
+    final audience = e.audience;
+    final devices = e.devices;
+    if (audience == null || devices == null) return;
+    for (final c in _open) {
+      if (c.live && c.principalId == audience && devices.contains(c.deviceId)) {
+        _send(c, 'dispatch', e.envelope);
       }
     }
   }

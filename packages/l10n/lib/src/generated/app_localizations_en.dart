@@ -6752,4 +6752,59 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get adminLogoFileType => 'Image';
+
+  @override
+  String get notificationPlaceholder => 'New message';
+
+  @override
+  String notificationTitle(String name, String title) {
+    return '$name · $title';
+  }
+
+  @override
+  String notificationText(String author, String excerpt) {
+    return '$author: $excerpt';
+  }
+
+  @override
+  String notificationBundled(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count new messages',
+      one: '1 new message',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationSecurityTitle => 'New device';
+
+  @override
+  String get notificationSecurityText =>
+      'A new device is waiting for your approval.';
+
+  @override
+  String get notificationAdminTitle => 'Administration';
+
+  @override
+  String get notificationAdminText =>
+      'A reminder from the administration is waiting.';
+
+  @override
+  String get trayOpen => 'Open';
+
+  @override
+  String get trayQuit => 'Quit';
+
+  @override
+  String get settingsNotificationsWhileRunning =>
+      'Notifications arrive only while the app is running.';
+
+  @override
+  String get settingsStartAtLogin => 'Start at login';
+
+  @override
+  String get settingsStartAtLoginUnavailable =>
+      'This system does not offer starting at login for the app.';
 }

@@ -1493,3 +1493,108 @@ version = "2.4.0"
 ecosystem = "Pub"
 license.override = ["BSD-3-Clause"]
 reason = "deps.dev knows no license for this pub package; its LICENSE file is the three-clause BSD text. Video playback through file tickets (M4-22, D-M4-22-4)."
+
+[[PackageOverrides]]
+name = "flutter_local_notifications"
+version = "22.3.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the BSD 3-Clause text. Local notifications on Windows and macOS (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "flutter_local_notifications_linux"
+version = "8.0.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the BSD 3-Clause text. Local notifications on Windows and macOS (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "flutter_local_notifications_platform_interface"
+version = "12.2.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the BSD 3-Clause text. Local notifications on Windows and macOS (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "flutter_local_notifications_web"
+version = "1.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the BSD 3-Clause text. Local notifications on Windows and macOS (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "flutter_local_notifications_windows"
+version = "3.1.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the BSD 3-Clause text. Local notifications on Windows and macOS (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "menu_base"
+version = "0.1.1"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. The tray menu (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "screen_retriever"
+version = "0.2.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. Window placement of window_manager (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "screen_retriever_linux"
+version = "0.2.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. Window placement of window_manager (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "screen_retriever_macos"
+version = "0.2.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. Window placement of window_manager (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "screen_retriever_platform_interface"
+version = "0.2.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. Window placement of window_manager (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "screen_retriever_windows"
+version = "0.2.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. Window placement of window_manager (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "shortid"
+version = "0.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the BSD 3-Clause text. Icon IDs of tray_manager (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "tray_manager"
+version = "0.5.3"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. The tray icon on Windows (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "win32_registry"
+version = "3.0.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the BSD 3-Clause text. Start at login on Windows (M4-30, docs/DECISIONS.md D-M4-30-6)."
+
+[[PackageOverrides]]
+name = "window_manager"
+version = "0.5.2"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file is the MIT text. The window in the notification area (M4-30, docs/DECISIONS.md D-M4-30-6)."

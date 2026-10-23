@@ -10,7 +10,9 @@ import 'package:auth/auth.dart' show StepUpPrompt;
 import 'package:client/app/bootstrap.dart';
 import 'package:client/app/discovery.dart';
 import 'package:client/app/providers/ports.dart';
+import 'package:client/desktop/window_behavior.dart';
 import 'package:client/files/file_ports.dart';
+import 'package:client/notifications/notification_presenter.dart';
 import 'package:client/onboarding/onboarding_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sync_engine/testing.dart';
@@ -44,12 +46,16 @@ class FakeInstance {
   );
 
   /// Starts a fake with the standard world and a container over test ports; [discovery]
-  /// wraps the discovery client of the app (a network the test switches).
+  /// wraps the discovery client of the app (a network the test switches); [platform],
+  /// [window] and [notifications] are the desktop ports of M4-30.
   static Future<FakeInstance> start({
     Map<String, String> config = fastConfig,
     DiscoveryClient Function(DiscoveryClient real)? discovery,
     StepUpPrompt? stepUpPrompt,
     FilePorts? files,
+    String platform = 'macos',
+    DesktopWindow window = const NoDesktopWindow(),
+    NotificationPresenter notifications = const NoNotificationPresenter(),
   }) async {
     final server = await FakeServer.start(
       options: const FakeServerOptions(
@@ -57,7 +63,17 @@ class FakeInstance {
       ),
     );
     final seed = WorldSeed.standard(server.world);
-    return _on(server, seed, config, discovery, stepUpPrompt, files);
+    return _on(
+      server,
+      seed,
+      config,
+      discovery,
+      stepUpPrompt,
+      files,
+      platform: platform,
+      window: window,
+      notifications: notifications,
+    );
   }
 
   /// A second app of Alex on the same fake: its own data folder, keys and secrets (a second
@@ -73,8 +89,11 @@ class FakeInstance {
     Map<String, String> config,
     DiscoveryClient Function(DiscoveryClient real)? discovery,
     StepUpPrompt? stepUpPrompt,
-    FilePorts? files,
-  ) async {
+    FilePorts? files, {
+    String platform = 'macos',
+    DesktopWindow window = const NoDesktopWindow(),
+    NotificationPresenter notifications = const NoNotificationPresenter(),
+  }) async {
     final root = await Directory.systemTemp.createTemp('client-flow');
     final keys = SoftwareKeyStore();
     final secure = MemorySecureBackend();
@@ -91,6 +110,9 @@ class FakeInstance {
       discovery: discovery == null ? real : discovery(real),
       stepUpPrompt: stepUpPrompt,
       files: files,
+      platform: platform,
+      window: window,
+      notifications: notifications,
     );
     return FakeInstance._(server, seed, root, ports, keys, secure);
   }

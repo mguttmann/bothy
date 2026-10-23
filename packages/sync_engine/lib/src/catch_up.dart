@@ -32,6 +32,7 @@ import 'fetcher.dart';
 import 'frames.dart';
 import 'gap_filler.dart';
 import 'isolate_decode.dart';
+import 'notifications.dart';
 import 'ports.dart';
 import 'session_listener.dart';
 import 'snapshot_applier.dart';
@@ -103,6 +104,7 @@ final class CatchUpListener implements SessionListener {
       notify: _notify,
       onEcho: onEcho ?? (_, _) {},
       onRunUpdated: onRunUpdated ?? (_) {},
+      onNotification: _hint,
       log: _log,
     );
     _resyncBackoff = ReconnectBackoff(
@@ -134,6 +136,8 @@ final class CatchUpListener implements SessionListener {
 
   final StreamController<SyncNotice> _notices =
       StreamController<SyncNotice>.broadcast(sync: true);
+  final StreamController<NotificationCreated> _hints =
+      StreamController<NotificationCreated>.broadcast(sync: true);
   final List<Map<String, Object?>> _page = [];
   StreamSubscription<ConnectionState>? _states;
   Future<void> _background = Future<void>.value();
@@ -154,6 +158,10 @@ final class CatchUpListener implements SessionListener {
 
   /// The notices to the app: removed targets, an overwritten draft, a resync, a sign-out.
   Stream<SyncNotice> get notices => _notices.stream;
+
+  /// The hints of `notification.created` (13 6.3), live or after the commit of the catch-up
+  /// page that carried them; never stored. Hints after [dispose] are dropped silently.
+  Stream<NotificationCreated> get notifications => _hints.stream;
 
   /// Unread messages and mentions of [threadId] between two server values (04 14).
   ThreadCounts countsOf(ThreadId threadId) => _sync.counter.countsOf(threadId);
@@ -668,6 +676,10 @@ final class CatchUpListener implements SessionListener {
     if (!_notices.isClosed) _notices.add(notice);
   }
 
+  void _hint(NotificationCreated n) {
+    if (!_hints.isClosed) _hints.add(n);
+  }
+
   void _log(String line) => _logHook?.call('catch-up: $line');
 
   /// Stops watching the connection and closes the streams.
@@ -683,6 +695,7 @@ final class CatchUpListener implements SessionListener {
     // Not awaited: a paused listener would hold the done event (D-M4-25-8, D-M4-19-14).
     unawaited(_sync.counterChanges.close());
     unawaited(_notices.close());
+    unawaited(_hints.close());
   }
 }
 

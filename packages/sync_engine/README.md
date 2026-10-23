@@ -23,8 +23,9 @@ Further rules checked by `make arch`:
 
 `GatewayConnection` holds the one WebSocket of the device (04 6.1): it never opens a second
 socket while one is open or opening. It answers `hello` through `GatewaySession` with `resume`
-(stored gateway session and cursor, last disconnect within `resume_window_ms`) or `identify`
-(cursor and epoch only when stored), both with a gateway DPoP proof of `auth`
+(stored gateway session and cursor, last disconnect within `resume_window_ms`, and this engine
+reached `ready` before: a new engine identifies, because only the snapshot of `ready` seeds its
+counters, D-M4-30-11) or `identify` (cursor and epoch only when stored), both with a gateway DPoP proof of `auth`
 (`DpopProofFactory.forGateway`: `htm` `GET`, `htu` the HTTPS form of the gateway URL, the
 `hello` nonce, `ath`). `ready` stores `gateway_session_id`, `permission_version` and `head_seq`
 through `SyncStateDao`; the `sync_epoch` stays in memory, because M4-14 stores it with the
@@ -110,7 +111,9 @@ most `sync.max_focused_threads`, the complete set per frame with `idle`) and
   they were and the listener applies nothing more until the next `ready` or `resumed`.
 - After `catchup.complete` the phase is `live` and `onLive` runs; every live durable event is its
   own transaction with `cursor = seq`; ephemeral events go to the `EphemeralStore` (typing capped
-  at `sync.typing_ttl`, presence seeded from `ready`) or raw to `onRunUpdated`.
+  at `sync.typing_ttl`, presence seeded from `ready`), raw to `onRunUpdated`, or as a
+  `NotificationCreated` to the `notifications` stream (13 6.3, never stored). Ephemeral events
+  inside a catch-up page run after the commit of the page.
 - `resync_required` (any reason) keeps the connection: `getSnapshot`, then in one transaction
   `clearMirror` (outbox, drafts and share inbox stay) and the snapshot with its cursor and epoch;
   the threads in focus load their newest page; phase `live`, notice `Resynced`. Frames that
@@ -169,7 +172,8 @@ through the `Fetcher` instead.
 | `session.revoked` | the whole database (wipe) | seq |
 
 In memory: `typing.started` and `agent.presence_changed` (`EphemeralStore`), `run.updated`
-(`onRunUpdated`, raw, also when truncated). Skipped, the cursor advances (no local table):
+(`onRunUpdated`, raw, also when truncated), `notification.created` (`notifications` of
+`CatchUpListener` and `SyncEngine`). Skipped, the cursor advances (no local table):
 `access.expiring`, `agent.config_changed`, `agent.followup`, `agent.invocation`,
 `agent_session.changed`, `channel.settings_changed`, `command.invoked`, `device.pending`,
 `gdpr.request_due`, `gdpr.request_updated`, `grant.changed`, `group.changed`, `host.updated` (M4-36), `import.progress`,
@@ -467,6 +471,22 @@ scope (instance for owners, a space with `manage`) and labels; the world's
 `expiryReminderLead` is `authz.expiry_reminder_lead`. Simplified: no project bindings or dev
 environments (so `trigger_blocked` names only `sr2`), no apps (only agent tokens) and an offset
 as cursor.
+
+From M4-30 the world decides hints as 13 says, in `world_notify.dart`. Preferences are set
+directly with `setNotificationPref(userId, targetKind, targetId, level, mutedUntil:)` and
+`deleteNotificationPref`; the fake has no REST endpoints and no `notification_pref.updated`
+events for them (M4-33 adds those). `effectiveLevel(userId, threadId)` follows 13 3.1: the own
+preference for thread, channel and space, the channel's `default_notification_level`, `all` in a
+DM channel, the setting `notify.default_level`, then `world.userDefaultLevel`; a selected
+preference with `muted_until` in the future is `mute`. `notify(messageId)` picks the recipients of
+13 2 (active people who see the channel, never the author, nothing for `silent`, `import` or
+`system`) with the kinds `message`, `mention` and `dm`, and sends each hint as the ephemeral
+`notification.created` with the preview of the recipient's `notify.preview_mode` (or
+`world.defaultPreviewMode`; `excerpt` cut to `world.previewMaxChars`) only to the live gateway
+connections of the recipient's active devices (13 4.6). `world.notifications` records the hints,
+`world.notificationSkips` the refusals (`level`, `no_route`); `world.quietHours` lists the people
+inside quiet hours (no quiet hour rules), and `world.notifyOnMessages` makes `createMessage`
+decide for every new message (off by default). Simplified: no runs, no bundling, no pushes.
 
 ### Faults
 

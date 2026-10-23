@@ -136,6 +136,27 @@ void main() {
     expect(sent['op'], 'identify');
   });
 
+  test('a new engine identifies even with a resumable session stored, so ready seeds its counters', () async {
+    // The state an earlier run of the app left: a gateway session, a cursor and a
+    // disconnect inside the resume window (an app restart, brief M4-30). A new engine holds
+    // no counters and no presence in memory; only the snapshot of `ready` seeds them (04 14),
+    // so its first answer is `identify` with the stored cursor, not `resume`.
+    await h.storeCursor(30);
+    await h.db.syncStateDao.saveSession(
+      gatewaySessionId: 'gs-1',
+      permissionVersion: const PermissionVersion(1),
+      headSeq: const GlobalSeq(30),
+    );
+    await h.db.syncStateDao.markDisconnected(h.clock.now());
+    await h.clock.elapse(const Duration(seconds: 5));
+    await h.open();
+    final sent = await h.answerHello();
+    expect(sent['op'], 'identify');
+    final d = sent['d']! as Map<String, Object?>;
+    expect(d['cursor'], 30);
+    expect(d['sync_epoch'], 'epoch-1');
+  });
+
   test('4006 after resume leads to identify', () async {
     final ch = await h.goLive();
     ch.serverClose(1001);
