@@ -62,7 +62,7 @@ func TestContextWindow(t *testing.T) {
 	logs := &httpservertest.LogCapture{}
 	cnt := &counter{}
 	svc, err := app.New(app.Config{MaxContentBytes: 1000, MaxMentions: 1, EventPayloadMaxBytes: 100, TemplateNameMaxChars: 10, TemplateMaxPerScope: 5,
-		ListContentMaxBytes: 10, PageSizeDefault: 10, PageSizeMax: 10, EmojiMaxBytes: 64, MaxDistinctReactions: 20, MaxPinsPerThread: 50},
+		ListContentMaxBytes: 10, PageSizeDefault: 10, PageSizeMax: 10, EmojiMaxBytes: 64, MaxDistinctReactions: 20, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: 50},
 		app.Deps{Store: store, UoW: noUoW{}, Authorizer: az, Events: noEvents{},
 			Threads: oneThread{info: chat.ThreadInfo{ID: thread, ChannelID: ch}}, Directory: anyone{}, Log: slog.New(logs), Errors: cnt,
 			Cursors: noCursors{}, Redactor: struct{ eventlog.Redactor }{}, Audit: struct{ auditing.Recorder }{}, Symbols: anySymbol{}})
