@@ -90,14 +90,49 @@ extension _NotifyWorld on FakeWorld {
     return userDefaultLevel;
   }
 
+  /// Silent messages, imports, system messages and run messages create no hint (13 2).
+  static bool _withoutHints(JsonMap m) =>
+      m['silent'] == true ||
+      const {'import', 'system'}.contains(m['origin']) ||
+      const {'run', 'system'}.contains(m['kind']);
+
+  /// Whether [userId] can receive a hint for a message of [author]: an active person, not the
+  /// author (13 2).
+  bool _isRecipient(String userId, String author) {
+    final person = people[userId];
+    return userId != author &&
+        person != null &&
+        person.kind == 'user' &&
+        person.status == 'active';
+  }
+
+  /// The kind of the hint for [userId] (01 10.1): `dm` in a direct message channel, `mention`
+  /// when mentioned, otherwise `message`.
+  static String _kindFor(
+    String userId, {
+    required bool dm,
+    required List<String> mentions,
+  }) {
+    if (dm) return 'dm';
+    return mentions.contains(userId) ? 'mention' : 'message';
+  }
+
+  /// The active devices of [userId] with a live gateway connection (13 4.6).
+  Set<String> _routeOf(String userId) {
+    final connected = connectedDevices(userId);
+    return {
+      for (final d in devices.values)
+        if (d.userId == userId &&
+            d.state == 'active' &&
+            connected.contains(d.id))
+          d.id,
+    };
+  }
+
   List<FakeNotification> _notify(String messageId) {
     final m = messages[messageId];
     if (m == null) throw ArgumentError.value(messageId, 'messageId');
-    if (m['silent'] == true ||
-        const {'import', 'system'}.contains(m['origin']) ||
-        const {'run', 'system'}.contains(m['kind'])) {
-      return const [];
-    }
+    if (_withoutHints(m)) return const [];
     final threadId = m['thread_id']! as String;
     final thread = threads[threadId]!;
     final channel = channels[thread['channel_id']! as String]!;
@@ -106,31 +141,14 @@ extension _NotifyWorld on FakeWorld {
     final mentions = (m['mention_ids']! as List<Object?>).cast<String>();
     final created = <FakeNotification>[];
     for (final userId in channel.access.keys) {
-      final person = people[userId];
-      if (userId == author ||
-          person == null ||
-          person.kind != 'user' ||
-          person.status != 'active') {
-        continue;
-      }
-      final kind = dm
-          ? 'dm'
-          : mentions.contains(userId)
-          ? 'mention'
-          : 'message';
+      if (!_isRecipient(userId, author)) continue;
+      final kind = _kindFor(userId, dm: dm, mentions: mentions);
       final level = _effectiveLevel(userId, threadId);
       if (level == 'mute' || (kind == 'message' && level != 'all')) {
         notificationSkips.add((userId: userId, reason: 'level'));
         continue;
       }
-      final connected = connectedDevices(userId);
-      final route = {
-        for (final d in devices.values)
-          if (d.userId == userId &&
-              d.state == 'active' &&
-              connected.contains(d.id))
-            d.id,
-      };
+      final route = _routeOf(userId);
       if (route.isEmpty) {
         notificationSkips.add((userId: userId, reason: 'no_route'));
         continue;
