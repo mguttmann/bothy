@@ -232,35 +232,53 @@ func (h *Finder) objectsOf(ctx context.Context, hits []search.ResultHit) (map[id
 			channels = append(channels, hit.ChannelID)
 		}
 	}
-	out := make(map[ids.ID]rest.SearchHit, len(hits))
 	switch hits[0].Kind {
 	case string(rest.SearchHitKindThread):
-		list, err := h.objects.Threads.HitThreads(ctx, idsOf, channels)
-		if err != nil {
-			return nil, err
-		}
-		for _, t := range list {
-			v := h.render.Thread(t)
-			out[t.ID] = rest.SearchHit{Thread: &v}
-		}
+		return h.threadObjects(ctx, idsOf, channels)
 	case string(rest.SearchHitKindFile):
-		list, err := h.objects.Files.HitFiles(ctx, idsOf, channels)
-		if err != nil {
-			return nil, err
-		}
-		for _, f := range list {
-			v := h.render.File(f)
-			out[f.ID] = rest.SearchHit{File: &v}
-		}
-	default:
-		list, err := h.objects.Messages.HitMessages(ctx, idsOf, channels)
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range list {
-			v := h.render.Message(m)
-			out[m.ID] = rest.SearchHit{Message: &v}
-		}
+		return h.fileObjects(ctx, idsOf, channels)
+	}
+	return h.messageObjects(ctx, idsOf, channels)
+}
+
+// threadObjects renders the threads of a page with chat's renderer.
+func (h *Finder) threadObjects(ctx context.Context, idsOf, channels []ids.ID) (map[ids.ID]rest.SearchHit, error) {
+	list, err := h.objects.Threads.HitThreads(ctx, idsOf, channels)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[ids.ID]rest.SearchHit, len(list))
+	for _, t := range list {
+		v := h.render.Thread(t)
+		out[t.ID] = rest.SearchHit{Thread: &v}
+	}
+	return out, nil
+}
+
+// fileObjects renders the files of a page with the renderer of files.
+func (h *Finder) fileObjects(ctx context.Context, idsOf, channels []ids.ID) (map[ids.ID]rest.SearchHit, error) {
+	list, err := h.objects.Files.HitFiles(ctx, idsOf, channels)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[ids.ID]rest.SearchHit, len(list))
+	for _, f := range list {
+		v := h.render.File(f)
+		out[f.ID] = rest.SearchHit{File: &v}
+	}
+	return out, nil
+}
+
+// messageObjects renders the messages of a page with the renderer of messaging.
+func (h *Finder) messageObjects(ctx context.Context, idsOf, channels []ids.ID) (map[ids.ID]rest.SearchHit, error) {
+	list, err := h.objects.Messages.HitMessages(ctx, idsOf, channels)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[ids.ID]rest.SearchHit, len(list))
+	for _, m := range list {
+		v := h.render.Message(m)
+		out[m.ID] = rest.SearchHit{Message: &v}
 	}
 	return out, nil
 }

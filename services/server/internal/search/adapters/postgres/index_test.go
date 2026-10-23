@@ -145,7 +145,7 @@ func TestIndex_ResolvesThreadFacts(t *testing.T) {
 var fuzzSeeds = []string{
 	"!!!", "...", "\"", "\"invoice", "-", "-invoice", "or", "invoice or", ":*", "a:*", "&|!()", "(a & b) | !c", "\\", "a\\b",
 	"\x00", "a\x00b", "\xff\xfe", "invoice\xff", "'", "''", "o'neil", "<b>", "%", strings.Repeat("a", 256), strings.Repeat("a", 257),
-	strings.Repeat("ä", 300), strings.Repeat("-a ", 85), "\t\n", "", "the", "a:B*", "‮", "�", "x'y'z", "e'\\x00'",
+	strings.Repeat("ä", 300), strings.Repeat("-a ", 85), "\t\n", "", "the", "a:B*", "\u202e", "\ufffd", "x'y'z", "e'\\x00'",
 }
 
 // FuzzSearchQuery (14 12): every q gives a page or 400 validation_failed on #query/q with code

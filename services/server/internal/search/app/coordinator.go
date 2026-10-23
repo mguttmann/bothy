@@ -39,7 +39,10 @@ const (
 	reasonSearchTimeout  = "search_timeout"
 	keyAction            = "bothy.action"
 	keyReason            = "bothy.reason"
-	purposeAttachment    = "attachment"
+	// msgFilterMismatch is the log line of a filter mismatch; the read action in bothy.action names
+	// the resource kind too (message.read a message, thread.read a thread, file.read a file).
+	msgFilterMismatch = "search: a hit of a visible channel failed its read action"
+	purposeAttachment = "attachment"
 )
 
 // Config is the configuration of the coordinator, bound in internal/wire from the search.* keys of
@@ -356,7 +359,7 @@ func pageCheck[H any](ctx context.Context, c *Coordinator, p actor.Actor, read a
 			return nil, authorize.Scope{}, err
 		}
 		if !d.Allowed() {
-			c.filterMismatch(ctx, read, res.Kind)
+			c.filterMismatch(ctx, read)
 			continue
 		}
 		kept = append(kept, h)
@@ -378,9 +381,10 @@ func compareIDs(a, b ids.ID) int {
 }
 
 // filterMismatch records a hit that the visible predicate let through and authorize refused (07
-// 7.4 rule 3): only the action, the resource kind and the reason, never an id or content.
-func (c *Coordinator) filterMismatch(ctx context.Context, read authorize.Action, kind authorize.ResourceKind) {
-	c.d.Log.LogAttrs(ctx, slog.LevelError, "search: a hit of a visible channel failed "+string(read)+" (resource kind "+string(kind)+")",
+// 7.4 rule 3): only the action (which names the resource kind) and the reason, never an id or
+// content.
+func (c *Coordinator) filterMismatch(ctx context.Context, read authorize.Action) {
+	c.d.Log.LogAttrs(ctx, slog.LevelError, msgFilterMismatch,
 		slog.String(keyAction, string(read)), slog.String(keyReason, reasonFilterMismatch))
 	if c.d.Errors != nil {
 		c.d.Errors.CountError(ctx, reasonFilterMismatch)

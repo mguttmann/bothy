@@ -24,6 +24,9 @@ const (
 	keySearchPrefixMinChars   = "search.prefix_min_chars"
 )
 
+// searchRecencyScaleDefault is the default of search.recency_scale (14 section 15).
+const searchRecencyScaleDefault = "30d"
+
 // searchConfigKeys returns the keys of the search from docs/spec/14-search.md "Configuration values
 // of this chapter" that the server reads so far: the language configuration of the search
 // vectors and of the query function (M3-13). The search coordinator (M3-14) adds the keys of the
@@ -56,7 +59,7 @@ func searchConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.recency_scale", Kind: config.KindDuration, Default: "30d", Min: "1s",
+			Name: "search.recency_scale", Kind: config.KindDuration, Default: searchRecencyScaleDefault, Min: "1s",
 			Doc:     "Age at which the relevance score of a hit falls to half.",
 			Chapter: chapter14,
 		},
@@ -96,7 +99,7 @@ func searchConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.statement_timeout", Kind: config.KindDuration, Default: "3s", Min: "1ms",
+			Name: "search.statement_timeout", Kind: config.KindDuration, Default: "3s", Min: minDeadline,
 			Doc:     "Time limit of the statements of one search; reaching it answers 503 search_timeout.",
 			Chapter: chapter14,
 		},

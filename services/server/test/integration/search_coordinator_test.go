@@ -773,7 +773,7 @@ var fuzzSeeds = []string{
 	"!!!", "...", "\"", "\"\"", "\"invoice", "-", "--", "-invoice", "or", "or or", "invoice or", ":*", "a:*", "&|!()",
 	"(a & b) | !c", "\\", "\\\\", "a\\b", "\x00", "a\x00b", "\xff\xfe", "invoice\xff", "'", "''", "o'neil", "<b>", "%", "_",
 	strings.Repeat("a", 256), strings.Repeat("a", 257), strings.Repeat("ä", 256), strings.Repeat("-a ", 85), "\t\n\r", " ",
-	"", "the", "Rechnung's", "a:b", "a:B*", "@@", "$$", "‮", "�",
+	"", "the", "Rechnung's", "a:b", "a:B*", "@@", "$$", "\u202e", "\ufffd",
 }
 
 // TestSearch_HTTPNeverServerError runs the seeds of FuzzSearchQuery through the port and through
