@@ -672,13 +672,15 @@ T-AI-02 in the threat model.
 The header is `Invocation-Token` with the compact JWS of `EventEnvelope.invocation_token` of the
 run ([06-api.md](06-api.md), section 4 point 8). The binding check on every request: the
 signature, `typ`, `kid` and `iss` of the token, `aud` equal to the authenticated agent, then the
-run of the claim `run_id`, which must exist, belong to this agent, be triggered by `sub` and lie in
-the claimed thread; a token without `run_id` (autocomplete, a command without an active run) is
+run of the claim `run_id`, which must exist, belong to this agent, be triggered by `sub` (for the
+tokens of trigger kind `message` and `command`; an interaction or follow-up token names the person
+who acted, and the binding always takes the person from the run, [09-agents.md](09-agents.md)
+section 4.5) and lie in the claimed thread; a token without `run_id` (autocomplete, a command without an active run) is
 invalid, because SR9 binds a run. An active run (`queued`, `running`, `waiting_input`) binds; an
 ended one answers `invocation_token_invalid` with `reason: run_inactive`, every other failure
 `reason: invalid`, also for the header sent by a principal that is not an agent. Expiry and the
-currency of the `jti` are not checked: a run outlives `agent.invocation_token_ttl`, every token of
-a run names the same person, and the token never adds a right, so a leaked or older token gives its
+currency of the `jti` are not checked: a run outlives `agent.invocation_token_ttl`, the binding
+always intersects with the run's triggering person, and the token never adds a right, so a leaked or older token gives its
 holder nothing the agent token alone would not give (docs/DECISIONS.md D-M2-14-3). The exceptions
 above hold only for the own thread and run: the resolved thread of the resource is the run's
 thread, and for a resource of kind `run` it is the run itself, so `run.finish` of an earlier run in

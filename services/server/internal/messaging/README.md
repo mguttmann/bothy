@@ -588,7 +588,7 @@ Tests: `app/incoming_test.go` (`TestCreate_SkipMentions`, `TestCreate_HashContex
 - Deletion empties the content and redacts the payload of the events in the same transaction (03, 6.5).
 - A mention of a principal without read permission is stored but triggers nothing (03, `mentions`).
 
-Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md and D-M2-15-1 to D-M2-15-29 in docs/decisions.d/M2-15.md.
+Rulings: docs/DECISIONS.md M1-56, M1-57, M1-58, M1-59 and M1-60, D-M3-11-1 to D-M3-11-10 in docs/decisions.d/M3-11.md and D-M2-15-1 to D-M2-15-30 in docs/decisions.d/M2-15.md.
 
 ## Chapters
 
