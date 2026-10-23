@@ -60,12 +60,13 @@ func (s *Service) installCommands(ctx context.Context, appID ids.ID, m domain.Ma
 	return nil
 }
 
-// upgradeCommands applies the difference of the commands of old and next (11 section 4.2): added
-// and changed commands through UpsertOwned, removed ones through RemoveOwned; commands the app
-// registered through the API and that neither manifest names stay. It names the IDs in attrs.
+// upgradeCommands applies the difference of the commands of old and next (11 section 4.2): removed
+// commands through RemoveOwned first, so they free their place under command.max_per_principal,
+// then changed and added ones through UpsertOwned; commands the app registered through the API and
+// that neither manifest names stay. It names the IDs in attrs.
 func (s *Service) upgradeCommands(ctx context.Context, appID ids.ID, old, next domain.Manifest, attrs auditing.Attrs) error {
 	d := domain.DiffCommands(old, next)
-	added, err := s.upsertCommands(ctx, appID, d.Added)
+	removed, err := s.d.Commands.RemoveOwned(ctx, appID, d.Removed)
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func (s *Service) upgradeCommands(ctx context.Context, appID ids.ID, old, next d
 	if err != nil {
 		return err
 	}
-	removed, err := s.d.Commands.RemoveOwned(ctx, appID, d.Removed)
+	added, err := s.upsertCommands(ctx, appID, d.Added)
 	if err != nil {
 		return err
 	}

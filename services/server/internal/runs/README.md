@@ -345,7 +345,8 @@ deadline the earlier of the end of the person's wait (`command.autocomplete_time
 deferred keeps waiting for `answerAutocomplete` or the op `command.autocomplete_result` until
 `command.autocomplete_timeout`, every other outcome expires the request at once with an empty
 list. `gateway` offers the event through `AutocompleteRelay.Ask` with an empty token to one live
-connection of the app (the live phase of an app starts with `ready`). `inactive` gives an empty
+connection of the app (the live phase of an app starts with `ready`; until the contract gap of
+D-M2-25-24 is closed an app has no live connection, so this gives an empty list). `inactive` gives an empty
 list at once. The use case holds no transaction, so the request to the app runs inside the
 person's request; the person never waits longer than `command.autocomplete_timeout`. The app
 answers with `command.autocomplete.respond` (app-self, `commands:write`).

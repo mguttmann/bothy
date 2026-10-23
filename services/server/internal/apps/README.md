@@ -276,7 +276,9 @@ check and the receive rule live in `authz`.
   reported). A new command whose scope the installation lacks stays inactive through the guard.
 - **Ways to an app.** Gateway: the app connects with its API token (`gateway.connect` needs
   `events:subscribe`) and gets `command.invoked`, `interaction.created` and
-  `command.autocomplete_requested` live; catch-up: `listEvents` with `events:subscribe`; webhook
+  `command.autocomplete_requested` live. The gateway way stays closed for now: `ready` needs
+  `sync.snapshot.read`, which has no app scope in the core contract, so the app is closed with
+  `4018` and gets nothing live (D-M2-25-24, spec gap reported); catch-up: `listEvents` with `events:subscribe`; webhook
   subscription: `command.invoked` and `interaction.created` in the `event_types` of a subscription
   of the app; `delivery.interactions_url`: the adapter below. The receive check of the first three
   is `agent.events.consume` in filter mode, which `authz` admits for the audience app with an
