@@ -96,7 +96,7 @@ mixin FakeInstance {
     ),
     'branding.product_name': const InstanceSettingEntry(
       key: 'branding.product_name',
-      value: 'Bothy',
+      value: 'Team Chat',
       version: 0,
     ),
     'locale.default': const InstanceSettingEntry(
@@ -107,7 +107,7 @@ mixin FakeInstance {
   };
 
   /// The product name.
-  String productName = 'Bothy';
+  String productName = 'Team Chat';
 
   /// The accent key.
   String accentColor = 'spruce';

@@ -57,7 +57,7 @@ void main() {
     await tester.pumpAndSettle();
     await confirmChange(tester);
 
-    expect(r.calls.last, 'updateBranding Bothy loch');
+    expect(r.calls.last, 'updateBranding Team Chat loch');
     expect(r.accentColor, 'loch');
     expect(accentPaletteKeys, contains(r.accentColor));
   });

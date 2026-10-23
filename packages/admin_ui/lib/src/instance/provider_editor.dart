@@ -559,104 +559,110 @@ class _ProviderEditorDialogState extends State<ProviderEditorDialog> {
     final config = _config();
     final canSave =
         !_busy && _name.text.trim().isNotEmpty && _hasChange(config);
-    return AlertDialog(
-      key: const ValueKey('provider.editor'),
-      backgroundColor: colors.surfaceRaised,
-      title: Text(
-        _editing
-            ? l.instanceProviderEditTitle(widget.provider!.name)
-            : l.instanceProviderAddTitle(providerKindText(l, widget.kind)),
-        style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_loopback case final text?)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: DsSpace.s12),
-                  child: DsBanner(
-                    key: const ValueKey('provider.loopbackRefused'),
-                    tone: DsTone.danger,
-                    text: text,
-                    liveRegion: true,
-                  ),
-                ),
-              if (_failure case final text?)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: DsSpace.s12),
-                  child: DsBanner(
-                    key: const ValueKey('provider.error'),
-                    tone: DsTone.danger,
-                    text: text,
-                    liveRegion: true,
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: DsSpace.s12),
-                child: TextField(
-                  key: const ValueKey('provider.name'),
-                  controller: _name,
-                  enabled: !_busy,
-                  decoration: InputDecoration(
-                    labelText: l.instanceProviderName,
-                    helperText: l.instanceProviderNameHelp,
-                    errorText: _errorAt('/name'),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              ...switch (widget.kind) {
-                ProviderKind.oidc => _oidcFields(l),
-                ProviderKind.trustedHeader => _headerFields(l),
-                ProviderKind.local || ProviderKind.unknown => [
+    // While a write runs the dialog stays, so its result always reaches the list.
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        key: const ValueKey('provider.editor'),
+        backgroundColor: colors.surfaceRaised,
+        title: Text(
+          _editing
+              ? l.instanceProviderEditTitle(widget.provider!.name)
+              : l.instanceProviderAddTitle(providerKindText(l, widget.kind)),
+          style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_loopback case final text?)
                   Padding(
                     padding: const EdgeInsets.only(bottom: DsSpace.s12),
-                    child: Text(
-                      l.instanceProviderLocalNote,
-                      style: dsTextStyle(DsType.bodySm)
-                          .copyWith(color: colors.textSecondary),
+                    child: DsBanner(
+                      key: const ValueKey('provider.loopbackRefused'),
+                      tone: DsTone.danger,
+                      text: text,
+                      liveRegion: true,
                     ),
                   ),
-                ],
-              },
-              if (!_editing)
-                SwitchListTile(
-                  key: const ValueKey('provider.enabled'),
-                  contentPadding: EdgeInsets.zero,
-                  value: _enabled,
-                  onChanged: _busy ? null : (v) => setState(() => _enabled = v),
-                  title: Text(l.instanceProviderEnableNow),
+                if (_failure case final text?)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: DsSpace.s12),
+                    child: DsBanner(
+                      key: const ValueKey('provider.error'),
+                      tone: DsTone.danger,
+                      text: text,
+                      liveRegion: true,
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: DsSpace.s12),
+                  child: TextField(
+                    key: const ValueKey('provider.name'),
+                    controller: _name,
+                    enabled: !_busy,
+                    decoration: InputDecoration(
+                      labelText: l.instanceProviderName,
+                      helperText: l.instanceProviderNameHelp,
+                      errorText: _errorAt('/name'),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
-              SwitchListTile(
-                key: const ValueKey('provider.provisioning'),
-                contentPadding: EdgeInsets.zero,
-                value: _provisioning,
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() => _provisioning = v),
-                title: Text(l.instanceProviderProvisioning),
-                subtitle: Text(l.instanceProviderProvisioningHelp),
-              ),
-            ],
+                ...switch (widget.kind) {
+                  ProviderKind.oidc => _oidcFields(l),
+                  ProviderKind.trustedHeader => _headerFields(l),
+                  ProviderKind.local || ProviderKind.unknown => [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: DsSpace.s12),
+                      child: Text(
+                        l.instanceProviderLocalNote,
+                        style: dsTextStyle(DsType.bodySm)
+                            .copyWith(color: colors.textSecondary),
+                      ),
+                    ),
+                  ],
+                },
+                if (!_editing)
+                  SwitchListTile(
+                    key: const ValueKey('provider.enabled'),
+                    contentPadding: EdgeInsets.zero,
+                    value: _enabled,
+                    onChanged: _busy
+                        ? null
+                        : (v) => setState(() => _enabled = v),
+                    title: Text(l.instanceProviderEnableNow),
+                  ),
+                SwitchListTile(
+                  key: const ValueKey('provider.provisioning'),
+                  contentPadding: EdgeInsets.zero,
+                  value: _provisioning,
+                  onChanged: _busy
+                      ? null
+                      : (v) => setState(() => _provisioning = v),
+                  title: Text(l.instanceProviderProvisioning),
+                  subtitle: Text(l.instanceProviderProvisioningHelp),
+                ),
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            key: const ValueKey('provider.cancel'),
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: Text(l.selfCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('provider.save'),
+            onPressed: canSave ? _save : null,
+            child: Text(l.instanceSave),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          key: const ValueKey('provider.cancel'),
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.selfCancel),
-        ),
-        FilledButton(
-          key: const ValueKey('provider.save'),
-          onPressed: canSave ? _save : null,
-          child: Text(l.instanceSave),
-        ),
-      ],
     );
   }
 }

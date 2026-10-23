@@ -377,72 +377,78 @@ class _FlagSwitchDialogState extends State<FlagSwitchDialog> {
     final on = !widget.flag.enabled;
     final rollout =
         widget.flag.rolloutUserIds.length + widget.flag.rolloutGroupIds.length;
-    return AlertDialog(
-      key: const ValueKey('flag.dialog'),
-      backgroundColor: colors.surfaceRaised,
-      title: Text(
-        on
-            ? l.instanceFlagOnTitle(widget.flag.key)
-            : l.instanceFlagOffTitle(widget.flag.key),
-        style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                [
-                  l.instanceChangeFromTo(
-                    widget.flag.enabled ? l.instanceFlagOn : l.instanceFlagOff,
-                    on ? l.instanceFlagOn : l.instanceFlagOff,
-                  ),
-                  l.instanceFlagEveryone,
-                  if (rollout > 0) l.instanceFlagRolloutStays(rollout),
-                ].join('\n'),
-                key: const ValueKey('flag.body'),
-                style: dsTextStyle(DsType.body)
-                    .copyWith(color: colors.textSecondary),
-              ),
-              if (_failure case final f?)
-                Padding(
-                  padding: const EdgeInsets.only(top: DsSpace.s12),
-                  child: DsBanner(
-                    key: const ValueKey('flag.error'),
-                    tone: DsTone.danger,
-                    text: f,
-                    liveRegion: true,
-                  ),
+    // While a write runs the dialog stays, so its result always reaches the list.
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        key: const ValueKey('flag.dialog'),
+        backgroundColor: colors.surfaceRaised,
+        title: Text(
+          on
+              ? l.instanceFlagOnTitle(widget.flag.key)
+              : l.instanceFlagOffTitle(widget.flag.key),
+          style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  [
+                    l.instanceChangeFromTo(
+                      widget.flag.enabled
+                          ? l.instanceFlagOn
+                          : l.instanceFlagOff,
+                      on ? l.instanceFlagOn : l.instanceFlagOff,
+                    ),
+                    l.instanceFlagEveryone,
+                    if (rollout > 0) l.instanceFlagRolloutStays(rollout),
+                  ].join('\n'),
+                  key: const ValueKey('flag.body'),
+                  style: dsTextStyle(DsType.body)
+                      .copyWith(color: colors.textSecondary),
                 ),
-              const SizedBox(height: DsSpace.s16),
-              TextField(
-                key: const ValueKey('flag.reason'),
-                controller: _reason,
-                enabled: !_busy,
-                decoration: InputDecoration(
-                  labelText: l.instanceFlagReason,
-                  errorText: _reasonError,
+                if (_failure case final f?)
+                  Padding(
+                    padding: const EdgeInsets.only(top: DsSpace.s12),
+                    child: DsBanner(
+                      key: const ValueKey('flag.error'),
+                      tone: DsTone.danger,
+                      text: f,
+                      liveRegion: true,
+                    ),
+                  ),
+                const SizedBox(height: DsSpace.s16),
+                TextField(
+                  key: const ValueKey('flag.reason'),
+                  controller: _reason,
+                  enabled: !_busy,
+                  decoration: InputDecoration(
+                    labelText: l.instanceFlagReason,
+                    errorText: _reasonError,
+                  ),
+                  onChanged: (_) => setState(() {}),
                 ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            key: const ValueKey('flag.cancel'),
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: Text(l.selfCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('flag.submit'),
+            onPressed: _busy || _reason.text.trim().isEmpty ? null : _submit,
+            child: Text(on ? l.instanceFlagSwitchOn : l.instanceFlagSwitchOff),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          key: const ValueKey('flag.cancel'),
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.selfCancel),
-        ),
-        FilledButton(
-          key: const ValueKey('flag.submit'),
-          onPressed: _busy || _reason.text.trim().isEmpty ? null : _submit,
-          child: Text(on ? l.instanceFlagSwitchOn : l.instanceFlagSwitchOff),
-        ),
-      ],
     );
   }
 }

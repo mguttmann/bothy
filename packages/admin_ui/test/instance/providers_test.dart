@@ -351,4 +351,37 @@ void main() {
     expect(find.byKey(ValueKey('provider.${p.id}.edit')), findsNothing);
     expect(find.byKey(ValueKey('provider.${p.id}.toggle')), findsOneWidget);
   });
+
+  testWidgets('the form cannot be closed while its write runs', (tester) async {
+    await pump(tester);
+    await openAdd(tester, 'local');
+    await type(tester, 'provider.name', 'Local accounts');
+    await save(tester);
+    await confirmChange(tester);
+    // The step-up of the write is open: the form waits for its result.
+    expect(find.byType(StepUpDialog), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(find.byKey(const ValueKey('provider.cancel')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<PopScope<dynamic>>(
+            find
+                .ancestor(
+                  of: find.byKey(const ValueKey('provider.editor')),
+                  matching: find.byWidgetPredicate((w) => w is PopScope),
+                )
+                .first,
+          )
+          .canPop,
+      isFalse,
+    );
+    await tester.tap(find.byKey(const ValueKey('stepUp.continue')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('provider.editor')), findsNothing);
+    expect(find.text('Local accounts is added.'), findsOneWidget);
+  });
 }

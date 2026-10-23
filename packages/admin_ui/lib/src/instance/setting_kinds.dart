@@ -32,14 +32,14 @@ enum SettingRoute {
   branding,
 }
 
-/// One key of the configuration reference section 6.
+/// One key of the configuration reference section 6. Defaults are the server's: a key without a
+/// row is listed with its default and version 0 (DECISIONS M1-46/3).
 final class SettingSchema {
   /// Creates the entry.
   const SettingSchema({
     required this.key,
     required this.kind,
     required this.docType,
-    required this.defaultValue,
     required this.route,
   });
 
@@ -51,9 +51,6 @@ final class SettingSchema {
 
   /// The text of the column "Type" of the configuration reference, for example `BCP 47`.
   final String docType;
-
-  /// The default as the configuration reference writes it, or null for `empty`.
-  final String? defaultValue;
 
   /// The operation that writes the key.
   final SettingRoute route;
@@ -77,28 +74,24 @@ const List<SettingSchema> instanceSettingSchemas = [
     key: 'branding.product_name',
     kind: SettingKind.text,
     docType: 'string',
-    defaultValue: 'Bothy',
     route: SettingRoute.branding,
   ),
   SettingSchema(
     key: 'branding.accent_color',
     kind: SettingKind.paletteKey,
     docType: 'key of the category colors',
-    defaultValue: 'spruce',
     route: SettingRoute.branding,
   ),
   SettingSchema(
     key: 'branding.logo_file_id',
     kind: SettingKind.uuid,
     docType: 'uuid',
-    defaultValue: null,
     route: SettingRoute.branding,
   ),
   SettingSchema(
     key: 'locale.default',
     kind: SettingKind.locale,
     docType: 'BCP 47',
-    defaultValue: 'de',
     route: SettingRoute.settings,
   ),
 ];

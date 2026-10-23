@@ -60,7 +60,7 @@ void main() {
     );
     await tester.enterText(
       find.byKey(const ValueKey('branding.name')),
-      'Team Chat',
+      'Forum',
     );
     await tester.tap(find.byKey(const ValueKey('accent.moss')));
     await tester.pumpAndSettle();
@@ -68,14 +68,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('confirm.body'))).data,
-      'Product name: Bothy becomes Team Chat\n'
+      'Product name: Team Chat becomes Forum\n'
       'Accent: Spruce becomes Moss\n'
       'Everyone sees the change immediately.',
     );
     await confirmChange(tester);
     await confirmStepUp(tester, 'Change the branding of the instance');
 
-    expect(r.calls.last, 'updateBranding Team Chat moss');
+    expect(r.calls.last, 'updateBranding Forum moss');
     expect(find.text('The branding is saved.'), findsOneWidget);
     expect(changed, 1);
   });
@@ -87,7 +87,7 @@ void main() {
     await pump(tester);
     await saveName(tester, 'A' * (fakeProductNameMax + 1));
     expect(fieldError(tester), 'This is too long for the server.');
-    expect(r.productName, 'Bothy');
+    expect(r.productName, 'Team Chat');
     expect(changed, 0);
   });
 
@@ -102,7 +102,7 @@ void main() {
       'Contains a character that is not allowed, for example a control or '
       'text direction character.',
     );
-    expect(r.productName, 'Bothy');
+    expect(r.productName, 'Team Chat');
   });
 
   testWidgets('a 412 shows the newer branding and the next save wins', (
@@ -111,7 +111,7 @@ void main() {
     r.stepUpFresh = true;
     await pump(tester);
     r.concurrent['updateBranding'] = () => r.otherOwnerBrands('Forum', 'rowan');
-    await saveName(tester, 'Team Chat');
+    await saveName(tester, 'Help Desk');
 
     final conflict = find.byKey(const ValueKey('branding.conflict'));
     expect(conflict, findsOneWidget);
@@ -128,12 +128,12 @@ void main() {
           .widget<TextField>(find.byKey(const ValueKey('branding.name')))
           .controller!
           .text,
-      'Team Chat',
+      'Help Desk',
     );
     await tester.tap(find.byKey(const ValueKey('branding.save')));
     await tester.pumpAndSettle();
     await confirmChange(tester);
-    expect(r.productName, 'Team Chat');
+    expect(r.productName, 'Help Desk');
     expect(find.byKey(const ValueKey('branding.conflict')), findsNothing);
   });
 

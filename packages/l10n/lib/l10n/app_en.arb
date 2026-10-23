@@ -9633,7 +9633,7 @@
     "placeholders": {
       "from": {
         "type": "String",
-        "example": "Bothy"
+        "example": "Forum"
       },
       "to": {
         "type": "String",

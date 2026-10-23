@@ -2,7 +2,7 @@
 
 // The typed editors of the instance settings are held equal to their sources (brief M6-09
 // Design note 1; Ruling D-M6-09-1): every key of the table of the configuration reference
-// section 6 with its type and default, the accent keys of ADR 0044 and of the server
+// section 6 with its type, the accent keys of ADR 0044 and of the server
 // (`kernel/designkeys`), and the languages of `locale.default` that the server accepts.
 
 import 'dart:io';
@@ -21,18 +21,16 @@ Directory _root() {
 
 String _read(String path) => File('${_root().path}/$path').readAsStringSync();
 
-/// The rows of the table of section 6: key, type and default (`empty` as null).
-List<(String, String, String?)> _section6() {
+/// The rows of the table of section 6: key and type.
+List<(String, String)> _section6() {
   final text = _read('docs/operations/configuration.md');
   final start = text.indexOf('## 6. Instance settings');
   final end = text.indexOf('\n## 7.', start);
-  final rows = <(String, String, String?)>[];
+  final rows = <(String, String)>[];
   for (final line in text.substring(start, end).split('\n')) {
-    final m = RegExp(r'^\| `([a-z_.]+)` \| ([^|]+) \| ([^|]+) \|')
-        .firstMatch(line);
+    final m = RegExp(r'^\| `([a-z_.]+)` \| ([^|]+) \|').firstMatch(line);
     if (m == null) continue;
-    final def = m[3]!.trim().replaceAll('`', '');
-    rows.add((m[1]!, m[2]!.trim(), def == 'empty' ? null : def));
+    rows.add((m[1]!, m[2]!.trim()));
   }
   return rows;
 }
@@ -41,10 +39,7 @@ void main() {
   test('the table holds exactly the keys of configuration reference 6', () {
     final doc = _section6();
     expect(doc, isNotEmpty);
-    expect([
-      for (final s in instanceSettingSchemas)
-        (s.key, s.docType, s.defaultValue),
-    ], doc);
+    expect([for (final s in instanceSettingSchemas) (s.key, s.docType)], doc);
   });
 
   test('branding keys are written only by the branding operations', () {

@@ -361,94 +361,100 @@ class _SettingEditorDialogState extends State<SettingEditorDialog> {
     final conflict = _conflict;
     final input = _input;
     final changed = input != null && input != _current.value;
-    return AlertDialog(
-      key: const ValueKey('setting.editor'),
-      backgroundColor: colors.surfaceRaised,
-      title: Text(
-        widget.entry.key,
-        style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
-      ),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                settingKindText(l, widget.schema.kind),
-                style: dsTextStyle(DsType.bodySm)
-                    .copyWith(color: colors.textSecondary),
-              ),
-              const SizedBox(height: DsSpace.s12),
-              if (conflict != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: DsSpace.s12),
-                  child: DsBanner(
-                    key: const ValueKey('setting.conflict'),
-                    tone: DsTone.warning,
-                    text: l.instanceConflict(
-                      settingValueText(l, conflict.value),
-                      settingValueText(l, input),
-                    ),
-                    liveRegion: true,
-                  ),
+    // While a write runs the dialog stays, so its result always reaches the list.
+    return PopScope(
+      canPop: !_busy,
+      child: AlertDialog(
+        key: const ValueKey('setting.editor'),
+        backgroundColor: colors.surfaceRaised,
+        title: Text(
+          widget.entry.key,
+          style: dsTextStyle(DsType.title).copyWith(color: colors.textPrimary),
+        ),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: DsLayout.overlayWidth),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  settingKindText(l, widget.schema.kind),
+                  style: dsTextStyle(DsType.bodySm)
+                      .copyWith(color: colors.textSecondary),
                 ),
-              if (_failure case final f?)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: DsSpace.s12),
-                  child: DsBanner(
-                    key: const ValueKey('setting.error'),
-                    tone: DsTone.danger,
-                    text: f,
-                    liveRegion: true,
-                  ),
-                ),
-              if (_closed)
-                DropdownButtonFormField<String>(
-                  key: const ValueKey('setting.input'),
-                  initialValue: _options.contains(_choice) ? _choice : null,
-                  decoration: InputDecoration(
-                    labelText: l.instanceSettingValue,
-                    errorText: _fieldError,
-                  ),
-                  items: [
-                    for (final o in _options)
-                      DropdownMenuItem(
-                        key: ValueKey('setting.option.$o'),
-                        value: o,
-                        child: Text(o),
+                const SizedBox(height: DsSpace.s12),
+                if (conflict != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: DsSpace.s12),
+                    child: DsBanner(
+                      key: const ValueKey('setting.conflict'),
+                      tone: DsTone.warning,
+                      text: l.instanceConflict(
+                        settingValueText(l, conflict.value),
+                        settingValueText(l, input),
                       ),
-                  ],
-                  onChanged: _busy ? null : (v) => setState(() => _choice = v),
-                )
-              else
-                TextField(
-                  key: const ValueKey('setting.input'),
-                  controller: _text,
-                  enabled: !_busy,
-                  decoration: InputDecoration(
-                    labelText: l.instanceSettingValue,
-                    errorText: _fieldError,
+                      liveRegion: true,
+                    ),
                   ),
-                  onChanged: (_) => setState(() {}),
-                ),
-            ],
+                if (_failure case final f?)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: DsSpace.s12),
+                    child: DsBanner(
+                      key: const ValueKey('setting.error'),
+                      tone: DsTone.danger,
+                      text: f,
+                      liveRegion: true,
+                    ),
+                  ),
+                if (_closed)
+                  DropdownButtonFormField<String>(
+                    key: const ValueKey('setting.input'),
+                    initialValue: _options.contains(_choice) ? _choice : null,
+                    decoration: InputDecoration(
+                      labelText: l.instanceSettingValue,
+                      errorText: _fieldError,
+                    ),
+                    items: [
+                      for (final o in _options)
+                        DropdownMenuItem(
+                          key: ValueKey('setting.option.$o'),
+                          value: o,
+                          child: Text(o),
+                        ),
+                    ],
+                    onChanged: _busy
+                        ? null
+                        : (v) => setState(() => _choice = v),
+                  )
+                else
+                  TextField(
+                    key: const ValueKey('setting.input'),
+                    controller: _text,
+                    enabled: !_busy,
+                    decoration: InputDecoration(
+                      labelText: l.instanceSettingValue,
+                      errorText: _fieldError,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            key: const ValueKey('setting.cancel'),
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: Text(l.selfCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('setting.save'),
+            onPressed: _busy || !changed ? null : _save,
+            child: Text(l.instanceSave),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          key: const ValueKey('setting.cancel'),
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.selfCancel),
-        ),
-        FilledButton(
-          key: const ValueKey('setting.save'),
-          onPressed: _busy || !changed ? null : _save,
-          child: Text(l.instanceSave),
-        ),
-      ],
     );
   }
 }
