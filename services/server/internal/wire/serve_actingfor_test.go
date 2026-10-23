@@ -3,7 +3,6 @@
 package wire_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -15,29 +14,21 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 )
 
-// callWithInvocation is consumerWorld.call with the Invocation-Token values of an agent inside a
-// run (07 guard rule SR9).
-func (w *invocationWorld) callWithInvocation(a consumerAgent, method, path string, body any, tokens ...string) (int, map[string]any) {
+// callWithInvocation is a GET of consumerWorld.call with the Invocation-Token values of an agent
+// inside a run (07 guard rule SR9).
+func (w *invocationWorld) callWithInvocation(a consumerAgent, path string, tokens ...string) (int, map[string]any) {
 	w.t.Helper()
-	var rd io.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		rd = bytes.NewReader(b)
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, method, w.base+path, rd)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.base+path, nil)
 	if err != nil {
 		w.t.Fatal(err)
 	}
 	req.Header.Set("Authorization", "DPoP "+a.tok)
-	req.Header.Set("DPoP", identitytest.SignDPoPProof(a.key, identitytest.ProofClaims{HTM: method, HTU: gwPublicURL + path,
+	req.Header.Set("DPoP", identitytest.SignDPoPProof(a.key, identitytest.ProofClaims{HTM: http.MethodGet, HTU: gwPublicURL + path,
 		IAT: time.Now(), Nonce: w.id.DPoP.CurrentNonce(), ATH: dpop.ATH(a.tok)}))
 	for _, t := range tokens {
 		req.Header.Add("Invocation-Token", t)
-	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -77,16 +68,16 @@ func TestWire_ActingForSource(t *testing.T) {
 	w.sql(`UPDATE channels SET operator_inherit = false, operator_agent_id = $1 WHERE id = $2`, a.id.String(), other.id)
 	hidden, _ := w.say(w.owner, other.thread, "not for Sam")
 
-	if code, b := w.callWithInvocation(a, http.MethodGet, "/api/v1/messages/"+m, nil, tok); code != http.StatusOK {
+	if code, b := w.callWithInvocation(a, "/api/v1/messages/"+m, tok); code != http.StatusOK {
 		t.Fatalf("own channel with the token = %d %v", code, b)
 	}
-	if code, b := w.callWithInvocation(a, http.MethodGet, "/api/v1/messages/"+hidden, nil); code != http.StatusOK {
+	if code, b := w.callWithInvocation(a, "/api/v1/messages/"+hidden); code != http.StatusOK {
 		t.Fatalf("operated channel without the token = %d %v", code, b)
 	}
-	if code, b := w.callWithInvocation(a, http.MethodGet, "/api/v1/messages/"+hidden, nil, tok); code != http.StatusNotFound || b["reason"] != nil {
+	if code, b := w.callWithInvocation(a, "/api/v1/messages/"+hidden, tok); code != http.StatusNotFound || b["reason"] != nil {
 		t.Fatalf("operated channel with Sam's token = %d %v, want 404 without reason", code, b)
 	}
-	code, b := w.callWithInvocation(a, http.MethodGet, "/api/v1/messages/"+m, nil, "not-a-token")
+	code, b := w.callWithInvocation(a, "/api/v1/messages/"+m, "not-a-token")
 	if code != http.StatusForbidden || b["code"] != "invocation_token_invalid" || b["reason"] != "invalid" {
 		t.Fatalf("garbage header = %d %v", code, b)
 	}

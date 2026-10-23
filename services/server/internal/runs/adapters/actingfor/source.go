@@ -48,6 +48,7 @@ func (s *Source) ResolveActingFor(ctx context.Context, agentID ids.ID, token str
 		return actor.ActingFor{}, err
 	}
 	var status actor.ActingForStatus
+	//exhaustive:ignore // invalid and every unknown status map to invalid (default, fail closed).
 	switch res.Status {
 	case domain.ActingForBound:
 		status = actor.ActingForBound

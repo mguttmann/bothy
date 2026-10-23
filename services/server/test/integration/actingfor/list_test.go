@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -20,7 +19,7 @@ import (
 
 // scopeGolden is the file of the operations whose requests call Scope (brief M2-14
 // "TestSR9_EveryScopedList"): one operationId per line, sorted, after a header of comment lines.
-var scopeGolden = filepath.Join("testdata", "sr9_scope_operations.golden")
+const scopeGolden = "testdata/sr9_scope_operations.golden"
 
 // engineeringParams are the path parameters the fixture fills with an ID of Engineering; a request
 // with T on such a path must answer like one with an unknown ID.

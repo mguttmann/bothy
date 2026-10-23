@@ -39,12 +39,11 @@ func (w *world) agentFor(agent, person ids.ID, r actingRun, status actor.ActingF
 	return a
 }
 
-// grantLotse gives Lotse level l on the space and raises the rights version.
-func (w *world) grantLotse(t testing.TB, space ids.ID, l domain.Level, caps ...domain.Capability) ids.ID {
+// grantLotse gives Lotse level read on the space and raises the rights version.
+func (w *world) grantLotse(t testing.TB, space ids.ID) {
 	t.Helper()
-	id := w.grant(t, domain.Subject{Kind: domain.SubjectAgent, PrincipalID: w.lotse}, domain.Target{Kind: domain.TargetSpace, SpaceID: space}, l, time.Time{}, caps...)
+	w.grant(t, domain.Subject{Kind: domain.SubjectAgent, PrincipalID: w.lotse}, domain.Target{Kind: domain.TargetSpace, SpaceID: space}, domain.LevelRead, time.Time{})
 	w.versions.Bump()
-	return id
 }
 
 // runRes is a run resource as runs builds it (OwnerID the run's agent, M2-09) in thread.
@@ -70,7 +69,7 @@ func scopeHasAny(sc authorize.Scope, these []ids.ID) bool {
 // names no Engineering channel.
 func TestAZM44_ActingForInsufficient(t *testing.T) {
 	w := newWorld(t)
-	w.grantLotse(t, w.engineering, domain.LevelRead)
+	w.grantLotse(t, w.engineering)
 	lotse := w.agentFor(w.lotse, w.alex, w.newActingRun(), actor.ActingForBound)
 	w.expect(t, lotse, authorize.ActionMessageRead, w.msg(w.projektA, w.robin), notFound, "acting_for_insufficient")
 	sc, err := w.az.Scope(context.Background(), lotse, authorize.ActionMessageRead)
@@ -86,7 +85,7 @@ func TestAZM44_ActingForInsufficient(t *testing.T) {
 // rights (hint H1).
 func TestAZM45_WithoutRun(t *testing.T) {
 	w := newWorld(t)
-	w.grantLotse(t, w.engineering, domain.LevelRead)
+	w.grantLotse(t, w.engineering)
 	w.allow(t, w.agent(w.lotse), authorize.ActionMessageRead, w.msg(w.projektA, w.robin))
 	sc, err := w.az.Scope(context.Background(), w.agent(w.lotse), authorize.ActionMessageRead)
 	if err != nil || !scopeHasAny(sc, w.engineeringIDs()) {
@@ -143,7 +142,7 @@ func (w *world) exceptionCases() []exceptionCase {
 // bound; run.finish of an earlier run of the same thread is bound.
 func TestActingFor_Exceptions(t *testing.T) {
 	w := newWorld(t)
-	w.grantLotse(t, w.engineering, domain.LevelRead)
+	w.grantLotse(t, w.engineering)
 	run := w.newActingRun()
 	lotse := w.agentFor(w.lotse, w.alex, run, actor.ActingForBound)
 	w.revoke(t, w.g1)
@@ -253,7 +252,7 @@ func TestActingFor_StatusRunInactive(t *testing.T) {
 // and the run as IDs; an allow writes nothing.
 func TestActingFor_DeniedDetails(t *testing.T) {
 	w := newWorld(t)
-	w.grantLotse(t, w.engineering, domain.LevelRead)
+	w.grantLotse(t, w.engineering)
 	run := w.newActingRun()
 	lotse := w.agentFor(w.lotse, w.alex, run, actor.ActingForBound)
 	before, _ := w.rec.counts()
@@ -273,7 +272,7 @@ func TestActingFor_DeniedDetails(t *testing.T) {
 // decision and Scope of an agent consumer ignore the binding; in filter mode they stay bound.
 func TestActingFor_DeliveryModeIgnores(t *testing.T) {
 	w := newWorld(t)
-	w.grantLotse(t, w.engineering, domain.LevelRead)
+	w.grantLotse(t, w.engineering)
 	run := w.newActingRun()
 	bound := w.agentFor(w.lotse, w.alex, run, actor.ActingForBound)
 	del := authorize.Delivery(context.Background())
@@ -306,7 +305,7 @@ func TestActingFor_DeliveryModeIgnores(t *testing.T) {
 // snapshot.
 func TestActingFor_OwnerTriggerer(t *testing.T) {
 	w := newWorld(t)
-	w.grantLotse(t, w.engineering, domain.LevelRead)
+	w.grantLotse(t, w.engineering)
 	w.addToken(w.owner)
 	personal := actor.Actor{ID: w.owner, Kind: actor.KindUser, TokenID: w.tokens[w.owner]}
 	lotse := w.agentFor(w.lotse, w.owner, w.newActingRun(), actor.ActingForBound)

@@ -280,8 +280,8 @@ type problem struct {
 }
 
 // wantProblem requires status, a body that validates against the schema Problem of the contract,
-// the code and the reason (empty: no reason member), and returns the problem.
-func (e *env) wantProblem(r harness.Response, status int, code, reason, label string) problem {
+// the code and the reason (empty: no reason member).
+func (e *env) wantProblem(r harness.Response, status int, code, reason, label string) {
 	e.t.Helper()
 	if r.Status != status {
 		e.t.Fatalf("%s = %d %s, want %d %s", label, r.Status, e.redact(r.Body), status, code)
@@ -304,7 +304,6 @@ func (e *env) wantProblem(r harness.Response, status int, code, reason, label st
 	if p := nullPath(raw, ""); p != "" {
 		e.t.Fatalf("%s: JSON null at %s", label, p)
 	}
-	return p
 }
 
 // volatileHeaders differ between two otherwise equal answers: time, correlation, the DPoP nonce
