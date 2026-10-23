@@ -127,7 +127,7 @@ func TestMigrationMessageAttachments(t *testing.T) {
 
 // TestMigrationHasAttachments holds messages.has_attachments (03 section 4.6, M3-07): boolean,
 // not null, default false; the CHECK deleted_at IS NULL OR NOT has_attachments is created NOT
-// VALID by 00062 (docs/operations/upgrade.md rule M5) and validated by 00063. Existing rows get
+// VALID by 00065 (docs/operations/upgrade.md rule M5) and validated by 00066. Existing rows get
 // false; a deleted message with the flag fails the check. A second up changes nothing.
 func TestMigrationHasAttachments(t *testing.T) {
 	t.Parallel()
@@ -135,8 +135,8 @@ func TestMigrationHasAttachments(t *testing.T) {
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	conn := db.SuperConn(t)
 	provider := attachmentProvider(t, db)
-	if _, err := provider.UpTo(ctx, 61); err != nil {
-		t.Fatalf("up to 61: %v", err)
+	if _, err := provider.UpTo(ctx, 64); err != nil {
+		t.Fatalf("up to 64: %v", err)
 	}
 	// A message from before the column.
 	for _, stmt := range attachmentFixture[:5] {
@@ -144,8 +144,8 @@ func TestMigrationHasAttachments(t *testing.T) {
 			t.Fatalf("%s: %v", stmt, err)
 		}
 	}
-	if _, err := provider.UpTo(ctx, 62); err != nil {
-		t.Fatalf("up to 62: %v", err)
+	if _, err := provider.UpTo(ctx, 65); err != nil {
+		t.Fatalf("up to 65: %v", err)
 	}
 	const checkName = "messages_has_attachments_deleted_check"
 	validated := func() (string, bool) {
@@ -159,17 +159,17 @@ func TestMigrationHasAttachments(t *testing.T) {
 		return def, ok
 	}
 	if def, ok := validated(); def != "CHECK (((deleted_at IS NULL) OR (NOT has_attachments))) NOT VALID" || ok {
-		t.Errorf("after 00062: %q validated %v, want NOT VALID", def, ok)
+		t.Errorf("after 00065: %q validated %v, want NOT VALID", def, ok)
 	}
 	var flag bool
 	if err := conn.QueryRow(ctx, `SELECT has_attachments FROM messages WHERE id = $1`, attMessage).Scan(&flag); err != nil || flag {
 		t.Errorf("an existing message: has_attachments %v, %v; want false", flag, err)
 	}
-	if _, err := provider.UpTo(ctx, 63); err != nil {
-		t.Fatalf("up to 63: %v", err)
+	if _, err := provider.UpTo(ctx, 66); err != nil {
+		t.Fatalf("up to 66: %v", err)
 	}
 	if def, ok := validated(); def != "CHECK (((deleted_at IS NULL) OR (NOT has_attachments)))" || !ok {
-		t.Errorf("after 00063: %q validated %v", def, ok)
+		t.Errorf("after 00066: %q validated %v", def, ok)
 	}
 	var typ, dflt string
 	var nullable bool

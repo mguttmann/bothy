@@ -76,7 +76,7 @@ Messages, revisions, mentions, reactions, pins, templates, channel export.
   `00034_message_templates.sql` (`message_templates` as 03 section 4.6) and
   `00040_messaging_message_revisions.sql` (`message_revisions` as 03 states it, M1-58) and
   `00041_messaging_reactions_pins.sql` (`reactions` and `pins` as 03 states them, M1-59), and
-  `00062_messaging_has_attachments.sql` with `00063_messaging_has_attachments_validate.sql`
+  `00065_messaging_has_attachments.sql` with `00066_messaging_has_attachments_validate.sql`
   (`messages.has_attachments` and the CHECK `messages_has_attachments_deleted_check`, added
   `NOT VALID` and validated separately, M3-07), which close the `has_attachments` deviation the
   header of 00032 names.
