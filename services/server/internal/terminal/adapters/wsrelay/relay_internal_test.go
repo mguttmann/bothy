@@ -33,6 +33,8 @@ type fakeRelayUC struct {
 	// write fail.
 	written      []app.Counts
 	failCounters bool
+	// failEnd makes every RelayEnd fail after it recorded the call.
+	failEnd bool
 	// okWritten are the counts of the writes that succeeded.
 	okWritten []app.Counts
 	// entered receives one value when a RelayCounters write starts and hold, when set, keeps the
@@ -76,7 +78,11 @@ func (f *fakeRelayUC) RelayEnd(_ context.Context, _ ids.ID, r domain.CloseReason
 	f.add("end:" + string(r))
 	f.mu.Lock()
 	f.progress = append(f.progress, p)
+	fail := f.failEnd
 	f.mu.Unlock()
+	if fail {
+		return errors.New("fake: end failed")
+	}
 	return nil
 }
 func (f *fakeRelayUC) RelaySessionState(context.Context, ids.ID) (string, bool, error) {

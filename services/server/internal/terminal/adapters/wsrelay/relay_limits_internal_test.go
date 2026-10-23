@@ -474,3 +474,65 @@ func TestRelayLimits_EndWaitsForWriteInFlight(t *testing.T) {
 		t.Fatalf("bytes_in %d over the writes and the end, want %d", in, len("abc"))
 	}
 }
+
+// TestRelayLimits_FailedEndKeepsProgress: a limit end that waited for a write in flight and then
+// failed (the session stays open) gives its counts back and lets the progress writes go on, so the
+// input typed afterwards still reaches the store and terminal.sweep does not see a stale
+// last_input_at (D-M2-46-25).
+func TestRelayLimits_FailedEndKeepsProgress(t *testing.T) {
+	t.Parallel()
+	r, uc, timers := limitRelay(t)
+	t0 := timers.Clock.Now()
+	id := ids.New()
+	r.Expect(app.Expectation{SessionID: id, HostID: ids.New(), DeviceID: ids.New(), Deadline: t0.Add(farDeadline), Started: true,
+		Times: domain.SessionTimes{State: domain.SessionActive, OpenedAt: t0, StartedAt: t0}})
+	r.mu.Lock()
+	dev, hst := r.newSide(domain.SideClient, id, nil), r.newSide(domain.SideHost, id, nil)
+	r.slots[id].dev, r.slots[id].hst, r.slots[id].paired = dev, hst, true
+	r.hold(r.slots[id])
+	r.mu.Unlock()
+	r.forward(dev, []byte("handshake-1"))
+	r.forward(hst, []byte("handshake-2"))
+	uc.mu.Lock()
+	uc.failEnd = true
+	uc.entered, uc.hold = make(chan struct{}, 64), make(chan struct{})
+	uc.mu.Unlock()
+	r.forward(dev, []byte("abc")) // the first input is written at once and held in flight
+	testkit.Receive(t, "the first progress write", uc.entered)
+	advanced := make(chan struct{})
+	go func() {
+		defer close(advanced)
+		timers.Advance(limitWindows.Idle + limitWindows.IdleGrace)
+	}()
+	testkit.Until(t, "the idle end waits for the write in flight", func() bool {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return r.slots[id].ending
+	})
+	close(uc.hold)
+	testkit.Receive(t, "the idle end", advanced)
+	r.writes.Wait()
+	if e := uc.ends(); !slices.Equal(e, []string{"end:idle_timeout"}) {
+		t.Fatalf("ends %v, want one idle_timeout", e)
+	}
+	uc.mu.Lock()
+	uc.hold = nil
+	uc.mu.Unlock()
+	// The end failed, the session stays open and the user types on.
+	for range 6 {
+		timers.Advance(limitWindows.IdleGrace)
+		r.forward(dev, []byte("more"))
+		r.writes.Wait()
+	}
+	timers.Advance(limitWindows.IdleGrace)
+	r.writes.Wait()
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	var in int64
+	for _, c := range uc.okWritten {
+		in += c.In
+	}
+	if want := int64(len("abc") + 6*len("more")); in != want {
+		t.Fatalf("bytes_in %d over the progress writes after a failed end, want %d (writes %v)", in, want, uc.okWritten)
+	}
+}

@@ -343,7 +343,19 @@ func (r *Relay) limitDeadline(id ids.ID, gen int) {
 		s.limitEnded = true
 		r.mu.Unlock()
 		ctx := context.Background()
-		r.call(ctx, r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput}))
+		err := r.uc.RelayEnd(ctx, id, reason, domain.Progress{BytesIn: c.In, BytesOut: c.Out, LastInputAt: c.LastInput})
+		if err == nil {
+			return
+		}
+		r.call(ctx, err)
+		// The end failed and the session stays open: its counts go back to the slot and the
+		// progress writes go on, so last_input_at keeps moving; terminal.sweep repeats the end
+		// (D-M2-46-25).
+		r.mu.Lock()
+		s.ending = false
+		fx := r.giveBackLocked(id, c)
+		r.mu.Unlock()
+		fx.run(ctx)
 		return
 	}
 }

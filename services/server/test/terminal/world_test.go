@@ -547,7 +547,7 @@ func (w *world) state(session string) string {
 // eventually waits until cond holds or waitLong passes.
 func (w *world) eventually(what string, cond func() bool) {
 	w.t.Helper()
-	deadline := time.Now().Add(waitLong)
+	deadline := testkit.Deadline()
 	for !cond() {
 		if time.Now().After(deadline) {
 			w.t.Fatalf("timed out waiting for %s", what)

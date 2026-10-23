@@ -22,10 +22,6 @@ import (
 	"github.com/OWNER/bothy/services/host/internal/session/sessiontest"
 )
 
-// treeEndDeadline bounds the wait for the end of the PTY and its background processes after a
-// close; the helper ends the tree at once (24 6.5), the bound only absorbs a slow build machine.
-const treeEndDeadline = testkit.Patience
-
 // quietWindow is how long the test listens for a session.ended after a close by the server.
 const quietWindow = 300 * time.Millisecond
 
@@ -81,7 +77,8 @@ func TestTMT10_SessionCloseEndsProcessTree(t *testing.T) {
 		} else {
 			dc.Close(CodeClosed, "")
 		}
-		deadline := time.Now().Add(treeEndDeadline)
+		// The helper ends the tree at once (24 6.5); the bound only absorbs a slow build machine.
+		deadline := testkit.Deadline()
 		for _, pid := range []int{leader, detached, nohup} {
 			for pidAlive(pid) {
 				if time.Now().After(deadline) {
