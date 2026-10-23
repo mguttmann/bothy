@@ -14,14 +14,14 @@ part 'import_file_slot.g.dart';
 ///
 /// Properties:
 /// * [item]
-/// * [upload] - Absent when the file is already `posted`.
+/// * [upload] - Absent when the file is already `posted`. Its part URLs name `uploadImportFilePart`.
 @BuiltValue()
 abstract class ImportFileSlot
     implements Built<ImportFileSlot, ImportFileSlotBuilder> {
   @BuiltValueField(wireName: r'item')
   ImportItem get item;
 
-  /// Absent when the file is already `posted`.
+  /// Absent when the file is already `posted`. Its part URLs name `uploadImportFilePart`.
   @BuiltValueField(wireName: r'upload')
   UploadSession? get upload;
 

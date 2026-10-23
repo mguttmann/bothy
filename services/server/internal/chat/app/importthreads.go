@@ -146,8 +146,8 @@ func (s *Service) importParent(ctx context.Context, c ChannelRow, p *chat.Parent
 	return p.MessageID, nil
 }
 
-// importTags keeps the live tags of the forum c among want, in the order given and without
-// duplicates; a text channel has none.
+// importTags keeps the live tags of the forum c among want, in the order given, without
+// duplicates and at most thread.max_tags of them (22 5.1.1); a text channel has none.
 func (s *Service) importTags(ctx context.Context, c ChannelRow, want []ids.ID) ([]ids.ID, error) {
 	if len(want) == 0 || c.Channel.Kind != domain.ChannelForum {
 		return nil, nil
@@ -158,6 +158,10 @@ func (s *Service) importTags(ctx context.Context, c ChannelRow, want []ids.ID) (
 	}
 	out := make([]ids.ID, 0, len(want))
 	for _, id := range want {
+		if len(out) == s.cfg.ThreadMaxTags {
+			// Further tags are dropped, so the set stays editable within thread.max_tags.
+			break
+		}
 		if slices.Contains(out, id) || !slices.ContainsFunc(live, func(t domain.ForumTag) bool { return t.ID == id }) {
 			continue
 		}

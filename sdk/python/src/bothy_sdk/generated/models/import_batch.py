@@ -21,7 +21,8 @@ class ImportBatch:
 
         Attributes:
             items (list[ImportObject]): At most `import.batch_max_items`.
-            thread_origin_key (str | Unset):
+            thread_origin_key (str | Unset): `thread:<id>` for a thread or forum post, `channel:<id>` for the main thread of
+                a text channel; absent for a structure batch.
     """
 
     items: list[ImportObject]

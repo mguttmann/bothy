@@ -21,6 +21,8 @@ import 'package:api_client/src/generated/model/import_source.dart';
 import 'package:api_client/src/generated/model/import_source_create.dart';
 import 'package:api_client/src/generated/model/import_source_page.dart';
 import 'package:api_client/src/generated/model/problem.dart';
+import 'package:api_client/src/generated/model/upload_complete.dart';
+import 'package:api_client/src/generated/model/upload_part_result.dart';
 
 class ImportApi {
   final Dio _dio;
@@ -30,7 +32,7 @@ class ImportApi {
   const ImportApi(this._dio, this._serializers);
 
   /// Write a batch of imported objects
-  /// One transaction, at most &#x60;import.batch_max_items&#x60; objects. Every target must lie in a channel of this running source. Existing &#x60;posted&#x60; keys return their target without a duplicate or event (22, 7.2). Writes &#x60;thread.updated&#x60; and &#x60;import.progress&#x60; instead of one event per message. A source that is not &#x60;running&#x60; is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_not_running&#x60;; a target outside the channels of the source is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;target_outside_source&#x60;; a new channel whose name equals a live channel of its space is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;name_collision&#x60;. The &#x60;data&#x60; of a structure item follows &#x60;ImportSpaceData&#x60;, &#x60;ImportChannelData&#x60;, &#x60;ImportForumTagData&#x60; or &#x60;ImportUserData&#x60;; until the content items are enabled, &#x60;thread&#x60;, &#x60;message&#x60; and &#x60;pin&#x60; items and &#x60;thread_origin_key&#x60; answer &#x60;400 validation_failed&#x60; with the code &#x60;not_enabled&#x60;.
+  /// One transaction, at most &#x60;import.batch_max_items&#x60; objects. Every target must lie in a channel of this running source. Existing &#x60;posted&#x60; keys return their target without a duplicate or event (22, 7.2). Writes &#x60;thread.updated&#x60; and &#x60;import.progress&#x60; instead of one event per message. A source that is not &#x60;running&#x60; is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;import_not_running&#x60;; a target outside the channels of the source is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;target_outside_source&#x60;; a new channel whose name equals a live channel of its space is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;name_collision&#x60;. The &#x60;data&#x60; of a structure item follows &#x60;ImportSpaceData&#x60;, &#x60;ImportChannelData&#x60;, &#x60;ImportForumTagData&#x60; or &#x60;ImportUserData&#x60;. A batch with &#x60;thread_origin_key&#x60; concerns exactly one thread (&#x60;thread:&lt;id&gt;&#x60;, or &#x60;channel:&lt;id&gt;&#x60; for the main thread of a text channel; a forum has none, &#x60;400 validation_failed&#x60;). Its optional first item is the &#x60;thread&#x60; item of that key (&#x60;ImportThreadData&#x60;), every other item a &#x60;message&#x60; (&#x60;ImportMessageData&#x60;) or a &#x60;pin&#x60; (&#x60;ImportPinData&#x60;); a structure item there, or a content item in a batch without &#x60;thread_origin_key&#x60;, is &#x60;400 validation_failed&#x60; at its &#x60;item_kind&#x60;. A thread that is neither posted nor created by the batch is &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;thread_not_imported&#x60;; a message whose author item is not posted &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;author_not_imported&#x60;. Imported messages have &#x60;origin &#x3D; import&#x60;, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets &#x60;threads.unread_floor_seq&#x60; to the end of the thread and appends one &#x60;thread.updated&#x60; and one &#x60;import.progress&#x60;, never &#x60;message.created&#x60; (04 15.8).
   ///
   /// Parameters:
   /// * [importId]
@@ -333,6 +335,129 @@ class ImportApi {
     );
   }
 
+  /// Finish the upload of an imported file
+  /// Completes the upload of the file of a file item of this source with the rules of &#x60;completeUpload&#x60; (12, 3.4): &#x60;parts&#x60; is checked against the confirmed parts, missing parts are &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;upload_incomplete&#x60;, another &#x60;etag&#x60; &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;part_conflict&#x60;, an expired session &#x60;410 gone&#x60;. The job &#x60;files.scan&#x60; checks size and SHA-256 against the declaration of &#x60;createImportFile&#x60;, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes &#x60;posted&#x60; in the same transaction; a repeated call answers the posted item. It authorizes &#x60;import.apply&#x60; on the running source instead of &#x60;file.upload&#x60; (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is &#x60;404&#x60;.
+  ///
+  /// Parameters:
+  /// * [importId]
+  /// * [fileId]
+  /// * [uploadComplete]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ImportFileSlot] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ImportFileSlot>> completeImportFile({
+    required String importId,
+    required String fileId,
+    required UploadComplete uploadComplete,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/imports/{import_id}/files/{file_id}/complete'
+        .replaceAll(
+          '{'
+          r'import_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            importId,
+            const FullType(String),
+          ).toString(),
+        )
+        .replaceAll(
+          '{'
+          r'file_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            fileId,
+            const FullType(String),
+          ).toString(),
+        );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      const _type = FullType(UploadComplete);
+      _bodyData = _serializers.serialize(uploadComplete, specifiedType: _type);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ImportFileSlot? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(ImportFileSlot),
+            ) as ImportFileSlot;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ImportFileSlot>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Add an import source
   ///
   ///
@@ -441,7 +566,7 @@ class ImportApi {
   }
 
   /// Reserve an imported file
-  /// Writes the &#x60;pending&#x60; item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+  /// Writes the &#x60;pending&#x60; item and reserves the file ID with an upload session of mode &#x60;direct&#x60;, without the quota check of &#x60;createUpload&#x60; (12, 11); the parts and the completion follow through &#x60;uploadImportFilePart&#x60; and &#x60;completeImportFile&#x60;, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without &#x60;upload&#x60; once the item is &#x60;posted&#x60; (22, 7.2). &#x60;channel_id&#x60; must be the target of a posted channel item of the source (&#x60;409 conflict&#x60;, &#x60;reason&#x60; &#x60;target_outside_source&#x60;), &#x60;author_id&#x60; the target of a posted user item (&#x60;409 conflict&#x60;, &#x60;reason&#x60; &#x60;author_not_imported&#x60;); the scan of an import file runs with the lowest job priority.
   ///
   /// Parameters:
   /// * [importId]
@@ -1269,6 +1394,142 @@ class ImportApi {
     }
 
     return Response<ImportSource>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Upload one part of an imported file
+  /// One part of the file of a file item of this source in mode &#x60;direct&#x60;, with the rules of &#x60;uploadPart&#x60; (12, 3.2): the same part number with the same &#x60;Content-Digest&#x60; answers 200 without new work, with another digest &#x60;409 conflict&#x60; with &#x60;reason&#x60; &#x60;part_conflict&#x60;; a wrong length or digest is &#x60;400 validation_failed&#x60; with &#x60;errors[].code&#x60; &#x60;part_digest_mismatch&#x60; and stores nothing; an expired session answers &#x60;410 gone&#x60; (a repeated &#x60;createImportFile&#x60; opens a new one). It authorizes &#x60;import.apply&#x60; on the running source instead of &#x60;file.upload&#x60;, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is &#x60;404&#x60;.
+  ///
+  /// Parameters:
+  /// * [importId]
+  /// * [fileId]
+  /// * [partNumber]
+  /// * [contentDigest] - RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored.
+  /// * [body]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [UploadPartResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<UploadPartResult>> uploadImportFilePart({
+    required String importId,
+    required String fileId,
+    required int partNumber,
+    required String contentDigest,
+    required MultipartFile body,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/imports/{import_id}/files/{file_id}/parts/{part_number}'
+        .replaceAll(
+          '{'
+          r'import_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            importId,
+            const FullType(String),
+          ).toString(),
+        )
+        .replaceAll(
+          '{'
+          r'file_id'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            fileId,
+            const FullType(String),
+          ).toString(),
+        )
+        .replaceAll(
+          '{'
+          r'part_number'
+          '}',
+          encodeQueryParameter(
+            _serializers,
+            partNumber,
+            const FullType(int),
+          ).toString(),
+        );
+    final _options = Options(
+      method: r'PUT',
+      headers: <String, dynamic>{r'Content-Digest': contentDigest, ...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'apiKey',
+            'name': 'consoleSession',
+            'keyName': '__Host-console_session',
+            'where': '',
+          },
+          {'type': 'http', 'scheme': 'DPoP', 'name': 'dpopAuth'},
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearerAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/octet-stream',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = body.finalize();
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    UploadPartResult? _responseData;
+
+    try {
+      final rawResponse = _response.data;
+      _responseData = rawResponse == null
+          ? null
+          : _serializers.deserialize(
+              rawResponse,
+              specifiedType: const FullType(UploadPartResult),
+            ) as UploadPartResult;
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<UploadPartResult>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -108,8 +108,18 @@ def sync_detailed(
     outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
     channel whose name equals a live channel of its space is `409 conflict` with `reason`
     `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
-    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
-    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+    `ImportForumTagData` or `ImportUserData`.
+    A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for
+    the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first
+    item is the `thread` item of that key (`ImportThreadData`), every other item a `message`
+    (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a
+    batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is
+    neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a
+    message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported
+    messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted
+    thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something
+    sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one
+    `import.progress`, never `message.created` (04 15.8).
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -151,8 +161,18 @@ def sync(
     outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
     channel whose name equals a live channel of its space is `409 conflict` with `reason`
     `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
-    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
-    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+    `ImportForumTagData` or `ImportUserData`.
+    A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for
+    the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first
+    item is the `thread` item of that key (`ImportThreadData`), every other item a `message`
+    (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a
+    batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is
+    neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a
+    message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported
+    messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted
+    thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something
+    sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one
+    `import.progress`, never `message.created` (04 15.8).
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -189,8 +209,18 @@ async def asyncio_detailed(
     outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
     channel whose name equals a live channel of its space is `409 conflict` with `reason`
     `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
-    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
-    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+    `ImportForumTagData` or `ImportUserData`.
+    A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for
+    the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first
+    item is the `thread` item of that key (`ImportThreadData`), every other item a `message`
+    (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a
+    batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is
+    neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a
+    message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported
+    messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted
+    thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something
+    sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one
+    `import.progress`, never `message.created` (04 15.8).
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -230,8 +260,18 @@ async def asyncio(
     outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new
     channel whose name equals a live channel of its space is `409 conflict` with `reason`
     `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`,
-    `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message`
-    and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+    `ImportForumTagData` or `ImportUserData`.
+    A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for
+    the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first
+    item is the `thread` item of that key (`ImportThreadData`), every other item a `message`
+    (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a
+    batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is
+    neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a
+    message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported
+    messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted
+    thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something
+    sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one
+    `import.progress`, never `message.created` (04 15.8).
 
     Args:
         import_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

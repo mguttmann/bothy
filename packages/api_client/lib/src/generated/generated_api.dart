@@ -322,7 +322,9 @@ export 'package:api_client/src/generated/model/import_item_page.dart';
 export 'package:api_client/src/generated/model/import_item_state.dart';
 export 'package:api_client/src/generated/model/import_kind.dart';
 export 'package:api_client/src/generated/model/import_lead_set.dart';
+export 'package:api_client/src/generated/model/import_message_data.dart';
 export 'package:api_client/src/generated/model/import_object.dart';
+export 'package:api_client/src/generated/model/import_pin_data.dart';
 export 'package:api_client/src/generated/model/import_progress_event.dart';
 export 'package:api_client/src/generated/model/import_progress_payload.dart';
 export 'package:api_client/src/generated/model/import_source.dart';
@@ -334,6 +336,7 @@ export 'package:api_client/src/generated/model/import_source_discord_config_spac
 export 'package:api_client/src/generated/model/import_source_discord_config_users_inner.dart';
 export 'package:api_client/src/generated/model/import_source_page.dart';
 export 'package:api_client/src/generated/model/import_space_data.dart';
+export 'package:api_client/src/generated/model/import_thread_data.dart';
 export 'package:api_client/src/generated/model/import_user_data.dart';
 export 'package:api_client/src/generated/model/incoming_webhook.dart';
 export 'package:api_client/src/generated/model/incoming_webhook_create.dart';

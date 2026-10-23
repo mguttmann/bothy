@@ -13,10 +13,11 @@ part 'import_batch.g.dart';
 /// One transaction. Objects of one thread, in source order; structure objects (space, channel, forum tag, person) come in batches without `thread_origin_key`.
 ///
 /// Properties:
-/// * [threadOriginKey]
+/// * [threadOriginKey] - `thread:<id>` for a thread or forum post, `channel:<id>` for the main thread of a text channel; absent for a structure batch.
 /// * [items] - At most `import.batch_max_items`.
 @BuiltValue()
 abstract class ImportBatch implements Built<ImportBatch, ImportBatchBuilder> {
+  /// `thread:<id>` for a thread or forum post, `channel:<id>` for the main thread of a text channel; absent for a structure batch.
   @BuiltValueField(wireName: r'thread_origin_key')
   String? get threadOriginKey;
 

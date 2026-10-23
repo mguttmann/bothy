@@ -139,7 +139,7 @@ func ParseThreadData(raw json.RawMessage, ptr string, p *Problems) ThreadData {
 	d.Name, _ = str(m, memberName, ptr, true, p)
 	d.CreatedAt = stamp(m, "created_at", ptr, true, p)
 	d.LastActivityAt = stamp(m, "last_activity_at", ptr, true, p)
-	if raw, ok := m["closed"]; !ok {
+	if raw, ok := m["closed"]; !ok || string(raw) == "null" {
 		p.Add(ptr+"/closed", FieldRequired, "the member is required")
 	} else if err := json.Unmarshal(raw, &d.Closed); err != nil {
 		p.Add(ptr+"/closed", FieldInvalid, "a boolean is required")
@@ -179,7 +179,7 @@ func ParseMessageData(raw json.RawMessage, ptr string, p *Problems) MessageData 
 	}
 	var d MessageData
 	d.AuthorOriginKey = keyOf(m, "author_origin_key", KindUser, ptr, true, p)
-	if _, present := m["content_md"]; !present {
+	if raw, present := m["content_md"]; !present || string(raw) == "null" {
 		p.Add(ptr+"/content_md", FieldRequired, "the member is required")
 	} else if err := json.Unmarshal(m["content_md"], &d.ContentMD); err != nil || !utf8.ValidString(d.ContentMD) {
 		p.Add(ptr+"/content_md", FieldInvalid, "a string is required")

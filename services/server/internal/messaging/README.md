@@ -641,7 +641,7 @@ stored in `files` (D-M3-11-8).
 `messaging.ImportMessages` (`importmessages.go`, implemented by `app.ImportMessagesPort`, which
 `Service.ImportMessages()` returns) runs only inside the unit of work of an import batch and
 authorizes nothing (`import.apply` decided). `Append` checks every message (content at most
-`message.max_content_bytes`, else `400 too_long` at `/content_md`; no U+0000; a visible character
+`message.max_content_bytes`, else `400 validation_failed` with the code `too_long` at `/content_md`; no U+0000; a visible character
 unless it has files; at most `message.max_attachments`; the reply target in the same thread),
 takes the numbers of all of them in one `chat.ImportThreads.Reserve` (row lock, no reopen) and
 inserts each with `queries/import.sql` (`InsertImportedMessage`, behind the store port

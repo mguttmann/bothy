@@ -4655,7 +4655,8 @@ export interface paths {
         /**
          * Write a batch of imported objects
          * @description One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
-         *     A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`; until the content items are enabled, `thread`, `message` and `pin` items and `thread_origin_key` answer `400 validation_failed` with the code `not_enabled`.
+         *     A source that is not `running` is `409 conflict` with `reason` `import_not_running`; a target outside the channels of the source is `409 conflict` with `reason` `target_outside_source`; a new channel whose name equals a live channel of its space is `409 conflict` with `reason` `name_collision`. The `data` of a structure item follows `ImportSpaceData`, `ImportChannelData`, `ImportForumTagData` or `ImportUserData`.
+         *     A batch with `thread_origin_key` concerns exactly one thread (`thread:<id>`, or `channel:<id>` for the main thread of a text channel; a forum has none, `400 validation_failed`). Its optional first item is the `thread` item of that key (`ImportThreadData`), every other item a `message` (`ImportMessageData`) or a `pin` (`ImportPinData`); a structure item there, or a content item in a batch without `thread_origin_key`, is `400 validation_failed` at its `item_kind`. A thread that is neither posted nor created by the batch is `409 conflict` with `reason` `thread_not_imported`; a message whose author item is not posted `409 conflict` with `reason` `author_not_imported`. Imported messages have `origin = import`, are silent, write no mentions and never trigger an agent; a posted thread only follows the mirror rules of 22 12.2 step 3. At its end a batch that changed something sets `threads.unread_floor_seq` to the end of the thread and appends one `thread.updated` and one `import.progress`, never `message.created` (04 15.8).
          */
         post: operations["applyImportBatch"];
         delete?: never;
@@ -4675,9 +4676,49 @@ export interface paths {
         put?: never;
         /**
          * Reserve an imported file
-         * @description Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+         * @description Writes the `pending` item and reserves the file ID with an upload session of mode `direct`, without the quota check of `createUpload` (12, 11); the parts and the completion follow through `uploadImportFilePart` and `completeImportFile`, which a read-only mirror channel accepts (05 rule 1.8). A repeated call with the same key returns the same ID: with the open session, with a new session after an aborted or expired one, and without `upload` once the item is `posted` (22, 7.2). `channel_id` must be the target of a posted channel item of the source (`409 conflict`, `reason` `target_outside_source`), `author_id` the target of a posted user item (`409 conflict`, `reason` `author_not_imported`); the scan of an import file runs with the lowest job priority.
          */
         post: operations["createImportFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/imports/{import_id}/files/{file_id}/parts/{part_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload one part of an imported file
+         * @description One part of the file of a file item of this source in mode `direct`, with the rules of `uploadPart` (12, 3.2): the same part number with the same `Content-Digest` answers 200 without new work, with another digest `409 conflict` with `reason` `part_conflict`; a wrong length or digest is `400 validation_failed` with `errors[].code` `part_digest_mismatch` and stores nothing; an expired session answers `410 gone` (a repeated `createImportFile` opens a new one). It authorizes `import.apply` on the running source instead of `file.upload`, so a read-only mirror channel accepts it (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+         */
+        put: operations["uploadImportFilePart"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/imports/{import_id}/files/{file_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish the upload of an imported file
+         * @description Completes the upload of the file of a file item of this source with the rules of `completeUpload` (12, 3.4): `parts` is checked against the confirmed parts, missing parts are `409 conflict` with `reason` `upload_incomplete`, another `etag` `409 conflict` with `reason` `part_conflict`, an expired session `410 gone`. The job `files.scan` checks size and SHA-256 against the declaration of `createImportFile`, detects the type and scans; it runs with the lowest job priority, so live uploads are scanned first (12, 11). The item becomes `posted` in the same transaction; a repeated call answers the posted item. It authorizes `import.apply` on the running source instead of `file.upload` (05 rule 1.8, 4.12). A file that is not the target of a file item of this source is `404`.
+         */
+        post: operations["completeImportFile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9704,12 +9745,15 @@ export interface components {
             item_kind: "space" | "channel" | "forum_tag" | "thread" | "message" | "user" | "pin";
             /** @description Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source. */
             content_sha256?: string;
-            /** @description Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`). */
+            /** @description Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6). Structure items use `ImportSpaceData` (`space`), `ImportChannelData` (`channel`), `ImportForumTagData` (`forum_tag`) and `ImportUserData` (`user`); content items `ImportThreadData` (`thread`), `ImportMessageData` (`message`) and `ImportPinData` (`pin`). */
             data: components["schemas"]["JsonObject"];
         };
         /** @description One transaction. Objects of one thread, in source order; structure objects (space, channel, forum tag, person) come in batches without `thread_origin_key`. */
         ImportBatch: {
-            /** @example thread:1029384700 */
+            /**
+             * @description `thread:<id>` for a thread or forum post, `channel:<id>` for the main thread of a text channel; absent for a structure batch.
+             * @example thread:1029384700
+             */
             thread_origin_key?: string;
             /** @description At most `import.batch_max_items`. */
             items: components["schemas"]["ImportObject"][];
@@ -9731,14 +9775,49 @@ export interface components {
             name: string;
             /** Format: int64 */
             size_bytes: number;
+            /** @description Lowercase hex SHA-256 of the bytes (`file_upload_sessions.declared_sha256`); the scan checks the bytes against it. */
+            sha256: string;
             /** @example application/pdf */
             declared_mime_type?: string;
         };
         /** @description The `pending` item reserves the file ID; a repeated call with the same key returns the same ID (22, 7.2). */
         ImportFileSlot: {
             item: components["schemas"]["ImportItem"];
-            /** @description Absent when the file is already `posted`. */
+            /** @description Absent when the file is already `posted`. Its part URLs name `uploadImportFilePart`. */
             upload?: components["schemas"]["UploadSession"];
+        };
+        /** @description Data of a `thread` item (22, 5.1.1). The title is `name` cut to `thread.title_max_chars`, `title_source` is `auto` for a placeholder name and `manual` otherwise; the operator is the planned operator of the channel in the mapping; `parent_message_id` is the starter message only when its item is posted in the main thread of the same channel; the tags are the posted `forum_tag` items of the same channel. A posted thread only follows the mirror rules of 22 12.2 step 3. */
+        ImportThreadData: {
+            /** @example channel:1029384600 */
+            channel_origin_key: string;
+            /** @example Login fails on mobile */
+            name: string;
+            created_at: components["schemas"]["Timestamp"];
+            last_activity_at: components["schemas"]["Timestamp"];
+            /** @description The archive rule of the tool (22 5.1.1, R-IM-11). */
+            closed: boolean;
+            /** @description Required exactly when `closed` is true. */
+            closed_at?: components["schemas"]["Timestamp"];
+            /** @example message:1029384700 */
+            starter_message_origin_key?: string;
+            tag_origin_keys?: string[];
+        };
+        /** @description Data of a `message` item (22, 6.2). The message gets `origin = import`, `kind = text`, `silent`, no mentions and no `trigger_state`; `content_md` is stored as given (at most `message.max_content_bytes`, never split); the reply target must be a posted message of the same thread; the files must be posted file items of this source uploaded for the channel of the thread by the author, at most `message.max_attachments`. */
+        ImportMessageData: {
+            /** @example user:1029384000 */
+            author_origin_key: string;
+            /** @example The invoice export fails. */
+            content_md: string;
+            created_at: components["schemas"]["Timestamp"];
+            edited_at?: components["schemas"]["Timestamp"];
+            /** @example message:1029384701 */
+            reply_to_origin_key?: string;
+            attachment_file_ids?: components["schemas"]["Uuid"][];
+        };
+        /** @description Data of a `pin` item (22, 6.6); `pinned_by` is the importing owner. */
+        ImportPinData: {
+            /** @example message:1029384756 */
+            message_origin_key: string;
         };
         ImportCursorSet: {
             /** @description Progress per source channel and thread; only after a successful batch. */
@@ -21753,6 +21832,87 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    uploadImportFilePart: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description RFC 9530 digest of the part with the member `sha-256`, e.g. `sha-256=:<base64>:`; other members are ignored. */
+                "Content-Digest": string;
+            };
+            path: {
+                import_id: components["parameters"]["ImportIdPath"];
+                file_id: components["parameters"]["FileIdPath"];
+                part_number: components["parameters"]["PartNumberPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadPartResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
+            413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            default: components["responses"]["Error"];
+        };
+    };
+    completeImportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: components["parameters"]["ImportIdPath"];
+                file_id: components["parameters"]["FileIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadComplete"];
+            };
+        };
+        responses: {
+            /** @description OK. */
+            200: {
+                headers: {
+                    "Correlation-Id": components["headers"]["Correlation-Id"];
+                    RateLimit: components["headers"]["RateLimit"];
+                    "RateLimit-Policy": components["headers"]["RateLimit-Policy"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportFileSlot"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

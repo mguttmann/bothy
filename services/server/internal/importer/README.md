@@ -48,7 +48,7 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
   its first item creates (`chat.ImportThreads.Create`: planned operator of the mapping, times and
   done state of the source, starter message, posted forum tags) or mirrors
   (`Lock`, `ApplyMirror`); every message goes through `messaging.ImportMessages.Append` (author of
-  the posted user item, else `409 author_not_imported`; reply target and files of posted items),
+  the posted user item, else `409 conflict` with reason `author_not_imported`; reply target and files of posted items),
   every pin through `ImportMessages.Pin` with the owner as `pinned_by`. A batch that wrote anything
   ends with `chat.ImportThreads.FinishBatch` (floor, version, one `thread.updated`), the counters
   and `import.progress`; a replayed batch writes nothing. Imported messages never publish
@@ -67,8 +67,7 @@ Import sources, batches with origin key (`import.apply`), ownership list and rea
 
 ## Dependencies
 
-May use the ports of these modules: `identity`, `chat`, `agents`, `messaging`, `files`. Since
-M8-11 it uses `chat.ImportThreads`, `messaging.ImportMessages` and `files.ImportFiles`.
+May use the ports of these modules: `identity`, `chat`, `agents`, `messaging`, `files`.
 
 Reason: creates people, structure, messages, earlier session references and files; sets the read-only state of the mirrored channels.
 

@@ -126,7 +126,7 @@ func TestMirrorChange(t *testing.T) {
 // TestCutTitle cuts at code points, never inside a rune.
 func TestCutTitle(t *testing.T) {
 	t.Parallel()
-	if got := domain.CutTitle("äöü", 2); got != "äö" {
+	if got := domain.CutTitle("日本語", 2); got != "日本" {
 		t.Errorf("CutTitle = %q", got)
 	}
 	if got := domain.CutTitle("short", 200); got != "short" {
@@ -164,6 +164,13 @@ func TestParseContentData(t *testing.T) {
 	got = pointers(&p)
 	if got["/d/content_md"] != domain.FieldRequired || got["/d/attachment_file_ids/0"] != domain.FieldInvalid {
 		t.Errorf("message problems %v", got)
+	}
+	p = domain.Problems{}
+	domain.ParseThreadData(json.RawMessage(`{"channel_origin_key":"channel:20","name":"n","created_at":"2025-03-01T08:00:00Z",
+		"last_activity_at":"2025-03-01T08:00:00Z","closed":null}`), "/d", &p)
+	domain.ParseMessageData(json.RawMessage(`{"author_origin_key":"user:1","content_md":null,"created_at":"2025-03-01T08:00:00Z"}`), "/m", &p)
+	if got := pointers(&p); got["/d/closed"] != domain.FieldRequired || got["/m/content_md"] != domain.FieldRequired {
+		t.Errorf("null members %v", got)
 	}
 	p = domain.Problems{}
 	if pin := domain.ParsePinData(json.RawMessage(`{"message_origin_key":"message:9"}`), "/d", &p); !p.Empty() || pin.MessageOriginKey != "message:9" {

@@ -16,6 +16,7 @@ part 'import_file_create.g.dart';
 /// * [authorId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [name]
 /// * [sizeBytes]
+/// * [sha256] - Lowercase hex SHA-256 of the bytes (`file_upload_sessions.declared_sha256`); the scan checks the bytes against it.
 /// * [declaredMimeType]
 @BuiltValue()
 abstract class ImportFileCreate
@@ -36,6 +37,10 @@ abstract class ImportFileCreate
 
   @BuiltValueField(wireName: r'size_bytes')
   int get sizeBytes;
+
+  /// Lowercase hex SHA-256 of the bytes (`file_upload_sessions.declared_sha256`); the scan checks the bytes against it.
+  @BuiltValueField(wireName: r'sha256')
+  String get sha256;
 
   @BuiltValueField(wireName: r'declared_mime_type')
   String? get declaredMimeType;
@@ -90,6 +95,11 @@ class _$ImportFileCreateSerializer
     yield serializers.serialize(
       object.sizeBytes,
       specifiedType: const FullType(int),
+    );
+    yield r'sha256';
+    yield serializers.serialize(
+      object.sha256,
+      specifiedType: const FullType(String),
     );
     if (object.declaredMimeType != null) {
       yield r'declared_mime_type';
@@ -159,6 +169,13 @@ class _$ImportFileCreateSerializer
             specifiedType: const FullType(int),
           ) as int;
           result.sizeBytes = valueDes;
+          break;
+        case r'sha256':
+          final valueDes = serializers.deserialize(
+            value,
+            specifiedType: const FullType(String),
+          ) as String;
+          result.sha256 = valueDes;
           break;
         case r'declared_mime_type':
           final valueDes = serializers.deserialize(

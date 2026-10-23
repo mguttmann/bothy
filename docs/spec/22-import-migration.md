@@ -198,6 +198,8 @@ Rules:
   `closed_at` is `archive_timestamp`. Missing metadata, `false` or a thread in both lists
   count as open. Reason: a thread wrongly left open does no harm; a thread wrongly
   closed hides work.
+- `applied_tags` become `thread_tags` up to `thread.max_tags`; further tags are dropped, so the tag
+  set of the thread stays editable (M8-11).
 - `threads.operator_agent_id` comes from `planned_operator` of the channel in the mapping file, not
   from the effective operator (empty in the read mirror) (03, `threads.operator_agent_id`). Reason: R-DM-12 pins the operator; without this rule every imported
   thread would stay without an agent forever after the switch-over.
@@ -402,7 +404,9 @@ The answer to such a key carries the stored item with the member `source_changed
 (`ImportItem`), and the server raises its counter `server.source_changed` in
 `import_sources.stats`; nothing else changes and no other event is written (M8-03). A key that
 exists is locked before it is read, so a concurrent batch with the same key waits for the commit of
-the other (section 7.4). A batch whose items all existed already writes no event at all.
+the other (section 7.4). A batch whose items all existed already writes no event at all, unless its
+posted thread item applies a mirror change (section 12.2 step 3), which writes one `thread.updated`
+and one `import.progress`.
 
 ### 7.3 Cursor
 

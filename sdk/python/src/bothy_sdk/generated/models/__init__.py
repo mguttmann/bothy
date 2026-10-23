@@ -383,8 +383,10 @@ from .import_item_state import ImportItemState
 from .import_kind import ImportKind
 from .import_lead_set import ImportLeadSet
 from .import_lead_set_lead import ImportLeadSetLead
+from .import_message_data import ImportMessageData
 from .import_object import ImportObject
 from .import_object_item_kind import ImportObjectItemKind
+from .import_pin_data import ImportPinData
 from .import_progress_event import ImportProgressEvent
 from .import_progress_event_type import ImportProgressEventType
 from .import_progress_payload import ImportProgressPayload
@@ -412,6 +414,7 @@ from .import_source_discord_config_version import ImportSourceDiscordConfigVersi
 from .import_source_page import ImportSourcePage
 from .import_source_state import ImportSourceState
 from .import_space_data import ImportSpaceData
+from .import_thread_data import ImportThreadData
 from .import_user_data import ImportUserData
 from .import_user_data_discord_kind import ImportUserDataDiscordKind
 from .incoming_webhook import IncomingWebhook
@@ -1169,8 +1172,10 @@ __all__ = (
     "ImportKind",
     "ImportLeadSet",
     "ImportLeadSetLead",
+    "ImportMessageData",
     "ImportObject",
     "ImportObjectItemKind",
+    "ImportPinData",
     "ImportProgressEvent",
     "ImportProgressEventType",
     "ImportProgressPayload",
@@ -1188,6 +1193,7 @@ __all__ = (
     "ImportSourcePage",
     "ImportSourceState",
     "ImportSpaceData",
+    "ImportThreadData",
     "ImportUserData",
     "ImportUserDataDiscordKind",
     "IncomingWebhook",
