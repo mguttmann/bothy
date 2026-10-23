@@ -18,6 +18,7 @@ from websockets.asyncio.server import ServerConnection, serve
 from bothy_sdk.auth import Credentials, Secret
 from bothy_sdk.gateway import IDENTIFY_ON, RESUME_ON, STOP_ON, Gateway, GatewayEvent
 from bothy_sdk.settings import SdkSettings
+from bothy_sdk.testing._patience import eventually, within_patience
 from bothy_sdk.testing.doubles import FakeClock
 
 AGENT = UUID("0192f4a0-7b1c-7000-8a00-0000000000a2")
@@ -130,9 +131,7 @@ def gateway(
     )
 
 
-async def collect(
-    gw: Gateway, until: Callable[[list[GatewayEvent]], bool], limit: float = 5.0
-) -> list[GatewayEvent]:
+async def collect(gw: Gateway, until: Callable[[list[GatewayEvent]], bool]) -> list[GatewayEvent]:
     seen: list[GatewayEvent] = []
 
     async def run() -> None:
@@ -141,8 +140,7 @@ async def collect(
             if until(seen):
                 await gw.close()
 
-    with contextlib.suppress(TimeoutError):
-        await asyncio.wait_for(run(), limit)
+    await within_patience(run())
     return seen
 
 
@@ -195,17 +193,14 @@ async def test_first_heartbeat_jittered() -> None:
     expected = seeded(5).random() * 10.0
     async with running(script) as server:
         gw = gateway(server, clock=clock, rng=seeded(5))
-        task = asyncio.ensure_future(collect(gw, lambda s: False, limit=5))
-        for _ in range(100):
-            if server.frames:
-                break
-            await asyncio.sleep(0.01)
-        await asyncio.sleep(0.05)
+        task = asyncio.ensure_future(collect(gw, lambda s: False))
+        # The heartbeat loop sleeps on the clock once the connection is ready.
+        await eventually(lambda: clock.sleepers == 1, "the first heartbeat wait")
         await clock.advance(max(0.0, expected - 0.01))
         await asyncio.sleep(0.05)
         assert not got.is_set()
         await clock.advance(0.02)
-        await asyncio.wait_for(got.wait(), 2)
+        await within_patience(got.wait())
         await gw.close()
         await task
 
@@ -227,12 +222,10 @@ async def test_missing_heartbeat_ack_reconnects() -> None:
             clock=clock,
             settings=SdkSettings(reconnect_backoff_base=0.01, reconnect_backoff_cap=0.01),
         )
-        task = asyncio.ensure_future(collect(gw, lambda s: False, limit=5))
-        for _ in range(200):
-            if server.connections >= 2:
-                break
-            await clock.advance(0.5)
-            await asyncio.sleep(0.01)
+        task = asyncio.ensure_future(collect(gw, lambda s: False))
+        await eventually(
+            lambda: server.connections >= 2, "the reconnect", step=lambda: clock.advance(0.5)
+        )
         assert server.connections >= 2
         assert any(f["op"] == "heartbeat" for f in server.frames)
         await gw.close()
@@ -259,7 +252,7 @@ async def test_close_code_reactions(code: int) -> None:
 
     async with running(script) as server:
         gw = gateway(server)
-        await collect(gw, lambda seen: server.connections >= 2 and len(server.frames) >= 2, limit=3)
+        await collect(gw, lambda seen: server.connections >= 2 and len(server.frames) >= 2)
     if code in STOP_ON:
         assert server.connections == 1
         assert gw.close_reason is not None
@@ -286,20 +279,13 @@ async def test_rate_limited_close_waits_retry_after() -> None:
 
     async with running(script) as server:
         gw = gateway(server, clock=clock)
-        task = asyncio.ensure_future(collect(gw, lambda s: False, limit=5))
-        for _ in range(100):
-            if clock.sleepers:
-                break
-            await asyncio.sleep(0.01)
+        task = asyncio.ensure_future(collect(gw, lambda s: False))
+        await eventually(lambda: clock.sleepers == 1, "the wait of retry_after")
         await clock.advance(29)
         await asyncio.sleep(0.1)
         assert server.connections == 1
         await clock.advance(1.5)
-        for _ in range(100):
-            if server.connections == 2:
-                break
-            await asyncio.sleep(0.01)
-        assert server.connections == 2
+        await eventually(lambda: server.connections == 2, "the second connection")
         await gw.close()
         await task
 
@@ -329,7 +315,7 @@ async def test_principal_mismatch_stops() -> None:
 
     async with running(script) as server:
         gw = gateway(server)
-        seen = await collect(gw, lambda s: False, limit=3)
+        seen = await collect(gw, lambda s: False)
     assert server.connections == 1
     assert not any(f.op == "ready" for f in seen)
     assert gw.close_reason is not None

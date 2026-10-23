@@ -34,6 +34,7 @@ from bothy_sdk.errors import ForbiddenError
 from bothy_sdk.generated.models import CommandChoice
 from bothy_sdk.settings import SdkSettings
 from bothy_sdk.testing import FakeClock
+from bothy_sdk.testing._patience import eventually
 
 pytestmark = pytest.mark.anyio
 
@@ -296,11 +297,7 @@ class _Sender:
 
 async def _sleeping(clock: FakeClock, n: int) -> None:
     """Wait until ``n`` tasks sleep on the clock, so an advance cannot overtake them."""
-    for _ in range(1000):
-        if clock.sleepers == n:
-            return
-        await asyncio.sleep(0)
-    raise AssertionError("sleepers not reached")
+    await eventually(lambda: clock.sleepers == n, f"{n} sleepers on the clock")
 
 
 def _choices(n: int) -> list[CommandChoice]:

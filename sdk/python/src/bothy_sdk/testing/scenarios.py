@@ -18,6 +18,7 @@ import contextlib
 import inspect
 import json
 import logging
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
@@ -60,6 +61,7 @@ from bothy_sdk.generated.types import UNSET
 from bothy_sdk.inbox import EntryState
 from bothy_sdk.settings import SdkSettings
 from bothy_sdk.sources import Envelope, EventSource, SourceReady
+from bothy_sdk.testing._patience import PATIENCE
 from bothy_sdk.testing.doubles import (
     KEEP,
     REMOVE,
@@ -176,15 +178,20 @@ async def _until(
     limit: float = 60.0,
     step: float = 0.05,
 ) -> None:
-    """Wait until ``predicate`` holds, letting time pass on the server's clock."""
+    """Wait until ``predicate`` holds, letting time pass on the server's clock.
+
+    It fails only after ``limit`` seconds of server time and `PATIENCE` of real time both passed,
+    so a loaded machine that needs more loop turns per server second never fails a correct run.
+    """
     waited = 0.0
+    deadline = time.monotonic() + PATIENCE
     while True:
         result = predicate()
         if inspect.isawaitable(result):
             result = await result
         if result:
             return
-        if waited >= limit:
+        if waited >= limit and time.monotonic() > deadline:
             raise ScenarioFailed(f"timed out waiting for {what}")
         await server.pass_time(step)
         await asyncio.sleep(0.01)
@@ -268,7 +275,7 @@ async def _running(
     finally:
         await adapter.stop()
         with contextlib.suppress(asyncio.CancelledError, Exception):
-            await asyncio.wait_for(task, 30)
+            await asyncio.wait_for(task, PATIENCE)
 
 
 def _ready(recording: RecordingSource) -> Callable[[], bool]:

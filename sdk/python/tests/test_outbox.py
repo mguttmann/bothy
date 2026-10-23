@@ -37,6 +37,7 @@ from bothy_sdk.outbox import (
 )
 from bothy_sdk.settings import SdkSettings
 from bothy_sdk.testing import FakeClock
+from bothy_sdk.testing._patience import eventually
 from bothy_sdk.testing.fakeserver import FakeServer
 from bothy_sdk.testing.faults import Fault
 
@@ -236,12 +237,7 @@ def _fake_client(fake: FakeServer, **settings: Any) -> Client:
 
 async def _drive(fake: FakeServer, task: asyncio.Future[Any], step: float = 0.25) -> None:
     """Move the shared clock until ``task`` is done (retries sleep on the FakeClock)."""
-    for _ in range(400):
-        if task.done():
-            return
-        await asyncio.sleep(0.01)
-        await fake.pass_time(step)
-    raise AssertionError("the outbox did not finish")
+    await eventually(task.done, "the outbox to finish", step=lambda: fake.pass_time(step))
 
 
 def _message_keys(fake: FakeServer) -> list[str]:
@@ -278,11 +274,7 @@ async def test_stored_late_no_duplicate(fake: FakeServer) -> None:
         await client.discover()  # takes the DPoP nonce, so no request meets the challenge
         task = asyncio.ensure_future(Outbox(client).send_message(triggered.thread_id, "Late"))
         # The server waits on its clock; the client times out and sleeps before its retry.
-        for _ in range(300):
-            if fake.clock.sleepers >= 2:
-                break
-            await asyncio.sleep(0.01)
-        assert fake.clock.sleepers >= 2
+        await eventually(lambda: fake.clock.sleepers >= 2, "the server wait and the retry wait")
         await _drive(fake, task)
         entry = task.result()
         # Let the late request finish its store as well.
@@ -335,10 +327,9 @@ async def test_threads_flush_in_parallel() -> None:
         # Thread A hangs on the server; thread B still goes out during the same flush.
         server.gates[str(THREAD_A)] = asyncio.Event()
         flush = asyncio.ensure_future(outbox.flush())
-        for _ in range(500):
-            if server.keys(str(THREAD_B)).count(b1.key) == 2:
-                break
-            await asyncio.sleep(0)
+        await eventually(
+            lambda: server.keys(str(THREAD_B)).count(b1.key) == 2, "the second send of thread B"
+        )
         assert server.keys(str(THREAD_B)) == [b1.key, b1.key]
         assert not flush.done()
         server.gates[str(THREAD_A)].set()
@@ -404,10 +395,7 @@ async def test_transient_failure_stays_pending(answer: int | str) -> None:
     ) as client:
         outbox = Outbox(client)
         task = asyncio.ensure_future(outbox.send_message(THREAD_A, "later"))
-        for _ in range(200):
-            if task.done():
-                break
-            await clock.advance(1)
+        await eventually(task.done, "the call", step=lambda: clock.advance(1))
         entry = task.result()
         assert entry.state is OutboxState.PENDING
         assert server.keys(str(THREAD_A)) == [entry.key] * attempts
@@ -505,10 +493,7 @@ async def test_call_key_repeated_across_retries_of_one_attempt() -> None:
                 body=CommandRegister(name="status", description="Show the run status"),
             )
         )
-        for _ in range(200):
-            if task.done():
-                break
-            await clock.advance(1)
+        await eventually(task.done, "the call", step=lambda: clock.advance(1))
         entry = task.result()
     assert entry.state is OutboxState.SENT
     assert server.keys("commands") == [entry.key] * 3

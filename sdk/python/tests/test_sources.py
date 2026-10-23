@@ -41,6 +41,7 @@ from bothy_sdk.sources import (
     envelope_from,
 )
 from bothy_sdk.testing import FakeClock, fingerprint
+from bothy_sdk.testing._patience import eventually
 
 pytestmark = pytest.mark.anyio
 
@@ -82,12 +83,8 @@ async def _turns(n: int = 200) -> None:
         await asyncio.sleep(0)
 
 
-async def _until(condition: Callable[[], bool], turns: int = 2000) -> None:
-    for _ in range(turns):
-        if condition():
-            return
-        await asyncio.sleep(0)
-    raise AssertionError("condition not reached")
+async def _until(condition: Callable[[], bool]) -> None:
+    await eventually(condition, "the condition")
 
 
 # envelope_from ---------------------------------------------------------------------------------
@@ -397,11 +394,7 @@ async def test_polling_survives_a_server_restart() -> None:
     settings = SdkSettings(poll_interval=1000.0, retry_max_attempts=1)
     async with _client(clock, responder, settings) as client:
         running = _Running(PollingSource(client, CONSUMER, settings=settings, clock=clock))
-        for _ in range(200):
-            if running.envelopes():
-                break
-            await clock.advance(1.0)
-            await asyncio.sleep(0)
+        await eventually(running.envelopes, "the first page", step=lambda: clock.advance(1.0))
         assert [e.seq for e in running.envelopes()] == [3]
         assert not running.task.done()
         await running.stop(clock)

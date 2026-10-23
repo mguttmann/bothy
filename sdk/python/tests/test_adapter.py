@@ -18,6 +18,7 @@ from bothy_sdk.generated.api.runs import get_run
 from bothy_sdk.inbox import EntryState, InboxEntry, MemoryInboxStore
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import EventSource, SourceReady
+from bothy_sdk.testing._patience import eventually, within_patience
 from bothy_sdk.testing.doubles import RecordingHandler, RecordingSource, fingerprint
 from bothy_sdk.testing.fakeserver import FakeServer
 
@@ -30,16 +31,8 @@ async def fake() -> AsyncIterator[FakeServer]:
         yield server
 
 
-async def until(fake: FakeServer, predicate: Callable[[], Any], limit: int = 400) -> None:
-    for _ in range(limit):
-        result = predicate()
-        if asyncio.iscoroutine(result):
-            result = await result
-        if result:
-            return
-        await fake.pass_time(0.05)
-        await asyncio.sleep(0.005)
-    raise AssertionError("condition not reached")
+async def until(fake: FakeServer, predicate: Callable[[], Any]) -> None:
+    await eventually(predicate, "the condition", step=lambda: fake.pass_time(0.05))
 
 
 class LoggingInbox(MemoryInboxStore):
@@ -132,7 +125,7 @@ async def running(
     finally:
         await adapter.stop()
         with contextlib.suppress(Exception):
-            await asyncio.wait_for(task, 10)
+            await within_patience(task)
 
 
 @pytest.mark.anyio
@@ -409,7 +402,7 @@ class TwoAnswers(RecordingHandler):
         await super().on_followup(inv, run)
         if self.count("on_followup") == 2:
             self.both.set()
-        await asyncio.wait_for(self.both.wait(), 5)
+        await within_patience(self.both.wait())
 
 
 @pytest.mark.anyio

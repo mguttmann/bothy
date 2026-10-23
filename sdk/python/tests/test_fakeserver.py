@@ -22,6 +22,7 @@ import websockets
 from bothy_sdk.auth import DpopAuth, Secret, dpop_proof
 from bothy_sdk.generated import models
 from bothy_sdk.testing import fingerprint
+from bothy_sdk.testing._patience import eventually, within_patience
 from bothy_sdk.testing.fakeserver import FakeServer, RunView
 from bothy_sdk.testing.faults import Fault
 from bothy_sdk.tolerance import decode_event
@@ -94,7 +95,7 @@ class _Gateway:
         self.session_id = ""
 
     async def recv(self) -> dict[str, Any]:
-        frame: dict[str, Any] = json.loads(await asyncio.wait_for(self.ws.recv(), 5))
+        frame: dict[str, Any] = json.loads(await within_patience(self.ws.recv()))
         return frame
 
     async def send(self, op: str, d: dict[str, Any]) -> None:
@@ -162,11 +163,7 @@ async def _close_code(gw: _Gateway) -> int:
 
 
 async def _eventually(check: Callable[[], bool]) -> None:
-    async def wait() -> None:
-        while not check():
-            await asyncio.sleep(0.01)
-
-    await asyncio.wait_for(wait(), 5)
+    await eventually(check, "the condition")
 
 
 # Discovery, JWKS and tokens -----------------------------------------------------------------
@@ -778,7 +775,7 @@ async def test_faults(fake: FakeServer) -> None:
         assert not late.done()
         assert len(fake.messages) == 1
         await fake.pass_time(5)
-        assert (await asyncio.wait_for(late, 5)).status_code == 201
+        assert (await within_patience(late)).status_code == 201
         assert len(fake.messages) == 2
 
 
