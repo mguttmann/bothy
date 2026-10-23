@@ -17,6 +17,7 @@ import type { components } from "../../generated/openapi.js";
 import { uuidv7 } from "../../ids.js";
 import type { FakeClock } from "../clock.js";
 import {
+  byCodeUnit,
   canonicalUuid,
   FakeProblem,
   fieldError,
@@ -318,7 +319,7 @@ function closed(
   if (!isPlainObject(body)) throw fieldError("", "required");
   const errors = Object.keys(body)
     .filter((n) => !required.includes(n) && !optional.includes(n))
-    .sort()
+    .sort(byCodeUnit)
     .map((n) => ({ pointer: `/${n}`, code: "unknown_member" }));
   for (const n of required)
     if (!(n in body)) errors.push({ pointer: `/${n}`, code: "required" });

@@ -77,7 +77,8 @@ const FIELD_NAME = /^[a-z][a-z0-9_]*$/;
 const LENGTH_TYPES: ReadonlySet<string> = new Set(["text", "textarea"]);
 // Control characters (category Cc) and the bidi controls of SEC-IN-4, as kernel/textcheck of
 // the server lists them.
-const UNSAFE_TEXT = /[\p{Cc}؜‎‏‪‫‬‭‮⁦⁧⁨⁩]/u;
+const UNSAFE_TEXT =
+  /[\p{Cc}\u061C\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069]/u;
 
 // (label, style, required capability, restricted to) per approval value, the table of 09 11.5.
 const APPROVAL: Readonly<

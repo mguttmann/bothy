@@ -50,6 +50,7 @@ import type { components } from "../generated/openapi.js";
 import { uuidv7 } from "../ids.js";
 import { FakeClock, settle } from "./clock.js";
 import {
+  byCodeUnit,
   canonicalJson,
   canonicalUuid,
   FakeProblem,
@@ -1168,7 +1169,7 @@ export class FakeServer implements ScenarioServer {
         if (!isPlainObject(body)) throw fieldError("", "required");
         const unknown = Object.keys(body)
           .filter((k) => k !== "base_version" && k !== "ops")
-          .sort();
+          .sort(byCodeUnit);
         if (unknown.length)
           throw fieldError(`/${unknown[0]}`, "unknown_member");
         const version = body.base_version;

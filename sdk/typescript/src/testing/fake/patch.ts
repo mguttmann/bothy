@@ -12,6 +12,7 @@
  */
 
 import {
+  byCodeUnit,
   canonicalUuid,
   FakeProblem,
   isPlainObject,
@@ -57,18 +58,18 @@ const STEP_MEMBERS = new Set([
   "finished_at",
 ]);
 const BIDI = new Set([
-  "؜",
-  "‎",
-  "‏",
-  "‪",
-  "‫",
-  "‬",
-  "‭",
-  "‮",
-  "⁦",
-  "⁧",
-  "⁨",
-  "⁩",
+  "\u061C",
+  "\u200E",
+  "\u200F",
+  "\u202A",
+  "\u202B",
+  "\u202C",
+  "\u202D",
+  "\u202E",
+  "\u2066",
+  "\u2067",
+  "\u2068",
+  "\u2069",
 ]);
 const CURRENCY = /^[A-Z]{3}$/;
 // An RFC 3339 date-time as Python's `datetime.fromisoformat` reads it, with the `T` separator.
@@ -171,7 +172,7 @@ function firstNull(value: unknown, at: string): string | undefined {
       if (found) return found;
     }
   } else if (isPlainObject(value)) {
-    for (const key of Object.keys(value).sort()) {
+    for (const key of Object.keys(value).sort(byCodeUnit)) {
       const found = firstNull(value[key], `${at}/${key}`);
       if (found) return found;
     }
@@ -226,7 +227,7 @@ function checkValue(
     case "retry": {
       if (!isPlainObject(value)) return err(at, "invalid_type");
       const known = ["attempt", "max_retries", "retry_delay_ms", "error"];
-      for (const name of Object.keys(value).sort())
+      for (const name of Object.keys(value).sort(byCodeUnit))
         if (!known.includes(name)) err(`${at}/${name}`, "unknown_member");
       if (!("attempt" in value)) err(`${at}/attempt`, "required");
       for (const name of ["attempt", "max_retries", "retry_delay_ms"])
@@ -239,7 +240,7 @@ function checkValue(
     case "money": {
       if (!isPlainObject(value)) return err(at, "invalid_type");
       const known = ["amount_micros", "currency", "is_estimate"];
-      for (const name of Object.keys(value).sort())
+      for (const name of Object.keys(value).sort(byCodeUnit))
         if (!known.includes(name)) err(`${at}/${name}`, "unknown_member");
       for (const name of known)
         if (!(name in value)) err(`${at}/${name}`, "required");
@@ -304,7 +305,7 @@ function checkStep(
   const errs: FieldErrorBody[] = [];
   if ("ordinal" in value)
     errs.push({ pointer: `${at}/ordinal`, code: "patch_path_forbidden" });
-  for (const name of Object.keys(value).sort())
+  for (const name of Object.keys(value).sort(byCodeUnit))
     if (!STEP_MEMBERS.has(name) && name !== "ordinal")
       errs.push({ pointer: `${at}/${name}`, code: "unknown_member" });
   if ("id" in value && value.id !== stepId)

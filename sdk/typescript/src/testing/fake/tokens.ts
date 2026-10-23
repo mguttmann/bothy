@@ -27,7 +27,13 @@ import type { components } from "../../generated/openapi.js";
 import { uuidv7 } from "../../ids.js";
 import type { ForgedVariant } from "../scenario-server.js";
 import { FORGED_VARIANTS } from "../scenario-server.js";
-import { b64url, b64urlDecode, compactJson, strictObject } from "./base.js";
+import {
+  b64url,
+  b64urlDecode,
+  byCodeUnit,
+  compactJson,
+  strictObject,
+} from "./base.js";
 
 /** The `typ` of an invocation token. */
 export const TYP = "agent-invocation+jwt";
@@ -196,7 +202,7 @@ function signJws(header: object, claims: object, key: KeyObject): string {
 function sorted(value: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.keys(value)
-      .sort()
+      .sort(byCodeUnit)
       .map((k) => [k, value[k]]),
   );
 }

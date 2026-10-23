@@ -271,6 +271,18 @@ export function compactJson(value: unknown): Uint8Array {
 }
 
 /**
+ * Orders strings by UTF-16 code units, the order of a plain `sort()`, as a compare function.
+ *
+ * @param a - The first string.
+ * @param b - The second string.
+ * @returns A negative number, zero or a positive number.
+ */
+export function byCodeUnit(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+/**
  * Encodes JSON with sorted object members (the `sort_keys` form of the Python fake).
  *
  * @param value - The value.
@@ -281,7 +293,7 @@ export function canonicalJson(value: unknown): string {
     isPlainObject(v)
       ? Object.fromEntries(
           Object.keys(v)
-            .sort()
+            .sort(byCodeUnit)
             .map((k) => [k, v[k]]),
         )
       : v,

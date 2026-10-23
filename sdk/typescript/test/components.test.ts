@@ -332,7 +332,7 @@ describe("builders", () => {
     refuses("value", () => button("b", "Label", ""));
   });
 
-  it.each(["line\nbreak", "tab\there", "bidi‮evil", "nul\x00"])(
+  it.each(["line\nbreak", "tab\there", "bidi\u202Eevil", "nul\x00"])(
     "refuses control and bidi characters in %j",
     (text) => {
       refuses("label", () => button("b", text, "v"), text);
