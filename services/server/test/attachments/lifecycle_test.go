@@ -338,7 +338,7 @@ func TestMoveThread_ConcurrentSendWithAttachment(t *testing.T) {
 		case http.StatusConflict:
 			wantProblem(t, r, http.StatusConflict, "conflict", "file_not_attachable")
 		default:
-			t.Fatalf("sender %d: %d %s", i, r.Status, r.Body)
+			t.Fatalf("sender %d: %d %s\nserver log:\n%s", i, r.Status, r.Body, e.logs.lines(`"level":"ERROR"`))
 		}
 	}
 	if created == 0 {

@@ -51,6 +51,8 @@ type env struct {
 	w     *harness.World
 	clamd *clamdtest.Fake
 	veto  *veto.Veto
+	// logs holds the JSON log lines of the server, for the report of an unexpected answer.
+	logs  *serverLog
 	db    *pgxpool.Pool
 	owner *harness.Client
 	alex  *harness.Client
@@ -89,10 +91,37 @@ func start(t *testing.T) *env {
 	cfg["file.scan.retry_backoff_cap"] = "2s"
 	cfg["message.max_attachments"] = strconv.Itoa(maxAttachments)
 	v := &veto.Veto{}
-	s := harness.Start(t, harness.Options{Config: cfg, TxnTestSubscribers: v.Register})
+	logs := &serverLog{}
+	s := harness.Start(t, harness.Options{Config: cfg, TxnTestSubscribers: v.Register, LogWriter: logs})
 	w := harness.BuildMatrixWorld(t, s)
-	return &env{s: s, w: w, clamd: fake, veto: v, db: s.AdminDB(), owner: s.Owner, alex: w.People["Alex"], sam: w.People["Sam"],
+	return &env{s: s, w: w, clamd: fake, veto: v, logs: logs, db: s.AdminDB(), owner: s.Owner, alex: w.People["Alex"], sam: w.People["Sam"],
 		robin: w.People["Robin"], lotse: w.Agents["Lotse"], allg: w.Channels["Support/Allgemein"], esk: w.Channels["Support/Eskalation"]}
+}
+
+// serverLog keeps the log lines of a test server; it is safe for concurrent use.
+type serverLog struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+// Write implements io.Writer.
+func (l *serverLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+// lines returns the log lines that contain needle.
+func (l *serverLog) lines(needle string) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []string
+	for _, ln := range strings.Split(l.buf.String(), "\n") {
+		if strings.Contains(ln, needle) {
+			out = append(out, ln)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 func sha(b []byte) string {
