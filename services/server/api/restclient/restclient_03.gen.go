@@ -2940,6 +2940,8 @@ type ClientWithResponsesInterface interface {
 	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
 	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
 	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2956,6 +2958,8 @@ type ClientWithResponsesInterface interface {
 	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
 	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
 	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22720,9 +22724,4 @@ type RemoveGroupMemberResponse struct {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r RemoveGroupMemberResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
 }

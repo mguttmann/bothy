@@ -8,7 +8,7 @@
 --
 -- The same file adds the foreign key runs.triggering_interaction_id -> interactions(id) ON DELETE
 -- SET NULL that 00051 left out until this table exists. It starts NOT VALID
--- (docs/operations/upgrade.md rule M5); 00062 validates it. No run can name an interaction before
+-- (docs/operations/upgrade.md rule M5); 00063 validates it. No run can name an interaction before
 -- this table exists, so the validation finds nothing.
 --
 -- Grants (migrations/README.md, grant rule): bothy_app may read, insert and update interactions;

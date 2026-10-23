@@ -340,3 +340,21 @@ exceptions:
   - query: sync.ReadPositionsOfUser
     category: system_job
     reason: "the badge count reads one person's read positions in the threads of its visible channels; every counted thread is confirmed with push.deliver (M3-19 design note 16)"
+  - query: runs.LockActiveRunOfThread
+    category: after_authorize
+    reason: "the acceptance locks the active run of the one thread whose message.create authorize allowed, before the trigger decision; runs has no channel_id, and the follow-up is authorized with run.followup.create (D-M2-05-9, M2-11)"
+  - query: runs.LockOpenFollowups
+    category: after_authorize
+    reason: "the end of a run locks the open follow-ups of the one run it is ending in the same unit of work; run_followups has no channel_id, and nothing of the rows leaves the server (07 7.4 rule 1, M2-11)"
+  - query: runs.RunFollowups
+    category: after_authorize
+    reason: "the follow-ups of the one run whose run.read (getRun, live box), run.update (patch) or start/finish use case authorized it; run_followups has no channel_id (07 7.4 rule 1, M2-11)"
+  - query: runs.FollowupStatesOf
+    category: after_authorize
+    reason: "the states of the named follow-ups of the one run whose run.update authorize allowed and whose row the patch or the delivery locked; run_followups has no channel_id (07 7.4 rule 1, M2-11)"
+  - query: runs.LockFollowup
+    category: after_authorize
+    reason: "one follow-up of the one run a patch or a deletion locked after its authorization; run_followups has no channel_id (07 7.4 rule 1, M2-11)"
+  - query: runs.FollowupOfMessage
+    category: after_authorize
+    reason: "the follow-up of the one message whose message.delete authorize allowed in the same unit of work; nothing of the row leaves the server (07 7.4 rule 1, M2-11)"

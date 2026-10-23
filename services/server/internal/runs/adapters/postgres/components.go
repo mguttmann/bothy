@@ -21,7 +21,7 @@ import (
 // Compile-time check: Repository is the outgoing port of components and interactions (M2-15).
 var _ app.ComponentRepository = (*Repository)(nil)
 
-// clientInteractionConstraint is the unique key (principal_id, client_interaction_id) of 00061.
+// clientInteractionConstraint is the unique key (principal_id, client_interaction_id) of 00062.
 const clientInteractionConstraint = "interactions_principal_id_client_interaction_id_key"
 
 // InsertComponents implements app.ComponentRepository: one INSERT per component inside the unit

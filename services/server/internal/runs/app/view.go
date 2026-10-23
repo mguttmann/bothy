@@ -69,7 +69,7 @@ func document(r RunRow, channelID ids.ID, rows []StepRow) runs.Run {
 		RunSummary: summary(r, channelID, len(rows)), AgentSessionID: r.AgentSessionID, TriggerKind: r.TriggerKind,
 		TriggeringMessageID: r.TriggeringMessageID, TriggeringCommandID: r.TriggeringCommandID,
 		TriggeringInteractionID: r.TriggeringInteractionID, Model: r.Model, LastTextExcerpt: r.LastTextExcerpt,
-		Metrics: object(r.Metrics), Steps: steps,
+		Metrics: object(r.Metrics), Steps: steps, Followups: []runs.Followup{},
 	}
 	if plan := object(r.Plan); hasItems(plan) {
 		doc.Plan = plan

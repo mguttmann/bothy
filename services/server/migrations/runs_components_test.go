@@ -207,8 +207,8 @@ func TestMigration_ComponentsDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 59); err != nil {
-		t.Fatalf("down to 59: %v", err)
+	if _, err := provider.DownTo(ctx, 60); err != nil {
+		t.Fatalf("down to 60: %v", err)
 	}
 	var left int
 	if err := sqlDB.QueryRowContext(ctx, `SELECT (to_regclass('interactions') IS NOT NULL)::int

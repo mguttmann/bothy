@@ -7,7 +7,6 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
-	"github.com/OWNER/bothy/services/server/internal/messaging"
 	"github.com/OWNER/bothy/services/server/internal/runs/domain"
 )
 
@@ -83,20 +82,18 @@ func (s *Service) changeStates(ctx context.Context, card ids.ID, list []Componen
 	return err
 }
 
-// OnMessageDeleted is the in-transaction subscriber of messaging.MessageDeleted (M2-15 design note
-// 15 d; 03 messages "Deletion ... deletes ... components"): the components of the deleted message
-// are deleted, their interactions follow by cascade and runs.triggering_interaction_id becomes
-// NULL. No event of its own: message.deleted and the redacted message.* payloads with
-// components [] cover it (04 2.2 rule 5). A scheduled expiry job then finds nothing. Until Bind it
-// does nothing.
+// deleteComponentsOf is the M2-15 part of Acceptor.OnMessageDeleted (design note 15 d; 03
+// messages "Deletion ... deletes ... components"): the components of the deleted message are
+// deleted, their interactions follow by cascade and runs.triggering_interaction_id becomes NULL.
+// No event of its own: message.deleted and the redacted message.* payloads with components []
+// cover it (04 2.2 rule 5). A scheduled expiry job then finds nothing.
 //
 // Errors: those of the database, which roll the deletion back.
-func (a *Acceptor) OnMessageDeleted(ctx context.Context, ev messaging.MessageDeleted) error {
-	s := a.svc.Load()
-	if s == nil || s.d.Components == nil {
+func (s *Service) deleteComponentsOf(ctx context.Context, messageID ids.ID) error {
+	if s.d.Components == nil {
 		return nil
 	}
-	_, err := s.d.Components.DeleteComponentsOfMessage(ctx, ev.MessageID)
+	_, err := s.d.Components.DeleteComponentsOfMessage(ctx, messageID)
 	return err
 }
 

@@ -4,6 +4,7 @@ package wire_test
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +25,13 @@ func TestWire_TerminalSubscriptionsAndSweep(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(golden)), "\n")
-	tail := lines[len(lines)-3:]
+	// The terminal subscriptions follow the runs subscribers of M2-09; later modules (M2-11) may
+	// register after them.
+	first := slices.IndexFunc(lines, func(l string) bool { return strings.Contains(l, "internal/terminal/app.(*Subscribers).") })
+	if first < 1 || first+3 > len(lines) || !strings.HasPrefix(lines[first-1], "subscribe agents.AgentDisabled -> runs ") {
+		t.Fatalf("terminal subscriptions at %d, not after the runs subscribers of M2-09", first)
+	}
+	tail := lines[first : first+3]
 	for i, want := range []string{"subscribe kernel.AccessChanged -> terminal ", "subscribe identity.DeviceRevoked -> terminal ",
 		"subscribe identity.SessionEnded -> terminal "} {
 		if !strings.HasPrefix(tail[i], want) || !strings.Contains(tail[i], "internal/terminal/app.(*Subscribers).") {

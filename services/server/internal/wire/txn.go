@@ -204,8 +204,9 @@ func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 // messaging.MessagePosted -> runs after the existing subscribers (M2-05) and -> notify (the
 // automatic following, M3-19), then chat.ChannelArchived -> apps (the incoming webhooks of the
 // channel, M2-27), then authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09), then
-// messaging.MessageDeleted -> runs (M2-15), then kernel.AccessChanged, identity.DeviceRevoked and
-// identity.SessionEnded -> terminal (M2-46).
+// kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46), then
+// messaging.MessageDeleted -> runs (the open follow-up of a deleted message, M2-11, and the
+// components of a deleted card, M2-15, in one subscriber).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err
@@ -237,10 +238,6 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.RunsAcceptor.OnAgentDisabled); err != nil {
 		return err
 	}
-	// The components of a deleted message go in the deleting transaction (03 messages, M2-15).
-	if err := txn.Subscribe(reg, m.RunsAcceptor.OnMessageDeleted); err != nil {
-		return err
-	}
 	if m.TerminalSubscribers == nil {
 		return errNoTerminalSubscribers
 	}
@@ -250,7 +247,10 @@ func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.TerminalSubscribers.OnDeviceRevoked); err != nil {
 		return err
 	}
-	return txn.Subscribe(reg, m.TerminalSubscribers.OnSessionEnded)
+	if err := txn.Subscribe(reg, m.TerminalSubscribers.OnSessionEnded); err != nil {
+		return err
+	}
+	return txn.Subscribe(reg, m.RunsAcceptor.OnMessageDeleted)
 }
 
 // errNoAppsArchive reports Modules without the archive subscriber of apps: an archived channel

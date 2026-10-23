@@ -23699,6 +23699,8 @@ type ClientInterface interface {
 	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
 	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
 	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -23715,6 +23717,8 @@ type ClientInterface interface {
 	// `base_version_conflict` with the current document in `current`, exactly as `getRun`
 	// answers it. Set semantics: `add` and `replace` set a member also when it is absent,
 	// `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+	// A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+	// `absorbed`); a backward change gives 409 `invalid_state_transition`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -25397,25 +25401,6 @@ func (c *Client) UninstallApp(ctx context.Context, appId AppIdPath, params *Unin
 // Corresponds with GET /apps/{app_id}/webhooks (the `ListWebhookSubscriptions` operationId).
 func (c *Client) ListWebhookSubscriptions(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWebhookSubscriptionsRequest(c.Server, appId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateWebhookSubscriptionWithBody Subscribe a URL to events
-//
-// The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
-func (c *Client) CreateWebhookSubscriptionWithBody(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateWebhookSubscriptionRequestWithBody(c.Server, appId, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}

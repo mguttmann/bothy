@@ -5,7 +5,8 @@
 //
 // PersistHeartbeat writes the persisted heartbeat of an agent directly, so integration tests of
 // runs.stall_check (M2-09) can place a heartbeat at any time of a fake clock without a running
-// presence tracker and its persist interval.
+// presence tracker and its persist interval. ReportCapabilities stores the capabilities an
+// adapter reports, so the follow-up tests of runs (M2-11) set the reported followups directly.
 //
 // Example:
 //
@@ -14,6 +15,7 @@ package agentstest
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -51,5 +53,32 @@ func PersistHeartbeat(tb testing.TB, db Execer, agentID ids.ID, at time.Time, ac
 	}
 	if tag.RowsAffected() != 1 {
 		tb.Fatalf("agentstest: no agents row for the heartbeat")
+	}
+}
+
+// ReportCapabilities stores caps as reported_details.capabilities of agentID, the way a
+// persisted heartbeat with these capabilities would (09 section 4.8, schema agent_heartbeat.v1);
+// the other members of reported_details stay. An empty Followups is not reported. It fails tb
+// when the statement fails or the agent has no row.
+//
+// Example:
+//
+//	agentstest.ReportCapabilities(t, pool, lotse, domain.Capabilities{Followups: "steer"})
+func ReportCapabilities(tb testing.TB, db Execer, agentID ids.ID, caps domain.Capabilities) {
+	tb.Helper()
+	raw, err := json.Marshal(caps)
+	if err != nil {
+		tb.Fatalf("agentstest: encoding capabilities: %v", err)
+		return
+	}
+	tag, err := db.Exec(context.Background(),
+		`UPDATE agents SET reported_details = jsonb_set(reported_details, '{capabilities}', $1::jsonb, true) WHERE principal_id = $2`,
+		string(raw), agentID.String())
+	if err != nil {
+		tb.Fatalf("agentstest: storing capabilities: %v", err)
+		return
+	}
+	if tag.RowsAffected() != 1 {
+		tb.Fatalf("agentstest: no agents row for the capabilities")
 	}
 }

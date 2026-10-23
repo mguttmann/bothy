@@ -226,7 +226,8 @@ func TestPrepare_StartedRunNotRecorded(t *testing.T) {
 }
 
 // TestPrepare_FollowupJtiRules: agent.followup of a running run keeps invocation_jti, of a waiting
-// run replaces it; a denial fails the follow-up message and leaves the run.
+// run replaces it; a denial fails the follow-up message, discards its row and only raises the
+// run's version (M2-11 design note 6).
 func TestPrepare_FollowupJtiRules(t *testing.T) {
 	t.Parallel()
 	w := newDeliveryWorld(t)
@@ -240,6 +241,9 @@ func TestPrepare_FollowupJtiRules(t *testing.T) {
 	}
 	in := w.input(domain.EventAgentFollowup)
 	in.Payload = p
+	if err := w.fus.InsertFollowup(context.Background(), w.run.ID, follow); err != nil {
+		t.Fatal(err)
+	}
 	before := w.current()
 	out := w.prepare(in)
 	c := claimsOf(t, out.InvocationToken)
@@ -253,8 +257,12 @@ func TestPrepare_FollowupJtiRules(t *testing.T) {
 	}
 	cur := w.current()
 	w.deny("level_insufficient")
+	cur.Version++
 	if out := w.prepare(in); out.Send || !reflect.DeepEqual(w.current(), cur) {
-		t.Fatalf("denied follow-up: sent %v or changed the run", out.Send)
+		t.Fatalf("denied follow-up: sent %v or changed the run beyond its version", out.Send)
+	}
+	if rows, _ := w.fus.RunFollowups(context.Background(), w.run.ID); len(rows) != 1 || rows[0].State != domain.FollowupDiscarded {
+		t.Fatalf("follow-up rows %+v", rows)
 	}
 	if got := w.triggerStates(follow); strings.Join(got, " ") != "failed:access_revoked" {
 		t.Fatalf("follow-up trigger states %v", got)

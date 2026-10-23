@@ -104,6 +104,8 @@ def sync_detailed(
     `base_version_conflict` with the current document in `current`, exactly as `getRun`
     answers it. Set semantics: `add` and `replace` set a member also when it is absent,
     `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+    A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+    `absorbed`); a backward change gives 409 `invalid_state_transition`.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -145,6 +147,8 @@ def sync(
     `base_version_conflict` with the current document in `current`, exactly as `getRun`
     answers it. Set semantics: `add` and `replace` set a member also when it is absent,
     `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+    A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+    `absorbed`); a backward change gives 409 `invalid_state_transition`.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -181,6 +185,8 @@ async def asyncio_detailed(
     `base_version_conflict` with the current document in `current`, exactly as `getRun`
     answers it. Set semantics: `add` and `replace` set a member also when it is absent,
     `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+    A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+    `absorbed`); a backward change gives 409 `invalid_state_transition`.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -220,6 +226,8 @@ async def asyncio(
     `base_version_conflict` with the current document in `current`, exactly as `getRun`
     answers it. Set semantics: `add` and `replace` set a member also when it is absent,
     `remove` of an absent member is a no-op, and one stored patch raises the version by one.
+    A follow-up state moves forward only (`queued` to `delivered` or `absorbed`, `delivered` to
+    `absorbed`); a backward change gives 409 `invalid_state_transition`.
 
     Args:
         run_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

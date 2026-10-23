@@ -134,3 +134,55 @@ type recorder struct {
 func (r *recorder) Helper() {}
 
 func (r *recorder) Fatalf(string, ...any) { r.failed = true }
+
+// TestReportCapabilities: the reported followups set by the helper reach the run facts of runs
+// with the owner's supports_followups, also next to a persisted heartbeat (M2-11).
+func TestReportCapabilities(t *testing.T) {
+	t.Parallel()
+	db := pgtest.New(t)
+	pool := db.Pool(t, pg.RoleApp)
+	owner := db.Pool(t, pg.RoleOwner)
+	ctx := context.Background()
+	repo := postgres.NewRepository(pool)
+	reg := txn.NewRegistry()
+	reg.Seal()
+	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{StatementTimeout: 30 * time.Second, LockTimeout: 10 * time.Second, IdleInTxTimeout: 60 * time.Second}, reg)
+	no := false
+	cfg, err := domain.ParseOperatorConfig(map[string]any{"supports_followups": no})
+	if err != nil {
+		t.Fatal(err)
+	}
+	insert := func(handle string, c domain.OperatorConfig) ids.ID {
+		id := ids.New()
+		if _, err := owner.Exec(ctx, `INSERT INTO principals (id, kind, handle, display_name) VALUES ($1, 'agent', $2, $2)`, id.String(), handle); err != nil {
+			t.Fatal(err)
+		}
+		if err := uow.Do(ctx, func(ctx context.Context) error {
+			return repo.InsertAgent(ctx, domain.NewAgent(id, "hermes", "", c))
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	lotse, texter, scout := insert("lotse", domain.OperatorConfig{}), insert("texter", cfg), insert("scout", domain.OperatorConfig{})
+	agentstest.PersistHeartbeat(t, pool, lotse, time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC), []ids.ID{})
+	agentstest.ReportCapabilities(t, pool, lotse, domain.Capabilities{Followups: "steer"})
+	agentstest.ReportCapabilities(t, owner, texter, domain.Capabilities{Followups: "queue"})
+	got, err := repo.Agents(ctx, []ids.ID{lotse, texter, scout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[ids.ID]string{lotse: "steer", texter: "queue", scout: ""}
+	for _, a := range got {
+		if a.Reported.Followups != want[a.ID] {
+			t.Errorf("%s: reported followups %q, want %q", a.ID, a.Reported.Followups, want[a.ID])
+		}
+		permitted := a.Config.Permission(domain.CapabilityFollowups)
+		if (a.ID == texter) != (permitted != nil && !*permitted) || (a.ID != texter && permitted != nil) {
+			t.Errorf("%s: permission %v", a.ID, permitted)
+		}
+	}
+	if len(got) != 3 {
+		t.Fatalf("%d agents", len(got))
+	}
+}

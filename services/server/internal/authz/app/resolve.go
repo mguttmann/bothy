@@ -263,8 +263,8 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 // command.autocomplete, which applies the agent.invoke guard without a run (M2-17), and
 // interaction.create with the facts of the component (M2-15).
 func takesInvokeFacts(action string) bool {
-	return action == string(authorize.ActionAgentInvoke) || action == string(authorize.ActionCommandAutocomplete) ||
-		action == string(authorize.ActionInteractionCreate)
+	return action == string(authorize.ActionAgentInvoke) || action == string(authorize.ActionRunFollowupCreate) ||
+		action == string(authorize.ActionCommandAutocomplete) || action == string(authorize.ActionInteractionCreate)
 }
 
 // pendingReason is the reason of a pending person or device whose pending gate passed.

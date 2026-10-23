@@ -92,15 +92,7 @@ func (s *Service) Get(ctx context.Context, runID ids.ID) (runs.Run, error) {
 	if err != nil {
 		return runs.Run{}, err
 	}
-	info, err := s.d.Threads.Info(ctx, row.ThreadID)
-	if err != nil {
-		return runs.Run{}, err
-	}
-	steps, err := s.d.Repo.AllSteps(ctx, row.ID)
-	if err != nil {
-		return runs.Run{}, err
-	}
-	return document(row, info.ChannelID, steps), nil
+	return s.documentOf(ctx, row)
 }
 
 // ListSteps implements runs.Runs (listRunSteps): the checks of Get, then a keyset page by ordinal

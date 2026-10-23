@@ -62,15 +62,18 @@ func toolRank(c string) int {
 // The actions with a guard.
 const (
 	actionAgentInvoke = "agent.invoke"
-	actionGrantCreate = "grant.create"
-	actionGrantRevoke = "grant.revoke"
-	actionTokenCreate = "token.create"
+	// actionRunFollowupCreate is a follow-up of the active run; it takes the guard of
+	// agent.invoke (05 section 4.10, M2-11).
+	actionRunFollowupCreate = "run.followup.create"
+	actionGrantCreate       = "grant.create"
+	actionGrantRevoke       = "grant.revoke"
+	actionTokenCreate       = "token.create"
 )
 
-// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke, the same guard
-// with the interaction rules on interaction.create (M2-15), token.create, the mode guard of
-// run.start (M2-09) and the terminal guards SR10, SR11 and SR12 of terminal.open and
-// terminal.attach (M2-40). The
+// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke and
+// run.followup.create (M2-11), the same guard with the interaction rules on interaction.create
+// (M2-15), token.create, the mode guard of run.start (M2-09) and the terminal guards SR10, SR11 and
+// SR12 of terminal.open and terminal.attach (M2-40). The
 // delegation limits of grant.create and grant.revoke belong to the requirement (decideDelegation).
 func guards(in *Input) (Decision, error) {
 	switch in.Action {
@@ -87,9 +90,9 @@ func guards(in *Input) (Decision, error) {
 		return commandInvokeGuard(in)
 	case actionCommandAutocomplete:
 		return commandAutocompleteGuard(in)
-	case actionAgentInvoke:
+	case actionAgentInvoke, actionRunFollowupCreate:
 		if in.Invoke == nil {
-			return Decision{}, internalError("agent.invoke without its trigger")
+			return Decision{}, internalError(in.Action + " without its trigger")
 		}
 		if in.Interaction != nil && in.Interaction.Stage != InteractionStageDeliver {
 			return Decision{}, internalError("agent.invoke with interaction facts outside stage deliver")

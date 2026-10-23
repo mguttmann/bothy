@@ -41,7 +41,8 @@ func (s *Service) RunFacts(ctx context.Context, agentIDs []ids.ID) (map[ids.ID]a
 		out[rec.ID] = agents.RunFacts{
 			ID: rec.ID, Handle: p.Handle, Status: string(p.Status), BillingMode: string(rec.Policy.Mode),
 			CredentialHolderID: rec.Policy.HolderID, ToolClass: string(rec.ToolClass),
-			ComponentsAllowed: rec.Config.Allows(domain.CapabilityComponents),
+			ComponentsAllowed:  rec.Config.Allows(domain.CapabilityComponents),
+			FollowupsPermitted: rec.Config.Permission(domain.CapabilityFollowups), FollowupsReported: rec.Reported.Followups,
 		}
 	}
 	return out, nil

@@ -183,6 +183,9 @@ var appPrivileges = map[string][]string{
 	// their component or message (cascade).
 	"message_components": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"interactions":       {"SELECT", "INSERT", "UPDATE"},
+	// 03 run_followups (M2-11): a follow-up changes state and moves to the follow-on run; rows
+	// end only with their run or message (ON DELETE CASCADE).
+	"run_followups": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

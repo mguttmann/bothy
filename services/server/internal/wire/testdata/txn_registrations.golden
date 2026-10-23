@@ -13,7 +13,7 @@ subscribe messaging.MessagePosted -> notify github.com/OWNER/bothy/services/serv
 subscribe chat.ChannelArchived -> apps github.com/OWNER/bothy/services/server/internal/apps/app.(*ArchiveSubscriber).OnChannelArchived-fm
 subscribe kernel.AccessChanged -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAccessChanged-fm
 subscribe agents.AgentDisabled -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnAgentDisabled-fm
-subscribe messaging.MessageDeleted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessageDeleted-fm
 subscribe kernel.AccessChanged -> terminal github.com/OWNER/bothy/services/server/internal/terminal/app.(*Subscribers).OnAccessChanged-fm
 subscribe identity.DeviceRevoked -> terminal github.com/OWNER/bothy/services/server/internal/terminal/app.(*Subscribers).OnDeviceRevoked-fm
 subscribe identity.SessionEnded -> terminal github.com/OWNER/bothy/services/server/internal/terminal/app.(*Subscribers).OnSessionEnded-fm
+subscribe messaging.MessageDeleted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessageDeleted-fm

@@ -155,7 +155,7 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		Repo: repo, UoW: uow, Authorizer: az, Events: d.Events, Messages: d.Messages, Threads: d.Threads,
 		Channels: d.Channels, Agents: d.Agents, Cursors: runshttp.Cursors{}, Errors: counter, Log: log, Clock: clk, Metrics: d.Metrics,
 		Versions: d.Versions, Audit: d.Audit, Telemetry: telemetry, Expiry: d.Expiry, CancelTimeouts: d.CancelTimeouts,
-		Heartbeats: d.Heartbeats, Mismatches: mismatches, Followups: runsapp.NoFollowups{}, Steps: stepMetrics(d.Metrics),
+		Heartbeats: d.Heartbeats, Mismatches: mismatches, FollowupRows: repo, Steps: stepMetrics(d.Metrics),
 	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {

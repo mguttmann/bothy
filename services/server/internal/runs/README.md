@@ -181,7 +181,7 @@ The port `runs.Runs` gains `Start`, `Resume`, `RenewToken`, `AwaitInput`, `Finis
 
 **Delivery and renewal.** The resolver table holds `interaction.created` (`resolveInteraction`) and `agent.invocation` with `trigger_kind = interaction` (`resolveInvocationInteraction`); the check at stage `deliver` evaluates `required_capability` and `restricted_to` and skips the state and `run_active`. An allow sets the interaction `dispatched`, a denial `failed` with the run unchanged; see "Delivery (M2-08)" above. `renewInvocationToken` rebuilds the delivery of an interaction token the same way (D-M2-15-22).
 
-**End of run, follow-up answer and deletion.** `DisableRunComponents(ctx, runID)` disables the active components of a run in the caller's unit of work, grouped by card in ascending message id, with one `message.updated` per card. `endRun` calls it at every end state (D-M2-15-21), and the denial of a queued run at delivery and `runs.queued_expiry` go through `endRun`; the follow-up acceptance of M2-11 calls it when a follow-up answers a waiting run (09 11.6). `Acceptor.OnMessageDeleted`, the in-transaction subscriber of `messaging.MessageDeleted`, deletes the components of the deleted message; their interactions follow by cascade and `runs.triggering_interaction_id` becomes NULL; no event of its own (the tombstone carries `components: []`).
+**End of run, follow-up answer and deletion.** `DisableRunComponents(ctx, runID)` disables the active components of a run in the caller's unit of work, grouped by card in ascending message id, with one `message.updated` per card. `endRun` calls it at every end state (D-M2-15-21), and the denial of a queued run at delivery and `runs.queued_expiry` go through `endRun`; `Followups.store` (M2-11) calls it when a follow-up answers a run in `waiting_input` (09 11.6). `Acceptor.OnMessageDeleted`, the in-transaction subscriber of `messaging.MessageDeleted`, deletes the components of the deleted message; their interactions follow by cascade and `runs.triggering_interaction_id` becomes NULL; no event of its own (the tombstone carries `components: []`).
 
 **Job `runs.component_expiry`** (`adapters/jobs/component_expiry.go`, queue `maintenance`, args `ComponentExpiry{MessageID}` only, registered in every role, run by `worker` and `all`): scheduled per card at its earliest `expires_at`, never periodic. `ExpireComponents` locks the card (missing or deleted: done), locks its active components with `expires_at` at or before now in ascending id, sets them `expired` with `version + 1`, calls `ComponentsChanged` once if any changed and schedules itself for the next `expires_at`. Repeated execution is harmless; correctness never depends on the job, because `authorize` treats a passed `expires_at` as expired.
 
@@ -325,10 +325,9 @@ already been checked"). Their queries are `runs.ActiveRunsOfThreads`, `runs.GetR
 one unit of work, so a document is never torn by a concurrent patch.
 
 **Follow-ups** (`app/followups.go`, D-M2-10-8): the outgoing port `FollowupStates` (`States`,
-`SetState`) reads and writes the follow-up states a patch names. `internal/wire` binds
-`NoFollowups` until M2-11 creates `run_followups`, so every follow-up op gives
-`patch_target_missing`; M2-11 replaces it and adds the forward-only rule and
-`trigger_state = followup_delivered`.
+`SetState`) reads and writes the follow-up states a patch names. `Followups` implements it over
+`run_followups` (M2-11, see "Follow-ups" below); `NoFollowups` remains only for a service without
+a follow-up repository, where every follow-up op gives `patch_target_missing`.
 
 **Configuration keys:** `run.excerpt_max_chars`, `run.step_detail_max_bytes` and
 `run.max_steps_persisted` (registered in `internal/wire/configkeys_runs.go`),
@@ -363,6 +362,48 @@ one unit of work, so a document is never torn by a concurrent patch.
 - `LockRunForAnswer` is an `after_authorize` exception of the SQL visibility lint
   (`tools/lint/sql_visibility.yaml`).
 
+## Follow-ups (M2-11)
+
+A human message that would trigger the agent of the thread's active run becomes a follow-up of
+that run (09 section 7, AG-13). `app.Followups` (from `Service.Followups`) is the only code that
+changes a follow-up state (D-M2-11-1); it joins the unit of work of its caller.
+
+- **Acceptance** (`Followups.Accept`, inside the unit of `createMessage`): the acceptance reads
+  the active run with its row lock (`LockActiveRunOfThread`) before `domain.Decide`. A decision
+  `followup` authorizes `run.followup.create` for the author (a candidate without mention in
+  filter mode first: a person without `trigger` gets nothing; then request mode, authz audits the
+  denial). A denial sets `trigger_state = failed` with the reason of `domain.Settle`; an allow
+  inserts the row `queued`, raises `runs.version`, sets `received` and appends `agent.followup`
+  when `domain.FollowupEventNeeded` for the effective mode (D-M2-11-2).
+- **Effective mode** (`domain.EffectiveFollowupMode`): the owner's `supports_followups`
+  (`agents.RunFacts.FollowupsPermitted`, absent allows) and the adapter's persisted report
+  (`FollowupsReported`, `steer` or `queue`); anything else is `none`. With `steer` the event goes
+  out in every active state, with `queue` and `none` only to a run in `waiting_input`.
+- **States** (`domain.FollowupState`): `queued`, `delivered`, `absorbed`, `deferred`,
+  `discarded`. The adapter's patch (`FollowupStates.SetState`, M2-10's port) moves forward only
+  (`domain.AdvanceFollowup`; 409 `invalid_state_transition` otherwise); the first move out of
+  `queued` sets `followup_delivered` (D-M2-11-3).
+- **Delivery** (`Prepare` with `agent.followup`): only an open row of this run whose message is not
+  deleted is checked (`ForDelivery`); otherwise nothing is sent, without token or audit. A denial
+  fails the message, discards the row and raises `runs.version` (`RefuseDelivery`, D-M2-11-4).
+- **End of a run** (`Followups.OnRunEnded`, called by `endRun` after the transition; every end
+  goes through `endRun`, D-M2-11-10): the open rows are locked in ascending `message_id` and split
+  by `domain.PlanRunEnd`: deleted messages are discarded, after `user_cancelled` the rest are
+  discarded with `cancelled` / `user_cancelled`, after every other end they become `deferred` in
+  thread order (D-M2-11-5). The first candidate whose author passes `agent.invoke` (re-check
+  principal, filter mode, pinned permission version, no active run, audit stage `run_end`)
+  triggers the follow-on run through `Open` and stays `deferred`; the rest move to the new run as
+  `queued` with `received` (D-M2-11-6).
+- **Deleted message** (`Acceptor.OnMessageDeleted`, subscriber of `messaging.MessageDeleted`): an
+  open follow-up becomes `discarded` and raises `runs.version`; the tombstone keeps its trigger
+  state (D-M2-11-7).
+- **Versions** (D-M2-11-8): acceptance, refused delivery and deletion raise `runs.version` without
+  `run.updated`; the run document lists the follow-ups (`runs.Run.Followups`, REST keyed by
+  message id).
+- **Queries** (`adapters/postgres/queries/run_followups.sql`): every read names the rows of one
+  run or one message whose run the use case authorized or changes in the same unit; they stand
+  under `after_authorize` in `tools/lint/sql_visibility.yaml`.
+
 ## Invocation tokens (M2-06)
 
 `app.InvocationTokens` issues and verifies the invocation tokens of invariant I3 (09 4.5, 05 section 5, ADR 0023). `internal/wire` builds it once per process in the signing keys step (`Runs.BindInvocationTokens`) over `instance.Keys`, the instance row and the configuration keys `agent.invocation_token_ttl` and `auth.clock_leeway`. It stays inside the module: every consumer up to M2-17 is in `runs`; M2-14 adds a port for other modules (D-M2-06-1).
@@ -386,7 +427,7 @@ An agent that calls the server API inside a run sends the run's invocation token
 - Nothing is cached: a revocation or the end of a run counts on the next request in every process.
 - Query exception: `GetRunBinding` reads one run by primary key without the visible-channel predicate, on the pool, outside a unit of work and without a lock, during the authentication of a request and before any `authorize`; nothing of the row leaves the server (07 section 7.4 rule 1, exception "resolution for authorize"; category `authorize_resolution` in `tools/lint/sql_visibility.yaml`). It is the port `app.RunBindings`, separate from `Repository`.
 
-## Visibility of `runs` and `run_steps`
+## Visibility of `runs`, `run_steps` and `run_followups`
 
 The tables have no `channel_id` (07 7.4 rule 1, D-M2-05-9): every query reads the rows of one thread or run whose visibility the use case checked first, or (the active-run lists) the active runs whose threads `chat.Threads.Locate` resolves, kept only when the channel is in `Scope.ChannelIDs` and `run.read` allows each row in filter mode (category `thread_scope` of `tools/lint/sql_visibility.yaml`); the gauge query has no principal.
 
@@ -411,7 +452,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 ## Events and WebSocket ops
 
-- Durable: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 also `agent.invocation`, since M2-16 `command.invoked`, since M2-09 `run.cancel_requested`, since M2-15 `interaction.created`; the others come with their tickets.
+- Durable: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`. Since M2-05 the first of them is written, since M2-08 also `agent.invocation`, since M2-16 `command.invoked`, since M2-09 `run.cancel_requested`, since M2-11 `agent.followup`, since M2-15 `interaction.created`; the others come with their tickets.
 - Ephemeral: `run.updated`, `command.autocomplete_requested`.
 - WebSocket ops (client to server): `run.update`, `command.autocomplete_result`.
 

@@ -226,6 +226,48 @@ type Repository interface {
 	// OrphanCandidates reads the runs in running or waiting_input, ascending by id, for the job
 	// runs.stall_check (M2-09); a thread has at most one (R-DM-14).
 	OrphanCandidates(ctx context.Context) ([]RunRow, error)
+	// LockActiveRunOfThread reads the run in queued, running or waiting_input of the thread with
+	// its row lock for the rest of the unit of work (M2-11 design note 3 a): a run that ended while
+	// the statement waited is not found. It needs a unit of work.
+	LockActiveRunOfThread(ctx context.Context, threadID ids.ID) (row RunRow, found bool, err error)
+	// RaiseRunVersion raises runs.version by one for a stored change of the run document outside a
+	// patch (a follow-up accepted, refused or deleted, M2-11 design note 10) and returns the new
+	// version. The caller holds the row lock. Errors: not_found for an unknown run, internal
+	// outside a unit of work.
+	RaiseRunVersion(ctx context.Context, id ids.ID) (int64, error)
+}
+
+// FollowupRow is one row of run_followups (M2-11).
+type FollowupRow struct {
+	RunID, MessageID ids.ID
+	State            domain.FollowupState
+}
+
+// FollowupRepository is the outgoing port of the run_followups rows (M2-11); adapters/postgres
+// implements it next to Repository. Every read names the rows of one run, or one message, whose
+// run the use case authorized or changes in the same unit of work (07 section 7.4 rule 1). Writes
+// and locking reads need the unit of work; the caller holds the row lock of the run first (03
+// section 6.3). Errors are kernel/errs errors.
+type FollowupRepository interface {
+	// InsertFollowup inserts the follow-up messageID of runID in queued.
+	InsertFollowup(ctx context.Context, runID, messageID ids.ID) error
+	// LockOpenFollowups locks the follow-ups of runID in queued or delivered in ascending
+	// message_id.
+	LockOpenFollowups(ctx context.Context, runID ids.ID) ([]FollowupRow, error)
+	// RunFollowups reads every follow-up of runID in ascending message_id (the run document).
+	RunFollowups(ctx context.Context, runID ids.ID) ([]FollowupRow, error)
+	// FollowupStatesOf reads the follow-ups of runID among messageIDs.
+	FollowupStatesOf(ctx context.Context, runID ids.ID, messageIDs []ids.ID) ([]FollowupRow, error)
+	// LockFollowup reads the follow-up messageID of runID with its row lock; found is false
+	// when the message is no follow-up of the run.
+	LockFollowup(ctx context.Context, runID, messageID ids.ID) (row FollowupRow, found bool, err error)
+	// SetFollowupStates stores state for the follow-ups messageIDs of runID.
+	SetFollowupStates(ctx context.Context, runID ids.ID, messageIDs []ids.ID, state domain.FollowupState) error
+	// MoveFollowups moves the follow-ups messageIDs of fromRunID to toRunID in queued.
+	MoveFollowups(ctx context.Context, fromRunID, toRunID ids.ID, messageIDs []ids.ID) error
+	// FollowupOfMessage reads the follow-up of messageID without a lock; found is false when the
+	// message is no follow-up.
+	FollowupOfMessage(ctx context.Context, messageID ids.ID) (row FollowupRow, found bool, err error)
 }
 
 // RunBindings is the outgoing port of the acting-for resolution (07 guard rule SR9, M2-14 Design
