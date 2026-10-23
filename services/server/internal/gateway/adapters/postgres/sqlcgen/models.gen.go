@@ -540,6 +540,34 @@ type IdentityProvider struct {
 	UpdatedAt         pgtype.Timestamptz
 }
 
+type ImportItem struct {
+	ID            pgtype.UUID
+	SourceID      pgtype.UUID
+	OriginKey     string
+	ItemKind      string
+	TargetKind    pgtype.Text
+	TargetID      pgtype.UUID
+	State         string
+	ContentSha256 []byte
+	Error         pgtype.Text
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+type ImportSource struct {
+	ID         pgtype.UUID
+	Kind       string
+	Name       string
+	Config     []byte
+	State      string
+	Cursor     []byte
+	Stats      []byte
+	CreatedBy  pgtype.UUID
+	CreatedAt  pgtype.Timestamptz
+	StartedAt  pgtype.Timestamptz
+	FinishedAt pgtype.Timestamptz
+}
+
 type IncomingWebhook struct {
 	ID         pgtype.UUID
 	AppID      pgtype.UUID
@@ -571,6 +599,19 @@ type InstanceSetting struct {
 	Version   int64
 	UpdatedBy pgtype.UUID
 	UpdatedAt pgtype.Timestamptz
+}
+
+type Interaction struct {
+	ID                  pgtype.UUID
+	ComponentID         pgtype.UUID
+	MessageID           pgtype.UUID
+	PrincipalID         pgtype.UUID
+	ClientInteractionID pgtype.UUID
+	Values              []byte
+	State               string
+	Response            []byte
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
 }
 
 type LocalCredential struct {
@@ -620,6 +661,33 @@ type Message struct {
 	CreatedAt           pgtype.Timestamptz
 	SearchLanguage      interface{}
 	SearchVector        interface{}
+	HasAttachments      bool
+}
+
+type MessageAttachment struct {
+	MessageID pgtype.UUID
+	FileID    pgtype.UUID
+	Position  int16
+	ThreadID  pgtype.UUID
+	ChannelID pgtype.UUID
+}
+
+type MessageComponent struct {
+	ID                 pgtype.UUID
+	MessageID          pgtype.UUID
+	CustomID           string
+	Type               string
+	Definition         []byte
+	Position           int16
+	SingleUse          bool
+	RequiredCapability pgtype.Text
+	RestrictedTo       string
+	RunID              pgtype.UUID
+	State              string
+	ExpiresAt          pgtype.Timestamptz
+	UsedBy             pgtype.UUID
+	UsedAt             pgtype.Timestamptz
+	Version            int64
 }
 
 type MessageRevision struct {
