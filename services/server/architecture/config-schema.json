@@ -46,7 +46,7 @@
       "enum": [],
       "min": "1",
       "max": "",
-      "chapter": "09-agenten.md",
+      "chapter": "09-agents.md",
       "doc": "Sum of the contents in a run context without the triggering message, in bytes; older elements are dropped first."
     },
     {
@@ -58,7 +58,7 @@
       "enum": [],
       "min": "1",
       "max": "",
-      "chapter": "09-agenten.md",
+      "chapter": "09-agents.md",
       "doc": "Content of one run-context element in bytes; a longer content is cut at a UTF-8 boundary with truncated true."
     },
     {

@@ -16,6 +16,88 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// NewGetUsageStatsRequest constructs an http.Request for the GetUsageStats method
+func NewGetUsageStatsRequest(server string, params *GetUsageStatsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/stats/usage")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Granularity != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "granularity", *params.Granularity, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SpaceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "space_id", *params.SpaceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetStatusRequest constructs an http.Request for the GetStatus method
 func NewGetStatusRequest(server string) (*http.Request, error) {
 	var err error
@@ -5975,7 +6057,13 @@ type ClientWithResponsesInterface interface {
 
 	// GetRunContextWithResponse Load the context of an own active run
 	//
-	// Agent-self, only for own active runs (09, 4.6).
+	// Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
+	// adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
+	// that is no longer active answer the same 404; another agent gets 403 `not_self`, a person or
+	// an app 403 `subject_kind_not_allowed`. The server computes `role` and `trust` of every
+	// element at the time of the request from the current rights; `trigger_message` is never cut
+	// and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
+	// and in sum at `agent.context_max_bytes` from old to new.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -22984,78 +23072,4 @@ type SubmitTranscriptResponse200Headers struct {
 	CorrelationId   *CorrelationId
 	RateLimit       *string
 	RateLimitPolicy *string
-}
-
-// SubmitTranscriptResponse400Headers the declared response headers of an HTTP 400 response for SubmitTranscript
-type SubmitTranscriptResponse400Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SubmitTranscriptResponse401Headers the declared response headers of an HTTP 401 response for SubmitTranscript
-type SubmitTranscriptResponse401Headers struct {
-	CorrelationId   *CorrelationId
-	DPoPNonce       *string
-	SetCookie       *string
-	WWWAuthenticate *string
-}
-
-// SubmitTranscriptResponse403Headers the declared response headers of an HTTP 403 response for SubmitTranscript
-type SubmitTranscriptResponse403Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SubmitTranscriptResponse404Headers the declared response headers of an HTTP 404 response for SubmitTranscript
-type SubmitTranscriptResponse404Headers struct {
-	CorrelationId *CorrelationId
-}
-
-// SubmitTranscriptResponse429Headers the declared response headers of an HTTP 429 response for SubmitTranscript
-type SubmitTranscriptResponse429Headers struct {
-	CorrelationId   *CorrelationId
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      *int
-}
-
-// SubmitTranscriptResponseDefaultHeaders the declared response headers of an HTTP default response for SubmitTranscript
-type SubmitTranscriptResponseDefaultHeaders struct {
-	CorrelationId *CorrelationId
-}
-
-type SubmitTranscriptResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Transcript
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *SubmitTranscriptResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *SubmitTranscriptResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *SubmitTranscriptResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *SubmitTranscriptResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *SubmitTranscriptResponse404Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *SubmitTranscriptResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *SubmitTranscriptResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r SubmitTranscriptResponse) GetJSON200() *Transcript {
-	return r.JSON200
 }

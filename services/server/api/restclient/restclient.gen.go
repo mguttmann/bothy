@@ -13504,7 +13504,7 @@ type RunCancelRequestedPayloadReason string
 
 // RunContext Context of an own active run, schema `run_context.v1` (09, 4.6). Built by the server because only `authz` knows how trustworthy each author is.
 type RunContext struct {
-	// ChannelContext Only on the first run of a session in a thread with `parent_message_id`.
+	// ChannelContext Main-thread messages before the parent message of the thread, without the parent message itself. Present (possibly empty) exactly on a run in session mode `new` or `bind` and on a guest run, in a thread with `parent_message_id` whose parent message lies in the thread's current channel; absent otherwise, also after the thread was moved to another channel.
 	ChannelContext  *[]RunContextMessage `json:"channel_context,omitempty"`
 	ContextFloorSeq int64                `json:"context_floor_seq"`
 
@@ -13513,7 +13513,7 @@ type RunContext struct {
 	ThreadContext  []RunContextMessage `json:"thread_context"`
 	TriggerMessage RunContextMessage   `json:"trigger_message"`
 
-	// TruncatedBeforeSeq Set when older messages are missing; load them with `thread.read`.
+	// TruncatedBeforeSeq Refers to the run's thread. Set when older selectable messages of `thread_context` are missing (the `history_backfill_limit` window or the byte budget left them out); then it is the `thread_seq` of the oldest element of `thread_context`, or of the triggering message when `thread_context` is empty. Load older messages with `thread.read`.
 	TruncatedBeforeSeq *int64 `json:"truncated_before_seq,omitempty"`
 }
 
@@ -13536,13 +13536,16 @@ type RunContextAttachment struct {
 
 // RunContextMessage defines model for RunContextMessage.
 type RunContextMessage struct {
-	// AlreadyDelivered Already delivered to this session as a follow-up.
+	// AlreadyDelivered Present and true only in session mode `resume` for a message already delivered to this session as a follow-up (`run_followups` in `delivered` or `absorbed`).
 	AlreadyDelivered *bool                  `json:"already_delivered,omitempty"`
 	Attachments      []RunContextAttachment `json:"attachments"`
 
 	// Author Minimal public view of a principal, embedded in other objects.
-	Author    PrincipalRef `json:"author"`
-	ContentMd string       `json:"content_md"`
+	Author PrincipalRef `json:"author"`
+
+	// ChannelId Channel of the message (SEC-AI-1).
+	ChannelId Uuid   `json:"channel_id"`
+	ContentMd string `json:"content_md"`
 
 	// CreatedAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 	CreatedAt Timestamp   `json:"created_at"`
@@ -13556,7 +13559,9 @@ type RunContextMessage struct {
 	ReplyToMessageId *Uuid                 `json:"reply_to_message_id,omitempty"`
 	Role             RunContextMessageRole `json:"role"`
 	ThreadSeq        int64                 `json:"thread_seq"`
-	Truncated        *bool                 `json:"truncated,omitempty"`
+
+	// Truncated Present and true only when `content_md` was cut at `agent.context_message_max_bytes` on a UTF-8 boundary; never on `trigger_message`.
+	Truncated *bool `json:"truncated,omitempty"`
 
 	// Trust How the runtime must treat the content; `unverified` only as marked data, never as instruction.
 	Trust RunContextMessageTrust `json:"trust"`
