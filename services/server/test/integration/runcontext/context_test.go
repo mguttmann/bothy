@@ -271,6 +271,44 @@ func TestRunContext_ResumeFloorAndAlreadyDelivered(t *testing.T) {
 	}
 }
 
+// TestRunContext_ResetDuringQueuedRunKeepsResume (09 9.4, red team M1 of M2-13): a reset of the
+// session while a run invoked in mode resume is queued leaves the run on its session row, so its
+// context keeps the floor, leaves Lotse's answers out and builds no channel_context, before and
+// after the start.
+func TestRunContext_ResetDuringQueuedRunKeepsResume(t *testing.T) {
+	t.Parallel()
+	c := newCtxWorld(t)
+	th := c.newThread(c.allgemein)
+	run1, msg1 := c.triggerWith("alex", th, "@lotse first")
+	c.startWithSession(run1, "sess-1", th)
+	c.say("lotse", th, "Answer of the first run")
+	c.finishOK(run1)
+	run2, _ := c.triggerWith("alex", th, "@lotse second")
+	if p := c.invocation(run2); p["session_mode"] != "resume" {
+		t.Fatalf("session_mode %v", p["session_mode"])
+	}
+	check := func(when string) {
+		t.Helper()
+		body := c.contextOf("lotse", run2)
+		if num(body, "context_floor_seq") != c.seqOf(msg1) {
+			t.Errorf("%s: floor %v, want %d", when, body["context_floor_seq"], c.seqOf(msg1))
+		}
+		if _, ok := body["channel_context"]; ok {
+			t.Errorf("%s: channel_context in mode resume", when)
+		}
+		for _, e := range part(body, "thread_context") {
+			if e["author"].(map[string]any)["id"] == c.lotse.String() {
+				t.Errorf("%s: Lotse's message %v in mode resume", when, e["thread_seq"])
+			}
+		}
+	}
+	check("before the reset")
+	c.want(c.reset("alex", th), http.StatusCreated, "")
+	check("after the reset")
+	c.wantOK(c.start("lotse", run2, c.deliver(run2)))
+	check("after the start")
+}
+
 // TestRunContext_NewAndBindIncludeOwnMessages (09 9.1): after resetAgentSession (mode new) and
 // after bindAgentSession (mode bind) Lotse's earlier answers are present with self, the floor is
 // zero and channel_context is built for a thread with a parent.

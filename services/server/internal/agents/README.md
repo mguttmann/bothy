@@ -82,9 +82,10 @@ Agents, backend policy and tool class (configured), reported state, consumer cur
 
 ## Sessions (M2-12)
 
-- Port `CurrentSessions` (`sessions.go`, M2-13): `CurrentSession(ctx, threadID)` reads the current
-  row of a thread without authorization and without a lock, for the session mode of the run context
-  (`runs` authorized `run.context.read` first); `SessionService` implements it.
+- Port `RunSessions` (`sessions.go`, M2-13): `RunSession(ctx, threadID, sessionID)` reads one row of
+  a thread (current or ended, through `ThreadSessions`) without authorization and without a lock,
+  for the session mode of the run context over `runs.agent_session_id` (`runs` authorized
+  `run.context.read` first); `SessionService` implements it.
 
 - Port (`sessions.go`): `Sessions` with seven methods. For people and adapters through
   `adapters/httpapi` (`AgentSessions`): `List` (`listAgentSessions`, `agent_session.read`, every

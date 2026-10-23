@@ -270,13 +270,14 @@ type Deps struct {
 	Costs billing.Costs
 	// ContextMessages reads the windows and messages of the run context (messaging, M2-13);
 	// TriggerHolders answers who has trigger on the channel (authz through kernel/authorize);
-	// CurrentSessions reads the current session of a thread (agents); ContextRows are the
-	// run-context reads of runs. getRunContext answers internal_error without the first three
-	// collaborators; without CurrentSessions every operator run counts as session mode new.
-	// internal/wire always sets them.
+	// RunSessions reads the session row of a run (agents); ContextRows are the run-context reads
+	// of runs. getRunContext answers internal_error without ContextMessages, TriggerHolders or
+	// ContextRows; without RunSessions (a world without the sessions, like Sessions) every operator
+	// run counts as session mode new. internal/wire sets all four and refuses a collaborator that
+	// does not implement its port.
 	ContextMessages ContextMessages
 	TriggerHolders  authorize.TriggerHolders
-	CurrentSessions agents.CurrentSessions
+	RunSessions     agents.RunSessions
 	ContextRows     ContextRepository
 }
 

@@ -49,10 +49,10 @@ content_tables:
 exceptions:
   - query: agents.ThreadSessions
     category: after_authorize
-    reason: "listAgentSessions reads the sessions of the one thread whose agent_session.read authorize allowed; agent_sessions has no channel_id, the thread was checked first (M2-12)"
+    reason: "listAgentSessions reads the sessions of the one thread whose agent_session.read authorize allowed; agent_sessions has no channel_id, the thread was checked first (M2-12); the run context of runs reads the session row of the one run whose run.context.read authorize allowed among them (agents.RunSessions, M2-13)"
   - query: agents.CurrentSession
     category: after_authorize
-    reason: "the current session of the one thread whose agent_session.bind authorize allowed or whose run invocation agent.invoke decided, or of the run whose run.context.read authorize allowed (the session mode of the run context, M2-13); nothing of the row leaves before that decision (M2-12)"
+    reason: "the current session of the one thread whose agent_session.bind authorize allowed or whose run invocation agent.invoke decided; nothing of the row leaves before that decision (M2-12)"
   - query: agents.LockCurrentSession
     category: after_authorize
     reason: "locks the current session of the one thread whose agent_session.reset or agent_session.bind authorize allowed, or whose run invocation or run.start runs decided (09 9.1, 9.2, 9.4; M2-12)"

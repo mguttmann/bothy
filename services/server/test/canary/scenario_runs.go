@@ -7,7 +7,8 @@ import (
 	"strings"
 )
 
-// runs drives the four run reads of M2-05 and the live-box patch of M2-10: the first message of the owner in the thread of
+// runs drives the four run reads of M2-05, the live-box patch of M2-10, the run context of M2-13
+// and the session operations of M2-12: the first message of the owner in the thread of
 // Support/Allgemein opened a run of Lotse (BuildMatrixWorld); Alex (reads Support) lists the runs
 // of the thread and "Running now", reads the run document and its steps, and Sam, who reads
 // Support/Allgemein through Leser, reads it too, so the pages of both carry the run summaries.

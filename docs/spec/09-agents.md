@@ -529,8 +529,9 @@ Rules of the run context (M2-13, docs/DECISIONS.md D-M2-13-3 to D-M2-13-12):
   effective `trigger` on C (an active owner counts on every channel that is not a DM) and
   `unverified` otherwise. `authz` answers who has `trigger` at the time of the request through
   `authorize.TriggerHolders`; a source error fails the request and never weakens trust.
-- Session mode: the mode of the invocation (9.1) over the current session of T when it belongs to
-  the run's agent. In `new`, `bind` and guest runs `context_floor_seq` is `0`, the agent's own
+- Session mode: the mode of the invocation (9.1) over the session row of the run
+  (`runs.agent_session_id`, the row the run was invoked with or attached at its start), so a reset
+  or bind during the run (9.4) does not change it. In `new`, `bind` and guest runs `context_floor_seq` is `0`, the agent's own
   messages are included and `channel_context` is built; in `resume` the own messages are left out,
   no `channel_context` is built, and the floor is the `thread_seq` of the triggering message of the
   latest earlier started run of the session that has one, `0` when that message lies outside T

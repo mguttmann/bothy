@@ -511,16 +511,17 @@ An agent that calls the server API inside a run sends the run's invocation token
   owner, the same `404` for unknown, invisible and inactive runs and for a triggering message the
   agent cannot read; then `chat.Threads.Info` (current channel, kind, parent message, fixed
   operator), `chat.TriggerFacts.TriggerChannel` (effective operator, `history_backfill_limit`),
-  the session plan, the windows through `messaging.Messages.ContextWindow` and `ContextMessage`,
+  the session plan over `runs.agent_session_id` (`agents.RunSessions`), the windows through `messaging.Messages.ContextWindow` and `ContextMessage`,
   cutting and budget, one `authorize.TriggerHolders.WithTrigger` call for the trust marks and the
   delivered follow-ups. No unit of work, no lock; logs carry the run id at most.
 - Pure rules in `domain/runcontext.go`: `Classify` (role and trust, origin before author),
   `PlanContext` (mode through `DecideSession`, floor, own messages, channel context),
   `CutContent`, `FitBudget`, `TruncatedBeforeSeq`.
 - Collaborators in `app.Deps`: `ContextMessages` (messaging), `TriggerHolders` (authz through
-  `kernel/authorize`), `CurrentSessions` (agents) and `ContextRows` (`adapters/postgres`,
+  `kernel/authorize`), `RunSessions` (agents) and `ContextRows` (`adapters/postgres`,
   queries `EarlierSessionRun` and `DeliveredFollowupsOfSession` in `queries/runcontext.sql`);
-  `internal/wire` takes the first three from the values it already wires.
+  `internal/wire` takes the first three from the values it already wires and refuses one that does
+  not implement its port.
 - Configuration keys: `agent.context_max_bytes`, `agent.context_message_max_bytes`.
 - Rulings: docs/DECISIONS.md M2-13.
 

@@ -187,7 +187,9 @@ func NewRuns(cfg runsapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 		ContextRows: repo,
 		Files:       d.Files, Holds: d.Holds, Uncorrelated: synctelemetry.Uncorrelated,
 	}
-	withContext(&deps, az, d)
+	if err := withContext(&deps, az, d); err != nil {
+		return nil, err
+	}
 	svc, components, err := newRunsService(cfg, deps, d, repo)
 	if err != nil {
 		return nil, err
@@ -239,19 +241,29 @@ func componentDeps(deps *runsapp.Deps, d RunsDeps, repo *runspg.Repository) (*ru
 
 // withContext adds the collaborators of the run context to deps (M2-13): the context reads of the
 // messaging use cases behind d.Messages, the TriggerHolders of the authz Authorizer az (02 section
-// 4.5, kernel/authorize) and the current-session read of the agent sessions d.Sessions. Each is
-// taken from the value the process already wires, so no second instance exists; a collaborator
-// that does not implement its port stays nil and getRunContext answers internal_error.
-func withContext(out *runsapp.Deps, az authorize.Authorizer, d RunsDeps) {
-	if cm, ok := d.Messages.(runsapp.ContextMessages); ok {
-		out.ContextMessages = cm
+// 4.5, kernel/authorize) and the session-row read of the agent sessions d.Sessions. Each is taken
+// from the value the process already wires, so no second instance exists. Errors: a collaborator
+// that does not implement its port, so getRunContext never runs with a silently missing part. A
+// world without sessions (d.Sessions nil) has no session-row read either.
+func withContext(out *runsapp.Deps, az authorize.Authorizer, d RunsDeps) error {
+	cm, ok := d.Messages.(runsapp.ContextMessages)
+	if !ok {
+		return errors.New("wire: the messaging port of runs does not read the run context")
 	}
-	if th, ok := az.(authorize.TriggerHolders); ok {
-		out.TriggerHolders = th
+	th, ok := az.(authorize.TriggerHolders)
+	if !ok {
+		return errors.New("wire: the Authorizer of runs does not answer the trigger holders")
 	}
-	if cs, ok := d.Sessions.(agents.CurrentSessions); ok {
-		out.CurrentSessions = cs
+	out.ContextMessages, out.TriggerHolders = cm, th
+	if d.Sessions == nil {
+		return nil
 	}
+	rs, ok := d.Sessions.(agents.RunSessions)
+	if !ok {
+		return errors.New("wire: the agent sessions of runs do not read the session row of a run")
+	}
+	out.RunSessions = rs
+	return nil
 }
 
 // stepMetrics returns m as the counter of bothy.run.steps when it is one (runs/adapters/otelmetrics

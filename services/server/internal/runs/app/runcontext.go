@@ -150,25 +150,26 @@ func (s *Service) contextFacts(ctx context.Context, row RunRow) (contextBuild, e
 }
 
 // contextPlan returns the session plan of row (design note 5) and the session row it is based on
-// (zero for none): whether the agent operates the thread, its current session there and the
-// earlier started runs in that session.
+// (zero for none): whether the agent operates the thread, the session row the run was invoked
+// with (runs.agent_session_id, so a reset or bind during the run does not change the mode the
+// invocation announced, 09 9.4) and the earlier started runs in that session.
 func (s *Service) contextPlan(ctx context.Context, row RunRow, operator ids.ID) (domain.ContextPlan, ids.ID, error) {
 	f := domain.PlanFacts{Operator: !operator.IsZero() && operator == row.AgentID}
-	if !f.Operator || s.d.CurrentSessions == nil {
+	if !f.Operator || row.AgentSessionID.IsZero() || s.d.RunSessions == nil {
 		return domain.PlanContext(f), ids.ID{}, nil
 	}
-	cur, found, err := s.d.CurrentSessions.CurrentSession(ctx, row.ThreadID)
+	sess, found, err := s.d.RunSessions.RunSession(ctx, row.ThreadID, row.AgentSessionID)
 	if err != nil {
 		return domain.ContextPlan{}, ids.ID{}, err
 	}
-	if !found || cur.AgentID != row.AgentID {
+	if !found || sess.AgentID != row.AgentID {
 		return domain.PlanContext(f), ids.ID{}, nil
 	}
-	f.HasSession, f.Started = true, cur.Started
-	if f.Earlier, err = s.earlierRuns(ctx, row, cur.ID); err != nil {
+	f.HasSession, f.Started = true, sess.Started
+	if f.Earlier, err = s.earlierRuns(ctx, row, sess.ID); err != nil {
 		return domain.ContextPlan{}, ids.ID{}, err
 	}
-	return domain.PlanContext(f), cur.ID, nil
+	return domain.PlanContext(f), sess.ID, nil
 }
 
 // earlierRuns returns the earlier started runs of row's agent in the session row, as PlanFacts
