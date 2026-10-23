@@ -10818,7 +10818,7 @@
   },
   "importConflictLeadNotHere": "Not every imported channel is led here yet. Switch each channel over first.",
   "@importConflictLeadNotHere": {
-    "description": "The server answered 409 conflict with reason lead_not_bothy."
+    "description": "The server answered 409 conflict because an imported channel is not led here."
   },
   "importConflictNotImported": "This channel is not imported yet.",
   "@importConflictNotImported": {

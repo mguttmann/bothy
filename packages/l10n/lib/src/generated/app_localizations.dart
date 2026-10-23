@@ -11263,7 +11263,7 @@ abstract class AppLocalizations {
   /// **'The source is in another state now. The page shows the current state.'**
   String get importConflictState;
 
-  /// The server answered 409 conflict with reason lead_not_bothy.
+  /// The server answered 409 conflict because an imported channel is not led here.
   ///
   /// In en, this message translates to:
   /// **'Not every imported channel is led here yet. Switch each channel over first.'**
