@@ -3552,8 +3552,8 @@ export interface paths {
          * Load the context of an own active run
          * @description Agent-self, only for own active runs in `queued`, `running` or `waiting_input` (09, 4.6): the
          *     adapter reads it before `startRun`. An unknown run, a run the agent cannot see and an own run
-         *     that is no longer active answer the same 404; another agent gets 403 `not_self`, a person or
-         *     an app 403 `subject_kind_not_allowed`. The server computes `role` and `trust` of every
+         *     that is no longer active answer the same 404; another agent gets 403 `forbidden` with reason
+         *     `not_self`, a person or an app reason `subject_kind_not_allowed`. The server computes `role` and `trust` of every
          *     element at the time of the request from the current rights; `trigger_message` is never cut
          *     and never counted, the other parts are cut per element at `agent.context_message_max_bytes`
          *     and in sum at `agent.context_max_bytes` from old to new.
