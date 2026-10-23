@@ -196,6 +196,9 @@ var appPrivileges = map[string][]string{
 	// 03 agent_sessions (M2-12): a session ends with ended_at and end_reason, never with a
 	// delete; the rows are the session history of the thread.
 	"agent_sessions": {"SELECT", "INSERT", "UPDATE"},
+	// 03 gateway_presence (M7-17): every api node upserts and deletes the rows of its live
+	// connections and deletes the rows of nodes that stopped refreshing.
+	"gateway_presence": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).
