@@ -52,6 +52,35 @@ function isDateNow(node: ts.Node): boolean {
   );
 }
 
+const LONG_MS = 1000;
+
+function isLong(node: ts.Node | undefined): boolean {
+  return (
+    node !== undefined &&
+    ts.isNumericLiteral(node) &&
+    Number(node.text.replaceAll("_", "")) >= LONG_MS
+  );
+}
+
+/**
+ * A timer delay of a second or more: a literal, or a parameter whose default is one. A test
+ * that ends a wait with such a timer (for example a close after 3 s) bounds by wall clock what
+ * must happen; short delays stay allowed for checks that something does not happen.
+ */
+function longDelay(delay: ts.Node | undefined): boolean {
+  if (delay === undefined) return false;
+  if (isLong(delay)) return true;
+  if (!ts.isIdentifier(delay)) return false;
+  for (let scope: ts.Node | undefined = delay; scope; scope = scope.parent) {
+    if (!ts.isFunctionLike(scope)) continue;
+    const param = scope.parameters.find(
+      (p) => ts.isIdentifier(p.name) && p.name.text === delay.text,
+    );
+    if (param !== undefined) return isLong(param.initializer);
+  }
+  return false;
+}
+
 /** The fixed waits of one source text: a deadline from `Date.now()` or a bounded polling loop. */
 function fixedWaits(name: string, text: string): string[] {
   const file = ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true);
@@ -76,6 +105,12 @@ function fixedWaits(name: string, text: string): string[] {
         node.condition.getText().includes("&&"))
     )
       found.push(`${line(node)}: a polling loop of fixed turns`);
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText() === "setTimeout" &&
+      longDelay(node.arguments[1])
+    )
+      found.push(`${line(node)}: a real timer of a second or more`);
     if (
       ts.isCallExpression(node) &&
       ["it", "test"].includes(node.expression.getText()) &&
@@ -111,12 +146,17 @@ describe("waits of the tests", () => {
       "  for (let i = 0; i < 3; i++) await c();",
       "}",
       'it("t", async () => {}, 30000);',
+      "function g(gw, ms = 3000) { setTimeout(() => gw.close(), ms); }",
+      "setTimeout(() => undefined, 2_000);",
+      "setTimeout(() => undefined, 50);",
     ].join("\n");
     expect(fixedWaits("sample.ts", sample)).toEqual([
       "2: a deadline from Date.now()",
       "3: a polling loop of fixed turns",
       "7: a polling loop of fixed turns",
       "10: a fixed test timeout",
+      "11: a real timer of a second or more",
+      "12: a real timer of a second or more",
     ]);
   });
 

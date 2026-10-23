@@ -293,14 +293,9 @@ class Collector {
     })();
   }
 
-  /** Waits for the iterator to end, closing the gateway after `ms` of real time. */
-  async finish(ms = 3000): Promise<GatewayEvent[]> {
-    const timer = setTimeout(() => void this.gw.close(), ms);
-    try {
-      await this.done;
-    } finally {
-      clearTimeout(timer);
-    }
+  /** Waits for the iterator to end (a stop, a close or `stopWhen`), with the patience only. */
+  async finish(): Promise<GatewayEvent[]> {
+    await withinPatience(this.done, "the end of frames()");
     return this.seen;
   }
 }

@@ -571,6 +571,25 @@ describe("retries", () => {
     expect(fromSettings.timeoutMs).toBe(4_500);
   });
 
+  it("ends an attempt after sdk.http_timeout even when the fetch ignores the signal", async () => {
+    // The class behind a hang under load: the client must not depend on a custom fetch
+    // seeing the abort through request.signal (docs/decisions.d/M2-30.md D-M2-30-16).
+    let calls = 0;
+    const { retry } = recordedRetry({ maxAttempts: 2 });
+    const api = createApiClient({
+      baseUrl: BASE,
+      timeoutMs: 20,
+      retry,
+      fetch: () => {
+        calls++;
+        return new Promise<Response>(() => undefined);
+      },
+    });
+    const err: unknown = await getRun(api).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(TimeoutError);
+    expect(calls).toBe(2);
+  });
+
   it("an abort by the caller is not repeated", async () => {
     let calls = 0;
     const controller = new AbortController();

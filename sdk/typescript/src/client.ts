@@ -6,7 +6,7 @@
  * and a wrapped `fetch` that, per attempt, sets `Authorization` (`DPoP` with a fresh proof when a
  * DPoP key is configured, else `Bearer`), the run's newest `Invocation-Token` inside
  * {@link ApiClientExtras.bindRun} only (07 SR9), the `User-Agent` of docs/spec/06-api.md 2 and an
- * `AbortSignal.timeout` of `sdk.http_timeout`. It keeps the newest `DPoP-Nonce` and repeats once
+ * abort after `sdk.http_timeout` (`attemptSignal`). It keeps the newest `DPoP-Nonce` and repeats once
  * on `401 use_dpop_nonce` outside the retry count (06 3.1 point 2); it repeats idempotent requests
  * only (`./retry`) and warns once per operation on `Deprecation` or `Sunset` (11 12). Node.js only:
  * the run binding lives in an `AsyncLocalStorage` (docs/decisions.d/M2-30.md D-M2-30-3).
@@ -212,6 +212,73 @@ async function problemCode(response: Response): Promise<string | undefined> {
 }
 
 /** The wrapped `fetch` of one client with its state (nonce, bindings, warned operations). */
+
+/**
+ * The signal of one attempt: aborted by the caller's signal or after `timeoutMs`.
+ *
+ * The attempt's `Request` carries it, and {@link untilAborted} also races the `fetch` against
+ * it: in Node.js the signal of a `Request` follows the given signal only through a weak
+ * reference, so after a garbage collection a custom `fetch` that waits on `request.signal`
+ * waited past the timeout (docs/decisions.d/M2-30.md D-M2-30-16). The caller's listener goes
+ * when the timer fires.
+ */
+function attemptSignal(
+  caller: AbortSignal,
+  timeoutMs: number,
+): { readonly signal: AbortSignal; expired(): boolean } {
+  const controller = new AbortController();
+  let expired = false;
+  const onCaller = (): void => controller.abort(caller.reason);
+  const timer = setTimeout(() => {
+    expired = true;
+    caller.removeEventListener("abort", onCaller);
+    controller.abort(
+      new DOMException("The operation timed out.", "TimeoutError"),
+    );
+  }, timeoutMs);
+  timer.unref();
+  if (caller.aborted) controller.abort(caller.reason);
+  else caller.addEventListener("abort", onCaller, { once: true });
+  return { signal: controller.signal, expired: () => expired };
+}
+
+/**
+ * Settles with `pending`, or rejects with the reason of `signal` once it aborts first; a
+ * response that arrives after the abort is cancelled.
+ */
+function untilAborted(
+  pending: Promise<Response>,
+  signal: AbortSignal,
+): Promise<Response> {
+  if (signal.aborted) {
+    void pending.then(
+      (late) => late.body?.cancel(),
+      () => undefined,
+    );
+    return Promise.reject(signal.reason as Error);
+  }
+  return new Promise<Response>((resolve, reject) => {
+    const onAbort = (): void => {
+      void pending.then(
+        (late) => late.body?.cancel(),
+        () => undefined,
+      );
+      reject(signal.reason as Error);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    pending.then(
+      (response) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(response);
+      },
+      (cause: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(cause as Error);
+      },
+    );
+  });
+}
+
 class Transport {
   readonly bindings = new Map<string, Binding>();
   readonly storage = new AsyncLocalStorage<Binding | undefined>();
@@ -267,20 +334,23 @@ class Transport {
     const { maxAttempts } = this.config;
     let nonceRepeated = false;
     for (let attempt = 1; ; attempt++) {
-      const timeout = AbortSignal.timeout(this.config.timeoutMs);
+      const limit = attemptSignal(request.signal, this.config.timeoutMs);
       const attemptRequest = await this.prepare(
         request,
         body,
         binding,
-        timeout,
+        limit.signal,
       );
       const last = !retryable || attempt >= maxAttempts;
       let response: Response;
       try {
-        response = await this.config.fetch(attemptRequest);
+        response = await untilAborted(
+          this.config.fetch(attemptRequest),
+          limit.signal,
+        );
       } catch (cause) {
         if (request.signal.aborted) throw cause;
-        const error = timeout.aborted
+        const error = limit.expired()
           ? new TimeoutError(operation, this.config.timeoutMs, { cause })
           : new TransportError(operation, { cause });
         this.log("debug", "request failed", operation, attempt, {
@@ -337,7 +407,7 @@ class Transport {
     request: Request,
     body: ArrayBuffer | undefined,
     binding: Binding | undefined,
-    timeout: AbortSignal,
+    signal: AbortSignal,
   ): Promise<Request> {
     const headers = new Headers(request.headers);
     if (!headers.has("User-Agent"))
@@ -362,7 +432,6 @@ class Transport {
     }
     if (binding !== undefined)
       headers.set(INVOCATION_TOKEN_HEADER, binding.token.reveal());
-    const signal = AbortSignal.any([request.signal, timeout]);
     return new Request(
       request,
       body === undefined ? { headers, signal } : { headers, signal, body },
