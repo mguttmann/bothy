@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"slices"
 
@@ -59,8 +60,22 @@ type presenceCandidate struct {
 // close state and the idle flag each under their own short lock afterwards, so the read never
 // nests locks and never waits on a connection queue. Every returned slice is new.
 func (h *Hub) Presence(userIDs []ids.ID) map[ids.ID][]presence.Connection {
+	byUser := h.presenceCandidates(userIDs)
+	out := make(map[ids.ID][]presence.Connection, len(byUser))
+	for u, cands := range byUser {
+		if conns := devicePresence(cands); len(conns) > 0 {
+			out[u] = conns
+		}
+	}
+	return out
+}
+
+// presenceCandidates copies, under the hub's lock, the registration order and the focus of every
+// connection of each person of userIDs.
+func (h *Hub) presenceCandidates(userIDs []ids.ID) map[ids.ID][]presenceCandidate {
 	byUser := make(map[ids.ID][]presenceCandidate, len(userIDs))
 	h.mu.Lock()
+	defer h.mu.Unlock()
 	for _, u := range userIDs {
 		if _, done := byUser[u]; done {
 			continue
@@ -69,32 +84,22 @@ func (h *Hub) Presence(userIDs []ids.ID) map[ids.ID][]presence.Connection {
 			byUser[u] = append(byUser[u], presenceCandidate{m: m, seq: m.seq, focus: slices.Clone(m.focus)})
 		}
 	}
-	h.mu.Unlock()
-	out := make(map[ids.ID][]presence.Connection, len(byUser))
-	for u, cands := range byUser {
-		// Newest registration first, so the first entry of a device is the newer connection.
-		slices.SortFunc(cands, func(a, b presenceCandidate) int {
-			switch {
-			case a.seq > b.seq:
-				return -1
-			case a.seq < b.seq:
-				return 1
-			}
-			return 0
-		})
-		var conns []presence.Connection
-		for _, c := range cands {
-			pc, ok := counted(c)
-			if !ok || slices.ContainsFunc(conns, func(x presence.Connection) bool { return x.DeviceID == pc.DeviceID }) {
-				continue
-			}
-			conns = append(conns, pc)
+	return byUser
+}
+
+// devicePresence returns one entry per device of the counted connections of cands, the newest
+// registration of a device first.
+func devicePresence(cands []presenceCandidate) []presence.Connection {
+	slices.SortFunc(cands, func(a, b presenceCandidate) int { return cmp.Compare(b.seq, a.seq) })
+	var conns []presence.Connection
+	for _, c := range cands {
+		pc, ok := counted(c)
+		if !ok || slices.ContainsFunc(conns, func(x presence.Connection) bool { return x.DeviceID == pc.DeviceID }) {
+			continue
 		}
-		if len(conns) > 0 {
-			out[u] = conns
-		}
+		conns = append(conns, pc)
 	}
-	return out
+	return conns
 }
 
 // counted returns the presence entry of the candidate c and whether its connection counts.
