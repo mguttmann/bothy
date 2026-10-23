@@ -368,6 +368,7 @@ stateDiagram-v2
 `4017`: a newer connection of the same device is active; the app reconnects only on the return to the foreground or on user action.
 `4008`: the app waits the seconds of `retry_after=<seconds>` in the close reason instead of the jitter; without a readable value the normal backoff applies.
 `4006`: the app connects with `identify` instead of `resume`.
+After an app start the first connection is `identify` with the stored cursor, also inside the resume window: `resumed` carries no snapshot, and the new engine holds no counters until the snapshot of `ready` seeds them (04 14; docs/DECISIONS.md D-M4-30-11).
 Every attempt has the deadline `client.sync.connect_timeout` from its start in `Connecting` until `ready` or `resumed`: a socket that does not open, a missing `hello` or a missing answer to `identify` or `resume` ends the attempt, and the app goes to `Backoff` like after a failed connect.
 
 Every state carries a reason beside its phase (`ConnectionState(phase, reason)` of `sync_engine`): `none`, `networkUnavailable`, `devicePending`, `deviceReplaced`, `forbidden`, `rateLimited`, `revoked`, `protocolUnsupported` or `closedByServer(code)`; the interface explains `Offline` and `Backoff` with it. `Offline` with `networkUnavailable` connects when the network returns. The close reactions are one table in code (`closeCodeTable`, docs/DECISIONS.md D-M4-13-2).

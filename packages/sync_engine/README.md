@@ -23,8 +23,9 @@ Further rules checked by `make arch`:
 
 `GatewayConnection` holds the one WebSocket of the device (04 6.1): it never opens a second
 socket while one is open or opening. It answers `hello` through `GatewaySession` with `resume`
-(stored gateway session and cursor, last disconnect within `resume_window_ms`) or `identify`
-(cursor and epoch only when stored), both with a gateway DPoP proof of `auth`
+(stored gateway session and cursor, last disconnect within `resume_window_ms`, and this engine
+reached `ready` before: a new engine identifies, because only the snapshot of `ready` seeds its
+counters, D-M4-30-11) or `identify` (cursor and epoch only when stored), both with a gateway DPoP proof of `auth`
 (`DpopProofFactory.forGateway`: `htm` `GET`, `htu` the HTTPS form of the gateway URL, the
 `hello` nonce, `ath`). `ready` stores `gateway_session_id`, `permission_version` and `head_seq`
 through `SyncStateDao`; the `sync_epoch` stays in memory, because M4-14 stores it with the

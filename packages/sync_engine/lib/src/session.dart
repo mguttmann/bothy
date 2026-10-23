@@ -57,7 +57,12 @@ final class GatewaySession {
 
   /// When set, the next answer is `identify` even within the resume window (`4006`); cleared
   /// by `ready`.
-  bool forceIdentify = false;
+  ///
+  /// Set from the start: a new session object belongs to a new engine (an app start), which
+  /// holds no counters and no agent presence in memory. Only the snapshot of `ready` seeds them
+  /// (04 14); `resumed` carries none, so a resume of the gateway session an earlier run of the
+  /// app left would show every thread as read (brief M4-30: the counters after a restart).
+  bool forceIdentify = true;
 
   /// The `sync_epoch` of the current `hello`, `ready` or `resumed`.
   String? syncEpoch;
@@ -67,8 +72,9 @@ final class GatewaySession {
   bool supports(GatewayHello hello) =>
       hello.protocolVersions.contains(gatewayProtocolVersion);
 
-  /// The answer to [hello]: `resume` when a gateway session is stored and the last disconnect
-  /// lies less than `resume_window_ms` back (04 6.3 item 7), otherwise `identify` with cursor
+  /// The answer to [hello]: `resume` when this engine reached `ready` before ([forceIdentify]),
+  /// a gateway session is stored and the last disconnect lies less than `resume_window_ms` back
+  /// (04 6.3 item 7), otherwise `identify` with cursor
   /// and epoch when stored (absent on the first connection, item 3).
   ///
   /// Stores the nonce of `hello` in the `NonceStore` of `auth`. Throws the `AuthException` of

@@ -4,7 +4,8 @@
 // the app's providers against the fake server with a Windows window that hides to the
 // notification area. With the window hidden, a message from Sam makes the fake send
 // `notification.created` and the presenter shows one toast; a click opens the thread at the
-// message; after Quit the device has no connection and the fake creates nothing.
+// message; after Quit the device has no connection and the fake creates nothing; after a restart
+// the counters show the messages.
 
 import 'dart:io';
 
@@ -12,6 +13,9 @@ import 'package:client/app/providers/session.dart';
 import 'package:client/desktop/providers.dart';
 import 'package:client/desktop/window_behavior.dart';
 import 'package:client/notifications/providers.dart';
+import 'package:client/onboarding/onboarding_controller.dart';
+import 'package:client/sidebar/providers.dart';
+import 'package:domain/domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sync_engine/sync_engine.dart';
@@ -121,5 +125,42 @@ void main() {
     ]);
     await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(presenter.shown, isEmpty);
+  });
+
+  test('a restart after Quit shows both messages in the counters', () async {
+    final seed = fake.seed;
+    seed.post(seed.sam, seed.releaseNotes, 'Build is green');
+    final general = ChannelId.parse(seed.general);
+    await eventually(
+      'the live message counted',
+      () =>
+          c
+              .read(syncEngineProvider)!
+              .catchUp
+              .countsOfChannel(general)
+              .values
+              .firstOrNull
+              ?.unread ==
+          1,
+    );
+    await c.read(windowBehaviorProvider).quit();
+    seed.post(seed.sam, seed.releaseNotes, 'Deploy is done');
+
+    // A new start of the app on the same data within the resume window (04 6.3 item 7): the
+    // new engine identifies, and the snapshot of `ready` seeds the counters (04 14).
+    final restarted = appContainer(fake);
+    addTearDown(restarted.dispose);
+    restarted.read(onboardingControllerProvider);
+    final rows = restarted.listen(
+      channelsOfSpaceProvider(seed.space),
+      (_, _) {},
+    );
+    addTearDown(rows.close);
+    await eventually(
+      'two unread in general',
+      () => restarted
+          .read(channelsOfSpaceProvider(seed.space))
+          .any((row) => row.channel.id == general && row.counts.unread == 2),
+    );
   });
 }
