@@ -89,13 +89,17 @@ class _ImportCreateDialogState extends State<ImportCreateDialog> {
 
   Future<void> _pick() async {
     final l = AppLocalizations.of(context);
-    final file = await widget.pickMapping();
-    if (file == null || !mounted) return;
+    // A new choice replaces the old file at once: until it is read, nothing counts as chosen,
+    // so "Add" never sends the file of the choice before.
     setState(() {
       _serverErrors = const [];
       _failure = null;
       _config = null;
       _fileError = null;
+    });
+    final file = await widget.pickMapping();
+    if (file == null || !mounted) return;
+    setState(() {
       try {
         _config = mappingJsonOf(utf8.decode(file.bytes));
       } on FormatException {

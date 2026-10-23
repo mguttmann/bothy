@@ -5,6 +5,8 @@
 // their places in the file, a fixed file added after the confirmation and the step-up, and
 // the list read again on the refresh control and when the tab becomes visible.
 
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:admin_ui/admin_ui.dart';
@@ -183,4 +185,37 @@ void main() {
       expect(find.text('Second'), findsOneWidget);
     },
   );
+
+  testWidgets('choosing again drops the old file until the new one is read', (
+    tester,
+  ) async {
+    final next = <Completer<PickedFile?>>[];
+    Future<PickedFile?> pick() {
+      final c = Completer<PickedFile?>();
+      next.add(c);
+      return c.future;
+    }
+
+    PickedFile file(String text) =>
+        PickedFile('mapping.yaml', Uint8List.fromList(utf8.encode(text)));
+
+    await pumpList(tester, pick: pick);
+    await tapKey(tester, 'import.add');
+    await tapKey(tester, 'import.create.pick');
+    next.last.complete(file(mappingYaml()));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('import.create.file')), findsOneWidget);
+
+    // A second choice: while it is open, no file counts as read and "Add" is off.
+    await tapKey(tester, 'import.create.pick');
+    expect(find.byKey(const ValueKey('import.create.file')), findsNothing);
+    next.last.complete(file('a: .nan\n'));
+    await tester.pumpAndSettle();
+    // A value JSON cannot hold is refused like any other unreadable mapping.
+    expect(
+      find.byKey(const ValueKey('import.create.fileError')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('import.create.file')), findsNothing);
+  });
 }

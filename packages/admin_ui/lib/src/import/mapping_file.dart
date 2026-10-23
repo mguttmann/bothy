@@ -66,8 +66,13 @@ Map<String, Object?> mappingJsonOf(String text) {
   if (json is! Map<String, Object?>) {
     throw const MappingFileError(MappingFileProblem.notMapping);
   }
-  // A round trip through JSON proves the value is plain JSON (numbers, texts, lists, maps).
-  return (jsonDecode(jsonEncode(json)) as Map).cast<String, Object?>();
+  // A round trip through JSON proves the value is plain JSON (numbers, texts, lists, maps);
+  // a value JSON cannot hold (`.nan`, `.inf`) is no valid mapping either.
+  try {
+    return (jsonDecode(jsonEncode(json)) as Map).cast<String, Object?>();
+  } on JsonUnsupportedObjectError {
+    throw const MappingFileError(MappingFileProblem.notMapping);
+  }
 }
 
 Object? _plain(Object? node) => switch (node) {
