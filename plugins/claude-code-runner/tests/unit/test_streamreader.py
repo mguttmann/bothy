@@ -7,6 +7,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.streamreader import StreamReader
 
@@ -28,7 +29,7 @@ async def test_partial_invalid_unknown_and_end_after_result(tmp_path: Path) -> N
         await asyncio.sleep(0.05)
         fh.write('tant"}\nnot json\n[1, 2]\n{"type":"weird"}\n\n')
         fh.write('{"type":"result","subtype":"success"}\n{"type":"after"}\n')
-    messages = await asyncio.wait_for(task, 5)
+    messages = await asyncio.wait_for(task, PATIENCE)
     assert [m["type"] for m in messages] == ["system", "assistant", "result"]
 
 
@@ -37,11 +38,11 @@ async def test_end_after_exit(tmp_path: Path) -> None:
     path = tmp_path / "s.jsonl"
     path.write_text('{"type":"assistant"}\n{"type":"user"')
     reader = StreamReader(path, 0.01, lambda: False)
-    messages = await asyncio.wait_for(collect(reader), 5)
+    messages = await asyncio.wait_for(collect(reader), PATIENCE)
     assert [m["type"] for m in messages] == ["assistant"]
 
 
 @pytest.mark.anyio
 async def test_missing_file_after_exit(tmp_path: Path) -> None:
     reader = StreamReader(tmp_path / "none.jsonl", 0.01, lambda: False)
-    assert await asyncio.wait_for(collect(reader), 5) == []
+    assert await asyncio.wait_for(collect(reader), PATIENCE) == []

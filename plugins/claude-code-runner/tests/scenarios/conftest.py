@@ -24,6 +24,7 @@ from uuid import UUID
 
 import pytest
 from bothy_sdk.sources import EventSource
+from bothy_sdk.testing._patience import PATIENCE
 from bothy_sdk.testing.fakeserver import FakeServer
 
 from claude_code_runner.app import Runner
@@ -82,8 +83,10 @@ class World:
             "poll_interval": "20ms",
             "stop_grace": "1s",
             "kill_grace": "1s",
-            "session_lock_wait": "3s",
-            "cli_probe_timeout": "30s",
+            # A wait of the runner never decides a test by the machine's speed: a test of the
+            # limit sets a short value itself, every other one waits as long as the patience.
+            "session_lock_wait": f"{int(PATIENCE)}s",
+            "cli_probe_timeout": f"{int(PATIENCE)}s",
         }
         values.update(runner)
         lines = ["[runner]"]
@@ -125,9 +128,17 @@ class World:
                 self.runners.remove(item)
                 await runner.stop()
                 with contextlib.suppress(Exception):
-                    await asyncio.wait_for(item[1], 20)
+                    await asyncio.wait_for(item[1], PATIENCE)
 
-    async def until(self, predicate: Callable[[], Any], timeout: float = 90.0) -> None:
+    def gate(self, name: str) -> Path:
+        """Return the path of a Fake-Claude gate (``auth_gate``, ``turn_gate``), not yet open."""
+        return self.root / f"{name}.open"
+
+    def release(self, gate: Path) -> None:
+        """Open a gate: every Fake-Claude command waiting on it goes on."""
+        gate.touch()
+
+    async def until(self, predicate: Callable[[], Any], timeout: float = PATIENCE) -> None:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while loop.time() < deadline:
@@ -139,7 +150,7 @@ class World:
     def state_of(self, run_id: UUID) -> str:
         return self.fake.run_state(run_id).state
 
-    async def ended(self, run_id: UUID, timeout: float = 90.0) -> str:
+    async def ended(self, run_id: UUID, timeout: float = PATIENCE) -> str:
         await self.until(
             lambda: self.state_of(run_id) in ("completed", "failed", "cancelled"), timeout
         )
@@ -196,7 +207,7 @@ async def world(tmp_path: Path) -> AsyncIterator[World]:
             for runner, task in list(w.runners):
                 await runner.stop()
                 with contextlib.suppress(Exception):
-                    await asyncio.wait_for(task, 20)
+                    await asyncio.wait_for(task, PATIENCE)
             pump.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await pump

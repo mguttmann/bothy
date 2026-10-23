@@ -45,14 +45,17 @@ async def test_az_p6_runner_never_starts_runtime(world: World) -> None:
 
     # The token expires while prepare waits for auth status; the renewal is refused.
     fake.inject("renewInvocationToken", Fault.problem("agent_invocation_denied"))
-    world.scenario(fixture="plain", auth_sleep=2)
+    gate = world.gate("auth_gate")
+    world.scenario(fixture="plain", auth_gate=str(gate))
     expired = await fake.trigger("AZ-P6 expired", channel_id=world.forum_a)
     slot(expired.run_id).set_result(KEEP)
-    await world.until(lambda: len(world.calls("auth_status")) == 1)
-    # Step by step, so heartbeats and their answers keep up with the clock.
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    # Step by step, so heartbeats and their answers keep up with the clock. The pre-check
+    # answers only after the token has expired, however long these steps take.
     for _ in range(int(fake.timings["agent.invocation_token_ttl"]) + 20):
         await fake.pass_time(1.0)
         await asyncio.sleep(0.005)
+    world.release(gate)
     await world.until(lambda: len(world.requests("renewInvocationToken")) == 1)
     await asyncio.sleep(0.5)
     assert fake.run_state(expired.run_id).state == "queued"

@@ -10,6 +10,18 @@ from typing import Any
 
 FAKE = Path(__file__).resolve().parent / "fake_claude.py"
 
+# Scenario keys that made Fake-Claude wait a fixed real time; a test that raced such a wait
+# against the machine's load failed on a slow runner. Gates (``auth_gate``, ``turn_gate``) wait
+# for the test instead.
+WALL_CLOCK_KEYS = frozenset({"auth_sleep", "version_sleep", "delay"})
+
+
+def _checked(scenario: dict[str, Any]) -> str:
+    timed = sorted(WALL_CLOCK_KEYS & scenario.keys())
+    if timed:
+        raise ValueError(f"Fake-Claude waits on gates, not on time: {', '.join(timed)}")
+    return json.dumps(scenario)
+
 
 def install(directory: Path, scenario: dict[str, Any], capture: Path, name: str = "claude") -> Path:
     """Write the scenario and a wrapper with the test interpreter and the paths baked in.
@@ -20,7 +32,7 @@ def install(directory: Path, scenario: dict[str, Any], capture: Path, name: str 
     directory.mkdir(parents=True, exist_ok=True)
     directory.chmod(0o755)
     scenario_path = directory / f"{name}.scenario.json"
-    scenario_path.write_text(json.dumps(scenario))
+    scenario_path.write_text(_checked(scenario))
     wrapper = directory / name
     wrapper.write_text(
         f"#!{sys.executable}\n"
@@ -35,7 +47,7 @@ def install(directory: Path, scenario: dict[str, Any], capture: Path, name: str 
 
 def update(wrapper: Path, scenario: dict[str, Any]) -> None:
     """Replace the scenario of an installed wrapper (the next call uses it)."""
-    (wrapper.parent / f"{wrapper.name}.scenario.json").write_text(json.dumps(scenario))
+    (wrapper.parent / f"{wrapper.name}.scenario.json").write_text(_checked(scenario))
 
 
 def read_capture(capture: Path) -> list[dict[str, Any]]:

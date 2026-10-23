@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 import pytest
+from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.turn import (
     Turn,
@@ -52,7 +53,7 @@ async def test_group_cwd_and_files(tmp_path: Path) -> None:
     turn = start(tmp_path, code)
     await turn.write_line('{"type":"user"}')
     turn.close_stdin()
-    assert await turn.wait(10)
+    assert await turn.wait(PATIENCE)
     lines = turn.paths.stream.read_text().splitlines()
     assert Path(lines[0]).resolve() == (tmp_path / "project").resolve()
     assert int(lines[1]) == turn.pgid == turn.pid
@@ -99,7 +100,7 @@ async def test_terminate_escalates_to_sigkill(tmp_path: Path) -> None:
 @pytest.mark.anyio
 async def test_terminate_after_exit_is_harmless(tmp_path: Path) -> None:
     turn = start(tmp_path, "pass")
-    assert await turn.wait(10)
+    assert await turn.wait(PATIENCE)
     await terminate(turn, stop_grace=0.1, kill_grace=0.1, poll=0.02)
 
 
@@ -116,7 +117,8 @@ def test_turn_record(tmp_path: Path) -> None:
 async def _until_line(turn: Turn, text: str) -> None:
     import asyncio
 
-    for _ in range(500):
+    deadline = time.monotonic() + PATIENCE
+    while time.monotonic() < deadline:
         if turn.paths.stream.exists() and text in turn.paths.stream.read_text():
             return
         await asyncio.sleep(0.01)
@@ -127,21 +129,33 @@ async def _until_line(turn: Turn, text: str) -> None:
 async def test_large_stdin_line_does_not_block_the_loop(tmp_path: Path) -> None:
     import asyncio
 
-    turn = start(tmp_path, "import time\ntime.sleep(1.5)\nimport sys\nsys.stdin.read()")
+    # The child reads stdin only after the event loop has ticked ten times during the write;
+    # a write that blocked the loop would never open the gate and the wait would hang.
+    gate = tmp_path / "gate"
+    code = (
+        "import pathlib, sys, time\n"
+        f"gate = pathlib.Path({str(gate)!r})\n"
+        "while not gate.exists():\n"
+        "    time.sleep(0.01)\n"
+        "sys.stdin.read()\n"
+    )
+    turn = start(tmp_path, code)
     ticks = 0
 
     async def ticker() -> None:
         nonlocal ticks
         while True:
             ticks += 1
-            await asyncio.sleep(0.05)
+            if ticks == 10:
+                gate.touch()
+            await asyncio.sleep(0.01)
 
     task = asyncio.ensure_future(ticker())
-    await turn.write_line("x" * 400_000)
+    await asyncio.wait_for(turn.write_line("x" * 400_000), PATIENCE)
     task.cancel()
     assert ticks >= 10  # the loop ran while the pipe was full
     turn.close_stdin()
-    assert await turn.wait(10)
+    assert await turn.wait(PATIENCE)
 
 
 @pytest.mark.anyio
@@ -152,11 +166,12 @@ async def test_terminate_ends_children_after_the_leader(tmp_path: Path) -> None:
         "print(child.pid, flush=True)\n"
     )
     turn = start(tmp_path, code)
-    assert await turn.wait(10)
+    assert await turn.wait(PATIENCE)
     child = int(turn.paths.stream.read_text().split()[0])
     os.kill(child, 0)  # still running after the leader exited
     await terminate(turn, stop_grace=1.0, kill_grace=1.0, poll=0.02)
-    for _ in range(100):
+    deadline = time.monotonic() + PATIENCE
+    while time.monotonic() < deadline:
         try:
             os.kill(child, 0)
         except ProcessLookupError:

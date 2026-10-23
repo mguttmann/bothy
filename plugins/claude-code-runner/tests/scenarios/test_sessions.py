@@ -165,11 +165,11 @@ def _assert_lock_free(path: Any) -> None:
 
 
 async def test_inbox_survives_restart(world: World) -> None:
-    world.scenario(fixture="plain", auth_sleep=2)
+    world.scenario(fixture="plain", auth_gate=str(world.gate("auth_gate")))
     first = await world.start()
     run = await world.fake.trigger("Fix it", channel_id=world.forum_a)
-    await world.until(lambda: len(world.calls("auth_status")) == 1)
-    await world.stop(first)  # after ack, before startRun
+    await world.until(lambda: len(world.calls("gate_wait")) == 1)
+    await world.stop(first)  # after ack, before startRun; the pre-check never answers
     assert world.requests("startRun") == []
     world.scenario(fixture="plain")
     await world.start()

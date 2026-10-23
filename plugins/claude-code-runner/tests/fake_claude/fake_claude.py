@@ -13,6 +13,11 @@ environment of a turn drops every control variable. Commands:
   ``system/init``, echoes the first stdin line with ``isReplay``, plays the fixture, emits the
   ``result`` and exits after stdin EOF. SIGINT ends it with ``error_during_execution``.
 
+Fake-Claude never waits a fixed time: a scenario holds a command with a gate, a file path the
+test creates when it wants the command to go on (``auth_gate`` before the answer of
+``auth status``, ``turn_gate`` before the ``result`` of a turn). ``helper.install`` refuses the
+former wall-clock keys, so a test cannot rest on a race between a sleep and the machine's load.
+
 Fixtures are constructed from the message shapes of the Agent SDK reference, not recorded.
 """
 
@@ -30,6 +35,8 @@ from typing import Any
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PINNED = "2.1.259"
+# quality.test.patience (bothy_sdk.testing._patience.PATIENCE); standard library only here.
+GATE_PATIENCE = 180.0
 
 
 class Fake:
@@ -61,15 +68,12 @@ class Fake:
         else:
             print(f"{self.scenario.get('version', PINNED)} (Claude Code)")
         sys.stdout.flush()
-        if self.scenario.get("version_sleep"):
-            time.sleep(float(self.scenario["version_sleep"]))
         return int(self.scenario.get("version_exit", 0))
 
     def auth_status(self) -> int:
         env = dict(os.environ)
         self.record("auth_status", argv=sys.argv[1:], env=env, cwd=os.getcwd())
-        if self.scenario.get("auth_sleep"):
-            time.sleep(float(self.scenario["auth_sleep"]))
+        self.gate("auth_gate")
         if "auth_raw" in self.scenario:
             sys.stdout.write(str(self.scenario["auth_raw"]))
             return int(self.scenario.get("auth_exit", 0))
@@ -145,8 +149,7 @@ class Fake:
                 result = line
                 continue
             self.emit(line)
-        if self.scenario.get("delay"):
-            self.sleep(float(self.scenario["delay"]))
+        self.gate("turn_gate")
         if self.scenario.get("hold"):
             self.sleep(600.0)
         if not self.scenario.get("no_result"):
@@ -169,6 +172,18 @@ class Fake:
 
     def sleep(self, seconds: float) -> None:
         self.stopping.wait(seconds)
+
+    def gate(self, key: str) -> None:
+        """Wait until the test creates the gate file of ``key`` (or a SIGINT stops the turn)."""
+        path = self.scenario.get(key)
+        if not path:
+            return
+        self.record("gate_wait", gate=key)
+        # Only a bound for an orphaned process; a test releases the gate or ends the process.
+        deadline = time.monotonic() + GATE_PATIENCE
+        while not Path(path).exists() and time.monotonic() < deadline:
+            if self.stopping.wait(0.01):
+                return
 
     def on_sigint(self, *_: Any) -> None:
         self.emit(
