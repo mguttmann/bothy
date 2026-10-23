@@ -67,13 +67,10 @@ String importFieldProblem(AppLocalizations l, String code) => switch (code) {
 /// "channels[2].planned_operator: names no person or agent with this handle".
 List<String> importFieldErrors(AppLocalizations l, ApiProblem problem) => [
   for (final e in problem.errors)
-    l.importFieldError(
-      switch (mappingPathOf(e.pointer)) {
-        '' => l.importFieldWholeFile,
-        final path => path,
-      },
-      importFieldProblem(l, e.code),
-    ),
+    l.importFieldError(switch (mappingPathOf(e.pointer)) {
+      '' => l.importFieldWholeFile,
+      final path => path,
+    }, importFieldProblem(l, e.code)),
 ];
 
 /// The text of [error] of a mapping file that could not be read.

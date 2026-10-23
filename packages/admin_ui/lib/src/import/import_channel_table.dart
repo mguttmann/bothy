@@ -110,8 +110,7 @@ class ImportChannelTable extends StatelessWidget {
           Text(
             r.bothyName ?? l.importChannelUnknownName,
             key: ValueKey('$key.name'),
-            style: dsTextStyle(DsType.body)
-                .copyWith(color: colors.textPrimary),
+            style: dsTextStyle(DsType.body).copyWith(color: colors.textPrimary),
           ),
           Text(l.importChannelDiscord(id), style: secondary),
           const SizedBox(height: DsSpace.s4),

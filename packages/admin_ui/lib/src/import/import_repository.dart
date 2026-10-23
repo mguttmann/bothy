@@ -319,13 +319,22 @@ abstract interface class ImportRepository {
   });
 
   /// Moves the source to `running` (`startImport`, step-up).
-  Future<ImportSourceSnapshot> startImport(String id, {required String purpose});
+  Future<ImportSourceSnapshot> startImport(
+    String id, {
+    required String purpose,
+  });
 
   /// Moves the source to `paused` (`pauseImport`, step-up).
-  Future<ImportSourceSnapshot> pauseImport(String id, {required String purpose});
+  Future<ImportSourceSnapshot> pauseImport(
+    String id, {
+    required String purpose,
+  });
 
   /// Ends the source as `failed` with `cancelled` (`cancelImport`, step-up).
-  Future<ImportSourceSnapshot> cancelImport(String id, {required String purpose});
+  Future<ImportSourceSnapshot> cancelImport(
+    String id, {
+    required String purpose,
+  });
 
   /// Moves the source to `completed` (`completeImport`, step-up).
   Future<ImportSourceSnapshot> completeImport(
@@ -371,10 +380,8 @@ abstract interface class ImportRepository {
 final class ApiImportRepository implements ImportRepository {
   /// Creates the repository over `api` (the client of the signed-in session, so the cookie,
   /// CSRF and the step-up adapter apply); [newIdempotencyKey] returns a fresh UUIDv7.
-  ApiImportRepository(
-    this._api, {
-    required String Function() newIdempotencyKey,
-  }) : _newKey = newIdempotencyKey;
+  ApiImportRepository(this._api, {required String Function() newIdempotencyKey})
+    : _newKey = newIdempotencyKey;
 
   final ApiClient _api;
   final String Function() _newKey;
@@ -386,10 +393,11 @@ final class ApiImportRepository implements ImportRepository {
 
   Map<String, Object?> _purpose(String text) => {stepUpPurposeExtra: text};
 
-  ImportSourceSnapshot _snapshot(ImportSource s) => ImportSourceSnapshot.fromJson(
-    (_api.serializers.serializeWith(ImportSource.serializer, s)! as Map)
-        .cast<String, Object?>(),
-  );
+  ImportSourceSnapshot _snapshot(ImportSource s) =>
+      ImportSourceSnapshot.fromJson(
+        (_api.serializers.serializeWith(ImportSource.serializer, s)! as Map)
+            .cast<String, Object?>(),
+      );
 
   static ImportChannelState _channel(Channel c) => ImportChannelState(
     id: c.id,
@@ -528,44 +536,46 @@ final class ApiImportRepository implements ImportRepository {
   );
 
   @override
-  Future<List<ImportItemEntry>> importItems(String id, {String? state}) =>
-      adminCall(() async {
-        final out = <ImportItemEntry>[];
-        String? cursor;
-        do {
-          final page = (await _imports.listImportItems(
-            importId: id,
-            cursor: cursor,
-            limit: _itemPage,
-            state: state == null ? null : ImportItemState.valueOf(state),
-          )).data!;
-          for (final i in page.items) {
-            // The wire values (`forum_tag`), not the names of the generated enums.
-            final json = (_api.serializers.serializeWith(ImportItem.serializer, i)!
-                    as Map)
+  Future<List<ImportItemEntry>> importItems(
+    String id, {
+    String? state,
+  }) => adminCall(() async {
+    final out = <ImportItemEntry>[];
+    String? cursor;
+    do {
+      final page = (await _imports.listImportItems(
+        importId: id,
+        cursor: cursor,
+        limit: _itemPage,
+        state: state == null ? null : ImportItemState.valueOf(state),
+      )).data!;
+      for (final i in page.items) {
+        // The wire values (`forum_tag`), not the names of the generated enums.
+        final json =
+            (_api.serializers.serializeWith(ImportItem.serializer, i)! as Map)
                 .cast<String, Object?>();
-            out.add(
-              ImportItemEntry(
-                id: i.id,
-                originKey: i.originKey,
-                itemKind: json['item_kind']! as String,
-                state: json['state']! as String,
-                targetId: i.targetId,
-                error: i.error,
-              ),
-            );
-          }
-          cursor = page.nextCursor;
-        } while (cursor != null);
-        return out;
-      });
+        out.add(
+          ImportItemEntry(
+            id: i.id,
+            originKey: i.originKey,
+            itemKind: json['item_kind']! as String,
+            state: json['state']! as String,
+            targetId: i.targetId,
+            error: i.error,
+          ),
+        );
+      }
+      cursor = page.nextCursor;
+    } while (cursor != null);
+    return out;
+  });
 
   @override
   Future<ImportChannelState> importChannel(String channelId) => adminCall(
     () async => _channel(
-      (await _api.getChannelsApi().getChannel(
-        channelId: channelId,
-      )).data!.channel,
+      (await _api.getChannelsApi().getChannel(channelId: channelId))
+          .data!
+          .channel,
     ),
   );
 

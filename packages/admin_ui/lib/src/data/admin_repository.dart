@@ -497,7 +497,10 @@ final class ApiAdminRepository implements AdminRepository {
         _api,
         newIdempotencyKey: newIdempotencyKey,
       ),
-      _imports = ApiImportRepository(_api, newIdempotencyKey: newIdempotencyKey);
+      _imports = ApiImportRepository(
+        _api,
+        newIdempotencyKey: newIdempotencyKey,
+      );
 
   final ApiClient _api;
   final String Function() _newKey;
@@ -521,11 +524,8 @@ final class ApiAdminRepository implements AdminRepository {
     required String name,
     required Map<String, Object?> config,
     required String purpose,
-  }) => _imports.createImportSource(
-    name: name,
-    config: config,
-    purpose: purpose,
-  );
+  }) =>
+      _imports.createImportSource(name: name, config: config, purpose: purpose);
 
   @override
   Future<ImportSourceSnapshot> startImport(

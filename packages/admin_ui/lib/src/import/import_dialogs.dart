@@ -47,7 +47,10 @@ List<ImportStateAction> importStateActions(
   ImportSourceSnapshot source, {
   required bool allImportedLedHere,
 }) => switch (source.state) {
-  ImportState.draft => const [ImportStateAction.start, ImportStateAction.cancel],
+  ImportState.draft => const [
+    ImportStateAction.start,
+    ImportStateAction.cancel,
+  ],
   ImportState.running => [
     ImportStateAction.pause,
     ImportStateAction.cancel,
@@ -61,17 +64,139 @@ List<ImportStateAction> importStateActions(
   ImportState.completed || ImportState.failed => const [],
 };
 
-/// The confirmations of the import screens; each returns whether the owner confirmed.
+/// The confirmations of the import screens; each shows an [ImportConfirmDialog] and returns
+/// whether the owner confirmed.
 abstract final class ImportConfirm {
-  /// The confirmation of [action] on the source named [name]: cancel is destructive; complete
-  /// warns that the mapping in `import_items` stays until the retention class `import` is
-  /// deleted and that a repeated import is no longer idempotent after that (22 13.5).
+  /// The confirmation of [action] on the source named [name].
   static Future<bool> stateAction(
     BuildContext context,
     ImportStateAction action,
     String name,
-  ) async {
+  ) => _show(context, ImportConfirmDialog.state(action: action, name: name));
+
+  /// "Bothy leads" for [row] (requirement 13).
+  static Future<bool> leadBothy(BuildContext context, ImportChannelRow row) =>
+      _show(context, ImportConfirmDialog.leadBothy(row: row));
+
+  /// "Discord leads" for [row] (22 13.4).
+  static Future<bool> leadDiscord(BuildContext context, ImportChannelRow row) =>
+      _show(context, ImportConfirmDialog.leadDiscord(row: row));
+
+  /// The confirmation of adding the source named [name].
+  static Future<bool> create(BuildContext context, String name) =>
+      _show(context, ImportConfirmDialog.create(name: name));
+
+  static Future<bool> _show(
+    BuildContext context,
+    ImportConfirmDialog dialog,
+  ) async =>
+      await showDialog<String>(context: context, builder: (_) => dialog) !=
+      null;
+}
+
+/// What an [ImportConfirmDialog] confirms.
+enum ImportConfirmKind {
+  /// A state step ([ImportStateAction]).
+  state,
+
+  /// "Bothy leads" for a channel.
+  leadBothy,
+
+  /// "Discord leads" for a channel.
+  leadDiscord,
+
+  /// Adding a source.
+  create,
+}
+
+/// The [ConfirmChange] of one import step with its plain-language effect (01 5.2; fixed
+/// requirements 11, 13 to 15):
+///
+/// - a state step: cancel is destructive; complete warns that the mapping in `import_items`
+///   stays until the retention class `import` is deleted and that a repeated import is no
+///   longer idempotent after that (22 13.5);
+/// - "Bothy leads": the order of 22 13.3 (Discord locked by the owner, the `switch` command
+///   with `--discord-locked` succeeded, then the lead, then the planned operator) and, when the
+///   channel already has another operator than the planned one, the warning that imported
+///   threads keep the planned operator (R-IM-08);
+/// - "Discord leads": read-only for everyone, answers in progress cancelled, messages written
+///   in Bothy stay and the `revert` command counts them (22 13.4);
+/// - adding a source: the mapping is stored without secrets and starts as a draft.
+///
+/// Pops the reason text (empty) on "Confirm", null on "Cancel".
+class ImportConfirmDialog extends StatelessWidget {
+  /// The confirmation of the state step [action] on the source [name].
+  const ImportConfirmDialog.state({
+    super.key,
+    required ImportStateAction this.action,
+    required String this.name,
+  }) : kind = ImportConfirmKind.state,
+       row = null;
+
+  /// "Bothy leads" for [row].
+  const ImportConfirmDialog.leadBothy({
+    super.key,
+    required ImportChannelRow this.row,
+  }) : kind = ImportConfirmKind.leadBothy,
+       action = null,
+       name = null;
+
+  /// "Discord leads" for [row].
+  const ImportConfirmDialog.leadDiscord({
+    super.key,
+    required ImportChannelRow this.row,
+  }) : kind = ImportConfirmKind.leadDiscord,
+       action = null,
+       name = null;
+
+  /// Adding the source [name].
+  const ImportConfirmDialog.create({super.key, required String this.name})
+    : kind = ImportConfirmKind.create,
+      action = null,
+      row = null;
+
+  /// What is confirmed.
+  final ImportConfirmKind kind;
+
+  /// The state step, for [ImportConfirmKind.state].
+  final ImportStateAction? action;
+
+  /// The source name, for a state step and for adding.
+  final String? name;
+
+  /// The channel, for a lead step.
+  final ImportChannelRow? row;
+
+  @override
+  Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    return switch (kind) {
+      ImportConfirmKind.state => _state(l, action!, name!),
+      ImportConfirmKind.leadBothy => _leadBothy(l, row!),
+      ImportConfirmKind.leadDiscord => ConfirmChange(
+        title: l.importLeadDiscordTitle(_channelName(row!)),
+        body: l.importLeadDiscordBody(
+          'bothy import discord revert --channel ${row!.mapped.discordId}',
+        ),
+        confirmLabel: l.importLeadDiscordAction,
+        destructive: true,
+      ),
+      ImportConfirmKind.create => ConfirmChange(
+        title: l.importCreateConfirmTitle(name!),
+        body: l.importCreateConfirmBody,
+        confirmLabel: l.importCreateSubmit,
+      ),
+    };
+  }
+
+  static String _channelName(ImportChannelRow row) =>
+      row.bothyName ?? row.mapped.discordId;
+
+  static Widget _state(
+    AppLocalizations l,
+    ImportStateAction action,
+    String name,
+  ) {
     final (title, body, label) = switch (action) {
       ImportStateAction.start => (
         l.importStartTitle(name),
@@ -94,35 +219,29 @@ abstract final class ImportConfirm {
         l.importComplete,
       ),
     };
-    return await ConfirmChange.show(
-          context,
-          title: title,
-          body: body,
-          confirmLabel: label,
-          destructive: action == ImportStateAction.cancel,
-        ) !=
-        null;
+    return ConfirmChange(
+      title: title,
+      body: body,
+      confirmLabel: label,
+      destructive: action == ImportStateAction.cancel,
+    );
   }
 
-  /// "Bothy leads" for [row] (requirement 13): the order of 22 13.3 (Discord locked by the
-  /// owner, the `switch` command with `--discord-locked` succeeded, then the lead, then the
-  /// planned operator) and, when the channel already has another operator than the planned
-  /// one, the warning that imported threads keep the planned operator (R-IM-08).
-  static Future<bool> leadBothy(BuildContext context, ImportChannelRow row) {
-    final l = AppLocalizations.of(context);
-    final planned = row.plannedAgent?.displayName ?? row.mapped.plannedAgentHandle;
-    final command =
-        'bothy import discord switch --channel ${row.mapped.discordId} --discord-locked';
+  static Widget _leadBothy(AppLocalizations l, ImportChannelRow row) {
+    final planned =
+        row.plannedAgent?.displayName ?? row.mapped.plannedAgentHandle;
     final operator = row.channel?.operatorAgentId;
     final other =
         planned != null && operator != null && operator != row.plannedAgent?.id;
-    return _confirm(
-      context,
-      title: l.importLeadBothyTitle(row.bothyName ?? row.mapped.discordId),
+    return ConfirmChange(
+      title: l.importLeadBothyTitle(_channelName(row)),
       body: [
         l.importLeadBothyOrder,
         l.importLeadBothyStepDiscord,
-        l.importLeadBothyStepSwitch(command),
+        l.importLeadBothyStepSwitch(
+          'bothy import discord switch --channel ${row.mapped.discordId} '
+          '--discord-locked',
+        ),
         l.importLeadBothyStepLead,
         if (planned != null)
           l.importLeadBothyStepOperator(planned)
@@ -130,61 +249,15 @@ abstract final class ImportConfirm {
           l.importLeadBothyStepNoOperator,
       ].join('\n'),
       confirmLabel: l.importLeadBothyAction,
-      warning: other ? l.importLeadBothyOtherOperator(planned) : null,
+      fields: other
+          ? DsBanner(
+              key: const ValueKey('import.confirm.warning'),
+              tone: DsTone.warning,
+              text: l.importLeadBothyOtherOperator(planned),
+            )
+          : null,
     );
   }
-
-  /// "Discord leads" for [row] (22 13.4): read-only for everyone, answers in progress
-  /// cancelled, messages written in Bothy stay and the `revert` command counts them.
-  static Future<bool> leadDiscord(BuildContext context, ImportChannelRow row) {
-    final l = AppLocalizations.of(context);
-    return _confirm(
-      context,
-      title: l.importLeadDiscordTitle(row.bothyName ?? row.mapped.discordId),
-      body: l.importLeadDiscordBody(
-        'bothy import discord revert --channel ${row.mapped.discordId}',
-      ),
-      confirmLabel: l.importLeadDiscordAction,
-      destructive: true,
-    );
-  }
-
-  /// The confirmation of adding the source named [name].
-  static Future<bool> create(BuildContext context, String name) {
-    final l = AppLocalizations.of(context);
-    return _confirm(
-      context,
-      title: l.importCreateConfirmTitle(name),
-      body: l.importCreateConfirmBody,
-      confirmLabel: l.importCreateSubmit,
-    );
-  }
-
-  static Future<bool> _confirm(
-    BuildContext context, {
-    required String title,
-    required String body,
-    required String confirmLabel,
-    bool destructive = false,
-    String? warning,
-  }) async =>
-      await showDialog<String>(
-        context: context,
-        builder: (_) => ConfirmChange(
-          title: title,
-          body: body,
-          confirmLabel: confirmLabel,
-          destructive: destructive,
-          fields: warning == null
-              ? null
-              : DsBanner(
-                  key: const ValueKey('import.confirm.warning'),
-                  tone: DsTone.warning,
-                  text: warning,
-                ),
-        ),
-      ) !=
-      null;
 }
 
 /// The answer of [ImportOperatorDialog]: the channel after the change and the agents the
@@ -357,11 +430,13 @@ class _ImportOperatorDialogState extends State<ImportOperatorDialog> {
     final colors = context.dsColors;
     final planned = widget.row.plannedAgent;
     final chosen = _agentId;
-    final other = !widget.remove &&
+    final other =
+        !widget.remove &&
         planned != null &&
         chosen != null &&
         chosen != planned.id;
-    final canSend = !_busy &&
+    final canSend =
+        !_busy &&
         _reason.text.trim().isNotEmpty &&
         (widget.remove || chosen != null);
     final names = _names;

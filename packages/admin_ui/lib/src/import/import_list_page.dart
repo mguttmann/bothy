@@ -152,17 +152,22 @@ class _ImportListPageState extends State<ImportListPage> {
             )
           else
             for (final s in _controller.sources)
-              ListTile(
-                key: ValueKey('import.row.${s.id}'),
-                title: Text(s.name),
-                subtitle: Text(
-                  [
-                    s.kind,
-                    importStateLabel(l, s),
-                    l.importItemsImported(importPostedCount(s)),
-                  ].join('  |  '),
+              // Its own Material: the console draws its pages on a colored box, which would
+              // hide the tile's ink.
+              Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  key: ValueKey('import.row.${s.id}'),
+                  title: Text(s.name),
+                  subtitle: Text(
+                    [
+                      s.kind,
+                      importStateLabel(l, s),
+                      l.importItemsImported(importPostedCount(s)),
+                    ].join('  |  '),
+                  ),
+                  onTap: () => widget.onOpen(s.id),
                 ),
-                onTap: () => widget.onOpen(s.id),
               ),
         ],
       ),

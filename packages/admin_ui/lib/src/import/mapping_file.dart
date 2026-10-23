@@ -72,15 +72,15 @@ Map<String, Object?> mappingJsonOf(String text) {
 
 Object? _plain(Object? node) => switch (node) {
   final YamlMap m => <String, Object?>{
-    for (final e in m.entries)
-      switch (e.key) {
-        final String k => k,
-        _ => throw const MappingFileError(MappingFileProblem.notMapping),
-      }: _plain(e.value),
+    for (final e in m.entries) _key(e.key): _plain(e.value),
   },
   final YamlList l => [for (final e in l) _plain(e)],
   _ => node,
 };
+
+String _key(Object? key) => key is String
+    ? key
+    : throw const MappingFileError(MappingFileProblem.notMapping);
 
 /// The place in the mapping file of the server's JSON [pointer] (RFC 6901): the members below
 /// `/config` joined with dots, a list index in brackets.

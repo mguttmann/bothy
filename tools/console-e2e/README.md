@@ -192,6 +192,15 @@ The suites of brief M6-09 run after A8:
   again and sees the button "Log in with Example login" on E2. It ends the session, so it is the
   last suite of the bundle.
 
+The import suite of brief M8-08 (`import_test.dart`) runs after A9 and before A10. The seed
+creates nothing for it: the flow adds a source from a white-label mapping (the YAML is built in
+the flow and set on the page's file input, a wrong handle is shown at its place first), starts
+it, posts a structure batch and the tool's counters through the API with the console session as
+the import tool would, sees the counters and two mirrored channels, lets Bothy and then Discord
+lead in a channel with the operator step each, sees completion held back until Bothy leads in
+both channels and its retention warning, completes, and pauses and cancels a second source;
+every step with the step-up.
+
 A token or the webhook address is never printed: the Dart helpers keep it out of every failure
 message (`hideInFailures` in `support.dart`), and a check that fails names only the kind of secret.
 

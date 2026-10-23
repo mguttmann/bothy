@@ -117,6 +117,31 @@ void main() {
       expect(ConsoleRoute.parse('/instance/x'), isNull);
     });
 
+    test(
+      'the import page hosts the import sources, a source by its ID (M8-08)',
+      () {
+        final list = ConsoleRoute.parse('/import')!;
+        expect(list.page, ConsolePage.dataImport);
+        expect(list.admin, const AdminLocation(AdminSection.dataImport));
+        final source = ConsoleRoute.parse('/import/$_id')!;
+        expect(source.page, ConsolePage.dataImport);
+        expect(
+          source.admin,
+          const AdminLocation(AdminSection.dataImport, id: _id),
+        );
+        expect(
+          ConsoleRoute.forAdmin(
+            const AdminLocation(AdminSection.dataImport, id: _id),
+          ).path,
+          '/import/$_id',
+        );
+        expect(ConsoleRoute.parse('/import/$_id/x'), isNull);
+        // Web only (01 3.7): the desktop shell neither lists nor opens it.
+        expect(AdminSection.listed, isNot(contains(AdminSection.dataImport)));
+        expect(AdminLocation.parse(['import']), isNull);
+      },
+    );
+
     test('view as person has its own place below people', () {
       final r = ConsoleRoute.parse('/people/view-as')!;
       expect(r.page, ConsolePage.people);
@@ -162,6 +187,7 @@ void main() {
         AdminSection.hosts: ConsolePage.hosts,
         AdminSection.apps: ConsolePage.apps,
         AdminSection.webhooks: ConsolePage.apps,
+        AdminSection.dataImport: ConsolePage.dataImport,
       };
       for (final e in pages.entries) {
         expect(
@@ -185,7 +211,7 @@ void main() {
       '/s/',
     ];
     final routes = [
-      for (final s in AdminSection.listed) ...[
+      for (final s in [...AdminSection.listed, AdminSection.dataImport]) ...[
         ConsoleRoute.forAdmin(AdminLocation(s)),
         ConsoleRoute.forAdmin(
           AdminLocation(

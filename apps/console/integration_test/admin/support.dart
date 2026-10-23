@@ -327,6 +327,38 @@ Future<web.HTMLInputElement> _manifestInput(
   throw _failure('timed out waiting for $selector; ${screenText()}');
 }
 
+/// Taps "Choose mapping file" ([pickKey]) and sets a YAML file [name] with [text] on the file
+/// input the console appended (`data-bothy-file-input="mapping"`), then fires its `change`
+/// event (brief M8-08). The text is built by the flow itself, so the runner needs no action.
+Future<void> chooseMapping(
+  PatrolIntegrationTester $,
+  String text, {
+  String name = 'mapping.yaml',
+  String pickKey = 'import.create.pick',
+}) async {
+  await tapKey($, pickKey);
+  const selector = 'input[data-bothy-file-input="mapping"]';
+  final end = DateTime.now().add(const Duration(seconds: 60));
+  web.Element? found;
+  while ((found = web.document.querySelector(selector)) == null) {
+    if (!DateTime.now().isBefore(end)) {
+      throw _failure('timed out waiting for $selector; ${screenText()}');
+    }
+    await $.tester.pump(const Duration(milliseconds: 200));
+  }
+  final input = found! as web.HTMLInputElement;
+  final file = web.File(
+    [text.toJS].toJS,
+    name,
+    web.FilePropertyBag(type: 'application/yaml'),
+  );
+  final transfer = web.DataTransfer()..items.add(file);
+  input
+    ..files = transfer.files
+    ..dispatchEvent(web.Event('change'));
+  await $.tester.pump(const Duration(milliseconds: 300));
+}
+
 /// The state of the checkbox with [key]: its value and whether it takes a tap. The key may sit
 /// on a Checkbox, a CheckboxListTile or a widget around one of them.
 ({bool? value, bool enabled}) checkboxOf(String key) {

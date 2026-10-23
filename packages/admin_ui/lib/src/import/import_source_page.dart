@@ -78,6 +78,17 @@ class _ImportSourcePageState extends State<ImportSourcePage> {
   }
 
   @override
+  void didUpdateWidget(ImportSourcePage old) {
+    super.didUpdateWidget(old);
+    // Another source in the same place: read it, and drop the notice of the old one.
+    if (old.sourceId != widget.sourceId) {
+      _notice = null;
+      _error = null;
+      unawaited(_refresh());
+    }
+  }
+
+  @override
   void dispose() {
     _lifecycle.dispose();
     _controller.dispose();
@@ -426,7 +437,8 @@ class _ImportSourcePageState extends State<ImportSourcePage> {
         header: true,
         child: Text(
           l.importFailedItems,
-          style: dsTextStyle(DsType.heading).copyWith(color: colors.textPrimary),
+          style: dsTextStyle(DsType.heading)
+              .copyWith(color: colors.textPrimary),
         ),
       ),
       const SizedBox(height: DsSpace.s4),

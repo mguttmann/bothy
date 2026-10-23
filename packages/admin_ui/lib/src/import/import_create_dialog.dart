@@ -148,8 +148,7 @@ class _ImportCreateDialogState extends State<ImportCreateDialog> {
     final colors = context.dsColors;
     final secondary = dsTextStyle(DsType.bodySm)
         .copyWith(color: colors.textSecondary);
-    final canSubmit =
-        !_busy && _config != null && _name.text.trim().isNotEmpty;
+    final canSubmit = !_busy && _config != null && _name.text.trim().isNotEmpty;
     return AlertDialog(
       key: const ValueKey('import.create.dialog'),
       backgroundColor: colors.surfaceRaised,

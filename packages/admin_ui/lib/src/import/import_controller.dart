@@ -98,9 +98,8 @@ final class ImportSourceDetails {
   final List<AgentRecord> agents;
 
   /// Whether completion may be offered: every imported channel is led here (22 13.5).
-  bool get allImportedLedHere => rows.every(
-    (r) => !r.imported || r.mapped.lead == ImportLead.bothy,
-  );
+  bool get allImportedLedHere =>
+      rows.every((r) => !r.imported || r.mapped.lead == ImportLead.bothy);
 }
 
 /// Holds the latest [ImportSourceSnapshot] per source ID and the details of the open source.
