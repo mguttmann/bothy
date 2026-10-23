@@ -57,7 +57,8 @@ func NewUnitOfWork(pool *Pool, cfg UnitConfig, reg *txn.Registry) *UnitOfWork {
 // Do runs fn in a unit of work (txn.UnitOfWork).
 //
 // Outermost unit, per attempt: BEGIN with READ COMMITTED explicitly (never the database
-// default, ADR 0009), SET LOCAL of the three deadlines, then the phases rights_begin (only with
+// default, ADR 0009), SET LOCAL of the three deadlines (statement_timeout from
+// txn.StatementTimeout when the unit gives one), then the phases rights_begin (only with
 // txn.RightsChange), work (fn), rights_check (only with RightsChange), sync, audit and the
 // commit; a phase without a hook is skipped. After a successful commit the functions of
 // txn.AfterCommit run. Every attempt has a fresh per-unit state. Any error
@@ -156,6 +157,19 @@ func (u *unit) lateRun(ctx context.Context, fn func(context.Context) error) erro
 	return u.hook(ctx, txn.PhaseRightsCheck)
 }
 
+// sqlstateQueryCanceled is query_canceled: a statement_timeout or a cancel request.
+const sqlstateQueryCanceled = "57014"
+
+// IsStatementTimeout reports whether err is a statement that PostgreSQL canceled at
+// statement_timeout: SQLSTATE 57014 while ctx is still live. A canceled or expired ctx makes pgx
+// send a cancel request, which gives the same SQLSTATE; that is the caller giving up, not the
+// deadline, so it reports false. The search maps a true result to 503 search_timeout
+// (docs/spec/14-search.md section 7).
+func IsStatementTimeout(ctx context.Context, err error) bool {
+	var pgErr *pgconn.PgError
+	return ctx.Err() == nil && errors.As(err, &pgErr) && pgErr.Code == sqlstateQueryCanceled
+}
+
 // retryable reports whether err carries SQLSTATE 40P01 or 55P03.
 func retryable(err error) bool {
 	var pgErr *pgconn.PgError
@@ -180,8 +194,12 @@ func (w *UnitOfWork) attempt(ctx context.Context, fn func(context.Context) error
 			panic(r)
 		}
 	}()
+	statement := w.cfg.StatementTimeout
+	if o.StatementTimeout > 0 {
+		statement = o.StatementTimeout
+	}
 	if err := SetLocalTimeouts(ctx, tx, Timeouts{
-		Statement: w.cfg.StatementTimeout, Lock: w.cfg.LockTimeout, IdleInTx: w.cfg.IdleInTxTimeout,
+		Statement: statement, Lock: w.cfg.LockTimeout, IdleInTx: w.cfg.IdleInTxTimeout,
 	}); err != nil {
 		return err
 	}
