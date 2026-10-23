@@ -247,7 +247,6 @@ func emptyAsObject(raw json.RawMessage) json.RawMessage {
 	return raw
 }
 
-
 // equalJSON compares two decoded JSON values; numbers are equal when their text is equal or
 // both parse to the same 64-bit float.
 func equalJSON(a, b any) bool {
