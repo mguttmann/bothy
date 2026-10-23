@@ -39,7 +39,13 @@ const (
 // whose difference is at most TimingBound(tolerance) ends the comparison with same true; a
 // difference in every one of TimingRounds rounds is a real one and returns false with the
 // smallest difference seen. A slow round on a loaded machine therefore never fails the test,
-// and the bound is never widened beyond TimingBound.
+// and the bound is never widened beyond TimingBound. Load that lasts the whole comparison is
+// different: it lengthens a real, allowed difference by the same factor as the operations (an
+// invisible channel that also decides and audits, against an unknown one that does not, beyond
+// the bound in every round next to the parallel tests of its package). Call TimingSame only from a top-level
+// test that does not call t.Parallel, so the parallel tests of the package wait until it is done
+// (Semgrep rule bothy-go-test-timing-parallel); other packages running at the same time are not
+// excluded.
 func TimingSame(tolerance time.Duration, a, b func() time.Duration) (time.Duration, bool) {
 	bound := TimingBound(tolerance)
 	smallest := time.Duration(-1)

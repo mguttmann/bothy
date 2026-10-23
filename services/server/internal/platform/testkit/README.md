@@ -47,7 +47,11 @@ bounded by a constant of the test or by `time.Sleep`.
 their time (AZ-P4: an invisible and an unknown ID). Per round it runs warm-up pairs, then counted
 pairs in alternating order, and compares the shortest counted duration of each side within
 `TimingBound(tolerance)`; it tries up to `TimingRounds` rounds and fails only when every round
-differs. Load and the scheduler only add delay, so a busy machine slows a round but cannot fail
+differs. Load and the scheduler only add delay, so a burst of load slows a round but cannot fail
 the comparison, while a real difference lengthens the shortest run in every round.
 `TimingBound` alone widens a bound under the race detector; a new timing comparison uses
-`TimingSame` instead of comparing medians once.
+`TimingSame` instead of comparing medians once. Load that lasts the whole comparison lengthens a
+real, allowed difference by the same factor as the operations, so `TimingSame` runs only in a
+top-level test that does not call `t.Parallel` (Semgrep rule `bothy-go-test-timing-parallel`): Go
+starts the parallel tests of the package only after every such test has finished. Other packages
+of the same `go test` run still load the machine; that is not excluded.
