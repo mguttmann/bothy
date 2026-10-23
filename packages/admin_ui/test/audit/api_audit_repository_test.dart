@@ -70,7 +70,10 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'http://192.0.2.1/api/v1'))
       ..httpClientAdapter = adapter;
     repository = ApiAdminRepository(
-      ApiClient(dio: dio, interceptors: [ProblemInterceptor()]),
+      ApiClient(
+        dio: dio,
+        interceptors: [BinaryProblemInterceptor(), ProblemInterceptor()],
+      ),
       newIdempotencyKey: () => '0192f4a0-7b1c-7000-8000-0000000000ff',
     );
   }
