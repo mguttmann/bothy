@@ -15,12 +15,14 @@ import (
 	"text/tabwriter"
 )
 
-// Required are the targets make perf measures: those of M1 (brief M1-72, requirement 9) and
-// perf.push_handoff_p95 (M3-24); a results file without one of them does not end green.
+// Required are the targets make perf measures: those of M1 (brief M1-72, requirement 9),
+// perf.push_handoff_p95 (M3-24) and perf.fanout_cross_node_p99 (M7-17); a results file without
+// one of them does not end green.
 var Required = []string{
 	"perf.message_create_p99",
 	"perf.event_commit_min_per_s",
 	"perf.fanout_local_p99",
+	"perf.fanout_cross_node_p99",
 	"perf.catchup_page_p99",
 	"perf.authorize_cached_p99",
 	"perf.ws_connections_per_node",
