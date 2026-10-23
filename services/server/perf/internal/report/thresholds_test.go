@@ -358,3 +358,49 @@ func TestClockSkewCorrection(t *testing.T) {
 		t.Error("no samples gave an offset")
 	}
 }
+
+// TestReport_PushHandoffFailsAboveThreshold (brief M3-24): perf.push_handoff_p95 is a target of
+// the real chapter 02 in seconds with comparison <=; a result one millisecond above its threshold
+// fails the exit logic and marks the row failed, a result exactly at it passes, and a passing
+// value measured with synchronous_commit off does not end green.
+func TestReport_PushHandoffFailsAboveThreshold(t *testing.T) {
+	t.Parallel()
+	targets, err := report.Load(report.ArchitectureChapter())
+	if err != nil {
+		t.Fatal(err)
+	}
+	th, err := targets.Threshold("perf.push_handoff_p95")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if th.Unit != "s" || th.Comparison != report.AtMost {
+		t.Fatalf("perf.push_handoff_p95 = %+v, want unit s and <=", th)
+	}
+	with := func(base float64) report.File {
+		f := green(report.ModeMatch)
+		for i, r := range f.Results {
+			if r.Name == th.Name {
+				f.Results[i] = th.Result("TestPerf_PushHandoffP95", base, 1000)
+			}
+		}
+		return f
+	}
+	var out bytes.Buffer
+	above := with(th.Base + float64(time.Millisecond))
+	if code := report.Exit(above, report.Required, &out); code != 1 || !strings.Contains(out.String(), "perf.push_handoff_p95") {
+		t.Errorf("one millisecond above the threshold: exit %d\n%s", code, out.String())
+	}
+	if r := above.Results[slices.IndexFunc(above.Results, func(r report.Result) bool { return r.Name == th.Name })]; r.Pass {
+		t.Errorf("row above the threshold marked passed: %+v", r)
+	}
+	out.Reset()
+	if code := report.Exit(with(th.Base), report.Required, &out); code != 0 {
+		t.Errorf("exactly at the threshold: exit %d\n%s", code, out.String())
+	}
+	f := with(th.Base)
+	f.Profile.SynchronousCommit = "off"
+	out.Reset()
+	if code := report.Exit(f, report.Required, &out); code != 1 {
+		t.Errorf("passing value with synchronous_commit off: exit %d\n%s", code, out.String())
+	}
+}

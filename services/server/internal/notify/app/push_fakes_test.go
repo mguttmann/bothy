@@ -123,6 +123,8 @@ type pushWorld struct {
 	liveRoute app.LiveRoutes
 	// publisher records notification.created (M3-23); nil builds the push path without one.
 	publisher *fakePublisher
+	// authzScopes are the request memo and the structure memo of every Authorize call.
+	authzScopes [][2]*authorize.RequestMemo
 }
 
 // agentMessage is one message of an agent in a thread of the fake messaging.
@@ -380,8 +382,13 @@ func (s pushSettings) ValuesFor(_ context.Context, users []ids.ID, _ []string) (
 
 type pushAuthz struct{ w *pushWorld }
 
-func (a pushAuthz) Authorize(_ context.Context, p authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
+func (a pushAuthz) Authorize(ctx context.Context, p authorize.Principal, act authorize.Action, r authorize.Resource) (authorize.Decision, error) {
 	a.w.calls.inc("Authorize")
+	req, _ := authorize.RequestMemoFrom(ctx)
+	st, _ := authorize.StructureMemoFrom(ctx)
+	a.w.metricsMu.Lock()
+	a.w.authzScopes = append(a.w.authzScopes, [2]*authorize.RequestMemo{req, st})
+	a.w.metricsMu.Unlock()
 	if !authorize.IsRecheckPrincipal(p) || act != authorize.ActionPushDeliver || r.Kind != authorize.ResourceThread {
 		return authorize.Decision{}, errs.New(errs.CodeInternalError, "unexpected authorize")
 	}
@@ -609,7 +616,9 @@ type scheduledSend struct {
 
 // fakeScheduler keeps the jobs in memory with the uniqueness of the jobs adapter.
 type fakeScheduler struct {
-	mu      stdsync.Mutex
+	mu stdsync.Mutex
+	// windowReads counts WindowEnd calls.
+	windowReads int
 	windows map[[2]ids.ID]time.Time
 	flushes map[string]time.Time
 	sends   []scheduledSend
@@ -632,6 +641,7 @@ func flushKey(u, t ids.ID, end time.Time) string {
 func (s *fakeScheduler) WindowEnd(_ context.Context, u, t ids.ID) (time.Time, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.windowReads++
 	end, ok := s.windows[[2]ids.ID{u, t}]
 	return end, ok, nil
 }

@@ -191,11 +191,18 @@ const clockSamples = 20
 // (report.ClockOffset over bracketed SELECT clock_timestamp() samples).
 func ClockOffset(t testing.TB, p *harness.Process) time.Duration {
 	t.Helper()
+	return ClockOffsetOf(t, p.AdminDB())
+}
+
+// ClockOffsetOf is ClockOffset for the superuser pool q of any measured database, such as the
+// admin pool of an in-process harness server (perf/push_handoff).
+func ClockOffsetOf(t testing.TB, q Querier) time.Duration {
+	t.Helper()
 	samples := make([]report.ClockSample, 0, clockSamples)
 	for range clockSamples {
 		var s report.ClockSample
 		s.Before = time.Now()
-		if err := p.AdminDB().QueryRow(context.Background(), "SELECT clock_timestamp()").Scan(&s.DB); err != nil {
+		if err := q.QueryRow(context.Background(), "SELECT clock_timestamp()").Scan(&s.DB); err != nil {
 			t.Fatal(err)
 		}
 		s.After = time.Now()

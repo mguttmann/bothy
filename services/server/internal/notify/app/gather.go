@@ -97,8 +97,12 @@ func (p *Push) gather(ctx context.Context, g group, users []ids.ID, now time.Tim
 			f.ThreadID = g.threadID
 			f.Level = levels[u]
 			f.Level.DirectMessage = g.kind == domain.KindDM
-			if f.Window, err = p.window(ctx, u, g.threadID, now); err != nil {
-				return nil, err
+			// The window is one job query per person; a decision that ends before the window step
+			// (no right, level, active in the thread) does not read it (domain.NeedsWindow).
+			if domain.NeedsWindow(f) {
+				if f.Window, err = p.window(ctx, u, g.threadID, now); err != nil {
+					return nil, err
+				}
 			}
 		}
 		out[u] = f

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
@@ -516,4 +517,52 @@ func TestSend_Retry(t *testing.T) {
 	if len(e.sched.sends) != 0 || !slices.Equal(e.skips, []string{"expired"}) {
 		t.Fatalf("retry past max age: jobs %d, skips %v", len(e.sched.sends), e.skips)
 	}
+}
+
+// TestEventScope_OneVersionAndStructurePerEvent (M3-24 design note 14): every push.deliver check
+// of one event runs under one request memo (one rights version) and one structure memo (one read
+// of the thread and channel), and the next event gets fresh ones, so a later rights change is
+// seen by the next event.
+func TestEventScope_OneVersionAndStructurePerEvent(t *testing.T) {
+	t.Parallel()
+	w := newPushWorld(t)
+	for range 2 {
+		w.mustHandle(w.messageEvent(nextSeq(), msg{thread: w.thread, channel: w.channel, author: w.sam}))
+	}
+	if len(w.authzScopes) < 4 {
+		t.Fatalf("%d push.deliver checks, want several per event", len(w.authzScopes))
+	}
+	first := w.authzScopes[0]
+	if first[0] == nil || first[1] == nil {
+		t.Fatalf("a check without request memo (%v) or structure memo (%v)", first[0] != nil, first[1] != nil)
+	}
+	events := map[[2]*authorize.RequestMemo]int{}
+	for _, s := range w.authzScopes {
+		events[s]++
+		if (s[0] == first[0]) != (s[1] == first[1]) {
+			t.Fatal("request and structure memo change at different points")
+		}
+	}
+	if len(events) != 2 {
+		t.Fatalf("%d distinct scopes for two events, want 2", len(events))
+	}
+}
+
+// TestGather_WindowOnlyWhenNeeded (M3-24 design note 14): under the level mentions a plain
+// message reads no coalescing window for its readers; a mention reads it for the mentioned person.
+func TestGather_WindowOnlyWhenNeeded(t *testing.T) {
+	t.Parallel()
+	w := newPushWorld(t)
+	for _, p := range []ids.ID{w.alex, w.owner} {
+		w.levels[p] = domain.LevelMentions
+	}
+	w.mustHandle(w.messageEvent(nextSeq(), msg{thread: w.thread, channel: w.channel, author: w.sam}))
+	if n := w.sched.windowReads; n != 0 {
+		t.Fatalf("a plain message under mentions read the window %d times, want 0", n)
+	}
+	w.mustHandle(w.messageEvent(nextSeq(), msg{thread: w.thread, channel: w.channel, author: w.sam, mentions: []ids.ID{w.alex}}))
+	if n := w.sched.windowReads; n != 1 {
+		t.Fatalf("a mention of Alex read the window %d times, want 1", n)
+	}
+	wantKinds(t, w.hints(), w.alex, "mention", domain.KindMention)
 }

@@ -164,6 +164,28 @@ func Decide(in RecipientFacts) (Decision, error) {
 	return decide(in, false, 1)
 }
 
+// NeedsWindow reports whether Decide reads the coalescing window of in: only for a kind with
+// thread whose recipient passes push.deliver, the recipient column and the level and activity
+// steps (13 4.1 to 4.4). Every decision before that step is final, so the push path gathers the
+// window (one job query per recipient) only when NeedsWindow is true and gets the same decision
+// (M3-24 design note 14: under the level mentions, the default, no plain message of a busy
+// channel reaches the window). An input that does not validate or whose level does not resolve
+// answers true, so Decide reports it with every fact gathered.
+func NeedsWindow(in RecipientFacts) bool {
+	if !in.Kind.HasThread() {
+		return false
+	}
+	if validate(in) != nil {
+		return true
+	}
+	if !in.Allowed || !in.recipient() {
+		return false
+	}
+	var d Decision
+	reason, err := in.levelAndActivity(&d)
+	return err != nil || reason == ""
+}
+
 // decide runs steps 2 to 9 on a valid input; flush leaves out the recipient and window steps and
 // sends count instead of 1.
 func decide(in RecipientFacts, flush bool, count int64) (Decision, error) {

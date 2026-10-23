@@ -93,6 +93,10 @@ type Options struct {
 	// DurableDB puts the database on the durable pgtest server (pgtest.Durable: fsync,
 	// synchronous_commit and full_page_writes on); every perf and chaos test sets it (ADR 0063).
 	DurableDB bool
+	// DBCPUs and DBMemoryBytes limit the PostgreSQL container (pgtest.Limits) of a DurableDB, as
+	// the emulated profile of make perf asks (ADR 0063 point 3); 0 is no limit.
+	DBCPUs        float64
+	DBMemoryBytes int64
 	// SecretFiles are extra files of the secrets directory of the server by relative path, written
 	// with mode 0400 after bothy secrets init (the client secret of a fake OIDC provider as
 	// idp/<name>, referenced as file:<secrets.dir>/idp/<name>; M1-69).
@@ -221,6 +225,9 @@ func Start(tb testing.TB, opts Options) *Server {
 	var dbOpts []pgtest.Option
 	if opts.DurableDB {
 		dbOpts = append(dbOpts, pgtest.Durable())
+		if opts.DBCPUs > 0 || opts.DBMemoryBytes > 0 {
+			dbOpts = append(dbOpts, pgtest.Limits(opts.DBCPUs, opts.DBMemoryBytes))
+		}
 	}
 	db := pgtest.New(tb, dbOpts...)
 	jobstest.Migrate(tb, db, "jobs")
