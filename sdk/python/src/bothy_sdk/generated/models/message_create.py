@@ -39,10 +39,11 @@ class MessageCreate:
         clear_draft (bool | Unset):
         run_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         components (list[ComponentCreate] | Unset): Requires `kind = card`, and `kind = card` requires at least one
-            component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled`
-            until app components are built). The whole `message.created` payload of the card must fit
+            component; at most `component.max_per_message`. Agents and apps send cards (people get `invalid`). An app needs
+            `write` and `messages:write` as for every message; without `components:write` its components stay inactive, and
+            a use answers `409 component_used`. The whole `message.created` payload of the card must fit
             `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched
-            `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1).
+            `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1); the switch does not apply to apps.
     """
 
     client_msg_id: UUID

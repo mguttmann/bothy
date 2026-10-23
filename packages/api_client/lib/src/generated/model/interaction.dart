@@ -19,11 +19,11 @@ part 'interaction.g.dart';
 /// * [customId]
 /// * [messageId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [threadId] - UUIDv7 (RFC 9562), lowercase canonical form.
-/// * [runId] - UUIDv7 (RFC 9562), lowercase canonical form.
+/// * [runId] - Run of the agent card the component belongs to; absent for a component of an app card.
 /// * [principalId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [clientInteractionId] - UUIDv7 (RFC 9562), lowercase canonical form.
 /// * [values] - Free-form JSON object whose schema is named in the field description.
-/// * [state]
+/// * [state] - `received` when stored. For a component of an agent card the delivery sets `dispatched` when it hands `interaction.created` to the agent, or `failed` when the re-check denies (09, 11.2). For a component of an app card the job `runs.app_dispatch` acts after the commit: `failed` when the app has no active installation; for an app whose manifest declares `delivery.interactions_url` it re-checks with the rights of that moment (`failed` without a request on a denial), sets `dispatched` when it hands the event to that address, then `acknowledged` on a `200` answer whose reply message is written in the name of the app, and `failed` when the app does not answer within `app.interaction_timeout` or gives any other answer; a `202` keeps `dispatched` until the app calls `respondToInteraction`. For an app that receives its events over the gateway the interaction stays `received` until `respondToInteraction`. `respondToInteraction` moves the state from `received` or `dispatched` to `acknowledged`, `failed` or `rejected`; every change is a compare-and-swap, so the first of the job and the owner wins and the job never overwrites the answer of the owner.
 /// * [response]
 /// * [createdAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 @BuiltValue()
@@ -47,7 +47,7 @@ abstract class Interaction implements Built<Interaction, InteractionBuilder> {
   @BuiltValueField(wireName: r'thread_id')
   String? get threadId;
 
-  /// UUIDv7 (RFC 9562), lowercase canonical form.
+  /// Run of the agent card the component belongs to; absent for a component of an app card.
   @BuiltValueField(wireName: r'run_id')
   String? get runId;
 
@@ -63,6 +63,7 @@ abstract class Interaction implements Built<Interaction, InteractionBuilder> {
   @BuiltValueField(wireName: r'values')
   BuiltMap<String, JsonObject?> get values;
 
+  /// `received` when stored. For a component of an agent card the delivery sets `dispatched` when it hands `interaction.created` to the agent, or `failed` when the re-check denies (09, 11.2). For a component of an app card the job `runs.app_dispatch` acts after the commit: `failed` when the app has no active installation; for an app whose manifest declares `delivery.interactions_url` it re-checks with the rights of that moment (`failed` without a request on a denial), sets `dispatched` when it hands the event to that address, then `acknowledged` on a `200` answer whose reply message is written in the name of the app, and `failed` when the app does not answer within `app.interaction_timeout` or gives any other answer; a `202` keeps `dispatched` until the app calls `respondToInteraction`. For an app that receives its events over the gateway the interaction stays `received` until `respondToInteraction`. `respondToInteraction` moves the state from `received` or `dispatched` to `acknowledged`, `failed` or `rejected`; every change is a compare-and-swap, so the first of the job and the owner wins and the job never overwrites the answer of the owner.
   @BuiltValueField(wireName: r'state')
   InteractionStateEnum get state;
   // enum stateEnum {  received,  dispatched,  acknowledged,  failed,  rejected,  };
@@ -315,6 +316,7 @@ class _$InteractionSerializer implements PrimitiveSerializer<Interaction> {
   }
 }
 
+/// `received` when stored. For a component of an agent card the delivery sets `dispatched` when it hands `interaction.created` to the agent, or `failed` when the re-check denies (09, 11.2). For a component of an app card the job `runs.app_dispatch` acts after the commit: `failed` when the app has no active installation; for an app whose manifest declares `delivery.interactions_url` it re-checks with the rights of that moment (`failed` without a request on a denial), sets `dispatched` when it hands the event to that address, then `acknowledged` on a `200` answer whose reply message is written in the name of the app, and `failed` when the app does not answer within `app.interaction_timeout` or gives any other answer; a `202` keeps `dispatched` until the app calls `respondToInteraction`. For an app that receives its events over the gateway the interaction stays `received` until `respondToInteraction`. `respondToInteraction` moves the state from `received` or `dispatched` to `acknowledged`, `failed` or `rejected`; every change is a compare-and-swap, so the first of the job and the owner wins and the job never overwrites the answer of the owner.
 class InteractionStateEnum extends EnumClass {
   @BuiltValueEnumConst(wireName: r'received')
   static const InteractionStateEnum received = _$interactionStateEnum_received;
