@@ -300,3 +300,23 @@ func TestContextEndsWhileWaitingForTheTokenLock(t *testing.T) {
 		t.Fatalf("error %v", err)
 	}
 }
+
+// TestCancelledContextDoesNotPause: a send whose context ended while a token is due is a
+// transient error, never a credential error that pauses the adapter (Design notes 4 d and 10).
+func TestCancelledContextDoesNotPause(t *testing.T) {
+	for range 20 {
+		w := newWorld(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		res, err := w.a.Send(ctx, w.sam, w.hint())
+		if err == nil {
+			t.Fatalf("cancelled send = %+v without an error", res)
+		}
+		if res := w.send(w.sam, w.hint()); res.Class != domain.ResultAccepted {
+			t.Fatalf("send after a cancelled one = %+v", res)
+		}
+		if n := w.log.count(slog.LevelError); n != 0 {
+			t.Fatalf("%d Error records", n)
+		}
+	}
+}

@@ -102,6 +102,10 @@ type tokenAnswer struct {
 func (s tokenSource) fetch(ctx context.Context, now time.Time) (tok string, lifetime time.Duration, cred *credentialError, err error) {
 	v, _, err := s.secrets.Resolve(ctx, s.ref)
 	if err != nil {
+		if ctx.Err() != nil {
+			// The caller gave up; the credentials are not shown wrong (Design note 4 d).
+			return "", 0, nil, fmt.Errorf("%w: %w", errTokenRequest, ctx.Err())
+		}
 		return "", 0, &credentialError{account: true, errType: secrets.ErrorCode(err)}, nil
 	}
 	sa, err := ParseServiceAccount(v, s.tokenURL)
@@ -196,14 +200,20 @@ func newTokenState(src tokenSource, pauseFor time.Duration, log *slog.Logger) *t
 	return &tokenState{src: src, pauseFor: pauseFor, log: log, lock: make(chan struct{}, 1)}
 }
 
-// acquireLock takes the lock or gives up with the context's error.
+// acquireLock takes the lock or gives up with the context's error. A context that ended
+// before or while waiting never gets the lock, so no token request runs for a caller that gave
+// up.
 func (s *tokenState) acquireLock(ctx context.Context) error {
 	select {
 	case s.lock <- struct{}{}:
-		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+	if err := ctx.Err(); err != nil {
+		<-s.lock
+		return err
+	}
+	return nil
 }
 
 // unlock releases the lock.
