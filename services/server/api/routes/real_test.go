@@ -949,6 +949,14 @@ func (stubServer) SendHeartbeat(context.Context, rest.SendHeartbeatRequestObject
 	return nil, nil
 }
 
+func (stubServer) Search(context.Context, rest.SearchRequestObject) (rest.SearchResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SearchThreadTitles(context.Context, rest.SearchThreadTitlesRequestObject) (rest.SearchThreadTitlesResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
 	return nil, nil
 }
@@ -1464,6 +1472,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listPrices":     {"GET /api/v1/prices", "price.read", "rl.read"},
 		"createPrice":    {"POST /api/v1/prices", "price.manage", "rl.admin"},
 		"closePrice":     {"POST /api/v1/prices/{price_id}/close", "price.manage", "rl.admin"},
+		// M3-14
+		"search":             {"GET /api/v1/search", "search.query", "rl.search"},
+		"searchThreadTitles": {"GET /api/v1/search/thread-titles", "search.query", "rl.search"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
