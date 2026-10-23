@@ -438,8 +438,7 @@ instance row, the threads of chat and the hub, which is also the process's `Ephe
 
 ## Tables
 
-`gateway_presence` (03-data-model.md, section 4.16, R-DM-51; migration
-`00061_gateway_presence.sql`, built by M7-17).
+`gateway_presence` (03-data-model.md, section 4.16, R-DM-51; built by M7-17).
 
 Only this module writes and reads this table via SQL (03-data-model.md, principle 12); for everything else it reads through the ports of other modules.
 
@@ -452,8 +451,7 @@ Only this module writes and reads this table via SQL (03-data-model.md, principl
 ## Events and WebSocket ops
 
 - Durable: none.
-- Ephemeral: `typing.started`; across nodes the internal signals `gateway.*` on the channel
-  `ephemeral` (no event types of 05).
+- Ephemeral: `typing.started`.
 - WebSocket ops (client to server): `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop`.
 
 ## Enabled ops

@@ -287,8 +287,9 @@ modules:
     ws_ops: [identify, resume, heartbeat, reauth, focus, typing.start, typing.stop]
     depends_on: [chat, agents, runs, sync, stats]
     # github.com/coder/websocket for the client connections (02 "Layers within a module" rule 4,
-    # M1-64; terminal has its own for the host services, M2-43); otel for the span gateway.connect.
-    adapter_vendors: [websocket, otel]
+    # M1-64; terminal has its own for the host services, M2-43); otel for the span gateway.connect;
+    # pgx for adapters/postgres, the sqlc code of gateway_presence and NOTIFY ephemeral (M7-17).
+    adapter_vendors: [websocket, otel, pgx]
 vendors:                    # <group>: [<import path>, <import path>/**]
   age: [filippo.io/age, filippo.io/age/**]
   oapi: [github.com/oapi-codegen/runtime, github.com/oapi-codegen/runtime/**]
