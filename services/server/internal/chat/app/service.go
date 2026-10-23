@@ -124,6 +124,9 @@ type Deps struct {
 	// ImportThreads writes the imported threads (M8-11); nil means Store when it implements
 	// ImportThreadStore. Without one the methods of chat.ImportThreads answer internal.
 	ImportThreads ImportThreadStore
+	// Search answers the read operations of the search coordinator (M3-14); nil means Store when
+	// it implements SearchReadStore. Without one the chat.SearchReads methods answer internal.
+	Search SearchReadStore
 	// Errors counts a filter mismatch of listServedChannels in bothy.authz.errors; nil counts
 	// nothing (M2-02).
 	Errors ErrorCounter
@@ -147,8 +150,8 @@ type Cursors interface {
 }
 
 // Service implements chat.Structure (space, sidebar, channel, forum tag and operator part),
-// chat.Threads (M1-55), chat.AgentConfig (M2-02) and chat.ProjectBindings (M2-03). It is safe for
-// concurrent use.
+// chat.Threads (M1-55), chat.AgentConfig (M2-02), chat.ProjectBindings (M2-03) and
+// chat.SearchReads (M3-14). It is safe for concurrent use.
 type Service struct {
 	cfg Config
 	d   Deps
@@ -184,6 +187,9 @@ func New(cfg Config, d Deps) (*Service, error) {
 	}
 	if d.ImportThreads == nil {
 		d.ImportThreads, _ = d.Store.(ImportThreadStore)
+	}
+	if d.Search == nil {
+		d.Search, _ = d.Store.(SearchReadStore)
 	}
 	if d.Log == nil {
 		d.Log = slog.Default()

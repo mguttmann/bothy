@@ -1,6 +1,6 @@
 # Module `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62), channel behaviour with agent configuration (M2-02) and the project binding with readiness (M2-03) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63); `Threads.UnreadCandidates` for the badge of notify (M3-19).
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54), threads (M1-55), moving threads (M1-62), channel behaviour with agent configuration (M2-02) and the project binding with readiness (M2-03) built; `createThread` is built in `messaging` (M1-56); `Threads.InfoForShare` for the read states and drafts of sync (M1-61); `Threads.Counters` for the unread counters of the snapshot of sync (M1-63); `Threads.UnreadCandidates` for the badge of notify (M3-19); `SearchReads` for the search coordinator (M3-14).
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -298,6 +298,56 @@ an agent or app), in the unit of work of the insert ([14-search.md](../../../../
 (`adapters/postgres`) fails when an `INSERT INTO threads` of `queries/*.sql` does not name
 `search_language`. `wire.NewChat` takes the directory in `ChatWrites.Directory`.
 
+## Read operations for the search coordinator (M3-14)
+
+`search` owns no tables and reads thread titles, thread facts and names only through the port
+`chat.SearchReads` ([14-search.md](../../../../docs/spec/14-search.md) section 10, R-SU-09).
+`*app.Service` implements it; the reads come from the port `app.SearchReadStore` beside `Store`
+(`Deps.Search`, which falls back to `Store` when it implements the port, like `Unread`), and a
+service without one answers `internal`, never an empty page. None of the reads authorizes: each
+statement carries the visible set the coordinator passes from `Authorizer.Scope`
+(`t.channel_id = ANY(@channel_ids::uuid[])`, `c.space_id = ANY(...)`; 07 7.4 rule 1, the form the
+AZ-P12 lint of `tools/lint/sql_visibility.py` checks), and the coordinator checks every delivered
+item with `authorize` again (14 4.3). Empty input (no channel, no space, an empty thread id list, a
+limit below one) answers an empty result without a statement.
+
+- `SearchThreadTitles` runs one statement (`queries/search.sql`, shape of 14 4.8) over
+  `threads.title_search`: candidates are the matches of the visible channels with the filters of
+  the query (`Query.Thread`: state, any of the tags through `thread_tags`, the operator agent;
+  `ThreadIDs`; `After` and `Before` on `created_at`) and `created_at` at or before the reference
+  time, the newest `search.max_candidates` of them ranked, one more fetched to report
+  `CandidatesCapped` (also on an empty page). `relevance` scores `ts_rank` with
+  `search.rank_normalization` divided by `1 + age / search.recency_scale`, the age measured from the
+  reference time, then the higher id; `newest` orders by `created_at`, then id. The keyset starts
+  strictly after `Query.From`, one row beyond the page size tells whether `Next` is set. The
+  headline runs only for the rows of the page, over the title cut at
+  `search.headline_input_max_chars` in `threads.search_language`, with the options of
+  `searchkit.Limits.HeadlineOptions` and the random markers; `searchkit.Split` makes the segments.
+  Main threads have an empty title and never match; `AuthorID` and `HasFile` do not apply.
+- `PrefixThreadTitles` (quick switcher, 14 4.9): the prefix tsquery against `title_search`,
+  newest `last_activity_at` first, then id, at most `Limit`.
+- `ThreadsMatching`: the thread ids of the visible channels that match a `searchkit.ThreadFilter`,
+  ascending; the index adapter of `search` resolves thread filters for messages and files into
+  `Query.ThreadIDs` with it (07 7.4 rule 6).
+- `ChannelsInSpaces`: the channel ids of the given (visible) spaces, ascending.
+- `Labels`: channel and space names of the channels whose space is visible (a dm channel has
+  none) and the titles of the threads in the visible channels (main threads have none).
+- `HitThreads`: the threads in the representation of `getThread` (the same `views` path: live
+  tags, billing mode of the fixed operator), in input order; missing or invisible ids are absent.
+- Errors: a statement PostgreSQL cancels at `search.statement_timeout` (the unit option
+  `txn.StatementTimeout` of the coordinator) gives `searchkit.ErrTimeout` for `SearchThreadTitles`,
+  `PrefixThreadTitles` and `ThreadsMatching` (`pg.IsStatementTimeout`), an ended context its own
+  error, any other database error `internal`.
+- Residual risk (RK-10): the duration of a search also depends on matches in channels the caller
+  cannot read, because the GIN index filters by channel only afterwards; the candidate limit, the
+  statement timeout and `rl.search` bound it (14 4.3).
+- Code: `search.go` (port), `app/search.go`, `adapters/postgres/search.go`,
+  `adapters/postgres/queries/search.sql`. Tests: `app/search_test.go` (empty input, delegation,
+  input order and the `getThread` representation of `HitThreads`) and
+  `adapters/postgres/search_test.go` (PostgreSQL 18: visibility, every filter, candidate limit for
+  both sorts, relevance with recency and the id tie break, paging over three pages, reference time,
+  headline segments with random markers, prefix search, labels, the statement timeout mapping).
+
 ## Notification paths (M3-18)
 
 - Port: `Structure` adds `NotificationPath` and `LockNotificationPath` (the path of a notification preference target as `chat.NotificationPath`: kind, space, channel, thread, channel kind, `default_notification_level`, archived; the lock form takes `FOR SHARE` on thread, then channel, then space), `ChannelIDsOfSpace` (archived channels included) and `ThreadIDsOfChannels`, all ascending. None of them authorizes: `notify` authorizes the target with the returned path, and the two id lists run inside an archive that `space.archive` or `channel.archive` allowed. An id of another kind than the requested one is `not_found`.
@@ -359,7 +409,7 @@ internal/wire, HTTP through the chain with response validation).
 
 ## Port (root package `internal/chat`)
 
-- Inbound: `Structure` (spaces, channels, read-only), `ImportStructure` and `ReadOnlySwitch` (M8-03), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`.
+- Inbound: `Structure` (spaces, channels, read-only), `ImportStructure` and `ReadOnlySwitch` (M8-03), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info, locate), `ThreadsByParent` (M2-27), `AgentConfig`, `TriggerFacts`, `ProjectBindings`, `SearchReads` (M3-14).
 - Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`; declares `ReadOnlyGuard` (implemented by `importer`, bound by `internal/wire`, M8-03).
