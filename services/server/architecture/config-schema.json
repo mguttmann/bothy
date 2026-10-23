@@ -3507,7 +3507,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "2147483647",
       "chapter": "14-search.md",
       "doc": "Characters of a hit's text that the highlighting reads."
     },
@@ -3579,7 +3579,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "2147483646",
       "chapter": "14-search.md",
       "doc": "Newest hits after filters and rights that a search ranks; reaching it sets candidates_capped."
     },
@@ -3603,7 +3603,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "2147483646",
       "chapter": "14-search.md",
       "doc": "Largest page of a search; a larger limit is capped."
     },
@@ -3663,7 +3663,7 @@
       "required": false,
       "enum": [],
       "min": "1ms",
-      "max": "",
+      "max": "24d",
       "chapter": "14-search.md",
       "doc": "Time limit of the statements of one search; reaching it answers 503 search_timeout."
     },

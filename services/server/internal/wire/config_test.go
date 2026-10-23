@@ -336,17 +336,17 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"search.locale_map": {Kind: config.KindStringMap, Default: `{"de":"german","en":"english"}`, Chapter: "14-search.md"},
 		// The query side of the search (M3-14, brief design note 12).
 		"search.query_max_chars":          {Kind: config.KindInt, Default: "256", Min: "1", Chapter: "14-search.md"},
-		"search.max_candidates":           {Kind: config.KindInt, Default: "2000", Min: "1", Chapter: "14-search.md"},
+		"search.max_candidates":           {Kind: config.KindInt, Default: "2000", Min: "1", Max: "2147483646", Chapter: "14-search.md"},
 		"search.rank_normalization":       {Kind: config.KindInt, Default: "1", Min: "0", Max: "63", Chapter: "14-search.md"},
 		"search.recency_scale":            {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "14-search.md"},
 		"search.page_size_default":        {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "14-search.md"},
-		"search.page_size_max":            {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "14-search.md"},
-		"search.headline_input_max_chars": {Kind: config.KindInt, Default: "20000", Min: "1", Chapter: "14-search.md"},
+		"search.page_size_max":            {Kind: config.KindInt, Default: "50", Min: "1", Max: "2147483646", Chapter: "14-search.md"},
+		"search.headline_input_max_chars": {Kind: config.KindInt, Default: "20000", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
 		"search.headline_max_fragments":   {Kind: config.KindInt, Default: "2", Min: "0", Chapter: "14-search.md"},
 		"search.headline_max_words":       {Kind: config.KindInt, Default: "30", Min: "1", Chapter: "14-search.md"},
 		"search.headline_min_words":       {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "14-search.md"},
 		"search.prefix_min_chars":         {Kind: config.KindInt, Default: "2", Min: "1", Chapter: "14-search.md"},
-		"search.statement_timeout":        {Kind: config.KindDuration, Default: "3s", Min: "1ms", Chapter: "14-search.md"},
+		"search.statement_timeout":        {Kind: config.KindDuration, Default: "3s", Min: "1ms", Max: "24d", Chapter: "14-search.md"},
 
 		// M2-26
 		"webhook.max_consecutive_failures":     {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "03-data-model.md"},
@@ -1230,6 +1230,37 @@ func TestSearchConfig_StartChecks(t *testing.T) {
 			if strings.Contains(strings.ReplaceAll(msg, "search.", ""), " "+n) {
 				t.Errorf("%v: problem %q names a value", c.env, msg)
 			}
+		}
+	}
+}
+
+// TestSearchConfig_BoundsFitTheStatements: the search keys that reach int32 parameters of the
+// search statements (with the extra look-ahead row of max_candidates and page_size_max) or SET
+// LOCAL statement_timeout are refused at load above what PostgreSQL accepts, and accepted at it.
+func TestSearchConfig_BoundsFitTheStatements(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		env string
+		key string
+		ok  bool
+	}{
+		{env: "BOTHY_SEARCH__MAX_CANDIDATES=2147483646", key: "search.max_candidates", ok: true},
+		{env: "BOTHY_SEARCH__MAX_CANDIDATES=2147483647", key: "search.max_candidates"},
+		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=2147483647", key: "search.headline_input_max_chars", ok: true},
+		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=2147483648", key: "search.headline_input_max_chars"},
+		{env: "BOTHY_SEARCH__PAGE_SIZE_MAX=2147483647", key: "search.page_size_max"},
+		{env: "BOTHY_SEARCH__STATEMENT_TIMEOUT=24d", key: "search.statement_timeout", ok: true},
+		{env: "BOTHY_SEARCH__STATEMENT_TIMEOUT=25d", key: "search.statement_timeout"},
+	} {
+		got := load(t, c.env)
+		if c.ok {
+			if len(got) != 0 {
+				t.Errorf("%s: problems %v", c.env, got)
+			}
+			continue
+		}
+		if len(got) != 1 || !strings.Contains(got[0].String(), c.key) {
+			t.Errorf("%s: problems %v, want one naming %s", c.env, got, c.key)
 		}
 	}
 }

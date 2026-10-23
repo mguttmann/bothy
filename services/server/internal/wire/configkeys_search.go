@@ -24,6 +24,10 @@ const (
 	keySearchPrefixMinChars   = "search.prefix_min_chars"
 )
 
+// maxSearchRows bounds the row counts of a search: the statements take them as int32 and read
+// one row more than the limit to tell whether more follow.
+const maxSearchRows = "2147483646"
+
 // searchRecencyScaleDefault is the default of search.recency_scale (14 section 15).
 const searchRecencyScaleDefault = "30d"
 
@@ -49,7 +53,7 @@ func searchConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.max_candidates", Kind: config.KindInt, Default: "2000", Min: "1",
+			Name: "search.max_candidates", Kind: config.KindInt, Default: "2000", Min: "1", Max: maxSearchRows,
 			Doc:     "Newest hits after filters and rights that a search ranks; reaching it sets candidates_capped.",
 			Chapter: chapter14,
 		},
@@ -69,12 +73,12 @@ func searchConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
-			Name: keySearchPageSizeMax, Kind: config.KindInt, Default: "50", Min: "1",
+			Name: keySearchPageSizeMax, Kind: config.KindInt, Default: "50", Min: "1", Max: maxSearchRows,
 			Doc:     "Largest page of a search; a larger limit is capped.",
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.headline_input_max_chars", Kind: config.KindInt, Default: "20000", Min: "1",
+			Name: "search.headline_input_max_chars", Kind: config.KindInt, Default: "20000", Min: "1", Max: "2147483647",
 			Doc:     "Characters of a hit's text that the highlighting reads.",
 			Chapter: chapter14,
 		},
@@ -99,7 +103,7 @@ func searchConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.statement_timeout", Kind: config.KindDuration, Default: "3s", Min: minDeadline,
+			Name: "search.statement_timeout", Kind: config.KindDuration, Default: "3s", Min: minDeadline, Max: maxPGTimeout,
 			Doc:     "Time limit of the statements of one search; reaching it answers 503 search_timeout.",
 			Chapter: chapter14,
 		},
