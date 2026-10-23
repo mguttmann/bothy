@@ -69,6 +69,13 @@ type gwWorld struct {
 // gwHeartbeatInterval is the sync.heartbeat_interval of a gateway world: the default of the key.
 const gwHeartbeatInterval = 30 * time.Second
 
+// gwAccessTokenTTL is the auth.access_token_ttl of a gateway world, longer than any run of the
+// package: its people get their access token once, when the world starts, and a suite on a loaded
+// runner can take longer than the default ten minutes (TestCommandAutocomplete: its Owner got 401
+// token_expired in the middle of a subtest). A test of token expiry sets the key
+// itself.
+const gwAccessTokenTTL = 24 * time.Hour
+
 // patientWindows are the environment entries of testkit.PatientGateway for the heartbeat interval
 // interval: no heartbeat or identify deadline of the gateway closes a connection of a world
 // before the test has waited testkit.Patience for what it checks, however slow the host.
@@ -95,7 +102,8 @@ func newGatewayWorldWith(t *testing.T, deps wire.Deps, extra ...string) *gwWorld
 	ctx := context.Background()
 	db := newServeDB(t)
 	completeSetup(t, db)
-	base := append([]string{"BOTHY_SERVER__PUBLIC_URL=" + gwPublicURL}, patientWindows(gwHeartbeatInterval)...)
+	base := append([]string{"BOTHY_SERVER__PUBLIC_URL=" + gwPublicURL, "BOTHY_AUTH__ACCESS_TOKEN_TTL=" + strconv.Itoa(int(gwAccessTokenTTL.Hours())) + "h"},
+		patientWindows(gwHeartbeatInterval)...)
 	env := serveEnv(t, db, append(base, extra...)...)
 	p := start(t, wire.RoleAPI, env, deps)
 	waitReadyz(t, p.waitInternal(t), http.StatusOK)
@@ -933,4 +941,20 @@ func TestGatewayTokenExpiry(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestGatewayWorldTokenOutlivesTheRun: a person of a gateway world gets an access token for
+// gwAccessTokenTTL, longer than any run of the package, so a suite that takes longer than the
+// default auth.access_token_ttl on a loaded runner keeps its people signed in. The token of the side identity carries the lifetime of the
+// process's configuration, which serves the same key.
+func TestGatewayWorldTokenOutlivesTheRun(t *testing.T) {
+	t.Parallel()
+	w := newGatewayWorld(t)
+	p := w.newPerson("alex", identity.DeviceStateActive)
+	if got := time.Duration(p.set.ExpiresIn) * time.Second; got != gwAccessTokenTTL {
+		t.Fatalf("access token for %s, want %s", got, gwAccessTokenTTL)
+	}
+	if v := envValue(w.env, "BOTHY_AUTH__ACCESS_TOKEN_TTL"); v != "24h" {
+		t.Fatalf("auth.access_token_ttl of the process %q, want 24h", v)
+	}
 }

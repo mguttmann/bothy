@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-test-timing-parallel
+    languages: [go]
+    severity: ERROR
+    paths:
+      include: ["*_test.go"]
+      # The tests of TimingSame itself feed it fixed durations; no real time passes.
+      exclude: ["services/*/internal/platform/testkit/*"]
+    message: >-
+      A timing comparison (testkit.TimingSame) runs in a test that calls t.Parallel. The other
+      parallel tests of the package then load the machine for the whole comparison, and load
+      lengthens a real, allowed difference of the two operations by the same factor as the
+      operations themselves, until it exceeds the bound in every round. Compare times in a
+      top-level test that does not call t.Parallel: Go starts the parallel tests of the package
+      only after every such test has finished (services/server/internal/platform/testkit
+      README, "Timing comparisons").
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              func $TEST($T *testing.T) {
+                ...
+                $T.Parallel()
+                ...
+              }
+          - pattern-inside: |
+              func($T *testing.T) {
+                ...
+                $T.Parallel()
+                ...
+              }
+      - pattern: testkit.TimingSame(...)
