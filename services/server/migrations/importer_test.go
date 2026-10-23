@@ -117,8 +117,8 @@ func TestMigration_ImporterDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 58); err != nil {
-		t.Fatalf("down to 58: %v", err)
+	if _, err := provider.DownTo(ctx, 59); err != nil {
+		t.Fatalf("down to 59: %v", err)
 	}
 	var left int
 	if err := sqlDB.QueryRowContext(ctx, `SELECT (to_regclass('import_sources') IS NOT NULL)::int + (to_regclass('import_items') IS NOT NULL)::int

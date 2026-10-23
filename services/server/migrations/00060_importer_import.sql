@@ -8,7 +8,7 @@
 --
 -- messages.import_item_id gets its foreign key here, because import_items did not exist when
 -- M1-56 created messages (00032). It is DEFERRABLE INITIALLY DEFERRED like messages.run_id and
--- starts NOT VALID (upgrade.md rule M5); 00060 validates it.
+-- starts NOT VALID (upgrade.md rule M5); 00061 validates it.
 --
 -- Grants (migrations/README.md, grant rule): bothy_app may read, insert, update and delete both
 -- tables (the deletion by retention class import, M7).
