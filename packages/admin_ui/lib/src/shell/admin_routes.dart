@@ -42,8 +42,8 @@ enum AdminSection {
   /// Statistics (M6-06).
   statistics('statistics'),
 
-  /// Instance settings (M6-09).
-  instance('instance'),
+  /// Instance settings, branding, login providers and feature flags, for owners (M6-09).
+  instance('instance', hasScreen: true),
 
   /// Hosts of the terminal, for owners (M4-37).
   hosts('hosts', hasScreen: true);
@@ -102,6 +102,7 @@ final class AdminLocation {
         AdminSection.webhooks,
         AdminSection.hints,
         AdminSection.expiring,
+        AdminSection.instance,
       }.contains(section)) {
         return null;
       }

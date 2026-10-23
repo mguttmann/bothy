@@ -6098,4 +6098,655 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get expiringRenewToken => 'Renew token';
+
+  @override
+  String get adminNavInstance => 'Instance and branding';
+
+  @override
+  String get instanceTitle => 'Instance and branding';
+
+  @override
+  String get instanceTabSettings => 'Settings';
+
+  @override
+  String get instanceTabBranding => 'Branding';
+
+  @override
+  String get instanceTabProviders => 'Login providers';
+
+  @override
+  String get instanceTabFlags => 'Feature flags';
+
+  @override
+  String get instanceSave => 'Save';
+
+  @override
+  String get instanceValueNone => 'no value';
+
+  @override
+  String get instanceValueEmpty => 'empty';
+
+  @override
+  String get instanceNeverChanged => 'Default, never changed';
+
+  @override
+  String instanceChangedBy(int version, String name, String when) {
+    return 'Version $version, changed by $name, $when';
+  }
+
+  @override
+  String instanceChangedAt(int version, String when) {
+    return 'Version $version, changed $when';
+  }
+
+  @override
+  String instanceChangeFromTo(String from, String to) {
+    return 'From: $from\nTo: $to';
+  }
+
+  @override
+  String instanceConflict(String current, String input) {
+    return 'Another owner changed this setting in the meantime. Now stored: $current. Your input: $input. Save again to replace the stored value with your input.';
+  }
+
+  @override
+  String get instanceFieldRequired => 'This field is required.';
+
+  @override
+  String get instanceFieldTooLong => 'This is too long for the server.';
+
+  @override
+  String get instanceFieldInvalidText =>
+      'Contains a character that is not allowed, for example a control or text direction character.';
+
+  @override
+  String get instanceFieldUnknownColor =>
+      'Only one of the palette colors can be chosen.';
+
+  @override
+  String get instanceFieldInvalidEnum =>
+      'This value is not one of the allowed values.';
+
+  @override
+  String get instanceFieldInvalidFormat =>
+      'This value does not have the expected form.';
+
+  @override
+  String get instanceFieldInvalidType => 'This value has the wrong type.';
+
+  @override
+  String get instanceFieldNotAllowed =>
+      'This field is not allowed with these settings.';
+
+  @override
+  String get instanceFieldDuplicate => 'An entry appears twice.';
+
+  @override
+  String get instanceFieldUnknown => 'The server does not know this field.';
+
+  @override
+  String instanceFieldOther(String code) {
+    return 'The server refused this value ($code).';
+  }
+
+  @override
+  String get instanceSettingsIntro =>
+      'These settings apply to the whole instance and take effect immediately.';
+
+  @override
+  String get instanceKindText => 'Text';
+
+  @override
+  String get instanceKindUuid => 'File ID';
+
+  @override
+  String instanceKindPalette(String keys) {
+    return 'One of the palette colors: $keys';
+  }
+
+  @override
+  String instanceKindLocale(String tags) {
+    return 'Language: $tags';
+  }
+
+  @override
+  String get instanceSettingChange => 'Change';
+
+  @override
+  String get instanceSettingOnBranding => 'Changed under Branding.';
+
+  @override
+  String get instanceSettingUnknownKey =>
+      'This version has no editor for this key; change it through the API.';
+
+  @override
+  String get instanceSettingValue => 'Value';
+
+  @override
+  String instanceSettingConfirmTitle(String key) {
+    return 'Change $key?';
+  }
+
+  @override
+  String instanceSettingSaved(String key, String value) {
+    return '$key is now $value.';
+  }
+
+  @override
+  String get instanceBrandingName => 'Product name';
+
+  @override
+  String get instanceBrandingNameHelp =>
+      'Shown to everyone in the apps and the console. The server checks the length and refuses control and text direction characters.';
+
+  @override
+  String get instanceAccentLabel => 'Accent';
+
+  @override
+  String get instanceAccentHelp =>
+      'The accent comes only from the checked palette; there is no free color value.';
+
+  @override
+  String get instanceAccentSpruce => 'Spruce';
+
+  @override
+  String get instanceAccentLoch => 'Loch';
+
+  @override
+  String get instanceAccentHeather => 'Heather';
+
+  @override
+  String get instanceAccentRowan => 'Rowan';
+
+  @override
+  String get instanceAccentAmber => 'Amber';
+
+  @override
+  String get instanceAccentGorse => 'Gorse';
+
+  @override
+  String get instanceAccentMoss => 'Moss';
+
+  @override
+  String get instancePreviewLight => 'Light';
+
+  @override
+  String get instancePreviewDark => 'Dark';
+
+  @override
+  String get instancePreviewButton => 'Send';
+
+  @override
+  String get instancePreviewChip => 'Selected';
+
+  @override
+  String get instancePreviewLink => 'A link';
+
+  @override
+  String get instanceBrandingConfirmTitle => 'Change the branding?';
+
+  @override
+  String instanceBrandingNameChange(String from, String to) {
+    return 'Product name: $from becomes $to';
+  }
+
+  @override
+  String instanceBrandingAccentChange(String from, String to) {
+    return 'Accent: $from becomes $to';
+  }
+
+  @override
+  String get instanceBrandingEveryone =>
+      'Everyone sees the change immediately.';
+
+  @override
+  String get instanceBrandingSaved => 'The branding is saved.';
+
+  @override
+  String instanceBrandingConflict(String name, String accent) {
+    return 'Another owner changed the branding in the meantime: now $name with the accent $accent. Your input stays; save again to replace it.';
+  }
+
+  @override
+  String get instanceLogoTitle => 'Logo';
+
+  @override
+  String get instanceLogoNone => 'No logo is set.';
+
+  @override
+  String get instanceLogoPending =>
+      'The logo is being checked and appears when it is ready.';
+
+  @override
+  String get instanceLogoRefresh => 'Check again';
+
+  @override
+  String get instanceLogoUpload => 'Upload logo';
+
+  @override
+  String get instanceLogoRemove => 'Remove logo';
+
+  @override
+  String get instanceLogoConfirmTitle => 'Upload the logo?';
+
+  @override
+  String instanceLogoConfirmBody(String file) {
+    return '$file replaces the current logo for everyone. The server checks it and removes metadata before it is shown.';
+  }
+
+  @override
+  String get instanceLogoUploaded => 'The logo is uploaded.';
+
+  @override
+  String get instanceLogoRemoveTitle => 'Remove the logo?';
+
+  @override
+  String get instanceLogoRemoveBody =>
+      'Everyone sees the product name without a logo.';
+
+  @override
+  String get instanceLogoRemoved => 'The logo is removed.';
+
+  @override
+  String get instanceProvidersIntro =>
+      'People sign in through these providers. Changes take effect immediately.';
+
+  @override
+  String get instanceProvidersEmpty => 'No login provider is set up.';
+
+  @override
+  String get instanceProviderAdd => 'Add provider';
+
+  @override
+  String get instanceProviderKindOidc => 'OpenID Connect';
+
+  @override
+  String get instanceProviderKindHeader => 'Proxy header';
+
+  @override
+  String get instanceProviderKindLocal => 'Local accounts';
+
+  @override
+  String get instanceProviderKindUnknown => 'Unknown driver';
+
+  @override
+  String get instanceProviderStateEnabled => 'Enabled';
+
+  @override
+  String get instanceProviderStateDisabled => 'Disabled';
+
+  @override
+  String get instanceProviderProvisioningShort => 'Creates accounts';
+
+  @override
+  String instanceProviderHeaderLine(String header) {
+    return 'Login header: $header';
+  }
+
+  @override
+  String instanceProviderIssuerLine(String issuer) {
+    return 'Issuer: $issuer';
+  }
+
+  @override
+  String get instanceProviderChange => 'Change';
+
+  @override
+  String get instanceProviderEnable => 'Enable';
+
+  @override
+  String get instanceProviderDisable => 'Disable';
+
+  @override
+  String get instanceProviderDelete => 'Delete';
+
+  @override
+  String instanceProviderDisableTitle(String name) {
+    return 'Disable $name?';
+  }
+
+  @override
+  String instanceProviderDisableBody(String name) {
+    return 'All sessions that started with $name end immediately. Nobody can sign in with it until it is enabled again.';
+  }
+
+  @override
+  String instanceProviderEnableTitle(String name) {
+    return 'Enable $name?';
+  }
+
+  @override
+  String instanceProviderEnableBody(String name) {
+    return 'People can sign in with $name again.';
+  }
+
+  @override
+  String instanceProviderDeleteTitle(String name) {
+    return 'Delete $name?';
+  }
+
+  @override
+  String instanceProviderDeleteBody(String name) {
+    return 'All sessions that started with $name end immediately. The server refuses while identities are linked to it; disable it then.';
+  }
+
+  @override
+  String instanceProviderDisabled(String name) {
+    return '$name is disabled; its sessions ended.';
+  }
+
+  @override
+  String instanceProviderEnabled(String name) {
+    return '$name is enabled.';
+  }
+
+  @override
+  String instanceProviderDeleted(String name) {
+    return '$name is deleted.';
+  }
+
+  @override
+  String instanceProviderAdded(String name) {
+    return '$name is added.';
+  }
+
+  @override
+  String instanceProviderSaved(String name) {
+    return '$name is saved.';
+  }
+
+  @override
+  String get instanceProviderLoopbackRule =>
+      'The proxy header provider works only while the server listens on a loopback address (127.0.0.1 or ::1); otherwise the server refuses to enable it.';
+
+  @override
+  String get instanceProviderLoopbackRefused =>
+      'The server refused: the proxy header provider needs a server that listens only on a loopback address.';
+
+  @override
+  String get instanceProviderRedirectLabel =>
+      'Redirect URI to register at the OIDC provider';
+
+  @override
+  String get instanceProviderRedirectCopy => 'Copy';
+
+  @override
+  String get instanceProviderRedirectCopied => 'Copied';
+
+  @override
+  String instanceProviderAddTitle(String kind) {
+    return 'Add $kind provider';
+  }
+
+  @override
+  String instanceProviderEditTitle(String name) {
+    return 'Change $name';
+  }
+
+  @override
+  String get instanceProviderName => 'Name';
+
+  @override
+  String get instanceProviderNameHelp => 'Shown on the login button.';
+
+  @override
+  String get instanceProviderIssuer => 'Issuer';
+
+  @override
+  String get instanceProviderIssuerHelp =>
+      'Exact https address of the issuer, for example https://login.example.com';
+
+  @override
+  String get instanceProviderClientId => 'Client ID';
+
+  @override
+  String get instanceProviderClientAuth => 'Client authentication';
+
+  @override
+  String get instanceProviderSecretRef => 'Client secret reference';
+
+  @override
+  String get instanceProviderKeyRef => 'Private key reference';
+
+  @override
+  String get instanceProviderSecretRefHelp =>
+      'A reference such as file:/run/secrets/idp/client or env:BOTHY_IDP_CLIENT, never the secret itself. It is never shown again.';
+
+  @override
+  String get instanceProviderSecretKeep =>
+      'Leave empty to keep the stored reference.';
+
+  @override
+  String get instanceProviderKeyAlg => 'Key algorithm';
+
+  @override
+  String get instanceProviderKeyId => 'Key ID';
+
+  @override
+  String get instanceProviderX5t => 'Certificate thumbprint (x5t#S256)';
+
+  @override
+  String get instanceProviderTenants => 'Allowed tenant IDs';
+
+  @override
+  String instanceProviderTenantsHelp(String tenantid) {
+    return 'Separated by commas; required when the issuer contains $tenantid.';
+  }
+
+  @override
+  String get instanceProviderAppRedirects => 'App redirect URIs';
+
+  @override
+  String get instanceProviderAppRedirectsHelp =>
+      'One per line: private schemes or claimed https addresses of the apps.';
+
+  @override
+  String get instanceProviderGroupsClaim => 'Group claim';
+
+  @override
+  String get instanceProviderGroupsClaimHelp =>
+      'Without a group claim, groups are not synchronized.';
+
+  @override
+  String get instanceProviderLoginHeader => 'Login header';
+
+  @override
+  String get instanceProviderLoginHeaderHelp =>
+      'For example Tailscale-User-Login';
+
+  @override
+  String get instanceProviderNameHeader => 'Name header (optional)';
+
+  @override
+  String get instanceProviderLocalNote =>
+      'Local accounts sign in with password and TOTP or a passkey; there is nothing to configure.';
+
+  @override
+  String get instanceProviderEnableNow => 'Enable at once';
+
+  @override
+  String get instanceProviderProvisioning =>
+      'Create accounts for unknown people';
+
+  @override
+  String get instanceProviderProvisioningHelp =>
+      'Otherwise a person needs an enrollment code for the first login.';
+
+  @override
+  String instanceProviderCreateSummary(String kind, String name) {
+    return 'A new $kind provider named $name is added.';
+  }
+
+  @override
+  String get instanceProviderStartsEnabled => 'It is enabled at once.';
+
+  @override
+  String get instanceProviderStartsDisabled => 'It starts disabled.';
+
+  @override
+  String get instanceProviderProvisioningOn =>
+      'Unknown people get an account at their first login.';
+
+  @override
+  String get instanceProviderProvisioningOff =>
+      'Unknown people need an enrollment code.';
+
+  @override
+  String instanceProviderNameChange(String from, String to) {
+    return 'Name: $from becomes $to';
+  }
+
+  @override
+  String instanceProviderMembersChange(String members) {
+    return 'Changed settings: $members';
+  }
+
+  @override
+  String stepUpPurposeInstanceSetting(String key) {
+    return 'Change the instance setting $key';
+  }
+
+  @override
+  String get stepUpPurposeBranding => 'Change the branding of the instance';
+
+  @override
+  String get stepUpPurposeLogo => 'Upload the logo of the instance';
+
+  @override
+  String get stepUpPurposeLogoRemove => 'Remove the logo of the instance';
+
+  @override
+  String stepUpPurposeProviderAdd(String name) {
+    return 'Add the login provider $name';
+  }
+
+  @override
+  String stepUpPurposeProviderEdit(String name) {
+    return 'Change the login provider $name';
+  }
+
+  @override
+  String stepUpPurposeProviderDisable(String name) {
+    return 'Disable the login provider $name';
+  }
+
+  @override
+  String stepUpPurposeProviderEnable(String name) {
+    return 'Enable the login provider $name';
+  }
+
+  @override
+  String stepUpPurposeProviderDelete(String name) {
+    return 'Delete the login provider $name';
+  }
+
+  @override
+  String stepUpPurposeFlagOn(String key) {
+    return 'Switch on the feature flag $key';
+  }
+
+  @override
+  String stepUpPurposeFlagOff(String key) {
+    return 'Switch off the feature flag $key';
+  }
+
+  @override
+  String get instanceFlagsIntro =>
+      'Feature flags switch functions for the whole instance. The state for you includes rollouts to people and groups.';
+
+  @override
+  String get instanceFlagOn => 'on';
+
+  @override
+  String get instanceFlagOff => 'off';
+
+  @override
+  String get instanceFlagKindRelease => 'Release switch';
+
+  @override
+  String get instanceFlagKindOption => 'Option';
+
+  @override
+  String get instanceFlagKindUnknown => 'Unknown kind';
+
+  @override
+  String get instanceFlagOrphaned => 'No longer registered';
+
+  @override
+  String instanceFlagForYou(String state) {
+    return 'For you: $state';
+  }
+
+  @override
+  String get instanceFlagForYouUnknown => 'For you: not evaluated';
+
+  @override
+  String instanceFlagStored(String state) {
+    return 'Stored: $state';
+  }
+
+  @override
+  String instanceFlagDefault(String state) {
+    return 'Default: $state';
+  }
+
+  @override
+  String instanceFlagRollout(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Inverted for $count people or groups',
+      one: 'Inverted for 1 person or group',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String instanceFlagRolloutStays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'The rollout to $count people or groups stays.',
+      one: 'The rollout to 1 person or group stays.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String instanceFlagOnTitle(String key) {
+    return 'Switch on $key?';
+  }
+
+  @override
+  String instanceFlagOffTitle(String key) {
+    return 'Switch off $key?';
+  }
+
+  @override
+  String get instanceFlagEveryone =>
+      'The global value changes for everyone immediately.';
+
+  @override
+  String get instanceFlagReason => 'Reason (required)';
+
+  @override
+  String get instanceFlagSwitchOn => 'Switch on';
+
+  @override
+  String get instanceFlagSwitchOff => 'Switch off';
+
+  @override
+  String instanceFlagSwitchedOn(String key) {
+    return '$key is switched on.';
+  }
+
+  @override
+  String instanceFlagSwitchedOff(String key) {
+    return '$key is switched off.';
+  }
+
+  @override
+  String instanceFlagConflict(String key, String state) {
+    return 'Another owner changed $key in the meantime; it is now $state. Nothing was changed; switch again if needed.';
+  }
 }

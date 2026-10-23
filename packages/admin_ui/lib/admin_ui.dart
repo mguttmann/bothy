@@ -63,6 +63,16 @@
 /// `l10n`, see [hintLines]) and [ExpiringAccessView] (grants, memberships and tokens that
 /// expire soon, with "Extend" as a new grant and then the revocation of the old one), and
 /// their data in [AccessRepository] ([AccessHintPage], [ExpiringPage], [AccessPageLabels]).
+///
+/// M6-09 adds the place [AdminSection.instance] for owners (01 5.5 "Instance, branding"): the
+/// [InstanceView] with the [SettingsSection] (typed editors per key of the configuration
+/// reference section 6, [instanceSettingSchemas], [SettingEditorDialog]), the
+/// [BrandingSection] (product name, logo through a [LogoPicker], [AccentPicker] of the seven
+/// palette keys with its [AccentPreview] in light and dark), the [ProvidersSection] with the
+/// [ProviderEditorDialog] (OIDC and proxy header per 08 2.6, write-only secret references, the
+/// [RedirectUriView]) and the [FlagsSection] with its [FlagSwitchDialog], and the data source
+/// [InstanceRepository] ([ApiInstanceRepository]), which [AdminRepository] includes. A write
+/// that loses against a concurrent change ends in [InstanceVersionConflict].
 library;
 
 export 'src/access/source_chain.dart';
@@ -106,6 +116,7 @@ export 'src/data/admin_repository.dart';
 export 'src/data/agents_repository.dart';
 export 'src/data/apps_repository.dart';
 export 'src/data/hosts_repository.dart';
+export 'src/data/instance_repository.dart';
 export 'src/data/self_repository.dart';
 export 'src/devices/approve_device_dialog.dart';
 export 'src/devices/waiting_devices.dart';
@@ -135,6 +146,15 @@ export 'src/hosts/server_host_section.dart';
 export 'src/hosts/session_users_section.dart';
 export 'src/incoming_webhooks/create_incoming_dialog.dart';
 export 'src/incoming_webhooks/incoming_webhooks_view.dart';
+export 'src/instance/accent_picker.dart';
+export 'src/instance/branding_section.dart';
+export 'src/instance/flags_section.dart';
+export 'src/instance/instance_common.dart';
+export 'src/instance/instance_view.dart';
+export 'src/instance/provider_editor.dart';
+export 'src/instance/providers_section.dart';
+export 'src/instance/setting_kinds.dart';
+export 'src/instance/settings_section.dart';
 export 'src/people/create_person_dialog.dart';
 export 'src/people/credentials_section.dart';
 export 'src/people/enrollment_code_view.dart';

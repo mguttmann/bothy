@@ -19,12 +19,14 @@ import 'access_fake.dart';
 import 'agents_fake.dart';
 import 'apps_fake.dart';
 import 'hosts_fake.dart';
+import 'instance_fake.dart';
 
 export '../self/support.dart' show pumpInApp, testClock, testNow;
 export 'access_fake.dart';
 export 'agents_fake.dart';
 export 'apps_fake.dart';
 export 'hosts_fake.dart';
+export 'instance_fake.dart';
 
 /// The changing calls of this fake and whether 05 gives their action step-up.
 const Map<String, bool> stepUpOf = {
@@ -52,6 +54,7 @@ const Map<String, bool> stepUpOf = {
   ...hostsStepUpOf,
   ...agentsStepUpOf,
   ...appsStepUpOf,
+  ...instanceStepUpOf,
 };
 
 /// The audit entries of the fake: Alex created a grant, Sam was denied an agent run, Alex
@@ -138,7 +141,7 @@ AdminPerson _p(
 /// Robin until the end of the year. The grant calls come from [FakeAccess], the host calls
 /// from [FakeHosts].
 class FakeAdminRepository
-    with FakeAccess, FakeHosts, FakeAgents, FakeApps
+    with FakeAccess, FakeHosts, FakeAgents, FakeApps, FakeInstance
     implements AdminRepository {
   /// Creates the fake; [prompt] is asked as the step-up interceptor would.
   FakeAdminRepository({required this.prompt});
