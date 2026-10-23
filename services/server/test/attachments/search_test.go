@@ -10,7 +10,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -123,7 +122,10 @@ func deref(s *string) string {
 
 // TestSearch_NotSearchable (14 12, DP-T01 search part): a deleted message, an attached file that
 // is pending, infected, error or of a deleted message, a file in state failed, a clean file never
-// attached, and a draft give no hit in any type.
+// attached, and a draft give no hit in any type; an attached clean file with the same word is the
+// positive control and the only hit. No state depends on the retry clock of the scan pass: the
+// files that must end clean are scanned before clamd stalls, the stall lasts until the end, so the
+// pending file stays pending, and infected and error come from the fixture.
 func TestSearch_NotSearchable(t *testing.T) {
 	t.Parallel()
 	e := start(t)
@@ -131,41 +133,42 @@ func TestSearch_NotSearchable(t *testing.T) {
 	gone := msgOf(t, e.send(t, e.alex, th, "obsolete zebra", nil, nil), http.StatusCreated)
 	harness.MustDo(t, e.alex, harness.Request{Method: http.MethodDelete, Path: "/messages/" + gone.ID}, http.StatusNoContent)
 
-	never := e.clean(t, e.alex, e.allg, "zebra-never.txt", []byte("never attached"))
-	ofDeleted := e.clean(t, e.alex, e.allg, "zebra-deleted.txt", []byte("of a deleted message"))
+	control := e.clean(t, e.alex, e.allg, "zebra control.txt", []byte("control"))
+	msgOf(t, e.send(t, e.alex, th, "control file", []string{control}, nil), http.StatusCreated)
+	e.clean(t, e.alex, e.allg, "zebra never.txt", []byte("never attached"))
+	ofDeleted := e.clean(t, e.alex, e.allg, "zebra deleted.txt", []byte("of a deleted message"))
 	carrier := msgOf(t, e.send(t, e.alex, th, "carrier", []string{ofDeleted}, nil), http.StatusCreated)
 	harness.MustDo(t, e.alex, harness.Request{Method: http.MethodDelete, Path: "/messages/" + carrier.ID}, http.StatusNoContent)
+	infected := e.clean(t, e.alex, e.allg, "zebra infected.txt", []byte("infected"))
+	msgOf(t, e.send(t, e.alex, th, "infected file", []string{infected}, nil), http.StatusCreated)
+	broken := e.clean(t, e.alex, e.allg, "zebra error.txt", []byte("error"))
+	msgOf(t, e.send(t, e.alex, th, "error file", []string{broken}, nil), http.StatusCreated)
+	// The scan outcomes infected and error need clamd answers at the right retry; the fixture
+	// sets them directly (12 2: neither is deliverable).
+	e.exec(t, `UPDATE files SET scan_status = 'infected' WHERE id = $1`, infected)
+	e.exec(t, `UPDATE files SET scan_status = 'error' WHERE id = $1`, broken)
 
-	failed := e.open(t, e.alex, e.allg, "zebra-failed.txt", []byte("aborted"))
+	failed := e.open(t, e.alex, e.allg, "zebra failed.txt", []byte("aborted"))
 	harness.MustDo(t, e.alex, harness.Request{Method: http.MethodDelete, Path: "/uploads/" + failed.FileID}, http.StatusNoContent)
 
-	e.stallScans()
-	pending := e.file(t, e.alex, e.allg, "zebra-pending.txt", []byte("pending"))
+	e.stallScans() // until the end of the test: every retry stalls again
+	pending := e.file(t, e.alex, e.allg, "zebra pending.txt", []byte("pending"))
 	msgOf(t, e.send(t, e.alex, th, "pending file", []string{pending}, nil), http.StatusCreated)
-	e.clamd.SetScript(clamdtest.Script{Reply: "stream: Eicar-Test-Signature FOUND"})
-	infected := e.file(t, e.alex, e.allg, "zebra-infected.txt", []byte("infected"))
-	msgOf(t, e.send(t, e.alex, th, "infected file", []string{infected}, nil), http.StatusCreated)
-	if st := e.waitFinal(t, infected); st != "complete/infected" {
-		t.Fatalf("infected file ended %s", st)
-	}
-	e.answerScans()
-	broken := e.clean(t, e.alex, e.allg, "zebra-error.txt", []byte("error"))
-	msgOf(t, e.send(t, e.alex, th, "error file", []string{broken}, nil), http.StatusCreated)
-	// The scan outcome error needs clamd failing every retry; the fixture sets it directly.
-	e.exec(t, `UPDATE files SET scan_status = 'error' WHERE id = $1`, broken)
-	if st := e.state(t, pending); st != "pending/pending" {
-		t.Fatalf("pending file is %s", st)
-	}
 
 	harness.MustDo(t, e.alex, harness.Request{Method: http.MethodPut, Path: "/threads/" + th + "/draft",
 		Body: map[string]any{"content_md": "draft zebra"}}, http.StatusOK)
 
-	for _, typ := range []string{"messages", "threads", "files"} {
+	if st := e.state(t, pending); st != "pending/pending" {
+		t.Fatalf("pending file is %s", st)
+	}
+	for _, typ := range []string{"messages", "threads"} {
 		if got := search(t, e.alex, sq("zebra", "type", typ)); len(got.Items) != 0 {
 			t.Errorf("type %s found %v", typ, got.ids())
 		}
 	}
-	_ = never
+	if got := search(t, e.alex, sq("zebra", "type", "files")).ids(); !slices.Equal(got, []string{control}) {
+		t.Errorf("type files found %v, want only the control %s", got, control)
+	}
 }
 
 // TestSearch_HitObjectsEqualModuleRepresentation: the message of a hit equals its item of
