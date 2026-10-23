@@ -173,8 +173,10 @@ func TestAZP3_UnknownActionFailsClosedThroughAuthorize(t *testing.T) {
 	if detached != 1 || w.rec.detached[0].Decision != auditing.DecisionError || w.rec.detached[0].Reason != auditing.ReasonUnknownAction {
 		t.Fatalf("recorder %+v", w.rec.detached)
 	}
-	// A deferred action fails the same way (D3).
-	for _, a := range []authorize.Action{authorize.ActionRunFollowupCreate, authorize.ActionFileTranscriptSubmit, authorize.ActionImportApply} {
+	// Every deferred action fails the same way (D3). The list comes from the requirement table, so a
+	// ticket that builds one of them leaves this test valid.
+	for _, id := range domain.DeferredActions() {
+		a := authorize.Action(id)
 		d, err := w.az.Authorize(context.Background(), w.user(w.owner), a, authorize.Resource{Kind: authorize.ResourceInstance})
 		if e, ok := errs.As(err); !ok || d.Allowed() || e.Cause != errs.CauseUnknownAction {
 			t.Errorf("%s: %+v %v", a, d, err)
