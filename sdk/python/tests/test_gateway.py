@@ -280,7 +280,9 @@ async def test_rate_limited_close_waits_retry_after() -> None:
     async with running(script) as server:
         gw = gateway(server, clock=clock)
         task = asyncio.ensure_future(collect(gw, lambda s: False))
-        await eventually(lambda: clock.sleepers == 1, "the wait of retry_after")
+        # The heartbeat of the first connection sleeps on the same clock, so wait for the sleep
+        # whose deadline is the retry_after of the close (30), not for any sleeper.
+        await eventually(lambda: 30.0 in clock.deadlines, "the wait of retry_after")
         await clock.advance(29)
         await asyncio.sleep(0.1)
         assert server.connections == 1

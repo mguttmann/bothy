@@ -107,6 +107,11 @@ class FakeClock:
         """The number of tasks currently waiting in `sleep`."""
         return sum(1 for _, _, f in self._sleepers if not f.done())
 
+    @property
+    def deadlines(self) -> list[float]:
+        """The deadlines of the tasks currently waiting in `sleep`, earliest first."""
+        return sorted(d for d, _, f in self._sleepers if not f.done())
+
     async def advance(self, seconds: float) -> None:
         """Move the time forward by ``seconds``, waking sleepers in deadline order.
 

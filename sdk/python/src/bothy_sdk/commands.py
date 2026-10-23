@@ -2,7 +2,7 @@
 """Slash commands of an agent: a declared list, reconciliation and autocomplete.
 
 An adapter may declare its commands (``AdapterConfig.commands``). When it does, the adapter
-reconciles them after every ``ready`` (docs/DECISIONS.md D-M2-29-11; 09 10.2 asks for one
+reconciles them after every ``ready`` (docs/DECISIONS.md D-M2-29-12; 09 10.2 asks for one
 request, but the API has no such operation and no list of own commands, a reported spec gap):
 own commands are those of ``listChannelCommands`` over the channels of ``listServedChannels``
 whose ``owner_principal_id`` is the agent; missing ones are registered, changed ones updated with
@@ -158,7 +158,7 @@ async def reconcile_commands(
     declared: Sequence[CommandSpec] | None,
     settings: SdkSettings | None = None,
 ) -> ReconcileResult:
-    """Make the agent's own commands equal to ``declared`` (D-M2-29-11).
+    """Make the agent's own commands equal to ``declared`` (D-M2-29-12).
 
     Args:
         client: The REST client.

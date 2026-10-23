@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Commands: reconciliation of the declared list, the description limit and autocomplete.
 
-docs/DECISIONS.md D-M2-29-11 and Design note 12 of the brief: own commands are those of
+docs/DECISIONS.md D-M2-29-12 and Design note 12 of the brief: own commands are those of
 ``listChannelCommands`` over ``listServedChannels`` owned by the agent; missing ones are
 registered, changed ones updated with ``If-Match`` of their version, undeclared ones removed; a
 ``409 conflict`` on register is skipped; ``None`` makes no request. Autocomplete runs under a
