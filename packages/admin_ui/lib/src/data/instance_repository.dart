@@ -377,7 +377,7 @@ abstract interface class InstanceRepository {
 /// The path of the OIDC callback below the API base (08 2.2 step 4).
 const String oidcCallbackPath = '/auth/oidc/callback';
 
-/// [entry] of an `InstanceSetting` JSON object.
+/// The setting of an `InstanceSetting` JSON object.
 InstanceSettingEntry instanceSettingOfJson(Map<String, Object?> json) =>
     InstanceSettingEntry(
       key: json['key']! as String,
