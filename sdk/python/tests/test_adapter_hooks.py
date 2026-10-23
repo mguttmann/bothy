@@ -29,6 +29,7 @@ from bothy_sdk.adapter import (
 from bothy_sdk.generated.models import ProjectReadiness
 from bothy_sdk.runs import RunHandle
 from bothy_sdk.sources import EventSource, SourceReady
+from bothy_sdk.testing._patience import eventually, within_patience
 from bothy_sdk.testing.doubles import RecordingHandler, RecordingSource
 from bothy_sdk.testing.fakeserver import FakeServer
 
@@ -39,13 +40,8 @@ async def fake() -> AsyncIterator[FakeServer]:
         yield server
 
 
-async def until(fake: FakeServer, predicate: Callable[[], Any], limit: int = 400) -> None:
-    for _ in range(limit):
-        if predicate():
-            return
-        await fake.pass_time(0.05)
-        await asyncio.sleep(0.005)
-    raise AssertionError("condition not reached")
+async def until(fake: FakeServer, predicate: Callable[[], Any]) -> None:
+    await eventually(predicate, "the condition", step=lambda: fake.pass_time(0.05))
 
 
 def make_adapter(fake: FakeServer, handler: RecordingHandler, consumer: str) -> Adapter:
@@ -72,7 +68,7 @@ async def running(adapter: Adapter, fake: FakeServer) -> AsyncIterator[None]:
     finally:
         await adapter.stop()
         with contextlib.suppress(Exception):
-            await asyncio.wait_for(task, 10)
+            await within_patience(task)
 
 
 class Refusing(RecordingHandler):
