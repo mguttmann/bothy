@@ -2948,7 +2948,7 @@ export interface paths {
         /**
          * Full-text search
          * @description Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-         *     are not returned.
+         *     are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
          */
         get: operations["search"];
         put?: never;
@@ -2968,7 +2968,7 @@ export interface paths {
         };
         /**
          * Prefix search over thread titles
-         * @description For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first.
+         * @description For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most `search.page_size_max`.
          */
         get: operations["searchThreadTitles"];
         put?: never;

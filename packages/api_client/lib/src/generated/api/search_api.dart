@@ -23,7 +23,7 @@ class SearchApi {
   const SearchApi(this._dio, this._serializers);
 
   /// Full-text search
-  /// Results are filtered by &#x60;message.read&#x60;, &#x60;thread.read&#x60; and &#x60;file.read&#x60; inside the query; counts are not returned.
+  /// Results are filtered by &#x60;message.read&#x60;, &#x60;thread.read&#x60; and &#x60;file.read&#x60; inside the query; counts are not returned. Page size &#x60;search.page_size_default&#x60;, at most &#x60;search.page_size_max&#x60; (14, 4.7).
   ///
   /// Parameters:
   /// * [q] - Query in web search syntax: words, \"phrases\", `or`, `-word`.
@@ -226,7 +226,7 @@ class SearchApi {
   }
 
   /// Prefix search over thread titles
-  /// For the quick switcher (14, 4.9): words shorter than &#x60;search.prefix_min_chars&#x60; are dropped; same access filter as &#x60;/search&#x60;, newest activity first.
+  /// For the quick switcher (14, 4.9): words shorter than &#x60;search.prefix_min_chars&#x60; are dropped; same access filter as &#x60;/search&#x60;, newest activity first. Page size &#x60;search.page_size_default&#x60;, at most &#x60;search.page_size_max&#x60;.
   ///
   /// Parameters:
   /// * [q] - Typed prefix text.
