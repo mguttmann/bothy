@@ -22,12 +22,12 @@ What `install` establishes:
   (docs/spec/06-api.md 2 "Kein null", ADR 0053).
 * Unknown event type: ``EventPage.from_dict`` drops every item of ``events`` whose ``type`` is
   not in `KNOWN_EVENT_TYPES` before the generated code runs; the caller still advances with
-  ``next_cursor`` (docs/spec/04-sync-protokoll.md 7.4).
+  ``next_cursor`` (docs/spec/04-sync-protocol.md 7.4).
 
 Not covered here: unknown gateway ops and close codes (the gateway module of M2-29). Known
 values decode exactly as without the hooks.
 
-Example:
+Examples:
     >>> import bothy_sdk  # importing any part of the SDK installs the hooks
     >>> from bothy_sdk.generated.models import ThreadState
     >>> state = ThreadState("archived_example")
@@ -86,7 +86,7 @@ class UnknownEvent:
     """An event whose ``type`` this SDK version does not know (or that has no ``type``).
 
     The core has no model for it (ADR 0026 "Confirmation"); callers skip it and keep advancing
-    their cursor (docs/spec/04-sync-protokoll.md 7.1).
+    their cursor (docs/spec/04-sync-protocol.md 7.1).
 
     Attributes:
         type: The received ``type``, or ``""`` when it is missing or not a string.
@@ -160,7 +160,7 @@ def is_unknown(value: enum.Enum) -> bool:
         True for a pseudo member that carries a value received from a newer server; False for
         every member the enum declares.
 
-    Example:
+    Examples:
         >>> from bothy_sdk.generated.models import ActorKind
         >>> is_unknown(ActorKind("robot_example")), is_unknown(ActorKind.USER)
         (True, False)
@@ -279,7 +279,7 @@ def decode_event(data: Mapping[str, Any]) -> KnownEvent | UnknownEvent:
         KeyError: A known event lacks a required member.
         ValueError: A known event carries a value of the wrong type.
 
-    Example:
+    Examples:
         >>> event = decode_event({"type": "future.example", "seq": 9})
         >>> isinstance(event, UnknownEvent), event.type, event.seq
         (True, 'future.example', 9)

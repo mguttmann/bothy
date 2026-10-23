@@ -1,0 +1,30 @@
+{
+  "api_versions": [
+    "v1"
+  ],
+  "auth_providers": [
+    {
+      "id": "01900000-0000-7000-8000-000000000001",
+      "kind": "local",
+      "name": "Local accounts"
+    }
+  ],
+  "branding": {
+    "accent_color": "spruce",
+    "product_name": "Example Chat"
+  },
+  "features": [],
+  "gateway": {
+    "protocol_versions": [
+      1
+    ],
+    "url": "/api/v1/gateway"
+  },
+  "instance_id": "01900000-0000-7000-8000-000000000002",
+  "jwks_uri": "/api/v1/instance/jwks",
+  "local_password_enabled": true,
+  "min_client_versions": [],
+  "setup_required": false,
+  "spec_version": "0.2.0",
+  "webhook_keys_uri": "/api/v1/instance/webhook-keys"
+}

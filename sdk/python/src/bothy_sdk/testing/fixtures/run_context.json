@@ -1,0 +1,41 @@
+{
+  "channel_context": [],
+  "context_floor_seq": 0,
+  "run_id": "01900000-0000-7000-8000-000000000101",
+  "thread_context": [
+    {
+      "attachments": [],
+      "author": {
+        "display_name": "Alex",
+        "handle": "alex",
+        "id": "01900000-0000-7000-8000-000000000201",
+        "kind": "user"
+      },
+      "content_md": "Hello @Lotse",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "kind": "text",
+      "message_id": "01900000-0000-7000-8000-000000000105",
+      "origin": "human",
+      "role": "user",
+      "thread_seq": 1,
+      "trust": "trigger"
+    }
+  ],
+  "trigger_message": {
+    "attachments": [],
+    "author": {
+      "display_name": "Alex",
+      "handle": "alex",
+      "id": "01900000-0000-7000-8000-000000000201",
+      "kind": "user"
+    },
+    "content_md": "Hello @Lotse",
+    "created_at": "2026-01-01T00:00:00.000Z",
+    "kind": "text",
+    "message_id": "01900000-0000-7000-8000-000000000105",
+    "origin": "human",
+    "role": "user",
+    "thread_seq": 1,
+    "trust": "trigger"
+  }
+}

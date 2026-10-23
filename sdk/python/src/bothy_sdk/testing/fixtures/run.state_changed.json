@@ -1,0 +1,44 @@
+{
+  "actor": {
+    "kind": "system"
+  },
+  "id": "01900000-0000-7000-8000-000000000906",
+  "occurred_at": "2026-01-01T00:00:00.000Z",
+  "payload": {
+    "run": {
+      "agent_id": "01900000-0000-7000-8000-000000000301",
+      "billing_mode_expected": "organization",
+      "billing_mode_used": "organization",
+      "channel_id": "01900000-0000-7000-8000-000000000103",
+      "cost": {
+        "amount_micros": 0,
+        "currency": "USD",
+        "is_estimate": true
+      },
+      "id": "01900000-0000-7000-8000-000000000101",
+      "queued_at": "2026-01-01T00:00:00.000Z",
+      "started_at": "2026-01-01T00:00:00.000Z",
+      "state": "running",
+      "step_count": 0,
+      "thread_id": "01900000-0000-7000-8000-000000000102",
+      "triggered_by": "01900000-0000-7000-8000-000000000201",
+      "version": 3
+    },
+    "trigger_state": "working",
+    "triggering_message_id": "01900000-0000-7000-8000-000000000105"
+  },
+  "permission_version": 1,
+  "resource": {
+    "id": "01900000-0000-7000-8000-000000000101",
+    "kind": "run",
+    "version": 3
+  },
+  "schema_version": 1,
+  "scope": {
+    "channel_id": "01900000-0000-7000-8000-000000000103",
+    "space_id": "01900000-0000-7000-8000-000000000104",
+    "thread_id": "01900000-0000-7000-8000-000000000102"
+  },
+  "seq": 6,
+  "type": "run.state_changed"
+}

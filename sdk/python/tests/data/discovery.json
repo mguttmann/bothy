@@ -1,0 +1,11 @@
+{
+  "instance_id": "0192f4a0-7b1c-7000-8a00-0000000000a1",
+  "setup_required": false,
+  "api_versions": ["v1"],
+  "spec_version": "1.0.0",
+  "gateway": {"url": "/api/v1/gateway", "protocol_versions": [1]},
+  "branding": {"product_name": "Example Chat"},
+  "auth_providers": [],
+  "jwks_uri": "/api/v1/instance/jwks",
+  "webhook_keys_uri": "/api/v1/instance/webhook-keys"
+}

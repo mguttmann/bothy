@@ -62,3 +62,22 @@ def answering() -> Callable[[Mapping[str, Any]], tuple[Client, list[httpx.Reques
         return client, seen
 
     return make
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    """Async tests of the hand layer run on asyncio (the anyio pytest plugin of httpx)."""
+    return "asyncio"
+
+
+def config_defaults() -> dict[str, str]:
+    """The "Default" column of docs/operations/configuration.md by key, backticks removed."""
+    out: dict[str, str] = {}
+    text = (REPO / "docs" / "operations" / "configuration.md").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if not line.startswith("| `"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 5:  # key, env, place, type, default, ...
+            out.setdefault(cells[0].strip("`"), cells[4].strip("`"))
+    return out

@@ -32,6 +32,8 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `zizmor` | `1.30.1` | security analysis of the workflows | MIT | required by the planning basis; checks injection, permissions, pinning |
 | `mkdocs` | `1.6.1` | docs site | BSD | ADR 0045 |
 | `mkdocs-material` | `9.7.7` | theme of the docs site | MIT | ADR 0045 |
+| `mkdocstrings` | `1.0.8` | API reference of the Python SDK from its docstrings (`docs/sdk/python.md`) | ISC | the MkDocs plugin for references from source code (23 "Documentation in code", M2-29) |
+| `mkdocstrings-python` | `2.0.10` | Python handler of mkdocstrings: reads the SDK with griffe without importing it, google docstrings | ISC | the official Python handler of mkdocstrings |
 | `semgrep` | `1.180.0` | project rules (`.semgrep/`) | LGPL-2.1 | pattern rules for project invariants without an own parser (R-QA-05) |
 | `@mermaid-js/mermaid-cli` | `11.17.0` | rendering diagrams | MIT | reference renderer of Mermaid; major 11 as at planning time |
 | `puppeteer` | `25.13.0` | browser control for mermaid-cli | Apache-2.0 | dependency of mermaid-cli; determines the browser version |
