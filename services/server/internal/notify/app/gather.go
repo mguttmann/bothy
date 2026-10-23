@@ -94,20 +94,31 @@ func (p *Push) gather(ctx context.Context, g group, users []ids.ID, now time.Tim
 			QuietHours: quiet[u], Devices: devices[u], Policy: policy,
 		}
 		if g.kind.HasThread() {
-			f.ThreadID = g.threadID
-			f.Level = levels[u]
-			f.Level.DirectMessage = g.kind == domain.KindDM
-			// The window is one job query per person; a decision that ends before the window step
-			// (no right, level, active in the thread) does not read it (domain.NeedsWindow).
-			if domain.NeedsWindow(f) {
-				if f.Window, err = p.window(ctx, u, g.threadID, now); err != nil {
-					return nil, err
-				}
+			if f, err = p.threadFacts(ctx, f, g, u, levels[u]); err != nil {
+				return nil, err
 			}
 		}
 		out[u] = f
 	}
 	return out, nil
+}
+
+// threadFacts adds the thread, the level facts and the window of user to f for a kind with
+// thread. The window is one job query per person; a decision that ends before the window step
+// (no right, level, active in the thread) does not read it (domain.NeedsWindow).
+func (p *Push) threadFacts(ctx context.Context, f domain.RecipientFacts, g group, user ids.ID, level domain.LevelFacts) (domain.RecipientFacts, error) {
+	f.ThreadID = g.threadID
+	f.Level = level
+	f.Level.DirectMessage = g.kind == domain.KindDM
+	if !domain.NeedsWindow(f) {
+		return f, nil
+	}
+	w, err := p.window(ctx, user, g.threadID, f.Now)
+	if err != nil {
+		return domain.RecipientFacts{}, err
+	}
+	f.Window = w
+	return f, nil
 }
 
 // runKind reports the kinds of the run starter (RecipientFacts.RunStarter).

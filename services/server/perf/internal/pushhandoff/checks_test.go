@@ -50,9 +50,13 @@ func request(token, nid, msg string, at time.Time) apnstest.Request {
 		Body:   body(nid, "mention", thread, msg, `,"badge":1`)}
 }
 
-// run is a clean run: the window holds n mention messages of Alex, each mentioning Sam and
+// runMessages is how many mention messages the window of a clean run holds.
+const runMessages = 3
+
+// run is a clean run: the window holds runMessages mention messages of Alex, each mentioning Sam and
 // Robin, committed at t0 + i seconds and accepted 100 ms later; one message lies in the warm-up.
-func run(n int) pushhandoff.Run {
+func run() pushhandoff.Run {
+	n := runMessages
 	r := pushhandoff.Run{
 		Registrations: map[string]pushhandoff.Registration{samToken: {ID: samReg, Recipient: samID}, robinToken: {ID: robinReg, Recipient: robinID}},
 		Occurred:      map[string]time.Time{}, From: t0, To: t0.Add(time.Hour), Canary: canary, MinSamples: 2 * n,
@@ -102,7 +106,7 @@ func TestHintSample(t *testing.T) {
 	if got := pushhandoff.Sample(t0.Add(500*time.Millisecond), t0.Add(offset), offset); got != 500*time.Millisecond {
 		t.Errorf("sample %s, want 500ms", got)
 	}
-	r := run(3)
+	r := run()
 	r.Offset = 0
 	r.From = t0.Add(time.Second) // message 0 now lies in the warm-up
 	r.To = t0.Add(2 * time.Second)
@@ -122,7 +126,7 @@ func TestHintSample(t *testing.T) {
 
 func TestMatcher(t *testing.T) {
 	t.Parallel()
-	if res := pushhandoff.Check(run(3)); !res.OK() || len(res.Samples) != 6 || res.Matched != 6 || res.Received != 8 {
+	if res := pushhandoff.Check(run()); !res.OK() || len(res.Samples) != 6 || res.Matched != 6 || res.Received != 8 {
 		t.Fatalf("clean run: ok %v, %d samples, %d matched, %d received, problems %v", res.OK(), len(res.Samples), res.Matched, res.Received, res.Problems)
 	}
 	last := func(r *pushhandoff.Run) *apnstest.Request { return &r.Requests[len(r.Requests)-1] }
@@ -191,7 +195,7 @@ func TestMatcher(t *testing.T) {
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			r := run(3)
+			r := run()
 			mutate(&r)
 			res := pushhandoff.Check(r)
 			if res.OK() || !strings.Contains(strings.Join(res.Problems, "\n"), want[name]) {
@@ -210,7 +214,7 @@ func TestMatcher(t *testing.T) {
 
 func TestMinSamples(t *testing.T) {
 	t.Parallel()
-	r := run(3)
+	r := run()
 	r.MinSamples = 7
 	res := pushhandoff.Check(r)
 	if res.OK() || !strings.Contains(strings.Join(res.Problems, "\n"), "MinSamples") {

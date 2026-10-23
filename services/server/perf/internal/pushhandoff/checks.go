@@ -103,90 +103,16 @@ type pair struct{ message, recipient string }
 func Check(run Run) Result {
 	var p problems
 	res := Result{Received: len(run.Requests)}
-	mentions := map[string]Send{}
-	for _, s := range run.Sends {
-		if s.Status != http.StatusCreated {
-			p.add("answer not 201", "status %d scheduled %s: %s", s.Status, s.Scheduled.Format(time.RFC3339Nano), s.Body)
-			continue
-		}
-		if len(s.Recipients) > 0 {
-			mentions[s.MessageID] = s
-		}
-	}
-	seen := map[pair][]Hint{}
-	nids := map[string]int{}
-	for i, r := range run.Requests {
-		reg, known := run.Registrations[r.Token]
-		name := "request " + fmt.Sprint(i)
-		if known {
-			name += " registration " + reg.ID
-		}
-		if run.Canary != "" && carries(r, run.Canary) {
-			p.add("canary in a request", "%s", name)
-		}
-		h, err := DecodeRequest(r)
-		if err != nil {
-			p.add("request does not decode", "%s: %v", name, err)
-			continue
-		}
-		if h.AcceptedAt.IsZero() {
-			p.add("Fake answer other than 200", "%s message %s", name, h.Message)
-		}
-		if !known {
-			p.add("token of no seeded registration", "%s apns-id %s", name, h.APNsID)
-			continue
-		}
-		if h.Sync {
-			p.add("badge sync request", "%s", name)
-			continue
-		}
-		if nids[h.NID]++; nids[h.NID] == 2 {
-			p.add("two requests with one nid", "nid %s", h.NID)
-		}
-		m, ok := mentions[h.Message]
-		switch {
-		case !ok:
-			p.add("b.m is no mention message of the run", "%s message %q", name, h.Message)
-			continue
-		case !slices.Contains(m.Recipients, reg.Recipient):
-			p.add("recipient not mentioned", "%s message %s", name, h.Message)
-			continue
-		}
-		if h.Kind != "mention" {
-			p.add("b.k is not mention", "%s message %s kind %q", name, h.Message, h.Kind)
-		}
-		if h.Thread != m.Thread || h.CollapseID != m.Thread {
-			p.add("b.t or apns-collapse-id is not the thread", "%s message %s", name, h.Message)
-		}
-		if h.Badge == nil || *h.Badge < 1 {
-			p.add("aps.badge missing or below one", "%s message %s", name, h.Message)
-		}
-		k := pair{h.Message, reg.Recipient}
-		seen[k] = append(seen[k], h)
-	}
+	mentions := checkSends(&p, run.Sends)
+	seen := checkRequests(&p, run, mentions)
 	for k, hs := range seen {
 		if len(hs) > 1 {
 			p.add("two requests for one pair", "message %s recipient %s: %d", k.message, k.recipient, len(hs))
 		}
 	}
 	for _, s := range run.Sends {
-		if s.Status != http.StatusCreated || len(s.Recipients) == 0 || !inWindow(s.Scheduled, run.From, run.To) {
-			continue
-		}
-		occurred, ok := run.Occurred[s.MessageID]
-		if !ok {
-			p.add("no message.created in event_log", "message %s", s.MessageID)
-		}
-		for _, rcp := range s.Recipients {
-			res.Expected++
-			hs := seen[pair{s.MessageID, rcp}]
-			switch {
-			case len(hs) == 0:
-				p.add("expected pair without a request", "message %s recipient %s", s.MessageID, rcp)
-			case len(hs) == 1 && ok && !hs[0].AcceptedAt.IsZero():
-				res.Matched++
-				res.Samples = append(res.Samples, Sample(hs[0].AcceptedAt, occurred, run.Offset))
-			}
+		if s.Status == http.StatusCreated && len(s.Recipients) > 0 && inWindow(s.Scheduled, run.From, run.To) {
+			sampleSend(&p, &res, run, s, seen)
 		}
 	}
 	for _, id := range run.Unhealthy {
@@ -197,6 +123,115 @@ func Check(run Run) Result {
 	}
 	res.Problems = p.list()
 	return res
+}
+
+// sampleSend adds the expected pairs of the mention s of the window to res: a sample for each
+// recipient with exactly one accepted request, a problem for each without one.
+func sampleSend(p *problems, res *Result, run Run, s Send, seen map[pair][]Hint) {
+	occurred, ok := run.Occurred[s.MessageID]
+	if !ok {
+		p.add("no message.created in event_log", "message %s", s.MessageID)
+	}
+	for _, rcp := range s.Recipients {
+		res.Expected++
+		hs := seen[pair{s.MessageID, rcp}]
+		switch {
+		case len(hs) == 0:
+			p.add("expected pair without a request", "message %s recipient %s", s.MessageID, rcp)
+		case len(hs) == 1 && ok && !hs[0].AcceptedAt.IsZero():
+			res.Matched++
+			res.Samples = append(res.Samples, Sample(hs[0].AcceptedAt, occurred, run.Offset))
+		}
+	}
+}
+
+// checkSends reports every answer other than 201 and returns the mention messages by ID.
+func checkSends(p *problems, sends []Send) map[string]Send {
+	mentions := map[string]Send{}
+	for _, s := range sends {
+		if s.Status != http.StatusCreated {
+			p.add("answer not 201", "status %d scheduled %s: %s", s.Status, s.Scheduled.Format(time.RFC3339Nano), s.Body)
+			continue
+		}
+		if len(s.Recipients) > 0 {
+			mentions[s.MessageID] = s
+		}
+	}
+	return mentions
+}
+
+// checkRequests checks every request at the Fake and returns the hints that belong to a
+// (mention message, mentioned recipient) pair of the run, by pair.
+func checkRequests(p *problems, run Run, mentions map[string]Send) map[pair][]Hint {
+	seen := map[pair][]Hint{}
+	nids := map[string]int{}
+	for i, r := range run.Requests {
+		reg, known := run.Registrations[r.Token]
+		name := "request " + fmt.Sprint(i)
+		if known {
+			name += " registration " + reg.ID
+		}
+		h, ok := decodeChecked(p, name, r, run.Canary)
+		switch {
+		case !ok:
+			continue
+		case !known:
+			p.add("token of no seeded registration", "%s apns-id %s", name, h.APNsID)
+			continue
+		case h.Sync:
+			p.add("badge sync request", "%s", name)
+			continue
+		}
+		if nids[h.NID]++; nids[h.NID] == 2 {
+			p.add("two requests with one nid", "nid %s", h.NID)
+		}
+		if checkHint(p, name, h, reg, mentions) {
+			k := pair{h.Message, reg.Recipient}
+			seen[k] = append(seen[k], h)
+		}
+	}
+	return seen
+}
+
+// decodeChecked checks r for the canary, decodes it and checks the answer of the Fake; ok is
+// false when the request does not decode.
+func decodeChecked(p *problems, name string, r apnstest.Request, canary string) (Hint, bool) {
+	if canary != "" && carries(r, canary) {
+		p.add("canary in a request", "%s", name)
+	}
+	h, err := DecodeRequest(r)
+	if err != nil {
+		p.add("request does not decode", "%s: %v", name, err)
+		return Hint{}, false
+	}
+	if h.AcceptedAt.IsZero() {
+		p.add("Fake answer other than 200", "%s message %s", name, h.Message)
+	}
+	return h, true
+}
+
+// checkHint checks one decoded hint of a seeded registration against the mention it names and
+// reports whether it belongs to a pair of the run.
+func checkHint(p *problems, name string, h Hint, reg Registration, mentions map[string]Send) bool {
+	m, ok := mentions[h.Message]
+	switch {
+	case !ok:
+		p.add("b.m is no mention message of the run", "%s message %q", name, h.Message)
+		return false
+	case !slices.Contains(m.Recipients, reg.Recipient):
+		p.add("recipient not mentioned", "%s message %s", name, h.Message)
+		return false
+	}
+	if h.Kind != "mention" {
+		p.add("b.k is not mention", "%s message %s kind %q", name, h.Message, h.Kind)
+	}
+	if h.Thread != m.Thread || h.CollapseID != m.Thread {
+		p.add("b.t or apns-collapse-id is not the thread", "%s message %s", name, h.Message)
+	}
+	if h.Badge == nil || *h.Badge < 1 {
+		p.add("aps.badge missing or below one", "%s message %s", name, h.Message)
+	}
+	return true
 }
 
 // carries reports whether the canary appears in the body, a header name or a header value of r.

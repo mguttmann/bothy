@@ -28,7 +28,7 @@ func TestNeedsWindowMatchesDecide(t *testing.T) {
 		}
 	}
 	needed, skipped := 0, 0
-	for kind := range uint8(len(domain.Kinds())) {
+	for kind := uint8(0); int(kind) < len(domain.Kinds()); kind++ {
 		for level := range uint8(4) {
 			for def := range uint8(3) {
 				for _, flags := range flagSets {
@@ -79,7 +79,9 @@ func TestNeedsWindow(t *testing.T) {
 		}, true},
 		{"mention without push.deliver", func(in *domain.RecipientFacts) { in.Kind, in.Allowed = domain.KindMention, false }, false},
 		{"mention to its author", func(in *domain.RecipientFacts) { in.Kind, in.Author = domain.KindMention, true }, false},
-		{"security", func(in *domain.RecipientFacts) { in.Kind, in.ThreadID, in.Level = domain.KindSecurity, threadID, domain.LevelFacts{} }, false},
+		{"security", func(in *domain.RecipientFacts) {
+			in.Kind, in.ThreadID, in.Level = domain.KindSecurity, threadID, domain.LevelFacts{}
+		}, false},
 	}
 	for _, c := range cases {
 		in := base

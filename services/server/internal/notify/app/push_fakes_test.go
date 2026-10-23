@@ -619,9 +619,9 @@ type fakeScheduler struct {
 	mu stdsync.Mutex
 	// windowReads counts WindowEnd calls.
 	windowReads int
-	windows map[[2]ids.ID]time.Time
-	flushes map[string]time.Time
-	sends   []scheduledSend
+	windows     map[[2]ids.ID]time.Time
+	flushes     map[string]time.Time
+	sends       []scheduledSend
 	// gateways are the inserted notify.gateway_send jobs, unique per hint and recipient.
 	gateways []app.GatewayJob
 	syncs    map[ids.ID]time.Time
