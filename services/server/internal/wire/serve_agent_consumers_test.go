@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -215,6 +216,31 @@ func (w *consumerWorld) tailed(a consumerAgent, consumer string) int64 {
 	return last
 }
 
+// restInsideTimeout runs attempts of a REST delivery until one fits inside timeout and returns the
+// consumer of that attempt. An attempt prepares a fresh consumer and returns its name and a pair
+// of polls: the first delivers, the second returns what it repeated. The window counts from just
+// before the pair to just after it, so the server saw less than timeout between delivery and
+// the repeat check whenever the window is shorter; a longer window is retried, never asserted.
+func restInsideTimeout(t *testing.T, timeout time.Duration, attempt func(int) (string, func() []event)) string {
+	t.Helper()
+	deadline := testkit.Deadline()
+	for i := 0; time.Now().Before(deadline); i++ {
+		name, pair := attempt(i)
+		begin := time.Now()
+		again := pair()
+		if time.Since(begin) >= timeout {
+			t.Logf("attempt %d took longer than the timeout %s, trying again", i, timeout)
+			continue
+		}
+		if len(again) != 0 {
+			t.Fatalf("a poll inside the timeout repeated %v", again)
+		}
+		return name
+	}
+	t.Fatalf("no pair of polls fitted inside the timeout %s", timeout)
+	return ""
+}
+
 // quiet reads frames of c for d and returns them; the window must stay closed meanwhile.
 func quiet(t *testing.T, c *wstest.Client, d time.Duration) []frame {
 	t.Helper()
@@ -388,7 +414,7 @@ func TestAgentConsumers(t *testing.T) {
 		readUntil(t, c, func(f frame) bool { return f.op == "catchup.complete" })
 		first := w.post(ch.thread, "first")
 		var flags []redeliveredFrame
-		ctx, cancel := context.WithTimeout(context.Background(), 4*consumerAckTimeout)
+		ctx, cancel := context.WithDeadline(context.Background(), testkit.Deadline())
 		defer cancel()
 		for len(flags) < 2 {
 			op, raw, err := c.Next(ctx)
@@ -426,17 +452,26 @@ func TestAgentConsumers(t *testing.T) {
 			t.Fatalf("event_log rows with redelivered: %d %v", stored, err)
 		}
 		// Over REST: a poll inside the timeout repeats nothing, a poll after it repeats with the flag.
-		w.poll(w.base, a, "rest-redeliver", "")
-		rest1 := w.post(ch.thread, "rest one")
-		_, evs := w.poll(w.base, a, "rest-redeliver", "")
-		if len(evs) != 1 || evs[0].ClientMsgID != rest1 {
-			t.Fatalf("poll %v", evs)
-		}
-		if _, again := w.poll(w.base, a, "rest-redeliver", ""); len(again) != 0 {
-			t.Fatalf("a poll inside the timeout repeated %v", again)
-		}
+		// The server measures the timeout on the clock of this process, from a moment after the
+		// delivering poll started to a moment before the next poll returned; a pair of polls that
+		// took longer than the timeout (a loaded machine) proves nothing and is tried again with a
+		// fresh consumer, until a pair fits.
+		consumer := restInsideTimeout(t, consumerAckTimeout, func(attempt int) (string, func() []event) {
+			name := fmt.Sprintf("rest-redeliver-%d", attempt)
+			w.poll(w.base, a, name, "")
+			rest1 := w.post(ch.thread, fmt.Sprintf("rest one %d", attempt))
+			w.tailed(a, name) // the wait for the log tail stays outside the measured pair
+			return name, func() []event {
+				_, evs := w.poll(w.base, a, name, "")
+				if len(evs) != 1 || evs[0].ClientMsgID != rest1 {
+					t.Fatalf("poll %v", evs)
+				}
+				_, again := w.poll(w.base, a, name, "")
+				return again
+			}
+		})
 		time.Sleep(consumerAckTimeout + 200*time.Millisecond)
-		p, again := w.poll(w.base, a, "rest-redeliver", "")
+		p, again := w.poll(w.base, a, consumer, "")
 		if len(again) != 1 || !bytes.Contains(p.Events[0], []byte(`"redelivered":true`)) {
 			t.Fatalf("a poll after the timeout %s", p.Events)
 		}
@@ -750,4 +785,26 @@ func TestAgentConsumers(t *testing.T) {
 			t.Fatalf("acked_seq %d after the shutdown, want %d", acked, seq)
 		}
 	})
+}
+
+// TestRestInsideTimeoutRetriesASlowPair: a pair of polls slower than the timeout is tried again
+// with a fresh attempt and never asserted, so a loaded machine cannot fail the check inside the
+// timeout; the attempt whose pair fits decides.
+func TestRestInsideTimeoutRetriesASlowPair(t *testing.T) {
+	t.Parallel()
+	const timeout = 10 * time.Millisecond
+	var tried []int
+	name := restInsideTimeout(t, timeout, func(attempt int) (string, func() []event) {
+		tried = append(tried, attempt)
+		return strconv.Itoa(attempt), func() []event {
+			if attempt == 0 {
+				time.Sleep(2 * timeout) // longer than the timeout: its repeat must not count
+				return []event{{}}
+			}
+			return nil
+		}
+	})
+	if name == "0" || len(tried) < 2 || tried[0] != 0 {
+		t.Fatalf("attempts %v ended with %q, want the slow attempt 0 retried", tried, name)
+	}
 }
