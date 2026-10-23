@@ -73,6 +73,15 @@
 /// [RedirectUriView]) and the [FlagsSection] with its [FlagSwitchDialog], and the data source
 /// [InstanceRepository] ([ApiInstanceRepository]), which [AdminRepository] includes. A write
 /// that loses against a concurrent change ends in [InstanceVersionConflict].
+///
+/// M8-08 adds the import of 01 3.7 (web only, [AdminSection.dataImport]): the [ImportListPage]
+/// with "Add source" ([ImportCreateDialog], the mapping file converted by [mappingJsonOf], the
+/// server's pointers translated by [mappingPathOf]), the [ImportSourcePage] with the counters,
+/// the failed items, the state steps ([ImportStateAction], [ImportConfirm]) and the
+/// [ImportChannelTable] with the lead steps and the [ImportOperatorDialog], the
+/// [ImportController] over the [ImportSourceSnapshot] that `getImport` and `import.progress`
+/// carry, and the data source [ImportRepository] ([ApiImportRepository]), which
+/// [AdminRepository] includes.
 library;
 
 export 'src/access/source_chain.dart';
@@ -144,6 +153,15 @@ export 'src/hosts/llm_login_section.dart';
 export 'src/hosts/pairing_wizard.dart';
 export 'src/hosts/server_host_section.dart';
 export 'src/hosts/session_users_section.dart';
+export 'src/import/import_channel_table.dart';
+export 'src/import/import_controller.dart';
+export 'src/import/import_create_dialog.dart';
+export 'src/import/import_dialogs.dart';
+export 'src/import/import_labels.dart';
+export 'src/import/import_list_page.dart';
+export 'src/import/import_repository.dart';
+export 'src/import/import_source_page.dart';
+export 'src/import/mapping_file.dart';
 export 'src/incoming_webhooks/create_incoming_dialog.dart';
 export 'src/incoming_webhooks/incoming_webhooks_view.dart';
 export 'src/instance/accent_picker.dart';

@@ -15,6 +15,7 @@ import 'package:auth/auth.dart';
 
 import '../apps/manifest_picker.dart' show PickedFile;
 import '../audit/audit_repository.dart';
+import '../import/import_repository.dart';
 import 'access_repository.dart';
 import 'agents_repository.dart';
 import 'apps_repository.dart';
@@ -291,8 +292,8 @@ final class WaitingDevice {
 /// repository never asks for a step-up on its own (fixed requirement 10). It also holds the
 /// grant calls of [AccessRepository] (M4-27), the host calls of [HostsRepository] (M4-37) and
 /// the app and webhook calls of [AppsRepository] (M6-08) and the instance settings, branding,
-/// feature flags and login providers of [InstanceRepository] (M6-09), so an app passes one
-/// repository to the shell.
+/// feature flags and login providers of [InstanceRepository] (M6-09) and the import sources of
+/// [ImportRepository] (M8-08), so an app passes one repository to the shell.
 ///
 /// The audit log of A6 is part of it ([AuditRepository], brief M4-29), so the shell hands one
 /// repository to every screen.
@@ -306,6 +307,7 @@ abstract interface class AdminRepository
         AppsRepository,
         AuditRepository,
         HostsRepository,
+        ImportRepository,
         InstanceRepository {
   /// One page of people; [query] and [status] are request parameters of `listUsers`.
   Future<AdminPage<AdminPerson>> people({
@@ -494,7 +496,8 @@ final class ApiAdminRepository implements AdminRepository {
       _instance = ApiInstanceRepository(
         _api,
         newIdempotencyKey: newIdempotencyKey,
-      );
+      ),
+      _imports = ApiImportRepository(_api, newIdempotencyKey: newIdempotencyKey);
 
   final ApiClient _api;
   final String Function() _newKey;
@@ -503,6 +506,88 @@ final class ApiAdminRepository implements AdminRepository {
   final ApiHostsRepository _hosts;
   final ApiAppsRepository _apps;
   final ApiInstanceRepository _instance;
+  final ApiImportRepository _imports;
+
+  @override
+  Future<ImportSourcesPage> importSources({String? cursor}) =>
+      _imports.importSources(cursor: cursor);
+
+  @override
+  Future<ImportSourceSnapshot> importSource(String id) =>
+      _imports.importSource(id);
+
+  @override
+  Future<ImportSourceSnapshot> createImportSource({
+    required String name,
+    required Map<String, Object?> config,
+    required String purpose,
+  }) => _imports.createImportSource(
+    name: name,
+    config: config,
+    purpose: purpose,
+  );
+
+  @override
+  Future<ImportSourceSnapshot> startImport(
+    String id, {
+    required String purpose,
+  }) => _imports.startImport(id, purpose: purpose);
+
+  @override
+  Future<ImportSourceSnapshot> pauseImport(
+    String id, {
+    required String purpose,
+  }) => _imports.pauseImport(id, purpose: purpose);
+
+  @override
+  Future<ImportSourceSnapshot> cancelImport(
+    String id, {
+    required String purpose,
+  }) => _imports.cancelImport(id, purpose: purpose);
+
+  @override
+  Future<ImportSourceSnapshot> completeImport(
+    String id, {
+    required String purpose,
+  }) => _imports.completeImport(id, purpose: purpose);
+
+  @override
+  Future<ImportSourceSnapshot> setImportLead(
+    String id, {
+    required String discordChannel,
+    required ImportLead lead,
+    required String purpose,
+  }) => _imports.setImportLead(
+    id,
+    discordChannel: discordChannel,
+    lead: lead,
+    purpose: purpose,
+  );
+
+  @override
+  Future<List<ImportItemEntry>> importItems(String id, {String? state}) =>
+      _imports.importItems(id, state: state);
+
+  @override
+  Future<ImportChannelState> importChannel(String channelId) =>
+      _imports.importChannel(channelId);
+
+  @override
+  Future<ImportChannelState> setImportChannelOperator(
+    String channelId, {
+    required String? agentId,
+    required int version,
+    required String reason,
+    I1Resolution? resolveI1,
+    required String purpose,
+  }) => _imports.setImportChannelOperator(
+    channelId,
+    agentId: agentId,
+    version: version,
+    reason: reason,
+    resolveI1: resolveI1,
+    purpose: purpose,
+  );
 
   @override
   Future<List<InstanceSettingEntry>> instanceSettings() =>

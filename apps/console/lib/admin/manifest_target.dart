@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// The file pickers of the console: the browser's file input for the manifest of an app (brief
-/// M6-08 Design note 1; 11 4.1: a file, never a URL) and for the logo of the instance (M6-09).
+/// M6-08 Design note 1; 11 4.1: a file, never a URL), for the logo of the instance (M6-09) and
+/// for the mapping file of an import source (M8-08).
 library;
 
 import 'package:admin_ui/admin_ui.dart';
@@ -37,5 +38,20 @@ const String logoInputTag = 'logo';
 /// Example: `AdminBody(pickLogo: logoPickerOf(environment.files!), ...)`.
 LogoPicker logoPickerOf(FileChooser files) => () async {
   final file = await files.choose(accept: logoAccept, tag: logoInputTag);
+  return file == null ? null : PickedFile(file.name, file.bytes);
+};
+
+/// The file types of a mapping file of an import source (22 5.2: YAML).
+const String mappingAccept = '.yaml,.yml,application/yaml,text/yaml';
+
+/// The name of the mapping input in the page (`data-bothy-file-input`).
+const String mappingInputTag = 'mapping';
+
+/// The [MappingPicker] of `admin_ui` over [files] (brief M8-08 Design note 2); the bytes stay in
+/// memory, nothing reaches browser storage.
+///
+/// Example: `AdminBody(pickMapping: mappingPickerOf(environment.files!), ...)`.
+MappingPicker mappingPickerOf(FileChooser files) => () async {
+  final file = await files.choose(accept: mappingAccept, tag: mappingInputTag);
   return file == null ? null : PickedFile(file.name, file.bytes);
 };

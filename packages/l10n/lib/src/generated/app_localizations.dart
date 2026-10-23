@@ -10878,6 +10878,696 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This system does not offer starting at login for the app.'**
   String get settingsStartAtLoginUnavailable;
+
+  /// Heading of the import page of the console (01 section 3.7 and 5.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Discord'**
+  String get importTitle;
+
+  /// Button that adds an import source with its mapping file.
+  ///
+  /// In en, this message translates to:
+  /// **'Add source'**
+  String get importAdd;
+
+  /// Button that reads the import sources again (the console has no live updates).
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get importRefresh;
+
+  /// Text of the import list without a source.
+  ///
+  /// In en, this message translates to:
+  /// **'No import source yet. Add one with the mapping file of the import tool.'**
+  String get importEmpty;
+
+  /// State draft of an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get importStateDraft;
+
+  /// State running of an import source: the owner allows imports.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get importStateRunning;
+
+  /// State paused of an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get importStatePaused;
+
+  /// State completed of an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get importStateCompleted;
+
+  /// State failed of an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get importStateFailed;
+
+  /// State of an import source the owner cancelled (failed with the counter cancelled).
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get importStateCancelled;
+
+  /// Progress of an import source in the list: the number of posted items.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items imported'**
+  String importItemsImported(int count);
+
+  /// Button back from one import source to the list.
+  ///
+  /// In en, this message translates to:
+  /// **'All import sources'**
+  String get importBack;
+
+  /// Heading of the server counters of an import source (stats.server).
+  ///
+  /// In en, this message translates to:
+  /// **'Counters of the server'**
+  String get importServerCounters;
+
+  /// Heading of the counters of the import tool (stats.tool).
+  ///
+  /// In en, this message translates to:
+  /// **'Counters of the import tool'**
+  String get importToolCounters;
+
+  /// Text of a counter section without counters.
+  ///
+  /// In en, this message translates to:
+  /// **'No counters yet.'**
+  String get importNoCounters;
+
+  /// Heading of the import items in state failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed items'**
+  String get importFailedItems;
+
+  /// Text without failed import items.
+  ///
+  /// In en, this message translates to:
+  /// **'No failed items.'**
+  String get importNoFailedItems;
+
+  /// Heading of the table of mapped channels of an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel mapping'**
+  String get importChannelMapping;
+
+  /// Text of the channel table when the mapping has no channel other than skip.
+  ///
+  /// In en, this message translates to:
+  /// **'The mapping names no channel to import.'**
+  String get importNoChannels;
+
+  /// The Discord channel ID of a row of the channel table.
+  ///
+  /// In en, this message translates to:
+  /// **'Discord ID {id}'**
+  String importChannelDiscord(String id);
+
+  /// Bothy name of a mapped existing channel that could not be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Name not readable'**
+  String get importChannelUnknownName;
+
+  /// Row state: the channel item is not posted yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not imported'**
+  String get importPhaseNotImported;
+
+  /// Row state: Discord leads, the channel here is read-only.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror, read-only'**
+  String get importPhaseMirror;
+
+  /// Row state: Bothy leads and the operator is the planned one.
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy leads, operator ok'**
+  String get importPhaseOperatorOk;
+
+  /// Row state: Bothy leads and the planned operator is not set.
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy leads, no operator'**
+  String get importPhaseNoOperator;
+
+  /// Row state: Bothy leads and the operator is not the planned one.
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy leads, other operator than planned'**
+  String get importPhaseOtherOperator;
+
+  /// The channel of a row is read-only.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only'**
+  String get importReadOnly;
+
+  /// The channel of a row is writable.
+  ///
+  /// In en, this message translates to:
+  /// **'Writable'**
+  String get importWritable;
+
+  /// The planned operator of a mapped channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Planned operator: {agent}'**
+  String importPlanned(String agent);
+
+  /// A mapped channel without planned operator.
+  ///
+  /// In en, this message translates to:
+  /// **'No operator planned'**
+  String get importPlannedNone;
+
+  /// A row whose channel getChannel refused.
+  ///
+  /// In en, this message translates to:
+  /// **'The channel could not be read.'**
+  String get importChannelUnreadable;
+
+  /// Button of a channel row that hands the lead to Bothy.
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy leads'**
+  String get importLeadBothyAction;
+
+  /// Button of a channel row that hands the lead back to Discord.
+  ///
+  /// In en, this message translates to:
+  /// **'Discord leads'**
+  String get importLeadDiscordAction;
+
+  /// Button of a channel row led by Bothy whose operator is not the planned one.
+  ///
+  /// In en, this message translates to:
+  /// **'Set operator'**
+  String get importSetOperatorAction;
+
+  /// Button that starts or continues an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get importStart;
+
+  /// Button that pauses an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get importPause;
+
+  /// Button that cancels an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel import'**
+  String get importCancel;
+
+  /// Button that completes an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get importComplete;
+
+  /// Why the completion is not offered yet (22 section 13.5).
+  ///
+  /// In en, this message translates to:
+  /// **'Completing is possible once Bothy leads in every imported channel.'**
+  String get importCompleteHint;
+
+  /// Title of the confirmation of starting an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Start {name}?'**
+  String importStartTitle(String name);
+
+  /// Effect of starting an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'The import tool may then write into this source with --apply. Nothing is imported until you use the tool.'**
+  String get importStartBody;
+
+  /// Title of the confirmation of pausing an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause {name}?'**
+  String importPauseTitle(String name);
+
+  /// Effect of pausing an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'The import tool cannot write into this source until you start it again. The leads stay as they are.'**
+  String get importPauseBody;
+
+  /// Title of the confirmation of cancelling an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel {name}?'**
+  String importCancelTitle(String name);
+
+  /// Effect of cancelling an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'The source ends as cancelled and cannot be started again. What was imported stays; the import tool can no longer write into this source.'**
+  String get importCancelBody;
+
+  /// Title of the confirmation of completing an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete {name}?'**
+  String importCompleteTitle(String name);
+
+  /// Effect of completing an import source with the retention warning (22 section 13.5).
+  ///
+  /// In en, this message translates to:
+  /// **'The mirror ends and the source is completed. The mapping in import_items stays until the retention class import is deleted. After that deletion a repeated import is no longer idempotent: it would import everything again.'**
+  String get importCompleteBody;
+
+  /// Title of the confirmation that hands the lead of a channel to Bothy.
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy leads in {name}?'**
+  String importLeadBothyTitle(String name);
+
+  /// Introduction of the steps of switching a channel over (22 section 13.3).
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this order, so two places never lead at the same time:'**
+  String get importLeadBothyOrder;
+
+  /// Step 1 of switching a channel over: the owner in Discord.
+  ///
+  /// In en, this message translates to:
+  /// **'1. In Discord you set the channel read-only and removed the agent there.'**
+  String get importLeadBothyStepDiscord;
+
+  /// Step 2 of switching a channel over: the switch command of the import tool.
+  ///
+  /// In en, this message translates to:
+  /// **'2. {command} succeeded.'**
+  String importLeadBothyStepSwitch(String command);
+
+  /// Step 3 of switching a channel over: this confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'3. Now Bothy leads: the channel here becomes writable.'**
+  String get importLeadBothyStepLead;
+
+  /// Step 4 of switching a channel over: the planned operator.
+  ///
+  /// In en, this message translates to:
+  /// **'4. Then you set the operator {agent}.'**
+  String importLeadBothyStepOperator(String agent);
+
+  /// Step 4 of switching a channel over without a planned operator.
+  ///
+  /// In en, this message translates to:
+  /// **'4. The mapping plans no operator for this channel.'**
+  String get importLeadBothyStepNoOperator;
+
+  /// Warning of the switch-over when the operator of the channel is not the planned one (R-IM-08).
+  ///
+  /// In en, this message translates to:
+  /// **'The channel has another operator than the planned {agent}. Imported threads keep {agent}; with another operator they stay without an agent.'**
+  String importLeadBothyOtherOperator(String agent);
+
+  /// Title of the confirmation that hands the lead of a channel back to Discord.
+  ///
+  /// In en, this message translates to:
+  /// **'Discord leads in {name}?'**
+  String importLeadDiscordTitle(String name);
+
+  /// Effect of reverting a channel (22 section 13.4).
+  ///
+  /// In en, this message translates to:
+  /// **'The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written in Bothy stay in Bothy; {command} counts them. Afterwards you can remove the operator.'**
+  String importLeadDiscordBody(String command);
+
+  /// Notice after the lead was handed to Bothy.
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy leads in {name}.'**
+  String importLeadBothyDone(String name);
+
+  /// Notice after the lead was handed back to Discord.
+  ///
+  /// In en, this message translates to:
+  /// **'Discord leads in {name}; it is read-only here.'**
+  String importLeadDiscordDone(String name);
+
+  /// Notice after starting an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is started.'**
+  String importStarted(String name);
+
+  /// Notice after pausing an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is paused.'**
+  String importPausedDone(String name);
+
+  /// Notice after cancelling an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is cancelled.'**
+  String importCancelledDone(String name);
+
+  /// Notice after completing an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is completed.'**
+  String importCompletedDone(String name);
+
+  /// The server answered 409 conflict with reason import_state.
+  ///
+  /// In en, this message translates to:
+  /// **'The source is in another state now. The page shows the current state.'**
+  String get importConflictState;
+
+  /// The server answered 409 conflict with reason lead_not_bothy.
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy does not lead in every imported channel yet. Switch each channel over first.'**
+  String get importConflictLeadNotBothy;
+
+  /// The server answered 409 conflict with reason channel_not_imported.
+  ///
+  /// In en, this message translates to:
+  /// **'This channel is not imported yet.'**
+  String get importConflictNotImported;
+
+  /// Title of the dialog that adds an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Add import source'**
+  String get importCreateTitle;
+
+  /// Field of the name of a new import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Name of the source'**
+  String get importCreateName;
+
+  /// Explanation of the mapping file in the dialog (22 section 5.2).
+  ///
+  /// In en, this message translates to:
+  /// **'The mapping file is the YAML of the import tool (bothy import discord init-map writes a skeleton). It holds no secret and is not stored in the browser.'**
+  String get importCreateHint;
+
+  /// Button that opens the file input for the mapping file.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose mapping file'**
+  String get importCreatePick;
+
+  /// The chosen mapping file was converted.
+  ///
+  /// In en, this message translates to:
+  /// **'Mapping file read.'**
+  String get importCreateFileRead;
+
+  /// Button that adds the import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get importCreateSubmit;
+
+  /// The mapping file could not be parsed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is no valid YAML (line {line}, column {column}). A key named twice is refused too.'**
+  String importFileInvalidYaml(int line, int column);
+
+  /// The mapping file could not be parsed, without a position.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is no valid YAML.'**
+  String get importFileInvalid;
+
+  /// The mapping file is no mapping.
+  ///
+  /// In en, this message translates to:
+  /// **'The file must be one YAML mapping with text keys.'**
+  String get importFileNotMapping;
+
+  /// The mapping file is not UTF-8.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is no UTF-8 text.'**
+  String get importFileUnreadable;
+
+  /// Heading of the field errors of createImport.
+  ///
+  /// In en, this message translates to:
+  /// **'The server refused the mapping:'**
+  String get importServerErrors;
+
+  /// One field error of the mapping file: its place in the file and the problem.
+  ///
+  /// In en, this message translates to:
+  /// **'{path}: {problem}'**
+  String importFieldError(String path, String problem);
+
+  /// Place of a field error that concerns the whole mapping.
+  ///
+  /// In en, this message translates to:
+  /// **'the file'**
+  String get importFieldWholeFile;
+
+  /// Field error required.
+  ///
+  /// In en, this message translates to:
+  /// **'is required'**
+  String get importFieldRequired;
+
+  /// Field error unknown_member.
+  ///
+  /// In en, this message translates to:
+  /// **'is not a member of the mapping file'**
+  String get importFieldUnknownMember;
+
+  /// Field error invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'has a wrong type or value'**
+  String get importFieldInvalid;
+
+  /// Field error not_digits.
+  ///
+  /// In en, this message translates to:
+  /// **'must be a Discord ID in quotes, digits only'**
+  String get importFieldNotDigits;
+
+  /// Field error duplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'names a Discord ID a second time'**
+  String get importFieldDuplicate;
+
+  /// Field error too_long.
+  ///
+  /// In en, this message translates to:
+  /// **'is too long'**
+  String get importFieldTooLong;
+
+  /// Field error unknown_handle.
+  ///
+  /// In en, this message translates to:
+  /// **'names no person or agent with this handle'**
+  String get importFieldUnknownHandle;
+
+  /// Field error not_active.
+  ///
+  /// In en, this message translates to:
+  /// **'names an agent or person that is not active'**
+  String get importFieldNotActive;
+
+  /// Field error unknown_space or unknown_channel: the existing UUID names nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'names nothing that exists here'**
+  String get importFieldUnknownExisting;
+
+  /// Field error unknown_category; spaces is the key of the mapping file.
+  ///
+  /// In en, this message translates to:
+  /// **'names no category of the list spaces'**
+  String get importFieldUnknownCategory;
+
+  /// Field error not_enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'is not available yet'**
+  String get importFieldNotEnabled;
+
+  /// Title of the confirmation of adding an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {name}?'**
+  String importCreateConfirmTitle(String name);
+
+  /// Effect of adding an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'The server stores the mapping without secrets. The source starts as a draft; nothing is imported yet.'**
+  String get importCreateConfirmBody;
+
+  /// Heading of the steps after adding an import source.
+  ///
+  /// In en, this message translates to:
+  /// **'Next steps:'**
+  String get importNextSteps;
+
+  /// First step after adding a source: the check of the tool without --apply.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Check the mapping with {command}; it only reads.'**
+  String importNextCheck(String command);
+
+  /// Second step after adding a source.
+  ///
+  /// In en, this message translates to:
+  /// **'2. Start the source here.'**
+  String get importNextStart;
+
+  /// Third step after adding a source.
+  ///
+  /// In en, this message translates to:
+  /// **'3. Import with {command}.'**
+  String importNextApply(String command);
+
+  /// Title of the dialog that sets the operator of an imported channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator of {name}'**
+  String importOperatorTitle(String name);
+
+  /// Explanation of the operator step of the switch-over (22 section 13.3 step 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Bothy leads here now. Set the planned operator, so the imported threads and the channel have the same agent.'**
+  String get importOperatorBody;
+
+  /// Field of the operator dialog: the agent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get importOperatorAgent;
+
+  /// Warning of the operator dialog when another agent than the planned one is chosen (R-IM-08).
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} is not the planned operator {planned}. Imported threads keep {planned}; they stay without an agent in this channel.'**
+  String importOperatorNotPlanned(String agent, String planned);
+
+  /// Button of the operator dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Set operator'**
+  String get importOperatorSet;
+
+  /// Button that closes the operator dialog without a change.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get importOperatorSkip;
+
+  /// Notice after the operator was set.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} is the operator of {name}.'**
+  String importOperatorDone(String agent, String name);
+
+  /// Title of the dialog that removes the operator after the lead went back to Discord.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the operator of {name}?'**
+  String importOperatorRemoveTitle(String name);
+
+  /// Effect of removing the operator (22 section 13.4 step 1).
+  ///
+  /// In en, this message translates to:
+  /// **'Discord leads again. Without an operator no agent answers here.'**
+  String get importOperatorRemoveBody;
+
+  /// Button that removes the operator.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove operator'**
+  String get importOperatorRemove;
+
+  /// Notice after the operator was removed.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} has no operator now.'**
+  String importOperatorRemoved(String name);
+
+  /// One failed import item: kind, origin key (Discord IDs only) and the code of the error.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind} {origin}: {error}'**
+  String importFailedItem(String kind, String origin, String error);
+
+  /// Purpose of the step-up of import.manage when creating a source.
+  ///
+  /// In en, this message translates to:
+  /// **'Add the import source {name}'**
+  String stepUpPurposeImportCreate(String name);
+
+  /// Purpose of the step-up of import.manage when starting a source.
+  ///
+  /// In en, this message translates to:
+  /// **'Start the import {name}'**
+  String stepUpPurposeImportStart(String name);
+
+  /// Purpose of the step-up of import.manage when pausing a source.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause the import {name}'**
+  String stepUpPurposeImportPause(String name);
+
+  /// Purpose of the step-up of import.manage when cancelling a source.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel the import {name}'**
+  String stepUpPurposeImportCancel(String name);
+
+  /// Purpose of the step-up of import.manage when completing a source.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete the import {name}'**
+  String stepUpPurposeImportComplete(String name);
+
+  /// Purpose of the step-up of import.manage when changing the lead of a channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the lead of {name}'**
+  String stepUpPurposeImportLead(String name);
+
+  /// Purpose of the step-up of channel.operator.set in the import.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the operator of {name}'**
+  String stepUpPurposeImportOperator(String name);
 }
 
 class _AppLocalizationsDelegate

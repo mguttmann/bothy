@@ -6836,4 +6836,448 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsStartAtLoginUnavailable =>
       'Dieses System bietet den Start bei Anmeldung für die App nicht an.';
+
+  @override
+  String get importTitle => 'Import aus Discord';
+
+  @override
+  String get importAdd => 'Quelle hinzufügen';
+
+  @override
+  String get importRefresh => 'Aktualisieren';
+
+  @override
+  String get importEmpty =>
+      'Noch keine Importquelle. Füge eine mit der Zuordnungsdatei des Import-Werkzeugs hinzu.';
+
+  @override
+  String get importStateDraft => 'Entwurf';
+
+  @override
+  String get importStateRunning => 'Gestartet';
+
+  @override
+  String get importStatePaused => 'Pausiert';
+
+  @override
+  String get importStateCompleted => 'Abgeschlossen';
+
+  @override
+  String get importStateFailed => 'Fehlgeschlagen';
+
+  @override
+  String get importStateCancelled => 'Abgebrochen';
+
+  @override
+  String importItemsImported(int count) {
+    return '$count Einträge importiert';
+  }
+
+  @override
+  String get importBack => 'Alle Importquellen';
+
+  @override
+  String get importServerCounters => 'Zähler des Servers';
+
+  @override
+  String get importToolCounters => 'Zähler des Import-Werkzeugs';
+
+  @override
+  String get importNoCounters => 'Noch keine Zähler.';
+
+  @override
+  String get importFailedItems => 'Fehlgeschlagene Einträge';
+
+  @override
+  String get importNoFailedItems => 'Keine fehlgeschlagenen Einträge.';
+
+  @override
+  String get importChannelMapping => 'Kanal-Zuordnung';
+
+  @override
+  String get importNoChannels =>
+      'Die Zuordnung nennt keinen Kanal zum Importieren.';
+
+  @override
+  String importChannelDiscord(String id) {
+    return 'Discord-ID $id';
+  }
+
+  @override
+  String get importChannelUnknownName => 'Name nicht lesbar';
+
+  @override
+  String get importPhaseNotImported => 'Nicht importiert';
+
+  @override
+  String get importPhaseMirror => 'Spiegel, schreibgeschützt';
+
+  @override
+  String get importPhaseOperatorOk => 'Bothy führt, Bediener stimmt';
+
+  @override
+  String get importPhaseNoOperator => 'Bothy führt, kein Bediener';
+
+  @override
+  String get importPhaseOtherOperator =>
+      'Bothy führt, anderer Bediener als geplant';
+
+  @override
+  String get importReadOnly => 'Schreibgeschützt';
+
+  @override
+  String get importWritable => 'Beschreibbar';
+
+  @override
+  String importPlanned(String agent) {
+    return 'Geplanter Bediener: $agent';
+  }
+
+  @override
+  String get importPlannedNone => 'Kein Bediener geplant';
+
+  @override
+  String get importChannelUnreadable =>
+      'Der Kanal konnte nicht gelesen werden.';
+
+  @override
+  String get importLeadBothyAction => 'Bothy führt';
+
+  @override
+  String get importLeadDiscordAction => 'Discord führt';
+
+  @override
+  String get importSetOperatorAction => 'Bediener setzen';
+
+  @override
+  String get importStart => 'Starten';
+
+  @override
+  String get importPause => 'Pausieren';
+
+  @override
+  String get importCancel => 'Import abbrechen';
+
+  @override
+  String get importComplete => 'Abschließen';
+
+  @override
+  String get importCompleteHint =>
+      'Abschließen geht erst, wenn Bothy in jedem importierten Kanal führt.';
+
+  @override
+  String importStartTitle(String name) {
+    return '$name starten?';
+  }
+
+  @override
+  String get importStartBody =>
+      'Das Import-Werkzeug darf danach mit --apply in diese Quelle schreiben. Importiert wird erst, wenn du das Werkzeug aufrufst.';
+
+  @override
+  String importPauseTitle(String name) {
+    return '$name pausieren?';
+  }
+
+  @override
+  String get importPauseBody =>
+      'Das Import-Werkzeug kann nicht in diese Quelle schreiben, bis du sie wieder startest. Die Führung bleibt, wie sie ist.';
+
+  @override
+  String importCancelTitle(String name) {
+    return '$name abbrechen?';
+  }
+
+  @override
+  String get importCancelBody =>
+      'Die Quelle endet als abgebrochen und kann nicht wieder gestartet werden. Was importiert ist, bleibt; das Import-Werkzeug kann nicht mehr in diese Quelle schreiben.';
+
+  @override
+  String importCompleteTitle(String name) {
+    return '$name abschließen?';
+  }
+
+  @override
+  String get importCompleteBody =>
+      'Der Spiegel endet und die Quelle ist abgeschlossen. Die Zuordnung in import_items bleibt, bis die Aufbewahrungsklasse import gelöscht wird. Nach dieser Löschung ist ein wiederholter Import nicht mehr idempotent: er würde alles erneut importieren.';
+
+  @override
+  String importLeadBothyTitle(String name) {
+    return 'Bothy führt in $name?';
+  }
+
+  @override
+  String get importLeadBothyOrder =>
+      'Halte diese Reihenfolge ein, damit nie zwei Orte gleichzeitig führen:';
+
+  @override
+  String get importLeadBothyStepDiscord =>
+      '1. In Discord hast du den Kanal schreibgeschützt und den Agenten dort entfernt.';
+
+  @override
+  String importLeadBothyStepSwitch(String command) {
+    return '2. $command war erfolgreich.';
+  }
+
+  @override
+  String get importLeadBothyStepLead =>
+      '3. Jetzt führt Bothy: der Kanal hier wird beschreibbar.';
+
+  @override
+  String importLeadBothyStepOperator(String agent) {
+    return '4. Danach setzt du den Bediener $agent.';
+  }
+
+  @override
+  String get importLeadBothyStepNoOperator =>
+      '4. Die Zuordnung plant für diesen Kanal keinen Bediener.';
+
+  @override
+  String importLeadBothyOtherOperator(String agent) {
+    return 'Der Kanal hat einen anderen Bediener als den geplanten $agent. Importierte Threads behalten $agent; mit einem anderen Bediener bleiben sie ohne Agent.';
+  }
+
+  @override
+  String importLeadDiscordTitle(String name) {
+    return 'Discord führt in $name?';
+  }
+
+  @override
+  String importLeadDiscordBody(String command) {
+    return 'Der Kanal hier wird für alle schreibgeschützt, auch für Inhaber, und laufende Antworten von Agenten werden abgebrochen. In Bothy geschriebene Nachrichten bleiben in Bothy; $command zählt sie. Danach kannst du den Bediener entfernen.';
+  }
+
+  @override
+  String importLeadBothyDone(String name) {
+    return 'Bothy führt in $name.';
+  }
+
+  @override
+  String importLeadDiscordDone(String name) {
+    return 'Discord führt in $name; hier ist er schreibgeschützt.';
+  }
+
+  @override
+  String importStarted(String name) {
+    return '$name ist gestartet.';
+  }
+
+  @override
+  String importPausedDone(String name) {
+    return '$name ist pausiert.';
+  }
+
+  @override
+  String importCancelledDone(String name) {
+    return '$name ist abgebrochen.';
+  }
+
+  @override
+  String importCompletedDone(String name) {
+    return '$name ist abgeschlossen.';
+  }
+
+  @override
+  String get importConflictState =>
+      'Die Quelle ist inzwischen in einem anderen Zustand. Die Seite zeigt den aktuellen Zustand.';
+
+  @override
+  String get importConflictLeadNotBothy =>
+      'Bothy führt noch nicht in jedem importierten Kanal. Stelle zuerst jeden Kanal um.';
+
+  @override
+  String get importConflictNotImported =>
+      'Dieser Kanal ist noch nicht importiert.';
+
+  @override
+  String get importCreateTitle => 'Importquelle hinzufügen';
+
+  @override
+  String get importCreateName => 'Name der Quelle';
+
+  @override
+  String get importCreateHint =>
+      'Die Zuordnungsdatei ist das YAML des Import-Werkzeugs (bothy import discord init-map schreibt ein Gerüst). Sie enthält kein Geheimnis und wird nicht im Browser gespeichert.';
+
+  @override
+  String get importCreatePick => 'Zuordnungsdatei wählen';
+
+  @override
+  String get importCreateFileRead => 'Zuordnungsdatei gelesen.';
+
+  @override
+  String get importCreateSubmit => 'Hinzufügen';
+
+  @override
+  String importFileInvalidYaml(int line, int column) {
+    return 'Die Datei ist kein gültiges YAML (Zeile $line, Spalte $column). Auch ein doppelt genannter Schlüssel wird abgelehnt.';
+  }
+
+  @override
+  String get importFileInvalid => 'Die Datei ist kein gültiges YAML.';
+
+  @override
+  String get importFileNotMapping =>
+      'Die Datei muss eine YAML-Zuordnung mit Text-Schlüsseln sein.';
+
+  @override
+  String get importFileUnreadable => 'Die Datei ist kein UTF-8-Text.';
+
+  @override
+  String get importServerErrors => 'Der Server hat die Zuordnung abgelehnt:';
+
+  @override
+  String importFieldError(String path, String problem) {
+    return '$path: $problem';
+  }
+
+  @override
+  String get importFieldWholeFile => 'die Datei';
+
+  @override
+  String get importFieldRequired => 'fehlt';
+
+  @override
+  String get importFieldUnknownMember => 'ist kein Feld der Zuordnungsdatei';
+
+  @override
+  String get importFieldInvalid => 'hat einen falschen Typ oder Wert';
+
+  @override
+  String get importFieldNotDigits =>
+      'muss eine Discord-ID in Anführungszeichen sein, nur Ziffern';
+
+  @override
+  String get importFieldDuplicate => 'nennt eine Discord-ID ein zweites Mal';
+
+  @override
+  String get importFieldTooLong => 'ist zu lang';
+
+  @override
+  String get importFieldUnknownHandle =>
+      'nennt keine Person und keinen Agenten mit diesem Handle';
+
+  @override
+  String get importFieldNotActive =>
+      'nennt einen Agenten oder eine Person, die nicht aktiv ist';
+
+  @override
+  String get importFieldUnknownExisting => 'nennt nichts, was hier existiert';
+
+  @override
+  String get importFieldUnknownCategory =>
+      'nennt keine Kategorie der Liste spaces (Bereiche)';
+
+  @override
+  String get importFieldNotEnabled => 'ist noch nicht verfügbar';
+
+  @override
+  String importCreateConfirmTitle(String name) {
+    return '$name hinzufügen?';
+  }
+
+  @override
+  String get importCreateConfirmBody =>
+      'Der Server speichert die Zuordnung ohne Geheimnisse. Die Quelle beginnt als Entwurf; noch wird nichts importiert.';
+
+  @override
+  String get importNextSteps => 'Nächste Schritte:';
+
+  @override
+  String importNextCheck(String command) {
+    return '1. Prüfe die Zuordnung mit $command; das liest nur.';
+  }
+
+  @override
+  String get importNextStart => '2. Starte die Quelle hier.';
+
+  @override
+  String importNextApply(String command) {
+    return '3. Importiere mit $command.';
+  }
+
+  @override
+  String importOperatorTitle(String name) {
+    return 'Bediener von $name';
+  }
+
+  @override
+  String get importOperatorBody =>
+      'Bothy führt hier jetzt. Setze den geplanten Bediener, damit die importierten Threads und der Kanal denselben Agenten haben.';
+
+  @override
+  String get importOperatorAgent => 'Agent';
+
+  @override
+  String importOperatorNotPlanned(String agent, String planned) {
+    return '$agent ist nicht der geplante Bediener $planned. Importierte Threads behalten $planned; sie bleiben in diesem Kanal ohne Agent.';
+  }
+
+  @override
+  String get importOperatorSet => 'Bediener setzen';
+
+  @override
+  String get importOperatorSkip => 'Nicht jetzt';
+
+  @override
+  String importOperatorDone(String agent, String name) {
+    return '$agent ist der Bediener von $name.';
+  }
+
+  @override
+  String importOperatorRemoveTitle(String name) {
+    return 'Bediener von $name entfernen?';
+  }
+
+  @override
+  String get importOperatorRemoveBody =>
+      'Discord führt wieder. Ohne Bediener antwortet hier kein Agent.';
+
+  @override
+  String get importOperatorRemove => 'Bediener entfernen';
+
+  @override
+  String importOperatorRemoved(String name) {
+    return '$name hat jetzt keinen Bediener.';
+  }
+
+  @override
+  String importFailedItem(String kind, String origin, String error) {
+    return '$kind $origin: $error';
+  }
+
+  @override
+  String stepUpPurposeImportCreate(String name) {
+    return 'Importquelle $name hinzufügen';
+  }
+
+  @override
+  String stepUpPurposeImportStart(String name) {
+    return 'Import $name starten';
+  }
+
+  @override
+  String stepUpPurposeImportPause(String name) {
+    return 'Import $name pausieren';
+  }
+
+  @override
+  String stepUpPurposeImportCancel(String name) {
+    return 'Import $name abbrechen';
+  }
+
+  @override
+  String stepUpPurposeImportComplete(String name) {
+    return 'Import $name abschließen';
+  }
+
+  @override
+  String stepUpPurposeImportLead(String name) {
+    return 'Führung von $name ändern';
+  }
+
+  @override
+  String stepUpPurposeImportOperator(String name) {
+    return 'Bediener von $name setzen';
+  }
 }

@@ -10445,5 +10445,711 @@
   "settingsStartAtLoginUnavailable": "This system does not offer starting at login for the app.",
   "@settingsStartAtLoginUnavailable": {
     "description": "Shown instead of the switch Start at login where the system offers no login start (15 section 10.3)."
+  },
+  "importTitle": "Import from Discord",
+  "@importTitle": {
+    "description": "Heading of the import page of the console (01 section 3.7 and 5.5)."
+  },
+  "importAdd": "Add source",
+  "@importAdd": {
+    "description": "Button that adds an import source with its mapping file."
+  },
+  "importRefresh": "Refresh",
+  "@importRefresh": {
+    "description": "Button that reads the import sources again (the console has no live updates)."
+  },
+  "importEmpty": "No import source yet. Add one with the mapping file of the import tool.",
+  "@importEmpty": {
+    "description": "Text of the import list without a source."
+  },
+  "importStateDraft": "Draft",
+  "@importStateDraft": {
+    "description": "State draft of an import source."
+  },
+  "importStateRunning": "Started",
+  "@importStateRunning": {
+    "description": "State running of an import source: the owner allows imports."
+  },
+  "importStatePaused": "Paused",
+  "@importStatePaused": {
+    "description": "State paused of an import source."
+  },
+  "importStateCompleted": "Completed",
+  "@importStateCompleted": {
+    "description": "State completed of an import source."
+  },
+  "importStateFailed": "Failed",
+  "@importStateFailed": {
+    "description": "State failed of an import source."
+  },
+  "importStateCancelled": "Cancelled",
+  "@importStateCancelled": {
+    "description": "State of an import source the owner cancelled (failed with the counter cancelled)."
+  },
+  "importItemsImported": "{count} items imported",
+  "@importItemsImported": {
+    "description": "Progress of an import source in the list: the number of posted items.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "12"
+      }
+    }
+  },
+  "importBack": "All import sources",
+  "@importBack": {
+    "description": "Button back from one import source to the list."
+  },
+  "importServerCounters": "Counters of the server",
+  "@importServerCounters": {
+    "description": "Heading of the server counters of an import source (stats.server)."
+  },
+  "importToolCounters": "Counters of the import tool",
+  "@importToolCounters": {
+    "description": "Heading of the counters of the import tool (stats.tool)."
+  },
+  "importNoCounters": "No counters yet.",
+  "@importNoCounters": {
+    "description": "Text of a counter section without counters."
+  },
+  "importFailedItems": "Failed items",
+  "@importFailedItems": {
+    "description": "Heading of the import items in state failed."
+  },
+  "importNoFailedItems": "No failed items.",
+  "@importNoFailedItems": {
+    "description": "Text without failed import items."
+  },
+  "importChannelMapping": "Channel mapping",
+  "@importChannelMapping": {
+    "description": "Heading of the table of mapped channels of an import source."
+  },
+  "importNoChannels": "The mapping names no channel to import.",
+  "@importNoChannels": {
+    "description": "Text of the channel table when the mapping has no channel other than skip."
+  },
+  "importChannelDiscord": "Discord ID {id}",
+  "@importChannelDiscord": {
+    "description": "The Discord channel ID of a row of the channel table.",
+    "placeholders": {
+      "id": {
+        "type": "String",
+        "example": "1029384000"
+      }
+    }
+  },
+  "importChannelUnknownName": "Name not readable",
+  "@importChannelUnknownName": {
+    "description": "Bothy name of a mapped existing channel that could not be read."
+  },
+  "importPhaseNotImported": "Not imported",
+  "@importPhaseNotImported": {
+    "description": "Row state: the channel item is not posted yet."
+  },
+  "importPhaseMirror": "Mirror, read-only",
+  "@importPhaseMirror": {
+    "description": "Row state: Discord leads, the channel here is read-only."
+  },
+  "importPhaseOperatorOk": "Bothy leads, operator ok",
+  "@importPhaseOperatorOk": {
+    "description": "Row state: Bothy leads and the operator is the planned one."
+  },
+  "importPhaseNoOperator": "Bothy leads, no operator",
+  "@importPhaseNoOperator": {
+    "description": "Row state: Bothy leads and the planned operator is not set."
+  },
+  "importPhaseOtherOperator": "Bothy leads, other operator than planned",
+  "@importPhaseOtherOperator": {
+    "description": "Row state: Bothy leads and the operator is not the planned one."
+  },
+  "importReadOnly": "Read-only",
+  "@importReadOnly": {
+    "description": "The channel of a row is read-only."
+  },
+  "importWritable": "Writable",
+  "@importWritable": {
+    "description": "The channel of a row is writable."
+  },
+  "importPlanned": "Planned operator: {agent}",
+  "@importPlanned": {
+    "description": "The planned operator of a mapped channel.",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Lotse"
+      }
+    }
+  },
+  "importPlannedNone": "No operator planned",
+  "@importPlannedNone": {
+    "description": "A mapped channel without planned operator."
+  },
+  "importChannelUnreadable": "The channel could not be read.",
+  "@importChannelUnreadable": {
+    "description": "A row whose channel getChannel refused."
+  },
+  "importLeadBothyAction": "Bothy leads",
+  "@importLeadBothyAction": {
+    "description": "Button of a channel row that hands the lead to Bothy."
+  },
+  "importLeadDiscordAction": "Discord leads",
+  "@importLeadDiscordAction": {
+    "description": "Button of a channel row that hands the lead back to Discord."
+  },
+  "importSetOperatorAction": "Set operator",
+  "@importSetOperatorAction": {
+    "description": "Button of a channel row led by Bothy whose operator is not the planned one."
+  },
+  "importStart": "Start",
+  "@importStart": {
+    "description": "Button that starts or continues an import source."
+  },
+  "importPause": "Pause",
+  "@importPause": {
+    "description": "Button that pauses an import source."
+  },
+  "importCancel": "Cancel import",
+  "@importCancel": {
+    "description": "Button that cancels an import source."
+  },
+  "importComplete": "Complete",
+  "@importComplete": {
+    "description": "Button that completes an import source."
+  },
+  "importCompleteHint": "Completing is possible once Bothy leads in every imported channel.",
+  "@importCompleteHint": {
+    "description": "Why the completion is not offered yet (22 section 13.5)."
+  },
+  "importStartTitle": "Start {name}?",
+  "@importStartTitle": {
+    "description": "Title of the confirmation of starting an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importStartBody": "The import tool may then write into this source with --apply. Nothing is imported until you use the tool.",
+  "@importStartBody": {
+    "description": "Effect of starting an import source."
+  },
+  "importPauseTitle": "Pause {name}?",
+  "@importPauseTitle": {
+    "description": "Title of the confirmation of pausing an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importPauseBody": "The import tool cannot write into this source until you start it again. The leads stay as they are.",
+  "@importPauseBody": {
+    "description": "Effect of pausing an import source."
+  },
+  "importCancelTitle": "Cancel {name}?",
+  "@importCancelTitle": {
+    "description": "Title of the confirmation of cancelling an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importCancelBody": "The source ends as cancelled and cannot be started again. What was imported stays; the import tool can no longer write into this source.",
+  "@importCancelBody": {
+    "description": "Effect of cancelling an import source."
+  },
+  "importCompleteTitle": "Complete {name}?",
+  "@importCompleteTitle": {
+    "description": "Title of the confirmation of completing an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importCompleteBody": "The mirror ends and the source is completed. The mapping in import_items stays until the retention class import is deleted. After that deletion a repeated import is no longer idempotent: it would import everything again.",
+  "@importCompleteBody": {
+    "description": "Effect of completing an import source with the retention warning (22 section 13.5)."
+  },
+  "importLeadBothyTitle": "Bothy leads in {name}?",
+  "@importLeadBothyTitle": {
+    "description": "Title of the confirmation that hands the lead of a channel to Bothy.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importLeadBothyOrder": "Keep this order, so two places never lead at the same time:",
+  "@importLeadBothyOrder": {
+    "description": "Introduction of the steps of switching a channel over (22 section 13.3)."
+  },
+  "importLeadBothyStepDiscord": "1. In Discord you set the channel read-only and removed the agent there.",
+  "@importLeadBothyStepDiscord": {
+    "description": "Step 1 of switching a channel over: the owner in Discord."
+  },
+  "importLeadBothyStepSwitch": "2. {command} succeeded.",
+  "@importLeadBothyStepSwitch": {
+    "description": "Step 2 of switching a channel over: the switch command of the import tool.",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "bothy import discord switch --channel 1029384000 --discord-locked"
+      }
+    }
+  },
+  "importLeadBothyStepLead": "3. Now Bothy leads: the channel here becomes writable.",
+  "@importLeadBothyStepLead": {
+    "description": "Step 3 of switching a channel over: this confirmation."
+  },
+  "importLeadBothyStepOperator": "4. Then you set the operator {agent}.",
+  "@importLeadBothyStepOperator": {
+    "description": "Step 4 of switching a channel over: the planned operator.",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Lotse"
+      }
+    }
+  },
+  "importLeadBothyStepNoOperator": "4. The mapping plans no operator for this channel.",
+  "@importLeadBothyStepNoOperator": {
+    "description": "Step 4 of switching a channel over without a planned operator."
+  },
+  "importLeadBothyOtherOperator": "The channel has another operator than the planned {agent}. Imported threads keep {agent}; with another operator they stay without an agent.",
+  "@importLeadBothyOtherOperator": {
+    "description": "Warning of the switch-over when the operator of the channel is not the planned one (R-IM-08).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Lotse"
+      }
+    }
+  },
+  "importLeadDiscordTitle": "Discord leads in {name}?",
+  "@importLeadDiscordTitle": {
+    "description": "Title of the confirmation that hands the lead of a channel back to Discord.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importLeadDiscordBody": "The channel here becomes read-only for everyone, owners too, and answers of agents in progress are cancelled. Messages written in Bothy stay in Bothy; {command} counts them. Afterwards you can remove the operator.",
+  "@importLeadDiscordBody": {
+    "description": "Effect of reverting a channel (22 section 13.4).",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "bothy import discord revert --channel 1029384000"
+      }
+    }
+  },
+  "importLeadBothyDone": "Bothy leads in {name}.",
+  "@importLeadBothyDone": {
+    "description": "Notice after the lead was handed to Bothy.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importLeadDiscordDone": "Discord leads in {name}; it is read-only here.",
+  "@importLeadDiscordDone": {
+    "description": "Notice after the lead was handed back to Discord.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importStarted": "{name} is started.",
+  "@importStarted": {
+    "description": "Notice after starting an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importPausedDone": "{name} is paused.",
+  "@importPausedDone": {
+    "description": "Notice after pausing an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importCancelledDone": "{name} is cancelled.",
+  "@importCancelledDone": {
+    "description": "Notice after cancelling an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importCompletedDone": "{name} is completed.",
+  "@importCompletedDone": {
+    "description": "Notice after completing an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importConflictState": "The source is in another state now. The page shows the current state.",
+  "@importConflictState": {
+    "description": "The server answered 409 conflict with reason import_state."
+  },
+  "importConflictLeadNotBothy": "Bothy does not lead in every imported channel yet. Switch each channel over first.",
+  "@importConflictLeadNotBothy": {
+    "description": "The server answered 409 conflict with reason lead_not_bothy."
+  },
+  "importConflictNotImported": "This channel is not imported yet.",
+  "@importConflictNotImported": {
+    "description": "The server answered 409 conflict with reason channel_not_imported."
+  },
+  "importCreateTitle": "Add import source",
+  "@importCreateTitle": {
+    "description": "Title of the dialog that adds an import source."
+  },
+  "importCreateName": "Name of the source",
+  "@importCreateName": {
+    "description": "Field of the name of a new import source."
+  },
+  "importCreateHint": "The mapping file is the YAML of the import tool (bothy import discord init-map writes a skeleton). It holds no secret and is not stored in the browser.",
+  "@importCreateHint": {
+    "description": "Explanation of the mapping file in the dialog (22 section 5.2)."
+  },
+  "importCreatePick": "Choose mapping file",
+  "@importCreatePick": {
+    "description": "Button that opens the file input for the mapping file."
+  },
+  "importCreateFileRead": "Mapping file read.",
+  "@importCreateFileRead": {
+    "description": "The chosen mapping file was converted."
+  },
+  "importCreateSubmit": "Add",
+  "@importCreateSubmit": {
+    "description": "Button that adds the import source."
+  },
+  "importFileInvalidYaml": "The file is no valid YAML (line {line}, column {column}). A key named twice is refused too.",
+  "@importFileInvalidYaml": {
+    "description": "The mapping file could not be parsed.",
+    "placeholders": {
+      "line": {
+        "type": "int",
+        "example": "3"
+      },
+      "column": {
+        "type": "int",
+        "example": "1"
+      }
+    }
+  },
+  "importFileInvalid": "The file is no valid YAML.",
+  "@importFileInvalid": {
+    "description": "The mapping file could not be parsed, without a position."
+  },
+  "importFileNotMapping": "The file must be one YAML mapping with text keys.",
+  "@importFileNotMapping": {
+    "description": "The mapping file is no mapping."
+  },
+  "importFileUnreadable": "The file is no UTF-8 text.",
+  "@importFileUnreadable": {
+    "description": "The mapping file is not UTF-8."
+  },
+  "importServerErrors": "The server refused the mapping:",
+  "@importServerErrors": {
+    "description": "Heading of the field errors of createImport."
+  },
+  "importFieldError": "{path}: {problem}",
+  "@importFieldError": {
+    "description": "One field error of the mapping file: its place in the file and the problem.",
+    "placeholders": {
+      "path": {
+        "type": "String",
+        "example": "channels[2].planned_operator"
+      },
+      "problem": {
+        "type": "String",
+        "example": "names no person or agent with this handle"
+      }
+    }
+  },
+  "importFieldWholeFile": "the file",
+  "@importFieldWholeFile": {
+    "description": "Place of a field error that concerns the whole mapping."
+  },
+  "importFieldRequired": "is required",
+  "@importFieldRequired": {
+    "description": "Field error required."
+  },
+  "importFieldUnknownMember": "is not a member of the mapping file",
+  "@importFieldUnknownMember": {
+    "description": "Field error unknown_member."
+  },
+  "importFieldInvalid": "has a wrong type or value",
+  "@importFieldInvalid": {
+    "description": "Field error invalid."
+  },
+  "importFieldNotDigits": "must be a Discord ID in quotes, digits only",
+  "@importFieldNotDigits": {
+    "description": "Field error not_digits."
+  },
+  "importFieldDuplicate": "names a Discord ID a second time",
+  "@importFieldDuplicate": {
+    "description": "Field error duplicate."
+  },
+  "importFieldTooLong": "is too long",
+  "@importFieldTooLong": {
+    "description": "Field error too_long."
+  },
+  "importFieldUnknownHandle": "names no person or agent with this handle",
+  "@importFieldUnknownHandle": {
+    "description": "Field error unknown_handle."
+  },
+  "importFieldNotActive": "names an agent or person that is not active",
+  "@importFieldNotActive": {
+    "description": "Field error not_active."
+  },
+  "importFieldUnknownExisting": "names nothing that exists here",
+  "@importFieldUnknownExisting": {
+    "description": "Field error unknown_space or unknown_channel: the existing UUID names nothing."
+  },
+  "importFieldUnknownCategory": "names no category of the list spaces",
+  "@importFieldUnknownCategory": {
+    "description": "Field error unknown_category; spaces is the key of the mapping file."
+  },
+  "importFieldNotEnabled": "is not available yet",
+  "@importFieldNotEnabled": {
+    "description": "Field error not_enabled."
+  },
+  "importCreateConfirmTitle": "Add {name}?",
+  "@importCreateConfirmTitle": {
+    "description": "Title of the confirmation of adding an import source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "importCreateConfirmBody": "The server stores the mapping without secrets. The source starts as a draft; nothing is imported yet.",
+  "@importCreateConfirmBody": {
+    "description": "Effect of adding an import source."
+  },
+  "importNextSteps": "Next steps:",
+  "@importNextSteps": {
+    "description": "Heading of the steps after adding an import source."
+  },
+  "importNextCheck": "1. Check the mapping with {command}; it only reads.",
+  "@importNextCheck": {
+    "description": "First step after adding a source: the check of the tool without --apply.",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "bothy import discord --guild 100 --map mapping.yaml"
+      }
+    }
+  },
+  "importNextStart": "2. Start the source here.",
+  "@importNextStart": {
+    "description": "Second step after adding a source."
+  },
+  "importNextApply": "3. Import with {command}.",
+  "@importNextApply": {
+    "description": "Third step after adding a source.",
+    "placeholders": {
+      "command": {
+        "type": "String",
+        "example": "bothy import discord --guild 100 --map mapping.yaml --apply"
+      }
+    }
+  },
+  "importOperatorTitle": "Operator of {name}",
+  "@importOperatorTitle": {
+    "description": "Title of the dialog that sets the operator of an imported channel.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importOperatorBody": "Bothy leads here now. Set the planned operator, so the imported threads and the channel have the same agent.",
+  "@importOperatorBody": {
+    "description": "Explanation of the operator step of the switch-over (22 section 13.3 step 3)."
+  },
+  "importOperatorAgent": "Agent",
+  "@importOperatorAgent": {
+    "description": "Field of the operator dialog: the agent."
+  },
+  "importOperatorNotPlanned": "{agent} is not the planned operator {planned}. Imported threads keep {planned}; they stay without an agent in this channel.",
+  "@importOperatorNotPlanned": {
+    "description": "Warning of the operator dialog when another agent than the planned one is chosen (R-IM-08).",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Texter"
+      },
+      "planned": {
+        "type": "String",
+        "example": "Lotse"
+      }
+    }
+  },
+  "importOperatorSet": "Set operator",
+  "@importOperatorSet": {
+    "description": "Button of the operator dialog."
+  },
+  "importOperatorSkip": "Not now",
+  "@importOperatorSkip": {
+    "description": "Button that closes the operator dialog without a change."
+  },
+  "importOperatorDone": "{agent} is the operator of {name}.",
+  "@importOperatorDone": {
+    "description": "Notice after the operator was set.",
+    "placeholders": {
+      "agent": {
+        "type": "String",
+        "example": "Lotse"
+      },
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importOperatorRemoveTitle": "Remove the operator of {name}?",
+  "@importOperatorRemoveTitle": {
+    "description": "Title of the dialog that removes the operator after the lead went back to Discord.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importOperatorRemoveBody": "Discord leads again. Without an operator no agent answers here.",
+  "@importOperatorRemoveBody": {
+    "description": "Effect of removing the operator (22 section 13.4 step 1)."
+  },
+  "importOperatorRemove": "Remove operator",
+  "@importOperatorRemove": {
+    "description": "Button that removes the operator."
+  },
+  "importOperatorRemoved": "{name} has no operator now.",
+  "@importOperatorRemoved": {
+    "description": "Notice after the operator was removed.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "importFailedItem": "{kind} {origin}: {error}",
+  "@importFailedItem": {
+    "description": "One failed import item: kind, origin key (Discord IDs only) and the code of the error.",
+    "placeholders": {
+      "kind": {
+        "type": "String",
+        "example": "channel"
+      },
+      "origin": {
+        "type": "String",
+        "example": "channel:1029384000"
+      },
+      "error": {
+        "type": "String",
+        "example": "name_collision"
+      }
+    }
+  },
+  "stepUpPurposeImportCreate": "Add the import source {name}",
+  "@stepUpPurposeImportCreate": {
+    "description": "Purpose of the step-up of import.manage when creating a source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "stepUpPurposeImportStart": "Start the import {name}",
+  "@stepUpPurposeImportStart": {
+    "description": "Purpose of the step-up of import.manage when starting a source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "stepUpPurposeImportPause": "Pause the import {name}",
+  "@stepUpPurposeImportPause": {
+    "description": "Purpose of the step-up of import.manage when pausing a source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "stepUpPurposeImportCancel": "Cancel the import {name}",
+  "@stepUpPurposeImportCancel": {
+    "description": "Purpose of the step-up of import.manage when cancelling a source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "stepUpPurposeImportComplete": "Complete the import {name}",
+  "@stepUpPurposeImportComplete": {
+    "description": "Purpose of the step-up of import.manage when completing a source.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Old community server"
+      }
+    }
+  },
+  "stepUpPurposeImportLead": "Change the lead of {name}",
+  "@stepUpPurposeImportLead": {
+    "description": "Purpose of the step-up of import.manage when changing the lead of a channel.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
+  },
+  "stepUpPurposeImportOperator": "Set the operator of {name}",
+  "@stepUpPurposeImportOperator": {
+    "description": "Purpose of the step-up of channel.operator.set in the import.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "tickets"
+      }
+    }
   }
 }
