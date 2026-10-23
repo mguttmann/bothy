@@ -6098,7 +6098,7 @@ type ClientWithResponsesInterface interface {
 	// SearchWithResponse Full-text search
 	//
 	// Results are filtered by `message.read`, `thread.read` and `file.read` inside the query; counts
-	// are not returned.
+	// are not returned. Page size `search.page_size_default`, at most `search.page_size_max` (14, 4.7).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -6107,7 +6107,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchThreadTitlesWithResponse Prefix search over thread titles
 	//
-	// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first.
+	// For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first. Page size `search.page_size_default`, at most `search.page_size_max`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
