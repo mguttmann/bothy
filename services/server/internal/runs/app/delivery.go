@@ -375,24 +375,9 @@ func (s *Service) prepare(ctx context.Context, in runs.DeliveryInput, issuer Tok
 		s.noResolver(ctx, in.Type)
 		return outcome{}, nil
 	}
-	if in.Type == domain.EventAgentFollowup {
-		// A follow-up that is no longer open or whose message is deleted is not delivered: no
-		// check, no token, no audit, like a terminal run (M2-11 design note 6).
-		if ok, err := s.followupDeliverable(ctx, run.ID, in.Payload); err != nil || !ok {
-			return outcome{}, err
-		}
-	}
-	if run.State == domain.StateQueued && domain.QueuedTooOld(run.QueuedAt, s.now(), s.cfg.QueuedMaxAge) {
-		// Not an authorization decision: no check, no token, no audit (design note 3 c).
-		return outcome{}, s.expire(ctx, run)
-	}
-	tr, err := res(s, ctx, run, in)
-	if err != nil {
+	tr, ok, err := s.deliveryTrigger(ctx, in, run, res)
+	if err != nil || !ok {
 		return outcome{}, err
-	}
-	if tr.gone {
-		// The interaction of the event no longer exists (design note 11 a): nothing to check.
-		return outcome{}, nil
 	}
 	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{run.AgentID})
 	if err != nil {
@@ -411,6 +396,26 @@ func (s *Service) prepare(ctx context.Context, in runs.DeliveryInput, issuer Tok
 	}
 	o.handle = agent.Handle
 	return o, err
+}
+
+// deliveryTrigger resolves the trigger of a delivery before the check; ok is false when nothing
+// is checked or sent: a follow-up that is no longer open or whose message is deleted (no check, no
+// token, no audit, M2-11 design note 6), a queued run past run.queued_max_age, which fails without
+// a check (design note 3 c), and an interaction that no longer exists (M2-15 design note 11 a).
+func (s *Service) deliveryTrigger(ctx context.Context, in runs.DeliveryInput, run RunRow, res resolver) (trigger, bool, error) {
+	if in.Type == domain.EventAgentFollowup {
+		if ok, err := s.followupDeliverable(ctx, run.ID, in.Payload); err != nil || !ok {
+			return trigger{}, false, err
+		}
+	}
+	if run.State == domain.StateQueued && domain.QueuedTooOld(run.QueuedAt, s.now(), s.cfg.QueuedMaxAge) {
+		return trigger{}, false, s.expire(ctx, run)
+	}
+	tr, err := res(s, ctx, run, in)
+	if err != nil || tr.gone {
+		return trigger{}, false, err
+	}
+	return tr, true, nil
 }
 
 // check decides agent.invoke for the trigger tr of run and applies the result.
@@ -455,24 +460,8 @@ func (s *Service) deny(ctx context.Context, in runs.DeliveryInput, run RunRow, r
 			return err
 		}
 	case domain.DenyFailFollowup:
-		if !tr.interaction.IsZero() {
-			// interaction.created: the interaction fails, the run stays (ruling D-M2-15-15).
-			if err := s.setInteraction(ctx, tr.interaction, interactionFailed); err != nil {
-				return err
-			}
-		}
-		if tr.human {
-			if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{
-				MessageID: tr.message, State: string(domain.TriggerStateFailed), Reason: reason,
-			}); err != nil {
-				return err
-			}
-		}
-		// A refused follow-up is never processed: its row becomes discarded (M2-11 design note 6).
-		if in.Type == domain.EventAgentFollowup && s.fu != nil {
-			if err := s.fu.RefuseDelivery(ctx, run.ID, tr.message); err != nil {
-				return err
-			}
+		if err := s.failTrigger(ctx, in, run, tr, reason); err != nil {
+			return err
 		}
 	case domain.DenyKeepRun:
 	}
@@ -480,6 +469,28 @@ func (s *Service) deny(ctx context.Context, in runs.DeliveryInput, run RunRow, r
 		attrRunID: auditing.ID(run.ID), attrAgentID: auditing.ID(run.AgentID), attrStage: auditing.Code(stageDelivery),
 		attrEventType: auditing.Code(in.Type), attrTriggerKind: auditing.Code(triggerKindOf(in.Type, run)),
 	})
+}
+
+// failTrigger applies a denial that keeps the run (domain.DenyFailFollowup): the interaction of
+// interaction.created fails (ruling D-M2-15-15), the trigger_state of a human trigger message
+// fails with the reason, and a refused follow-up becomes discarded (M2-11 design note 6).
+func (s *Service) failTrigger(ctx context.Context, in runs.DeliveryInput, run RunRow, tr trigger, reason string) error {
+	if !tr.interaction.IsZero() {
+		if err := s.setInteraction(ctx, tr.interaction, interactionFailed); err != nil {
+			return err
+		}
+	}
+	if tr.human {
+		if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{
+			MessageID: tr.message, State: string(domain.TriggerStateFailed), Reason: reason,
+		}); err != nil {
+			return err
+		}
+	}
+	if in.Type == domain.EventAgentFollowup && s.fu != nil {
+		return s.fu.RefuseDelivery(ctx, run.ID, tr.message)
+	}
+	return nil
 }
 
 // auditDenial writes the one audit entry of a denial of agent.invoke in the unit of work, with the
