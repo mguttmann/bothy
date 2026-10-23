@@ -316,7 +316,7 @@ func (w *world) headerOf() map[string]any {
 }
 
 // eventsOf returns the payloads of the events of typ about run.
-func (w *world) eventsOf(typ, run string) []map[string]any { //nolint:unparam // the event type stays explicit at each call.
+func (w *world) eventsOf(typ, run string) []map[string]any {
 	w.t.Helper()
 	rs, err := w.db.Query(context.Background(), `SELECT payload::text FROM event_log WHERE type = $1 AND resource_id = $2 ORDER BY seq`, typ, run)
 	must(w.t, err)

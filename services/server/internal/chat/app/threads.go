@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	"github.com/OWNER/bothy/services/server/internal/chat/domain"
+	"github.com/OWNER/bothy/services/server/internal/chat/domain/title"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -316,9 +317,9 @@ func (s *Service) Reopen(ctx context.Context, a actor.Actor, threadID ids.ID) (c
 }
 
 // SetTitle implements chat.Threads (brief D4): thread.title.update decides who may call; If-Match
-// is required; a main thread has no title. A person sets the source manual. Agents and apps keep
-// the source, and a manual title is never replaced by them: 409 title_manual (09 section 12,
-// AG-19; docs/DECISIONS.md M1-55/3).
+// is required; a main thread has no title. Then package title decides the source on the locked
+// row (M2-18): the thread's operator agent keeps auto and gets 409 title_manual on a manual title
+// (09 section 12, AG-19); every other principal sets manual (05 thread.title.update).
 func (s *Service) SetTitle(ctx context.Context, a actor.Actor, cmd chat.SetTitleCmd) (chat.Thread, error) {
 	return s.threadUnit(ctx, a, authorize.ActionThreadTitleUpdate, cmd.ThreadID, authorize.EventThreadUpdated,
 		func(ctx context.Context, th *domain.Thread, _ ChannelRow) (bool, error) {
@@ -331,15 +332,25 @@ func (s *Service) SetTitle(ctx context.Context, a actor.Actor, cmd chat.SetTitle
 			if err := domain.CheckThreadTitle(cmd.Title, s.cfg.ThreadTitleMaxChars); err != nil {
 				return false, err
 			}
-			source := th.TitleSource
-			switch {
-			case a.Kind == actor.KindUser:
-				source = domain.TitleManual
-			case th.TitleSource == domain.TitleManual:
-				return false, errs.New(errs.CodeTitleManual, "the title was set by a person")
+			source, err := title.SourceOnUpdate(titleBy(a, *th), title.Source(th.TitleSource))
+			if err != nil {
+				return false, err
 			}
-			return th.SetTitle(cmd.Title, source), nil
+			return th.SetTitle(cmd.Title, domain.TitleSource(source)), nil
 		})
+}
+
+// titleBy classifies the principal a for the title rules of package title (brief M2-18 note 6a): a
+// person is ByPerson; the agent that is the operator of th is ByOperatorAgent; every other agent
+// or app is ByOther. kernel/actor is a port the domain may not import, so the class is decided here.
+func titleBy(a actor.Actor, th domain.Thread) title.By {
+	switch {
+	case a.Kind == actor.KindUser:
+		return title.ByPerson
+	case a.Kind == actor.KindAgent && !th.OperatorAgentID.IsZero() && a.ID == th.OperatorAgentID:
+		return title.ByOperatorAgent
+	}
+	return title.ByOther
 }
 
 // threadPrecondition checks If-Match against the locked thread (06 section 8): without the header
@@ -506,7 +517,7 @@ func (s *Service) newThread(a actor.Actor, c ChannelRow, cmd chat.CreateThreadCm
 	if err := domain.CheckThreadTitle(th.Title, s.cfg.ThreadTitleMaxChars); err != nil {
 		return domain.Thread{}, err
 	}
-	th.TitleSource = domain.CreateTitleSource(a.Kind == actor.KindUser, th.Title, s.cfg.PlaceholderTitles)
+	th.TitleSource = domain.TitleSource(s.placeholders.SourceAtCreation(titleBy(a, th), th.Title))
 	th.CreatedAt = s.now()
 	th.LastActivityAt = th.CreatedAt
 	return th, nil

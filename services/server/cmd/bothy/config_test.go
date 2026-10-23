@@ -527,7 +527,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"terminal.step_up_max_age = 1m  # default\n" +
 		"terminal.sweep_interval = 30s  # default\n" +
 		"thread.max_tags = 5  # default\n" +
-		"thread.placeholder_titles = Neuer Chat, New chat, Chat, Ohne Titel, Untitled, Test  # default\n" +
+		"thread.placeholder_titles = Neuer Chat, Chat, Ohne Titel, Test, New chat, Untitled  # default\n" +
 		"thread.title_max_chars = 200  # default\n" +
 		"voice.max_duration = 15m  # default\n" +
 		"webhook.allowed_hosts =   # default\n" +

@@ -28,6 +28,7 @@ import (
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
+	"github.com/OWNER/bothy/services/server/internal/chat/domain/title"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
@@ -89,7 +90,7 @@ var chatConfig = chatapp.Config{
 	SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 200, TagNameMaxChars: 20,
 	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200,
 	ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
-	PlaceholderTitles: []string{"Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"},
+	PlaceholderTitles: title.DefaultEntries(),
 	PageSizeDefault:   20, PageSizeMax: 50,
 	ProjectBindingTextMaxChars: 64, ReasonMaxChars: 200,
 }
@@ -218,6 +219,13 @@ func chapterSearch(t *testing.T) searchlang.Map {
 // (M3-13).
 func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 	t.Helper()
+	return newEmptyWorldWithChat(t, search, chatConfig)
+}
+
+// newEmptyWorldWithChat is newEmptyWorldWith with the chat configuration chatCfg (M2-18: a
+// configured thread.placeholder_titles).
+func newEmptyWorldWithChat(t *testing.T, search searchlang.Map, chatCfg chatapp.Config) *world {
+	t.Helper()
 	db := pgtest.New(t)
 	cfg := db.Config(pg.RoleApp)
 	cfg.MaxConns = 16
@@ -294,7 +302,7 @@ func newEmptyWorldWith(t *testing.T, search searchlang.Map) *world {
 		Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 20, PageSizeMax: 50},
 	})
 	must(t, err)
-	c, err := wire.NewChat(chatConfig, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook,
+	c, err := wire.NewChat(chatCfg, pool, uow, w.az, w.az, wire.ChatWrites{Audit: w.rec, Events: appender, Rights: w.hook,
 		Directory: w.id.Directory}, nil, w.clk)
 	must(t, err)
 	w.chat = c.Service

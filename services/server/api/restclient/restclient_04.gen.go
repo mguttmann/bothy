@@ -7,6 +7,13 @@ import (
 	"net/http"
 )
 
+// PostIncomingWebhookWithBearerResponse201Headers the declared response headers of an HTTP 201 response for PostIncomingWebhookWithBearer
+type PostIncomingWebhookWithBearerResponse201Headers struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
 // PostIncomingWebhookWithBearerResponse400Headers the declared response headers of an HTTP 400 response for PostIncomingWebhookWithBearer
 type PostIncomingWebhookWithBearerResponse400Headers struct {
 	CorrelationId *CorrelationId
@@ -26039,9 +26046,4 @@ func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON409() *Confl
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON422() *UnprocessableEntity {
 	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON429() *TooManyRequests {
-	return r.ApplicationproblemJSON429
 }

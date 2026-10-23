@@ -4112,13 +4112,13 @@
       "name": "thread.placeholder_titles",
       "env": "BOTHY_THREAD__PLACEHOLDER_TITLES",
       "kind": "list(string)",
-      "default": "[\"Neuer Chat\", \"New chat\", \"Chat\", \"Ohne Titel\", \"Untitled\", \"Test\"]",
+      "default": "[\"Neuer Chat\", \"Chat\", \"Ohne Titel\", \"Test\", \"New chat\", \"Untitled\"]",
       "required": false,
       "enum": [],
       "min": "",
       "max": "",
       "chapter": "09-agents.md",
-      "doc": "Placeholder titles: a new thread with such a title keeps title_source auto."
+      "doc": "Placeholder titles: a person's new thread with such a title, also with an appended number, keeps title_source auto; the configured list replaces the default."
     },
     {
       "name": "thread.title_max_chars",

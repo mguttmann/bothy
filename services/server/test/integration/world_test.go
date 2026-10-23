@@ -28,6 +28,7 @@ import (
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
+	"github.com/OWNER/bothy/services/server/internal/chat/domain/title"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
@@ -74,7 +75,7 @@ var chatConfig = chatapp.Config{
 	SpaceNameMaxChars: 40, ChannelNameMaxChars: 40, ChannelTopicMaxChars: 200, TagNameMaxChars: 20,
 	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200,
 	ThreadTitleMaxChars: 200, ThreadMaxTags: 5,
-	PlaceholderTitles: []string{"Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"},
+	PlaceholderTitles: title.DefaultEntries(),
 	PageSizeDefault:   20, PageSizeMax: 50,
 	ProjectBindingTextMaxChars: 64, ReasonMaxChars: 200,
 }
