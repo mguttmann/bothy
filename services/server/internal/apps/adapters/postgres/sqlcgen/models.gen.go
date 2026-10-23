@@ -651,6 +651,15 @@ type Message struct {
 	CreatedAt           pgtype.Timestamptz
 	SearchLanguage      interface{}
 	SearchVector        interface{}
+	HasAttachments      bool
+}
+
+type MessageAttachment struct {
+	MessageID pgtype.UUID
+	FileID    pgtype.UUID
+	Position  int16
+	ThreadID  pgtype.UUID
+	ChannelID pgtype.UUID
 }
 
 type MessageComponent struct {

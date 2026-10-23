@@ -256,9 +256,9 @@ func (s *Service) ownSession(ctx context.Context, a actor.Actor, fileID ids.ID, 
 		// An avatar or logo has no scope channel; its session belongs to its operation (M3-10).
 		return SessionRecord{}, notFound()
 	}
-	r := authorize.Resource{Kind: authorize.ResourceChannel, ID: rec.File.ScopeChannelID}
-	if act == authorize.ActionFileDelete {
-		r = fileResource(rec.File)
+	r, err := s.sessionResource(ctx, rec.File, act)
+	if err != nil {
+		return SessionRecord{}, err
 	}
 	d, err := s.decide(ctx, a, act, r)
 	if err != nil {
@@ -275,6 +275,15 @@ func (s *Service) ownSession(ctx context.Context, a actor.Actor, fileID ids.ID, 
 	return rec, d.Err()
 }
 
+// sessionResource is the resource of act on the file of a session: its scope channel for
+// file.upload, the file itself (fileResource through readResource) for file.delete.
+func (s *Service) sessionResource(ctx context.Context, f FileRecord, act authorize.Action) (authorize.Resource, error) {
+	if act == authorize.ActionFileDelete {
+		return s.readResource(ctx, f)
+	}
+	return authorize.Resource{Kind: authorize.ResourceChannel, ID: f.ScopeChannelID}, nil
+}
+
 // actingPrincipal is the 401 of a caller without an acting principal (anonymous or host). Every
 // lookup of a session by its uploader calls it first, so such a caller gets 401 as authorize gives
 // it for the other operations (SR7), never the 404 of a session it does not own.
@@ -283,12 +292,6 @@ func actingPrincipal(a actor.Actor) error {
 		return nil
 	}
 	return authorize.Decision{Outcome: authorize.OutcomeUnauthenticated}.Err()
-}
-
-// fileResource describes a file for file.read and file.delete (design note 15).
-func fileResource(f FileRecord) authorize.Resource {
-	return authorize.Resource{Kind: authorize.ResourceFile, ID: f.ID, ChannelID: f.ScopeChannelID, OwnerID: f.UploadedBy,
-		File: &authorize.FileFacts{Purpose: f.Purpose, Attached: false}}
 }
 
 // logDiscard logs a failed removal of parts with the file id only; the cleanup of failed files

@@ -48,6 +48,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/notify/adapters/apns/apnstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
@@ -149,6 +150,10 @@ type Options struct {
 	// JobModules receives the use cases of the jobs (wire.Deps.JobModules, M2-46): a test runs
 	// authz.expiry_sweep or terminal.sweep directly.
 	JobModules func(*wire.JobModules)
+	// TxnTestSubscribers registers in-transaction subscribers of the test after the production
+	// ones (wire.Deps.TxnTestSubscribers, M3-07): a veto subscriber of files.FileFinalized,
+	// chat.ThreadMoved or messaging.MessageDeleted.
+	TxnTestSubscribers func(reg *txn.Registry) error
 	// TerminalSessionMetrics replaces the session instruments of the terminal
 	// (wire.Deps.TerminalSessionMetrics, M2-46).
 	TerminalSessionMetrics terminalapp.SessionMetrics
@@ -324,6 +329,7 @@ func start(tb testing.TB, db *pgtest.DB, opts Options, clk clock.Clock, secretsD
 		TerminalSignals: opts.TerminalSignals, TerminalListenerGate: opts.TerminalListenerGate, TerminalMetrics: opts.TerminalMetrics,
 		TerminalModule: opts.TerminalModule, FilesImageHooks: opts.FilesImageHooks, ScopeObserver: opts.ScopeObserver,
 		JobModules: opts.JobModules, TerminalSessionMetrics: opts.TerminalSessionMetrics,
+		TxnTestSubscribers: opts.TxnTestSubscribers,
 	}
 	if opts.Telemetry != nil {
 		deps.TelemetryExporters = opts.Telemetry.exporters()

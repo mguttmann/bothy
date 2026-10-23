@@ -73,7 +73,11 @@ func TestCreateMessage_MaxContentBytes(t *testing.T) {
 // TestCreateMessage_NotEnabledMembers400 (brief D2, M2-15 design note 6 a): kind voice and
 // attachments are refused with not_enabled; a card without components, components without kind
 // card and a card of a person get their card rules; run_id of a person is run_mismatch since
-// M2-19 (design note 3); nothing is written.
+// M2-19 (design note 3); nothing is written. Since M3-07 attachment_file_ids is accepted where
+// messaging has the files port; this world (test/messagingworld) builds messaging without it
+// (app.Deps.Files nil), so the attachments row keeps the not_enabled answer of a server without
+// files. The accepted path is tested over the fake port in app/attachments_test.go and end to end
+// with the real files module in test/attachments.
 func TestCreateMessage_NotEnabledMembers400(t *testing.T) {
 	t.Parallel()
 	w := mw.New(t, subscribe)
@@ -81,6 +85,7 @@ func TestCreateMessage_NotEnabledMembers400(t *testing.T) {
 	for _, c := range []struct{ extra, pointer, code string }{
 		{`"kind":"voice"`, "/kind", "not_enabled"},
 		{`"kind":"card"`, "/components", "required"},
+		// Without the files port in this world (see above).
 		{`"attachment_file_ids":["` + ids.New().String() + `"]`, "/attachment_file_ids", "not_enabled"},
 		{`"components":[{"custom_id":"ok","type":"button","definition":{}}]`, "/kind", "invalid"},
 		{`"kind":"card","components":[{"custom_id":"ok","type":"button","definition":{}}]`, "/components", "invalid"},

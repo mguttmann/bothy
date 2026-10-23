@@ -22,9 +22,16 @@ class MessageCreate:
     Attributes:
         client_msg_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
         kind (MessageCreateKind | Unset):
-        content_md (str | Unset):
+        content_md (str | Unset): Empty or white space only content is allowed only when `attachment_file_ids` lists at
+            least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
         reply_to_message_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        attachment_file_ids (list[UUID] | Unset):
+        attachment_file_ids (list[UUID] | Unset): Own files uploaded for the channel of this message with a completed
+            upload session, in the order they appear in the message; at most `message.max_attachments`. Needs the right
+            `upload` in addition to `write` (`403 forbidden` with `reason` `capability_missing`). A file that is not
+            attachable (not the caller's, another channel, upload not completed or failed, deleted, already attached, or
+            listed twice) answers `409 conflict` with `reason` `file_not_attachable` and the pointer of the entry in
+            `detail`; more than `message.max_attachments` answer `400 validation_failed` with `errors[].code`
+            `limit_reached`. Files whose scan has not ended are attachable.
         mention_ids (list[UUID] | Unset): Optional check. The server resolves mentions from `content_md` (03 `messages`,
             content format; 07 section 4.6); when present, the set must equal the resolved set, else `400 validation_failed`
             with code `mention_mismatch`.

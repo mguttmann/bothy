@@ -114,7 +114,10 @@ def sync_detailed(
      Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
     200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
     into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-    denial sets `trigger_state = failed` with `trigger_state_reason`.
+    denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+    agent while one of its attachments is not final (scan or check still running), the agent
+    invocation waits until all attachments are final or until `file.invocation_hold_max` has
+    passed; `trigger_state` stays `received` meanwhile.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -151,7 +154,10 @@ def sync(
      Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
     200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
     into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-    denial sets `trigger_state = failed` with `trigger_state_reason`.
+    denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+    agent while one of its attachments is not final (scan or check still running), the agent
+    invocation waits until all attachments are final or until `file.invocation_hold_max` has
+    passed; `trigger_state` stays `received` meanwhile.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -183,7 +189,10 @@ async def asyncio_detailed(
      Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
     200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
     into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-    denial sets `trigger_state = failed` with `trigger_state_reason`.
+    denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+    agent while one of its attachments is not final (scan or check still running), the agent
+    invocation waits until all attachments are final or until `file.invocation_hold_max` has
+    passed; `trigger_state` stays `received` meanwhile.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -218,7 +227,10 @@ async def asyncio(
      Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
     200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
     into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-    denial sets `trigger_state = failed` with `trigger_state_reason`.
+    denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+    agent while one of its attachments is not final (scan or check still running), the agent
+    invocation waits until all attachments are final or until `file.invocation_hold_max` has
+    passed; `trigger_state` stays `received` meanwhile.
 
     Args:
         thread_id (UUID): UUIDv7 (RFC 9562), lowercase canonical form.

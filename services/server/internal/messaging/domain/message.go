@@ -116,6 +116,10 @@ type Message struct {
 	ReplyToID ids.ID
 	// Silent suppresses notifications.
 	Silent bool
+	// HasAttachments is messages.has_attachments (M3-07): true exactly when the message was
+	// created with at least one attachment and is not deleted (the CHECK
+	// messages_has_attachments_deleted_check holds the second half).
+	HasAttachments bool
 	// RunID is the run of a live box anchor (KindRun, M2-05); zero for every other message.
 	RunID ids.ID
 	// TriggerState is trigger_state of a message of a person (09 section 6), "" while NULL;

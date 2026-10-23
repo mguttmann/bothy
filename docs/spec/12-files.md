@@ -81,9 +81,16 @@ section 6). Content never appears in the event.
 Before attachment the event goes only to the uploader: it carries `audience_principal_id` =
 `uploaded_by` in the scope of the scope channel, because the scope alone would hand the file name
 to every reader of the channel, while before attachment only the uploader reads the file (05 2.2;
-docs/DECISIONS.md D-M3-03-16). An attached file is written without audience in the scope of its
-message (M3-07). Creating and completing an upload write no event: neither `upload_state` nor
-`scan_status` changes.
+docs/DECISIONS.md D-M3-03-16). An attached file is written without audience in the scope
+`{space_id, channel_id, thread_id}` of its message, with `channel_id` and `thread_id` from the
+copies in `message_attachments` (R-DM-43), and its payload has no `scope_channel_id` (section 10).
+Creating and completing an upload write no event: neither `upload_state` nor `scan_status` changes.
+
+One write appends `file.updated` for every such change, and the same write publishes the in-tx
+event `files.FileFinalized` exactly when the file becomes final (not final before, final after):
+the scan outcome, the abort of an upload and the image transactions of 7.1 and 7.3, so every
+finalization publishes once and in the transaction that stores the final state (section 10;
+docs/decisions.d/M3-07.md D-M3-07-6).
 
 ## 3. Upload flow
 
@@ -913,17 +920,58 @@ Additions of M3-05 (rulings D-M3-05-5, D-M3-05-9 to D-M3-05-12 in
 
 ## 10. Attaching and agent invocation
 
-Rules when sending a message with `file_ids` (`message.create` with `+upload`):
+Rules when a message is sent with `attachment_file_ids` (`createMessage`, and `createThread` in
+`first_message`; `message.create` with `+upload`):
 
-1. Every file belongs to the author (`uploaded_by`), has `purpose = 'attachment'`,
-   `scope_channel_id` = channel of the message, a session in state `completed`, is not
-   `failed` and is not yet attached to any message. Otherwise `409 conflict` with `reason`
-   `file_not_attachable`.
-2. At most `message.max_attachments` files.
+1. Every file was uploaded by the author (`uploaded_by`), has `purpose = 'attachment'`,
+   `scope_channel_id` = the channel of the message, an upload session in state `completed`, an
+   `upload_state` other than `failed`, no `deleted_at` and no attachment yet. A blocked file
+   (`infected`, `error`) and a file whose scan has not ended are attachable (3.4 step 3); the
+   invocation rule below protects the agent.
+2. At most `message.max_attachments` files; more give `400 validation_failed` with
+   `errors[].code` `limit_reached` and the pointer `/attachment_file_ids`
+   (`/first_message/attachment_file_ids` in `createThread`).
 3. A file is attached to at most one message (03, unique index on
    `message_attachments(file_id)`, R-DM-22). Reason: deleting a message deletes its files
-   unambiguously, without reference counting. Forwarding creates a new file.
-4. Successful sending with `clear_draft: true` removes the file from `drafts.file_ids`.
+   unambiguously, without reference counting. Forwarding creates a new file. An ID listed twice
+   in one request fails as already attached.
+4. A successful send with `clear_draft: true` removes the files from `drafts.file_ids`, because
+   the draft is deleted in the same transaction.
+
+**Check and answer.** The server locks the rows of the listed files (`FOR UPDATE`, ascending `id`)
+before it checks them, so a concurrent attach of the same file and the outcome write of the scan
+wait for the send. It walks the list in request order; the first file that fails rule 1 or 3 ends
+the request with `409 conflict` with `reason` `file_not_attachable` and `detail` = the JSON
+pointer of the entry (zero-based, for example `/attachment_file_ids/0` for the first file).
+Unknown, foreign, deleted, other-channel, open, aborted, expired, failed and already attached
+files give the same status, code, reason and headers, so the answer tells nothing about files of
+other people (SEC-UP-9). A unique violation on `message_attachments(file_id)` from a concurrent
+send gives the same answer with the pointer of the list. Nothing of the request is stored, and the
+thread sequence number is given back (03 6.2).
+
+**Content and rights.** With at least one attachment `content_md` may be empty or white space
+only (a picture without caption); without attachments it may not. Sending attachments needs
+`write` and the additional right `upload` on the channel of the thread; without `upload` the
+answer is `403 forbidden` with `reason` `capability_missing`. An agent sends files only while the
+owner's switch `supports_files_out` in its `operator_config` is not `false`
+([09-agents.md](09-agents.md) 2.2); otherwise the server rejects the message with
+`403 feature_disabled` and stores nothing.
+
+**Binding.** Each attachment row carries `position` (request order), the `thread_id` and the
+`channel_id` of its message (R-DM-43); `messages.has_attachments` is `true`. The copies follow the
+thread when it moves, in the transaction of the move; `files.scope_channel_id` counts only before
+the file is attached and never changes. An attached file is read through the channel and thread
+of its message ([05-actions.md](05-actions.md) 2.2), and its representation (`File` in
+`Message.attachments`, `getFile`, `file.updated`) omits `scope_channel_id`, because after a move
+that channel may be one the reader cannot see. Every representation of a message lists its
+attachments in position order; a deleted message lists none.
+
+**Deletion with the message.** Deleting a message removes its attachment rows, sets
+`has_attachments` to `false` and sets `files.deleted_at` of its files in the same transaction
+(section 12). It writes no `file.updated` for these files: none of the fields whose change
+section 2 announces with `file.updated` (`upload_state`, `scan_status`, thumbnails, transcript)
+changes, and `message.deleted` already removes the message with its attachments from every
+client. The objects stay until `files.purge_objects` removes them.
 
 **Invocation only after the check.** If a message with attachments triggers an agent, the
 event `agent.invocation` is written only when all attachments are final (section 2) and,
@@ -935,6 +983,29 @@ final publishes the in-tx event `files.FileFinalized` in its transaction; the mo
 subscribes to it and writes the held-back invocation ([02-architecture.md](02-architecture.md),
 section 4.3). The scheduled job `runs.invocation_hold_timeout` covers the time limit. This is
 how [04-sync-protocol.md](04-sync-protocol.md), 15.3 step 1 states it.
+
+The hold in detail:
+
+- Acceptance holds the run when an attachment of the triggering message is not final: the run is
+  `queued`, `runs.invocation_held_until` (R-DM-44) is the release time, and the job
+  `runs.invocation_hold_timeout` is scheduled for that time. The release time is fixed at
+  acceptance from one clock reading, so a later change of `file.invocation_hold_max` does not move
+  held runs.
+- `ReleaseInvocation` writes the held `agent.invocation` exactly once, either in the transaction
+  that makes the last attachment final (subscriber of `files.FileFinalized`) or from the job with
+  the attachments in their current state. Both serialize on the run row; the release sets
+  `invocation_held_until` to `NULL` and raises `runs.version` by one, without
+  `run.state_changed`. A run that ended while held (for example through `runs.queued_expiry` or a
+  cancel) keeps the column and is never released.
+- The released invocation has no `actor` and no `correlation_id`, because its writer is a job
+  without principal; the trigger stays in `triggered_by`. Scope, billing mode and settings
+  version are those of the moment of the release; the rights are checked by the delivery as for
+  every invocation (04 15.3 point 2).
+- The follow-on run of deferred follow-ups is held like an acceptance when its triggering message
+  has an attachment that is not final. A follow-up (`agent.followup`) to an existing run is not
+  held: the core contract holds only `agent.invocation` (04 15.3 point 1), and the agent reads
+  attachments only through `file.read`, which serves no bytes before `scan_status IN
+  ('clean','skipped')` (9.3).
 
 Reasons: an agent never receives unchecked bytes. Holding back in the gateway delivery would
 block the events of a consumer behind the waiting invocation, because they run in

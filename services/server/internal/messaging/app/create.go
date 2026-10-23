@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
@@ -40,6 +41,10 @@ type prepared struct {
 	// runID is the run_id of an agent's answer (M2-19 design note 3); it goes into MessagePosted
 	// only, never into the row or the hash (design note 6).
 	runID *ids.ID
+	// attachmentIDs are the files of attachment_file_ids in request order (M3-07); pointer is the
+	// JSON pointer of that list in the request body, which a refusal of files names.
+	attachmentIDs []ids.ID
+	pointer       string
 }
 
 // Create implements messaging.Messages (brief D1): the thread (404 for an unknown or invisible
@@ -51,11 +56,11 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd messaging.Creat
 	if err != nil {
 		return messaging.Created{}, err
 	}
-	info, err := s.loadThread(ctx, a, cmd.ThreadID)
+	info, err := s.loadThread(ctx, a, cmd.ThreadID, s.withAttachments(cmd.AttachmentIDs))
 	if err != nil {
 		return messaging.Created{}, err
 	}
-	p, err := s.prepare(ctx, a, cmd, info.ID, "thread:"+info.ID.String())
+	p, err := s.prepare(ctx, a, cmd, info.ID, "thread:"+info.ID.String(), "")
 	if err != nil {
 		return messaging.Created{}, err
 	}
@@ -71,15 +76,21 @@ func (s *Service) Create(ctx context.Context, a actor.Actor, cmd messaging.Creat
 	if err != nil || out.Replay {
 		return out, err
 	}
-	out.Message, err = s.reread(ctx, a, out.Message.ID)
+	out.Message, err = s.reread(ctx, a, out.Message.ID, out.Message.Attachments)
 	return out, err
 }
+
+// withAttachments reports whether a request with the files list asks for attachments: a list
+// that is not empty, in a service with the files port. Without the port the list is refused as
+// not_enabled (prepare), so message.create is checked as before M3-07.
+func (s *Service) withAttachments(list []ids.ID) bool { return len(list) > 0 && s.d.Files != nil }
 
 // reread returns the stored representation of the new message id after its unit of work (04
 // section 16.5, M2-05 brief note 7): a subscriber of MessagePosted may have changed the row in
 // the same unit (runs sets trigger_state received, version 2), so the 201 body is the row as
-// committed, read through stored like a replay.
-func (s *Service) reread(ctx context.Context, a actor.Actor, id ids.ID) (messaging.Message, error) {
+// committed, read through stored like a replay. attached are the attachments Attach returned in
+// the unit (brief M3-07 design note 6: the 201 uses them), so the answer costs no ForMessages.
+func (s *Service) reread(ctx context.Context, a actor.Actor, id ids.ID, attached []messaging.Attachment) (messaging.Message, error) {
 	m, found, err := s.d.Store.Message(ctx, id)
 	if err != nil {
 		return messaging.Message{}, err
@@ -91,7 +102,7 @@ func (s *Service) reread(ctx context.Context, a actor.Actor, id ids.ID) (messagi
 	if err != nil {
 		return messaging.Message{}, err
 	}
-	return s.stored(ctx, m, visible)
+	return s.storedWith(ctx, m, visible, attached)
 }
 
 // afterRace answers the request whose insert lost against a concurrent identical one (04 section
@@ -118,8 +129,10 @@ func (s *Service) afterRace(ctx context.Context, a actor.Actor, p prepared) (mes
 
 // loadThread reads the routing data of the thread id and authorizes message.create on it before
 // it answers a missing thread, so an unknown and an invisible id give the same 404 (02 section
-// 9.2); a read-only or archived channel is 403 channel_read_only from authorize.
-func (s *Service) loadThread(ctx context.Context, a actor.Actor, id ids.ID) (chat.ThreadInfo, error) {
+// 9.2); a read-only or archived channel is 403 channel_read_only from authorize. withFiles marks a
+// message with attachments, which needs upload besides write (05 section 4.7, M3-07): without it
+// authorize answers 403 forbidden with reason capability_missing.
+func (s *Service) loadThread(ctx context.Context, a actor.Actor, id ids.ID, withFiles bool) (chat.ThreadInfo, error) {
 	info, err := s.d.Threads.Info(ctx, id)
 	found := err == nil
 	if err != nil && errs.KindOf(err) != errs.KindNotFound {
@@ -129,6 +142,7 @@ func (s *Service) loadThread(ctx context.Context, a actor.Actor, id ids.ID) (cha
 	if found {
 		r = threadResource(info)
 	}
+	r.HasAttachments = withFiles
 	if err := s.check(ctx, a, authorize.ActionMessageCreate, r); err != nil {
 		return chat.ThreadInfo{}, err
 	}
@@ -140,8 +154,10 @@ func (s *Service) loadThread(ctx context.Context, a actor.Actor, id ids.ID) (cha
 
 // prepare checks the body of a new message for the thread (zero for a thread created with it)
 // and computes the request hash with hashContext, or with cmd.HashContext when the caller set
-// one (brief D2, D3, M2-27 design note 6c).
-func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.CreateMessageCmd, thread ids.ID, hashContext string) (prepared, error) {
+// one (brief D2, D3, M2-27 design note 6c). base is the JSON pointer of the message in the
+// request body: "" for createMessage, domain.FirstMessagePointer for createThread; the
+// attachment list is named below it (brief M3-07 design note 5 a).
+func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.CreateMessageCmd, thread ids.ID, hashContext, base string) (prepared, error) {
 	if err := domain.CheckClientMsgID(cmd.ClientMsgID); err != nil {
 		return prepared{}, err
 	}
@@ -153,15 +169,13 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err != nil {
 		return prepared{}, err
 	}
-	content := ""
-	if cmd.ContentMD != nil {
-		content = *cmd.ContentMD
-	}
-	if err := domain.CheckContent(content, s.cfg.MaxContentBytes); err != nil {
+	pointer := base + domain.AttachmentsPointer
+	content, err := s.checkBody(cmd, pointer)
+	if err != nil {
 		return prepared{}, err
 	}
 	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, kind: domain.Kind(kind), content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft,
-		runID: cmd.RunID}
+		runID: cmd.RunID, attachmentIDs: slices.Clone(cmd.AttachmentIDs), pointer: pointer}
 	// SkipMentions leaves handles empty, so send resolves and stores no mention (R-EX-09).
 	if !cmd.SkipMentions {
 		p.handles = domain.ScanMentions(content)
@@ -180,7 +194,7 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 		}
 		p.replyTo, replyTo = *cmd.ReplyToID, cmd.ReplyToID.String()
 	}
-	hash := domain.HashInput{Context: hashContext, Kind: kind, Content: content, ReplyTo: replyTo}
+	hash := domain.HashInput{Context: hashContext, Kind: kind, Content: content, ReplyTo: replyTo, AttachmentIDs: idStrings(p.attachmentIDs)}
 	if isCard {
 		if p.card.checked, err = s.checkCard(ctx, a, cmd, thread); err != nil {
 			return prepared{}, err
@@ -192,9 +206,8 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 }
 
 // kindOf returns the kind of a new message (text without a kind member) and whether it is a card:
-// voice and every other kind are not enabled, attachments neither (M3-07), the card rules of
-// M2-15 apply, and run_id is refused for every principal but an agent (M2-19). Errors: 400
-// validation_failed.
+// voice and every other kind are not enabled, the card rules of M2-15 apply, and run_id is
+// refused for every principal but an agent (M2-19). Errors: 400 validation_failed.
 func kindOf(a actor.Actor, cmd messaging.CreateMessageCmd) (string, bool, error) {
 	kind := string(domain.KindText)
 	if cmd.Kind != nil {
@@ -202,9 +215,6 @@ func kindOf(a actor.Actor, cmd messaging.CreateMessageCmd) (string, bool, error)
 	}
 	if kind != string(domain.KindText) && kind != string(domain.KindCard) {
 		return "", false, domain.NotEnabled("/kind")
-	}
-	if len(cmd.AttachmentIDs) > 0 {
-		return "", false, domain.NotEnabled("/attachment_file_ids")
 	}
 	isCard, err := cardRules(a, kind, cmd)
 	if err != nil {
@@ -219,6 +229,35 @@ func runIDText(run *ids.ID) string {
 		return ""
 	}
 	return run.String()
+}
+
+// checkBody applies the attachment and content rules of a new message (brief M3-07 design note
+// 5 a): the attachment list below pointer (not_enabled without the files port, limit_reached above
+// message.max_attachments) and the content, which may be empty only with attachments. It returns
+// content_md, "" when absent.
+func (s *Service) checkBody(cmd messaging.CreateMessageCmd, pointer string) (string, error) {
+	if len(cmd.AttachmentIDs) > 0 && s.d.Files == nil {
+		return "", domain.NotEnabled(domain.AttachmentsPointer)
+	}
+	if err := domain.CheckAttachments(len(cmd.AttachmentIDs), s.cfg.MaxAttachments, pointer); err != nil {
+		return "", err
+	}
+	content := ""
+	if cmd.ContentMD != nil {
+		content = *cmd.ContentMD
+	}
+	return content, domain.CheckNewContent(content, s.cfg.MaxContentBytes, len(cmd.AttachmentIDs) > 0)
+}
+
+// idStrings returns the ids of the request in request order for the request hash (M1-56 D3); an
+// empty list encodes as before M3-07, so the stored hashes of messages without attachments keep
+// matching.
+func idStrings(list []ids.ID) []string {
+	out := make([]string, 0, len(list))
+	for _, id := range list {
+		out = append(out, id.String())
+	}
+	return out
 }
 
 // checkReply allows a reply only to a message of the same thread, deleted ones included; an
@@ -254,12 +293,14 @@ func (s *Service) repetition(ctx context.Context, a actor.Actor, p prepared) (me
 }
 
 // send is step 5 of brief D1 inside the unit of work for the thread of info: a repetition answers
-// the original; otherwise the mentions, the thread number (with the reopen and its system line)
-// and the rows, then message.created of the unit (the system line first, then the message) and
-// only then MessagePosted in the same order (ruling D-M2-05-3): a subscriber that appends a
-// message to the same thread, the run anchor, must not overtake the message in the log (04
-// section 10). created marks the first message of a thread created in the same unit. The
-// returned message is the row as inserted; the callers read it again after the unit (reread).
+// the original (with its attachments, attaching nothing); otherwise the mentions, the thread
+// number (with the reopen and its system line) and the rows, the attachments through files (brief
+// M3-07 design note 5 c), then message.created of the unit (the system line first, then the
+// message) and only then MessagePosted in the same order (ruling D-M2-05-3): a subscriber that
+// appends a message to the same thread, the run anchor, must not overtake the message in the log
+// (04 section 10). created marks the first message of a thread created in the same unit. The
+// returned message is the row as inserted with the attachments of Attach; the callers read it
+// again after the unit (reread).
 func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat.ThreadInfo, created bool) (messaging.Created, error) {
 	if m, found, err := s.repetition(ctx, a, p); err != nil || found {
 		return messaging.Created{Message: m, Replay: found}, err
@@ -284,8 +325,8 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	row, err := s.d.Store.InsertMessage(ctx, domain.Message{
 		ID: ids.New(), ThreadID: info.ID, ChannelID: info.ChannelID, ThreadSeq: seq, AuthorID: a.ID,
 		ClientMsgID: p.clientMsgID, PayloadSHA256: p.hash, Origin: p.origin, Kind: p.kind, ContentMD: p.content,
-		ContentFormat: domain.ContentFormat, ReplyToID: p.replyTo, Silent: p.silent, Version: 1, CreatedAt: now,
-		SearchLanguage: lang,
+		ContentFormat: domain.ContentFormat, ReplyToID: p.replyTo, Silent: p.silent, HasAttachments: len(p.attachmentIDs) > 0,
+		Version: 1, CreatedAt: now, SearchLanguage: lang,
 	})
 	if err != nil {
 		return messaging.Created{}, err
@@ -295,8 +336,12 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 		return messaging.Created{}, err
 	}
 	m := view(row, author, mentions)
-	// The components of a card come after the message row and before MessagePosted and
-	// message.created, which carries them (M2-15 design note 6 d).
+	// The files come right after the message row (lock order thread, message, files,
+	// message_attachments, then runs; brief M3-07 design note 14), the components of a card after
+	// them and before MessagePosted and message.created, which carries both (M2-15 design note 6 d).
+	if m.Attachments, err = s.attachFiles(ctx, a, p, row); err != nil {
+		return messaging.Created{}, err
+	}
 	if p.card.checked != nil {
 		p.card.checked.Input.ThreadID = info.ID
 	}
@@ -314,6 +359,24 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 		return messaging.Created{}, err
 	}
 	return messaging.Created{Message: m}, nil
+}
+
+// attachFiles binds the files of p to the message row just inserted (brief M3-07 design note 5 c):
+// the thread of the row and the channel AppendToThread returned under the thread lock, which the
+// rows of message_attachments copy (R-DM-43). A message without files makes no call (M1-56 D9,
+// perf.message_create_p99). The refusal of files (409 conflict, reason file_not_attachable) is
+// the answer of the use case, and the unit of work rolls back with the message and its number.
+func (s *Service) attachFiles(ctx context.Context, a actor.Actor, p prepared, row domain.Message) ([]messaging.Attachment, error) {
+	if len(p.attachmentIDs) == 0 {
+		return []messaging.Attachment{}, nil
+	}
+	list, err := s.d.Files.Attach(ctx, files.AttachCmd{
+		MessageID: row.ID, ThreadID: row.ThreadID, ChannelID: row.ChannelID, AuthorID: a.ID, FileIDs: p.attachmentIDs, Pointer: p.pointer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return attachmentsOf(list), nil
 }
 
 // announce appends message.created of the reopen line (when there is one) and of m, then
@@ -416,7 +479,7 @@ func (s *Service) posted(a actor.Actor, info chat.ThreadInfo, m messaging.Messag
 		MessageID: m.ID, ThreadID: m.ThreadID, ChannelID: m.ChannelID, SpaceID: info.SpaceID, ThreadKind: info.Kind,
 		ThreadSeq: m.ThreadSeq, AuthorID: m.Author.ID, AuthorKind: string(a.Kind), Origin: m.Origin, Kind: m.Kind,
 		ClientMsgID: m.ClientMsgID, MentionedIDs: slices.Clone(m.MentionIDs), Silent: m.Silent, ClearDraft: clearDraft,
-		CreatedAt: m.CreatedAt,
+		HasAttachments: m.HasAttachments, CreatedAt: m.CreatedAt,
 	}
 	if a.Kind == actor.KindUser && !a.DeviceID.IsZero() {
 		d := a.DeviceID

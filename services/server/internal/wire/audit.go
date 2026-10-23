@@ -93,8 +93,16 @@ func NewAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek aud
 // clock.System(); NewModulesWithClock, M2-46).
 func NewAuditWithClock(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek auditapp.KEKSource, clk clock.Clock,
 	log *slog.Logger) (*Audit, error) {
+	return newAudit(pool, unitCfg, cfg, kek, clk, nil, log)
+}
+
+// newAudit is NewAuditWithClock with the test subscribers of the registry (Modules.TestSubscribers;
+// nil in production).
+func newAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek auditapp.KEKSource, clk clock.Clock,
+	testSubs func(*txn.Registry) error, log *slog.Logger) (*Audit, error) {
 	log = orDiscard(log)
 	mods := NewModulesWithClock(pool, clk, log)
+	mods.TestSubscribers = testSubs
 	reg, err := NewTxnRegistry(mods)
 	if err != nil {
 		return nil, err

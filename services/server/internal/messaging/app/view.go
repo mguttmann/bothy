@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -51,12 +52,21 @@ func (s *Service) base(ctx context.Context, m domain.Message) (messaging.Message
 }
 
 // stored returns the current representation of a stored message for the principal of the
-// request: its author, mentions, reactions, own reactions and pin now, read with the visible
-// channels of the caller.
+// request: its author, mentions, attachments, reactions, own reactions and pin now, read with the
+// visible channels of the caller.
 func (s *Service) stored(ctx context.Context, m domain.Message, visible []ids.ID) (messaging.Message, error) {
+	return s.storedWith(ctx, m, visible, nil)
+}
+
+// storedWith is stored with the attachments a caller already holds (the result of Attach in the
+// same request, brief M3-07 design note 6), so decorate does not read them again; nil reads them.
+func (s *Service) storedWith(ctx context.Context, m domain.Message, visible []ids.ID, attached []messaging.Attachment) (messaging.Message, error) {
 	v, err := s.base(ctx, m)
 	if err != nil {
 		return messaging.Message{}, err
+	}
+	if v.HasAttachments && len(attached) > 0 {
+		v.Attachments = attached
 	}
 	list := []messaging.Message{v}
 	if err := s.decorate(ctx, visible, list); err != nil {
@@ -65,11 +75,16 @@ func (s *Service) stored(ctx context.Context, m domain.Message, visible []ids.ID
 	return list[0], nil
 }
 
-// decorate fills reactions, my_reactions (for the principal of the request) and pinned of the
-// live messages of list with one statement each for the whole list (brief M1-59 design note 7),
-// and the components of the live cards with one ComponentReader call (M2-15 design note 7); a
-// tombstone keeps empty reactions, no components and pinned false.
+// decorate fills the attachments (attachments, M3-07), reactions, my_reactions (for the
+// principal of the request) and pinned of the live messages of list with one statement each for
+// the whole list (brief M1-59 design note 7), and the components of the live cards with one
+// ComponentReader call (M2-15 design note 7); a tombstone keeps empty attachments and reactions,
+// no components and pinned false. It is the one decoration of every representation (stored,
+// History, Get, the mention list, the export, SetTriggerState).
 func (s *Service) decorate(ctx context.Context, visible []ids.ID, list []messaging.Message) error {
+	if err := s.attachments(ctx, list); err != nil {
+		return err
+	}
 	if err := s.attachComponents(ctx, list); err != nil {
 		return err
 	}
@@ -101,6 +116,13 @@ func (s *Service) decorateReactions(ctx context.Context, visible []ids.ID, list 
 	if err != nil {
 		return err
 	}
+	applyReactions(list, groups, own, pinned)
+	return nil
+}
+
+// applyReactions sets reactions, my_reactions and pinned of the live messages of list from the
+// reads of decorate; a tombstone keeps empty reactions and pinned false.
+func applyReactions(list []messaging.Message, groups map[ids.ID][]domain.ReactionGroup, own map[ids.ID]map[string]bool, pinned map[ids.ID]bool) {
 	for i := range list {
 		m := &list[i]
 		if !m.DeletedAt.IsZero() {
@@ -114,15 +136,61 @@ func (s *Service) decorateReactions(ctx context.Context, visible []ids.ID, list 
 		m.MyReactions = domain.OwnInOrder(ordered, own[m.ID])
 		m.Pinned = pinned[m.ID]
 	}
+}
+
+// attachments fills the attachments of the live messages of list whose has_attachments is set and
+// that have none yet, with one ForMessages call of files for the whole list (brief M3-07 design
+// note 6); a list without such a message makes no call (perf.message_create_p99), and a tombstone
+// keeps []. The caller read every message of list before (message.read or its own write).
+func (s *Service) attachments(ctx context.Context, list []messaging.Message) error {
+	var want []ids.ID
+	for _, m := range list {
+		if m.HasAttachments && m.DeletedAt.IsZero() && len(m.Attachments) == 0 {
+			want = append(want, m.ID)
+		}
+	}
+	if len(want) == 0 || s.d.Files == nil {
+		return nil
+	}
+	got, err := s.d.Files.ForMessages(ctx, want)
+	if err != nil {
+		return err
+	}
+	for i := range list {
+		if found, ok := got[list[i].ID]; ok && len(list[i].Attachments) == 0 {
+			list[i].Attachments = attachmentsOf(found)
+		}
+	}
 	return nil
 }
 
-// view converts a row into the port DTO; the mentions are never nil. It is the one representation
-// of a message (brief M1-57 note 6, also for M1-58 and M1-59): a deleted message is a tombstone
-// with empty content, no mentions, no reactions, no components and not pinned, every other field
-// as stored (attachments stay empty until M3-07); run_id and the trigger state are not content, so
-// a tombstone keeps them (03 messages, M2-05). Reactions, the pin and the components start empty;
-// decorate fills them for a stored message.
+// attachmentsOf maps the attachments of files into the port of messaging (02 section 7.2: the
+// port of messaging names no other module): position order as files returns it, never nil, and
+// the attached form of the file without scope_channel_id (docs/decisions.d/M3-07.md D-M3-07-5).
+func attachmentsOf(list []files.Attachment) []messaging.Attachment {
+	out := make([]messaging.Attachment, 0, len(list))
+	for _, a := range list {
+		f := a.File
+		thumbs := make([]messaging.AttachedThumbnail, 0, len(f.Thumbnails))
+		for _, t := range f.Thumbnails {
+			thumbs = append(thumbs, messaging.AttachedThumbnail{Variant: t.Variant, MIMEType: t.MIMEType, Width: t.Width, Height: t.Height})
+		}
+		out = append(out, messaging.Attachment{Position: a.Position, File: messaging.AttachedFile{
+			ID: f.ID, SHA256: f.SHA256, SizeBytes: f.SizeBytes, MIMEType: f.MIMEType, OriginalName: f.OriginalName, UploadedBy: f.UploadedBy,
+			Purpose: f.Purpose, UploadState: f.UploadState, ScanStatus: f.ScanStatus, Width: f.Width, Height: f.Height, DurationMS: f.DurationMS,
+			TranscriptStatus: f.TranscriptStatus, TranscriptLanguage: f.TranscriptLanguage, TranscriptSource: f.TranscriptSource,
+			Thumbnails: thumbs, CreatedAt: f.CreatedAt,
+		}})
+	}
+	return out
+}
+
+// view converts a row into the port DTO; the mentions and attachments are never nil. It is the
+// one representation of a message (brief M1-57 note 6, also for M1-58, M1-59 and M3-07): a
+// deleted message is a tombstone with empty content, no mentions, no attachments, no reactions, no
+// components and not pinned, every other field as stored; run_id and the trigger state are not
+// content, so a tombstone keeps them (03 messages, M2-05). Attachments, reactions, the pin and the
+// components start empty; decorate fills them for a stored message.
 func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) messaging.Message {
 	if mentions == nil || !m.DeletedAt.IsZero() {
 		mentions = []ids.ID{}
@@ -135,6 +203,7 @@ func view(m domain.Message, author messaging.PrincipalRef, mentions []ids.ID) me
 		Origin: string(m.Origin), Kind: string(m.Kind), SystemCode: m.SystemCode, ContentMD: m.ContentMD,
 		ContentFormat: int(m.ContentFormat), ReplyToID: m.ReplyToID, RunID: m.RunID, TriggerState: m.TriggerState,
 		TriggerStateReason: m.TriggerStateReason, TriggerStateAt: m.TriggerStateAt, Silent: m.Silent, MentionIDs: mentions,
+		HasAttachments: m.HasAttachments && m.DeletedAt.IsZero(), Attachments: []messaging.Attachment{},
 		Reactions: []messaging.ReactionCount{}, MyReactions: []string{}, Components: []messaging.Component{}, Version: m.Version,
 		EditedAt: m.EditedAt, DeletedAt: m.DeletedAt, CreatedAt: m.CreatedAt,
 	}
@@ -168,9 +237,67 @@ type reactionCountJSON struct {
 	Count int    `json:"count"`
 }
 
-// messageJSON is the schema Message in an event (brief D7): attachments empty, the reaction summary,
-// pinned (M1-59) and the components (M2-15) as decorated, never my_reactions, which only REST
-// responses carry. Optional members are left out, never null (ADR 0053).
+// attachmentJSON is the schema Attachment: the position from 1 and the file.
+type attachmentJSON struct {
+	Position int      `json:"position"`
+	File     fileJSON `json:"file"`
+}
+
+// fileJSON is the schema File of an attached file (brief M3-07 design note 6): scope_channel_id is
+// never shown once a file is attached, sha256 only when files set it (upload_state complete), the
+// thumbnails always an array; other optional members are left out, never null (ADR 0053).
+type fileJSON struct {
+	ID                 string          `json:"id"`
+	SHA256             string          `json:"sha256,omitempty"`
+	SizeBytes          int64           `json:"size_bytes"`
+	MIMEType           string          `json:"mime_type"`
+	OriginalName       string          `json:"original_name"`
+	UploadedBy         string          `json:"uploaded_by"`
+	Purpose            string          `json:"purpose"`
+	UploadState        string          `json:"upload_state"`
+	ScanStatus         string          `json:"scan_status"`
+	Width              int             `json:"width,omitempty"`
+	Height             int             `json:"height,omitempty"`
+	DurationMS         int64           `json:"duration_ms,omitempty"`
+	TranscriptStatus   string          `json:"transcript_status"`
+	TranscriptLanguage string          `json:"transcript_language,omitempty"`
+	TranscriptSource   string          `json:"transcript_source,omitempty"`
+	Thumbnails         []thumbnailJSON `json:"thumbnails"`
+	CreatedAt          string          `json:"created_at"`
+}
+
+// thumbnailJSON is the schema Thumbnail.
+type thumbnailJSON struct {
+	Variant  string `json:"variant"`
+	MIMEType string `json:"mime_type"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+}
+
+// attachmentsBody converts the attachments of a message into their event form, in position
+// order; never nil.
+func attachmentsBody(list []messaging.Attachment) []attachmentJSON {
+	out := make([]attachmentJSON, 0, len(list))
+	for _, a := range list {
+		f := a.File
+		thumbs := make([]thumbnailJSON, 0, len(f.Thumbnails))
+		for _, t := range f.Thumbnails {
+			thumbs = append(thumbs, thumbnailJSON{Variant: t.Variant, MIMEType: t.MIMEType, Width: t.Width, Height: t.Height})
+		}
+		out = append(out, attachmentJSON{Position: a.Position, File: fileJSON{
+			ID: f.ID.String(), SHA256: f.SHA256, SizeBytes: f.SizeBytes, MIMEType: f.MIMEType, OriginalName: f.OriginalName,
+			UploadedBy: f.UploadedBy.String(), Purpose: f.Purpose, UploadState: f.UploadState, ScanStatus: f.ScanStatus, Width: f.Width,
+			Height: f.Height, DurationMS: f.DurationMS, TranscriptStatus: f.TranscriptStatus, TranscriptLanguage: f.TranscriptLanguage,
+			TranscriptSource: f.TranscriptSource, Thumbnails: thumbs, CreatedAt: stamp(f.CreatedAt),
+		}})
+	}
+	return out
+}
+
+// messageJSON is the schema Message in an event (brief D7): the attachments in position order
+// (M3-07), the reaction summary, pinned (M1-59) and the components (M2-15) as decorated, never
+// my_reactions, which only REST responses carry. Optional members are left out, never null (ADR
+// 0053).
 type messageJSON struct {
 	ID               string              `json:"id"`
 	ThreadID         string              `json:"thread_id"`
@@ -190,7 +317,7 @@ type messageJSON struct {
 	TriggerStateAt   string              `json:"trigger_state_at,omitempty"`
 	TriggerReason    string              `json:"trigger_state_reason,omitempty"`
 	Silent           bool                `json:"silent"`
-	Attachments      []struct{}          `json:"attachments"`
+	Attachments      []attachmentJSON    `json:"attachments"`
 	MentionIDs       []string            `json:"mention_ids"`
 	Reactions        []reactionCountJSON `json:"reactions"`
 	Pinned           bool                `json:"pinned"`
@@ -219,7 +346,7 @@ func messageBody(m messaging.Message) messageJSON {
 		},
 		ClientMsgID: m.ClientMsgID.String(), Origin: m.Origin, Kind: m.Kind, SystemCode: m.SystemCode, ContentMD: m.ContentMD,
 		ContentFormat: m.ContentFormat, ReplyToMessageID: optionalID(m.ReplyToID), RunID: optionalID(m.RunID), TriggerState: m.TriggerState,
-		TriggerStateAt: stamp(m.TriggerStateAt), TriggerReason: m.TriggerStateReason, Silent: m.Silent, Attachments: []struct{}{},
+		TriggerStateAt: stamp(m.TriggerStateAt), TriggerReason: m.TriggerStateReason, Silent: m.Silent, Attachments: attachmentsBody(m.Attachments),
 		MentionIDs: mentions, Reactions: reactions, Pinned: m.Pinned, Components: componentsBody(m.Components), Version: m.Version, EditedAt: stamp(m.EditedAt),
 		DeletedAt: stamp(m.DeletedAt), CreatedAt: stamp(m.CreatedAt),
 	}

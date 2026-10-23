@@ -8877,7 +8877,7 @@ type File struct {
 	// ScanStatus Examples: clean
 	ScanStatus FileScanStatus `json:"scan_status"`
 
-	// ScopeChannelId UUIDv7 (RFC 9562), lowercase canonical form.
+	// ScopeChannelId Channel the file was uploaded for; present only before the file is attached to a message. An attached file is read through the channel of its message.
 	ScopeChannelId *Uuid `json:"scope_channel_id,omitempty"`
 
 	// Sha256 Hex SHA-256 of the stored bytes.
@@ -11404,6 +11404,7 @@ type MentionItemPage struct {
 
 // Message defines model for Message.
 type Message struct {
+	// Attachments Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message.
 	Attachments []Attachment `json:"attachments"`
 
 	// Author Minimal public view of a principal, embedded in other objects.
@@ -11481,6 +11482,7 @@ type MessageSystemCode string
 
 // MessageCreate defines model for MessageCreate.
 type MessageCreate struct {
+	// AttachmentFileIds Own files uploaded for the channel of this message with a completed upload session, in the order they appear in the message; at most `message.max_attachments`. Needs the right `upload` in addition to `write` (`403 forbidden` with `reason` `capability_missing`). A file that is not attachable (not the caller's, another channel, upload not completed or failed, deleted, already attached, or listed twice) answers `409 conflict` with `reason` `file_not_attachable` and the pointer of the entry in `detail`; more than `message.max_attachments` answer `400 validation_failed` with `errors[].code` `limit_reached`. Files whose scan has not ended are attachable.
 	AttachmentFileIds *[]Uuid `json:"attachment_file_ids,omitempty"`
 	ClearDraft        *bool   `json:"clear_draft,omitempty"`
 
@@ -11490,7 +11492,9 @@ type MessageCreate struct {
 	// Components Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1).
 	Components *[]ComponentCreate `json:"components,omitempty"`
 
-	// ContentMd Examples: @support-agent the invoice export fails since this morning.
+	// ContentMd Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
+	//
+	// Examples: @support-agent the invoice export fails since this morning.
 	ContentMd *string            `json:"content_md,omitempty"`
 	Kind      *MessageCreateKind `json:"kind,omitempty"`
 

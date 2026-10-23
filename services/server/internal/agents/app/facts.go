@@ -43,6 +43,7 @@ func (s *Service) RunFacts(ctx context.Context, agentIDs []ids.ID) (map[ids.ID]a
 			CredentialHolderID: rec.Policy.HolderID, ToolClass: string(rec.ToolClass),
 			ComponentsAllowed:  rec.Config.Allows(domain.CapabilityComponents),
 			FollowupsPermitted: rec.Config.Permission(domain.CapabilityFollowups), FollowupsReported: rec.Reported.Followups,
+			FilesOutPermitted: rec.Config.Permission(domain.CapabilityFilesOut),
 		}
 	}
 	return out, nil

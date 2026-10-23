@@ -50,22 +50,22 @@ func TestEditRules(t *testing.T) {
 	}
 }
 
-// TestTombstone (M1-58): the tombstone keeps every stored field except the content, which it
-// empties, and sets the deletion and the next version.
+// TestTombstone (M1-58, M3-07): the tombstone keeps every stored field except the content, which
+// it empties, and has_attachments, which it resets, and sets the deletion and the next version.
 func TestTombstone(t *testing.T) {
 	t.Parallel()
 	at := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
 	m := domain.Message{ID: ids.New(), ThreadID: ids.New(), ThreadSeq: 7, AuthorID: ids.New(), ContentMD: "secret", Version: 3,
-		Kind: domain.KindText, EditedAt: at.Add(-time.Hour), CreatedAt: at.Add(-2 * time.Hour)}
+		Kind: domain.KindText, HasAttachments: true, EditedAt: at.Add(-time.Hour), CreatedAt: at.Add(-2 * time.Hour)}
 	by := ids.New()
 	got := domain.Tombstone(m, by, at)
 	want := m
-	want.ContentMD, want.DeletedAt, want.DeletedBy, want.Version = "", at, by, 4
-	if got.ContentMD != "" || !got.DeletedAt.Equal(at) || got.DeletedBy != by || got.Version != 4 || got.ThreadSeq != 7 ||
+	want.ContentMD, want.HasAttachments, want.DeletedAt, want.DeletedBy, want.Version = "", false, at, by, 4
+	if got.ContentMD != "" || got.HasAttachments || !got.DeletedAt.Equal(at) || got.DeletedBy != by || got.Version != 4 || got.ThreadSeq != 7 ||
 		got.ID != m.ID || !got.EditedAt.Equal(m.EditedAt) {
 		t.Fatalf("tombstone %+v, want %+v", got, want)
 	}
-	if m.ContentMD != "secret" {
+	if m.ContentMD != "secret" || !m.HasAttachments {
 		t.Fatal("Tombstone changed its argument")
 	}
 }

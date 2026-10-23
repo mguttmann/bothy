@@ -52,3 +52,15 @@ func parseUUID(s string) ids.ID {
 	}
 	return id
 }
+
+// Uncorrelated returns ctx without the span context Correlation reads, so an event appended with
+// it carries no correlation_id from a trace (M3-07: an agent.invocation released by a job or a
+// finalizing write, brief note 12 c). The correlation_id of kernel/reqmeta is the caller's to
+// clear; runs does that itself.
+//
+// Example:
+//
+//	ctx = telemetry.Uncorrelated(ctx)
+func Uncorrelated(ctx context.Context) context.Context {
+	return trace.ContextWithSpanContext(ctx, trace.SpanContext{})
+}

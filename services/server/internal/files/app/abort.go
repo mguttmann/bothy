@@ -43,7 +43,8 @@ func completedNoAbort() error {
 
 // abort ends the open session of fileID of a in its own unit of work: the session row FOR
 // UPDATE (it serializes with parts and completion), aborted, the file failed, its part rows gone
-// and file.updated for the uploader; after the commit the part store removes the objects. A
+// and recordFileChange (file.updated for the uploader and FileFinalized, because failed is final);
+// after the commit the part store removes the objects. A
 // failure of that removal is logged with the file id only and does not fail the abort (the
 // cleanup of failed files removes what is left, M3-08). A session that changed state meanwhile
 // answers like Abort does.
@@ -70,7 +71,7 @@ func (s *Service) abort(ctx context.Context, a actor.Actor, fileID ids.ID) error
 		}
 		f := cur.File
 		f.UploadState = uploadStateFailed
-		return s.appendUpdated(ctx, a, f)
+		return s.changes().recordFileChange(ctx, a, cur.File, f)
 	})
 	if err != nil || locked.State != domain.SessionOpen {
 		return err

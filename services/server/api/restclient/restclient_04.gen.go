@@ -7,6 +7,22 @@ import (
 	"net/http"
 )
 
+// StatusCode returns HTTPResponse.StatusCode
+func (r AddGroupMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AddGroupMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // RemoveGroupMemberResponse204Headers the declared response headers of an HTTP 204 response for RemoveGroupMember
 type RemoveGroupMemberResponse204Headers struct {
 	CorrelationId   *CorrelationId
@@ -26048,20 +26064,4 @@ func (r DeleteWebhookSubscriptionResponse) GetApplicationproblemJSONDefault() *E
 // GetBody returns the raw response body bytes
 func (r DeleteWebhookSubscriptionResponse) GetBody() []byte {
 	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteWebhookSubscriptionResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteWebhookSubscriptionResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }

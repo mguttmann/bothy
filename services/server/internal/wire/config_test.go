@@ -93,6 +93,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"file.scan.clamd_address":               {Kind: config.KindString, Default: "unix:///run/clamav/clamd.sock", Chapter: "12-files.md"},
 		"file.scan.chunk_bytes":                 {Kind: config.KindInt, Default: "65536", Min: "1", Max: "2147483647", Chapter: "12-files.md"},
 		"file.scan.timeout":                     {Kind: config.KindDuration, Default: "120s", Min: "1s", Chapter: "12-files.md"},
+		"file.invocation_hold_max":              {Kind: config.KindDuration, Default: "120s", Min: "1s", Chapter: "12-files.md"},
 		"file.scan.max_concurrent":              {Kind: config.KindInt, Default: "4", Min: "1", Chapter: "12-files.md"},
 		"file.scan.retry_backoff_cap":           {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "12-files.md"},
 		"file.scan.health_interval":             {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "12-files.md"},

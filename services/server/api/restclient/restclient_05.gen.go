@@ -13,6 +13,22 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Status returns HTTPResponse.Status
+func (r DeleteWebhookSubscriptionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteWebhookSubscriptionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DeleteWebhookSubscriptionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
@@ -6497,7 +6513,10 @@ func (c *ClientWithResponses) ListThreadMessagesWithResponse(ctx context.Context
 // Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
 // 200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
 // into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-// denial sets `trigger_state = failed` with `trigger_state_reason`.
+// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+// agent while one of its attachments is not final (scan or check still running), the agent
+// invocation waits until all attachments are final or until `file.invocation_hold_max` has
+// passed; `trigger_state` stays `received` meanwhile.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -6515,7 +6534,10 @@ func (c *ClientWithResponses) CreateMessageWithBodyWithResponse(ctx context.Cont
 // Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
 // 200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
 // into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-// denial sets `trigger_state = failed` with `trigger_state_reason`.
+// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+// agent while one of its attachments is not final (scan or check still running), the agent
+// invocation waits until all attachments are final or until `file.invocation_hold_max` has
+// passed; `trigger_state` stays `received` meanwhile.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

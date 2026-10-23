@@ -6,6 +6,7 @@ hook audit audit github.com/OWNER/bothy/services/server/internal/audit/app.(*Cha
 subscribe messaging.MessagePosted -> sync github.com/OWNER/bothy/services/server/internal/sync/app.(*Subscribers).OnMessagePosted-fm
 subscribe chat.ThreadMoved -> messaging github.com/OWNER/bothy/services/server/internal/messaging/app.(*Subscribers).OnThreadMoved-fm
 subscribe chat.ThreadMoved -> sync github.com/OWNER/bothy/services/server/internal/sync/app.(*Subscribers).OnThreadMoved-fm
+subscribe chat.ThreadMoved -> files github.com/OWNER/bothy/services/server/internal/files/app.(*Subscribers).OnThreadMoved-fm
 subscribe chat.ChannelArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnChannelArchived-fm
 subscribe chat.SpaceArchived -> notify github.com/OWNER/bothy/services/server/internal/notify/app.(*Subscribers).OnSpaceArchived-fm
 subscribe messaging.MessagePosted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessagePosted-fm
@@ -18,3 +19,4 @@ subscribe kernel.AccessChanged -> terminal github.com/OWNER/bothy/services/serve
 subscribe identity.DeviceRevoked -> terminal github.com/OWNER/bothy/services/server/internal/terminal/app.(*Subscribers).OnDeviceRevoked-fm
 subscribe identity.SessionEnded -> terminal github.com/OWNER/bothy/services/server/internal/terminal/app.(*Subscribers).OnSessionEnded-fm
 subscribe messaging.MessageDeleted -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnMessageDeleted-fm
+subscribe files.FileFinalized -> runs github.com/OWNER/bothy/services/server/internal/runs/app.(*Acceptor).OnFileFinalized-fm

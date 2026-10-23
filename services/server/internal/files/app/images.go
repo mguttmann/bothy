@@ -13,7 +13,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
@@ -421,12 +420,10 @@ func (p *ImageProcessor) storeOriginal(ctx context.Context, f FileRecord, o Stor
 	if err := p.d.Repo.StoreImageOriginal(ctx, f.ID, o); err != nil {
 		return nil, "", err
 	}
+	before := cur
 	cur.ObjectKey, cur.SHA256, cur.SizeBytes, cur.MIMEType = o.ObjectKey, o.SHA256, o.SizeBytes, o.MIMEType
 	cur.Width, cur.Height, cur.UploadState = o.Width, o.Height, domain.UploadComplete
-	if err := p.appendUpdated(ctx, cur); err != nil {
-		return nil, "", err
-	}
-	if err := txn.Publish(ctx, files.FileFinalized{FileID: f.ID}); err != nil {
+	if err := p.changes().recordFileChange(ctx, actor.Actor{}, before, cur); err != nil {
 		return nil, "", err
 	}
 	return &cur, "", nil
@@ -454,12 +451,10 @@ func (p *ImageProcessor) failImage(ctx context.Context, f FileRecord, reason, ne
 		if err := p.d.Repo.FailImage(ctx, f.ID, reason); err != nil {
 			return err
 		}
+		before := cur
 		cur.UploadState = domain.UploadFailed
-		if err := p.appendUpdated(ctx, cur); err != nil {
-			return err
-		}
 		failed = true
-		return txn.Publish(ctx, files.FileFinalized{FileID: f.ID})
+		return p.changes().recordFileChange(ctx, actor.Actor{}, before, cur)
 	})
 	if err != nil || !failed {
 		return err
@@ -610,8 +605,9 @@ func (p *ImageProcessor) insertThumbnails(ctx context.Context, f FileRecord, row
 	if err != nil || n == 0 {
 		return nil, err
 	}
+	before := cur
 	cur.Thumbnails = mergeThumbnails(cur.Thumbnails, rows)
-	return nil, p.appendUpdated(ctx, cur)
+	return nil, p.changes().recordFileChange(ctx, actor.Actor{}, before, cur)
 }
 
 // mergeThumbnails adds the rows of variants have lacks.
@@ -665,13 +661,14 @@ func (p *ImageProcessor) storeMediaInfo(ctx context.Context, fileID ids.ID, info
 	if err := p.d.Repo.SetMediaInfo(ctx, fileID, m); err != nil {
 		return err
 	}
+	before := cur
 	if m.Width != 0 {
 		cur.Width, cur.Height = m.Width, m.Height
 	}
 	if m.DurationMS != 0 {
 		cur.DurationMS = m.DurationMS
 	}
-	return p.appendUpdated(ctx, cur)
+	return p.changes().recordFileChange(ctx, actor.Actor{}, before, cur)
 }
 
 // mediaChange returns the values of info that differ from the row; zero fields stay.
@@ -686,22 +683,11 @@ func mediaChange(f FileRecord, info MovieInfo) MediaInfo {
 	return m
 }
 
-// appendUpdated writes file.updated of f without actor for the uploader in the scope of the
-// channel of an attachment (design note 10f), as the scan pass does.
-func (p *ImageProcessor) appendUpdated(ctx context.Context, f FileRecord) error {
-	var space ids.ID
-	if !f.ScopeChannelID.IsZero() {
-		s, err := p.d.Channels.SpaceOf(ctx, f.ScopeChannelID)
-		if err != nil {
-			return err
-		}
-		space = s
-	}
-	ev, err := FileUpdated(actor.Actor{}, space, FileView(f), true)
-	if err != nil {
-		return err
-	}
-	return p.d.Events.Append(ctx, ev)
+// changes returns the collaborators of recordFileChange of the image job: file.updated without
+// actor (a job without principal) and FileFinalized when T1 or the failure transaction makes the
+// file final (D-M3-06-1).
+func (p *ImageProcessor) changes() fileChanges {
+	return fileChanges{attachments: p.d.Repo, channels: p.d.Channels, events: p.d.Events}
 }
 
 // objectReaderAt reads an object through ranged Get calls for the box reader (design note 2). It

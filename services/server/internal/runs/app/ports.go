@@ -43,6 +43,9 @@ type RunRow struct {
 	CostIsEstimate bool
 	// QueuedAt is never zero; StartedAt and FinishedAt are zero for NULL.
 	QueuedAt, StartedAt, FinishedAt time.Time
+	// InvocationHeldUntil is runs.invocation_held_until (R-DM-44, M3-07): the release time of a
+	// held agent.invocation; zero for NULL (never held, or released).
+	InvocationHeldUntil time.Time
 	// DurationMS is runs.duration_ms when HasDuration.
 	DurationMS  int64
 	HasDuration bool
@@ -76,6 +79,9 @@ type NewRun struct {
 	InvocationJTI ids.ID
 	// QueuedAt is the acceptance time.
 	QueuedAt time.Time
+	// InvocationHeldUntil is the release time of a held agent.invocation (M3-07); zero stores NULL
+	// (not held).
+	InvocationHeldUntil time.Time
 }
 
 // TransitionWrite is the input of Repository.TransitionRun: the compare-and-swap on state and
@@ -238,6 +244,14 @@ type Repository interface {
 	// version. The caller holds the row lock. Errors: not_found for an unknown run, internal
 	// outside a unit of work.
 	RaiseRunVersion(ctx context.Context, id ids.ID) (int64, error)
+	// LockHeldRunsOfMessage locks the queued runs triggered by messageID whose agent.invocation is
+	// held (invocation_held_until set), in ascending id, and returns their ids (M3-07, the
+	// subscriber of files.FileFinalized). It needs a unit of work.
+	LockHeldRunsOfMessage(ctx context.Context, messageID ids.ID) ([]ids.ID, error)
+	// ReleaseHeldInvocation clears invocation_held_until of a queued held run and raises version
+	// by one (M3-07); released is false when the run is not queued or not held, which leaves it
+	// unchanged. The caller holds the row lock. Errors: internal outside a unit of work.
+	ReleaseHeldInvocation(ctx context.Context, id ids.ID) (released bool, err error)
 }
 
 // FollowupRow is one row of run_followups (M2-11).

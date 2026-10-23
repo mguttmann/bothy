@@ -26,7 +26,7 @@ func httpConfigKeys() []config.Key {
 			Chapter: chapter02,
 		},
 		{
-			Name: "http.idle_timeout", Kind: config.KindDuration, Default: "120s", Min: minPositiveDuration,
+			Name: "http.idle_timeout", Kind: config.KindDuration, Default: defaultTwoMinutes, Min: minPositiveDuration,
 			Doc:     "How long a keep-alive connection may stay idle before the server closes it.",
 			Chapter: chapter02,
 		},

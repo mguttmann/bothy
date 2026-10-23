@@ -46,7 +46,8 @@ func (s *server) startMessaging(context.Context) error {
 	}
 	components := messagingsource.New()
 	m, err := NewMessaging(mcfg, pool, a.UoW(), az, MessagingWrites{Events: sy.Appender(), Redactor: sy.Redactor(), Audit: a.Recorder(),
-		Credentials: lazyCredentials(s.authenticator), Components: components}, c.Service, id.Directory, s.deps.Clock, s.logger())
+		Credentials: lazyCredentials(s.authenticator), Components: components, Files: &s.attachments}, c.Service, id.Directory,
+		s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}

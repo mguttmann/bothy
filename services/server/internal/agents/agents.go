@@ -206,6 +206,10 @@ type RunFacts struct {
 	// effective capability (M2-11).
 	FollowupsPermitted *bool
 	FollowupsReported  string
+	// FilesOutPermitted is the owner's operator_config.supports_files_out; nil when the key is
+	// absent, which allows (09 section 2.2). runs refuses a message of the agent with attachments
+	// with 403 feature_disabled when it is false (M3-07).
+	FilesOutPermitted *bool
 }
 
 // Facts is the incoming port of the agent facts of runs (M2-05). It never authorizes: runs decides

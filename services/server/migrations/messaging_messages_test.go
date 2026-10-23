@@ -18,8 +18,9 @@ import (
 
 // TestMessagingMigration_Schema holds messages and mentions against docs/spec/03-data-model.md
 // section 4.6 column by column, with every check, key and index, and with exactly the deviations
-// the migration names: the search columns come with 00035 and 00036 (M3-13), no has_attachments yet (M1-56); the foreign key to
-// runs comes with 00051 (M2-05), the one to import_items with 00059 (M8-03). threads.parent_message_id references messages, deferred.
+// the migration names: the search columns come with 00035 and 00036 (M3-13), has_attachments and its CHECK with 00067 and
+// 00068 (M3-07); the foreign key to runs comes with 00051 (M2-05), the one to import_items with 00059 (M8-03).
+// threads.parent_message_id references messages, deferred.
 func TestMessagingMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -52,6 +53,8 @@ func TestMessagingMigration_Schema(t *testing.T) {
 		// Added by 00035 (M3-13); the vector is a stored generated column without a default.
 		{"search_language", "regconfig", false, "'simple'::regconfig"},
 		{"search_vector", "tsvector", false, ""},
+		// Added by 00067 (M3-07).
+		{"has_attachments", "boolean", false, "false"},
 	}
 	if got := principalColumns(t, conn, "messages"); !reflect.DeepEqual(got, want) {
 		t.Errorf("messages columns:\n got %+v\nwant %+v", got, want)
@@ -60,6 +63,8 @@ func TestMessagingMigration_Schema(t *testing.T) {
 	slices.Sort(cons)
 	wantCons := []string{
 		"CHECK (((deleted_at IS NULL) OR (content_md = ''::text)))",
+		// Added by 00067 and validated by 00068 (M3-07).
+		"CHECK (((deleted_at IS NULL) OR (NOT has_attachments)))",
 		"CHECK (((kind <> 'system'::text) OR ((origin = 'system'::text) AND silent AND (content_md = ''::text))))",
 		"CHECK (((kind = 'run'::text) = (run_id IS NOT NULL)))",
 		"CHECK (((kind = 'system'::text) = (system_code IS NOT NULL)))",

@@ -208,7 +208,7 @@ func idList(list []rest.Uuid) []ids.ID {
 
 // MessageREST converts a message (schema Message): empty values become absent members, never
 // null (ADR 0053), run_id and the trigger state included (M2-05), the components of a card included
-// (M2-15); attachments are empty until M3-07. The
+// (M2-15), the attachments in position order with the File of each (M3-07, attachmentsREST). The
 // reaction summary, my_reactions (always present in REST, possibly empty) and pinned come from
 // the message (M1-59).
 func MessageREST(m messaging.Message) rest.Message {
@@ -225,7 +225,7 @@ func MessageREST(m messaging.Message) rest.Message {
 		ClientMsgId: rest.Uuid(m.ClientMsgID), Origin: rest.MessageOrigin(m.Origin), Kind: rest.MessageKind(m.Kind),
 		ContentMd: m.ContentMD, ContentFormat: m.ContentFormat, ReplyToMessageId: optionalID(m.ReplyToID), RunId: optionalID(m.RunID),
 		TriggerStateAt: optionalTime(m.TriggerStateAt), Silent: m.Silent,
-		Attachments: []rest.Attachment{}, MentionIds: mentions, Reactions: reactionsREST(m.Reactions), Components: ComponentsREST(m.Components),
+		Attachments: attachmentsREST(m.Attachments), MentionIds: mentions, Reactions: reactionsREST(m.Reactions), Components: ComponentsREST(m.Components),
 		MyReactions: myReactions(m.MyReactions), Pinned: m.Pinned,
 		Version: m.Version, EditedAt: optionalTime(m.EditedAt), DeletedAt: optionalTime(m.DeletedAt),
 		CreatedAt: m.CreatedAt.UTC().Truncate(time.Millisecond),
@@ -247,6 +247,55 @@ func MessageREST(m messaging.Message) rest.Message {
 		out.ContentTruncated = &cut
 	}
 	return out
+}
+
+// attachmentsREST converts the attachments of a message (schema Attachment) in their order;
+// never nil. The File is the attached form (brief M3-07 design note 6): scope_channel_id is never
+// set, because after a move it would name a channel the reader may not see; sha256 only when the
+// file has one (upload_state complete); thumbnails always an array; other empty values absent.
+func attachmentsREST(list []messaging.Attachment) []rest.Attachment {
+	out := make([]rest.Attachment, 0, len(list))
+	for _, a := range list {
+		f := a.File
+		file := rest.File{
+			Id: rest.Uuid(f.ID), SizeBytes: f.SizeBytes, MimeType: f.MIMEType, OriginalName: f.OriginalName,
+			UploadedBy: rest.Uuid(f.UploadedBy), Purpose: rest.FilePurpose(f.Purpose), UploadState: rest.FileUploadState(f.UploadState),
+			ScanStatus: rest.FileScanStatus(f.ScanStatus), TranscriptStatus: rest.TranscriptStatus(f.TranscriptStatus),
+			Thumbnails: make([]rest.Thumbnail, 0, len(f.Thumbnails)), CreatedAt: f.CreatedAt.UTC().Truncate(time.Millisecond),
+			Sha256: optionalString(f.SHA256), Width: optionalInt(f.Width), Height: optionalInt(f.Height),
+			TranscriptLanguage: optionalString(f.TranscriptLanguage),
+		}
+		if f.DurationMS != 0 {
+			d := f.DurationMS
+			file.DurationMs = &d
+		}
+		if f.TranscriptSource != "" {
+			src := rest.TranscriptSource(f.TranscriptSource)
+			file.TranscriptSource = &src
+		}
+		for _, t := range f.Thumbnails {
+			file.Thumbnails = append(file.Thumbnails, rest.Thumbnail{Variant: rest.ThumbnailVariant(t.Variant), MimeType: t.MIMEType,
+				Width: t.Width, Height: t.Height})
+		}
+		out = append(out, rest.Attachment{Position: a.Position, File: file})
+	}
+	return out
+}
+
+// optionalString returns nil for "", so the member is absent.
+func optionalString(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+// optionalInt returns nil for 0, so the member is absent.
+func optionalInt(v int) *int {
+	if v == 0 {
+		return nil
+	}
+	return &v
 }
 
 // myReactions returns the own symbols for the member my_reactions; never nil, so REST always

@@ -7,16 +7,18 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/postgres/sqlcgen"
-	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/files/app"
 )
 
-// ReleaseFile implements app.Repository (M3-10): the deleted mark of the file fileID of purpose,
-// of uploadedBy unless it is zero, at at; released reports whether this call set it.
-func (r *Repository) ReleaseFile(ctx context.Context, fileID ids.ID, purpose string, uploadedBy ids.ID, at time.Time) (bool, error) {
+// MarkFilesDeleted implements app.Repository: deleted_at = at on the files of d that are not
+// deleted yet, of d.Purpose and d.UploadedBy where they are set (M3-07, M3-10); it returns how
+// many it marked.
+func (r *Repository) MarkFilesDeleted(ctx context.Context, d app.Deletion, at time.Time) (int, error) {
 	q, err := r.write(ctx)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
-	n, err := q.ReleaseFile(ctx, sqlcgen.ReleaseFileParams{DeletedAt: ts(at), ID: uuid(fileID), Purpose: purpose, UploadedBy: optionalUUID(uploadedBy)})
-	return n == 1, mapError(err, "releasing a file")
+	n, err := q.MarkFilesDeleted(ctx, sqlcgen.MarkFilesDeletedParams{DeletedAt: ts(at), Ids: uuids(d.FileIDs), Purpose: text(d.Purpose),
+		UploadedBy: optionalUUID(d.UploadedBy)})
+	return int(n), mapError(err, "marking files deleted")
 }

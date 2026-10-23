@@ -327,6 +327,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.image.max_concurrent = 2  # default\n" +
 		"file.image.max_pixels = 50000000  # default\n" +
 		"file.image.processing_timeout = 1m  # default\n" +
+		"file.invocation_hold_max = 2m  # default\n" +
 		"file.max_upload_bytes = 104857600  # default\n" +
 		"file.name_max_bytes = 255  # default\n" +
 		"file.not_ready_retry_after = 5s  # default\n" +

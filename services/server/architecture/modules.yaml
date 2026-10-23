@@ -208,7 +208,10 @@ modules:
              interaction.created, command.invoked]
     ephemeral_events: [run.updated, command.autocomplete_requested]
     ws_ops: [run.update, command.autocomplete_result]
-    depends_on: [instance, chat, agents, messaging, billing]
+    # M3-07: files for the held agent.invocation (subscriber of files.FileFinalized) and the
+    # attachment state of a message (files.Attachments.Pending); the edge points down
+    # (docs/decisions.d/M3-07.md D-M3-07-1).
+    depends_on: [instance, chat, agents, messaging, billing, files]
     adapter_vendors: [pgx, otel]   # sqlc code and the repository of runs and run_steps; adapters/otelmetrics records the run metrics (M2-05)
   search:
     tables: []

@@ -234,8 +234,7 @@ func (s *Service) ReleaseImage(ctx context.Context, fileID, uploadedBy ids.ID, p
 	if !p.Image() {
 		return errs.New(errs.CodeInternalError, "files: ReleaseImage of a purpose without image operations")
 	}
-	_, err := s.d.Repo.ReleaseFile(ctx, fileID, string(p), uploadedBy, s.now())
-	return err
+	return s.markDeleted(ctx, Deletion{FileIDs: []ids.ID{fileID}, Purpose: string(p), UploadedBy: uploadedBy})
 }
 
 // OpenImageVariant opens variant v of the deliverable file fileID of purpose p (design note 8):

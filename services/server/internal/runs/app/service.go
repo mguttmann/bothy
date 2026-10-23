@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -73,6 +74,10 @@ type Config struct {
 	// MaxContentBytes is message.max_content_bytes, the bound of response.text of
 	// respondToInteraction (ruling D-M2-15-16).
 	MaxContentBytes int `config:"message.max_content_bytes"`
+	// InvocationHoldMax is file.invocation_hold_max: the longest time the acceptance holds the
+	// agent.invocation of a run while an attachment of its triggering message is not final; the
+	// job runs.invocation_hold_timeout releases it then (12 section 10, M3-07).
+	InvocationHoldMax time.Duration `config:"file.invocation_hold_max"`
 }
 
 // check refuses limits below 1 and a default page above the largest.
@@ -91,6 +96,9 @@ func (c Config) check() error {
 	}
 	if c.EventPayloadMaxBytes < 1 {
 		return errors.New("runs: sync.event_payload_max_bytes must be at least 1")
+	}
+	if c.InvocationHoldMax <= 0 {
+		return errors.New("runs: file.invocation_hold_max must be positive")
 	}
 	if c.ClockLeeway < 0 || c.CancelGrace <= 0 || c.PresenceTimeout <= 0 || c.OrphanTimeout <= 0 || c.ReasonMaxChars < 1 {
 		return errors.New("runs: auth.clock_leeway must not be negative and agent.cancel_grace, agent.presence_timeout, " +
@@ -119,6 +127,13 @@ type MessageWriter interface {
 // at or after at (M2-08 design note 11); adapters/jobs implements it over jobs.Inserter.InsertTx.
 type ExpiryScheduler interface {
 	ScheduleQueuedExpiry(ctx context.Context, runID ids.ID, at time.Time) error
+}
+
+// HoldScheduler inserts the job runs.invocation_hold_timeout of a run in the unit of work of ctx,
+// to run at or after at, the release time of its held agent.invocation (M3-07); adapters/jobs
+// implements it over jobs.Inserter.InsertTx.
+type HoldScheduler interface {
+	ScheduleInvocationHoldTimeout(ctx context.Context, runID ids.ID, at time.Time) error
 }
 
 // ThreadPort is the part of chat.Threads runs uses: the routing data of one or many threads, the
@@ -221,6 +236,17 @@ type Deps struct {
 	// Threads when it implements ChannelThreads. Without one the subscriber of
 	// chat.ChannelReadOnlySet answers internal.
 	ChannelThreads ChannelThreads
+	// Files answers whether the attachments of a triggering message are final and where a file
+	// is attached (files.Attachments, M3-07); nil means nothing is ever pending, so no invocation
+	// is held.
+	Files files.Attachments
+	// Holds schedules runs.invocation_hold_timeout for every held run (M3-07); nil schedules
+	// nothing (a held run is then released only when its attachments become final).
+	Holds HoldScheduler
+	// Uncorrelated returns ctx without the trace correlation the appender attaches (the span
+	// context of platform/otel), for the append of a released agent.invocation, which carries no
+	// correlation_id (M3-07). nil clears only the request correlation id of kernel/reqmeta.
+	Uncorrelated func(ctx context.Context) context.Context
 }
 
 // ChannelThreads is the part of chat.Structure the subscriber of chat.ChannelReadOnlySet uses: every

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/chat"
+	"github.com/OWNER/bothy/services/server/internal/files"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
@@ -56,9 +57,13 @@ type Config struct {
 	// (D-M2-15-28), because the author can be renamed after the card was accepted.
 	HandleMaxChars      int `config:"principal.handle_max_chars"`
 	DisplayNameMaxChars int `config:"principal.display_name_max_chars"`
+	// MaxAttachments is message.max_attachments, the most files of one message (M3-07); its
+	// minimum is 0, which refuses every attachment.
+	MaxAttachments int `config:"message.max_attachments"`
 }
 
-// check refuses limits below 1 and a default page above the largest.
+// check refuses limits below 1 (message.max_attachments below 0) and a default page above the
+// largest.
 func (c Config) check() error {
 	if c.MaxContentBytes < 1 || c.MaxMentions < 1 || c.EventPayloadMaxBytes < 1 || c.ListContentMaxBytes < 1 {
 		return errors.New("messaging: message.max_content_bytes, message.max_mentions, sync.event_payload_max_bytes and message.list_content_max_bytes must be at least 1")
@@ -74,6 +79,9 @@ func (c Config) check() error {
 	}
 	if c.HandleMaxChars < 1 || c.DisplayNameMaxChars < 1 {
 		return errors.New("messaging: principal.handle_max_chars and principal.display_name_max_chars must be at least 1")
+	}
+	if c.MaxAttachments < 0 {
+		return errors.New("messaging: message.max_attachments must not be negative")
 	}
 	return nil
 }
@@ -126,6 +134,13 @@ type Deps struct {
 	// Cards checks and stores the components of a new card (M2-15, the source port runs
 	// implements); nil answers a card with 400 not_enabled.
 	Cards messaging.ComponentWriter
+	// Files binds the files of a new message and answers the attachments of a representation
+	// (files.Attachments, M3-07): Attach in the unit of work of a send, ForMessages once per list
+	// for the messages with has_attachments, DeleteForMessage in the unit of work of a deletion.
+	// internal/wire passes the port of files. Nil keeps the behaviour before M3-07 for test
+	// worlds without the files module: attachment_file_ids is refused with 400 validation_failed,
+	// errors[].code not_enabled, and no message gets attachments.
+	Files files.Attachments
 	// Credentials checks the session, device and token of the principal of a channel export again
 	// before every batch (brief M3-11 note 7, D-M3-11-5); internal/wire passes identity's
 	// Authenticator. The export refuses to start without it; the other use cases do not use it.

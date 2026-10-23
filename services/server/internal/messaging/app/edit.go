@@ -140,8 +140,10 @@ func (s *Service) edit(ctx context.Context, a actor.Actor, c messaging.UpdateCom
 	}
 	out := view(updated, cur.Author, mentions)
 	// The row lock serialises reactions, pins and component changes (runs locks the card through
-	// LockCard, M2-15) with the edit, so those of cur are current.
+	// LockCard, M2-15) with the edit, so those of cur are current; an edit never changes the
+	// attachments (03 messages, M3-07), so those of cur are the message's.
 	out.Reactions, out.MyReactions, out.Pinned, out.Components = cur.Reactions, cur.MyReactions, cur.Pinned, cur.Components
+	out.Attachments = cur.Attachments
 	return out, s.emitMessage(ctx, authorize.EventMessageUpdated, info, out, false)
 }
 
@@ -200,7 +202,9 @@ func (s *Service) Delete(ctx context.Context, messageID ids.ID) error {
 }
 
 // remove is the unit of work of Delete in the lock order of the README: the thread row through
-// chat, then the message row; a message deleted in the meantime ends the unit without a write.
+// chat, then the message row, then (M3-07) the files rows of its attachments in ascending id and
+// the rows of message_attachments through files; a message deleted in the meantime ends the unit
+// without a write.
 func (s *Service) remove(ctx context.Context, a actor.Actor, m domain.Message, visible []ids.ID) error {
 	if err := s.d.Threads.LockForMessageChange(ctx, m.ThreadID); err != nil {
 		return err
@@ -217,17 +221,7 @@ func (s *Service) remove(ctx context.Context, a actor.Actor, m domain.Message, v
 	if err != nil {
 		return err
 	}
-	if err := s.d.Store.DeleteRevisions(ctx, row.ID, visible); err != nil {
-		return err
-	}
-	if err := s.d.Store.DeleteMentionsExcept(ctx, row.ID, visible, nil); err != nil {
-		return err
-	}
-	// The reactions and the pin of the message go in the same transaction (M1-59 design note 9).
-	if err := s.d.Store.DeleteReactions(ctx, row.ID, visible); err != nil {
-		return err
-	}
-	if _, _, err := s.d.Store.DeletePin(ctx, row.ID, visible); err != nil {
+	if err := s.removeDependents(ctx, row, visible); err != nil {
 		return err
 	}
 	if err := s.d.Threads.DecrementMessageCount(ctx, row.ThreadID); err != nil {
@@ -258,6 +252,32 @@ func (s *Service) remove(ctx context.Context, a actor.Actor, m domain.Message, v
 			"thread_id": auditing.ID(tomb.ThreadID), "channel_id": auditing.ID(tomb.ChannelID), "author_principal_id": auditing.ID(tomb.AuthorID),
 		},
 	})
+}
+
+// removeDependents deletes what goes with a deleted message in its unit of work: revisions and
+// mentions (M1-58), reactions and the pin (M1-59 design note 9), and, when the locked row had the
+// flag, the attachments with the deleted_at of their files through files (brief M3-07 design note
+// 7, 03 messages, 12 section 12). The tombstone UPDATE already reset has_attachments.
+func (s *Service) removeDependents(ctx context.Context, row domain.Message, visible []ids.ID) error {
+	if err := s.d.Store.DeleteRevisions(ctx, row.ID, visible); err != nil {
+		return err
+	}
+	if err := s.d.Store.DeleteMentionsExcept(ctx, row.ID, visible, nil); err != nil {
+		return err
+	}
+	if err := s.d.Store.DeleteReactions(ctx, row.ID, visible); err != nil {
+		return err
+	}
+	if _, _, err := s.d.Store.DeletePin(ctx, row.ID, visible); err != nil {
+		return err
+	}
+	if !row.HasAttachments {
+		return nil
+	}
+	if s.d.Files == nil {
+		return errs.New(errs.CodeInternalError, "messaging: a message with attachments in a service without files")
+	}
+	return s.d.Files.DeleteForMessage(ctx, row.ID)
 }
 
 // redact replaces the payloads of the stored events of the deleted message tomb with their

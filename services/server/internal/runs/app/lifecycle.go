@@ -44,6 +44,9 @@ type OpenCmd struct {
 	TriggerKind string
 	// BillingModeExpected is the agent's billing mode now (ruling D-M2-05-5).
 	BillingModeExpected string
+	// InvocationHeldUntil is the release time of a held agent.invocation, stored in
+	// runs.invocation_held_until (R-DM-44, M3-07); zero: not held (NULL).
+	InvocationHeldUntil time.Time
 }
 
 // openTrigger reports a trigger Open accepts: kind message without a command or an interaction,
@@ -145,6 +148,7 @@ func (s *Service) Open(ctx context.Context, cmd OpenCmd) (runs.RunSummary, error
 		TriggeringMessageID: cmd.TriggeringMessageID, TriggeringCommandID: cmd.TriggeringCommandID,
 		TriggeringInteractionID: cmd.TriggeringInteractionID,
 		BillingModeExpected:     cmd.BillingModeExpected, InvocationJTI: ids.New(), QueuedAt: s.now(),
+		InvocationHeldUntil: cmd.InvocationHeldUntil,
 	})
 	if err != nil {
 		return runs.RunSummary{}, err

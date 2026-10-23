@@ -57,7 +57,7 @@ func (s *Service) CreateThread(ctx context.Context, a actor.Actor, cmd messaging
 	if err == nil && out.Replay {
 		// The handler answers with the thread without thread.read, so a replay proves
 		// message.create on the thread as it is now, like a replay of createMessage (brief D1).
-		if _, err := s.loadThread(ctx, a, out.ThreadID); err != nil {
+		if _, err := s.loadThread(ctx, a, out.ThreadID, p != nil && s.withAttachments(p.attachmentIDs)); err != nil {
 			return messaging.ThreadCreated{}, err
 		}
 	}
@@ -73,7 +73,7 @@ func (s *Service) prepareFirst(ctx context.Context, a actor.Actor, cmd messaging
 	if err := domain.CheckFirstMessageRunID(cmd.FirstMessage.RunID); err != nil {
 		return nil, err
 	}
-	first, err := s.prepare(ctx, a, *cmd.FirstMessage, ids.ID{}, newThreadContext(cmd))
+	first, err := s.prepare(ctx, a, *cmd.FirstMessage, ids.ID{}, newThreadContext(cmd), domain.FirstMessagePointer)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (s *Service) committedFirst(ctx context.Context, a actor.Actor, out messagi
 	if out.Replay || out.FirstMessage == nil {
 		return out, nil
 	}
-	m, err := s.reread(ctx, a, out.FirstMessage.ID)
+	m, err := s.reread(ctx, a, out.FirstMessage.ID, out.FirstMessage.Attachments)
 	if err != nil {
 		return messaging.ThreadCreated{}, err
 	}
@@ -125,7 +125,11 @@ func (s *Service) createThread(ctx context.Context, a actor.Actor, cmd messaging
 		}
 		return out, nil
 	}
-	if err := s.check(ctx, a, authorize.ActionMessageCreate, newThreadResource(info)); err != nil {
+	// A first message with attachments needs upload besides write on the new thread (05 section
+	// 4.7, brief M3-07 design note 5 b).
+	r := newThreadResource(info)
+	r.HasAttachments = len(p.attachmentIDs) > 0
+	if err := s.check(ctx, a, authorize.ActionMessageCreate, r); err != nil {
 		return messaging.ThreadCreated{}, err
 	}
 	c, err := s.send(ctx, a, *p, info, true)

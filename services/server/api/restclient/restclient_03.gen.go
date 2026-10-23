@@ -3642,7 +3642,10 @@ type ClientWithResponsesInterface interface {
 	// Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
 	// 200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
 	// into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-	// denial sets `trigger_state = failed` with `trigger_state_reason`.
+	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+	// agent while one of its attachments is not final (scan or check still running), the agent
+	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
+	// passed; `trigger_state` stays `received` meanwhile.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -3654,7 +3657,10 @@ type ClientWithResponsesInterface interface {
 	// Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
 	// 200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
 	// into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-	// denial sets `trigger_state = failed` with `trigger_state_reason`.
+	// denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+	// agent while one of its attachments is not final (scan or check still running), the agent
+	// invocation waits until all attachments are final or until `file.invocation_hold_max` has
+	// passed; `trigger_state` stays `received` meanwhile.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -22635,20 +22641,4 @@ func (r AddGroupMemberResponse) Status() string {
 		return r.HTTPResponse.Status
 	}
 	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r AddGroupMemberResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r AddGroupMemberResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
 }

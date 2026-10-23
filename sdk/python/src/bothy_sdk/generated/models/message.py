@@ -41,7 +41,8 @@ class Message:
         content_format (int): Version of the Markdown dialect; `1` is CommonMark 0.31.2 without raw HTML, with mention
             tokens (03 `messages`).
         silent (bool):
-        attachments (list[Attachment]):
+        attachments (list[Attachment]): Attachments in position order (the order of `attachment_file_ids` at sending);
+            empty for a message without attachments and for a deleted message.
         mention_ids (list[UUID]): Principals resolved from the mention tokens of `content_md`, sorted. Clients render a
             token as a mention only for these.
         reactions (list[ReactionSummary]):

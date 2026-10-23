@@ -9240,7 +9240,10 @@ paths:
         Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
         200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
         into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-        denial sets `trigger_state = failed` with `trigger_state_reason`.
+        denial sets `trigger_state = failed` with `trigger_state_reason`. When the message triggers an
+        agent while one of its attachments is not final (scan or check still running), the agent
+        invocation waits until all attachments are final or until `file.invocation_hold_max` has
+        passed; `trigger_state` stays `received` meanwhile.
       x-authz-action: message.create
       x-rate-limit-class: rl.message
       x-idempotency-exempt: client_id
@@ -24576,6 +24579,7 @@ components:
           type: boolean
         attachments:
           type: array
+          description: Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message.
           items:
             $ref: '#/components/schemas/Attachment'
         mention_ids:
@@ -24620,11 +24624,13 @@ components:
           enum: [text, voice, card]
         content_md:
           type: string
+          description: Empty or white space only content is allowed only when `attachment_file_ids` lists at least one file (a picture without caption); otherwise `400 validation_failed` with `errors[].code` `empty`.
           examples: ['@support-agent the invoice export fails since this morning.']
         reply_to_message_id:
           $ref: '#/components/schemas/Uuid'
         attachment_file_ids:
           type: array
+          description: Own files uploaded for the channel of this message with a completed upload session, in the order they appear in the message; at most `message.max_attachments`. Needs the right `upload` in addition to `write` (`403 forbidden` with `reason` `capability_missing`). A file that is not attachable (not the caller's, another channel, upload not completed or failed, deleted, already attached, or listed twice) answers `409 conflict` with `reason` `file_not_attachable` and the pointer of the entry in `detail`; more than `message.max_attachments` answer `400 validation_failed` with `errors[].code` `limit_reached`. Files whose scan has not ended are attachable.
           items:
             $ref: '#/components/schemas/Uuid'
         mention_ids:
@@ -24827,6 +24833,7 @@ components:
           enum: [attachment, avatar, branding, gdpr_export]
         scope_channel_id:
           $ref: '#/components/schemas/Uuid'
+          description: Channel the file was uploaded for; present only before the file is attached to a message. An attached file is read through the channel of its message.
         upload_state:
           type: string
           enum: [pending, complete, failed]

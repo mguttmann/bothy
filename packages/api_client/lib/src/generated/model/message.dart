@@ -37,7 +37,7 @@ part 'message.g.dart';
 /// * [triggerStateAt] - RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
 /// * [triggerStateReason] - Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`.
 /// * [silent]
-/// * [attachments]
+/// * [attachments] - Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message.
 /// * [mentionIds] - Principals resolved from the mention tokens of `content_md`, sorted. Clients render a token as a mention only for these.
 /// * [reactions]
 /// * [myReactions] - Emoji the caller reacted with. Only in REST responses, never in events.
@@ -119,6 +119,7 @@ abstract class Message implements Built<Message, MessageBuilder> {
   @BuiltValueField(wireName: r'silent')
   bool get silent;
 
+  /// Attachments in position order (the order of `attachment_file_ids` at sending); empty for a message without attachments and for a deleted message.
   @BuiltValueField(wireName: r'attachments')
   BuiltList<Attachment> get attachments;
 
