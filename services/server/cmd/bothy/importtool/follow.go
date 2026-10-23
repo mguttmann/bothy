@@ -369,7 +369,8 @@ func (m *mirror) local(c *channelPlan, err error) error {
 // writtenAfterSwitch reports new Discord messages in a lead=bothy channel: its main thread or an
 // active thread beyond the cursor.
 func (m *mirror) writtenAfterSwitch(c *channelPlan) bool {
-	if newer(c.ch.LastMessageID, m.cur.position(true, c.ch.ID)) {
+	// A forum has no main thread: its last_message_id is its newest post, which the threads cover.
+	if c.kind == kindText && newer(c.ch.LastMessageID, m.cur.position(true, c.ch.ID)) {
 		return true
 	}
 	for _, t := range m.wk.gs.activeBy[c.ch.ID] {
@@ -411,6 +412,9 @@ func (m *mirror) mirrorThread(ctx context.Context, c *channelPlan, t *threadPlan
 	wk := m.wk
 	active := wk.gs.active[t.th.ID]
 	stored, known := m.cur.mirrored(t.th.ID)
+	if !known && m.starterPending(c, t) {
+		return nil
+	}
 	wasOpen := !t.closed
 	if known {
 		wasOpen = strings.HasPrefix(stored, "o:")
@@ -433,6 +437,21 @@ func (m *mirror) mirrorThread(ctx context.Context, c *channelPlan, t *threadPlan
 		return nil
 	}
 	return m.thread(ctx, c, t)
+}
+
+// starterPending reports a thread of a text channel that must wait for its starter message: the
+// main thread is in scope and still has messages from the thread's ID on that this round did not
+// copy (the settle rule held them, or the read failed). The server links a new thread to its
+// starter only when the starter is posted first (22 5.1.1), and a re-post never adds the link, so
+// such a thread is posted in the round that copies its starter.
+func (m *mirror) starterPending(c *channelPlan, t *threadPlan) bool {
+	if c.kind != kindText || !c.selected || m.wk.w == nil {
+		// A dry round copies nothing, so it counts the thread as an --apply round after the
+		// starter would.
+		return false
+	}
+	main := m.wk.w.position(true, c.ch.ID)
+	return compareIDs(t.th.ID, main) > 0 && newer(c.ch.LastMessageID, main)
 }
 
 // newer reports a message ID after the cursor position.

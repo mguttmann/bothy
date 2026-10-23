@@ -17,7 +17,9 @@ const (
 	thAuto        = "13000303"
 	msgSettled    = "13001020"
 	msgBusy       = "13001021"
-	msgUnsettled  = "13001022"
+	msgUnsettled  = "13001022" // also the starter of the thread thNew created on it
+	thNew         = msgUnsettled
+	msgInNew      = "13001023"
 	busyEmoji     = "\U0001F440"
 	mirrorTimeout = 10 * time.Minute // the settle time passed between the two rounds, above import.follow.settle_after
 )
@@ -49,6 +51,12 @@ func TestReadMirrorAgainstRealServer(t *testing.T) {
 	fake.AddMessage(chGeneral, message(msgSettled, chGeneral, 0, alex, "Settled answer.", stamp(now.Add(-mirrorTimeout)), nil))
 	fake.AddMessage(chGeneral, message(msgBusy, chGeneral, 0, sam, "Working on it", stamp(now.Add(-mirrorTimeout)), busyReaction))
 	fake.AddMessage(chGeneral, message(msgUnsettled, chGeneral, 0, robin, "Typing still", stamp(now), nil))
+	fake.Mutate(func(fx *discordtest.Fixture) {
+		fx.ActiveThreads = append(fx.ActiveThreads, raw(t, map[string]any{"id": thNew, "type": 11, "guild_id": guildID,
+			"parent_id": chGeneral, "owner_id": userRobin, "name": "Typing still", "last_message_id": msgInNew,
+			"thread_metadata": map[string]any{"archived": false, "archive_timestamp": stamp(now), "locked": false}}))
+	})
+	fake.AddMessage(thNew, message(msgInNew, thNew, 0, alex, "Answer in the thread.", stamp(now.Add(-mirrorTimeout)), nil))
 	fake.RenameThread(thAuto, "Login on tablets")
 	fake.RenameThread(thRelease, "Release planning, week two")
 	fake.ArchiveThread(thLogin, stamp(now))
@@ -76,8 +84,8 @@ func TestReadMirrorAgainstRealServer(t *testing.T) {
 	fake.EditMessage(chGeneral, msgBusy, map[string]any{"reactions": nil})
 	w.clk.Advance(mirrorTimeout)
 	w.mustApply(once, importtool.ExitOK)
-	if n := w.count(`SELECT count(*) FROM messages WHERE origin = 'import'`); n != imported+3 {
-		t.Errorf("%d imported messages, want %d (the import and the three new ones)", n, imported+3)
+	if n := w.count(`SELECT count(*) FROM messages WHERE origin = 'import'`); n != imported+4 {
+		t.Errorf("%d imported messages, want %d (the import, the three new ones and the one of the new thread)", n, imported+4)
 	}
 	var all, distinct int
 	if err := w.s.AdminDB().QueryRow(w.ctx, `SELECT count(*), count(DISTINCT import_item_id) FROM messages WHERE origin = 'import'`).
@@ -88,6 +96,10 @@ func TestReadMirrorAgainstRealServer(t *testing.T) {
 		t.Errorf("%d imported messages for %d items: a message was copied twice", all, distinct)
 	}
 	w.checkOrder()
+	if got := w.text(`SELECT coalesce(parent_message_id::text, '') FROM threads WHERE id = $1`, w.target(src, "thread:"+thNew)); got !=
+		w.target(src, "message:"+msgUnsettled) {
+		t.Errorf("the thread created on the held message has parent %q, want its starter", got)
+	}
 	if n := w.count(`SELECT count(*) FROM messages m JOIN threads t ON t.id = m.thread_id
 		WHERE t.channel_id = $1 AND t.kind = 'main' AND m.origin = 'import'`, general); n == 0 {
 		t.Error("no imported message in the main thread of general")

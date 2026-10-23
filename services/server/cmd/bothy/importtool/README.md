@@ -87,7 +87,8 @@ never writes to Discord. A round:
    name or the done state differently from the fingerprint the cursor keeps of the last posted
    item (`mirrored`, a state letter and a hash of the name, never the name); a thread the cursor
    knows as open that is missing from the active list is confirmed with `GET /channels/{id}`; the
-   server renames only while `title_source = auto`;
+   server renames only while `title_source = auto`; a new thread of a text channel waits until its
+   starter message in the main thread is copied, so the server can link it;
 4. copies per thread the settled beginning of the new messages (settle rule below) through the
    same batches, attachments and cursor writes as a full run.
 

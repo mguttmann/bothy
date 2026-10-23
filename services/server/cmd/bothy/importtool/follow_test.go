@@ -450,3 +450,79 @@ func TestMirrorSettle(t *testing.T) {
 		}
 	}
 }
+
+// TestNewThreadWaitsForItsStarter (22 5.1.1, 12.2 item 3): a thread created on a message of the
+// main thread that the settle rule holds back is not posted before its starter message, so the
+// server can link it to the starter; once the starter is copied, the thread follows in the same
+// round.
+func TestNewThreadWaitsForItsStarter(t *testing.T) {
+	var e *testEnv
+	const starter, reply = "13009101", "13009102"
+	e, _, ctx := follower(t, func(call int, stop context.CancelFunc) {
+		switch call {
+		case 1:
+			now := e.clk.Now()
+			e.discord.AddMessage(fxGeneral, newMessage(starter, now))
+			e.discord.Mutate(func(fx *discordtest.Fixture) {
+				b, err := json.Marshal(map[string]any{"id": starter, "type": 11, "guild_id": fxGuild, "parent_id": fxGeneral,
+					"name": "Follow-up", "last_message_id": reply,
+					"thread_metadata": map[string]any{"archived": false, "archive_timestamp": now.Format(time.RFC3339Nano)}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				fx.ActiveThreads = append(fx.ActiveThreads, b)
+			})
+			r := newMessage(reply, now.Add(-time.Hour))
+			e.discord.AddMessage(starter, r)
+		case 2:
+			e.clk.Advance(DefaultConfig().FollowSettleAfter)
+		case 3:
+			stop()
+		}
+	})
+	src := e.startSource(fixtureMapping)
+	if code := e.runCtx(ctx, "--guild", fxGuild, "--map", e.writeMap(fixtureMapping), "--apply", "--follow"); code != ExitOK {
+		t.Fatalf("exit %d: %s", code, e.stderr.String())
+	}
+	starterBatch, threadBatch := -1, -1
+	for i, b := range e.bothy.Batches(src) {
+		if slices.Contains(b.Keys, "message:"+starter) {
+			starterBatch = i
+		}
+		if b.ThreadOriginKey == "thread:"+starter && threadBatch < 0 {
+			threadBatch = i
+		}
+	}
+	if starterBatch < 0 || threadBatch < 0 || threadBatch < starterBatch {
+		t.Errorf("batch of the starter %d, first batch of the thread %d: the thread must follow its starter", starterBatch, threadBatch)
+	}
+}
+
+// TestForumLeadBothyQuiet: a forum with lead bothy and a last_message_id (its newest post) but no
+// new post after the cursor gets no warning; forums have no main thread cursor.
+func TestForumLeadBothyQuiet(t *testing.T) {
+	e := newTestEnv(t, discordtest.BasicFixture(t))
+	stored := strings.Replace(fixtureMapping, `    target: {create: {name: "support"}}`, `    target: {create: {name: "support"}}
+    lead: bothy`, 1)
+	e.discord.Mutate(func(fx *discordtest.Fixture) {
+		for i, c := range fx.Channels {
+			var o struct {
+				ID string `json:"id"`
+			}
+			_ = json.Unmarshal(c, &o)
+			if o.ID == fxSupport {
+				var m map[string]any
+				_ = json.Unmarshal(c, &m)
+				m["last_message_id"] = "13000302"
+				fx.Channels[i], _ = json.Marshal(m)
+			}
+		}
+	})
+	e.startSource(stored)
+	if code := e.run("--guild", fxGuild, "--map", e.writeMap(fixtureMapping), "--apply", "--once"); code != ExitOK {
+		t.Fatalf("exit %d: %s", code, e.stderr.String())
+	}
+	if strings.Contains(e.stdout.String(), noteAfterSwitch) {
+		t.Errorf("a quiet forum with lead bothy got the warning:\n%s", e.stdout.String())
+	}
+}
