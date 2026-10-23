@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pb33f/libopenapi"
@@ -32,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/attachments/internal/veto"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
@@ -43,7 +43,6 @@ func TestMain(m *testing.M) { os.Exit(harness.Main(m)) }
 const (
 	partBytes      = 16384
 	maxAttachments = 3
-	waitAsync      = 2 * time.Minute
 )
 
 // env is one test server with its world, its scripted clamd and its veto subscribers.
@@ -187,20 +186,15 @@ func (e *env) state(t *testing.T, id string) string {
 }
 
 // waitFinal waits until the file left upload_state pending and returns its state; the scan pass
-// runs in the worker of the server, so the test polls with a deadline.
+// runs in the worker of the server, so the test waits for the condition within testkit.Patience.
 func (e *env) waitFinal(t *testing.T, id string) string {
 	t.Helper()
-	deadline := time.Now().Add(waitAsync)
-	for {
-		st := e.state(t, id)
-		if !strings.HasPrefix(st, "pending/") {
-			return st
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("file %s still pending after %v", id, waitAsync)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+	var st string
+	testkit.Until(t, "the scan of file "+id, func() bool {
+		st = e.state(t, id)
+		return !strings.HasPrefix(st, "pending/")
+	})
+	return st
 }
 
 // count runs a count query.

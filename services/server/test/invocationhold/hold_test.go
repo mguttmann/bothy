@@ -16,10 +16,10 @@ import (
 	"net/http"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/files/adapters/clamd/clamdtest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -175,8 +175,7 @@ func TestHold_TimeoutReleasesPending(t *testing.T) {
 // TestScanClamdStoppedStaysPending).
 func TestHold_RealClamdStoppedThenClean(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Minute)
-	defer cancel()
+	ctx := testkit.Context(t)
 	clamd, err := clamdtest.Start(ctx, clamdtest.Options{Restartable: true})
 	if err != nil {
 		t.Fatal(err)
@@ -202,20 +201,16 @@ func TestHold_RealClamdStoppedThenClean(t *testing.T) {
 	}
 	// The container needs a moment until it answers; every pass before that is one more retry
 	// round and keeps F pending and the run held.
-	deadline := time.Now().Add(2 * time.Minute)
-	for {
+	testkit.Until(t, "the scan of F after the start of the container", func() bool {
 		w.mustScan(f)
 		if _, scan := w.fileState(f); scan != "pending" {
-			break
+			return true
 		}
 		if len(w.invocations(r.ID)) != 0 {
 			t.Fatal("released while F is pending")
 		}
-		if time.Now().After(deadline) {
-			t.Fatal("F still pending after the start of the container")
-		}
-		time.Sleep(time.Second)
-	}
+		return false
+	})
 	if up, scan := w.fileState(f); up != "complete" || scan != "clean" {
 		t.Fatalf("file %s %s", up, scan)
 	}

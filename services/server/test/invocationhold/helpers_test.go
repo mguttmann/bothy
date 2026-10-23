@@ -31,6 +31,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	runsjobs "github.com/OWNER/bothy/services/server/internal/runs/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 	"github.com/OWNER/bothy/services/server/test/harness"
@@ -46,9 +47,6 @@ func TestMain(m *testing.M) { os.Exit(harness.Main(m)) }
 const (
 	holdMax   = 2 * time.Minute
 	partBytes = 16384
-	// eventWait bounds the wait for the log tail of the server, which serves pollAgentEvents a
-	// moment after the commit; no test waits for a window of the specification.
-	eventWait = 30 * time.Second
 )
 
 // config are the keys of a hold test server with the clamd at address; extra entries win. The
@@ -530,13 +528,12 @@ type feedEvent struct {
 
 // poll reads Lotse's consumer default through pollAgentEvents (M2-07) until it reached the newest
 // event of the log, acknowledging every page, and returns the events. The log tail serves the
-// poll a moment after the commit, so it waits up to eventWait for the head to arrive.
+// poll a moment after the commit, so it waits within testkit.Patience for the head to arrive.
 func (w *world) poll() []feedEvent {
 	w.t.Helper()
 	target := w.maxSeq()
-	deadline := time.Now().Add(eventWait)
 	var out []feedEvent
-	for {
+	testkit.Until(w.t, "pollAgentEvents reaching the head of the log", func() bool {
 		r := w.lotse.Do(w.t.Context(), harness.Request{Method: http.MethodGet, Path: "/agents/me/consumers/default/events"})
 		if r.Status != http.StatusOK {
 			w.t.Fatalf("pollAgentEvents: %d %s", r.Status, r.Body)
@@ -552,16 +549,9 @@ func (w *world) poll() []feedEvent {
 			harness.MustDo(w.t, w.lotse, harness.Request{Method: http.MethodPost, Path: "/agents/me/consumers/default/ack",
 				Body: map[string]any{"seq": page.NextCursor}}, http.StatusOK)
 		}
-		if page.HeadSeq >= target && page.NextCursor >= page.HeadSeq {
-			return out
-		}
-		if time.Now().After(deadline) {
-			w.t.Fatalf("pollAgentEvents did not reach seq %d within %v (head %d, cursor %d)", target, eventWait, page.HeadSeq, page.NextCursor)
-		}
-		if len(page.Events) == 0 {
-			time.Sleep(50 * time.Millisecond)
-		}
-	}
+		return page.HeadSeq >= target && page.NextCursor >= page.HeadSeq
+	})
+	return out
 }
 
 // delivered returns the agent.invocation events of the run among evs.

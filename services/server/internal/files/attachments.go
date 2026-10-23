@@ -42,7 +42,7 @@ type Attachments interface {
 	// MessageOf reports where a file is attached; ok is false for an unattached file.
 	MessageOf(ctx context.Context, fileID ids.ID) (ref AttachmentRef, ok bool, err error)
 	// Pending reports whether an attachment of the message is not final (12 section 2
-	// "endgültig"); false for a message without attachments.
+	// "final"); false for a message without attachments.
 	Pending(ctx context.Context, messageID ids.ID) (bool, error)
 }
 
