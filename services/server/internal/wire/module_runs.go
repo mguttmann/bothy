@@ -75,14 +75,26 @@ func (s *server) startRuns(context.Context) error {
 	if a == nil || sy == nil || c == nil || m == nil {
 		return errors.New("wire: the runs module needs audit, sync, chat and messaging")
 	}
+	scfg, err := SessionsConfig(s.values)
+	if err != nil {
+		return err
+	}
+	// The agent sessions (M2-12) are part of the agents module; runs decides them at every
+	// invocation and attaches them at the start, and fillHandlers mounts their REST handlers.
+	ss, err := NewAgentSessions(scfg, pool, a.UoW(), az, SessionWrites{Audit: a.Recorder(), Events: sy.Appender()}, c.Service, c.Service,
+		s.deps.Clock, s.logger())
+	if err != nil {
+		return err
+	}
 	rn, err := NewRuns(cfg, pool, a.UoW(), az, RunsDeps{
 		Events: sy.Appender(), Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service,
-		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(),
+		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Audit: a.Recorder(), Sessions: ss.Service,
 		Components: comps, Cards: m.Service, ThreadLocks: c.Service, Files: &s.attachments,
 	}, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
+	rn.Sessions = ss
 	if err := s.bindCommands(pool, a, az, sy, c, ag, rn); err != nil {
 		return err
 	}

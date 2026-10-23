@@ -454,7 +454,9 @@ passkey of the person with `revoked_at IS NULL`, for `local_credential.set` a ro
 itself stays in `authz` (B7).
 
 Actions with two targets (`thread.move`: thread and target channel, permission "manage on source and
-target") carry the second target in the resource reference (`ref.target`). `resolve` resolves both
+target"; `agent_session.bind`: thread and the thread in which the reference is current, permission
+"trigger and `agent.invoke` on the thread and, when the reference is current in another thread, also on that thread",
+09 section 9.4) carry the second target in the resource reference (`ref.target`). `resolve` resolves both
 paths; visibility and requirement apply on both. Without read permission on the target the response
 is `404`, the same as for an unknown ID. Reason: a second check in the use case would be permission
 logic outside of `authz` (05, rule 1.1).

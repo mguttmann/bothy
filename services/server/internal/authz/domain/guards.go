@@ -65,15 +65,20 @@ const (
 	// actionRunFollowupCreate is a follow-up of the active run; it takes the guard of
 	// agent.invoke (05 section 4.10, M2-11).
 	actionRunFollowupCreate = "run.followup.create"
+	// The session switches carry the agent.invoke guard (05 section 4.6, brief M2-12 design note
+	// 5).
+	actionAgentSessionReset = "agent_session.reset"
+	actionAgentSessionBind  = "agent_session.bind"
 	actionGrantCreate       = "grant.create"
 	actionGrantRevoke       = "grant.revoke"
 	actionTokenCreate       = "token.create"
 )
 
-// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke and
-// run.followup.create (M2-11), the same guard with the interaction rules on interaction.create
-// (M2-15), token.create, the mode guard of run.start (M2-09) and the terminal guards SR10, SR11 and
-// SR12 of terminal.open and terminal.attach (M2-40). The
+// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke,
+// run.followup.create (M2-11) and the session switches agent_session.reset and agent_session.bind
+// (brief M2-12), the same guard with the interaction rules on interaction.create (M2-15),
+// token.create, the mode guard of run.start (M2-09) and the terminal guards SR10, SR11 and SR12 of
+// terminal.open and terminal.attach (M2-40). The
 // delegation limits of grant.create and grant.revoke belong to the requirement (decideDelegation).
 func guards(in *Input) (Decision, error) {
 	switch in.Action {
@@ -90,7 +95,7 @@ func guards(in *Input) (Decision, error) {
 		return commandInvokeGuard(in)
 	case actionCommandAutocomplete:
 		return commandAutocompleteGuard(in)
-	case actionAgentInvoke, actionRunFollowupCreate:
+	case actionAgentInvoke, actionRunFollowupCreate, actionAgentSessionReset, actionAgentSessionBind:
 		if in.Invoke == nil {
 			return Decision{}, internalError(in.Action + " without its trigger")
 		}

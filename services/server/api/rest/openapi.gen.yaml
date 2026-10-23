@@ -8467,6 +8467,7 @@ paths:
     post:
       operationId: resetAgentSession
       summary: Start a new agent session in the thread
+      description: Ends the current session of the thread with `end_reason = reset` and returns the ended row; the next run gets `session_mode = new` (09, 9.2). A run in progress keeps its session. Without a current session 409 `conflict` with `reason` `no_current_session`.
       tags: [Threads]
       x-authz-action: agent_session.reset
       x-rate-limit-class: rl.trigger
@@ -8483,6 +8484,8 @@ paths:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
               $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -8495,7 +8498,7 @@ paths:
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
                     external_session_ref: sess-7f3a
-                    is_current: true
+                    is_current: false
                     started: true
                     model: model-large
                     cost:
@@ -8503,6 +8506,8 @@ paths:
                       currency: USD
                       is_estimate: true
                     created_at: '2026-10-10T09:30:00.000Z'
+                    ended_at: '2026-10-10T10:05:00.000Z'
+                    end_reason: reset
                     version: 3
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -8525,8 +8530,8 @@ paths:
     post:
       operationId: bindAgentSession
       summary: Bind an existing external session
+      description: Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409. `reason` `session_changed` when `expected_current_session_id` does not name the current session, `session_bound_elsewhere` when the reference is current in another thread without `take_over`. With `take_over` the permission is checked in that thread too. The next run gets `session_mode = bind`.
       tags: [Threads]
-      description: Compare-and-swap over the current session of the thread (09, 9.4); nothing changes on a 409.
       x-authz-action: agent_session.bind
       x-rate-limit-class: rl.trigger
       parameters:
@@ -8553,6 +8558,8 @@ paths:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
               $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -8595,12 +8602,14 @@ paths:
     post:
       operationId: reportAgentSession
       summary: Report the external session reference and model
+      description: 'The adapter reports the session of its own active run in the thread (09, 9.1 and 9.5). `If-Match` is the compare-and-swap over `agent_sessions.version`: absent means the run has no session row yet, and the report creates it; a row that exists needs its version, otherwise 412 `version_conflict` with `current`. 409 `conflict` with `reason` `session_bound_elsewhere` (the reference is current in another thread), `session_changed` (the thread got another current session) or `session_not_bound` (`bind_failed` without a started session row).'
       tags: [Agent runtime]
       x-authz-action: agent_session.report
       x-rate-limit-class: rl.agent_runtime
       parameters:
       - $ref: '#/components/parameters/ThreadIdPath'
       - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatchOptional'
       requestBody:
         required: true
         content:
@@ -8623,6 +8632,8 @@ paths:
               $ref: '#/components/headers/RateLimit'
             RateLimit-Policy:
               $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
@@ -8652,6 +8663,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -24489,9 +24504,18 @@ components:
         external_session_ref:
           type: string
           examples: [sess-7f3a]
+          description: The reference the runtime actually uses; a different one replaces the stored reference of the session (09, 9.5 item 3). At most `agent.session_ref_max_bytes` bytes of display text.
         model:
           type: string
           examples: [model-large]
+          description: The pattern of `default_model` (09, 2.2), at most `agent.session_ref_max_bytes` bytes.
+        started:
+          type: boolean
+          description: '`true` once the runtime confirmed the external session (09, 9.1); `started` only moves forward, `false` never resets it.'
+        bind_failed:
+          type: string
+          enum: [session_missing]
+          description: The bound session no longer exists in the runtime and the adapter started a new one (09, 9.5 item 4); only for a started session, otherwise 409 `conflict` with `reason` `session_not_bound`.
     MessageKind:
       type: string
       enum: [text, voice, run, card, system]
@@ -28188,6 +28212,11 @@ components:
           $ref: '#/components/schemas/BillingMode'
         agent_session:
           $ref: '#/components/schemas/AgentSession'
+          description: The session row of the run (09, 9.1); absent for `session_mode = new` without a row and for a guest run. With `started = false` the adapter reuses its `external_session_ref`; its `version` is the `If-Match` of the first `reportAgentSession`.
+        session_mode:
+          type: string
+          enum: [new, resume, bind]
+          description: '`session.mode` of 09, 9.1: `new` creates the external session (with the reference of `agent_session` when present), `resume` continues it, `bind` takes over a session that no run used yet (rebinding, import; 9.5). Present exactly for a run of the thread''s operator; a guest run has neither `session_mode` nor `agent_session` (09, 3.6).'
         settings_version:
           type: integer
           format: int64

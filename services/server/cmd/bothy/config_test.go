@@ -196,6 +196,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"agent.jwks_max_age = 1h  # default\n" +
 		"agent.max_inflight_events = 100  # default\n" +
 		"agent.presence_timeout = 90s  # default\n" +
+		"agent.session_ref_max_bytes = 1024  # default\n" +
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +

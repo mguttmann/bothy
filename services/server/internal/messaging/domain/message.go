@@ -87,8 +87,20 @@ const (
 )
 
 // SystemThreadReopened is the system_code of the line a reopening message leaves (03 messages,
-// R-DM-34). The column CHECK holds every code of 03; M2-12 adds agent_session.resume_failed.
+// R-DM-34). The column CHECK holds every code of 03.
 const SystemThreadReopened = "thread.reopened"
+
+// SystemAgentSessionResumeFailed is the system_code of the fail-open line of an agent session
+// (03 messages, R-DM-42, 09 9.5 item 4): the runtime no longer knew the bound session and the
+// adapter started a new one. Its author is the run's agent; it never reopens a closed thread.
+const SystemAgentSessionResumeFailed = "agent_session.resume_failed"
+
+// systemCodes are the values of the CHECK on messages.system_code (03 messages).
+var systemCodes = map[string]bool{SystemThreadReopened: true, SystemAgentSessionResumeFailed: true}
+
+// IsSystemCode reports whether code is a system_code of 03, so a caller never writes a line the
+// CHECK would refuse with a database error.
+func IsSystemCode(code string) bool { return systemCodes[code] }
 
 // ContentFormat is content_format 1: CommonMark 0.31.2 without raw HTML, with mention tokens.
 const ContentFormat = 1

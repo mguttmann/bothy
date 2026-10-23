@@ -412,7 +412,9 @@ func (s *Service) invoke(ctx context.Context, ev messaging.MessagePosted, info c
 // is a delivery field that Prepare adds per delivery (R-SY-07, R-SY-17). released marks the
 // release of a held invocation (ReleaseInvocation, M3-07): its envelope has no actor and no
 // correlation_id even when ctx carries them, because the writer is a job or a finalizing write
-// without principal (04 section 2.2 row actor); the trigger stays in triggered_by.
+// without principal (04 section 2.2 row actor); the trigger stays in triggered_by. The payload
+// carries the session of the run (M2-12 design note 9), decided after Open, so the run row is
+// locked before the session rows (03 6.3).
 func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, message ids.ID, mode string, released bool) error {
 	info, err := s.d.Threads.Info(ctx, sum.ThreadID)
 	if err != nil {
@@ -426,6 +428,10 @@ func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, messa
 	if err != nil {
 		return err
 	}
+	session, err := s.invocationSession(ctx, sum, operatorOf(info, ch))
+	if err != nil {
+		return err
+	}
 	p, err := domain.InvocationPayload(domain.InvocationPayloadInput{
 		RunID: sum.ID, ThreadID: sum.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, MessageID: message,
 		TriggeredBy: domain.PrincipalRefPayload{
@@ -433,7 +439,7 @@ func (s *Service) emitInvocation(ctx context.Context, sum runs.RunSummary, messa
 			AvatarFileID: optionalID(m.Author.AvatarFileID),
 		},
 		BillingMode: mode, SettingsVersion: ch.SettingsVersion,
-	})
+	}, session)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.invocation")
 	}

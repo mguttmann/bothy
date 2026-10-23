@@ -160,7 +160,7 @@ func TestAgentInvocationPayloadCommand(t *testing.T) {
 		SettingsVersion: 3, TriggerKind: "command", CommandInvocationID: ids.New(), CommandID: ids.New(), CommandName: "escalate",
 		Options: []domain.OptionValue{{Name: "ticket", Value: "T-1"}, {Name: "prio", Value: "high"}},
 	}
-	p, err := domain.InvocationPayload(in)
+	p, err := domain.InvocationPayload(in, domain.DecideSession(true, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,15 +174,15 @@ func TestAgentInvocationPayloadCommand(t *testing.T) {
 		t.Fatalf("InvocationCommandID %v %v", id, err)
 	}
 	in.Options = nil
-	if p, err = domain.InvocationPayload(in); err != nil || !strings.Contains(string(p), `"options":[]`) {
+	if p, err = domain.InvocationPayload(in, domain.DecideSession(true, nil)); err != nil || !strings.Contains(string(p), `"options":[]`) {
 		t.Fatalf("payload %s %v", p, err)
 	}
 	in.CommandID = ids.ID{}
-	if _, err := domain.InvocationPayload(in); err == nil {
+	if _, err := domain.InvocationPayload(in, domain.DecideSession(true, nil)); err == nil {
 		t.Fatal("a command payload without the command")
 	}
 	in.CommandID, in.MessageID = ids.New(), ids.New()
-	if _, err := domain.InvocationPayload(in); err == nil {
+	if _, err := domain.InvocationPayload(in, domain.DecideSession(true, nil)); err == nil {
 		t.Fatal("a command payload with a message")
 	}
 }

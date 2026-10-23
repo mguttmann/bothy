@@ -34,6 +34,7 @@ func (sc *Scenario) runs() {
 		sc.get(alex, "/runs/"+jsonText(foreign[0]["id"]), http.StatusNotFound)
 	}
 	sc.runLifecycle(run)
+	sc.agentSessions(thread)
 }
 
 // runLifecycle drives the six lifecycle operations of M2-09 on the queued run of Lotse without
@@ -53,4 +54,22 @@ func (sc *Scenario) runLifecycle(run string) {
 	sc.post(lotse, "/runs/"+run+"/finish", map[string]any{"state": "completed"}, http.StatusConflict)
 	sc.call(alex, req{method: http.MethodPost, path: "/runs/" + run + "/cancel", body: map[string]any{},
 		header: header("Idempotency-Key", newID())}, http.StatusForbidden, http.StatusNotFound)
+}
+
+// agentSessions drives the four session operations of M2-12 on the thread of Support/Allgemein
+// after the lifecycle steps: the owner lists the sessions, binds a session reference and resets
+// it again, so the thread ends without a current session, and Lotse reports a session for the
+// queued run. Every status the rules allow for this world is accepted; the scan checks the output.
+func (sc *Scenario) agentSessions(thread string) {
+	sc.T.Helper()
+	owner, lotse := sc.W.Owner, sc.W.Agents["Lotse"]
+	base := "/threads/" + thread + "/agent-sessions"
+	sc.get(owner, base, ok...)
+	refused := []int{http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict}
+	sc.call(owner, req{method: http.MethodPost, path: base + "/bind", body: map[string]any{"external_session_ref": "sess-canary"},
+		header: header("Idempotency-Key", newID())}, append([]int{http.StatusCreated}, refused...)...)
+	sc.call(owner, req{method: http.MethodPost, path: base + "/reset",
+		header: header("Idempotency-Key", newID())}, append([]int{http.StatusCreated}, refused...)...)
+	sc.call(lotse, req{method: http.MethodPost, path: base + "/report", body: map[string]any{"external_session_ref": "sess-canary-run"},
+		header: header("Idempotency-Key", newID())}, append([]int{http.StatusOK, http.StatusCreated, http.StatusPreconditionFailed}, refused...)...)
 }

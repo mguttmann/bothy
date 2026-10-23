@@ -93,7 +93,7 @@ adapter on the global meter provider.
 
 ## Port (root package `internal/messaging`)
 
-- Inbound: `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
+- Inbound: `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor, `AppendSystemLine` since M2-12, `LastAnchorBefore`, `AnchorOf`, `LastAgentMessageBefore`, `Newest`), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` and `ComponentWriter` (M2-15, implemented by runs in `internal/runs/adapters/messagingsource`). `Messages` offers runs `LockCard`, `ComponentsChanged` and `PrincipalOf` (M2-15).
 - Emits in-tx events: `MessagePosted`, `MessageDeleted`.
 - Subscribes to in-tx events: `chat.ThreadMoved`.
 - Implements source ports and cross-cutting ports: kernel `personaldata.Participant`.
@@ -213,8 +213,9 @@ sync checks the reply target of a thread draft with it after `draft.write`.
 
 System codes (`messages.system_code`, CHECK of 03): `thread.reopened`, written when a message
 reopens a closed thread, with origin `system`, empty content, `silent`, the author of the
-reopening message and the sequence right before it. The CHECK also allows `agent_session.resume_failed`,
-which M2-12 writes (R-DM-42).
+reopening message and the sequence right before it; `agent_session.resume_failed` (M2-12,
+R-DM-42), the fail-open line of an agent session, written through `AppendSystemLine`.
+`domain.IsSystemCode` holds the codes of the CHECK.
 
 ## Runs (M2-05)
 
@@ -327,6 +328,22 @@ through `decorate` with one `ForMessages` call per answer or page, never one per
 for live cards; every other message, and every tombstone, has `components: []`.
 `Component` carries no form values (they live only in `interactions`), so no `message.*` event
 carries them.
+
+## System lines of other modules (M2-12)
+
+`AppendSystemLine(ctx, SystemLine{ThreadID, AuthorID, Code})` writes a system line inside the
+caller's unit of work and never authorizes; runs calls it from `OnSessionAttached` when an
+adapter reports `bind_failed: session_missing` (09 9.5 item 4), with the code
+`messaging.SystemAgentSessionResumeFailed` and the run's agent as author. It follows the reopen
+line of `createMessage` (brief M1-56 D6): the next `thread_seq` through `chat.AppendToThread`
+without `ReopenIfClosed` (a system line never reopens a closed thread, R-DM-42, and writes no
+`thread.reopened`), `domain.SystemLine` (kind and origin `system`, empty content, silent, a
+server `client_msg_id`, no mentions, no `trigger_state`), `created_at` now, the instance search
+language, `message.created` without the `client_msg_id` echo, then `MessagePosted` with `Kind`
+`system`, which the acceptance of runs ignores (SR4). The caller principal of `AppendToThread`
+is the principal of the request, as for the run anchor, and the author outside a request. It
+returns the written line. Errors: internal outside a unit of work and for a code that is not a
+system code of 03; `not_found` for an unknown thread.
 
 ## Reading (M1-57)
 

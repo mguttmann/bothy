@@ -19,10 +19,11 @@ import (
 
 // TestMigration_RunsAndRunSteps holds runs and run_steps against docs/spec/03-data-model.md
 // section 4.8 column by column, with every check, key and index, and with exactly the deviations
-// 00051 names: no foreign keys of agent_session_id and dev_environment_id yet
-// (triggering_command_id references commands since 00057, M2-16; triggering_interaction_id
-// references interactions since 00062, M2-15, TestMigration_ComponentsAndInteractions).
-// messages.run_id references runs, deferred and validated (00053). As bothy_app it then shows the rules: a second active run in
+// 00051 names: no foreign key of dev_environment_id yet (triggering_command_id references
+// commands since 00057, M2-16; triggering_interaction_id references interactions since 00062,
+// M2-15, TestMigration_ComponentsAndInteractions; agent_session_id references agent_sessions since
+// 00069, validated by 00070, M2-12). messages.run_id references runs,
+// deferred and validated (00053). As bothy_app it then shows the rules: a second active run in
 // one thread fails on the partial unique index, an end state needs finished_at, two triggering_*
 // columns fail, and the anchor key is checked at the commit.
 func TestMigration_RunsAndRunSteps(t *testing.T) {
@@ -78,6 +79,7 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 		"CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting_input'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))",
 		"CHECK ((trigger_kind = ANY (ARRAY['message'::text, 'command'::text, 'interaction'::text])))",
 		"FOREIGN KEY (agent_id) REFERENCES agents(principal_id) ON DELETE RESTRICT",
+		"FOREIGN KEY (agent_session_id) REFERENCES agent_sessions(id) ON DELETE SET NULL",
 		"FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE RESTRICT",
 		"FOREIGN KEY (triggered_by) REFERENCES principals(id) ON DELETE RESTRICT",
 		"FOREIGN KEY (triggering_command_id) REFERENCES commands(id) ON DELETE SET NULL",
@@ -153,12 +155,12 @@ func TestMigration_RunsAndRunSteps(t *testing.T) {
 	}
 	// The deviation list of 00051: these keys come with the tickets that create their tables
 	// (triggering_command_id came with M2-16, 00057 and 00058; triggering_interaction_id with
-	// M2-15, 00062 and 00063).
+	// M2-15, 00062 and 00063; agent_session_id with M2-12, 00069 and 00070).
 	var deviating int
 	if err := conn.QueryRow(context.Background(), `SELECT count(*) FROM pg_constraint c
 		JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
 		WHERE c.conrelid = 'runs'::regclass AND c.contype = 'f'
-		AND a.attname IN ('agent_session_id', 'dev_environment_id')`).Scan(&deviating); err != nil {
+		AND a.attname IN ('dev_environment_id')`).Scan(&deviating); err != nil {
 		t.Fatal(err)
 	}
 	if deviating != 0 {

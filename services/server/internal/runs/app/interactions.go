@@ -522,7 +522,7 @@ func domainInteractionView(v runs.Interaction) domain.InteractionView {
 
 // emitInteractionInvocation appends agent.invocation for a run an interaction opened, as the last
 // event of the unit (M2-08 design note 10 f; design note 10 i): trigger_kind interaction, the
-// interaction, the person as triggered_by, no message_id.
+// interaction, the person as triggered_by, no message_id, and the session of the run (M2-12).
 func (s *Service) emitInteractionInvocation(ctx context.Context, sum runs.RunSummary, interaction, person ids.ID, mode string) error {
 	info, err := s.d.Threads.Info(ctx, sum.ThreadID)
 	if err != nil {
@@ -536,6 +536,15 @@ func (s *Service) emitInteractionInvocation(ctx context.Context, sum runs.RunSum
 	if err != nil {
 		return err
 	}
+	// The payload carries the session of the run like a message run (M2-12 design note 9), decided
+	// after the run row is written, with the person who interacted as the trigger.
+	if sum.TriggeredBy.IsZero() {
+		sum.TriggeredBy = person
+	}
+	session, err := s.invocationSession(ctx, sum, operatorOf(info, ch))
+	if err != nil {
+		return err
+	}
 	p, err := domain.InvocationPayload(domain.InvocationPayloadInput{
 		RunID: sum.ID, ThreadID: sum.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, InteractionID: interaction,
 		TriggerKind: string(domain.TriggerInteraction),
@@ -543,7 +552,7 @@ func (s *Service) emitInteractionInvocation(ctx context.Context, sum runs.RunSum
 			ID: ref.ID.String(), Kind: ref.Kind, Handle: ref.Handle, DisplayName: ref.DisplayName, AvatarFileID: optionalID(ref.AvatarFileID),
 		},
 		BillingMode: mode, SettingsVersion: ch.SettingsVersion,
-	})
+	}, session)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.invocation")
 	}

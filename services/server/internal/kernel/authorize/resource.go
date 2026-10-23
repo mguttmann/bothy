@@ -34,14 +34,22 @@ type Resource struct {
 	OwnerID ids.ID
 	// TargetChannelID is the destination channel of thread.move.
 	TargetChannelID ids.ID
+	// TargetThreadID is the second target of agent_session.bind (07 section 4.2, 09 section 9.4
+	// point 1): the thread in which the reference is current; zero when it is current nowhere.
+	// authz checks visibility and the same requirement on its path, so the use case checks
+	// nothing there itself.
+	TargetThreadID ids.ID
 	// HasAttachments marks a message.create with attachments (needs upload).
 	HasAttachments bool
 	// RestrictedTags marks a thread.tags.set that touches restricted tags (needs manage).
 	RestrictedTags bool
 	// Grant describes the new grant of grant.create and the existing grant of grant.revoke.
 	Grant *GrantFacts
-	// Invoke describes the trigger of agent.invoke, and of interaction.create (the card's agent,
-	// origin human, the agent of the thread's active run; brief M2-15 design note 8 b).
+	// Invoke describes the trigger of agent.invoke, of interaction.create (the card's agent,
+	// origin human, the agent of the thread's active run; brief M2-15 design note 8 b), and of
+	// agent_session.reset and agent_session.bind, which address the thread's operator (AgentID)
+	// explicitly by a human (TriggerOrigin human, MentionsAgent true) and start no run (brief M2-12
+	// design note 5).
 	Invoke *InvokeFacts
 	// Command describes a slash command (M2-16) for command.read and command.register on kind
 	// command and for command.invoke on the target thread; the owner of a command is OwnerID.

@@ -338,6 +338,19 @@ type RunAnchorCmd struct {
 	ThreadID, RunID, AgentID ids.ID
 }
 
+// SystemAgentSessionResumeFailed is the system_code of the fail-open line of an agent session (03
+// messages, R-DM-42, 09 9.5 item 4), the Code runs passes to AppendSystemLine when the runtime no
+// longer knew the bound session.
+const SystemAgentSessionResumeFailed = "agent_session.resume_failed"
+
+// SystemLine is the input of Messages.AppendSystemLine (M2-12 design note 12): a system line with
+// Code in ThreadID whose author is AuthorID. Code is a system_code of 03 messages, for example
+// agent_session.resume_failed with the run's agent as author (R-DM-42).
+type SystemLine struct {
+	ThreadID, AuthorID ids.ID
+	Code               string
+}
+
 // TriggerMessage are the facts of a triggering message that runs reads at a delivery (M2-08
 // design note 5): place, author, origin and kind, the mentions now and the trigger state. It carries
 // no content.
@@ -516,4 +529,17 @@ type Messages interface {
 	//
 	//	newest, found, err := msgs.Newest(ctx, thread)
 	Newest(ctx context.Context, threadID ids.ID) (MessageRef, bool, error)
+	// AppendSystemLine writes a system line inside the caller's unit of work (M2-12 design note
+	// 12, M1-56 D6): the next thread_seq of the thread without a reopen (a system line never
+	// reopens a closed thread, R-DM-42), kind system, origin system, l.AuthorID as author, empty
+	// content, silent, a server client_msg_id, no mentions and no trigger_state; then
+	// message.created and MessagePosted with Kind system, which never triggers a run (SR4). It never
+	// authorizes: the caller decided (runs, for the fail open of an agent session). It returns the
+	// written line. Errors: internal outside a unit of work and for a code that is not a
+	// system_code of 03; not_found for an unknown thread.
+	//
+	// Example:
+	//
+	//	m, err := msgs.AppendSystemLine(ctx, messaging.SystemLine{ThreadID: th, AuthorID: agent, Code: "agent_session.resume_failed"})
+	AppendSystemLine(ctx context.Context, l SystemLine) (Message, error)
 }

@@ -182,7 +182,8 @@ func (a *Authorizer) resolveGrant(ctx context.Context, id ids.ID, revoked bool) 
 }
 
 // tokenAndInvokeFacts adds the facts of token.create (the holder), of a requirement on the
-// invocation token (run.start, run.token.renew) and of agent.invoke to in.
+// invocation token (run.start, run.token.renew) and of the actions with the agent.invoke guard
+// (takesInvokeFacts) to in.
 func (a *Authorizer) tokenAndInvokeFacts(ctx context.Context, s *actingPrincipal, spec domain.ActionSpec, req domain.Expr,
 	r authorize.Resource, res resolved, t time.Time, in *domain.Input) error {
 	if spec.ID == string(authorize.ActionTokenCreate) {
@@ -260,11 +261,14 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 }
 
 // takesInvokeFacts reports the actions whose guard reads the invoke facts: agent.invoke,
-// command.autocomplete, which applies the agent.invoke guard without a run (M2-17), and
-// interaction.create with the facts of the component (M2-15).
+// run.followup.create (M2-11), command.autocomplete, which applies the agent.invoke guard without a
+// run (M2-17), interaction.create with the facts of the component (M2-15), and the session
+// switches agent_session.reset and agent_session.bind, whose descriptor carries the invoke facts
+// of the thread's operator (05 section 4.6, brief M2-12 design note 5).
 func takesInvokeFacts(action string) bool {
 	return action == string(authorize.ActionAgentInvoke) || action == string(authorize.ActionRunFollowupCreate) ||
-		action == string(authorize.ActionCommandAutocomplete) || action == string(authorize.ActionInteractionCreate)
+		action == string(authorize.ActionCommandAutocomplete) || action == string(authorize.ActionInteractionCreate) ||
+		action == string(authorize.ActionAgentSessionReset) || action == string(authorize.ActionAgentSessionBind)
 }
 
 // pendingReason is the reason of a pending person or device whose pending gate passed.

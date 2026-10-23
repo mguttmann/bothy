@@ -345,14 +345,25 @@ func (s *Service) emitCommandInvoked(ctx context.Context, c agents.Command, tg i
 }
 
 // emitCommandInvocation appends agent.invocation of a command run (design note 12 c) with the
-// command, its parsed options and the invocation, without message_id and without a token.
+// command, its parsed options and the invocation, without message_id and without a token. The
+// payload carries the session of the run like a message run (M2-12 design note 9), decided after
+// the run row is written.
 func (s *Service) emitCommandInvocation(ctx context.Context, c agents.Command, tg invocationTarget, inv runs.CommandInvocation, mode string,
 	invoker domain.PrincipalRefPayload, values []domain.OptionValue) error {
+	invokerID, err := ids.Parse(invoker.ID)
+	if err != nil {
+		return errs.Wrap(errs.CodeInternalError, err, "runs: the invoker of a command run")
+	}
+	sum := runs.RunSummary{ID: inv.RunID, ThreadID: tg.info.ID, AgentID: c.OwnerPrincipalID, TriggeredBy: invokerID}
+	session, err := s.invocationSession(ctx, sum, operatorOf(tg.info, tg.ch))
+	if err != nil {
+		return err
+	}
 	p, err := domain.InvocationPayload(domain.InvocationPayloadInput{
 		RunID: inv.RunID, ThreadID: tg.info.ID, ChannelID: tg.info.ChannelID, SpaceID: tg.info.SpaceID, TriggeredBy: invoker,
 		BillingMode: mode, SettingsVersion: tg.ch.SettingsVersion, TriggerKind: triggerKindCommand, CommandInvocationID: inv.InvocationID,
 		CommandID: c.ID, CommandName: c.Name, Options: values,
-	})
+	}, session)
 	if err != nil {
 		return errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.invocation")
 	}

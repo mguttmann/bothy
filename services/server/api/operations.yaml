@@ -29,6 +29,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - beginPasskeyLogin
   - beginPasskeyRegistration
   - beginStepUpOidcReauth
+  - bindAgentSession
   - cancelImport
   - cancelRun
   - closeTerminalSession
@@ -134,6 +135,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - invokeCommand
   - issueHostPairingCode
   - listActiveRuns
+  - listAgentSessions
   - listAgents
   - listApps
   - listAuditEvents
@@ -217,6 +219,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - removeReaction
   - renewInvocationToken
   - reopenThread
+  - reportAgentSession
+  - resetAgentSession
   - respondToInteraction
   - resumeApp
   - resumeRun
@@ -279,9 +283,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: addStatusIncidentUpdate
     milestone: M7
     ticket: M7-09
-  - operation_id: bindAgentSession
-    milestone: M2
-    ticket: M2-12
   - operation_id: closePrice
     milestone: M2
     ticket: M2-22
@@ -362,9 +363,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: leaveDm
     milestone: V3
     ticket: V3-01
-  - operation_id: listAgentSessions
-    milestone: M2
-    ticket: M2-12
   - operation_id: listAgentWebhookSubscriptions
     milestone: M2
   - operation_id: listCostEstimates
@@ -384,15 +382,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: registerPush
     milestone: M3
     ticket: M3-22
-  - operation_id: reportAgentSession
-    milestone: M2
-    ticket: M2-12
   - operation_id: requestTranscription
     milestone: M3
     ticket: M3-09
-  - operation_id: resetAgentSession
-    milestone: M2
-    ticket: M2-12
   - operation_id: search
     milestone: M3
     ticket: M3-14

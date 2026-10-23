@@ -656,15 +656,38 @@ func (a *Authorizer) acting(ctx context.Context, p authorize.Principal, action s
 }
 
 // decideFor is steps 5 to 9 of 07 section 4.2 for the acting principal s: the human gate,
-// resolving the resource, gathering the facts and Decide.
+// resolving the resource, gathering the facts and Decide, for agent_session.bind with a
+// TargetThreadID on both paths (both must allow).
 func (a *Authorizer) decideFor(ctx context.Context, s *actingPrincipal, act authorize.Action, r authorize.Resource, spec domain.ActionSpec,
 	req domain.Expr, preview *domain.PreviewFacts, t time.Time) (authorize.Decision, error) {
 	if d := domain.GateHumanSession(req, s.domainPrincipal()); d.Outcome != domain.OutcomeAllow {
 		return outcome(d), nil
 	}
+	dd, err := a.decideOn(ctx, s, act, r, spec, req, preview, t)
+	if err != nil {
+		return authorize.Decision{}, err
+	}
+	if dd.Outcome == domain.OutcomeAllow && act == authorize.ActionAgentSessionBind && !r.TargetThreadID.IsZero() {
+		// The second target of agent_session.bind (07 section 4.2 "Actions with two targets", 09
+		// section 9.4 point 1): the thread in which the reference is current must be visible, and
+		// the same requirement with the same invoke facts holds on its path, its operator and its
+		// channel settings. Authorize audits the one final denial (R-AZ-04).
+		target := authorize.Resource{Kind: authorize.ResourceThread, ID: r.TargetThreadID, Invoke: r.Invoke}
+		if dd, err = a.decideOn(ctx, s, act, target, spec, req, preview, t); err != nil {
+			return authorize.Decision{}, err
+		}
+	}
+	return outcome(dd), nil
+}
+
+// decideOn resolves r, gathers the facts of the call and decides it (steps 5 to 9 of 07 section
+// 4.2 after the human gate). A resource whose thread, channel, space or grant does not exist is
+// not_found no_grant, like an invisible one.
+func (a *Authorizer) decideOn(ctx context.Context, s *actingPrincipal, act authorize.Action, r authorize.Resource, spec domain.ActionSpec,
+	req domain.Expr, preview *domain.PreviewFacts, t time.Time) (domain.Decision, error) {
 	res, found, err := a.resolve(ctx, act, r)
 	if err != nil || !found {
-		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
+		return domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}, err
 	}
 	if s.actingFor != nil && !domain.ActingForApplies(domain.ActingForModeOf(spec.ID), s.af, res.path,
 		domain.ResourceFacts{Kind: string(r.Kind), ID: r.ID}, authorize.IsDelivery(ctx)) {
@@ -672,18 +695,14 @@ func (a *Authorizer) decideFor(ctx context.Context, s *actingPrincipal, act auth
 	}
 	in, err := a.gather(ctx, s, spec, req, r, res, t)
 	if err != nil {
-		return authorize.Decision{}, err
+		return domain.Decision{}, err
 	}
 	in.Preview = preview
 	in.Recheck = authorize.IsRecheck(ctx)
 	if in.StepUpWaived, err = a.stepUpWaived(ctx, spec, act, in.Principal); err != nil {
-		return authorize.Decision{}, err
+		return domain.Decision{}, err
 	}
-	dd, err := domain.Decide(in)
-	if err != nil {
-		return authorize.Decision{}, err
-	}
-	return outcome(dd), nil
+	return domain.Decide(in)
 }
 
 // authorizeDelivery decides webhook_out.deliver (M2-26 design note 8): the liveness check of the
