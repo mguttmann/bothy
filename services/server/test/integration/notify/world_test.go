@@ -539,7 +539,7 @@ func (w *world) buildPush(pool *pg.Pool, uow txn.UnitOfWork, syncRepo *syncpg.Re
 		Positions: syncpg.NewPersonalRepository(pool), InstanceID: w.instanceID, Providers: providers, Metrics: mustMetrics(t, mp),
 	}, w.clk, log)
 	must(t, err)
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute,
 		Push: w.push.Push})
 	must(t, err)
