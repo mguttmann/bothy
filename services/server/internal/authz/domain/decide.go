@@ -390,18 +390,9 @@ func decideRequirement(in *Input) (Decision, bool, error) {
 		return Decision{}, true, err
 	}
 	if !ok {
-		reason = notSelfForPersonalToken(in, reason)
-		if in.Principal.ActingFor {
-			// Only the intersection fails: acting_for_insufficient. If the agent alone already
-			// fails, the agent's own reason stays (brief M2-14 design note 4f).
-			base, baseReason, err := evaluate(in, in.Req, in.BaseEff, false)
-			if err != nil {
-				return Decision{}, true, err
-			}
-			reason = ReasonActingForInsufficient
-			if !base {
-				reason = notSelfForPersonalToken(in, baseReason)
-			}
+		reason, err = requirementDenyReason(in, reason)
+		if err != nil {
+			return Decision{}, true, err
 		}
 		return tokenDetail(in, deny(OutcomeForbidden, reason)), true, nil
 	}
@@ -416,6 +407,23 @@ func decideRequirement(in *Input) (Decision, bool, error) {
 		}
 	}
 	return Decision{}, false, nil
+}
+
+// requirementDenyReason is the reason of a failed requirement. Bound to a run (SR9), only the
+// intersection failing gives acting_for_insufficient; if the agent alone already fails, the
+// agent's own reason stays (brief M2-14 design note 4f).
+func requirementDenyReason(in *Input, reason Reason) (Reason, error) {
+	if !in.Principal.ActingFor {
+		return notSelfForPersonalToken(in, reason), nil
+	}
+	base, baseReason, err := evaluate(in, in.Req, in.BaseEff, false)
+	if err != nil {
+		return "", err
+	}
+	if !base {
+		return notSelfForPersonalToken(in, baseReason), nil
+	}
+	return ReasonActingForInsufficient, nil
 }
 
 // decideArchived denies a requirement above read in an archived channel (07 section 4.5 point 1);
