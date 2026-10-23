@@ -8,6 +8,8 @@
 
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { inspect } from "node:util";
 import { parse } from "yaml";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -818,6 +820,40 @@ describe("run binding (07 SR9)", () => {
     api.setRunToken(RUN, "token-three");
     await unwrap(getRun(api), "getRun");
     expect(f.seen.at(-1)?.headers.get(INVOCATION_TOKEN_HEADER)).toBeNull();
+  });
+
+  it("refuses a redirect, so no credential reaches another origin", async () => {
+    const listen = async (server: Server): Promise<string> => {
+      await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+      return `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
+    };
+    const reached: IncomingHttpHeaders[] = [];
+    const other = createServer((req, res) => {
+      reached.push(req.headers);
+      res.writeHead(200, { "Content-Type": "application/json" }).end("{}");
+    });
+    const otherUrl = await listen(other);
+    const api = createServer((_req, res) => {
+      res.writeHead(307, { Location: `${otherUrl}/elsewhere` }).end();
+    });
+    const apiUrl = await listen(api);
+    try {
+      const client = createApiClient({
+        baseUrl: `${apiUrl}/api/v1`,
+        token: CANARY,
+        retry: recordedRetry({ maxAttempts: 1 }).retry,
+      });
+      const err: unknown = await client
+        .bindRun(RUN, "run-token", () => getRun(client))
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(TransportError);
+      expect(reached).toEqual([]);
+    } finally {
+      api.closeAllConnections();
+      other.closeAllConnections();
+      await new Promise((done) => api.close(done));
+      await new Promise((done) => other.close(done));
+    }
   });
 
   it("two concurrent runs never see each other's token", async () => {

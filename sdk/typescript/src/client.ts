@@ -431,10 +431,9 @@ class Transport {
     }
     if (binding !== undefined)
       headers.set(INVOCATION_TOKEN_HEADER, binding.token.reveal());
-    return new Request(
-      request,
-      body === undefined ? { headers, signal } : { headers, signal, body },
-    );
+    // No redirect: a followed one would carry Invocation-Token and DPoP to its target.
+    const init = { headers, signal, redirect: "error" as const };
+    return new Request(request, body === undefined ? init : { ...init, body });
   }
 
   private async wait(
