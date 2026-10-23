@@ -466,7 +466,7 @@ func TestPrefixThreadTitles(t *testing.T) {
 		lowID, highID = highID, lowID
 	}
 	later := t0.Add(time.Hour)
-	w.thread(t, threadSpec{channel: w.archive, id: lowID, title: "Rechnungsprüfung Oktober", at: t0, activity: later})
+	w.thread(t, threadSpec{channel: w.archive, id: lowID, title: "Rechnungsplanung Oktober", at: t0, activity: later})
 	w.thread(t, threadSpec{channel: w.archive, id: highID, title: "Oktober Rechnungsabschluss", at: t0, activity: later})
 	w.thread(t, threadSpec{channel: w.campaign, title: "Rechnungslauf Oktober Marketing", at: t0, activity: later.Add(time.Hour)})
 	w.thread(t, threadSpec{channel: w.questions, title: "Rechnungslauf November", at: t0})
@@ -477,7 +477,7 @@ func TestPrefixThreadTitles(t *testing.T) {
 	}
 	want := []searchkit.TitleHit{
 		{ThreadID: highID, ChannelID: w.archive, Title: "Oktober Rechnungsabschluss", LastActivityAt: later},
-		{ThreadID: lowID, ChannelID: w.archive, Title: "Rechnungsprüfung Oktober", LastActivityAt: later},
+		{ThreadID: lowID, ChannelID: w.archive, Title: "Rechnungsplanung Oktober", LastActivityAt: later},
 		{ThreadID: old, ChannelID: w.questions, Title: "Rechnungslauf Oktober", LastActivityAt: t0},
 	}
 	if len(got) != len(want) {

@@ -37,8 +37,8 @@ func TestValidateQ(t *testing.T) {
 	if got := fieldCodes(t, mustErr(t, "abcdef", maxChars)); len(got) != 1 || got[0] != "#query/q too_long" {
 		t.Fatalf("six runes: %v", got)
 	}
-	// Multi-byte runes count once each: five umlauts are ten bytes but five runes.
-	if _, err := domain.ValidateQ("äöüßé", maxChars); err != nil {
+	// Multi-byte runes count once each: five accented letters are ten bytes but five runes.
+	if _, err := domain.ValidateQ("éèêëç", maxChars); err != nil {
 		t.Fatalf("five multi-byte runes: %v", err)
 	}
 	// An invalid byte counts as one rune.
