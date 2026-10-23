@@ -142,7 +142,8 @@ func TestCreateMessage_CardRules(t *testing.T) {
 			t.Errorf("%s: %v", c.name, errsList)
 		}
 	}
-	p := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+thread.String()+"/messages", cardBody("x", ended.ID, twoButtons), key()...),
+	// The ended run in its own thread: an ended own run is 409, not a mismatch.
+	p := w.want(w.do("lotse", http.MethodPost, "/api/v1/threads/"+w.threadOf(ended.ID).String()+"/messages", cardBody("x", ended.ID, twoButtons), key()...),
 		http.StatusConflict, "conflict")
 	if p["reason"] != "run_not_active" {
 		t.Errorf("ended run: %v", p)
