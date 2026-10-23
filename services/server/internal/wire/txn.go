@@ -145,7 +145,8 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // chat.ChannelArchived and chat.SpaceArchived -> notify (preferences, M3-18) and, after the
 // existing subscribers, messaging.MessagePosted -> runs (the acceptance of a triggering message,
 // M2-05), chat.ChannelArchived -> apps (M2-27), authorize.AccessChanged, published by authz, and
-// agents.AgentDisabled -> runs (M2-09, 02 section 4.3) and kernel.AccessChanged,
+// agents.AgentDisabled -> runs (M2-09, 02 section 4.3), messaging.MessageDeleted -> runs after
+// them (the components of a deleted card, M2-15) and kernel.AccessChanged,
 // identity.DeviceRevoked and identity.SessionEnded -> terminal (the end of terminal sessions at
 // every revocation, M2-46).
 func registerTxn(reg *txn.Registry, m *Modules) error {
@@ -204,7 +205,8 @@ func registerArchiveAndTerminal(reg *txn.Registry, m *Modules) error {
 // automatic following, M3-19), then chat.ChannelArchived -> apps (the incoming webhooks of the
 // channel, M2-27), then authorize.AccessChanged and agents.AgentDisabled -> runs (M2-09), then
 // kernel.AccessChanged, identity.DeviceRevoked and identity.SessionEnded -> terminal (M2-46), then
-// messaging.MessageDeleted -> runs (the open follow-up of a deleted message, M2-11).
+// messaging.MessageDeleted -> runs (the open follow-up of a deleted message, M2-11, and the
+// components of a deleted card, M2-15, in one subscriber).
 func subscribeArchivesAndRuns(reg *txn.Registry, m *Modules) error {
 	if err := txn.Subscribe(reg, m.NotifySubscribers.OnChannelArchived); err != nil {
 		return err

@@ -114,3 +114,46 @@ func TestFilterMode(t *testing.T) {
 		t.Fatal("filter expected")
 	}
 }
+
+// TestDecisionMapping_Interactions covers every row of the decision mapping of interaction.create,
+// component.update and interaction.respond (brief M2-15 design note 8 d; 06 sections 4 and 5).
+func TestDecisionMapping_Interactions(t *testing.T) {
+	cases := []struct {
+		outcome    authorize.Outcome
+		reason     string
+		kind       errs.Kind
+		code       errs.Code
+		wantReason string
+	}{
+		{authorize.OutcomeNotFound, "no_grant", errs.KindNotFound, errs.CodeNotFound, ""},
+		{authorize.OutcomeNotFound, "not_self", errs.KindNotFound, errs.CodeNotFound, ""},
+		{authorize.OutcomeForbidden, "level_insufficient", errs.KindForbidden, errs.CodeForbidden, "level_insufficient"},
+		{authorize.OutcomeForbidden, "capability_missing", errs.KindForbidden, errs.CodeForbidden, "capability_missing"},
+		{authorize.OutcomeForbidden, "component_restricted", errs.KindForbidden, errs.CodeForbidden, "component_restricted"},
+		{authorize.OutcomeForbidden, "subject_kind_not_allowed", errs.KindForbidden, errs.CodeForbidden, "subject_kind_not_allowed"},
+		{authorize.OutcomeForbidden, "not_self", errs.KindForbidden, errs.CodeForbidden, "not_self"},
+		{authorize.OutcomeForbidden, "view_as_read_only", errs.KindForbidden, errs.CodeForbidden, "view_as_read_only"},
+		{authorize.OutcomeForbidden, "channel_read_only", errs.KindForbidden, errs.CodeChannelReadOnly, "channel_read_only"},
+		{authorize.OutcomeForbidden, "channel_archived", errs.KindForbidden, errs.CodeChannelReadOnly, "channel_archived"},
+		// A lost race answers the same whether authorize or the single-use lock decided; the
+		// reason stays in the audit (ruling of design note 8 d).
+		{authorize.OutcomeForbidden, "component_inactive", errs.KindConflict, errs.CodeComponentUsed, ""},
+		{authorize.OutcomeForbidden, "origin_not_human", errs.KindForbidden, errs.CodeAgentInvocationDenied, "origin_not_human"},
+		{authorize.OutcomeForbidden, "agent_not_reachable", errs.KindForbidden, errs.CodeAgentInvocationDenied, "agent_not_reachable"},
+		{authorize.OutcomeForbidden, "billing_mode_personal_not_holder", errs.KindForbidden, errs.CodeAgentInvocationDenied, "billing_mode_personal_not_holder"},
+		{authorize.OutcomeForbidden, "tool_class_owner_only", errs.KindForbidden, errs.CodeAgentInvocationDenied, "tool_class_owner_only"},
+		{authorize.OutcomeForbidden, "project_not_ready", errs.KindForbidden, errs.CodeAgentInvocationDenied, "project_not_ready"},
+		{authorize.OutcomeForbidden, "dev_environment_not_ready", errs.KindForbidden, errs.CodeAgentInvocationDenied, "dev_environment_not_ready"},
+		{authorize.OutcomeForbidden, "run_active", errs.KindForbidden, errs.CodeAgentInvocationDenied, "run_active"},
+		{authorize.OutcomeForbidden, "run_active_other_agent", errs.KindForbidden, errs.CodeAgentInvocationDenied, "run_active_other_agent"},
+	}
+	for _, c := range cases {
+		e, ok := errs.As(authorize.Decision{Outcome: c.outcome, Reason: authorize.Reason(c.reason)}.Err())
+		if !ok {
+			t.Fatalf("%s/%s: not an *errs.Error", c.outcome, c.reason)
+		}
+		if e.Kind() != c.kind || e.Code != c.code || e.Reason != c.wantReason {
+			t.Errorf("%s/%s: got kind %s code %s reason %q, want %s %s %q", c.outcome, c.reason, e.Kind(), e.Code, e.Reason, c.kind, c.code, c.wantReason)
+		}
+	}
+}

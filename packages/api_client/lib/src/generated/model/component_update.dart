@@ -14,7 +14,7 @@ part 'component_update.g.dart';
 ///
 /// Properties:
 /// * [state]
-/// * [definition] - Free-form JSON object whose schema is named in the field description.
+/// * [definition] - A new `component.v1` object for the type of the component (09, 11.1); it may change in every state. Type, `custom_id`, `single_use`, `required_capability`, `restricted_to` and `run_id` cannot change.
 @BuiltValue()
 abstract class ComponentUpdate
     implements Built<ComponentUpdate, ComponentUpdateBuilder> {
@@ -22,7 +22,7 @@ abstract class ComponentUpdate
   ComponentUpdateStateEnum? get state;
   // enum stateEnum {  active,  disabled,  };
 
-  /// Free-form JSON object whose schema is named in the field description.
+  /// A new `component.v1` object for the type of the component (09, 11.1); it may change in every state. Type, `custom_id`, `single_use`, `required_capability`, `restricted_to` and `run_id` cannot change.
   @BuiltValueField(wireName: r'definition')
   BuiltMap<String, JsonObject?>? get definition;
 

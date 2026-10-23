@@ -273,6 +273,12 @@ type ServerInterface interface {
 	// UpdateCommand Replace a command definition
 	// (PUT /commands/{command_id})
 	UpdateCommand(w http.ResponseWriter, r *http.Request, commandId CommandIdPath, params UpdateCommandParams)
+	// UpdateComponent Disable or change an own component
+	// (PATCH /components/{component_id})
+	UpdateComponent(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath, params UpdateComponentParams)
+	// CreateInteraction Use a button, select or form
+	// (POST /components/{component_id}/interactions)
+	CreateInteraction(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath)
 	// GetConsoleSession Read the console session
 	// (GET /console/session)
 	GetConsoleSession(w http.ResponseWriter, r *http.Request)
@@ -441,6 +447,9 @@ type ServerInterface interface {
 	// GetWebhookKeys Public keys for webhook signatures
 	// (GET /instance/webhook-keys)
 	GetWebhookKeys(w http.ResponseWriter, r *http.Request)
+	// RespondToInteraction Acknowledge or answer an interaction
+	// (POST /interactions/{interaction_id}/respond)
+	RespondToInteraction(w http.ResponseWriter, r *http.Request, interactionId InteractionIdPath, params RespondToInteractionParams)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -4301,6 +4310,105 @@ func (siw *ServerInterfaceWrapper) UpdateCommand(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateComponent operation middleware
+func (siw *ServerInterfaceWrapper) UpdateComponent(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "component_id" -------------
+	var componentId ComponentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "component_id", r.PathValue("component_id"), &componentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "component_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateComponentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateComponent(w, r, componentId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateInteraction operation middleware
+func (siw *ServerInterfaceWrapper) CreateInteraction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "component_id" -------------
+	var componentId ComponentIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "component_id", r.PathValue("component_id"), &componentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "component_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateInteraction(w, r, componentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetConsoleSession operation middleware
 func (siw *ServerInterfaceWrapper) GetConsoleSession(w http.ResponseWriter, r *http.Request) {
 
@@ -6386,6 +6494,56 @@ func (siw *ServerInterfaceWrapper) GetWebhookKeys(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetWebhookKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RespondToInteraction operation middleware
+func (siw *ServerInterfaceWrapper) RespondToInteraction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "interaction_id" -------------
+	var interactionId InteractionIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "interaction_id", r.PathValue("interaction_id"), &interactionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "interaction_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RespondToInteractionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RespondToInteraction(w, r, interactionId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10722,6 +10880,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/reactions/{emoji}", wrapper.AddReaction)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.UnpinMessage)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/messages/{message_id}/pin", wrapper.PinMessage)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/components/{component_id}/interactions", wrapper.CreateInteraction)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/components/{component_id}", wrapper.UpdateComponent)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/interactions/{interaction_id}/respond", wrapper.RespondToInteraction)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/channels/{channel_id}/uploads", wrapper.CreateUpload)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/uploads/{file_id}/parts/{part_number}", wrapper.UploadPart)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/uploads/{file_id}/complete", wrapper.CompleteUpload)
@@ -11246,6 +11407,12 @@ type StrictServerInterface interface {
 	// UpdateCommand Replace a command definition
 	// (PUT /commands/{command_id})
 	UpdateCommand(ctx context.Context, request UpdateCommandRequestObject) (UpdateCommandResponseObject, error)
+	// UpdateComponent Disable or change an own component
+	// (PATCH /components/{component_id})
+	UpdateComponent(ctx context.Context, request UpdateComponentRequestObject) (UpdateComponentResponseObject, error)
+	// CreateInteraction Use a button, select or form
+	// (POST /components/{component_id}/interactions)
+	CreateInteraction(ctx context.Context, request CreateInteractionRequestObject) (CreateInteractionResponseObject, error)
 	// GetConsoleSession Read the console session
 	// (GET /console/session)
 	GetConsoleSession(ctx context.Context, request GetConsoleSessionRequestObject) (GetConsoleSessionResponseObject, error)
@@ -11414,6 +11581,9 @@ type StrictServerInterface interface {
 	// GetWebhookKeys Public keys for webhook signatures
 	// (GET /instance/webhook-keys)
 	GetWebhookKeys(ctx context.Context, request GetWebhookKeysRequestObject) (GetWebhookKeysResponseObject, error)
+	// RespondToInteraction Acknowledge or answer an interaction
+	// (POST /interactions/{interaction_id}/respond)
+	RespondToInteraction(ctx context.Context, request RespondToInteractionRequestObject) (RespondToInteractionResponseObject, error)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -14384,6 +14554,73 @@ func (sh *strictHandler) UpdateCommand(w http.ResponseWriter, r *http.Request, c
 	}
 }
 
+// UpdateComponent operation middleware
+func (sh *strictHandler) UpdateComponent(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath, params UpdateComponentParams) {
+	var request UpdateComponentRequestObject
+
+	request.ComponentId = componentId
+	request.Params = params
+
+	var body UpdateComponentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateComponent(ctx, request.(UpdateComponentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateComponent")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateComponentResponseObject); ok {
+		if err := validResponse.VisitUpdateComponentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateInteraction operation middleware
+func (sh *strictHandler) CreateInteraction(w http.ResponseWriter, r *http.Request, componentId ComponentIdPath) {
+	var request CreateInteractionRequestObject
+
+	request.ComponentId = componentId
+
+	var body CreateInteractionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateInteraction(ctx, request.(CreateInteractionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateInteraction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateInteractionResponseObject); ok {
+		if err := validResponse.VisitCreateInteractionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetConsoleSession operation middleware
 func (sh *strictHandler) GetConsoleSession(w http.ResponseWriter, r *http.Request) {
 	var request GetConsoleSessionRequestObject
@@ -16018,6 +16255,40 @@ func (sh *strictHandler) GetWebhookKeys(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetWebhookKeysResponseObject); ok {
 		if err := validResponse.VisitGetWebhookKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RespondToInteraction operation middleware
+func (sh *strictHandler) RespondToInteraction(w http.ResponseWriter, r *http.Request, interactionId InteractionIdPath, params RespondToInteractionParams) {
+	var request RespondToInteractionRequestObject
+
+	request.InteractionId = interactionId
+	request.Params = params
+
+	var body RespondToInteractionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RespondToInteraction(ctx, request.(RespondToInteractionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RespondToInteraction")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RespondToInteractionResponseObject); ok {
+		if err := validResponse.VisitRespondToInteractionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

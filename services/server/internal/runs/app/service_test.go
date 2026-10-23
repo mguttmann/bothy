@@ -20,7 +20,8 @@ func TestNew_RefusesMissingCollaboratorsAndBadLimits(t *testing.T) {
 	}
 	good := app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: time.Hour, EventPayloadMaxBytes: 65536,
 		CancelGrace: time.Second, PresenceTimeout: time.Second, OrphanTimeout: time.Minute, ReasonMaxChars: 10,
-		ExcerptMaxChars: 8, MaxStepsPersisted: 4}
+		ComponentDefaultTTL: time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10,
+		MaxContentBytes: 4096, ExcerptMaxChars: 8, MaxStepsPersisted: 4}
 	if _, err := app.New(good, app.Deps{}); err == nil {
 		t.Fatal("New without collaborators: no error")
 	}

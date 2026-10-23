@@ -89,6 +89,15 @@ type trigger struct {
 	newThread bool
 	// state is the stored trigger_state of message.
 	state string
+	// interaction is the interaction of interaction.created whose state the delivery sets
+	// (dispatched on allow, failed on denial; zero for every other event, M2-15).
+	interaction ids.ID
+	// facts are the facts of the component for the check at stage deliver (M2-15 design note 8 c);
+	// nil when the trigger is no interaction or its interaction was deleted.
+	facts *authorize.InteractionFacts
+	// gone reports an interaction.created whose interaction no longer exists (its card was
+	// deleted): nothing is sent, without a check or an audit entry (design note 11 a).
+	gone bool
 }
 
 // resolver reads the trigger of one delivery of the locked run.
@@ -96,13 +105,100 @@ type resolver func(s *Service, ctx context.Context, run RunRow, in runs.Delivery
 
 // resolvers is the table of design note 5: one entry per event type, for agent.invocation one per
 // runs.trigger_kind; the trigger kind command and command.invoked come with M2-16
-// (delivery_command.go; command.invoked has no run and takes its own path, prepareInvoked).
-// interaction.created and the trigger kind interaction come with M2-15; until then such an event
-// is never sent.
+// (delivery_command.go; command.invoked has no run and takes its own path, prepareInvoked);
+// interaction.created and the trigger kind interaction come with M2-15.
 var resolvers = map[string]map[string]resolver{
-	domain.EventAgentInvocation: {triggerKindMessage: resolveInvocationMessage, triggerKindCommand: resolveInvocationCommand},
-	domain.EventAgentFollowup:   {"": resolveFollowup},
-	domain.EventCommandInvoked:  {},
+	domain.EventAgentInvocation: {triggerKindMessage: resolveInvocationMessage, triggerKindCommand: resolveInvocationCommand,
+		triggerKindInteraction: resolveInvocationInteraction},
+	domain.EventAgentFollowup:      {"": resolveFollowup},
+	domain.EventCommandInvoked:     {},
+	domain.EventInteractionCreated: {"": resolveInteraction},
+}
+
+// resolveInteraction is interaction.created (M2-15 design note 11 a): the trigger is the person of
+// the interaction, the triggering object the interaction, the component's facts are read now for
+// stage deliver. An interaction that no longer exists (its card was deleted) is gone.
+func resolveInteraction(s *Service, ctx context.Context, _ RunRow, in runs.DeliveryInput) (trigger, error) {
+	ixID, _, err := domain.InteractionDeliveryIDs(in.Payload)
+	if err != nil {
+		return trigger{}, errs.Wrap(errs.CodeInternalError, err, "runs: the payload of interaction.created")
+	}
+	if s.d.Components == nil {
+		return trigger{gone: true}, nil
+	}
+	ix, found, err := s.d.Components.Interaction(ctx, ixID)
+	if err != nil {
+		return trigger{}, err
+	}
+	if !found {
+		return trigger{gone: true}, nil
+	}
+	f, found, err := s.deliverFacts(ctx, ix.ComponentID)
+	if err != nil {
+		return trigger{}, err
+	}
+	if !found {
+		return trigger{gone: true}, nil
+	}
+	return trigger{person: ix.PrincipalID, object: ix.ID, origin: originHuman, interaction: ix.ID, facts: f}, nil
+}
+
+// resolveInvocationInteraction is agent.invocation with trigger_kind interaction (M2-15 design
+// note 11 b): the trigger is runs.triggered_by, the triggering object runs.triggering_interaction_id
+// (or, once the card was deleted and the column is NULL, the interaction_id of the stored payload),
+// the facts of the interaction's component at stage deliver; without its interaction the check
+// runs without them (points 1 to 5, 7 and 8 still re-check the person). Without any interaction id
+// the event cannot carry a valid token and is gone.
+func resolveInvocationInteraction(s *Service, ctx context.Context, run RunRow, in runs.DeliveryInput) (trigger, error) {
+	object := run.TriggeringInteractionID
+	if object.IsZero() {
+		id, err := domain.InvocationInteractionID(in.Payload)
+		if err != nil {
+			return trigger{}, errs.Wrap(errs.CodeInternalError, err, "runs: the payload of agent.invocation")
+		}
+		object = id
+	}
+	if object.IsZero() {
+		return trigger{gone: true}, nil
+	}
+	tr := trigger{person: run.TriggeredBy, object: object, origin: originHuman}
+	if s.d.Components == nil || run.TriggeringInteractionID.IsZero() {
+		return tr, nil
+	}
+	ix, found, err := s.d.Components.Interaction(ctx, run.TriggeringInteractionID)
+	if err != nil || !found {
+		return tr, err
+	}
+	f, found, err := s.deliverFacts(ctx, ix.ComponentID)
+	if err != nil || !found {
+		return tr, err
+	}
+	tr.facts = f
+	return tr, nil
+}
+
+// deliverFacts reads the facts of a component for the check at stage deliver: state, capability,
+// restriction and the starter of its run, read now (the rights of the moment decide, design note
+// 8 c). found is false for a component that is gone.
+func (s *Service) deliverFacts(ctx context.Context, componentID ids.ID) (*authorize.InteractionFacts, bool, error) {
+	comp, found, err := s.d.Components.Component(ctx, componentID)
+	if err != nil || !found {
+		return nil, found, err
+	}
+	f := &authorize.InteractionFacts{
+		Stage: authorize.InteractionStageDeliver, OwnerKind: ownerKindAgent, ComponentState: comp.State, ExpiresAt: comp.ExpiresAt,
+		RequiredCapability: comp.RequiredCapability, RestrictedTo: comp.RestrictedTo, ComponentRunID: comp.RunID,
+	}
+	if !comp.RunID.IsZero() {
+		r, found, err := s.d.Repo.Run(ctx, comp.RunID)
+		if err != nil {
+			return nil, false, err
+		}
+		if found {
+			f.ComponentRunActive, f.RunStarterID = r.State.Active(), r.TriggeredBy
+		}
+	}
+	return f, true, nil
 }
 
 // resolveInvocationMessage is agent.invocation with trigger_kind message: the run's trigger and
@@ -138,6 +234,9 @@ func resolveFollowup(s *Service, ctx context.Context, run RunRow, in runs.Delive
 // resolverFor returns the resolver of a delivery of typ for run; nil when none is registered.
 func resolverFor(typ string, run RunRow) resolver {
 	byKind := resolvers[typ]
+	if byKind == nil {
+		return nil
+	}
 	if typ == domain.EventAgentInvocation {
 		return byKind[run.TriggerKind]
 	}
@@ -217,6 +316,26 @@ func (s *Service) Prepare(ctx context.Context, in runs.DeliveryInput) (runs.Deli
 	return res.out, nil
 }
 
+// deliveryRun returns the run of a delivery: the resource of agent.invocation and agent.followup,
+// the run_id of the payload of interaction.created, whose resource is the interaction (M2-15
+// design note 11 a). Errors: internal for a resource or payload that names no run.
+func deliveryRun(in runs.DeliveryInput) (ids.ID, error) {
+	if in.Type == domain.EventInteractionCreated {
+		if in.ResourceKind != resourceInteraction {
+			return ids.ID{}, errs.New(errs.CodeInternalError, "runs: interaction.created without its interaction")
+		}
+		_, run, err := domain.InteractionDeliveryIDs(in.Payload)
+		if err != nil {
+			return ids.ID{}, errs.Wrap(errs.CodeInternalError, err, "runs: the payload of interaction.created")
+		}
+		return run, nil
+	}
+	if in.ResourceKind != resourceRun {
+		return ids.ID{}, errs.New(errs.CodeInternalError, "runs: the resource of a delivery is no run")
+	}
+	return in.ResourceID, nil
+}
+
 // noResolver logs an invocation-bearing event without a registered resolver; a retry cannot help,
 // so it is not sent (fail closed, design note 3 a).
 func (s *Service) noResolver(ctx context.Context, typ string) {
@@ -233,11 +352,15 @@ func (s *Service) telemetry() DeliveryTelemetry {
 
 // prepare is Prepare inside its unit of work.
 func (s *Service) prepare(ctx context.Context, in runs.DeliveryInput, issuer TokenIssuer) (outcome, error) {
-	run, found, err := s.d.Repo.LockRun(ctx, in.ResourceID)
+	runID, err := deliveryRun(in)
 	if err != nil {
 		return outcome{}, err
 	}
-	if !found || run.AgentID != in.AgentID || in.ResourceKind != resourceRun {
+	run, found, err := s.d.Repo.LockRun(ctx, runID)
+	if err != nil {
+		return outcome{}, err
+	}
+	if !found || run.AgentID != in.AgentID {
 		return outcome{}, errs.New(errs.CodeInternalError, "runs: the run of a delivery is missing or belongs to another agent")
 	}
 	rule, err := domain.DeliveryMatrix(in.Type, run.State)
@@ -252,19 +375,8 @@ func (s *Service) prepare(ctx context.Context, in runs.DeliveryInput, issuer Tok
 		s.noResolver(ctx, in.Type)
 		return outcome{}, nil
 	}
-	if in.Type == domain.EventAgentFollowup {
-		// A follow-up that is no longer open or whose message is deleted is not delivered: no
-		// check, no token, no audit, like a terminal run (M2-11 design note 6).
-		if ok, err := s.followupDeliverable(ctx, run.ID, in.Payload); err != nil || !ok {
-			return outcome{}, err
-		}
-	}
-	if run.State == domain.StateQueued && domain.QueuedTooOld(run.QueuedAt, s.now(), s.cfg.QueuedMaxAge) {
-		// Not an authorization decision: no check, no token, no audit (design note 3 c).
-		return outcome{}, s.expire(ctx, run)
-	}
-	tr, err := res(s, ctx, run, in)
-	if err != nil {
+	tr, ok, err := s.deliveryTrigger(ctx, in, run, res)
+	if err != nil || !ok {
 		return outcome{}, err
 	}
 	facts, err := s.d.Agents.RunFacts(ctx, []ids.ID{run.AgentID})
@@ -286,6 +398,26 @@ func (s *Service) prepare(ctx context.Context, in runs.DeliveryInput, issuer Tok
 	return o, err
 }
 
+// deliveryTrigger resolves the trigger of a delivery before the check; ok is false when nothing
+// is checked or sent: a follow-up that is no longer open or whose message is deleted (no check, no
+// token, no audit, M2-11 design note 6), a queued run past run.queued_max_age, which fails without
+// a check (design note 3 c), and an interaction that no longer exists (M2-15 design note 11 a).
+func (s *Service) deliveryTrigger(ctx context.Context, in runs.DeliveryInput, run RunRow, res resolver) (trigger, bool, error) {
+	if in.Type == domain.EventAgentFollowup {
+		if ok, err := s.followupDeliverable(ctx, run.ID, in.Payload); err != nil || !ok {
+			return trigger{}, false, err
+		}
+	}
+	if run.State == domain.StateQueued && domain.QueuedTooOld(run.QueuedAt, s.now(), s.cfg.QueuedMaxAge) {
+		return trigger{}, false, s.expire(ctx, run)
+	}
+	tr, err := res(s, ctx, run, in)
+	if err != nil || tr.gone {
+		return trigger{}, false, err
+	}
+	return tr, true, nil
+}
+
 // check decides agent.invoke for the trigger tr of run and applies the result.
 func (s *Service) check(ctx context.Context, in runs.DeliveryInput, run RunRow, rule domain.DeliveryRule, tr trigger, agentActive bool,
 	issuer TokenIssuer, billingMode, toolClass string) (outcome, error) {
@@ -302,6 +434,7 @@ func (s *Service) check(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 		Kind: authorize.ResourceThread, ID: run.ThreadID, ChannelID: info.ChannelID, SpaceID: info.SpaceID, OwnerID: info.CreatedBy,
 		Invoke: &authorize.InvokeFacts{AgentID: run.AgentID, TriggerOrigin: tr.origin, MentionsAgent: tr.mentions,
 			ActiveRunAgentID: run.AgentID, NewThread: tr.newThread},
+		Interaction: tr.facts,
 	}
 	d, err := s.d.Authorizer.Authorize(authorize.WithPermissionVersion(authorize.Filter(ctx), v), p, authorize.ActionAgentInvoke, r)
 	if err != nil {
@@ -321,22 +454,14 @@ func (s *Service) check(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 func (s *Service) deny(ctx context.Context, in runs.DeliveryInput, run RunRow, rule domain.DeliveryRule, tr trigger, reason, authzReason string) error {
 	switch rule.Denial {
 	case domain.DenyFailRun:
+		// Through the end-of-run function, so a card bound to the queued run is disabled too
+		// (M2-15 design note 15 b).
 		if _, err := s.endRun(ctx, run, domain.StateFailed, reason, domain.SetterServer, TransitionStore{}); err != nil {
 			return err
 		}
 	case domain.DenyFailFollowup:
-		if tr.human {
-			if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{
-				MessageID: tr.message, State: string(domain.TriggerStateFailed), Reason: reason,
-			}); err != nil {
-				return err
-			}
-		}
-		// A refused follow-up is never processed: its row becomes discarded (M2-11 design note 6).
-		if in.Type == domain.EventAgentFollowup && s.fu != nil {
-			if err := s.fu.RefuseDelivery(ctx, run.ID, tr.message); err != nil {
-				return err
-			}
+		if err := s.failTrigger(ctx, in, run, tr, reason); err != nil {
+			return err
 		}
 	case domain.DenyKeepRun:
 	}
@@ -344,6 +469,28 @@ func (s *Service) deny(ctx context.Context, in runs.DeliveryInput, run RunRow, r
 		attrRunID: auditing.ID(run.ID), attrAgentID: auditing.ID(run.AgentID), attrStage: auditing.Code(stageDelivery),
 		attrEventType: auditing.Code(in.Type), attrTriggerKind: auditing.Code(triggerKindOf(in.Type, run)),
 	})
+}
+
+// failTrigger applies a denial that keeps the run (domain.DenyFailFollowup): the interaction of
+// interaction.created fails (ruling D-M2-15-15), the trigger_state of a human trigger message
+// fails with the reason, and a refused follow-up becomes discarded (M2-11 design note 6).
+func (s *Service) failTrigger(ctx context.Context, in runs.DeliveryInput, run RunRow, tr trigger, reason string) error {
+	if !tr.interaction.IsZero() {
+		if err := s.setInteraction(ctx, tr.interaction, interactionFailed); err != nil {
+			return err
+		}
+	}
+	if tr.human {
+		if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{
+			MessageID: tr.message, State: string(domain.TriggerStateFailed), Reason: reason,
+		}); err != nil {
+			return err
+		}
+	}
+	if in.Type == domain.EventAgentFollowup && s.fu != nil {
+		return s.fu.RefuseDelivery(ctx, run.ID, tr.message)
+	}
+	return nil
 }
 
 // auditDenial writes the one audit entry of a denial of agent.invoke in the unit of work, with the
@@ -393,6 +540,12 @@ func (s *Service) allow(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 			return outcome{}, err
 		}
 	}
+	if !tr.interaction.IsZero() {
+		// The server sets dispatched when it hands the event to a transport (ruling D-M2-15-15).
+		if err := s.setInteraction(ctx, tr.interaction, interactionDispatched); err != nil {
+			return outcome{}, err
+		}
+	}
 	if in.Type == domain.EventAgentInvocation && run.State == domain.StateQueued && tr.human && tr.message == run.TriggeringMessageID &&
 		tr.state == triggerStateReceived {
 		if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: tr.message, State: string(domain.TriggerStateQueued)}); err != nil {
@@ -402,8 +555,25 @@ func (s *Service) allow(ctx context.Context, in runs.DeliveryInput, run RunRow, 
 	return outcome{out: runs.DeliveryOutcome{Send: true, InvocationToken: tok.Token.Reveal()}, checked: true, allowed: true}, nil
 }
 
+// setInteraction moves the interaction id from received to state at a delivery (dispatched on
+// allow, failed on denial) under its row lock; an interaction the agent already answered, or one
+// already in state, keeps its state.
+func (s *Service) setInteraction(ctx context.Context, id ids.ID, state string) error {
+	ix, found, err := s.d.Components.LockInteraction(ctx, id)
+	if err != nil || !found {
+		return err
+	}
+	if ix.State != interactionReceived && (ix.State != interactionDispatched || state != interactionFailed) {
+		return nil
+	}
+	_, err = s.d.Components.SetInteractionState(ctx, id, state, nil, s.now())
+	return err
+}
+
 // expire fails a queued run that reached run.queued_max_age with agent_unavailable (09 5.5,
 // D-AG-16); Transition sets trigger_state failed with the same reason.
+// It goes through the end-of-run function, so a card bound to the queued run is disabled too
+// (M2-15 design note 15 b).
 func (s *Service) expire(ctx context.Context, run RunRow) error {
 	_, err := s.endRun(ctx, run, domain.StateFailed, domain.RunReasonAgentUnavailable, domain.SetterServer, TransitionStore{})
 	return err

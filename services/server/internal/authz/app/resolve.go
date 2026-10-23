@@ -195,11 +195,16 @@ func (a *Authorizer) tokenAndInvokeFacts(ctx context.Context, s *actingPrincipal
 	if req.Contains(domain.Token()) && r.Token != nil {
 		in.Invocation = invocationFacts(r.Token)
 	}
-	if takesInvokeFacts(spec.ID) && r.Invoke != nil {
-		var err error
-		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
-			return err
+	if takesInvokeFacts(spec.ID) {
+		// interaction.create carries the agent.invoke guard with the facts of the component
+		// (brief M2-15 design note 8 b); agent.invoke carries them at stage deliver (note 8 c).
+		if r.Invoke != nil {
+			var err error
+			if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {
+				return err
+			}
 		}
+		in.Interaction = interactionFacts(r.Interaction)
 	}
 	return nil
 }
@@ -254,11 +259,12 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	return in, nil
 }
 
-// takesInvokeFacts reports the actions whose guard reads the invoke facts: agent.invoke and
-// command.autocomplete, which applies the agent.invoke guard without a run (M2-17).
+// takesInvokeFacts reports the actions whose guard reads the invoke facts: agent.invoke,
+// command.autocomplete, which applies the agent.invoke guard without a run (M2-17), and
+// interaction.create with the facts of the component (M2-15).
 func takesInvokeFacts(action string) bool {
 	return action == string(authorize.ActionAgentInvoke) || action == string(authorize.ActionRunFollowupCreate) ||
-		action == string(authorize.ActionCommandAutocomplete)
+		action == string(authorize.ActionCommandAutocomplete) || action == string(authorize.ActionInteractionCreate)
 }
 
 // pendingReason is the reason of a pending person or device whose pending gate passed.
@@ -517,6 +523,16 @@ func memoized[T any](ctx context.Context, key any, read func() (T, bool, error))
 
 // purposeAttachment is files.purpose of a file uploaded into a channel (M3-03).
 const purposeAttachment = "attachment"
+
+// interactionFacts converts the interaction facts of a descriptor (M2-15); nil stays nil.
+func interactionFacts(f *authorize.InteractionFacts) *domain.InteractionFacts {
+	if f == nil {
+		return nil
+	}
+	return &domain.InteractionFacts{Stage: f.Stage, OwnerKind: f.OwnerKind, ComponentState: f.ComponentState, ExpiresAt: f.ExpiresAt,
+		RequiredCapability: f.RequiredCapability, RestrictedTo: f.RestrictedTo, ComponentRunID: f.ComponentRunID,
+		ComponentRunActive: f.ComponentRunActive, RunStarterID: f.RunStarterID}
+}
 
 // invocationFacts converts the token facts of run.start and run.token.renew (M2-09).
 func invocationFacts(f *authorize.TokenFacts) *domain.InvocationFacts {

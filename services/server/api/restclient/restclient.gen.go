@@ -7849,7 +7849,7 @@ type Component struct {
 	// CustomId Examples: approve-refund
 	CustomId string `json:"custom_id"`
 
-	// Definition Schema `component.v1` (label, style, options, form fields).
+	// Definition Schema `component.v1` (09, 11.1) as stored, with the defaults applied (button `style`, select `min_values` and `max_values`, field `required`).
 	Definition JsonObject `json:"definition"`
 
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -7887,7 +7887,7 @@ type ComponentCreate struct {
 	// CustomId Examples: approve-refund
 	CustomId string `json:"custom_id"`
 
-	// Definition Free-form JSON object whose schema is named in the field description.
+	// Definition Schema `component.v1` (09, 11.1), a closed member set per type; `400 validation_failed` with one entry per finding below `/components/<index>/definition` and the codes `required`, `invalid` or `limit_reached`.
 	Definition JsonObject `json:"definition"`
 
 	// ExpiresAt RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
@@ -7910,7 +7910,7 @@ type ComponentType string
 
 // ComponentUpdate defines model for ComponentUpdate.
 type ComponentUpdate struct {
-	// Definition Free-form JSON object whose schema is named in the field description.
+	// Definition A new `component.v1` object for the type of the component (09, 11.1); it may change in every state. Type, `custom_id`, `single_use`, `required_capability`, `restricted_to` and `run_id` cannot change.
 	Definition *JsonObject           `json:"definition,omitempty"`
 	State      *ComponentUpdateState `json:"state,omitempty"`
 }
@@ -10986,7 +10986,7 @@ type InteractionCreate struct {
 	// ClientInteractionId UUIDv7 (RFC 9562), lowercase canonical form.
 	ClientInteractionId Uuid `json:"client_interaction_id"`
 
-	// Values Selected options or form values, validated against the component definition.
+	// Values Selected options or form values, validated against the component definition (09, 11.1); absent means `{}`. Button: `{}`. Select: `{"selected": [<option value>, ...]}` with between `min_values` and `max_values` distinct option values. Form: an object keyed by field `name` (`text` and `textarea` strings, `number` a finite number, `boolean` a boolean, `choice` one of `choices`). A finding gives `400 validation_failed` with code `interaction_values_invalid` and its pointer; values whose `interaction.created` would exceed `sync.event_payload_max_bytes` give `too_long` on `/values`.
 	Values *JsonObject `json:"values,omitempty"`
 }
 
@@ -11309,7 +11309,7 @@ type MessageCreate struct {
 	// ClientMsgId UUIDv7 created by the client before the first attempt; unique per author forever.
 	ClientMsgId Uuid `json:"client_msg_id"`
 
-	// Components Agents and apps only; requires `kind = card`.
+	// Components Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1).
 	Components *[]ComponentCreate `json:"components,omitempty"`
 
 	// ContentMd Examples: @support-agent the invoice export fails since this morning.
@@ -11322,7 +11322,7 @@ type MessageCreate struct {
 	// ReplyToMessageId UUIDv7 (RFC 9562), lowercase canonical form.
 	ReplyToMessageId *Uuid `json:"reply_to_message_id,omitempty"`
 
-	// RunId Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`.
+	// RunId Agents only; the run this message belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Never stored on the message (`Message.run_id` stays absent). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`. With `kind = card` it also binds the components of the card to this run (`Component.run_id`, 09 11.4) and is part of the canonical request of `client_msg_id` (`bothy-msg-v2`); for every other kind it is not (09 4.7).
 	RunId  *Uuid `json:"run_id,omitempty"`
 	Silent *bool `json:"silent,omitempty"`
 }
@@ -25404,44 +25404,6 @@ func (c *Client) UninstallApp(ctx context.Context, appId AppIdPath, params *Unin
 // Corresponds with GET /apps/{app_id}/webhooks (the `ListWebhookSubscriptions` operationId).
 func (c *Client) ListWebhookSubscriptions(ctx context.Context, appId AppIdPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWebhookSubscriptionsRequest(c.Server, appId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateWebhookSubscriptionWithBody Subscribe a URL to events
-//
-// The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
-func (c *Client) CreateWebhookSubscriptionWithBody(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateWebhookSubscriptionRequestWithBody(c.Server, appId, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// CreateWebhookSubscription Subscribe a URL to events
-//
-// The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
-func (c *Client) CreateWebhookSubscription(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, body CreateWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateWebhookSubscriptionRequest(c.Server, appId, params, body)
 	if err != nil {
 		return nil, err
 	}

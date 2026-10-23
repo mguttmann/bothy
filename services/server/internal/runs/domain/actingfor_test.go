@@ -43,6 +43,20 @@ func TestActingForVerdict(t *testing.T) {
 	add("no run with a row", false, invalid, func(*domain.InvocationClaims, *domain.RunBinding) {})
 	add("other agent", true, invalid, func(_ *domain.InvocationClaims, b *domain.RunBinding) { b.AgentID = ids.New() })
 	add("sub not triggered_by", true, invalid, func(c *domain.InvocationClaims, _ *domain.RunBinding) { c.Sub = ids.New().String() })
+	add("command sub not triggered_by", true, invalid, func(c *domain.InvocationClaims, _ *domain.RunBinding) {
+		c.TriggerKind, c.MessageID, c.CommandID, c.Sub = string(domain.TriggerCommand), "", ids.New().String(), ids.New().String()
+	})
+	// An interaction or a follow-up of another person in the run names that person in sub; the
+	// binding stays the run's triggering person (D-M2-15-30).
+	add("interaction of another person", true, bound(domain.ActingForBound), func(c *domain.InvocationClaims, _ *domain.RunBinding) {
+		c.TriggerKind, c.MessageID, c.InteractionID, c.Sub = string(domain.TriggerInteraction), "", ids.New().String(), ids.New().String()
+	})
+	add("follow-up of another person", true, bound(domain.ActingForBound), func(c *domain.InvocationClaims, _ *domain.RunBinding) {
+		c.TriggerKind, c.Sub = string(domain.TriggerFollowup), ids.New().String()
+	})
+	add("interaction sub not canonical", true, invalid, func(c *domain.InvocationClaims, _ *domain.RunBinding) {
+		c.TriggerKind, c.MessageID, c.InteractionID, c.Sub = string(domain.TriggerInteraction), "", ids.New().String(), "x"
+	})
 	add("other thread_id", true, invalid, func(c *domain.InvocationClaims, _ *domain.RunBinding) { c.ThreadID = ids.New().String() })
 	add("claims without run_id", true, invalid, func(c *domain.InvocationClaims, _ *domain.RunBinding) {
 		c.RunID, c.MessageID, c.CommandID, c.TriggerKind = "", "", ids.New().String(), string(domain.TriggerAutocomplete)

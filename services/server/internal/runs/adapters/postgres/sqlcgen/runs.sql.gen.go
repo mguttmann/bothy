@@ -220,26 +220,27 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 
 const insertRun = `-- name: InsertRun :one
 
-INSERT INTO runs (id, thread_id, agent_id, trigger_kind, triggering_message_id, triggering_command_id, triggered_by, state, version,
-    billing_mode_expected, invocation_jti, queued_at)
+INSERT INTO runs (id, thread_id, agent_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id,
+    triggered_by, state, version, billing_mode_expected, invocation_jti, queued_at)
 VALUES ($1, $2, $3, $4, $5,
-    $6, $7, 'queued', 1, $8, $9,
-    $10)
+    $6, $7, $8, 'queued', 1,
+    $9, $10, $11)
 ON CONFLICT (thread_id) WHERE state IN ('queued', 'running', 'waiting_input') DO NOTHING
 RETURNING id, thread_id, agent_id, agent_session_id, trigger_kind, triggering_message_id, triggering_command_id, triggering_interaction_id, triggered_by, state, state_reason, version, billing_mode_expected, billing_mode_used, billing_evidence, invocation_jti, started_jti, renewed_from_jti, dev_environment_id, model, status_line, last_text_excerpt, plan, metrics, cost_micros, currency, cost_is_estimate, summary, stall_warned_at, queued_at, invocation_held_until, started_at, finished_at, duration_ms
 `
 
 type InsertRunParams struct {
-	ID                  pgtype.UUID
-	ThreadID            pgtype.UUID
-	AgentID             pgtype.UUID
-	TriggerKind         string
-	TriggeringMessageID pgtype.UUID
-	TriggeringCommandID pgtype.UUID
-	TriggeredBy         pgtype.UUID
-	BillingModeExpected string
-	InvocationJti       pgtype.UUID
-	QueuedAt            pgtype.Timestamptz
+	ID                      pgtype.UUID
+	ThreadID                pgtype.UUID
+	AgentID                 pgtype.UUID
+	TriggerKind             string
+	TriggeringMessageID     pgtype.UUID
+	TriggeringCommandID     pgtype.UUID
+	TriggeringInteractionID pgtype.UUID
+	TriggeredBy             pgtype.UUID
+	BillingModeExpected     string
+	InvocationJti           pgtype.UUID
+	QueuedAt                pgtype.Timestamptz
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -258,6 +259,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (Run, erro
 		arg.TriggerKind,
 		arg.TriggeringMessageID,
 		arg.TriggeringCommandID,
+		arg.TriggeringInteractionID,
 		arg.TriggeredBy,
 		arg.BillingModeExpected,
 		arg.InvocationJti,

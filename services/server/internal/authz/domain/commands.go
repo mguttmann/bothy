@@ -251,7 +251,7 @@ func commandAutocompleteGuard(in *Input) (Decision, error) {
 		if in.Invoke == nil {
 			return Decision{}, internalError("command.autocomplete of an agent command without its trigger")
 		}
-		return invokeGuard(in, in.Invoke), nil
+		return invokeGuard(in, in.Invoke)
 	case commandOwnerApp:
 		return Allow, nil
 	}

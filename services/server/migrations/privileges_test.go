@@ -178,6 +178,11 @@ var appPrivileges = map[string][]string{
 	// M2-10).
 	"runs":      {"SELECT", "INSERT", "UPDATE"},
 	"run_steps": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 message_components and interactions (M2-15): runs deletes the components of a deleted
+	// message (its tombstone keeps the row, so the cascade never fires); interactions go only with
+	// their component or message (cascade).
+	"message_components": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"interactions":       {"SELECT", "INSERT", "UPDATE"},
 	// 03 run_followups (M2-11): a follow-up changes state and moves to the follow-on run; rows
 	// end only with their run or message (ON DELETE CASCADE).
 	"run_followups": {"SELECT", "INSERT", "UPDATE"},

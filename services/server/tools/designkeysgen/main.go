@@ -7,8 +7,9 @@
 // A category colour is the second path segment of every token key color.category.<key>.<role>
 // of contexts.theme.light and contexts.theme.dark; both themes must give the same set, otherwise
 // the run fails (a colour that exists in one theme only would pass the server but break a
-// client). The space icons are the list icons.space-icons. Both lists are written sorted and
-// without duplicates.
+// client). The space icons are the list icons.space-icons. The semantic icon names are the keys of
+// icons.glyphs, the names clients draw through (docs/design/icons.md "Rules"); runs checks the icon
+// of a button against them (M2-15). The lists are written sorted and without duplicates.
 //
 // It runs through go generate (directive in internal/kernel/designkeys/doc.go), which
 // make codegen-check runs and diffs:
@@ -69,11 +70,17 @@ type Keys struct {
 	CategoryColors []string
 	// SpaceIcons are the names of the space icons.
 	SpaceIcons []string
+	// Glyphs are the semantic icon names, the keys of icons.glyphs (M2-15).
+	Glyphs []string
 }
 
 // keyPattern is the form of a colour key and an icon name: lower case words joined by "-". A key
 // outside it could not be a stable value of the API.
 var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
+
+// glyphPattern is the form of a semantic icon name: keys of keyPattern, with "_" inside a word,
+// joined by "." (trigger.received, step.tool_call, action.quick-switch).
+var glyphPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*(-[a-z0-9_]+)*(\.[a-z][a-z0-9_]*(-[a-z0-9_]+)*)*$`)
 
 // categoryPrefix starts every token key of a category colour.
 const categoryPrefix = "color.category."
@@ -84,13 +91,14 @@ type tokenFile struct {
 		Theme map[string]map[string]json.RawMessage `json:"theme"`
 	} `json:"contexts"`
 	Icons struct {
-		SpaceIcons *[]string `json:"space-icons"`
+		SpaceIcons *[]string                  `json:"space-icons"`
+		Glyphs     map[string]json.RawMessage `json:"glyphs"`
 	} `json:"icons"`
 }
 
 // ReadKeys reads the token file at path and returns its keys. Errors: an unreadable or invalid
-// file, a missing theme or icon list, no category colour, a key or icon outside keyPattern, and
-// light and dark themes with different category colours (the error names the keys of each side).
+// file, a missing theme, icon list or glyph map, no category colour, a key or icon outside
+// keyPattern, a glyph name outside glyphPattern, and light and dark themes with different category colours (the error names the keys of each side).
 func ReadKeys(path string) (Keys, error) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
@@ -122,7 +130,18 @@ func ReadKeys(path string) (Keys, error) {
 		}
 	}
 	slices.Sort(icons)
-	return Keys{CategoryColors: light, SpaceIcons: slices.Compact(icons)}, nil
+	if len(f.Icons.Glyphs) == 0 {
+		return Keys{}, fmt.Errorf("%s: icons.glyphs is missing or empty", path)
+	}
+	glyphs := make([]string, 0, len(f.Icons.Glyphs))
+	for name := range f.Icons.Glyphs {
+		if !glyphPattern.MatchString(name) {
+			return Keys{}, fmt.Errorf("%s: glyph %q is not a semantic icon name", path, name)
+		}
+		glyphs = append(glyphs, name)
+	}
+	slices.Sort(glyphs)
+	return Keys{CategoryColors: light, SpaceIcons: slices.Compact(icons), Glyphs: glyphs}, nil
 }
 
 // categories returns the sorted category colour keys of the theme name.
@@ -168,11 +187,18 @@ var spaceIcons = []string{
 	{{quote .}},
 {{- end}}
 }
+
+// iconNames are the semantic icon names of the design system (the keys of icons.glyphs), sorted.
+var iconNames = []string{
+{{- range .Glyphs}}
+	{{quote .}},
+{{- end}}
+}
 `))
 
 // Render returns the formatted Go source of designkeys_gen.go for k.
 func Render(k Keys) ([]byte, error) {
-	if len(k.CategoryColors) == 0 || len(k.SpaceIcons) == 0 {
+	if len(k.CategoryColors) == 0 || len(k.SpaceIcons) == 0 || len(k.Glyphs) == 0 {
 		return nil, errors.New("nothing to render")
 	}
 	var buf bytes.Buffer

@@ -287,20 +287,13 @@ func TestPrepare_TerminalRunSkipped(t *testing.T) {
 	}
 }
 
-// TestPrepare_UnregisteredResolverFailsClosed: interaction.created is not sent before M2-15; a type
-// that bears no invocation is an internal error, so are a run of another agent, an unknown run and a
-// command.invoked whose resource is not its command (M2-16).
+// TestPrepare_UnregisteredResolverFailsClosed: every event type that bears an invocation has its
+// resolver since M2-15 (interaction.created) and M2-16 (command.invoked takes its own path); a
+// type that bears no invocation is an internal error, so are a run of another agent, an unknown
+// run and a command.invoked whose resource is not its command (M2-16).
 func TestPrepare_UnregisteredResolverFailsClosed(t *testing.T) {
 	t.Parallel()
 	w := newDeliveryWorld(t)
-	for _, typ := range []string{domain.EventInteractionCreated} {
-		if out := w.prepare(w.input(typ)); out.Send {
-			t.Fatalf("%s sent", typ)
-		}
-	}
-	if !strings.Contains(w.log.String(), "no trigger resolver") {
-		t.Fatalf("log %s", w.log.String())
-	}
 	for name, in := range map[string]runs.DeliveryInput{
 		"type":    w.input("run.cancel_requested"),
 		"foreign": {AgentID: w.texter, Type: domain.EventAgentInvocation, ResourceKind: "run", ResourceID: w.run.ID},

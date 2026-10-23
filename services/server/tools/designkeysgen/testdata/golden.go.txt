@@ -13,3 +13,9 @@ var spaceIcons = []string{
 	"code",
 	"terminal-window",
 }
+
+// iconNames are the semantic icon names of the design system (the keys of icons.glyphs), sorted.
+var iconNames = []string{
+	"action.send",
+	"state.warning",
+}

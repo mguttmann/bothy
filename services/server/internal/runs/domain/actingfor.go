@@ -40,7 +40,9 @@ type ActingForResult struct {
 // ActingForVerdict decides the binding of verified claims c to run (Design note 3 b to d of
 // M2-14). found reports whether the run of the claim run_id exists; agentID is the agent of the
 // request. Claims without run_id, an unknown run, a run of another agent, a sub other than
-// runs.triggered_by and a thread_id other than runs.thread_id give ActingForInvalid, because SR9
+// runs.triggered_by for the trigger kinds that open the run (message, command; an interaction or
+// follow-up token names the person who acted, D-M2-15-30) and a thread_id other than
+// runs.thread_id give ActingForInvalid, because SR9
 // binds a run and "run active" cannot hold without one. An active state (queued, running,
 // waiting_input) gives ActingForBound, an end state ActingForRunInactive; any other stored state
 // gives ActingForInvalid (fail closed). Expiry and the currency of the jti are not checked here
@@ -57,7 +59,7 @@ func ActingForVerdict(c InvocationClaims, run RunBinding, found bool, agentID id
 		return invalid
 	}
 	sub, err := ids.Parse(c.Sub)
-	if err != nil || run.TriggeredBy != sub {
+	if err != nil || (subIsRunStarter(c.TriggerKind) && run.TriggeredBy != sub) {
 		return invalid
 	}
 	thread, err := ids.Parse(c.ThreadID)
@@ -74,4 +76,18 @@ func ActingForVerdict(c InvocationClaims, run RunBinding, found bool, agentID id
 		return invalid
 	}
 	return ActingForResult{Status: status, UserID: run.TriggeredBy, RunID: run.ID, ThreadID: run.ThreadID, JTI: c.Jti}
+}
+
+// subIsRunStarter reports whether sub of a token of trigger kind kind is the run's triggering
+// person: message and command tokens are; an interaction or follow-up names whoever acted in the
+// run (09 4.5), so the binding takes the person from runs.triggered_by and never from sub
+// (D-M2-15-30). An unknown kind is held to the strict rule (fail closed).
+func subIsRunStarter(kind string) bool {
+	switch TriggerKind(kind) {
+	case TriggerInteraction, TriggerFollowup:
+		return false
+	case TriggerMessage, TriggerCommand, TriggerAutocomplete:
+		return true
+	}
+	return true
 }

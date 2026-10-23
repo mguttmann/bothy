@@ -195,6 +195,10 @@ type RunFacts struct {
 	CredentialHolderID ids.ID
 	// ToolClass is the target tool class.
 	ToolClass string
+	// ComponentsAllowed is the owner's part of the capability components: false exactly when
+	// operator_config sets supports_components to false (09 section 2.2, M2-15). runs refuses a
+	// card of such an agent with 403 feature_disabled; the adapter's report is M2-20.
+	ComponentsAllowed bool
 	// FollowupsPermitted is the owner's operator_config.supports_followups; nil when the key is
 	// absent, which allows (09 section 2.2). FollowupsReported is the adapter's last persisted
 	// capabilities.followups (steer or queue, "" when not reported; written by the heartbeat of

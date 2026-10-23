@@ -246,7 +246,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | int | `16384` | size of `run_steps.detail` | active |
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | int | `2000` | stored steps per run | active |
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | without progress: stall notice | planned (M2) |
-| `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | expiry of a component without its own value | planned (M2) |
+| `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server | duration | `24h` | expiry of a component without its own value | active |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server | int | `5` | after that, a push registration is deactivated | active |
 | `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | empty | allowed target hosts for outgoing webhooks | active |
 | `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | int | `20` | after that, a subscription is deactivated | active |
@@ -427,9 +427,9 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 | `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server | int | `25` | suggestions per answer | active |
 | `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | int | `100` | commands per agent or app | active |
 | `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | int | `100` | length of a description | active |
-| `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server |  | `25` | components per message | planned (M2) |
-| `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server |  | `100` | length of `custom_id` | planned (M2) |
-| `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server |  | `10` | fields per form | planned (M2) |
+| `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server | int | `25` | components per message | active |
+| `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server | int | `100` | length of `custom_id` | active |
+| `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server | int | `10` | fields per form | active |
 | `project.binding_text_max_chars` | `BOTHY_PROJECT__BINDING_TEXT_MAX_CHARS` | Server | int | `512` | longest `workspace_ref`, `repository_url`, `default_branch`, `runner_config.model` and tool name of a project binding in Unicode characters; 512 characters of at most 4 bytes in UTF-8, also after `lower()`, stay below the PostgreSQL B-tree entry limit of the unique index on `lower(workspace_ref)`, so an over-long reference is a field error, never an internal error (maximum `600`) | active |
 | `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | list(string) | `["Neuer Chat", "Chat", "Ohne Titel", "Test", "New chat", "Untitled"]` | placeholders for the title detection; the empty title is always a placeholder (12 point 2), a list entry is never empty | active |
 | `adapter.invocation_token_leeway` |  | Adapter |  | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |  |

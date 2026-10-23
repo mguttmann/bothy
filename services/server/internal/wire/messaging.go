@@ -16,6 +16,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
+	"github.com/OWNER/bothy/services/server/internal/messaging"
 	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	messagingmetrics "github.com/OWNER/bothy/services/server/internal/messaging/adapters/otelmetrics"
 	messagingpg "github.com/OWNER/bothy/services/server/internal/messaging/adapters/postgres"
@@ -28,7 +29,8 @@ import (
 // MessagingConfig binds the keys of the messaging use cases (message.max_content_bytes,
 // message.max_mentions, sync.event_payload_max_bytes, message.list_content_max_bytes,
 // template.name_max_chars, template.max_per_scope, api.page_size_default, api.page_size_max,
-// reaction.emoji_max_bytes, reaction.max_distinct_per_message, pin.max_per_thread). The error names
+// reaction.emoji_max_bytes, reaction.max_distinct_per_message, pin.max_per_thread,
+// principal.handle_max_chars, principal.display_name_max_chars). The error names
 // the key whose binding failed, never a value.
 func MessagingConfig(v *config.Values) (messagingapp.Config, error) {
 	var c messagingapp.Config
@@ -66,6 +68,17 @@ type MessagingWrites struct {
 	// server passes identity's Authenticator, bound when the session step has run; nil leaves the
 	// export refusing to start (a role or a test without it).
 	Credentials messagingapp.CredentialCheck
+	// Components is the source of the components of cards that runs implements (M2-15,
+	// runs/adapters/messagingsource), bound to the runs use cases once they exist (NewRuns); nil
+	// shows every message without components and answers a card with not_enabled (a role or a
+	// test without runs).
+	Components ComponentSource
+}
+
+// ComponentSource is the pair of source ports runs implements for messaging (M2-15).
+type ComponentSource interface {
+	messaging.ComponentReader
+	messaging.ComponentWriter
 }
 
 // lazyCredentials is the credential check of the export over the Authenticator of the HTTP chain,
@@ -100,11 +113,15 @@ func NewMessaging(cfg messagingapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az
 		}
 		w.Metrics = m
 	}
-	svc, err := messagingapp.New(cfg, messagingapp.Deps{
+	d := messagingapp.Deps{
 		Store: messagingpg.NewRepository(pool), UoW: uow, Authorizer: az, Events: w.Events, Redactor: w.Redactor, Audit: w.Audit,
 		Threads: threads, Directory: dir, Cursors: messaginghttp.Cursors{}, Symbols: messagingunicode.Normalizer{}, Errors: counter, Clock: clk, Log: log,
 		Metrics: w.Metrics, Credentials: w.Credentials,
-	})
+	}
+	if w.Components != nil {
+		d.Components, d.Cards = w.Components, w.Components
+	}
+	svc, err := messagingapp.New(cfg, d)
 	if err != nil {
 		return nil, err
 	}

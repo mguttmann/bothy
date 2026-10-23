@@ -33,7 +33,13 @@ func (s *Service) checkAnswer(ctx context.Context, ev messaging.MessagePosted) e
 	if err != nil {
 		return err
 	}
-	switch err := domain.AnswerVerdict(run, found, ev.AuthorID, ev.ThreadID); {
+	return answerError(domain.AnswerVerdict(run, found, ev.AuthorID, ev.ThreadID))
+}
+
+// answerError maps the verdict of domain.AnswerVerdict to the answer of run_id; the card check
+// of AttachCard (M2-15) uses it too, so a card and a text answer refuse a run_id alike.
+func answerError(verdict error) error {
+	switch err := verdict; {
 	case err == nil:
 		return nil
 	case errors.Is(err, domain.ErrAnswerRunMismatch):

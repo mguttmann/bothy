@@ -298,14 +298,14 @@ reveals nothing (never with `404`).
 | `channel_read_only` | `forbidden` | channel read-only; writing and triggering actions blocked, even for owners (05, rule 1.8); problem code `channel_read_only` |
 | `channel_archived` | `forbidden` | channel or its space archived; writing and triggering actions blocked, even for owners (section 4.5); problem code `channel_read_only` with `reason` |
 | `run_active_other_agent` | `forbidden` | the thread has an active run of another agent (05, section 5, item 8) |
-| `run_active` | `forbidden` | model command during an active run (05 `command.invoke`) |
+| `run_active` | `forbidden` | model command during an active run (05 `command.invoke`); also `interaction.create` on a component without run while the card's agent has an active run in the thread, which would need a second run (R-DM-14, [09-agents.md](09-agents.md) section 11.2, M2-15); problem code `agent_invocation_denied` with `reason` |
 | `billing_mode_mismatch` | `invariant_violation` | `run.start` with a reported mode not equal to the configured mode (I3); problem code `billing_mode_mismatch` (`409`) |
 | `tool_class_mismatch` | `invariant_violation` | the adapter reports a higher tool class than the token; problem code `tool_class_mismatch` (`409`) |
 | `invocation_token_invalid` | `forbidden` | invocation token invalid, expired, not the current one, or consumed (`run.start`, `run.token.renew`); `reason` `expired`, `superseded` or `invalid` ([09-agents.md](09-agents.md), section 4.5); also every request with `Invocation-Token` (SR9), with `reason` `invalid` (token, run, agent or person wrong, or the header repeated, empty or sent by a principal that is not an agent) or `run_inactive` (the run of the token has ended) |
 | `import_not_running` | `forbidden` | `import.apply` without a running source or with a target outside its channels |
 | `malware_detected` | no `authorize` result | reason of the audit entry for `file.upload` on a malware finding ([12-files.md](12-files.md), section 5.2) |
-| `component_inactive` | `forbidden` | component used, expired or deactivated |
-| `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` and the principal is neither the triggering person nor an owner |
+| `component_inactive` | `forbidden` | component used, expired or deactivated; also a component whose run has ended. Answered `409 component_used` without the reason, which stays in the audit, so a lost race answers the same whether `authorize` or the single-use lock decided it (09 section 11.2, M2-15) |
+| `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` and the principal is neither the triggering person nor an owner; also `restricted_to = 'owner'` and the principal is not an effective owner ("Always allow", 09 section 11.5, M2-15); problem code `forbidden` with `reason` |
 | `acting_for_insufficient` | `not_found` or `forbidden` | acting-for binding: the triggering person does not have the permission; `not_found` when the target is visible with the agent's own rights but not with the intersection (answered like an unknown ID), `forbidden` (problem `forbidden` with `reason: acting_for_insufficient`) when the requirement holds with the agent's own rights but fails with the intersection; if the agent alone already fails, the agent's own reason stays |
 | `terminal_not_host_assignee` | `forbidden` | SR10: a non-owner on a host whose assignee they are not; problem code `terminal_denied` with `reason: not_host_assignee` |
 | `terminal_server_host_owner_only` | `forbidden` | SR10: server host only for owners; problem code `terminal_denied` with `reason: server_host_owner_only` |
@@ -675,13 +675,15 @@ T-AI-02 in the threat model.
 The header is `Invocation-Token` with the compact JWS of `EventEnvelope.invocation_token` of the
 run ([06-api.md](06-api.md), section 4 point 8). The binding check on every request: the
 signature, `typ`, `kid` and `iss` of the token, `aud` equal to the authenticated agent, then the
-run of the claim `run_id`, which must exist, belong to this agent, be triggered by `sub` and lie in
-the claimed thread; a token without `run_id` (autocomplete, a command without an active run) is
+run of the claim `run_id`, which must exist, belong to this agent, be triggered by `sub` (for the
+tokens of trigger kind `message` and `command`; an interaction or follow-up token names the person
+who acted, and the binding always takes the person from the run, [09-agents.md](09-agents.md)
+section 4.5) and lie in the claimed thread; a token without `run_id` (autocomplete, a command without an active run) is
 invalid, because SR9 binds a run. An active run (`queued`, `running`, `waiting_input`) binds; an
 ended one answers `invocation_token_invalid` with `reason: run_inactive`, every other failure
 `reason: invalid`, also for the header sent by a principal that is not an agent. Expiry and the
-currency of the `jti` are not checked: a run outlives `agent.invocation_token_ttl`, every token of
-a run names the same person, and the token never adds a right, so a leaked or older token gives its
+currency of the `jti` are not checked: a run outlives `agent.invocation_token_ttl`, the binding
+always intersects with the run's triggering person, and the token never adds a right, so a leaked or older token gives its
 holder nothing the agent token alone would not give (docs/DECISIONS.md D-M2-14-3). The exceptions
 above hold only for the own thread and run: the resolved thread of the resource is the run's
 thread, and for a resource of kind `run` it is the run itself, so `run.finish` of an earlier run in

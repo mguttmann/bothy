@@ -42,6 +42,19 @@ func TestResourceFromEvent(t *testing.T) {
 	}
 }
 
+// TestInteractionStages: the two stages of InteractionFacts carry the codes authz expects
+// (brief M2-15 design note 8 a and c).
+func TestInteractionStages(t *testing.T) {
+	t.Parallel()
+	if authorize.InteractionStageAccept != "accept" || authorize.InteractionStageDeliver != "deliver" {
+		t.Fatalf("stages %q %q", authorize.InteractionStageAccept, authorize.InteractionStageDeliver)
+	}
+	r := authorize.Resource{Kind: authorize.ResourceComponent, Interaction: &authorize.InteractionFacts{Stage: authorize.InteractionStageAccept}}
+	if r.Interaction.Stage != "accept" {
+		t.Fatal("interaction facts not kept")
+	}
+}
+
 // TestResourceFromEvent_Audience: the audience of an event row is the owner of a file descriptor
 // (brief M3-10 design note 7) and of no other kind, so a personal file.updated reaches only its
 // uploader while the audience of any other event keeps its own rule.

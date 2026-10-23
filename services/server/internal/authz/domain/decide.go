@@ -246,6 +246,9 @@ type Input struct {
 	Token                                                      *TokenFacts
 	// Command are the facts of a command resource and of command.invoke (M2-16); nil otherwise.
 	Command *CommandFacts
+	// Interaction are the facts of the component of interaction.create, and of agent.invoke at
+	// stage deliver (M2-15); nil for every other check.
+	Interaction *InteractionFacts
 	// Invocation are the facts of the invocation token of run.start and run.token.renew (M2-09);
 	// nil for every other action.
 	Invocation *InvocationFacts

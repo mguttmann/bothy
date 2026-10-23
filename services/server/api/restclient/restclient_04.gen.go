@@ -7,6 +7,21 @@ import (
 	"net/http"
 )
 
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RemoveGroupMemberResponse) GetApplicationproblemJSON401() *Unauthorized {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RemoveGroupMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RemoveGroupMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r RemoveGroupMemberResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
@@ -5957,6 +5972,11 @@ type RespondToInteractionResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// RespondToInteractionResponse409Headers the declared response headers of an HTTP 409 response for RespondToInteraction
+type RespondToInteractionResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // RespondToInteractionResponse422Headers the declared response headers of an HTTP 422 response for RespondToInteraction
 type RespondToInteractionResponse422Headers struct {
 	CorrelationId *CorrelationId
@@ -5988,6 +6008,8 @@ type RespondToInteractionResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *UnprocessableEntity
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
@@ -6004,6 +6026,8 @@ type RespondToInteractionResponse struct {
 	Headers403 *RespondToInteractionResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *RespondToInteractionResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *RespondToInteractionResponse409Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
 	Headers422 *RespondToInteractionResponse422Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -6035,6 +6059,11 @@ func (r RespondToInteractionResponse) GetApplicationproblemJSON403() *Forbidden 
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r RespondToInteractionResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RespondToInteractionResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
@@ -26008,55 +26037,4 @@ type UpdateWebhookSubscriptionResponse429Headers struct {
 // UpdateWebhookSubscriptionResponseDefaultHeaders the declared response headers of an HTTP default response for UpdateWebhookSubscription
 type UpdateWebhookSubscriptionResponseDefaultHeaders struct {
 	CorrelationId *CorrelationId
-}
-
-type UpdateWebhookSubscriptionResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *WebhookSubscriptionCreated
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *BadRequest
-	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
-	ApplicationproblemJSON401 *Unauthorized
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *NotFound
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Conflict
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *UnprocessableEntity
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *TooManyRequests
-	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
-	ApplicationproblemJSONDefault *Error
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *UpdateWebhookSubscriptionResponse200Headers
-	// Headers400 the parsed response headers for an HTTP 400 response
-	Headers400 *UpdateWebhookSubscriptionResponse400Headers
-	// Headers401 the parsed response headers for an HTTP 401 response
-	Headers401 *UpdateWebhookSubscriptionResponse401Headers
-	// Headers403 the parsed response headers for an HTTP 403 response
-	Headers403 *UpdateWebhookSubscriptionResponse403Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *UpdateWebhookSubscriptionResponse404Headers
-	// Headers409 the parsed response headers for an HTTP 409 response
-	Headers409 *UpdateWebhookSubscriptionResponse409Headers
-	// Headers422 the parsed response headers for an HTTP 422 response
-	Headers422 *UpdateWebhookSubscriptionResponse422Headers
-	// Headers429 the parsed response headers for an HTTP 429 response
-	Headers429 *UpdateWebhookSubscriptionResponse429Headers
-	// HeadersDefault the parsed response headers for an HTTP default response
-	HeadersDefault *UpdateWebhookSubscriptionResponseDefaultHeaders
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r UpdateWebhookSubscriptionResponse) GetJSON200() *WebhookSubscriptionCreated {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r UpdateWebhookSubscriptionResponse) GetApplicationproblemJSON400() *BadRequest {
-	return r.ApplicationproblemJSON400
 }

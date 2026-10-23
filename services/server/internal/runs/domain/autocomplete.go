@@ -30,8 +30,6 @@ const (
 	FieldTooManyItems = "too_many_items"
 	// FieldTooShort: an empty name or value of a choice.
 	FieldTooShort = "too_short"
-	// FieldTooLong: a request whose payload does not fit sync.event_payload_max_bytes.
-	FieldTooLong = "too_long"
 )
 
 // channelKindForum is the kind of a forum channel, which has no main thread (R-DM-11).

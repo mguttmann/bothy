@@ -8,6 +8,12 @@
 -- The row lock of the run for the rest of the unit of work.
 SELECT * FROM runs WHERE id = sqlc.arg(id) FOR UPDATE;
 
+-- name: LockRunShared :one
+-- The share lock of the run of a new card (M2-15 design note 6 b): a concurrent end of the run
+-- either commits first (the card sees the ended run) or waits for the card's commit and then sees
+-- its components when it disables them.
+SELECT * FROM runs WHERE id = sqlc.arg(id) FOR SHARE;
+
 -- name: RecordDelivery :one
 -- An allowed delivery: invocation_jti is replaced and renewed_from_jti set to renewed_from (NULL
 -- for a delivery, the replaced jti for a renewal of M2-09) when record is true (a token that may

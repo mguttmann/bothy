@@ -16791,6 +16791,11 @@ type UpdateComponentResponse404Headers struct {
 	CorrelationId *CorrelationId
 }
 
+// UpdateComponentResponse409Headers the declared response headers of an HTTP 409 response for UpdateComponent
+type UpdateComponentResponse409Headers struct {
+	CorrelationId *CorrelationId
+}
+
 // UpdateComponentResponse412Headers the declared response headers of an HTTP 412 response for UpdateComponent
 type UpdateComponentResponse412Headers struct {
 	CorrelationId *CorrelationId
@@ -16832,6 +16837,8 @@ type UpdateComponentResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
 	ApplicationproblemJSON412 *PreconditionFailed
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
@@ -16852,6 +16859,8 @@ type UpdateComponentResponse struct {
 	Headers403 *UpdateComponentResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *UpdateComponentResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *UpdateComponentResponse409Headers
 	// Headers412 the parsed response headers for an HTTP 412 response
 	Headers412 *UpdateComponentResponse412Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
@@ -16887,6 +16896,11 @@ func (r UpdateComponentResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r UpdateComponentResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateComponentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
@@ -22710,19 +22724,4 @@ type RemoveGroupMemberResponse struct {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r RemoveGroupMemberResponse) GetApplicationproblemJSON400() *BadRequest {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON401() *Unauthorized {
-	return r.ApplicationproblemJSON401
-}
-
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r RemoveGroupMemberResponse) GetApplicationproblemJSON404() *NotFound {
-	return r.ApplicationproblemJSON404
 }

@@ -879,6 +879,7 @@ func (w *world) build() {
 	d := w.deps()
 	svc, err := app.New(app.Config{PageSizeDefault: 3, PageSizeMax: 5, StepDetailMaxBytes: 256, QueuedMaxAge: queuedMaxAge,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second, OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500,
+		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10, MaxContentBytes: 4096,
 		ExcerptMaxChars: 20, MaxStepsPersisted: 4, EventPayloadMaxBytes: w.payloadMax}, d)
 	if err != nil {
 		w.t.Fatal(err)

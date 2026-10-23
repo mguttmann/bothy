@@ -23,16 +23,20 @@ import (
 type prepared struct {
 	clientMsgID ids.ID
 	origin      domain.Origin
-	content     string
-	replyTo     ids.ID
-	silent      bool
-	clearDraft  bool
+	// kind is text or, for an agent's card, card (M2-15).
+	kind       domain.Kind
+	content    string
+	replyTo    ids.ID
+	silent     bool
+	clearDraft bool
 	// mentionCheck is the mention_ids of the request; checkMentions is false when absent.
 	mentionCheck  []ids.ID
 	checkMentions bool
 	// handles are the distinct mention handles of content.
 	handles []string
 	hash    []byte
+	// card holds the checked components of a card (M2-15); empty for every other kind.
+	card cardPrepared
 	// runID is the run_id of an agent's answer (M2-19 design note 3); it goes into MessagePosted
 	// only, never into the row or the hash (design note 6).
 	runID *ids.ID
@@ -145,17 +149,8 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err != nil {
 		return prepared{}, err
 	}
-	kind := string(domain.KindText)
-	if cmd.Kind != nil && *cmd.Kind != kind {
-		return prepared{}, domain.NotEnabled("/kind")
-	}
-	switch {
-	case len(cmd.AttachmentIDs) > 0:
-		return prepared{}, domain.NotEnabled("/attachment_file_ids")
-	case cmd.Components > 0:
-		return prepared{}, domain.NotEnabled("/components")
-	}
-	if err := domain.CheckRunID(string(a.Kind), cmd.RunID); err != nil {
+	kind, isCard, err := kindOf(a, cmd)
+	if err != nil {
 		return prepared{}, err
 	}
 	content := ""
@@ -165,7 +160,8 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 	if err := domain.CheckContent(content, s.cfg.MaxContentBytes); err != nil {
 		return prepared{}, err
 	}
-	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft, runID: cmd.RunID}
+	p := prepared{clientMsgID: cmd.ClientMsgID, origin: origin, kind: domain.Kind(kind), content: content, silent: cmd.Silent, clearDraft: cmd.ClearDraft,
+		runID: cmd.RunID}
 	// SkipMentions leaves handles empty, so send resolves and stores no mention (R-EX-09).
 	if !cmd.SkipMentions {
 		p.handles = domain.ScanMentions(content)
@@ -184,8 +180,45 @@ func (s *Service) prepare(ctx context.Context, a actor.Actor, cmd messaging.Crea
 		}
 		p.replyTo, replyTo = *cmd.ReplyToID, cmd.ReplyToID.String()
 	}
-	p.hash = domain.RequestHash(domain.HashInput{Context: hashContext, Kind: kind, Content: content, ReplyTo: replyTo})
+	hash := domain.HashInput{Context: hashContext, Kind: kind, Content: content, ReplyTo: replyTo}
+	if isCard {
+		if p.card.checked, err = s.checkCard(ctx, a, cmd, thread); err != nil {
+			return prepared{}, err
+		}
+		hash.Card, hash.RunID = p.card.checked.Canonical, runIDText(cmd.RunID)
+	}
+	p.hash = domain.RequestHash(hash)
 	return p, nil
+}
+
+// kindOf returns the kind of a new message (text without a kind member) and whether it is a card:
+// voice and every other kind are not enabled, attachments neither (M3-07), the card rules of
+// M2-15 apply, and run_id is refused for every principal but an agent (M2-19). Errors: 400
+// validation_failed.
+func kindOf(a actor.Actor, cmd messaging.CreateMessageCmd) (string, bool, error) {
+	kind := string(domain.KindText)
+	if cmd.Kind != nil {
+		kind = *cmd.Kind
+	}
+	if kind != string(domain.KindText) && kind != string(domain.KindCard) {
+		return "", false, domain.NotEnabled("/kind")
+	}
+	if len(cmd.AttachmentIDs) > 0 {
+		return "", false, domain.NotEnabled("/attachment_file_ids")
+	}
+	isCard, err := cardRules(a, kind, cmd)
+	if err != nil {
+		return "", false, err
+	}
+	return kind, isCard, domain.CheckRunID(string(a.Kind), cmd.RunID)
+}
+
+// runIDText is the run_id of the request hash, "" when absent.
+func runIDText(run *ids.ID) string {
+	if run == nil {
+		return ""
+	}
+	return run.String()
 }
 
 // checkReply allows a reply only to a message of the same thread, deleted ones included; an
@@ -250,18 +283,26 @@ func (s *Service) send(ctx context.Context, a actor.Actor, p prepared, info chat
 	}
 	row, err := s.d.Store.InsertMessage(ctx, domain.Message{
 		ID: ids.New(), ThreadID: info.ID, ChannelID: info.ChannelID, ThreadSeq: seq, AuthorID: a.ID,
-		ClientMsgID: p.clientMsgID, PayloadSHA256: p.hash, Origin: p.origin, Kind: domain.KindText, ContentMD: p.content,
+		ClientMsgID: p.clientMsgID, PayloadSHA256: p.hash, Origin: p.origin, Kind: p.kind, ContentMD: p.content,
 		ContentFormat: domain.ContentFormat, ReplyToID: p.replyTo, Silent: p.silent, Version: 1, CreatedAt: now,
 		SearchLanguage: lang,
 	})
 	if err != nil {
 		return messaging.Created{}, err
 	}
-	s.countCreated(ctx, domain.Message{Origin: p.origin, Kind: domain.KindText})
+	s.countCreated(ctx, domain.Message{Origin: p.origin, Kind: p.kind})
 	if err := s.d.Store.InsertMentions(ctx, row.ID, info.ID, mentions, now); err != nil {
 		return messaging.Created{}, err
 	}
 	m := view(row, author, mentions)
+	// The components of a card come after the message row and before MessagePosted and
+	// message.created, which carries them (M2-15 design note 6 d).
+	if p.card.checked != nil {
+		p.card.checked.Input.ThreadID = info.ID
+	}
+	if m.Components, err = s.attach(ctx, row, p.card); err != nil {
+		return messaging.Created{}, err
+	}
 	posted := s.posted(a, info, m, p.clearDraft)
 	posted.CreatedThread, posted.ReopenedThread = created, line != nil
 	if p.runID != nil {

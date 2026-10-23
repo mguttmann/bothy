@@ -329,7 +329,7 @@ func build(t *testing.T, subscribe Subscribe, personal bool, so *SyncOptions, no
 	mcfg := messagingapp.Config{MaxContentBytes: MaxContent, MaxMentions: MaxMentions, EventPayloadMaxBytes: PayloadMax,
 		TemplateNameMaxChars: TemplateNameMax, TemplateMaxPerScope: TemplateMax,
 		ListContentMaxBytes: ListContentMax, PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax,
-		EmojiMaxBytes: EmojiMax, MaxDistinctReactions: MaxDistinctReactions, MaxPinsPerThread: MaxPins}
+		EmojiMaxBytes: EmojiMax, MaxDistinctReactions: MaxDistinctReactions, HandleMaxChars: 32, DisplayNameMaxChars: 64, MaxPinsPerThread: MaxPins}
 	for _, o := range opts {
 		o(&mcfg)
 	}
@@ -414,7 +414,9 @@ func (w *World) syncReads(cfg syncapp.CatchUpConfig, pool *pg.Pool, uow *pg.Unit
 	rn, err := wire.NewRuns(runsapp.Config{PageSizeDefault: PageSizeDefault, PageSizeMax: PageSizeMax, StepDetailMaxBytes: StepDetailMax,
 		QueuedMaxAge: 48 * time.Hour, EventPayloadMaxBytes: 65536,
 		ClockLeeway: 30 * time.Second, CancelGrace: 30 * time.Second, PresenceTimeout: 90 * time.Second,
-		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000}, pool, uow, az,
+		OrphanTimeout: 15 * time.Minute, ReasonMaxChars: 500, ExcerptMaxChars: 500, MaxStepsPersisted: 2000,
+		ComponentDefaultTTL: 24 * time.Hour, ComponentMaxPerMessage: 25, ComponentCustomIDMaxChars: 100, ComponentFormMaxFields: 10,
+		MaxContentBytes: 4096}, pool, uow, az,
 		wire.RunsDeps{Events: appender, Messages: m.Service, Threads: c.Service, Channels: c.Service, Agents: ag.Service, Expiry: noExpiry{}}, w.Clock, log)
 	if err != nil {
 		w.t.Fatal(err)

@@ -16,6 +16,44 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// CreateWebhookSubscriptionWithBody Subscribe a URL to events
+//
+// The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
+func (c *Client) CreateWebhookSubscriptionWithBody(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWebhookSubscriptionRequestWithBody(c.Server, appId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateWebhookSubscription Subscribe a URL to events
+//
+// The host and port must be in `webhook.allowed_hosts`; otherwise 400 `webhook_host_not_allowed`. With `enable_hmac` the response carries the `v1` secret once; it is a one-time secret, so a replay with the same `Idempotency-Key` answers 409 `conflict` with `reason` `one_time_secret`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /apps/{app_id}/webhooks (the `CreateWebhookSubscription` operationId).
+func (c *Client) CreateWebhookSubscription(ctx context.Context, appId AppIdPath, params *CreateWebhookSubscriptionParams, body CreateWebhookSubscriptionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateWebhookSubscriptionRequest(c.Server, appId, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListAuditEvents Query the audit log
 //
 // Corresponds with GET /audit/events (the `ListAuditEvents` operationId).

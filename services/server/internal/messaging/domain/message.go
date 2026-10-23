@@ -222,21 +222,40 @@ type HashInput struct {
 	ReplyTo string
 	// AttachmentIDs are the attachment ids in request order.
 	AttachmentIDs []string
+	// RunID is run_id, "" when absent (M2-15).
+	RunID string
+	// Card is the canonical form of the components (messaging.CheckedCard.Canonical); nil
+	// without components (M2-15).
+	Card []byte
 }
 
 // hashVersion starts the encoding; a new encoding gets a new prefix, never an edit.
-const hashVersion = "bothy-msg-v1"
+// hashVersionCard is the encoding of a request with components or run_id (M2-15 design note
+// 6 c): the fields of v1 in v1 order, then run_id and the canonical card.
+const (
+	hashVersion     = "bothy-msg-v1"
+	hashVersionCard = "bothy-msg-v2"
+)
 
-// RequestHash returns client_payload_sha256 (brief D3): SHA-256 over hashVersion, then each field
-// as uvarint(length) and its bytes, so JSON key order and white space cannot change it and no
-// field boundary can move.
+// RequestHash returns client_payload_sha256 (brief D3): SHA-256 over the version prefix, then each
+// field as uvarint(length) and its bytes, so JSON key order and white space cannot change it and
+// no field boundary can move. A request with neither RunID nor Card keeps bothy-msg-v1 byte for
+// byte, so a message stored before M2-15 still replays; one with either uses bothy-msg-v2 (ruling
+// D-M2-15-7).
 func RequestHash(in HashInput) []byte {
 	h := sha256.New()
-	h.Write([]byte(hashVersion))
-	for _, f := range []string{in.Context, in.Kind, in.Content, in.ReplyTo, strings.Join(in.AttachmentIDs, ",")} {
+	fields := [][]byte{[]byte(in.Context), []byte(in.Kind), []byte(in.Content), []byte(in.ReplyTo),
+		[]byte(strings.Join(in.AttachmentIDs, ","))}
+	if in.RunID == "" && in.Card == nil {
+		h.Write([]byte(hashVersion))
+	} else {
+		h.Write([]byte(hashVersionCard))
+		fields = append(fields, []byte(in.RunID), in.Card)
+	}
+	for _, f := range fields {
 		var n [binary.MaxVarintLen64]byte
 		h.Write(n[:binary.PutUvarint(n[:], uint64(len(f)))])
-		h.Write([]byte(f))
+		h.Write(f)
 	}
 	return h.Sum(nil)
 }

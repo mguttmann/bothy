@@ -7171,9 +7171,9 @@ export interface components {
             mention_ids?: components["schemas"]["Uuid"][];
             silent?: boolean;
             clear_draft?: boolean;
-            /** @description Agents only; the run this answer belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Validated, never stored (`Message.run_id` stays absent) and not part of the canonical request of `client_msg_id` (09 4.7). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`. */
+            /** @description Agents only; the run this message belongs to. It must name an active run (`queued`, `running`, `waiting_input`) of the calling agent in this thread. Never stored on the message (`Message.run_id` stays absent). A person or app, an unknown run, a run of another thread or of another agent answer alike `400 validation_failed` with `errors[].code` `run_mismatch`; an ended own run answers `409 conflict` with `reason` `run_not_active`. With `kind = card` it also binds the components of the card to this run (`Component.run_id`, 09 11.4) and is part of the canonical request of `client_msg_id` (`bothy-msg-v2`); for every other kind it is not (09 4.7). */
             run_id?: components["schemas"]["Uuid"];
-            /** @description Agents and apps only; requires `kind = card`. */
+            /** @description Requires `kind = card`, and `kind = card` requires at least one component; at most `component.max_per_message`. Only agents send cards (people get `invalid`; apps `not_enabled` until app components are built). The whole `message.created` payload of the card must fit `sync.event_payload_max_bytes`, else `too_long` on `/components`. An agent whose owner switched `supports_components` off gets `403 feature_disabled` (09, 2.2 and 11.1). */
             components?: components["schemas"]["ComponentCreate"][];
         };
         /** @description The server resolves the mentions of the resulting content again; `mention_ids` is an optional check as in `MessageCreate`. */
@@ -8073,7 +8073,7 @@ export interface components {
             /** @example approve-refund */
             custom_id: string;
             type: components["schemas"]["ComponentType"];
-            /** @description Schema `component.v1` (label, style, options, form fields). */
+            /** @description Schema `component.v1` (09, 11.1) as stored, with the defaults applied (button `style`, select `min_values` and `max_values`, field `required`). */
             definition: components["schemas"]["JsonObject"];
             position: number;
             single_use: boolean;
@@ -8092,6 +8092,7 @@ export interface components {
             /** @example approve-refund */
             custom_id: string;
             type: components["schemas"]["ComponentType"];
+            /** @description Schema `component.v1` (09, 11.1), a closed member set per type; `400 validation_failed` with one entry per finding below `/components/<index>/definition` and the codes `required`, `invalid` or `limit_reached`. */
             definition: components["schemas"]["JsonObject"];
             single_use?: boolean;
             required_capability?: components["schemas"]["Capability"];
@@ -8101,11 +8102,12 @@ export interface components {
         ComponentUpdate: {
             /** @enum {string} */
             state?: "active" | "disabled";
+            /** @description A new `component.v1` object for the type of the component (09, 11.1); it may change in every state. Type, `custom_id`, `single_use`, `required_capability`, `restricted_to` and `run_id` cannot change. */
             definition?: components["schemas"]["JsonObject"];
         };
         InteractionCreate: {
             client_interaction_id: components["schemas"]["Uuid"];
-            /** @description Selected options or form values, validated against the component definition. */
+            /** @description Selected options or form values, validated against the component definition (09, 11.1); absent means `{}`. Button: `{}`. Select: `{"selected": [<option value>, ...]}` with between `min_values` and `max_values` distinct option values. Form: an object keyed by field `name` (`text` and `textarea` strings, `number` a finite number, `boolean` a boolean, `choice` one of `choices`). A finding gives `400 validation_failed` with code `interaction_values_invalid` and its pointer; values whose `interaction.created` would exceed `sync.event_payload_max_bytes` give `too_long` on `/values`. */
             values?: components["schemas"]["JsonObject"];
         };
         Interaction: {
@@ -17346,6 +17348,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["UnprocessableEntity"];
             428: components["responses"]["PreconditionRequired"];
@@ -17387,6 +17390,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["UnprocessableEntity"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];

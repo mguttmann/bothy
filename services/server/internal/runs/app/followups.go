@@ -141,7 +141,8 @@ func (f *Followups) authorizeFollowup(ctx context.Context, ev messaging.MessageP
 }
 
 // store writes an allowed follow-up (design note 3 e): the row in queued, one version step of the
-// run, trigger_state received and agent.followup when the effective mode asks for it.
+// run, trigger_state received, for a run in waiting_input the disabling of its open components
+// (M2-15) and agent.followup when the effective mode asks for it.
 func (f *Followups) store(ctx context.Context, message ids.ID, run RunRow) error {
 	s := f.s
 	if err := f.rows.InsertFollowup(ctx, run.ID, message); err != nil {
@@ -152,6 +153,13 @@ func (f *Followups) store(ctx context.Context, message ids.ID, run RunRow) error
 	}
 	if err := s.d.Messages.SetTriggerState(ctx, messaging.SetTriggerStateCmd{MessageID: message, State: string(domain.TriggerStateReceived)}); err != nil {
 		return err
+	}
+	// A follow-up that answers a waiting run disables the run's open components: whatever arrives
+	// first counts (09 section 11.6, M2-15 ruling D-M2-15-21).
+	if run.State == domain.StateWaitingInput {
+		if err := s.DisableRunComponents(ctx, run.ID); err != nil {
+			return err
+		}
 	}
 	mode, err := f.mode(ctx, run.AgentID)
 	if err != nil {

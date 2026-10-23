@@ -36,8 +36,9 @@ type Config struct {
 	QueuedMaxAge time.Duration `config:"run.queued_max_age"`
 	// EventPayloadMaxBytes is sync.event_payload_max_bytes: option values whose command.invoked or
 	// agent.invocation would not fit are refused with /options too_large (M2-16 design note 10 i),
-	// and a run.updated whose encoded payload reaches it is published without ops (04 section 2.2
-	// rule 2, M2-10).
+	// the interaction.created payload with the values must stay below it (04 2.2 rule 2; M2-15
+	// design note 9), and a run.updated whose encoded payload reaches it is published without ops
+	// (04 section 2.2 rule 2, M2-10).
 	EventPayloadMaxBytes int `config:"sync.event_payload_max_bytes"`
 	// ClockLeeway is auth.clock_leeway, the server's tolerance after exp of an invocation token at
 	// startRun and resumeRun (ruling D-M2-09-4).
@@ -59,6 +60,19 @@ type Config struct {
 	// ReasonMaxChars is audit.reason_max_chars, the longest reason of cancelRun in Unicode
 	// characters (D-M2-09-11).
 	ReasonMaxChars int `config:"audit.reason_max_chars"`
+	// ComponentDefaultTTL is component.default_ttl, the expiry of a component without its own
+	// expires_at (M2-15, 09 section 21).
+	ComponentDefaultTTL time.Duration `config:"component.default_ttl"`
+	// ComponentMaxPerMessage is component.max_per_message, the most components of one card.
+	ComponentMaxPerMessage int `config:"component.max_per_message"`
+	// ComponentCustomIDMaxChars is component.custom_id_max_chars, the longest custom_id in
+	// characters.
+	ComponentCustomIDMaxChars int `config:"component.custom_id_max_chars"`
+	// ComponentFormMaxFields is component.form_max_fields, the most fields of one form.
+	ComponentFormMaxFields int `config:"component.form_max_fields"`
+	// MaxContentBytes is message.max_content_bytes, the bound of response.text of
+	// respondToInteraction (ruling D-M2-15-16).
+	MaxContentBytes int `config:"message.max_content_bytes"`
 }
 
 // check refuses limits below 1 and a default page above the largest.
@@ -81,6 +95,11 @@ func (c Config) check() error {
 	if c.ClockLeeway < 0 || c.CancelGrace <= 0 || c.PresenceTimeout <= 0 || c.OrphanTimeout <= 0 || c.ReasonMaxChars < 1 {
 		return errors.New("runs: auth.clock_leeway must not be negative and agent.cancel_grace, agent.presence_timeout, " +
 			"run.orphan_timeout and audit.reason_max_chars must be positive")
+	}
+	if c.ComponentDefaultTTL <= 0 || c.ComponentMaxPerMessage < 1 || c.ComponentCustomIDMaxChars < 1 || c.ComponentFormMaxFields < 1 ||
+		c.EventPayloadMaxBytes < 1 || c.MaxContentBytes < 1 {
+		return errors.New("runs: component.default_ttl, component.max_per_message, component.custom_id_max_chars, " +
+			"component.form_max_fields, sync.event_payload_max_bytes and message.max_content_bytes must be positive")
 	}
 	return nil
 }
@@ -173,6 +192,19 @@ type Deps struct {
 	// Mismatches counts bothy.agent.billing_mode_mismatch at every I3 mismatch; nil counts
 	// nothing.
 	Mismatches MismatchCounter
+	// Components reads and writes message_components and interactions (M2-15); nil switches the
+	// components off: a card is refused, the end of a run and the deletion of a message have no
+	// components to handle.
+	Components ComponentRepository
+	// Cards locks card messages and announces their component changes (messaging, M2-15); it is
+	// required with Components.
+	Cards CardMessages
+	// ThreadLocks locks the thread of a card before an interaction may open a run in it (chat,
+	// M2-15); it is required with Components.
+	ThreadLocks ThreadLocker
+	// ComponentExpiry schedules runs.component_expiry per card (M2-15); nil schedules nothing
+	// (authorize still treats a passed expires_at as expired).
+	ComponentExpiry ComponentExpiryScheduler
 	// Publisher relays run.updated after a committed patch (the gateway hub of this process,
 	// M2-10); nil publishes nothing.
 	Publisher eventlog.EphemeralPublisher

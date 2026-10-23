@@ -83,15 +83,21 @@ func (a *Acceptor) OnMessagePosted(ctx context.Context, ev messaging.MessagePost
 	return s.accept(ctx, ev)
 }
 
-// OnMessageDeleted discards the open follow-up of a deleted message inside the deleting unit of
-// work (M2-11 design note 9, ruling D-M2-11-7); unbound, or without the follow-up service, it
-// writes nothing. Only infrastructure errors return an error.
+// OnMessageDeleted handles a deleted message inside the deleting unit of work: it discards the
+// open follow-up of the message (M2-11 design note 9, ruling D-M2-11-7), then deletes the
+// components of a deleted card (M2-15, deleteComponentsOf), in the lock order runs before
+// message_components; unbound it writes nothing. Only infrastructure errors return an error.
 func (a *Acceptor) OnMessageDeleted(ctx context.Context, ev messaging.MessageDeleted) error {
 	s := a.svc.Load()
-	if s == nil || s.fu == nil {
+	if s == nil {
 		return nil
 	}
-	return s.fu.OnMessageDeleted(ctx, ev)
+	if s.fu != nil {
+		if err := s.fu.OnMessageDeleted(ctx, ev); err != nil {
+			return err
+		}
+	}
+	return s.deleteComponentsOf(ctx, ev.MessageID)
 }
 
 // accept is the acceptance of one new message. Its first branch is the answer check of M2-19

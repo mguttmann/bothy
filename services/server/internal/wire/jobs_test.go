@@ -150,6 +150,25 @@ func TestWire_JobsAndSubscriptions(t *testing.T) {
 	}
 }
 
+// TestWire_ComponentExpiryJob: runs.component_expiry is on the queue maintenance and scheduled per
+// card, never periodic (M2-15 design note 15 a; 02 12.3).
+func TestWire_ComponentExpiryJob(t *testing.T) {
+	t.Parallel()
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q, ok := reg.Queue("runs.component_expiry"); !ok || q != jobs.QueueMaintenance {
+		t.Fatalf("runs.component_expiry: queue = %q, %v", q, ok)
+	}
+	for _, p := range reg.Periodic() {
+		if p.Args.Kind() == "runs.component_expiry" {
+			t.Fatal("runs.component_expiry is scheduled per card, not periodic")
+		}
+	}
+}
+
 // TestJobRegistryHasNotifyJobs: the six jobs of notify are on the queue delivery in every role
 // (M3-19, notify.gateway_send M3-23, 02 12.2).
 func TestJobRegistryHasNotifyJobs(t *testing.T) {

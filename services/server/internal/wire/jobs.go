@@ -119,6 +119,9 @@ type JobModules struct {
 	// runs.stall_check.
 	RunsLifecycle runsjobs.Lifecycle
 	StallInterval time.Duration
+	// ComponentExpiry is the use case of runs.component_expiry (M2-15); nil only where no job
+	// runs.
+	ComponentExpiry runsjobs.ComponentExpirer
 	// TerminalSweep is the use case of terminal.sweep (M2-46).
 	TerminalSweep terminaljobs.Sweeper
 	// TerminalSweepInterval is terminal.sweep_interval.
@@ -150,9 +153,10 @@ func TerminalSweepConfigFrom(v *config.Values) (TerminalSweepConfig, error) {
 // on the queue files without a River job timeout (M3-04), files.thumbnail on the queue files with
 // the timeout file.image.processing_timeout (M3-06), runs.queued_expiry on the queue default
 // (M2-08), runs.cancel_timeout and the periodic runs.stall_check on the queue maintenance (M2-09),
-// terminal.sweep on the queue maintenance, periodic with terminal.sweep_interval and once at the
-// start (M2-46), and the six jobs of notify on the queue delivery (M3-19, notify.gateway_send
-// M3-23); the error is the first rejected registration.
+// runs.component_expiry, scheduled per card, on the queue maintenance (M2-15), terminal.sweep on
+// the queue maintenance, periodic with terminal.sweep_interval and once at the start (M2-46), and
+// the six jobs of notify on the queue delivery (M3-19, notify.gateway_send M3-23); the error is the
+// first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -189,6 +193,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := runsjobs.RegisterLifecycle(reg, m.RunsLifecycle, m.StallInterval); err != nil {
+		return nil, err
+	}
+	if err := runsjobs.RegisterComponentExpiry(reg, m.ComponentExpiry); err != nil {
 		return nil, err
 	}
 	if err := terminaljobs.Register(reg, m.TerminalSweep, m.TerminalSweepInterval); err != nil {

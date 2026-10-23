@@ -18,7 +18,7 @@ part 'component_create.g.dart';
 /// Properties:
 /// * [customId]
 /// * [type]
-/// * [definition] - Free-form JSON object whose schema is named in the field description.
+/// * [definition] - Schema `component.v1` (09, 11.1), a closed member set per type; `400 validation_failed` with one entry per finding below `/components/<index>/definition` and the codes `required`, `invalid` or `limit_reached`.
 /// * [singleUse]
 /// * [requiredCapability]
 /// * [restrictedTo]
@@ -33,7 +33,7 @@ abstract class ComponentCreate
   ComponentType get type;
   // enum typeEnum {  button,  select,  form,  };
 
-  /// Free-form JSON object whose schema is named in the field description.
+  /// Schema `component.v1` (09, 11.1), a closed member set per type; `400 validation_failed` with one entry per finding below `/components/<index>/definition` and the codes `required`, `invalid` or `limit_reached`.
   @BuiltValueField(wireName: r'definition')
   BuiltMap<String, JsonObject?> get definition;
 
