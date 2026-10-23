@@ -109,7 +109,7 @@ func (s *server) startPresenceWriter(gw *Gateway) error {
 		return err
 	}
 	w, err := gatewayapp.NewPresenceWriter(gatewayapp.PresenceWriterConfig{Node: s.nodeID(), FlushInterval: cfg.FlushInterval, TTL: cfg.TTL},
-		gw.Hub, gatewaypg.NewPresenceStore(s.pool), s.deps.Clock, s.logger(), metrics)
+		gw.Hub, gatewaypg.NewPresenceStore(s.pool, s.audit.UoW()), s.deps.Clock, s.logger(), metrics)
 	if err != nil {
 		return err
 	}

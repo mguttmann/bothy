@@ -14,6 +14,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
@@ -42,7 +43,10 @@ func newEnv(t *testing.T) env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return env{store: postgres.NewPresenceStore(pool), view: view, clk: clk, owner: db.Pool(t, pg.RoleOwner), app: pool}
+	reg := txn.NewRegistry()
+	reg.Seal()
+	uow := pg.NewUnitOfWork(pool, pg.UnitConfig{StatementTimeout: 30 * time.Second, LockTimeout: 10 * time.Second, IdleInTxTimeout: time.Minute}, reg)
+	return env{store: postgres.NewPresenceStore(pool, uow), view: view, clk: clk, owner: db.Pool(t, pg.RoleOwner), app: pool}
 }
 
 // count returns the rows of gateway_presence, of node when it is not zero.

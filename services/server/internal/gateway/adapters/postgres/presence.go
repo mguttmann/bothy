@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/OWNER/bothy/services/server/internal/gateway/adapters/postgres/sqlcgen"
@@ -20,34 +19,36 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/presence"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
 // PresenceStore implements app.PresenceStore over gateway_presence. It is safe for concurrent use.
 type PresenceStore struct {
 	pool *pg.Pool
+	uow  txn.UnitOfWork
 }
 
 // Compile-time check.
 var _ app.PresenceStore = (*PresenceStore)(nil)
 
-// NewPresenceStore returns the store over pool.
-func NewPresenceStore(pool *pg.Pool) *PresenceStore { return &PresenceStore{pool: pool} }
+// NewPresenceStore returns the store over pool; uow is the unit of work of platform/pg the flush
+// writes in (R-AR-06: only platform/pg opens and ends transactions).
+func NewPresenceStore(pool *pg.Pool, uow txn.UnitOfWork) *PresenceStore {
+	return &PresenceStore{pool: pool, uow: uow}
+}
 
-// Flush implements app.PresenceStore in one transaction: the upsert of rows, the delete of the
-// node's gone rows and the delete of the stale rows of every node. Errors: those of the database,
-// after a rollback.
-func (s *PresenceStore) Flush(ctx context.Context, node ids.ID, rows []app.PresenceRow, at, staleBefore time.Time) (err error) {
-	tx, err := s.pool.Begin(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(context.WithoutCancel(ctx))
-		}
-	}()
-	q := sqlcgen.New(tx)
+// Flush implements app.PresenceStore in one unit of work: the upsert of rows, the delete of the
+// node's gone rows and the delete of the stale rows of every node. Errors: those of the unit of
+// work, which rolls back.
+func (s *PresenceStore) Flush(ctx context.Context, node ids.ID, rows []app.PresenceRow, at, staleBefore time.Time) error {
+	return s.uow.Do(ctx, func(ctx context.Context) error {
+		return flushPresence(ctx, sqlcgen.New(pg.Querier(ctx, s.pool)), node, rows, at, staleBefore)
+	})
+}
+
+// flushPresence runs the statements of Flush on q.
+func flushPresence(ctx context.Context, q *sqlcgen.Queries, node ids.ID, rows []app.PresenceRow, at, staleBefore time.Time) error {
 	sessions := make([]pgtype.UUID, 0, len(rows))
 	if len(rows) > 0 {
 		p := sqlcgen.UpsertPresenceParams{NodeID: pg.UUID(node), At: pgtype.Timestamptz{Time: at, Valid: true}}
@@ -59,17 +60,14 @@ func (s *PresenceStore) Flush(ctx context.Context, node ids.ID, rows []app.Prese
 			p.Idle = append(p.Idle, r.Idle)
 		}
 		p.SessionIds = sessions
-		if err = q.UpsertPresence(ctx, p); err != nil {
+		if err := q.UpsertPresence(ctx, p); err != nil {
 			return err
 		}
 	}
-	if err = q.DeleteGonePresence(ctx, sqlcgen.DeleteGonePresenceParams{NodeID: pg.UUID(node), SessionIds: sessions}); err != nil {
+	if err := q.DeleteGonePresence(ctx, sqlcgen.DeleteGonePresenceParams{NodeID: pg.UUID(node), SessionIds: sessions}); err != nil {
 		return err
 	}
-	if err = q.DeleteStalePresence(ctx, pgtype.Timestamptz{Time: staleBefore, Valid: true}); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+	return q.DeleteStalePresence(ctx, pgtype.Timestamptz{Time: staleBefore, Valid: true})
 }
 
 // DeleteNode implements app.PresenceStore.
