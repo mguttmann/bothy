@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/OWNER/bothy/services/server/internal/files"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -23,7 +24,7 @@ func (s *Service) Transcript(ctx context.Context, fileID ids.ID) (files.Transcri
 	}
 	a := caller(ctx)
 	if a.IsAnonymous() {
-		return files.TranscriptView{}, s.anonymous(ctx, a, fileID)
+		return files.TranscriptView{}, s.anonymous(ctx, a, authorize.ActionFileRead, fileID)
 	}
 	f, err := s.readable(ctx, a, fileID, false, false)
 	if err != nil {

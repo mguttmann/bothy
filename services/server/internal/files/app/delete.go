@@ -23,6 +23,7 @@ const (
 // Delete implements files.Files (deleteFile, 05 4.8 file.delete, 12 section 12 row "file.delete";
 // brief M3-08 design note 9):
 //
+//   - an anonymous caller: 401 unauthenticated from authorize before any read (07 4.2 step 1);
 //   - no row (never existed or purged): 404 not_found, the answer of an unknown id (06 7);
 //   - deleted already: the same 404 for everyone but its uploader, without asking authorize
 //     (AZ-P4); for the uploader file.delete on the descriptor of the dead row, which the HTTP
@@ -36,6 +37,9 @@ const (
 //     attach wins and gives its answer) and calls markDeleted. No event and no audit (05 4.8).
 func (s *Service) Delete(ctx context.Context, fileID ids.ID) error {
 	a := caller(ctx)
+	if a.IsAnonymous() {
+		return s.anonymous(ctx, a, authorize.ActionFileDelete, fileID)
+	}
 	f, found, err := s.d.Cleanup.FileForDelete(ctx, fileID)
 	if err != nil {
 		return err
