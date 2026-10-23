@@ -21,18 +21,27 @@ def _no_push_env(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.parametrize(
     ("files", "components", "areas"),
     [
-        # Source files of a component alone: only its gates, no tools gates.
-        (["services/server/internal/chat/x.go"], ["server"], []),
-        (["services/server/internal/chat/x_test.go", "services/host/main.go"], ["server"], []),
+        # Source files of a component alone: only its gates, no tools gates. The Python SDK
+        # also owns services/server/: its real-server scenarios run the server of the tree.
+        (["services/server/internal/chat/x.go"], ["sdk-python", "server"], []),
+        (
+            ["services/server/internal/chat/x_test.go", "services/host/main.go"],
+            ["sdk-python", "server"],
+            [],
+        ),
         (["apps/client/lib/main.dart", "packages/design_system/lib/a.dart"], ["apps"], []),
         (["sdk/python/src/bothy/client.py"], ["sdk-python"], []),
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"], []),
         (["plugins/hermes-adapter/adapter.py"], ["plugins"], []),
         # Manifests, configuration, test data and docs of a component are read by tools tests.
-        (["services/server/go.mod"], ["server"], ["tools"]),
-        (["services/server/Dockerfile"], ["server"], ["tools"]),
-        (["services/server/.golangci.yml"], ["server"], ["tools"]),
-        (["services/server/CHANGELOG.md", "services/server/x.go"], ["server"], ["tools"]),
+        (["services/server/go.mod"], ["sdk-python", "server"], ["tools"]),
+        (["services/server/Dockerfile"], ["sdk-python", "server"], ["tools"]),
+        (["services/server/.golangci.yml"], ["sdk-python", "server"], ["tools"]),
+        (
+            ["services/server/CHANGELOG.md", "services/server/x.go"],
+            ["sdk-python", "server"],
+            ["tools"],
+        ),
         (["packages/design_system/test/goldens/a.png"], ["apps"], ["tools"]),
         (["sdk/python/pyproject.toml"], ["sdk-python"], ["tools"]),
         # Docs and infrastructure: no component, the tools gates and every repository gate.
@@ -90,10 +99,10 @@ def test_shared_inputs_run_the_full_check(files: list[str]) -> None:
 
 def test_make_args_of_an_affected_plan() -> None:
     plan = push_plan.plan(["services/server/x.go"])
-    assert plan.make_args() == ["check", "COMPONENTS=server", "AREAS=none"]
+    assert plan.make_args() == ["check", "COMPONENTS=sdk-python server", "AREAS=none"]
     assert plan.make_args("b1", "h1") == [
         "check",
-        "COMPONENTS=server",
+        "COMPONENTS=sdk-python server",
         "AREAS=none",
         "LINT_FROM_REF=b1",
         "LINT_TO_REF=h1",
@@ -134,11 +143,11 @@ def test_push_plan_reads_the_diff_against_origin_main(
     repo = _repo_with_main(tmp_path)
     plan, base, head = push_plan.push_plan(repo)
     assert not plan.full
-    assert plan.components == ["server"]
+    assert plan.components == ["sdk-python", "server"]
     assert base == git_fixtures.git(repo, "rev-parse", "origin/main").strip()
     assert head == git_fixtures.git(repo, "rev-parse", "HEAD").strip()
     monkeypatch.setenv("PRE_COMMIT_TO_REF", head)
-    assert push_plan.push_plan(repo)[0].components == ["server"]
+    assert push_plan.push_plan(repo)[0].components == ["sdk-python", "server"]
 
 
 @pytest.mark.parametrize(
@@ -189,7 +198,14 @@ def test_run_executes_make_with_the_plan(monkeypatch: pytest.MonkeyPatch, tmp_pa
     monkeypatch.setattr(push_plan.subprocess, "run", fake_run)
     assert push_plan.main(["run", "--repo", str(tmp_path)]) == 2
     assert calls == [
-        ["make", "check", "COMPONENTS=server", "AREAS=none", "LINT_FROM_REF=b", "LINT_TO_REF=h"]
+        [
+            "make",
+            "check",
+            "COMPONENTS=server",
+            "AREAS=none",
+            "LINT_FROM_REF=b",
+            "LINT_TO_REF=h",
+        ]
     ]
     calls.clear()
     assert push_plan.main(["run", "--repo", str(tmp_path), "--dry-run"]) == 0
