@@ -165,9 +165,12 @@ type Repository interface {
 	SetMediaInfo(ctx context.Context, fileID ids.ID, m MediaInfo) error
 
 	// MarkFilesDeleted sets deleted_at = at on the files of d that are not deleted yet and returns
-	// how many it marked. Only markDeleted calls it (the one deleted_at write of the module). It
+	// the ids it marked. Only markDeleted calls it (the one deleted_at write of the module). It
 	// needs a unit of work.
-	MarkFilesDeleted(ctx context.Context, d Deletion, at time.Time) (int, error)
+	MarkFilesDeleted(ctx context.Context, d Deletion, at time.Time) ([]ids.ID, error)
+	// AbortOpenSessions sets the open sessions of fileIDs aborted, without touching the files
+	// (markDeleted, brief M3-08 design note 2 b). It needs a unit of work.
+	AbortOpenSessions(ctx context.Context, fileIDs []ids.ID) error
 
 	// LockAttachTargets reads the files of fileIDs, deleted or not, with the state of their upload
 	// session and their thumbnails, and locks the files rows FOR UPDATE in ascending id (the session

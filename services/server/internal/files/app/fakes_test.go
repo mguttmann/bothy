@@ -497,6 +497,8 @@ type env struct {
 	clk    *clock.Fake
 	uow    *uow
 	scans  *scanQueue
+	purges *purgeQueue
+	redact *redactor
 	alex   actor.Actor
 	ctx    context.Context
 	// space is the space of every channel; finalized lists the published files.FileFinalized.
@@ -537,10 +539,10 @@ func newEnv(t testing.TB, driver string, cfg app.Config) *env {
 	if driver == "s3" {
 		parts, fs = app.NewS3PartStore(e.store, e.repo, e.uow), nil
 	}
-	e.scans = &scanQueue{}
+	e.scans, e.purges, e.redact = &scanQueue{}, &purgeQueue{}, &redactor{}
 	svc, err := app.New(cfg, app.Deps{Repo: e.repo, Parts: parts, UoW: e.uow, Authorizer: e.az, Events: e.events,
 		Channels: channels{space: e.space}, Names: names{}, Types: types{"image/png": {".png"}}, FreeSpace: fs, Clock: e.clk, Store: e.store,
-		ScanQueue: e.scans})
+		ScanQueue: e.scans, Purge: e.purges, Redactor: e.redact, Cleanup: e.repo})
 	if err != nil {
 		t.Fatal(err)
 	}

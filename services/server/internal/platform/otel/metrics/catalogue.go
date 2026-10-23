@@ -289,6 +289,14 @@ var (
 		Name: "bothy.file.scan.queue", Kind: KindGauge, Unit: "{file}",
 		Description: "Files awaiting the read pass with the virus scan.",
 	}
+	// FilePurgeBacklog is bothy.file.purge.backlog (4.4, M3-08): the files marked deleted whose
+	// objects and row are not purged yet, recorded at the end of every run of the job
+	// files.cleanup_pending (12 section 14 "deletion backlog"); before the first run it reports
+	// nothing.
+	FilePurgeBacklog = Spec{
+		Name: "bothy.file.purge.backlog", Kind: KindGauge, Unit: "{file}",
+		Description: "Files marked deleted whose objects and row are not purged yet.",
+	}
 	// PushSent is bothy.push.sent (4.4, M3-19): one per provider answer of the job
 	// notify.push_send, with the outcome of its result class (13 7.3, D-M3-19-12).
 	PushSent = Spec{
@@ -591,7 +599,7 @@ func All() []Spec {
 		GatewayClose, GatewayOutboundDropped, GatewayPresenceWriteFailures,
 		MessageCreated, EventAppended, EventSeqLockWait, EventFanoutLag, EventConsumerLag,
 		EventConsumerPendingAge, DeliveryDuration, AgentHeartbeatAge, AgentBillingModeMismatchAge,
-		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue,
+		JobDuration, JobQueue, EgressBlocked, FileUploadSize, FileScan, FileScanDuration, FileScanQueue, FilePurgeBacklog,
 		PushSent, PushSendDuration, PushSkipped, PushRegistrationsActive, PushFetch, SearchDuration,
 		RunActive, RunStartLatency, RunDuration, RunFinished, RunSteps, RunCost, AgentInvocationDenied, AgentBillingModeMismatch,
 		DBClientOperationDuration, DBPoolConnections,

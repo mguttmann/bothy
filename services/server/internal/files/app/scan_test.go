@@ -33,6 +33,7 @@ type scanEnv struct {
 	store     *countingStore
 	scanner   *scanner
 	queue     *scanQueue
+	purges    *purgeQueue
 	audit     *audit
 	events    *events
 	metrics   *scanMetrics
@@ -51,7 +52,7 @@ func newScanEnv(t *testing.T, cfg app.ScanConfig) *scanEnv {
 func newScanEnvTypes(t *testing.T, cfg app.ScanConfig, types app.TypeDetector) *scanEnv {
 	t.Helper()
 	e := &scanEnv{repo: newRepo(), store: newCountingStore(newStore(t)), scanner: &scanner{verdict: domain.Verdict{Kind: domain.VerdictClean}},
-		queue: &scanQueue{}, audit: &audit{}, events: &events{}, metrics: &scanMetrics{},
+		queue: &scanQueue{}, purges: &purgeQueue{}, audit: &audit{}, events: &events{}, metrics: &scanMetrics{},
 		clk: clock.NewFake(time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)), logs: &bytes.Buffer{}}
 	u := newUoWWith(t, func(r *txn.Registry) error {
 		return txn.Subscribe(r, func(_ context.Context, ev files.FileFinalized) error {
@@ -62,7 +63,7 @@ func newScanEnvTypes(t *testing.T, cfg app.ScanConfig, types app.TypeDetector) *
 		})
 	})
 	p, err := app.NewScanPass(cfg, app.ScanDeps{Repo: e.repo, Scans: e.repo, Store: e.store, UoW: u, Events: e.events, Audit: e.audit,
-		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: types, Queue: e.queue, Metrics: e.metrics, Clock: e.clk,
+		Channels: channels{space: ids.New()}, Scanner: e.scanner, Types: types, Queue: e.queue, Purge: e.purges, Metrics: e.metrics, Clock: e.clk,
 		Log: slog.New(slog.NewJSONHandler(e.logs, nil))})
 	if err != nil {
 		t.Fatal(err)

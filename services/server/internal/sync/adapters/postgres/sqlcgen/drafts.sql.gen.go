@@ -65,6 +65,43 @@ func (q *Queries) DeleteThreadDraft(ctx context.Context, arg DeleteThreadDraftPa
 	return i, err
 }
 
+const heldByUploaderDrafts = `-- name: HeldByUploaderDrafts :many
+SELECT DISTINCT u.file_id::uuid AS file_id
+FROM (SELECT unnest($1::uuid[]) AS file_id, unnest($2::uuid[]) AS uploader_id) AS u
+JOIN drafts d ON d.user_id = u.uploader_id
+WHERE u.file_id = ANY(d.file_ids)
+`
+
+type HeldByUploaderDraftsParams struct {
+	FileIds     []pgtype.UUID
+	UploaderIds []pgtype.UUID
+}
+
+// files.DraftFileSource (M3-08, docs/spec/12-files.md section 12 row "Never attached"): the files
+// of the list that a draft of their own uploader holds. The two arrays have one entry per file in
+// the same order (set-returning functions of equal length in the select list advance together);
+// the partial unique indexes of drafts lead with user_id, so no index is added. A file ID in the
+// draft of another principal never matches.
+func (q *Queries) HeldByUploaderDrafts(ctx context.Context, arg HeldByUploaderDraftsParams) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, heldByUploaderDrafts, arg.FileIds, arg.UploaderIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var file_id pgtype.UUID
+		if err := rows.Scan(&file_id); err != nil {
+			return nil, err
+		}
+		items = append(items, file_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDraftsInChannels = `-- name: ListDraftsInChannels :many
 SELECT id, user_id, thread_id, channel_id, content_md, reply_to_message_id, file_ids, version, updated_by_device_id, updated_at FROM drafts WHERE user_id = $1 AND channel_id = ANY($2::uuid[]) ORDER BY id
 `

@@ -389,8 +389,8 @@ func TestRepository_MarkFilesDeleted(t *testing.T) {
 	mark := func(d app.Deletion) int {
 		var n int
 		if err := w.uow.Do(ctx, func(ctx context.Context) error {
-			var err error
-			n, err = w.repo.MarkFilesDeleted(ctx, d, w.clk.Now())
+			marked, err := w.repo.MarkFilesDeleted(ctx, d, w.clk.Now())
+			n = len(marked)
 			return err
 		}); err != nil {
 			t.Fatal(err)
