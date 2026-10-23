@@ -3507,7 +3507,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "2147483647",
+      "max": "1048575",
       "chapter": "14-search.md",
       "doc": "Characters of a hit's text that the highlighting reads."
     },
@@ -3519,7 +3519,7 @@
       "required": false,
       "enum": [],
       "min": "0",
-      "max": "",
+      "max": "2147483647",
       "chapter": "14-search.md",
       "doc": "Excerpts per hit (MaxFragments of ts_headline)."
     },
@@ -3531,7 +3531,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "2147483647",
       "chapter": "14-search.md",
       "doc": "Most words per excerpt (MaxWords of ts_headline)."
     },
@@ -3543,7 +3543,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "2147483647",
       "chapter": "14-search.md",
       "doc": "Fewest words per excerpt (MinWords of ts_headline)."
     },
@@ -3579,7 +3579,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "2147483646",
+      "max": "1048575",
       "chapter": "14-search.md",
       "doc": "Newest hits after filters and rights that a search ranks; reaching it sets candidates_capped."
     },
@@ -3603,7 +3603,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "2147483646",
+      "max": "1048575",
       "chapter": "14-search.md",
       "doc": "Largest page of a search; a larger limit is capped."
     },
@@ -3615,7 +3615,7 @@
       "required": false,
       "enum": [],
       "min": "1",
-      "max": "",
+      "max": "2147483647",
       "chapter": "14-search.md",
       "doc": "Shortest word of the prefix search over thread titles; shorter words are dropped."
     },

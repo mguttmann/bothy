@@ -336,16 +336,16 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"search.locale_map": {Kind: config.KindStringMap, Default: `{"de":"german","en":"english"}`, Chapter: "14-search.md"},
 		// The query side of the search (M3-14, brief design note 12).
 		"search.query_max_chars":          {Kind: config.KindInt, Default: "256", Min: "1", Chapter: "14-search.md"},
-		"search.max_candidates":           {Kind: config.KindInt, Default: "2000", Min: "1", Max: "2147483646", Chapter: "14-search.md"},
+		"search.max_candidates":           {Kind: config.KindInt, Default: "2000", Min: "1", Max: "1048575", Chapter: "14-search.md"},
 		"search.rank_normalization":       {Kind: config.KindInt, Default: "1", Min: "0", Max: "63", Chapter: "14-search.md"},
 		"search.recency_scale":            {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "14-search.md"},
 		"search.page_size_default":        {Kind: config.KindInt, Default: "20", Min: "1", Chapter: "14-search.md"},
-		"search.page_size_max":            {Kind: config.KindInt, Default: "50", Min: "1", Max: "2147483646", Chapter: "14-search.md"},
-		"search.headline_input_max_chars": {Kind: config.KindInt, Default: "20000", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
-		"search.headline_max_fragments":   {Kind: config.KindInt, Default: "2", Min: "0", Chapter: "14-search.md"},
-		"search.headline_max_words":       {Kind: config.KindInt, Default: "30", Min: "1", Chapter: "14-search.md"},
-		"search.headline_min_words":       {Kind: config.KindInt, Default: "10", Min: "1", Chapter: "14-search.md"},
-		"search.prefix_min_chars":         {Kind: config.KindInt, Default: "2", Min: "1", Chapter: "14-search.md"},
+		"search.page_size_max":            {Kind: config.KindInt, Default: "50", Min: "1", Max: "1048575", Chapter: "14-search.md"},
+		"search.headline_input_max_chars": {Kind: config.KindInt, Default: "20000", Min: "1", Max: "1048575", Chapter: "14-search.md"},
+		"search.headline_max_fragments":   {Kind: config.KindInt, Default: "2", Min: "0", Max: "2147483647", Chapter: "14-search.md"},
+		"search.headline_max_words":       {Kind: config.KindInt, Default: "30", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
+		"search.headline_min_words":       {Kind: config.KindInt, Default: "10", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
+		"search.prefix_min_chars":         {Kind: config.KindInt, Default: "2", Min: "1", Max: "2147483647", Chapter: "14-search.md"},
 		"search.statement_timeout":        {Kind: config.KindDuration, Default: "3s", Min: "1ms", Max: "24d", Chapter: "14-search.md"},
 
 		// M2-26
@@ -1235,8 +1235,9 @@ func TestSearchConfig_StartChecks(t *testing.T) {
 }
 
 // TestSearchConfig_BoundsFitTheStatements: the search keys that reach int32 parameters of the
-// search statements (with the extra look-ahead row of max_candidates and page_size_max) or SET
-// LOCAL statement_timeout are refused at load above what PostgreSQL accepts, and accepted at it.
+// search statements (with the extra look-ahead row of max_candidates and page_size_max, and the
+// row bound of the messaging adapter), the ts_headline options or SET LOCAL statement_timeout are
+// refused at load above what every search type accepts, and accepted at it.
 func TestSearchConfig_BoundsFitTheStatements(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -1244,11 +1245,13 @@ func TestSearchConfig_BoundsFitTheStatements(t *testing.T) {
 		key string
 		ok  bool
 	}{
-		{env: "BOTHY_SEARCH__MAX_CANDIDATES=2147483646", key: "search.max_candidates", ok: true},
-		{env: "BOTHY_SEARCH__MAX_CANDIDATES=2147483647", key: "search.max_candidates"},
-		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=2147483647", key: "search.headline_input_max_chars", ok: true},
-		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=2147483648", key: "search.headline_input_max_chars"},
-		{env: "BOTHY_SEARCH__PAGE_SIZE_MAX=2147483647", key: "search.page_size_max"},
+		{env: "BOTHY_SEARCH__MAX_CANDIDATES=1048575", key: "search.max_candidates", ok: true},
+		{env: "BOTHY_SEARCH__MAX_CANDIDATES=1048576", key: "search.max_candidates"},
+		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=1048575", key: "search.headline_input_max_chars", ok: true},
+		{env: "BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS=1048576", key: "search.headline_input_max_chars"},
+		{env: "BOTHY_SEARCH__PAGE_SIZE_MAX=1048576", key: "search.page_size_max"},
+		{env: "BOTHY_SEARCH__PREFIX_MIN_CHARS=2147483648", key: "search.prefix_min_chars"},
+		{env: "BOTHY_SEARCH__HEADLINE_MAX_FRAGMENTS=2147483648", key: "search.headline_max_fragments"},
 		{env: "BOTHY_SEARCH__STATEMENT_TIMEOUT=24d", key: "search.statement_timeout", ok: true},
 		{env: "BOTHY_SEARCH__STATEMENT_TIMEOUT=25d", key: "search.statement_timeout"},
 	} {

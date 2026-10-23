@@ -24,9 +24,15 @@ const (
 	keySearchPrefixMinChars   = "search.prefix_min_chars"
 )
 
-// maxSearchRows bounds the row counts of a search: the statements take them as int32 and read
-// one row more than the limit to tell whether more follow.
-const maxSearchRows = "2147483646"
+// maxSearchRows bounds the row counts and the headline input of a search. The statements take them
+// as int32 and read one row more than the limit, and the messaging adapter refuses a limit at or
+// above 1<<20 (internal/messaging/adapters/postgres/search.go maxSearchRows), so every value the
+// start accepts is one every search type runs with.
+const maxSearchRows = "1048575"
+
+// maxSearchInt4 bounds the search keys PostgreSQL reads as int4 (the prefix length parameter and
+// the ts_headline options).
+const maxSearchInt4 = "2147483647"
 
 // searchRecencyScaleDefault is the default of search.recency_scale (14 section 15).
 const searchRecencyScaleDefault = "30d"
@@ -78,27 +84,27 @@ func searchConfigKeys() []config.Key {
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.headline_input_max_chars", Kind: config.KindInt, Default: "20000", Min: "1", Max: "2147483647",
+			Name: "search.headline_input_max_chars", Kind: config.KindInt, Default: "20000", Min: "1", Max: maxSearchRows,
 			Doc:     "Characters of a hit's text that the highlighting reads.",
 			Chapter: chapter14,
 		},
 		{
-			Name: "search.headline_max_fragments", Kind: config.KindInt, Default: "2", Min: "0",
+			Name: "search.headline_max_fragments", Kind: config.KindInt, Default: "2", Min: "0", Max: maxSearchInt4,
 			Doc:     "Excerpts per hit (MaxFragments of ts_headline).",
 			Chapter: chapter14,
 		},
 		{
-			Name: keySearchHeadlineMaxWords, Kind: config.KindInt, Default: "30", Min: "1",
+			Name: keySearchHeadlineMaxWords, Kind: config.KindInt, Default: "30", Min: "1", Max: maxSearchInt4,
 			Doc:     "Most words per excerpt (MaxWords of ts_headline).",
 			Chapter: chapter14,
 		},
 		{
-			Name: keySearchHeadlineMinWords, Kind: config.KindInt, Default: "10", Min: "1",
+			Name: keySearchHeadlineMinWords, Kind: config.KindInt, Default: "10", Min: "1", Max: maxSearchInt4,
 			Doc:     "Fewest words per excerpt (MinWords of ts_headline).",
 			Chapter: chapter14,
 		},
 		{
-			Name: keySearchPrefixMinChars, Kind: config.KindInt, Default: "2", Min: "1",
+			Name: keySearchPrefixMinChars, Kind: config.KindInt, Default: "2", Min: "1", Max: maxSearchInt4,
 			Doc:     "Shortest word of the prefix search over thread titles; shorter words are dropped.",
 			Chapter: chapter14,
 		},
