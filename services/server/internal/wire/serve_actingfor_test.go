@@ -3,7 +3,6 @@
 package wire_test
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,15 +11,14 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/identitytest"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 )
 
 // callWithInvocation is a GET of consumerWorld.call with the Invocation-Token values of an agent
 // inside a run (07 guard rule SR9).
 func (w *invocationWorld) callWithInvocation(a consumerAgent, path string, tokens ...string) (int, map[string]any) {
 	w.t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, w.base+path, nil)
+	req, err := http.NewRequestWithContext(testkit.Context(w.t), http.MethodGet, w.base+path, nil)
 	if err != nil {
 		w.t.Fatal(err)
 	}

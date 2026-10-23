@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
@@ -64,7 +65,7 @@ func newEdge(t *testing.T) *edge {
 		r.Out.Host = r.In.Host
 		r.SetXForwarded()
 	}}
-	srv := &http.Server{Handler: proxy, ReadHeaderTimeout: waitLong}
+	srv := &http.Server{Handler: proxy, ReadHeaderTimeout: testkit.Patience}
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 	return e

@@ -13,13 +13,13 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/harness"
 )
 
@@ -29,12 +29,6 @@ const headerName = "Invocation-Token"
 // consumer is the REST consumer of the agents of a world (M2-07); its first poll creates it at
 // the head of the log, so every invocation of a run created later reaches it.
 const consumer = "sr9"
-
-// waitLong bounds every polling wait of the tests; the servers share a loaded machine.
-const waitLong = 90 * time.Second
-
-// pollEvery is the pause between two polls of a waiting loop.
-const pollEvery = 200 * time.Millisecond
 
 // syncBuffer is a goroutine-safe buffer for the JSON log lines of a server.
 type syncBuffer struct {
@@ -148,7 +142,7 @@ func attachEnv(t *testing.T, s *harness.Server, w *harness.World, logs *syncBuff
 		t.Fatal(err)
 	}
 	e := &env{t: t, s: s, w: w, db: s.AdminDB(), logs: logs, seen: &responses{}, owner: w.Owner, alex: w.People["Alex"],
-		lotse: w.Agents["Lotse"], texter: w.Agents["Texter"], problems: pv, plain: &http.Client{Timeout: time.Minute}, handled: &tokenList{}}
+		lotse: w.Agents["Lotse"], texter: w.Agents["Texter"], problems: pv, plain: &http.Client{Timeout: testkit.Patience}, handled: &tokenList{}}
 	for _, c := range append(slices.Collect(maps.Values(w.People)), append(slices.Collect(maps.Values(w.Agents)), w.Owner)...) {
 		c.Observer = e.seen.observe
 	}
@@ -484,16 +478,10 @@ func (e *env) invocationToken(agent *harness.Client, runID string) string {
 	return tok
 }
 
-// eventually polls cond until it holds or waitLong passed.
+// eventually polls cond until it holds, bounded by testkit.Patience.
 func (e *env) eventually(what string, cond func() bool) {
 	e.t.Helper()
-	deadline := time.Now().Add(waitLong)
-	for !cond() {
-		if time.Now().After(deadline) {
-			e.t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(pollEvery)
-	}
+	testkit.Until(e.t, what, cond)
 }
 
 // text runs a query with one text column and one row.
