@@ -110,13 +110,18 @@ class Fault:
 
     @classmethod
     def problem(cls, code: str, reason: str | None = None) -> Fault:
-        """Answer with the problem ``code`` at its status and store nothing.
+        """Answer the problem ``code`` (its status follows the code) and store nothing.
 
         Args:
-            code: A problem code, for example ``agent_invocation_denied``.
-            reason: The ``reason`` member, for example ``expired``.
+            code: A problem code of ``x-problem-codes``, for example ``agent_invocation_denied``.
+            reason: The ``reason`` member, if the code has one.
 
         Returns:
             The fault.
+
+        Raises:
+            ValueError: ``code`` is empty.
         """
+        if not code:
+            raise ValueError("code must not be empty")
         return cls(FaultKind.PROBLEM, code=code, reason=reason)

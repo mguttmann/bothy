@@ -39,6 +39,7 @@ from bothy_sdk.errors import (
     ProblemError,
     RateLimitedError,
     ServerError,
+    ValidationFailed,
 )
 from bothy_sdk.generated.api.agent_runtime import await_run_input, finish_run, patch_run
 from bothy_sdk.generated.api.runs import get_run, get_run_context
@@ -55,6 +56,7 @@ from bothy_sdk.generated.models import (
     RunPatch,
     RunPatchResult,
 )
+from bothy_sdk.generated.types import UNSET
 from bothy_sdk.ids import uuid7
 from bothy_sdk.settings import SdkSettings
 
@@ -646,6 +648,17 @@ class RunHandle:
         else:
             self._patch.base_version = run.version
 
+    def bound(self) -> contextlib.AbstractContextManager[bool]:
+        """Bind the current context to this run's newest token (`Client.rebind`).
+
+        For runtime callbacks that arrive on another task than the run's handler: inside the
+        block patches, messages and other requests carry ``Invocation-Token`` (07 SR9).
+
+        Returns:
+            A context manager yielding whether the run has a binding.
+        """
+        return self.client.rebind(self.run_id)
+
     @property
     def started_patcher(self) -> RunPatcher | None:
         """The patcher once the run started, else ``None``."""
@@ -750,8 +763,24 @@ class RunHandle:
         if costs:
             body.costs = list(costs)
         try:
-            await self.client.call(finish_run.asyncio_detailed, run_id=self.run_id, body=body)
+            try:
+                await self.client.call(finish_run.asyncio_detailed, run_id=self.run_id, body=body)
+            except ValidationFailed as exc:
+                if not costs or not _costs_not_enabled(exc):
+                    raise
+                # A server before cost booking refuses `costs` (docs/DECISIONS.md D-M2-33-7):
+                # the run still ends, without its costs.
+                _LOG.info("run %s: costs not enabled on the server; finished without", self.run_id)
+                body.costs = UNSET
+                await self.client.call(finish_run.asyncio_detailed, run_id=self.run_id, body=body)
         except ProblemError as exc:
             if not is_run_ended(exc):
                 raise
             _LOG.info("run %s already ended on the server", self.run_id)
+
+
+def _costs_not_enabled(error: ValidationFailed) -> bool:
+    """Whether a ``400 validation_failed`` refuses only the member ``costs`` as not enabled."""
+    return bool(error.errors) and all(
+        e.pointer == "/costs" and e.code == "not_enabled" for e in error.errors
+    )

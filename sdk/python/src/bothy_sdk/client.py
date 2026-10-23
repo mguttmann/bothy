@@ -252,6 +252,30 @@ class Client:
             self._binding.reset(reset)
 
     @contextlib.contextmanager
+    def rebind(self, run_id: UUID) -> Iterator[bool]:
+        """Bind the current context to a run that is bound elsewhere, with its newest token.
+
+        For work that belongs to a run but starts outside the run's own task (a callback of
+        the runtime on another task): inside the block every request carries the token the
+        run's binding holds now, and a later `set_run_token` reaches it too (07 SR9).
+
+        Args:
+            run_id: The run.
+
+        Yields:
+            True when the run has a binding; False (requests stay as they were) otherwise.
+        """
+        binding = self._bindings.get(run_id)
+        if binding is None:
+            yield False
+            return
+        reset = self._binding.set(binding)
+        try:
+            yield True
+        finally:
+            self._binding.reset(reset)
+
+    @contextlib.contextmanager
     def unbound(self) -> Iterator[None]:
         """Send the requests inside the block without any run binding (the agent's own writes).
 

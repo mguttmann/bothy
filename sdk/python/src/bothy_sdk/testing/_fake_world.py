@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """The FakeServer's data and run rules (private).
 
-One world after docs/spec/07-permissions.md "Examples": owner Robin, Alex who triggers, the agent
-Lotse that operates the channel Allgemein of space Support, and the agent Texter. The run rules
+One world after docs/spec/07-permissions.md "Examples": owner Robin, Alex and Sam who trigger, a
+person Writer with ``write`` only, the agent Lotse that operates the channel Allgemein of space
+Support, and the agent Texter. The run rules
 follow the server code of M2-08 to M2-10 (docs/spec/09-agents.md 4.5, 4.5.1, 5.1 and 5.3,
 docs/spec/04-sync-protocol.md 11.2 and 15.2 to 15.5): fresh tokens per delivery, the start
 verdicts ``superseded``, ``expired`` and ``invalid``, consumed tokens, ``already_started``,
@@ -26,12 +27,14 @@ from bothy_sdk.ids import uuid7
 from bothy_sdk.testing import _fake_fixtures as fixtures
 from bothy_sdk.testing._fake_base import FakeProblem, field_error, iso
 from bothy_sdk.testing._fake_events import LogEntry
+from bothy_sdk.testing._fake_extra import ContextFile, ContextMessage, Extras
 from bothy_sdk.testing._fake_patch import apply_ops, parse_ops, text_error
 from bothy_sdk.testing._fake_tokens import TRIGGER_OBJECT, Issuer
 from bothy_sdk.testing.doubles import FakeClock
 
 ACTIVE = frozenset({"queued", "running", "waiting_input"})
 ENDED = frozenset({"completed", "failed", "cancelled"})
+_ACTIVE = frozenset({"queued", "running", "waiting_input"})
 TOKEN_EVENTS = frozenset(
     {"agent.invocation", "agent.followup", "interaction.created", "command.invoked"}
 )
@@ -123,6 +126,10 @@ class RunRecord:
     costs: list[dict[str, Any]] | None = None
 
 
+AUTO_SESSION: Any = object()
+"""`World.trigger` default: the payload carries the thread's current session, if any."""
+
+
 class World:
     """Data and rules; the transport layers call into it.
 
@@ -160,7 +167,11 @@ class World:
         self.lotse = Person(uuid7(), "agent", "lotse", "Lotse")
         self.texter = Person(uuid7(), "agent", "texter", "Texter")
         self.sam = Person(uuid7(), "user", "sam", "Sam")
-        self.people = {p.id: p for p in (self.robin, self.alex, self.lotse, self.texter, self.sam)}
+        self.writer = Person(uuid7(), "user", "writer", "Writer")
+        self.system = Person(uuid7(), "system", "system", "System")
+        everyone = (self.robin, self.alex, self.lotse, self.texter, self.sam, self.writer)
+        self.people = {p.id: p for p in everyone}
+        self.by_handle = {p.handle: p for p in (*everyone, self.system)}
         self.permission_version = 1
         self.issuer = Issuer(self.instance_id)
         self.runs: dict[UUID, RunRecord] = {}
@@ -180,6 +191,8 @@ class World:
         self.files: dict[UUID, dict[str, Any]] = {}
         self.context_attachments: dict[UUID, list[UUID]] = {}
         self.sessions: dict[UUID, list[dict[str, Any]]] = {}
+        # Trust marks of context messages, titles set, message updates and session reports (M2-33).
+        self.extra = Extras(self.lotse.id)
 
     # Time ---------------------------------------------------------------------------------
 
@@ -362,32 +375,72 @@ class World:
         meta["last_activity_at"] = message["created_at"]
         return message
 
+    def store_file(self, f: ContextFile) -> None:
+        """Store a context file under its own ID (``downloadFile`` and attachments serve it)."""
+        self.files[f.file_id] = {
+            "content": f.content,
+            "name": f.name,
+            "mime": f.mime_type,
+            "status": f.scan_status,
+            "transcript": f.transcript,
+        }
+
+    def post_context(self, thread_id: UUID, item: ContextMessage) -> UUID:
+        """Store a message with its trust mark and files in a thread (for ``getRunContext``)."""
+        author = self.by_handle[item.author]
+        message = self._message(thread_id, author, item.text)
+        message["origin"] = item.origin
+        for f in item.files:
+            self.store_file(f)
+        self.context_attachments[UUID(message["id"])] = [f.file_id for f in item.files]
+        self.extra.message_meta[UUID(message["id"])] = {
+            "trust": item.trust,
+            "role": item.role,
+            "already_delivered": item.already_delivered,
+        }
+        return UUID(message["id"])
+
     def trigger(  # noqa: PLR0913 - the parts of a trigger a scenario chooses
         self,
         text: str,
         *,
         channel_id: UUID | None = None,
-        author: Person | None = None,
+        author: Person | str | None = None,
         trigger_kind: str = "message",
         attachments: tuple[UUID, ...] = (),
         thread_id: UUID | None = None,
         context: Mapping[str, Any] | None = None,
+        history: tuple[ContextMessage, ...] = (),
+        files: tuple[ContextFile, ...] = (),
+        session_mode: str | object | None = AUTO_SESSION,
     ) -> RunRecord:
         """A message (in a new thread or ``thread_id``), a queued run and its ``agent.invocation``.
 
         ``trigger_kind = interaction`` names an interaction instead of the message in the
-        payload and the token (a run an interaction opens, M2-15).
+        payload and the token (a run an interaction opens, M2-15). ``history`` are messages
+        posted in the thread before the trigger with their trust marks, ``files`` the trigger's
+        own attachments. ``session_mode`` left at `AUTO_SESSION` sends the thread's current
+        session (``resume`` when started, else ``new``); ``None`` makes a guest run without a
+        session (09 3.6); a mode sends that mode with the current session, if any (09 9.1).
         """
-        person = author or self.alex
+        person = self.by_handle[author] if isinstance(author, str) else (author or self.alex)
         channel = channel_id or self.channel_id
         if channel not in self.channels:
             raise KeyError("no such channel")
         if thread_id is None:
             thread_id = uuid7()
+        if thread_id not in self.thread_meta:
             self.thread_meta[thread_id] = self._thread(thread_id, channel, person)
         channel = self.thread_meta[thread_id]["channel_id"]
+        for item in history:
+            self.post_context(thread_id, item)
         message = self._message(thread_id, person, text)
-        self.context_attachments[UUID(message["id"])] = list(attachments)
+        for f in files:
+            self.store_file(f)
+        self.context_attachments[UUID(message["id"])] = [
+            *attachments,
+            *(f.file_id for f in files),
+        ]
         obj = message["id"] if trigger_kind == "message" else str(uuid7())
         run = RunRecord(
             id=uuid7(),
@@ -417,9 +470,14 @@ class World:
             TRIGGER_OBJECT[trigger_kind] if trigger_kind != "command" else "command_invocation_id"
         ] = obj
         session = self.current_session(thread_id)
-        if session is not None:
-            payload["agent_session"] = dict(session)
-            payload["session_mode"] = "resume" if session["started"] else "new"
+        if session_mode is AUTO_SESSION:
+            if session is not None:
+                payload["agent_session"] = dict(session)
+                payload["session_mode"] = "resume" if session["started"] else "new"
+        elif session_mode is not None:
+            payload["session_mode"] = session_mode
+            if session is not None:
+                payload["agent_session"] = dict(session)
         envelope = self.envelope(
             "agent.invocation",
             payload,
@@ -449,8 +507,39 @@ class World:
         self.append("agent.followup", envelope)
         return UUID(message["id"])
 
-    def interaction(self, run_id: UUID, custom_id: str, values: Mapping[str, Any]) -> UUID:
-        """Alex operates a component of the run: ``interaction.created``."""
+    def click(
+        self, run_id: UUID, custom_id: str, values: Mapping[str, Any], author: str
+    ) -> UUID | None:
+        """A person operates a component under the single-use rule of 09 11.3.
+
+        The first interaction with a ``single_use`` component disables every single-use
+        component of its message in the same step; a later click answers ``409
+        component_used`` (``None`` here) and delivers nothing.
+        """
+        component = next(
+            (
+                c
+                for c in self.components.values()
+                if c["custom_id"] == custom_id and c.get("run_id") == str(run_id)
+            ),
+            None,
+        )
+        if component is None:
+            raise KeyError("no such component")
+        if component["state"] != "active":
+            return None
+        if component["single_use"]:
+            for other in self.components.values():
+                if other["message_id"] == component["message_id"] and other["single_use"]:
+                    other["state"] = "disabled"
+                    other["version"] += 1
+        return self.interaction(run_id, custom_id, values, author=author)
+
+    def interaction(
+        self, run_id: UUID, custom_id: str, values: Mapping[str, Any], *, author: str = "alex"
+    ) -> UUID:
+        """A person operates a component of the run: ``interaction.created``."""
+        person = self.by_handle[author]
         run = self.runs[run_id]
         component = next(
             (
@@ -471,7 +560,7 @@ class World:
             "id": str(uuid7()),
             "component_id": component["id"],
             "message_id": component["message_id"],
-            "principal_id": str(self.alex.id),
+            "principal_id": str(person.id),
             "client_interaction_id": str(uuid7()),
             "custom_id": custom_id,
             "values": dict(values),
@@ -486,7 +575,7 @@ class World:
             {"interaction": interaction},
             resource={"kind": "interaction", "id": interaction["id"]},
             thread_id=run.thread_id,
-            actor=self.alex,
+            actor=person,
         )
         self.append("interaction.created", envelope)
         return UUID(interaction["id"])
@@ -911,7 +1000,11 @@ class World:
     # Context, channels, heartbeat ---------------------------------------------------------
 
     def context(self, run_id: str) -> dict[str, Any]:
-        """``getRunContext``: the trigger and the thread as marked items."""
+        """``getRunContext``: the trigger and the other messages of the thread as marked items.
+
+        ``thread_context`` holds every other message of the thread, also the follow-ups after the
+        trigger, so an adapter finds a follow-up's content by its ``message_id``.
+        """
         run = self.run_or_404(run_id)
         items = [self._context_item(self.messages[m], run) for m in self.threads[run.thread_id]]
         if run.context is not None:
@@ -924,7 +1017,7 @@ class World:
         doc = {
             "run_id": str(run.id),
             "trigger_message": trigger,
-            "thread_context": items,
+            "thread_context": [i for i in items if i is not trigger],
             "channel_context": [],
             "context_floor_seq": 0,
         }
@@ -933,20 +1026,27 @@ class World:
     def _context_item(self, message: dict[str, Any], run: RunRecord) -> dict[str, Any]:
         own = message["author"]["id"] == str(self.lotse.id)
         trigger = message["id"] == str(run.triggering_message_id)
-        return {
+        meta = self.extra.message_meta.get(UUID(message["id"]), {})
+        item = {
             "message_id": message["id"],
             "thread_seq": message["thread_seq"],
             "created_at": message["created_at"],
             "author": message["author"],
-            "role": "assistant" if own else "user",
+            "role": meta.get("role") or ("assistant" if own else "user"),
             "origin": message["origin"],
             "kind": message["kind"],
             "content_md": message["content_md"],
             "attachments": [
                 self.attachment(f) for f in self.context_attachments.get(UUID(message["id"]), [])
             ],
-            "trust": "trigger" if trigger else ("self" if own else "authorized"),
+            "trust": meta.get("trust")
+            or ("trigger" if trigger else ("self" if own else "authorized")),
         }
+        if trigger:
+            item["trust"] = "trigger"
+        if meta.get("already_delivered"):
+            item["already_delivered"] = True
+        return item
 
     @property
     def settings_version(self) -> int:
@@ -1106,6 +1206,7 @@ class World:
             raise field_error("/title", "invalid")
         meta["title"] = body["title"]
         meta["version"] += 1
+        self.extra.titles_set.append({"thread_id": meta["id"], "title": meta["title"]})
         return self.thread_doc(thread_id)
 
     def add_file(
@@ -1175,13 +1276,21 @@ class World:
         return row
 
     def report_session(self, thread_id: str, body: Any, if_match: str | None) -> dict[str, Any]:
-        """``reportAgentSession``: compare-and-swap over the current row's version."""
+        """``reportAgentSession``: compare-and-swap over the current row's version (09 9.1, 9.5).
+
+        Only during an active run of the thread. A different reference replaces the stored one
+        (9.5 point 3); ``bind_failed`` without a current row answers ``session_not_bound``.
+        """
         meta = self._thread_or_404(thread_id)
         _closed(
             body, required=("external_session_ref",), optional=("model", "started", "bind_failed")
         )
+        if not isinstance(body["external_session_ref"], str) or not body["external_session_ref"]:
+            raise field_error("/external_session_ref", "required")
+        if "bind_failed" in body and body["bind_failed"] != "session_missing":
+            raise field_error("/bind_failed", "invalid_enum")
         key = UUID(meta["id"])
-        active = [r for r in self.runs.values() if r.thread_id == key and r.state == "running"]
+        active = [r for r in self.runs.values() if r.thread_id == key and r.state in _ACTIVE]
         if not active:
             raise FakeProblem("conflict", reason="run_not_active")
         row = self.current_session(key)
@@ -1189,20 +1298,22 @@ class World:
         if row is None:
             if if_match is not None:
                 raise FakeProblem("version_conflict")
+            if "bind_failed" in body:
+                raise FakeProblem("conflict", reason="session_not_bound")
             row = self.session_for(key, body["external_session_ref"], started=False)
         elif if_match is None or if_match.strip() not in (
             f'"{row["version"]}"',
             f'W/"{row["version"]}"',
         ):
             raise FakeProblem("version_conflict", current=dict(row))
-        if row["external_session_ref"] != body["external_session_ref"]:
-            raise FakeProblem("conflict", reason="session_changed")
+        row["external_session_ref"] = body["external_session_ref"]
         if body.get("started") is True:
             row["started"] = True
         if body.get("model"):
             row["model"] = body["model"]
         if not created:
             row["version"] += 1
+        self.extra.reports.setdefault(key, []).append(dict(body))
         return dict(row)
 
     def heartbeat(self, body: Any) -> dict[str, Any]:

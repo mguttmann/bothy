@@ -45,14 +45,22 @@ from bothy_sdk.settings import SdkSettings
 from bothy_sdk.testing._fake_base import FakeProblem, field_error, timings_with_defaults
 from bothy_sdk.testing._fake_dpop import Authenticator
 from bothy_sdk.testing._fake_events import LogEntry, Window
+from bothy_sdk.testing._fake_extra import ContextFile, ContextMessage, byte_range
 from bothy_sdk.testing._fake_gateway import Gateway
 from bothy_sdk.testing._fake_hub import Hub
 from bothy_sdk.testing._fake_tokens import FORGE_VARIANTS
-from bothy_sdk.testing._fake_world import World, consumer_ok
+from bothy_sdk.testing._fake_world import AUTO_SESSION, World, consumer_ok
 from bothy_sdk.testing.doubles import FakeClock, fingerprint
 from bothy_sdk.testing.faults import Fault, FaultKind
 
-__all__ = ["FakeServer", "RecordedRequest", "RunView", "Triggered"]
+__all__ = [
+    "ContextFile",
+    "ContextMessage",
+    "FakeServer",
+    "RecordedRequest",
+    "RunView",
+    "Triggered",
+]
 
 _API = "/api/v1"
 _GATEWAY_PATH = f"{_API}/gateway"
@@ -64,6 +72,7 @@ _GATEWAY_OPS = frozenset(
 _PUBLIC = frozenset({"getDiscovery", "getJwks"})
 # Consumer operations judge the agent by its own grants: the run binding is ignored there.
 _DELIVERY = frozenset({"pollAgentEvents", "ackAgentEvents", "getConsumerState"})
+_THREAD_OPS = frozenset({"updateMessage"})
 _IDEMPOTENT_KEY_OPS = frozenset(
     {
         "updateComponent",
@@ -105,6 +114,7 @@ _ROUTES: tuple[tuple[str, str, str], ...] = (
     ("GET", "/threads/{thread_id}", "getThread"),
     ("PUT", "/threads/{thread_id}/title", "setThreadTitle"),
     ("POST", "/threads/{thread_id}/agent-sessions/report", "reportAgentSession"),
+    ("PATCH", "/messages/{message_id}", "updateMessage"),
 )
 _COMPILED = tuple(
     (method, re.compile("^" + re.sub(r"\{(\w+)\}", r"(?P<\1>[^/]+)", path) + "$"), op)
@@ -364,6 +374,9 @@ class FakeServer:
         attachments: tuple[UUID, ...] | list[UUID] = (),
         thread_id: UUID | None = None,
         context: Mapping[str, Any] | None = None,
+        history: tuple[ContextMessage, ...] = (),
+        files: tuple[ContextFile, ...] = (),
+        session_mode: str | object | None = AUTO_SESSION,
     ) -> Triggered:
         """A person posts ``text``: a queued run and its ``agent.invocation``.
 
@@ -372,26 +385,33 @@ class FakeServer:
         Args:
             text: The message content.
             channel_id: A served channel (`add_forum`); Allgemein when omitted.
-            author: ``alex`` or ``robin``.
+            author: The handle of the triggering person (``alex``, ``sam`` or ``robin``).
             trigger_kind: ``message`` or ``interaction`` (the token names that object).
             attachments: Files of `add_file` attached to the message.
             thread_id: An existing thread to post in; a new thread when omitted.
             context: A ``RunContext`` to serve for the run (``thread_context``,
                 ``channel_context``, ``context_floor_seq``, ...); its ``trigger_message`` is the
                 triggering message unless given. When omitted the thread is the context.
+            history: Messages posted in the thread before the trigger, with their trust marks.
+            files: Attachments of the triggering message with their content.
+            session_mode: Left out, the payload carries the thread's current session (``resume``
+                when started, else ``new``); ``None`` makes a guest run without a session (09
+                3.6); ``new``, ``resume`` or ``bind`` send that mode for an operator run (09 9.1).
 
         Returns:
             The run, thread and message.
         """
-        person = {"alex": self.world.alex, "robin": self.world.robin}[author]
         run = self.world.trigger(
             text,
             channel_id=channel_id,
-            author=person,
+            author=author,
             trigger_kind=trigger_kind,
             attachments=tuple(attachments),
             thread_id=thread_id,
             context=context,
+            history=history,
+            files=files,
+            session_mode=session_mode,
         )
         await _settle()
         return Triggered(run.id, run.thread_id, run.triggering_message_id)
@@ -504,6 +524,96 @@ class FakeServer:
         """
         return [dict(r) for r in self.world.sessions.get(thread_id, [])]
 
+    def set_channel(self, prompt: str = "", skills: tuple[str, ...] = ()) -> None:
+        """Change the channel prompt and skills of Allgemein (``settings_version`` + 1).
+
+        Args:
+            prompt: The channel prompt.
+            skills: The skill names, in order.
+        """
+        behavior = self.world.channels[self.world.channel_id]["behavior"]
+        behavior["prompt"] = prompt
+        behavior["skills"] = list(skills)
+        behavior["settings_version"] += 1
+
+    def enable_costs(self) -> None:
+        """Accept ``costs`` in ``finishRun`` (the server refuses them until M2-22)."""
+        self.world.costs_enabled = True
+
+    def start_session(self, thread_id: UUID, ref: str, *, started: bool = True) -> None:
+        """Give a thread a current session row with ``ref`` (a reset, bind or import did).
+
+        Args:
+            thread_id: The thread.
+            ref: The external session reference.
+            started: Whether a runtime already confirmed it.
+        """
+        self.world.session_for(thread_id, ref, started=started)
+
+    def session_reports(self, thread_id: UUID) -> list[dict[str, Any]]:
+        """The ``reportAgentSession`` bodies stored for a thread, in order.
+
+        Args:
+            thread_id: The thread.
+
+        Returns:
+            The bodies (empty without a report).
+        """
+        return list(self.world.extra.reports.get(thread_id, []))
+
+    def set_manual_title(self, thread_id: UUID, title: str) -> None:
+        """A person sets the thread's title: ``title_source`` becomes ``manual`` (09 12).
+
+        Args:
+            thread_id: The thread.
+            title: The title.
+        """
+        meta = self.world.thread_meta[thread_id]
+        meta["title"], meta["title_source"] = title, "manual"
+        meta["version"] += 1
+
+    @property
+    def titles(self) -> list[dict[str, Any]]:
+        """The titles the adapter set with ``setThreadTitle``, in order."""
+        return list(self.world.extra.titles_set)
+
+    @property
+    def message_updates(self) -> list[dict[str, Any]]:
+        """The ``updateMessage`` calls stored, in order (``message_id`` and ``body``)."""
+        return list(self.world.extra.message_updates)
+
+    def message(self, message_id: UUID) -> dict[str, Any]:
+        """A stored message.
+
+        Args:
+            message_id: The message.
+
+        Returns:
+            The Message body.
+        """
+        return self.world.messages[message_id]
+
+    def component(self, component_id: UUID) -> dict[str, Any]:
+        """A stored component.
+
+        Args:
+            component_id: The component.
+
+        Returns:
+            The component with its ``message_id``.
+        """
+        return self.world.components[component_id]
+
+    @property
+    def sam_id(self) -> UUID:
+        """Sam's principal ID."""
+        return self.world.sam.id
+
+    @property
+    def robin_id(self) -> UUID:
+        """Robin's principal ID."""
+        return self.world.robin.id
+
     async def deliver_followup(self, run_id: UUID, text: str = "One more thing") -> UUID:
         """Alex posts a follow-up to the run: ``agent.followup``.
 
@@ -535,6 +645,32 @@ class FakeServer:
             The interaction ID.
         """
         interaction_id = self.world.interaction(run_id, custom_id, values or {})
+        await _settle()
+        return interaction_id
+
+    async def click(
+        self,
+        run_id: UUID,
+        custom_id: str,
+        values: Mapping[str, Any] | None = None,
+        *,
+        author: str = "alex",
+    ) -> UUID | None:
+        """A person clicks a component of the run's card, with the single-use rule (09 11.3).
+
+        Args:
+            run_id: The run.
+            custom_id: The component's custom ID (it must exist on a card of the run).
+            values: The submitted values.
+            author: The clicking person's handle.
+
+        Returns:
+            The interaction ID, or ``None`` when the server answered ``409 component_used``.
+
+        Raises:
+            KeyError: No component of the run has this custom ID.
+        """
+        interaction_id = self.world.click(run_id, custom_id, values or {}, author)
         await _settle()
         return interaction_id
 
@@ -865,6 +1001,8 @@ class FakeServer:
                 raise FakeProblem(fault.code, reason=fault.reason)
             if fault is not None and fault.kind is FaultKind.RATE_LIMITED:
                 raise FakeProblem("rate_limited", headers={"Retry-After": str(fault.retry_after)})
+            if operation_id == "downloadFile":
+                return self._download(params["file_id"], request)
             if fault is not None and fault.kind is FaultKind.STORED_LATE:
                 await self.clock.sleep(fault.delay)
             status, out, extra = await self._serve(operation_id, params, request, body)
@@ -873,6 +1011,15 @@ class FakeServer:
         if fault is not None and fault.kind is FaultKind.STORED_THEN_502:
             return self._problem(FakeProblem("bad_gateway", status=502), path, operation_id)
         return self._respond(status, out, extra, operation_id)
+
+    def _download(self, file_id: str, request: web.Request) -> web.Response:
+        content, mime = self.world.download(file_id)
+        status, content, headers = byte_range(content, mime, request.headers.get("Range"))
+        out = dict(headers)
+        out["Correlation-Id"] = str(uuid7())
+        if self.credentials.dpop is not None:
+            out["DPoP-Nonce"] = self._auth.nonces.current()
+        return web.Response(status=status, body=content, headers=out)
 
     def _respond(
         self, status: int, body: Any, headers: Mapping[str, str], operation_id: str
@@ -994,7 +1141,7 @@ class FakeServer:
             return (
                 200,
                 {
-                    "principal_ids": [str(world.alex.id), str(world.robin.id)],
+                    "principal_ids": [str(world.alex.id), str(world.robin.id), str(world.sam.id)],
                     "permission_version": world.permission_version,
                 },
                 {},
@@ -1072,7 +1219,17 @@ class FakeServer:
             return 204, None, {}
         if op == "listChannelCommands":
             return 200, world.channel_commands(p["channel_id"]), {}
+        if op in _THREAD_OPS:
+            return self._thread_operation(op, p, request, body)
         return self._answer_autocomplete(p["request_id"], body)
+
+    def _thread_operation(
+        self, op: str, p: dict[str, str], request: web.Request, body: Any
+    ) -> _Answer:
+        del op  # updateMessage is the only one
+        message = self.world._get(self.world.messages, p["message_id"])
+        updated = self.world.extra.update_message(message, body, request.headers.get("If-Match"))
+        return 200, updated, {"ETag": f'"{updated["version"]}"'}
 
     def _answer_autocomplete(self, request_id: str, body: Any) -> _Answer:
         try:
