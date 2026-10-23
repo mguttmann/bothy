@@ -210,12 +210,14 @@ actions (R-AZ-03).
    and `device.expire` (jobs), `webhook_out.transition` (consumer `webhooks` and job
    `apps.webhook_deliver`), `group.member.sync` (reconciliation at OIDC login) as well as
    `dev_environment.*` (routes come with the dev environment milestone, 05 section 4.13).
-8. Acting-for binding: the server checks the header `Invocation-Token` on every request
-   (signature, audience, run of this agent triggered by the token's person, run active); the header
-   from a principal that is not an agent, repeated or empty, or an invalid token gives
-   `403 invocation_token_invalid` with `reason: invalid`, a token of an ended run `reason:
-   run_inactive`, except on `run.start` (also `resumeRun`) and `run.token.renew`, which answer with
-   the header exactly as without it. With a bound token every other action is decided
+8. Acting-for binding: the server checks the header `Invocation-Token` on every request that
+   passes the authenticator (step 7 of 02 section 9.1; the operations of `webhook_in.post` skip it
+   and ignore the header) (signature, audience, run of this agent triggered by the token's person,
+   run active); the header from a principal that is not an agent, repeated or empty, or an invalid
+   token gives `403 invocation_token_invalid` with `reason: invalid` on every action, a valid token
+   of an ended run `reason: run_inactive`, except on `run.start` (also `resumeRun`) and
+   `run.token.renew`, which answer a valid token exactly as without the header, also when its run
+   has ended. With a bound token every other action is decided
    on the intersection of the agent's rights and the current rights of the person who triggered the
    run: a target invisible only by the intersection answers `404` like an unknown ID, a requirement
    that fails only by it `403 forbidden` with `reason: acting_for_insufficient`, and every list,

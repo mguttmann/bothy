@@ -392,8 +392,9 @@ authorize(p, action, ref) -> Decision:
   return ALLOW
 ```
 
-SR9 in steps 1 and 4: `SR9_UNBOUND` is `run.start` (also `resumeRun`) and `run.token.renew`; they
-answer with the header exactly as without it, also when the run has ended. `sr9_applies` is false
+SR9 in steps 1 and 4: `SR9_UNBOUND` is `run.start` (also `resumeRun`) and `run.token.renew`; with
+a valid token they answer exactly as without the header, also when the run has ended; an invalid
+header denies them like every action (step 1). `sr9_applies` is false
 for these two actions and for the own exceptions of SR9 (`message.create`, `run.update`,
 `run.finish`, `interaction.respond`, `agent_session.report`) when the resolved thread of the
 resource is the run's thread and, for a resource of kind `run`, the resource is the run itself;
