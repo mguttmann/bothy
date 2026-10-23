@@ -9,6 +9,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
@@ -31,6 +32,7 @@ final class FakeRequest {
     required this.baseUri,
     this.session,
     this.proofJkt,
+    this.bytes,
   });
 
   /// The `operationId` of the route.
@@ -63,6 +65,9 @@ final class FakeRequest {
   /// The thumbprint of the DPoP proof's key, when the request carried a valid proof.
   final String? proofJkt;
 
+  /// The raw body of an `application/octet-stream` request (`uploadPart`), or null.
+  final Uint8List? bytes;
+
   /// The person of [session]; throws a [StateError] for an unsecured operation.
   FakePerson get person =>
       world.people[session?.userId] ?? (throw StateError('no session'));
@@ -84,14 +89,16 @@ final class FakeResponse {
     : bytes = null,
       _contentType = null;
 
-  /// A `200` with the binary [bytes] of [contentType] (an `image/*` download such as
-  /// `getBrandingLogo`); the contract check sees no JSON body.
+  /// A response with the binary [bytes] of [contentType] (an `image/*` download such as
+  /// `getBrandingLogo`, a file of `downloadFile`); the contract check sees no JSON body.
+  /// [status] is `200` unless a range gives `206`; [headers] adds `ETag`, `Repr-Digest` and
+  /// the like.
   const FakeResponse.bytes(
     List<int> this.bytes, {
     required String this._contentType,
-  }) : status = 200,
-       body = null,
-       headers = const {};
+    this.status = 200,
+    this.headers = const {},
+  }) : body = null;
 
   /// `204 No Content`.
   const FakeResponse.noContent() : this(204);
@@ -229,7 +236,13 @@ final class RestFake {
     request.headers.forEach(
       (name, values) => headers[name.toLowerCase()] = values.join(','),
     );
-    final raw = await utf8.decoder.bind(request).join();
+    final received = BytesBuilder(copy: false);
+    await request.forEach(received.add);
+    final rawBytes = received.takeBytes();
+    // 12 3.2: a part is the raw bytes of `application/octet-stream`, never JSON.
+    final binary =
+        request.headers.contentType?.mimeType == 'application/octet-stream';
+    final raw = binary ? '' : utf8.decode(rawBytes, allowMalformed: true);
     Object? body;
     if (raw.isNotEmpty) {
       try {
@@ -290,7 +303,9 @@ final class RestFake {
     FakeSession? session;
     String? jkt;
     try {
-      (session, jkt) = _authenticate(route.op, method, htu, headers);
+      (session, jkt) =
+          _ticketSession(op, headers, request.uri) ??
+          _authenticate(route.op, method, htu, headers);
       final requestViolations = contract.request(op, body);
       if (requestViolations.isNotEmpty) {
         violations.add('request $op: ${requestViolations.join('; ')}');
@@ -314,12 +329,14 @@ final class RestFake {
         baseUri: baseUri,
         session: session,
         proofJkt: jkt,
+        bytes: binary ? rawBytes : null,
       );
       final fault = faults.take(op);
       if (fault is AnswerFault) {
         response = _problem(
           fault.status,
           fault.code,
+          reason: fault.reason,
           retryAfter: fault.retryAfter,
         );
       } else {
@@ -406,6 +423,36 @@ final class RestFake {
     device.lastSeenAt = seen;
     session.lastSeenAt = seen;
     return (session, jkt);
+  }
+
+  /// The session of a file ticket (12 9.2) of `downloadFile` and `downloadThumbnail`: only
+  /// without `Authorization` (an `Authorization` header wins). Every failed check, a ticket
+  /// of another file or variant included, answers `404` (12 9.2 item 3).
+  (FakeSession?, String?)? _ticketSession(
+    String op,
+    Map<String, String> headers,
+    Uri uri,
+  ) {
+    if (op != 'downloadFile' && op != 'downloadThumbnail') return null;
+    final ticket = uri.queryParameters['ticket'];
+    if (ticket == null || headers.containsKey('authorization')) return null;
+    final grant = world.fileTickets[ticket];
+    if (grant == null || !world.now().isBefore(grant.expiresAt)) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    final session = world.sessions[grant.sessionId];
+    if (session == null ||
+        session.revoked ||
+        world.devices[session.deviceId]?.state == 'revoked') {
+      throw const FakeProblem(404, 'not_found');
+    }
+    final path = uri.pathSegments;
+    final fileId = path.length > 3 ? path[3] : '';
+    final variant = op == 'downloadFile' ? 'original' : path.last;
+    if (fileId != grant.fileId || variant != grant.variant) {
+      throw const FakeProblem(404, 'not_found');
+    }
+    return (session, null);
   }
 
   String _accept(DpopResult result) => switch (result) {

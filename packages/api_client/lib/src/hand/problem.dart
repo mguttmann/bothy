@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 
@@ -178,5 +180,38 @@ class ProblemInterceptor extends Interceptor {
     }
     final problem = ApiProblem.fromResponse(response);
     handler.next(err.copyWith(error: problem, message: problem.toString()));
+  }
+}
+
+/// Decodes the JSON problem body of an error response of a binary operation (a download
+/// with `ResponseType.bytes` or `ResponseType.stream`), so the interceptors after it (the
+/// DPoP nonce, refresh and step-up of `auth`, then [ProblemInterceptor]) see the problem as a
+/// JSON object like on every other operation. A body that is not JSON stays as it is.
+///
+/// `createApiClient` puts it first; a caller never adds it itself.
+class BinaryProblemInterceptor extends Interceptor {
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final response = err.response;
+    final type = response?.headers.value(Headers.contentTypeHeader) ?? '';
+    final data = response?.data;
+    if (response == null ||
+        !type.contains('json') ||
+        (data is! List<int> && data is! ResponseBody)) {
+      handler.next(err);
+      return;
+    }
+    try {
+      final bytes = data is ResponseBody
+          ? await data.stream.fold<List<int>>([], (a, b) => a..addAll(b))
+          : data as List<int>;
+      response.data = jsonDecode(utf8.decode(bytes));
+    } on Object {
+      // Not a JSON problem: the code stays `http_<status>`.
+    }
+    handler.next(err);
   }
 }

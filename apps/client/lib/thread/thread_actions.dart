@@ -8,6 +8,7 @@ import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../files/upload_executor.dart';
 import '../sync/message_ops_app.dart';
 import '../sync/thread_ops.dart';
 
@@ -27,22 +28,38 @@ final class ThreadActions {
 
   Outbox get _outbox => engine.outbox;
 
-  /// Sends [text] into [thread] (with [replyTo]); the server deletes the draft in the same
-  /// transaction (`clear_draft`, 04 14).
+  /// Sends [text] into [thread] (with [replyTo] and [attachments]); the server deletes the
+  /// draft in the same transaction (`clear_draft`, 04 14).
   Future<OutboxEntry> send(
     ThreadId thread,
     String text, {
     MessageId? replyTo,
+    MessageAttachments? attachments,
   }) => _outbox.enqueue(
-    OutboxRequest(
-      kind: MessageOps.createMessage,
-      threadId: thread,
-      payload: {
-        'content_md': text,
-        'clear_draft': true,
-        'reply_to_message_id': ?replyTo?.value,
-      },
-    ),
+    messageRequest(thread, text, replyTo: replyTo, attachments: attachments),
+  );
+
+  /// The outbox request of a message with [text] in [thread]: [kind] `voice` for a voice
+  /// message (12 8.1), [attachments] for files, which make it wait for their upload entries
+  /// (15 7.5, 12 3.4; brief M4-22 Design note 2).
+  static OutboxRequest messageRequest(
+    ThreadId thread,
+    String text, {
+    MessageId? replyTo,
+    MessageAttachments? attachments,
+    MessageKind kind = MessageKind.text,
+  }) => OutboxRequest(
+    kind: MessageOps.createMessage,
+    threadId: thread,
+    dependsOn: attachments?.uploads ?? const [],
+    payload: {
+      if (kind != MessageKind.text) 'kind': kind.code,
+      'content_md': text,
+      // A voice message is not the typed draft: the draft stays (04 14).
+      if (kind == MessageKind.text) 'clear_draft': true,
+      'reply_to_message_id': ?replyTo?.value,
+      ...?attachments?.payload,
+    },
   );
 
   /// Edits the confirmed [message] to [text] with `If-Match` of its version (04 13.3). When an

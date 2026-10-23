@@ -9,6 +9,8 @@ import 'package:domain/domain.dart';
 import 'package:local_store/local_store.dart';
 import 'package:sync_engine/sync_engine.dart';
 
+import '../files/upload_executor.dart';
+
 /// One row of the history.
 sealed class HistoryItem {
   const HistoryItem();
@@ -122,7 +124,9 @@ List<HistoryItem> buildHistory({
       items.add(PendingItem(v));
     } else if (v.stateLabel == OutboxStateLabel.failed &&
         v.entry.kind != PersonalOps.putThreadDraft &&
-        v.entry.kind != PersonalOps.putReadState) {
+        v.entry.kind != PersonalOps.putReadState &&
+        // A failed upload shows on the file of its message and in the composer (M4-22).
+        v.entry.kind != UploadOps.upload) {
       items.add(FailedWriteItem(v));
     }
   }
