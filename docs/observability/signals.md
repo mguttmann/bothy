@@ -140,6 +140,7 @@ Operating values of the own measurement ([25-visualization.md](../spec/25-visual
 | `bothy.file.scan` | Counter | `{file}` | `bothy.outcome` (`clean`, `infected`, `error`, `skipped`) | worker | `bothy_file_scan_total` |
 | `bothy.file.scan.duration` | Histogram | `s` | `bothy.outcome` | worker | `bothy_file_scan_duration_seconds` |
 | `bothy.file.scan.queue` | Gauge | `{file}` | none | worker | `bothy_file_scan_queue` |
+| `bothy.file.purge.backlog` | Gauge | `{file}` | none | worker: the files marked deleted whose purge is still due, recorded at the end of every run of `files.cleanup_pending`; nothing before the first run (M3-08) | `bothy_file_purge_backlog` |
 | `bothy.search.duration` | Histogram | `s` | `bothy.outcome` (`ok`, `client_error`, `timeout`, `server_error`) | api: one full-text search (`search`) from the start of the use case to its end; the prefix search is measured by `http.server.request.duration` (M3-14) | `bothy_search_duration_seconds` |
 | `bothy.job.duration` | Histogram | `s` | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) | worker | `bothy_job_duration_seconds` |
 | `bothy.job.queue` | Gauge | `{job}` | `bothy.job.kind` | worker | `bothy_job_queue` |

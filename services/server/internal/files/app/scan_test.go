@@ -494,6 +494,28 @@ func TestScanFileDeletedDuringPass(t *testing.T) {
 	}
 }
 
+// TestScanFilePurgedDuringPass (brief M3-08 design note 10): a row the purge removed during the
+// pass ends the run with nil and no write, and the pass removes the object it wrote itself.
+func TestScanFilePurgedDuringPass(t *testing.T) {
+	t.Parallel()
+	e := newScanEnv(t, scanCfg)
+	s := e.seed(t, []byte("0123456789"), []byte("0123456789"), false)
+	e.scanner.during = func() { e.repo.setPurged(s.FileID) }
+	res, err := e.pass.Run(context.Background(), s.FileID, 0)
+	if err != nil || res.Transitioned || res.Outcome != app.OutcomeNone {
+		t.Fatalf("Run = %+v, %v", res, err)
+	}
+	if len(e.events.list) != 0 || e.finalCount(s.FileID) != 0 || len(e.repo.finished) != 0 {
+		t.Error("write for a purged file")
+	}
+	if e.store.has(s.File.ObjectKey) {
+		t.Error("the assembled object of a purged file stays")
+	}
+	if res, err := e.pass.Run(context.Background(), s.FileID, 1); err != nil || res.Transitioned {
+		t.Fatalf("second Run = %+v, %v", res, err)
+	}
+}
+
 func TestScanPassCancelled(t *testing.T) {
 	t.Parallel()
 	e := newScanEnv(t, scanCfg)

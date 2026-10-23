@@ -12,7 +12,7 @@ type CleanupFacts struct {
 	CreatedAt, ScannedAt time.Time
 	// SessionState, CompletedAt and ExpiresAt are the session's state, completed_at and
 	// expires_at.
-	SessionState         SessionState
+	SessionState           SessionState
 	CompletedAt, ExpiresAt time.Time
 }
 

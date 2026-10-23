@@ -302,6 +302,27 @@ func TestProcessImageDeletedMidway(t *testing.T) {
 	}
 }
 
+// TestProcessImagePurgedMidway (brief M3-08 design note 10): a row the purge removed between the
+// object write and T1 ends the job with nil, no event, and the object the run wrote is removed.
+func TestProcessImagePurgedMidway(t *testing.T) {
+	t.Parallel()
+	e := newImageEnv(t, nil)
+	f := e.seed(t, "image/png", "pending", []byte("pixels"))
+	e.hooks.AfterPut = func(context.Context, ids.ID) { e.repo.setPurged(f.ID) }
+	if err := e.proc.ProcessImage(context.Background(), f.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.events.list) != 0 {
+		t.Errorf("events %d", len(e.events.list))
+	}
+	if k := e.keys(); len(k) != 1 || k[0] != f.ObjectKey {
+		t.Errorf("objects %v, want only the original the purge would remove", k)
+	}
+	if err := e.proc.ProcessImage(context.Background(), f.ID); err != nil {
+		t.Fatalf("a purged file: %v", err)
+	}
+}
+
 // TestProcessImageRetryAfterFailedCommit and run twice: T1 fails once, the retry ends with
 // revision 2, no leftover object and one event per transaction; a third run changes nothing.
 func TestProcessImageRetryAfterFailedCommit(t *testing.T) {

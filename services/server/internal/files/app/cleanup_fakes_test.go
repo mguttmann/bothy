@@ -68,18 +68,19 @@ func (r *redactor) list() []ids.ID {
 // holds it.
 type drafts struct {
 	held map[ids.ID]ids.ID
-	err  error
+	// fail makes the question for this file fail.
+	fail ids.ID
 }
 
 func (d *drafts) HeldByUploader(ctx context.Context, fs []files.UploaderFile) (map[ids.ID]bool, error) {
 	if err := needUnit(ctx); err != nil {
 		return nil, err
 	}
-	if d.err != nil {
-		return nil, d.err
-	}
 	out := map[ids.ID]bool{}
 	for _, f := range fs {
+		if f.FileID == d.fail {
+			return nil, errors.New("fake drafts: failing file")
+		}
 		if p, ok := d.held[f.FileID]; ok && p == f.UploaderID {
 			out[f.FileID] = true
 		}
@@ -302,4 +303,14 @@ func (r *repo) DeleteFileRow(ctx context.Context, fileID ids.ID) (bool, error) {
 	delete(r.parts, fileID)
 	delete(r.deletedAt, fileID)
 	return true, nil
+}
+
+// setPurged removes the row of fileID with its session and parts, as files.purge_objects does.
+func (r *repo) setPurged(fileID ids.ID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.files, fileID)
+	delete(r.sessions, fileID)
+	delete(r.parts, fileID)
+	delete(r.thumbs, fileID)
 }

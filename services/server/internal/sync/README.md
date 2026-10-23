@@ -398,18 +398,30 @@ below the value of 02; the threshold comes from the table of 02 through
   and checks every hint and badge count with `push.deliver` (07 7.4 rule 1). Both read the
   ambient transaction of `ctx` inside a unit of work and the pool outside one.
 
+## Drafts that hold files (M3-08)
+
+- `adapters/postgres.DraftFiles` (constructor `NewDraftFiles`) implements the source port
+  `files.DraftFileSource` with the query `HeldByUploaderDrafts` (`queries/drafts.sql`): of a list
+  of files with their uploaders it returns the files that `drafts.file_ids` of a draft of their
+  own uploader lists. Thread and channel drafts count alike, and a draft of a channel the author
+  lost still counts, because it stays stored. A file ID in the draft of another principal never
+  matches. The cleanup of `files` asks it inside its deleting unit of work after the file lock;
+  it locks no draft (docs/decisions.d/M3-08.md). The partial unique indexes of `drafts` lead with
+  `user_id`, so no index is added. The query stands in `tools/lint/sql_visibility.yaml` with the
+  category `system_job`.
+
 ## Port (root package `internal/sync`)
 
 - Inbound: `Tail`, `CatchUp`, `Snapshot`, `Consumers` (worker cursors), `ReadStates`, `Drafts`, `Settings`, `History` and `ReadPositions` (M3-19, read ports without `authorize` for `notify`).
 - Emits in-tx events: none.
 - Subscribes to in-tx events: `messaging.MessagePosted` (clear the draft), `chat.ThreadMoved` (copies of `channel_id`).
-- Implements source ports and cross-cutting ports: kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant`.
+- Implements source ports and cross-cutting ports: kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, `files.DraftFileSource` (M3-08), kernel `personaldata.Participant`.
 
 ## Dependencies
 
-May use the ports of these modules: `instance`, `identity`, `chat`, `agents`, `messaging`, `runs`.
+May use the ports of these modules: `instance`, `identity`, `chat`, `agents`, `messaging`, `runs`, `files`.
 
-Reason: counter `event_seq`; principal of the snapshot (handle, display name); snapshot from structure, presence, active runs; subscription to messages.
+Reason: counter `event_seq`; principal of the snapshot (handle, display name); snapshot from structure, presence, active runs; subscription to messages; implements `files.DraftFileSource`; drafts protect the files of their author, 12 12 (M3-08).
 
 In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
 Checked by go-arch-lint (ADR 0008).

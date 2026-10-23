@@ -209,6 +209,36 @@ exceptions:
   - query: files.ListFileThumbnails
     category: after_authorize
     reason: "the thumbnails of the one file getFile returns after file.read allowed it, or of the one file the job files.thumbnail processes (M3-06)"
+  - query: files.ExpiredOpenSessions
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: the cleanup reads open sessions past expires_at in batches (M3-08)"
+  - query: files.UnattachedCandidates
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: the cleanup reads never attached files past the prefilter in batches (M3-08)"
+  - query: files.FailedRowCandidates
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: the cleanup reads failed and blocked rows past the prefilter in batches (M3-08)"
+  - query: files.DeletedRows
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: the catch-up reads the files marked deleted in batches (M3-08)"
+  - query: files.PurgeBacklog
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: the cleanup counts the files marked deleted for bothy.file.purge.backlog; only a number (M3-08)"
+  - query: files.PurgeFacts
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: files.purge_objects reads the one file it was inserted for (M3-08)"
+  - query: files.LockFileForCleanup
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: the cleanup and the purge lock the one file they handle (M3-08)"
+  - query: files.CleanupFileFacts
+    category: system_job
+    reason: "job without principal; rows keyed by id or state: the cleanup, the purge and deleteFile read the one file they locked (M3-08)"
+  - query: files.FileForDelete
+    category: authorize_resolution
+    reason: "resolves the resource of file.delete (uploader, purpose, scope channel) by id; a deleted row answers only its uploader, everything else 404 (M3-08)"
+  - query: files.LockFileForDelete
+    category: after_authorize
+    reason: "locks the one file whose file.delete authorize allowed (M3-08)"
   - query: messaging.ListMentions
     category: after_authorize
     reason: "the mentioned principals of the one message authorize allowed (Message.mention_ids)"
@@ -236,6 +266,9 @@ exceptions:
   - query: sync.OldestEventAfter
     category: system_job
     reason: "occurred_at of the oldest pending event for bothy.event.consumer.pending_age, no principal"
+  - query: sync.HeldByUploaderDrafts
+    category: system_job
+    reason: "file cleanup asks whether a draft of the uploader holds a file; keyed by uploader, only file ids leave (M3-08)"
   - query: sync.HeadSeq
     category: log_tail
     reason: "the head of the log (max seq), no content"

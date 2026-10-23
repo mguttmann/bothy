@@ -35,6 +35,12 @@ const (
 	jpegQualityMax = "100"
 )
 
+// The keys of the cleanup check of M3-08 (object_delete_delay_gc, docs/decisions.d/M3-08.md).
+const (
+	keyFileGCInterval    = "file.gc_interval"
+	keyObjectDeleteDelay = "privacy.object_delete_delay"
+)
+
 // The keys of the upload checks of M3-03 (docs/DECISIONS.md D-M3-03-19).
 const (
 	keyMaxUploadBytes  = "file.max_upload_bytes"
@@ -70,6 +76,12 @@ const (
 // the longest time an acceptance holds agent.invocation while an attachment of the triggering
 // message is not final; runs reads it for the release time and the job
 // runs.invocation_hold_timeout.
+//
+// The keys of the cleanup and deletion of files (M3-08, 12 section 12) follow: file.unattached_ttl,
+// file.failed_row_ttl, file.gc_interval, file.gc_batch_size and privacy.object_delete_delay of
+// chapter 20, the bound within which the purge removes the objects of a deleted file. The
+// cross-check object_delete_delay_gc holds file.gc_interval below privacy.object_delete_delay,
+// so the catch-up runs at least once inside the delay.
 //
 // voice.max_duration is here because getInstance reports it as a client limit (M1-46) before the
 // voice messages of M3 read it.
@@ -221,6 +233,31 @@ func filesConfigKeys() []config.Key {
 			Name: "file.not_ready_retry_after", Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h",
 			Doc:     "Retry-After of the 409 file_not_ready responses, in whole seconds.",
 			Chapter: chapter12,
+		},
+		{
+			Name: "file.unattached_ttl", Kind: config.KindDuration, Default: "24h", Min: "1s",
+			Doc:     "Period for never attached files.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.failed_row_ttl", Kind: config.KindDuration, Default: "7d", Min: "1s",
+			Doc:     "Period for rows of failed or blocked files.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyFileGCInterval, Kind: config.KindDuration, Default: "10m", Min: "1s",
+			Doc:     "Interval of the cleanup job.",
+			Chapter: chapter12,
+		},
+		{
+			Name: "file.gc_batch_size", Kind: config.KindInt, Default: "500", Min: "1",
+			Doc:     "Candidates per batch of a cleanup step.",
+			Chapter: chapter12,
+		},
+		{
+			Name: keyObjectDeleteDelay, Kind: config.KindDuration, Default: "24h", Min: "1s",
+			Doc:     "Maximum time until deleted objects are removed.",
+			Chapter: chapter20,
 		},
 		{
 			Name: "file.invocation_hold_max", Kind: config.KindDuration, Default: defaultTwoMinutes, Min: "1s",

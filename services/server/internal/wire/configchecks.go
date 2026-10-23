@@ -52,6 +52,7 @@ var configChecks = []configCheck{
 	{name: "presigned_mode_unavailable", keys: []string{keyPresignedUpload}, fn: presignedModeUnavailable},
 	{name: "scan_stream_limit", keys: []string{keyScanMode, keyMaxUploadBytes, keyClamdStreamMaxByte}, fn: scanStreamLimit},
 	{name: "clamd_address_unix", keys: []string{keyClamdAddress}, fn: clamdAddressUnix},
+	{name: "object_delete_delay_gc", keys: []string{keyFileGCInterval, keyObjectDeleteDelay}, fn: objectDeleteDelayGC},
 	{name: "thumbnail_sizes_ordered", keys: []string{keyThumbnailSmallPx, keyThumbnailMediumPx, keyThumbnailLargePx}, fn: thumbnailSizesOrdered},
 	{name: "presence_ttl_above_flush", keys: []string{keyPresenceFlushInterval, keyPresenceTTL}, fn: presenceTTLAboveFlush},
 	{name: "consumer_alert_below_retention", keys: []string{keyConsumerPendingAlertAfter, keySyncEventRetention}, fn: consumerAlertBelowRetention},

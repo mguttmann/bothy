@@ -181,9 +181,12 @@ generated column, redact the payloads of the related events (forms in 04, sectio
 
 ### 4.3 Files
 
-A file is deleted with its message or through `file.delete`: row `deleted_at`; the cleanup job removes
-the object and the thumbnails within `privacy.object_delete_delay`. No
-deduplication (R-DM-13): deleting a file never affects the file of another person.
+A file is deleted with its message or through `file.delete`: row `deleted_at`; the deleting
+transaction also redacts the payloads of the stored `file.updated` events of the file (R-DM-45) and
+queues the job `files.purge_objects`, which removes the originals, the thumbnails and the parts and
+then the row itself (R-DM-46) within `privacy.object_delete_delay`; the cleanup job
+`files.cleanup_pending` catches up a purge that failed ([12-files.md](12-files.md) section 12,
+M3-08). No deduplication (R-DM-13): deleting a file never affects the file of another person.
 
 ### 4.4 Deleting an account
 

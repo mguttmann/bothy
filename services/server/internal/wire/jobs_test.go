@@ -18,7 +18,7 @@ import (
 // already. Empty until M1-16 registers the first handler.
 func TestWireJobArgsOnlyIDs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestJobRoleMapping(t *testing.T) {
 // missing interval.
 func TestJobRegistryHasAuthCleanup(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+	m := wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
 		AuthCleanupInterval: 3 * time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestJobRegistryHasAuthCleanup(t *testing.T) {
 // refuses a missing interval.
 func TestJobRegistryHasChainVerify(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+	m := wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
 		AuthCleanupInterval: time.Hour, ChainVerifyInterval: 2 * time.Hour, StallInterval: time.Minute}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
@@ -123,7 +123,7 @@ func TestJobRegistryHasChainVerify(t *testing.T) {
 // start of a worker, and a registry without the interval is refused (M2-09).
 func TestWire_JobsAndSubscriptions(t *testing.T) {
 	t.Parallel()
-	m := wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+	m := wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
 		AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: 90 * time.Second}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
@@ -156,7 +156,7 @@ func TestWire_JobsAndSubscriptions(t *testing.T) {
 // card, never periodic (M2-15 design note 15 a; 02 12.3).
 func TestWire_ComponentExpiryJob(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
@@ -175,7 +175,7 @@ func TestWire_ComponentExpiryJob(t *testing.T) {
 // (M3-19, notify.gateway_send M3-23, 02 12.2).
 func TestJobRegistryHasNotifyJobs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestJobRegistryHasNotifyJobs(t *testing.T) {
 // the queue default with the arguments of the run id only.
 func TestInvocationHoldJobRegistration(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
+	reg, err := wire.NewJobRegistry(&wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: time.Minute, PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute,
 		KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour, StallInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
@@ -201,5 +201,35 @@ func TestInvocationHoldJobRegistration(t *testing.T) {
 	}
 	if typ := reg.ArgTypes()[runsjobs.KindInvocationHoldTimeout]; typ != reflect.TypeFor[runsjobs.InvocationHoldTimeout]() {
 		t.Fatalf("argument type %v", typ)
+	}
+}
+
+// TestJobRegistryHasFilesCleanup: the registry of every role holds files.purge_objects and
+// files.cleanup_pending on the queue maintenance, files.cleanup_pending periodic every
+// file.gc_interval and once at the start (M3-08), and refuses a missing interval.
+func TestJobRegistryHasFilesCleanup(t *testing.T) {
+	t.Parallel()
+	m := wire.JobModules{TerminalSweepInterval: time.Minute, FilesGCInterval: 7 * time.Minute, PartitionInterval: time.Minute,
+		CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour,
+		ChainVerifyInterval: time.Hour, StallInterval: time.Minute}
+	reg, err := wire.NewJobRegistry(&m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"files.purge_objects", "files.cleanup_pending"} {
+		if q, ok := reg.Queue(kind); !ok || q != jobs.QueueMaintenance {
+			t.Fatalf("%s: queue = %q, %v", kind, q, ok)
+		}
+	}
+	found := false
+	for _, p := range reg.Periodic() {
+		found = found || p.Args.Kind() == "files.cleanup_pending" && p.Interval == 7*time.Minute && p.RunOnStart
+	}
+	if !found {
+		t.Fatalf("periodic jobs %+v lack files.cleanup_pending every file.gc_interval with RunOnStart", reg.Periodic())
+	}
+	m.FilesGCInterval = 0
+	if _, err := wire.NewJobRegistry(&m); err == nil {
+		t.Fatal("a registry without file.gc_interval was accepted")
 	}
 }

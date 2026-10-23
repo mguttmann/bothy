@@ -30,13 +30,13 @@ const (
 // The log keys and messages of the cleanup; lines carry at most bothy.file.id, a step name and
 // counts, never a file name, key or digest (12 section 14, SEC-LOG-4).
 const (
-	logKeyStep         = "bothy.step"
-	logKeyCount        = "bothy.count"
-	msgCleanupStep     = "file cleanup step failed"
-	msgCleanupFile     = "file cleanup of one file failed"
-	msgCleanupTemp     = "file cleanup removed temporary files"
-	msgCleanupBacklog  = "file purge backlog older than privacy.object_delete_delay"
-	msgCleanupCatchUp  = "file cleanup catch-up stopped at a storage error"
+	logKeyStep        = "bothy.step"
+	logKeyCount       = "bothy.count"
+	msgCleanupStep    = "file cleanup step failed"
+	msgCleanupFile    = "file cleanup of one file failed"
+	msgCleanupTemp    = "file cleanup removed temporary files"
+	msgCleanupBacklog = "file purge backlog older than privacy.object_delete_delay"
+	msgCleanupCatchUp = "file cleanup catch-up stopped at a storage error"
 )
 
 // CleanupConfig holds the configuration of the job files.cleanup_pending, bound in internal/wire
