@@ -64,11 +64,17 @@ async def test_ag28_real(real: ScenarioServer) -> None:
 
 
 def _normalize(value: Any, ids: dict[str, str]) -> Any:
-    """Fixed IDs in order of appearance, fixed times, ``seq`` 1, no delivery fields."""
+    """Fixed IDs in order of appearance, fixed times, ``seq`` 1, no delivery fields.
+
+    The product name becomes a neutral one: the working name stays at the places of 02 6.
+    """
     if isinstance(value, dict):
-        out = {}
+        out: dict[str, Any] = {}
         for key in sorted(value):
             if key in _DELIVERY:
+                continue
+            if key == "product_name":
+                out[key] = "Example Chat"
                 continue
             out[key] = 1 if key == "seq" else _normalize(value[key], ids)
         return out
