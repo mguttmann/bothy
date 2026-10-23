@@ -395,9 +395,9 @@ in the roles that run `notify.push_send` (`worker`, `all`); without it a send en
   `kid` = `private_key_id`, and the claims of exactly `iss` = `client_email`,
   `scope = https://www.googleapis.com/auth/firebase.messaging`, `aud` = the token URL, `iat` =
   now in Unix seconds and `exp` = `iat` plus one hour, the longest lifetime Google accepts for an
-  assertion [Q17, derived]. It posts it as `application/x-www-form-urlencoded` with exactly
+  assertion [Q17, verified]. It posts it as `application/x-www-form-urlencoded` with exactly
   `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` and `assertion` (the JWT bearer grant
-  of RFC 7523 2.1) [Q17, derived]. A `200` answer needs a non-empty `access_token`,
+  of RFC 7523 2.1) [Q17, verified]. A `200` answer needs a non-empty `access_token`,
   `token_type` `Bearer` (any case) and a positive `expires_in`. The token URL is fixed:
   `https://oauth2.googleapis.com/token`; a service account whose `token_uri` is present and names
   another URL is refused at start (11). Every token request resolves and parses the service
@@ -1039,7 +1039,7 @@ Values from other chapters (reference only): `push.max_consecutive_failures`
 
 ## 18. Sources
 
-All retrieved on 2026-10-10.
+Q1 to Q16 retrieved on 2026-10-10, Q17 on 2026-10-23.
 
 - Q1 River README (InsertTx, unique and scheduled jobs): https://github.com/riverqueue/river [verified]
 - Q2 Apple, Sending notification requests to APNs: https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns [verified]
@@ -1057,4 +1057,4 @@ All retrieved on 2026-10-10.
 - Q14 Apple, Generating a remote notification: https://developer.apple.com/documentation/usernotifications/generating-a-remote-notification [verified]
 - Q15 Apple, Handling notification responses from APNs: https://developer.apple.com/documentation/usernotifications/handling-notification-responses-from-apns [verified]
 - Q16 Firebase, FCM error codes: https://firebase.google.com/docs/cloud-messaging/error-codes [verified]
-- Q17 Google, Using OAuth 2.0 for Server to Server Applications: https://developers.google.com/identity/protocols/oauth2/service-account [derived; not retrieved: added by M3-21 in a build without network, the statements citing it follow the published OAuth 2.0 service account flow and are proven only against Fake-FCM]
+- Q17 Google, Using OAuth 2.0 for Server to Server Applications: https://developers.google.com/identity/protocols/oauth2/service-account [verified]
