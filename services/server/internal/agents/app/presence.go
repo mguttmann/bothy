@@ -271,23 +271,47 @@ func (t *Tracker) arm(e *entry, now time.Time) {
 // expire is the deadline timer of e: under the entry lock and only when no newer heartbeat
 // re-armed it, the agent becomes offline, the entry dirty and the mismatch times end; then the
 // change is published without an actor (D-M2-20-4). A timer that fires early re-arms itself.
+// Before the agent becomes offline the stored row is read outside the entry lock: with several
+// api nodes the agent may have reconnected to another node, whose heartbeats reach the row at
+// least every agent.heartbeat_persist_interval; while the stored last heartbeat plus
+// agent.presence_timeout lies ahead, the deadline moves there instead (M7-17,
+// docs/decisions.d/M7-17.md D-M7-17-10). A failed read keeps the verdict of this node.
 func (t *Tracker) expire(e *entry, gen uint64) {
-	if t.stopped.Load() {
+	if t.stopped.Load() || !t.due(e, gen) {
 		return
 	}
+	row, found, err := t.d.Store.GetPresenceRow(context.Background(), e.id)
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if gen != e.gen || !e.state.Present() {
+	if t.stopped.Load() || gen != e.gen || !e.state.Present() {
 		return
 	}
 	now := t.d.Clock.Now()
-	if now.Before(e.deadline) {
-		t.arm(e, now)
-		return
+	if err == nil && found {
+		if elsewhere := row.LastHeartbeatAt.Add(t.cfg.PresenceTimeout); elsewhere.After(now) && elsewhere.After(e.deadline) {
+			e.deadline = elsewhere
+			t.arm(e, now)
+			return
+		}
 	}
 	e.state, e.dirty, e.stop = domain.RuntimeOffline, true, nil
 	t.reassess(e, now)
 	t.publish(context.Background(), e, nil)
+}
+
+// due reports whether the timer of generation gen of e expires now: false when a newer heartbeat
+// re-armed it or the agent is not present; a timer that fired early re-arms itself and is not due.
+func (t *Tracker) due(e *entry, gen uint64) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if gen != e.gen || !e.state.Present() {
+		return false
+	}
+	if now := t.d.Clock.Now(); now.Before(e.deadline) {
+		t.arm(e, now)
+		return false
+	}
+	return true
 }
 
 // publish sends agent.presence_changed when state or reported mode differ from the last

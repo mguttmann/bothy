@@ -414,8 +414,10 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 - Several api nodes (M7-17): the fencing is this module's guarded `Save` (`ErrConsumerReplaced`
   when the row holds another session); the gateway sends a takeover signal over
   `NOTIFY ephemeral`, and the other nodes call `Save` for their connections of that agent at once
-  and close with `4015` on `ErrConsumerReplaced` (the gateway README, "Several api nodes"). Nothing
-  in this module changed for it.
+  and close with `4015` on `ErrConsumerReplaced` (the gateway README, "Several api nodes"). The
+  presence tracker reads the stored row before its deadline sets an agent `offline` and moves the
+  deadline when the stored last heartbeat (written by the node that now holds the agent's
+  connection) is newer (docs/decisions.d/M7-17.md D-M7-17-10).
 - Rebinding an agent session is a compare-and-swap over the current row (`expected_current_session_id`); `agent_session.report` is the compare-and-swap over `agent_sessions.version` (M2-12).
 
 ## Chapters

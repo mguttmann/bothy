@@ -31,9 +31,10 @@ const (
 const nodeHeader = "X-Test-Node"
 
 // The short windows of the cluster: the tests wait for conditions, bounded by testkit.Patience;
-// the exact boundaries are proven by the unit tests of gateway.
+// the exact boundaries are proven by the unit tests of gateway. cluster.presence_ttl keeps its
+// default, so a slow flush under load never lets a live row expire.
 var clusterConfig = map[string]string{
-	"cluster.mode": "multi", "cluster.presence_flush_interval": "100ms", "cluster.presence_ttl": "1s",
+	"cluster.mode": "multi", "cluster.presence_flush_interval": "100ms",
 	"signing_key.cache_ttl": "1s", "database.listen_reconnect_backoff_cap": "200ms", "audit.deny_aggregate_window": "50ms",
 	"sync.run_patch_coalesce_interval": "100ms",
 }

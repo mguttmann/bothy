@@ -436,6 +436,35 @@ func TestHeartbeat_OfflineTimer(t *testing.T) {
 	}
 }
 
+// TestHeartbeat_OfflineTimerHeedsAnotherNode (M7-17, docs/decisions.d/M7-17.md D-M7-17-10): the
+// agent reconnected to another api node, whose heartbeats reach the stored row; this node's
+// deadline passes without a heartbeat here, but the stored last heartbeat is newer, so the agent
+// stays online and nothing is published until the stored heartbeat is older than
+// agent.presence_timeout too.
+func TestHeartbeat_OfflineTimerHeedsAnotherNode(t *testing.T) {
+	t.Parallel()
+	w := newTracker(t)
+	w.beat(`{"state":"online","reported_billing_mode":"organization"}`)
+	elsewhere := w.clk.Now().Add(tTimeout / 2)
+	w.store.mu.Lock()
+	row := w.store.rows[w.agent.ID]
+	row.LastHeartbeatAt = elsewhere
+	w.store.rows[w.agent.ID] = row
+	w.store.mu.Unlock()
+	w.tm.advance(tTimeout)
+	if st := w.status(); st.State != agents.StateOnline || len(w.pub.events()) != 1 {
+		t.Fatalf("state %s, %d events at this node's deadline while another node took heartbeats", st.State, len(w.pub.events()))
+	}
+	w.tm.advance(tTimeout/2 - time.Millisecond)
+	if st := w.status(); st.State != agents.StateOnline {
+		t.Fatalf("state %s before the stored heartbeat expired", st.State)
+	}
+	w.tm.advance(time.Millisecond)
+	if st, evs := w.status(), w.pub.events(); st.State != agents.StateOffline || len(evs) != 2 {
+		t.Fatalf("state %s, events %+v after the stored heartbeat expired", st.State, evs)
+	}
+}
+
 // TestHeartbeat_PersistsAtMostOncePerInterval: many heartbeats in one interval are one
 // PersistHeartbeat; a mode change is one WriteReportedChange at once and one audit entry.
 func TestHeartbeat_PersistsAtMostOncePerInterval(t *testing.T) {
