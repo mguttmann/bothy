@@ -358,8 +358,112 @@ func (f *Fake) serve(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, inj.Status, []byte(body))
 		return
 	}
+	f.mu.Lock()
 	status, body := f.route(r)
+	f.mu.Unlock()
 	writeJSON(w, status, body)
+}
+
+// Mutate changes the fixture under the lock of the fake, so a test can change Discord between two
+// rounds of the read mirror; the helpers below cover the usual changes.
+func (f *Fake) Mutate(fn func(*Fixture)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fn(f.fixture)
+}
+
+// AddMessage appends raw (a message with a higher ID than every message of channelID) to the
+// messages of channelID and sets the last_message_id of that channel or active thread to its ID,
+// as Discord does.
+func (f *Fake) AddMessage(channelID string, raw json.RawMessage) {
+	f.Mutate(func(fx *Fixture) {
+		if fx.Messages == nil {
+			fx.Messages = map[string][]json.RawMessage{}
+		}
+		fx.Messages[channelID] = append(fx.Messages[channelID], raw)
+		id := objectID(raw)
+		for _, list := range [][]json.RawMessage{fx.Channels, fx.ActiveThreads} {
+			for i, c := range list {
+				if objectID(c) == channelID {
+					list[i] = withMembers(c, map[string]any{"last_message_id": id})
+				}
+			}
+		}
+	})
+}
+
+// EditMessage sets members of the message id of channelID (for example "edited_timestamp" or
+// "reactions"); a nil value removes the member.
+func (f *Fake) EditMessage(channelID, id string, members map[string]any) {
+	f.Mutate(func(fx *Fixture) {
+		for i, m := range fx.Messages[channelID] {
+			if objectID(m) == id {
+				fx.Messages[channelID][i] = withMembers(m, members)
+			}
+		}
+	})
+}
+
+// RenameThread sets the name of the active thread id.
+func (f *Fake) RenameThread(id, name string) {
+	f.Mutate(func(fx *Fixture) {
+		for i, t := range fx.ActiveThreads {
+			if objectID(t) == id {
+				fx.ActiveThreads[i] = withMembers(t, map[string]any{"name": name})
+			}
+		}
+	})
+}
+
+// ArchiveThread moves the active thread id to the front of the first archived public page of its
+// channel with thread_metadata.archived true and archive_timestamp at, as Discord does when a
+// thread is archived.
+func (f *Fake) ArchiveThread(id, at string) {
+	f.Mutate(func(fx *Fixture) {
+		for i, t := range fx.ActiveThreads {
+			if objectID(t) != id {
+				continue
+			}
+			var o struct {
+				ParentID string         `json:"parent_id"`
+				Meta     map[string]any `json:"thread_metadata"`
+			}
+			_ = json.Unmarshal(t, &o)
+			meta := o.Meta
+			if meta == nil {
+				meta = map[string]any{}
+			}
+			meta["archived"], meta["archive_timestamp"] = true, at
+			archived := withMembers(t, map[string]any{"thread_metadata": meta})
+			fx.ActiveThreads = slices.Delete(fx.ActiveThreads, i, i+1)
+			if fx.ArchivedPublic == nil {
+				fx.ArchivedPublic = map[string][]Page{}
+			}
+			pages := fx.ArchivedPublic[o.ParentID]
+			if len(pages) == 0 {
+				pages = []Page{{}}
+			}
+			pages[0].Threads = append([]json.RawMessage{archived}, pages[0].Threads...)
+			fx.ArchivedPublic[o.ParentID] = pages
+			return
+		}
+	})
+}
+
+// withMembers returns raw with members set (nil removes one).
+func withMembers(raw json.RawMessage, members map[string]any) json.RawMessage {
+	var o map[string]any
+	if err := json.Unmarshal(raw, &o); err != nil {
+		return raw
+	}
+	for k, v := range members {
+		if v == nil {
+			delete(o, k)
+		} else {
+			o[k] = v
+		}
+	}
+	return mustJSON(o)
 }
 
 // writeJSON writes a JSON answer.

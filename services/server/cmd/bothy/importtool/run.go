@@ -69,11 +69,15 @@ type Env struct {
 	// AfterBatch is a test hook: called after every successful thread batch before its cursor; an
 	// error ends the run there (the crash test of 22 16). nil in production.
 	AfterBatch func(batch int) error
+	// FollowSleep waits between two rounds of the read mirror (22 12.2), in pieces of at most
+	// import.follow.poll_interval; nil means Sleep. Cancelling its context (SIGINT, SIGTERM) ends
+	// the mirror after the current batch.
+	FollowSleep Sleeper
 }
 
 // usage is the help of "bothy import discord".
-const usage = `Usage: bothy import discord --guild ID --map FILE [--apply] [--channel ID]... [--only-thread ID]...
-                           [--report text|json] [--takeover] [--discord-token-file PATH]
+const usage = `Usage: bothy import discord --guild ID --map FILE [--apply] [--follow | --once] [--channel ID]...
+                           [--only-thread ID]... [--report text|json] [--takeover] [--discord-token-file PATH]
                            [--config FILE] [--session-file PATH]
        bothy import discord init-map --guild ID --out FILE [--discord-token-file PATH] [--config FILE]
        bothy import discord status --guild ID [--config FILE] [--session-file PATH]
@@ -81,12 +85,14 @@ const usage = `Usage: bothy import discord --guild ID --map FILE [--apply] [--ch
 Without --apply the run is a dry run: it only reads Discord and the server, downloads no attachment,
 writes no file (except the rotated session file) and prints the check report. With --apply it
 imports into the running source of this server that the owner created and started in the web
-console. The bot token comes from BOTHY_IMPORT_DISCORD_TOKEN or --discord-token-file (one of them).
+console. --follow runs the read mirror: a round every import.follow.poll_interval that copies the
+settled new Discord messages of the channels whose lead is discord (with --apply; without it the
+round only reads and reports what it would copy); --once runs exactly one round. The bot token comes from BOTHY_IMPORT_DISCORD_TOKEN or --discord-token-file (one of them).
 --config names a YAML file with nested import.* keys; BOTHY_IMPORT__... variables win.
 
 Exit codes: 0 done; 1 aborted (network, rate limit above the limit, server error, source paused),
 a new run resumes; 2 invocation, mapping file or preflight faulty, nothing written; 3 another run
-holds the lease of the source (use --takeover).
+holds the lease of the source (use --takeover; with --once the normal case for scheduled calls).
 `
 
 // stringList is a repeatable flag.
@@ -101,7 +107,7 @@ func (s *stringList) Set(v string) error { *s = append(*s, v); return nil }
 // options are the parsed flags of a run.
 type options struct {
 	guild, mapFile, report, tokenFile, configFile, sessionFile string
-	apply, takeover                                            bool
+	apply, takeover, follow, once                              bool
 	channels, threads                                          stringList
 }
 
@@ -138,6 +144,8 @@ func parseRun(args []string, env Env) (options, int) {
 	fs.Var(&o.threads, "only-thread", "")
 	fs.StringVar(&o.report, "report", "text", "")
 	fs.BoolVar(&o.takeover, "takeover", false, "")
+	fs.BoolVar(&o.follow, "follow", false, "")
+	fs.BoolVar(&o.once, "once", false, "")
 	fs.StringVar(&o.tokenFile, "discord-token-file", "", "")
 	fs.StringVar(&o.configFile, "config", "", "")
 	fs.StringVar(&o.sessionFile, "session-file", "", "")
@@ -154,6 +162,11 @@ func parseRun(args []string, env Env) (options, int) {
 		problem = "--report must be text or json"
 	case o.takeover && !o.apply:
 		problem = "--takeover needs --apply"
+	case o.follow && o.once:
+		// 22 10.2 rule 3: contradictory options end before any call.
+		problem = "--follow and --once contradict each other"
+	case o.follow && len(o.threads) > 0:
+		problem = "--only-thread and --follow contradict each other"
 	}
 	for _, id := range append(append([]string{}, o.channels...), o.threads...) {
 		if problem == "" && !snowflake(id) {
@@ -432,6 +445,9 @@ func execute(ctx context.Context, o options, env Env, cfg Config, m *Mapping, cl
 	wk, err := newWalker(o, env, cfg, m, gs, p, s, cl)
 	if err != nil {
 		return err
+	}
+	if o.follow || o.once {
+		return follow(ctx, o, env, wk, s.source)
 	}
 	rep := newReport(o.apply, gs, p)
 	wk.rep = rep

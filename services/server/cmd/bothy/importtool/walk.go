@@ -56,6 +56,24 @@ type walker struct {
 	skipped  map[string]bool            // origin keys the server skipped
 	userDone map[string]bool            // user keys posted (or counted in a dry run) in this run
 	present  time.Time
+
+	// halt reports a stop request (SIGINT, SIGTERM) of the read mirror; the walker checks it after
+	// every batch and ends with errHalted, so the current batch always finishes. nil never halts.
+	halt func() bool
+	// noStats leaves the counters out of the cursor writes: the read mirror keeps stats.tool at the
+	// totals of the last full run (docs/DECISIONS.md D-M8-05-6).
+	noStats bool
+}
+
+// errHalted ends a mirror round after a batch because of a stop request.
+var errHalted = errors.New("importtool: stopped by a signal")
+
+// stats returns the counters of the cursor writes, nil when they are left out.
+func (wk *walker) stats() map[string]any {
+	if wk.noStats {
+		return nil
+	}
+	return wk.rep.stats()
 }
 
 // convertEnv returns the lookups of the conversion: guild roles and channel names with the in-app
@@ -271,6 +289,7 @@ type pending struct {
 	texts     []string // the converted content of msgs
 	items     int
 	consumed  string
+	fp        string // the threadFingerprint of threadObj, recorded once it is posted
 }
 
 // thread reads one main thread (t nil) or thread from its cursor and writes it in batches.
@@ -282,7 +301,7 @@ func (wk *walker) thread(ctx context.Context, c *channelPlan, t *threadPlan) err
 		if err != nil {
 			return err
 		}
-		pd.threadObj, pd.items = &o, 1
+		pd.threadObj, pd.items, pd.fp = &o, 1, threadFingerprint(t.th.Name, t.closed)
 	}
 	after := "0"
 	if wk.w != nil {
@@ -477,7 +496,7 @@ func (wk *walker) reads(id string) bool {
 func (wk *walker) flush(ctx context.Context, c *channelPlan, pd *pending, end bool) error {
 	if len(pd.msgs) == 0 && pd.threadObj == nil {
 		if end && wk.w != nil && pd.consumed != wk.w.position(pd.main, pd.readID) {
-			return wk.w.advance(ctx, pd.main, pd.readID, pd.consumed, wk.rep.stats())
+			return wk.w.advance(ctx, pd.main, pd.readID, pd.consumed, wk.stats())
 		}
 		return nil
 	}
@@ -499,7 +518,7 @@ func (wk *walker) flush(ctx context.Context, c *channelPlan, pd *pending, end bo
 	}
 	b.Items = append(b.Items, msgItems...)
 	if len(b.Items) == 0 {
-		return wk.w.advance(ctx, pd.main, pd.readID, pd.consumed, wk.rep.stats())
+		return wk.w.advance(ctx, pd.main, pd.readID, pd.consumed, wk.stats())
 	}
 	got, err := wk.send(ctx, b)
 	if err != nil {
@@ -512,8 +531,17 @@ func (wk *walker) flush(ctx context.Context, c *channelPlan, pd *pending, end bo
 			return err
 		}
 	}
+	if pd.threadObj != nil && pd.fp != "" {
+		wk.w.mark(pd.readID, pd.fp)
+	}
 	pd.msgs, pd.texts, pd.threadObj, pd.items = nil, nil, nil, 0
-	return wk.w.advance(ctx, pd.main, pd.readID, pd.consumed, wk.rep.stats())
+	if err := wk.w.advance(ctx, pd.main, pd.readID, pd.consumed, wk.stats()); err != nil {
+		return err
+	}
+	if wk.halt != nil && wk.halt() {
+		return errHalted
+	}
+	return nil
 }
 
 // count counts a batch of a dry run as "would take over".

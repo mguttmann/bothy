@@ -22,7 +22,9 @@ type discordAPI interface {
 	ActiveThreads(ctx context.Context, guildID string) ([]discord.Channel, error)
 	ArchivedPublicThreads(ctx context.Context, channelID string, fn func([]discord.Channel) error) error
 	ArchivedPrivateThreads(ctx context.Context, channelID string, fn func([]discord.Channel) error) error
+	Channel(ctx context.Context, channelID string) (discord.Channel, error)
 	MessagesAfter(ctx context.Context, channelID, afterID string, limit int) ([]discord.Message, error)
+	MessagesBefore(ctx context.Context, channelID, beforeID string, limit int) ([]discord.Message, error)
 	MessagesAround(ctx context.Context, channelID, aroundID string, limit int) ([]discord.Message, error)
 }
 
