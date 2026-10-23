@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.authcheck import (
     auth_status,
@@ -92,7 +93,7 @@ async def test_auth_status_none_with_exit_1(tmp_path: Path) -> None:
         "print(json.dumps({'loggedIn': False, 'authMethod': 'none'}))\n"
         "sys.exit(1)",
     )
-    method = await auth_status(prog, {"PATH": "/usr/bin"}, tmp_path, 5.0)
+    method = await auth_status(prog, {"PATH": "/usr/bin"}, tmp_path, PATIENCE)
     assert method == "none"
     assert decide("organization", method) == "runtime_not_authenticated"
 
@@ -114,7 +115,7 @@ async def test_auth_status_passes_env_and_args(tmp_path: Path) -> None:
         f"open({str(out)!r}, 'w').write(json.dumps(seen))\n"
         "print(json.dumps({'authMethod': 'api_key'}))",
     )
-    assert await auth_status(prog, {"ANTHROPIC_API_KEY": "k"}, tmp_path, 5.0) == "api_key"
+    assert await auth_status(prog, {"ANTHROPIC_API_KEY": "k"}, tmp_path, PATIENCE) == "api_key"
     seen = json.loads(out.read_text())
     assert seen["argv"] == ["auth", "status"]
     assert seen["env"]["ANTHROPIC_API_KEY"] == "k"

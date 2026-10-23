@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pytest
+from bothy_sdk.testing._patience import PATIENCE
 
 from .conftest import API_KEY, World
 
@@ -100,9 +101,9 @@ async def test_br_05_counter_check_aborts_turn(world: World, stubborn: bool) -> 
         ignore_sigint=stubborn,
         ignore_sigterm=stubborn,
     )
-    # A turn that honours SIGINT gets a long grace, so a loaded machine cannot
+    # A turn that honours SIGINT gets the patience as its grace, so a loaded machine cannot
     # escalate to SIGTERM before Fake-Claude has recorded its SIGINT end.
-    await world.start(world.config(stop_grace="1s" if stubborn else "20s"))
+    await world.start(world.config(stop_grace="1s" if stubborn else f"{int(PATIENCE)}s"))
     run = await world.fake.trigger("Hello", channel_id=world.forum_a)
     assert await world.ended(run.run_id) == "failed"
     assert world.fake.run_state(run.run_id).state_reason == "billing_mode_mismatch"

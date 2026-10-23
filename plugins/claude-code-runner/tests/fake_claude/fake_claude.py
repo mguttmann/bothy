@@ -23,6 +23,7 @@ Fixtures are constructed from the message shapes of the Agent SDK reference, not
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
@@ -30,6 +31,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -50,12 +52,12 @@ class Fake:
 
     def record(self, kind: str, **data: Any) -> None:
         entry = {"kind": kind, "pid": os.getpid(), "t": time.monotonic(), **data}
-        with self.lock, self.capture.open("a", encoding="utf-8") as fh:
+        with _no_sigint(), self.lock, self.capture.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry) + "\n")
             fh.flush()
 
     def emit(self, message: dict[str, Any]) -> None:
-        with self.lock:
+        with _no_sigint(), self.lock:
             sys.stdout.write(json.dumps(message) + "\n")
             sys.stdout.flush()
 
@@ -210,6 +212,17 @@ class Fake:
                 continue
             out.append(line)
         return out
+
+
+@contextlib.contextmanager
+def _no_sigint() -> Iterator[None]:
+    """Hold SIGINT back during a write: its handler writes too, and a handler that ran inside
+    a blocked flush of the same buffer would die on a reentrant call (on a slow machine)."""
+    old = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
+    try:
+        yield
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, old)
 
 
 def _after(argv: list[str], flag: str) -> str | None:

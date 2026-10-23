@@ -75,7 +75,7 @@ async def test_terminate_sigint_first(tmp_path: Path) -> None:
     )
     turn = start(tmp_path, code)
     await _until_line(turn, "up")
-    await terminate(turn, stop_grace=5.0, kill_grace=5.0, poll=0.02)
+    await terminate(turn, stop_grace=PATIENCE, kill_grace=PATIENCE, poll=0.02)
     assert turn.poll() == 130
     assert "int" in turn.paths.stream.read_text()
 

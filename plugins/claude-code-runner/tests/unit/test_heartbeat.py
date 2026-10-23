@@ -10,6 +10,7 @@ from uuid import UUID
 import pytest
 from bothy_sdk.generated.models import ProjectReadiness
 from bothy_sdk.heartbeat import build_heartbeat
+from bothy_sdk.testing._patience import PATIENCE
 
 from claude_code_runner.heartbeat import (
     CAPABILITIES,
@@ -83,7 +84,7 @@ def script(tmp_path: Path, body: str) -> str:
 )
 async def test_probe(tmp_path: Path, output: str, reasons: tuple[str, ...]) -> None:
     prog = script(tmp_path, f"print({output!r})")
-    probe = await probe_version(prog, {}, tmp_path, 5.0)
+    probe = await probe_version(prog, {}, tmp_path, PATIENCE)
     assert probe.reasons == reasons
     assert probe.blocking is ("runtime_version_unsupported" in reasons)
 
@@ -94,5 +95,7 @@ async def test_probe_unreachable(tmp_path: Path) -> None:
     slow = script(tmp_path, "import time\ntime.sleep(30)")
     assert (await probe_version(slow, {}, tmp_path, 0.3)).blocking
     failing = script(tmp_path, "import sys\nsys.exit(1)")
-    assert (await probe_version(failing, {}, tmp_path, 5.0)).reasons == ("runtime_unreachable",)
+    assert (await probe_version(failing, {}, tmp_path, PATIENCE)).reasons == (
+        "runtime_unreachable",
+    )
     assert MIN_CLAUDE_CODE_VERSION <= PINNED_CLAUDE_CODE_VERSION
