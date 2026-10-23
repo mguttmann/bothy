@@ -149,7 +149,7 @@ All five run on the queue `delivery` (02 12.2, 12.3):
 
 - M3-20 (`adapters/apns`, see "APNs adapter") and M3-21 (`adapters/fcm`) implement `PushProvider` and map their answers onto the result classes; until a provider is registered, every `notify.push_send` ends with `no_provider`.
 - M3-22 adds the writes of `PushRegistrations` (`registerPush`, `unregisterPush`), the preview token and endpoint (with `BadgeCounter.For`) and the deactivation on logout, device revocation and user disable.
-- M3-23 replaces `presence.None` with the gateway's `presence.View` and `FailClosedRoutes` with `notification.created` and the delayed push.
+- M3-23 replaces `presence.None` with the gateway's `presence.View` and `FailClosedRoutes` with `notification.created` and the delayed push (built, see "Desktop hints over the gateway").
 - M3-24 adds the delivery measurement of 13 9.
 
 ### Rulings
@@ -203,6 +203,54 @@ Structs, not maps: `aps` with `alert` (`title-loc-key` `PUSH_TITLE`, `loc-key` `
 
 D-M3-20-0 to D-M3-20-8 in [docs/decisions.d/M3-20.md](../../../../docs/decisions.d/M3-20.md) ("M3-20 APNs adapter with Fake-APNs").
 
+## Desktop hints over the gateway (M3-23)
+
+### Live routes
+
+`app.NewLiveRoutes` implements `LiveRoutes` inside the unit of work of the round (the consumer
+round and the flush job); both methods only insert jobs, so jobs and cursor commit together:
+
+- `Gateway`: one job `notify.gateway_send` per hint and recipient, inserted unique (the other
+  connected devices of the same hint add nothing).
+- `Delayed`: one `notify.push_send` per registration of the route, scheduled at the end of
+  `notify.mobile_delay_when_desktop_active` with `DueAt` at the same time and `ReleaseSeq` =
+  `Hint.MessageSeq`, the thread sequence of the message the hint points at.
+
+### Job `notify.gateway_send`
+
+Step 1 in a unit of work: older than `push.max_age` gives `expired`; a recipient who is no longer
+an active human, a denied `push.deliver` on the thread (principal of a human without a request,
+filter mode) or a failed recipient rule of R-AZ-30 for `security` and `admin` gives `no_access`;
+the same function as the send step of `notify.push_send` decides (`mayDeliver`). Step 2 outside
+any transaction: without a publisher in the process (role `worker`) the skip `no_registration`
+with one Warn line per process, otherwise `notification.created` once to the recipient (audience
+self; resource the thread, or the recipient for a hint without a thread). A connection that ended
+meanwhile gets nothing and no fallback push. The payload holds `nid`, `kind`, `thread_id`,
+`message_id`, `target_id`, `quiet` and `count`; the preview fields of 13 6.4 are absent until
+M3-22 adds them with its preview builder.
+
+### Release check of delayed pushes
+
+`notify.push_send` with `ReleaseSeq > 0` reads, after the registration, age and access checks and
+before the provider lookup, the read position `max(read_states.last_read_seq,
+threads.unread_floor_seq)` and ends with the skip reason `read` when it reached `ReleaseSeq`
+(`domain.ReleaseDelayed`). An immediate push reads nothing extra; nothing else is evaluated again.
+
+### Role table
+
+| `server.role` | `presence.View` | `LiveRoutes` | publisher for `notify.gateway_send` |
+|---|---|---|---|
+| `all` | the gateway's `PresenceView` | `app.NewLiveRoutes` | the gateway's `EphemeralPublisher` |
+| `worker` | `presence.None` | `FailClosedRoutes` (M3-19) | none |
+| `api` | not wired (no consumer `push`) | not wired | not wired (no job execution) |
+
+A worker without presence logs `presence unavailable in this role: hints go by push only` once at
+start. Until M7-17 separate roles and several api nodes reach desktops only by push (RK-37).
+
+### Rulings
+
+D-M3-23-1 to D-M3-23-12 in [docs/decisions.d/M3-23.md](../../../../docs/decisions.d/M3-23.md) ("M3-23 Desktop hints over the gateway").
+
 ## Port (root package `internal/notify`)
 
 - Inbound: `Preferences`, `QuietHours`, `PushRegistrations`.
@@ -240,6 +288,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 | Job | Trigger | Queue |
 |---|---|---|
 | `notify.push_send` | consumer `push`, `notify.coalesce_flush`, `notify.badge_sync` | `delivery` |
+| `notify.gateway_send` | consumer `push`, `notify.coalesce_flush` (gateway route, M3-23) | `delivery` |
 | `notify.coalesce_window` | consumer `push`, `notify.coalesce_flush` | `delivery` |
 | `notify.coalesce_flush` | consumer `push` | `delivery` |
 | `notify.badge_sync` | consumer `push` | `delivery` |

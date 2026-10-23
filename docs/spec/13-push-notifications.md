@@ -223,12 +223,21 @@ mention of a person without read permission creates nothing and reveals nothing
   desktop window that is open but unused should keep receiving live box patches, but
   not count as "person is watching". When a client reports `idle` is defined by
   [15-client-architecture.md](15-client-architecture.md).
+  As built (M3-23): a connection counts from `catchup.complete` on (phase `live` of
+  [04-sync-protocol.md](04-sync-protocol.md) 7.2), only for a human with a device and not while
+  it closes; a connection that never sent `focus` has an empty focus and is not `idle`, so a
+  connected desktop that never reported `idle` counts as active (docs/DECISIONS.md D-M3-23-2).
 - **Desktop active:** a device with `platform IN ('macos','windows')` is connected and not
   `idle`. Then pushes to mobile devices go out only after `notify.mobile_delay_when_desktop_active`.
   If the notification has been read by then (the read position of 03 `read_states`, the greater
   of `last_read_seq` and `threads.unread_floor_seq`, is at least the thread sequence of the
   message; docs/DECISIONS.md D-M3-17-6), it is dropped. Reason: whoever sits at the computer does
   not want the phone to buzz at the same time.
+  As built (M3-23): the delayed push is one `notify.push_send` per registration, scheduled at the
+  end of the delay (also t0 of section 9), carrying the thread sequence of the message; at send
+  time it ends with the skip reason `read` when the read position reached that sequence. Nothing
+  else is evaluated again at the end of the delay; a quiet hint stays quiet (docs/DECISIONS.md
+  D-M3-23-5).
 - **Notifications without thread:** `security` and `admin` point at no thread, so "Active in the
   thread" does not apply to them; "Desktop active" and the delivery path per device do
   (docs/DECISIONS.md D-M3-17-2).
@@ -282,6 +291,11 @@ For every active device of r (`devices.state = 'active'`):
 1. If the device currently has a gateway connection, the ephemeral event
    `notification.created` goes over this connection (6.3; 05 section 6). The
    app shows its own notification or an in-app banner. No push for this device.
+   As built (M3-23): the round inserts one job `notify.gateway_send` per hint and recipient (unique,
+   however many devices are connected); after the commit it checks the rights of that moment and
+   publishes `notification.created` once to every live connection of the recipient. A connection
+   that ended in between gets nothing and no fallback push (at most once; docs/DECISIONS.md
+   D-M3-23-3).
 2. Otherwise a push goes to every active push registration of the device (`disabled_at IS NULL`).
 3. If the device has neither a connection nor a registration (for example the Windows app is closed),
    nothing is created. Unread counters show it on the next opening.
@@ -462,6 +476,15 @@ Ephemeral, only to connections of the recipient (`audience = self`), receive act
 ([05-actions.md](05-actions.md) section 6, ephemeral events). Payload: `nid`, `kind`, `thread_id`, `message_id`, `quiet`, `count` and the
 preview fields from 6.4. The preview may come along here because the connection is authenticated and
 `message.read` has already been checked; there is no third party on the way.
+
+As built (M3-23): the envelope resource is the thread; for a hint without a thread (`security`,
+`admin`) it is the recipient (`user`, R-AZ-30), and such a hint goes only to the recipient's own
+connections without a `push.deliver` check, because the job checked the recipient rule of R-AZ-30
+with the rights of that moment (docs/DECISIONS.md D-M3-23-6). The payload member `target_id` names
+the target of a hint without a thread: the waiting device for `security`, the grant or group of
+the reminder for `admin`. The preview fields come from the builder of 6.4, which M3-22 adds to
+`notification.created`; until then they are absent and the client shows the hint from its synced
+data (docs/DECISIONS.md D-M3-23-8).
 
 ### 6.4 Preview endpoint and preview token
 
@@ -748,6 +771,20 @@ no person, device or thread IDs.
    `presence.None`, which reports no connection, so no decision yields the routes over the gateway or the delayed
    push; the default receiver of those routes fails closed and rolls the round back
    (docs/DECISIONS.md D-M3-19-9).
+   As built (M3-23): the gateway implements `presence.View` over its hub, and `internal/wire`
+   wires it only where the hub and the consumer `push` share the process (docs/DECISIONS.md
+   D-M3-23-1):
+
+   | `server.role` | `presence.View` | live routes | publisher of `notify.gateway_send` |
+   |---|---|---|---|
+   | `all` | the gateway's `PresenceView` | `notify`'s live routes | the gateway's `EphemeralPublisher` |
+   | `worker` | `presence.None` | the fail-closed default of M3-19 | none |
+   | `api` | not wired (no consumer `push`) | not wired | not wired (no job execution) |
+
+   With separate roles and with several api nodes the worker sees no live connection, so every
+   device with an active push registration is reached by push until M7-17 brings a shared
+   presence state; with `cluster.mode = multi` and role `all` the view sees the connections of
+   its own node only (RK-37).
 
 5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with
    retries according to section 7. HTTP/2 connections to APNs stay open and are shared; at most `push.max_concurrent_requests` at the same time.
