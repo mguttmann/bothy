@@ -98,7 +98,7 @@ read `design/build/tokens.resolved.json`, which also selects `server`). Shared s
 `uv.lock`, `conftest.py`) and any tool folder the map does not name yet. A release (`release.yml` calls `ci.yml`)
 runs the jobs of the components of its tag. Documentation (`docs/` outside `docs/api/`, `infra/`,
 the root Markdown files, `LICENSE`, `NOTICE`) needs no conditional job, except the files the map
-assigns to a component (for example `docs/spec/actions.yaml` to `server`). The plan reads the diff
+assigns to a component (for example `docs/spec/actions.yaml` to `server`, and `infra/compose/` and `infra/otel/` to `server`, whose terminal suite starts that stack, M2-48). The plan reads the diff
 without rename detection, so a moved file counts for its old and its new path. A build branch
 (`build-verify.yml`) measures from the merge base with `build-base/<ticket>` when the build team
 pushed that ref before it (the integration head the ticket branch was built on), else from the
