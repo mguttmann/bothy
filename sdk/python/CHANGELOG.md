@@ -17,23 +17,6 @@ documented in this file. The format is based on
 ### Added
 
 - Generated models of the personal event `gdpr.request_due` (R-AZ-35).
-- Run loop hooks for the Claude Code runner (M2-34): `RunRefused(reason)` ends a run from
-  `prepare` with exactly that reason (or, without one, closes the entry without `finishRun`);
-  `AgentHandler.on_not_started` frees what `prepare` took when a run does not reach `execute`;
-  `AgentHandler.runtime_status` with `RuntimeStatus` supplies the heartbeat members that change
-  at run time (`state`, degraded reasons, `runtime_version`, `billing_modes_supported`,
-  `project_readiness`); `Adapter.send_heartbeat` sends one at once; `AgentHandler.on_ready`
-  follows every ready source.
-- FakeServer parts for the runner scenarios (M2-34): served forums with a project binding
-  (`add_forum`, `update_forum` with `agent.config_changed`, `remove_channel`), the routes
-  `getMe`, `downloadFile`, `getThread`, `setThreadTitle` and `reportAgentSession`, files with a
-  scan status (`add_file`), triggers in a forum, in an existing thread, with attachments or with
-  `trigger_kind` `interaction`, the thread's current agent session in the payload, a context per
-  run (`set_context`), `startRun` with `external_session_ref` (M2-12) and `finishRun` with
-  `costs` behind the switch `FakeServer(costs=True)` (the server books costs from M2-22 on).
-- FakeServer fault `Fault.problem(code, reason)`: the next calls of an operation answer that
-  problem and store nothing; `trigger(context=...)` serves a given run context and
-  `add_file(transcript=...)` a voice transcript (M2-34).
 - Generated core `bothy_sdk.generated` from `docs/api/openapi.yaml` (openapi-python-client
   0.29.1, standard settings): models and sync and async functions of every REST operation.
 - `make generate` and `make generate-check` (gate G4: drift check, compileall, mypy).
