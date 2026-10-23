@@ -6,13 +6,15 @@ library;
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
+import '../menus/channel_menu.dart';
 import 'sidebar_model.dart';
 
 /// The row of [entry], indented below its space.
 ///
 /// The row shows the states of components.md 7 (read, unread, mentions, active run, muted,
 /// selected) and the label `<Name>, <n> unread, <m> mentions, run active`; a click or Enter
-/// calls [onOpen] (the router path `/c/<id>`, brief M4-19 Design note 5).
+/// calls [onOpen] (the router path `/c/<id>`, brief M4-19 Design note 5). A right click, the
+/// menu key or Shift+F10 opens the channel's menu (M4-33).
 class ChannelEntry extends StatelessWidget {
   /// Creates the entry.
   const ChannelEntry({
@@ -37,11 +39,14 @@ class ChannelEntry extends StatelessWidget {
       start: DsSpace.s16,
       end: DsSpace.s4,
     ),
-    child: DsChannelRow(
-      entry.rowData,
-      key: ValueKey('sidebar.channel.${entry.channel.id.value}'),
-      selected: selected,
-      onOpen: onOpen,
+    child: ChannelMenu(
+      channel: entry.channel,
+      child: DsChannelRow(
+        entry.rowData,
+        key: ValueKey('sidebar.channel.${entry.channel.id.value}'),
+        selected: selected,
+        onOpen: onOpen,
+      ),
     ),
   );
 }

@@ -74,7 +74,7 @@ void registerNotifyHandlers(RestFake rest, ActionCatalog catalog) {
       }
       if (!(world.channels[channelId]!.capabilities[me]?.contains('export') ??
           false)) {
-        throw const FakeProblem(403, 'forbidden', reason: 'missing_capability');
+        throw const FakeProblem(403, 'forbidden', reason: 'capability_missing');
       }
       requireCatalogStepUp(r, rest.contract, catalog);
       final from = DateTime.tryParse(r.query('from') ?? '');

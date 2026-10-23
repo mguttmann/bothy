@@ -99,7 +99,7 @@ void main() {
       expect(counts, const ThreadCounts(unread: 7, mentions: 3));
     });
 
-    test('muted only by the own row with level mute, not expired', () {
+    test('muted by the own row whose level after 13 3.1 is mute (M4-33)', () {
       NotificationPreference pref(
         NotificationLevel level, {
         DateTime? until,
@@ -112,27 +112,17 @@ void main() {
         version: const ResourceVersion(1),
       );
       final now = t0;
+      final later = now.add(const Duration(hours: 1));
+      final earlier = now.subtract(const Duration(minutes: 1));
       bool muted(List<NotificationPreference> prefs) =>
           isMuted(channelId(1), prefs, now: now);
       expect(muted([pref(NotificationLevel.mute)]), isTrue);
-      expect(
-        muted([
-          pref(
-            NotificationLevel.mute,
-            until: now.add(const Duration(hours: 1)),
-          ),
-        ]),
-        isTrue,
-      );
-      expect(
-        muted([
-          pref(
-            NotificationLevel.mute,
-            until: now.subtract(const Duration(minutes: 1)),
-          ),
-        ]),
-        isFalse,
-      );
+      expect(muted([pref(NotificationLevel.mute, until: later)]), isTrue);
+      // A passed muted_until has no effect; the stored level applies (D-M3-18-3).
+      expect(muted([pref(NotificationLevel.mute, until: earlier)]), isTrue);
+      // "Mute until" keeps the level that applies afterwards (D-M4-33-2).
+      expect(muted([pref(NotificationLevel.all, until: later)]), isTrue);
+      expect(muted([pref(NotificationLevel.all, until: earlier)]), isFalse);
       expect(muted([pref(NotificationLevel.mentions)]), isFalse);
       expect(
         muted([

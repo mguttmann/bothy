@@ -25,6 +25,7 @@ import '../files/attachment_tile.dart';
 import '../files/providers.dart';
 import '../files/upload_executor.dart';
 import '../forum/forum_model.dart' show timeLabel;
+import '../menus/thread_menu.dart';
 import '../sidebar/providers.dart';
 import '../telemetry/telemetry_providers.dart';
 import 'delete_confirm.dart';
@@ -508,6 +509,13 @@ class HistoryColumnState extends ConsumerState<HistoryColumn> {
             onColumn: () => ref
                 .read(sessionColumnShownProvider.notifier)
                 .toggle(textThread: textLayout),
+            // The level of the thread, or of the channel for its main history (M4-33).
+            menu: channel == null
+                ? null
+                : TargetMenuButton(
+                    channel: channel,
+                    thread: main ? null : thread.id,
+                  ),
           ),
           Expanded(
             child: items.isEmpty

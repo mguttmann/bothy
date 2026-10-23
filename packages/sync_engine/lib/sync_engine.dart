@@ -98,6 +98,8 @@ export 'src/wire.dart'
         UnreadThread,
         channelViewFromJson,
         messageFromJson,
+        preferenceFromJson,
+        quietHoursFromJson,
         sidebarFromJson,
         snapshotFromJson,
         spaceViewFromJson,
