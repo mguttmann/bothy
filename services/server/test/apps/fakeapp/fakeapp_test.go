@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/egress"
+	"github.com/OWNER/bothy/services/server/internal/platform/testkit"
 	"github.com/OWNER/bothy/services/server/test/apps/fakeapp"
 )
 
@@ -78,7 +79,7 @@ func TestFakeAppVerifiesSignature(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	otherPub, otherPriv, _ := ed25519.GenerateKey(rand.Reader)
 	app := fakeapp.Start(t, []ed25519.PublicKey{otherPub, pub})
-	c := client(t, 5*time.Second, app)
+	c := client(t, testkit.Patience, app)
 	ctx := context.Background()
 	body := []byte(`{"type":"command.invoked"}`)
 	const id = "0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b"
@@ -121,7 +122,7 @@ func TestFakeAppScript(t *testing.T) {
 	t.Parallel()
 	app := fakeapp.Start(t, nil)
 	second := fakeapp.Start(t, nil)
-	c := client(t, 5*time.Second, app, second)
+	c := client(t, testkit.Patience, app, second)
 	ctx := context.Background()
 	app.Respond(
 		fakeapp.Response{Status: http.StatusAccepted},
@@ -168,9 +169,7 @@ func TestFakeAppScript(t *testing.T) {
 	if _, _, err := post(short, c, app.URL("/hooks"), nil, []byte(`{}`)); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("hanging answer ended with %v, want the deadline", err)
 	}
-	wait, cancelWait := context.WithTimeout(ctx, 5*time.Second)
-	defer cancelWait()
-	got, err := app.WaitRequests(wait, 9)
+	got, err := app.WaitRequests(testkit.Context(t), 9)
 	if err != nil || len(got) != 9 {
 		t.Fatalf("WaitRequests = %d %v", len(got), err)
 	}
